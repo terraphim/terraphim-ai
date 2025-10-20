@@ -7,18 +7,18 @@ export let customClass: string = '';
 // Hide button on these paths (home by default)
 export let hideOnPaths: string[] = ['/'];
 
-let _isVisible = true;
+let isVisible = true;
 
 function updateVisibility() {
 	try {
 		const path = window.location?.pathname || '/';
-		_isVisible = !hideOnPaths.includes(path);
+		isVisible = !hideOnPaths.includes(path);
 	} catch (_) {
-		_isVisible = true;
+		isVisible = true;
 	}
 }
 
-function _goBack() {
+function goBack() {
 	// Try to go back in browser history, fallback to specified path
 	if (window.history.length > 1) {
 		window.history.back();
@@ -27,37 +27,25 @@ function _goBack() {
 	}
 }
 
-// Initialize visibility immediately
-updateVisibility();
-
 onMount(() => {
-	// Update visibility again on mount in case window object is ready
 	updateVisibility();
-
-	const handleVisibilityUpdate = () => {
-		updateVisibility();
-		// Force Svelte to re-render by updating a reactive variable
-		_isVisible = _isVisible; // This triggers reactivity
-	};
-
-	window.addEventListener('popstate', handleVisibilityUpdate);
-	window.addEventListener('hashchange', handleVisibilityUpdate);
-
+	window.addEventListener('popstate', updateVisibility);
+	window.addEventListener('hashchange', updateVisibility);
 	return () => {
-		window.removeEventListener('popstate', handleVisibilityUpdate);
-		window.removeEventListener('hashchange', handleVisibilityUpdate);
+		window.removeEventListener('popstate', updateVisibility);
+		window.removeEventListener('hashchange', updateVisibility);
 	};
 });
 </script>
 
-{#if _isVisible}
+{#if isVisible}
 	<button
 		class="button is-light back-button {customClass}"
-		on:click={_goBack}
+		on:click={goBack}
 		on:keydown={(e) => {
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
-				_goBack();
+				goBack();
 			}
 		}}
 		title="Go back"

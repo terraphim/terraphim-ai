@@ -1368,43 +1368,61 @@ impl TerraphimService {
                         }
                     } else {
                         // Local document: Try direct persistence lookup first
-                        let mut placeholder = Document {
-                            id: document.id.clone(),
-                            ..Default::default()
-                        };
-                        if let Ok(persisted_doc) = placeholder.load().await {
-                            if let Some(better_description) = persisted_doc.description {
-                                log::debug!("Replaced ripgrep description for '{}' with persistence description", document.title);
-                                document.description = Some(better_description);
-                            }
-                        } else {
-                            // Try normalized ID based on document title (filename)
-                            // For KG files, the title might be "haystack" but persistence ID is "haystackmd"
-                            let normalized_id = normalize_filename_to_id(&document.title);
+                        let should_lookup_persistence = document
+                            .get_source_haystack()
+                            .and_then(|source| {
+                                role.haystacks
+                                    .iter()
+                                    .find(|haystack| haystack.location == *source)
+                            })
+                            .map(|haystack| haystack.fetch_content)
+                            .unwrap_or(true);
 
-                            let mut normalized_placeholder = Document {
-                                id: normalized_id.clone(),
+                        if !should_lookup_persistence {
+                            log::trace!(
+                                "Skipping persistence lookup for '{}' (haystack fetch_content=false)",
+                                document.title
+                            );
+                        } else {
+                            let mut placeholder = Document {
+                                id: document.id.clone(),
                                 ..Default::default()
                             };
-                            if let Ok(persisted_doc) = normalized_placeholder.load().await {
+                            if let Ok(persisted_doc) = placeholder.load().await {
                                 if let Some(better_description) = persisted_doc.description {
-                                    log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized from title: {})", document.title, normalized_id);
+                                    log::debug!("Replaced ripgrep description for '{}' with persistence description", document.title);
                                     document.description = Some(better_description);
                                 }
                             } else {
-                                // Try with "md" suffix for KG files (title "haystack" -> ID "haystackmd")
-                                let normalized_id_with_md = format!("{}md", normalized_id);
-                                let mut md_placeholder = Document {
-                                    id: normalized_id_with_md.clone(),
+                                // Try normalized ID based on document title (filename)
+                                // For KG files, the title might be "haystack" but persistence ID is "haystackmd"
+                                let normalized_id = normalize_filename_to_id(&document.title);
+
+                                let mut normalized_placeholder = Document {
+                                    id: normalized_id.clone(),
                                     ..Default::default()
                                 };
-                                if let Ok(persisted_doc) = md_placeholder.load().await {
+                                if let Ok(persisted_doc) = normalized_placeholder.load().await {
                                     if let Some(better_description) = persisted_doc.description {
-                                        log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized with md: {})", document.title, normalized_id_with_md);
+                                        log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized from title: {})", document.title, normalized_id);
                                         document.description = Some(better_description);
                                     }
                                 } else {
-                                    log::debug!("No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')", document.title, document.id, normalized_id, normalized_id_with_md);
+                                    // Try with "md" suffix for KG files (title "haystack" -> ID "haystackmd")
+                                    let normalized_id_with_md = format!("{}md", normalized_id);
+                                    let mut md_placeholder = Document {
+                                        id: normalized_id_with_md.clone(),
+                                        ..Default::default()
+                                    };
+                                    if let Ok(persisted_doc) = md_placeholder.load().await {
+                                        if let Some(better_description) = persisted_doc.description
+                                        {
+                                            log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized with md: {})", document.title, normalized_id_with_md);
+                                            document.description = Some(better_description);
+                                        }
+                                    } else {
+                                        log::debug!("No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')", document.title, document.id, normalized_id, normalized_id_with_md);
+                                    }
                                 }
                             }
                         }

@@ -1,85 +1,86 @@
 <script lang="ts">
-import { createEventDispatcher } from 'svelte';
-import { Modal } from 'svelma';
-import type { ContextItem } from './Chat.svelte';
+  import { Modal } from "svelma";
+  import { createEventDispatcher } from 'svelte';
+  import type { ContextItem } from './Chat.svelte';
 
-export let active: boolean = false;
-export const context: ContextItem | null = null;
-export const mode: 'create' | 'edit' = 'edit';
+  export let active: boolean = false;
+  export let context: ContextItem | null = null;
+  export let mode: 'create' | 'edit' = 'edit';
 
-const dispatch = createEventDispatcher();
+  const dispatch = createEventDispatcher();
 
-// Form data
-let editingContext: ContextItem | null = null;
-const _contextTypeOptions = [
-	{ value: 'Document', label: 'Document' },
-	{ value: 'SearchResult', label: 'Search Result' },
-	{ value: 'UserInput', label: 'User Input' },
-	{ value: 'System', label: 'System' },
-	{ value: 'External', label: 'External' },
-];
+  // Form data
+  let editingContext: ContextItem | null = null;
+  let contextTypeOptions = [
+    { value: 'Document', label: 'Document' },
+    { value: 'SearchResult', label: 'Search Result' },
+    { value: 'UserInput', label: 'User Input' },
+    { value: 'System', label: 'System' },
+    { value: 'External', label: 'External' }
+  ];
 
-// Initialize form data when modal becomes active
-$: if (active && context) {
-	editingContext = {
-		...context,
-		// Ensure we have a proper copy
-		metadata: { ...context.metadata },
-	};
-} else if (active && mode === 'create') {
-	// Initialize new context item
-	editingContext = {
-		id: '',
-		context_type: 'UserInput',
-		title: '',
-		summary: '',
-		content: '',
-		metadata: {},
-		created_at: new Date().toISOString(),
-		relevance_score: null,
-	};
-}
+  // Initialize form data when modal becomes active
+  $: if (active && context) {
+    editingContext = {
+      ...context,
+      // Ensure we have a proper copy
+      metadata: { ...context.metadata }
+    };
+  } else if (active && mode === 'create') {
+    // Initialize new context item
+    editingContext = {
+      id: '',
+      context_type: 'UserInput',
+      title: '',
+      summary: '',
+      content: '',
+      metadata: {},
+      created_at: new Date().toISOString(),
+      relevance_score: null
+    };
+  }
 
-// Validation
-$: isValid =
-	editingContext && editingContext.title.trim() !== '' && editingContext.content.trim() !== '';
+  // Validation
+  $: isValid = editingContext &&
+    editingContext.title.trim() !== '' &&
+    editingContext.content.trim() !== '';
 
-function handleClose() {
-	active = false;
-	editingContext = null;
-	dispatch('close');
-}
+  function handleClose() {
+    active = false;
+    editingContext = null;
+    dispatch('close');
+  }
 
-function handleSave() {
-	if (!isValid || !editingContext) return;
+  function handleSave() {
+    if (!isValid || !editingContext) return;
 
-	if (mode === 'edit') {
-		dispatch('update', editingContext);
-	} else {
-		dispatch('create', editingContext);
-	}
+    if (mode === 'edit') {
+      dispatch('update', editingContext);
+    } else {
+      dispatch('create', editingContext);
+    }
 
-	handleClose();
-}
+    handleClose();
+  }
 
-function _handleDelete() {
-	if (mode === 'edit' && context) {
-		dispatch('delete', context.id);
-		handleClose();
-	}
-}
+  function handleDelete() {
+    if (mode === 'edit' && context) {
+      dispatch('delete', context.id);
+      handleClose();
+    }
+  }
 
-// Handle keyboard shortcuts
-function _handleKeydown(event: KeyboardEvent) {
-	if (event.key === 'Escape') {
-		handleClose();
-	} else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-		handleSave();
-	}
-}
+  // Handle keyboard shortcuts
+  function handleKeydown(event: KeyboardEvent) {
+    if (event.key === 'Escape') {
+      handleClose();
+    } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+      handleSave();
+    }
+  }
 </script>
 
-<svelte:window on:keydown={_handleKeydown} />
+<svelte:window on:keydown={handleKeydown} />
 
 <Modal {active} on:close={handleClose}>
   <div class="modal-card">
