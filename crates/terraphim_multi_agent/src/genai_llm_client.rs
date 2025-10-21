@@ -6,8 +6,8 @@
 
 use crate::{LlmRequest, LlmResponse, MessageRole, MultiAgentError, MultiAgentResult, TokenUsage};
 use chrono::Utc;
-use genai::Client;
 use genai::chat::{ChatMessage, ChatOptions, ChatRequest};
+use genai::Client;
 use uuid::Uuid;
 
 /// Rust-GenAI LLM client that works with multiple providers
