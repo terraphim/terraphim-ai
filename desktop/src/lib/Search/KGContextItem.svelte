@@ -1,5 +1,6 @@
 <script lang="ts">
 import { createEventDispatcher } from 'svelte';
+import { Tag, Button } from 'svelma';
 
 export let contextItem: KGContextItem;
 export const removable: boolean = true;
@@ -266,7 +267,7 @@ $: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 
     <div class="context-actions">
       <Button
         type="is-ghost"
-        on:click={handleViewDetails}
+        on:click={_handleViewDetails}
         title="View details"
       >
         👁️
@@ -275,7 +276,7 @@ $: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 
       {#if removable}
         <Button
           type="is-ghost"
-          on:click={handleRemove}
+          on:click={_handleRemove}
           title="Remove from context"
         >
           ❌
@@ -327,15 +328,15 @@ $: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 
 
       <div class="kg-index-stats {compact ? 'compact' : ''}">
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_terms)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_terms)}</div>
           <div class="stat-label">Terms</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_nodes)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_nodes)}</div>
           <div class="stat-label">Nodes</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_edges)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_edges)}</div>
           <div class="stat-label">Edges</div>
         </div>
         <div class="stat-item">
@@ -361,7 +362,7 @@ $: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 
   </div>
 
   <div class="context-meta {compact ? 'compact' : ''}">
-    <span>Added {formatDate(contextItem.created_at)}</span>
+    <span>Added {_formatDate(contextItem.created_at)}</span>
 
     {#if contextItem.relevance_score}
       <span class="relevance-score">

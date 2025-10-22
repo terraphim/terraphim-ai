@@ -3,6 +3,8 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { CONFIG } from '../../config';
 import type { Haystack, Role } from '../generated/types';
 import type { Document } from './SearchResult';
+import { Modal, Message, Button, Input, Field } from 'svelma';
+import { role, configStore, is_tauri } from '$lib/stores';
 
 export let active: boolean = false;
 export let document: Document;
@@ -214,7 +216,7 @@ async function _saveToAtomic() {
 		}, 2000);
 	} catch (err) {
 		console.error('❌ Failed to save article to atomic server:', err);
-		_error = err.message || 'Failed to save article to atomic server';
+		_error = (err as Error).message || 'Failed to save article to atomic server';
 	} finally {
 		saving = false;
 	}
@@ -227,7 +229,7 @@ function _handleClose() {
 }
 </script>
 
-<Modal bind:active on:close={handleClose}>
+<Modal bind:active on:close={_handleClose}>
   <div class="box">
     <!-- Header -->
     <div class="level">
@@ -245,7 +247,7 @@ function _handleClose() {
         <div class="level-item">
           <button
             class="delete is-large"
-            on:click={handleClose}
+            on:click={_handleClose}
             disabled={saving}
             aria-label="close"
           ></button>
@@ -254,7 +256,7 @@ function _handleClose() {
     </div>
 
     <!-- Success Message -->
-    {#if success}
+    {#if _success}
       <Message type="is-success">
         <p><strong>Success!</strong> Article saved to atomic server successfully.</p>
         <p>The modal will close automatically...</p>
@@ -262,14 +264,14 @@ function _handleClose() {
     {/if}
 
     <!-- Error Message -->
-    {#if error}
+    {#if _error}
       <Message type="is-danger">
-        <p><strong>Error:</strong> {error}</p>
+        <p><strong>Error:</strong> {_error}</p>
       </Message>
     {/if}
 
     <!-- Main Content -->
-    {#if !success}
+    {#if !_success}
       <!-- Document Preview -->
       <div class="field">
         <div class="label">Document to Save</div>
@@ -385,7 +387,7 @@ function _handleClose() {
             <div class="control">
               <div class="select is-fullwidth">
                 <select bind:value={selectedParent} disabled={saving}>
-                  {#each predefinedParents as parent}
+                  {#each _predefinedParents as parent}
                     <option value={parent.value}>{parent.label}</option>
                   {/each}
                 </select>
@@ -415,7 +417,7 @@ function _handleClose() {
               type="is-primary"
               loading={saving}
               disabled={saving || !articleTitle.trim() || !selectedAtomicServer}
-              on:click={saveToAtomic}
+              on:click={_saveToAtomic}
             >
               <span class="icon">
                 <i class="fas fa-cloud-upload-alt"></i>
@@ -427,7 +429,7 @@ function _handleClose() {
             <Button
               type="is-light"
               disabled={saving}
-              on:click={handleClose}
+            on:click={_handleClose}
             >
               Cancel
             </Button>
