@@ -63,7 +63,7 @@ lru = "0.16"
 [dev-dependencies]
 tokio-test = "0.4.4"
 serial_test = "3.1.1"
-tempfile = "3.12.0"
+tempfile = "3.23.0"
 mockall = "0.13.1"
 
 [features]
