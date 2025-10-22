@@ -25,6 +25,6 @@ default = []
 onepassword = ["terraphim_onepassword_cli", "tokio"]
 
 [dev-dependencies]
-tempfile="3.2.0"
+tempfile="3.23.0"
 envtestkit = "1.1.2"
 test-log = "0.2.14"
