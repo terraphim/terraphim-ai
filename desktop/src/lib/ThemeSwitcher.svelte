@@ -61,9 +61,12 @@ function updateStoresFromConfig(config: ConfigResponse['config']) {
 	// Convert the roles map (keyed by role name) to an array and inject the
 	// `name` field so that each entry is self-contained. This makes look-ups by
 	// role name trivial later on.
-	const rolesArray = Object.entries(config.roles).map(([name, settings]) => ({
-		name,
+	const rolesArray = Object.entries(config.roles).map(([roleName, settings]) => ({
 		...settings,
+		name: {
+			original: roleName,
+			lowercase: roleName.toLowerCase(),
+		},
 	}));
 	roles.set(rolesArray);
 	role.set(config.selected_role);
