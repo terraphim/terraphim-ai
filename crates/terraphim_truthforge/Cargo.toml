@@ -21,7 +21,7 @@ futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+redis = { version = "0.29", features = ["tokio-comp", "connection-manager"] }
 
 rig-core = "0.1"
 
