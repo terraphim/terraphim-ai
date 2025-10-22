@@ -28,7 +28,7 @@ strsim = "0.11"
 log = "0.4"
 wasm-bindgen-futures = "0.4.1"
 wasm-bindgen = { version = "0.2.51" }
-cached = { version = "0.47.0", features = ["proc_macro", "async", "serde", "ahash"] }
+cached = { version = "0.56.0", features = ["proc_macro", "async", "serde", "ahash"] }
 tsify = { version = "0.5", features = ["js"], optional = true }
 
 [[bench]]
