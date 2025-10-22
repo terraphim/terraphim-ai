@@ -12,7 +12,7 @@
 		"build": "vite build",
 		"build:ci": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
 		"build:minimal": "vite build --mode minimal",
-	"build:ultra-minimal": "vite build --mode ultra-minimal",
+		"build:ultra-minimal": "vite build --mode ultra-minimal",
 		"preview": "vite preview",
 		"tauri": "tauri",
 		"tauri:dev": "tauri dev",
@@ -63,6 +63,7 @@
 		"svelte": "^4.2.19",
 		"svelte-check": "^3.8.6",
 		"svelte-preprocess": "^6.0.2",
+		"terser": "^5.44.0",
 		"tslib": "^2.5.0",
 		"typescript": "^5.0.4",
 		"vite": "^5.4.20"
@@ -105,26 +106,58 @@
 		"rollup-plugin-css-only": "^4.5.2",
 		"rollup-plugin-terser": "^7.0.2",
 		"svelma": "^0.4.5",
-		"svelte-jsoneditor": "^0.21.4",
+		"svelte-jsoneditor": "^0.21.6",
 		"svelte-markdown": "^0.4.1",
 		"tiptap-markdown": "^0.8.10"
 	},
 	"peerDependenciesMeta": {
-		"@fortawesome/fontawesome-free": { "optional": true },
-		"@tiptap/core": { "optional": true },
-		"@tiptap/extension-mention": { "optional": true },
-		"@tiptap/starter-kit": { "optional": true },
-		"@tiptap/suggestion": { "optional": true },
-		"@tomic/lib": { "optional": true },
-		"@tomic/svelte": { "optional": true },
-		"biome": { "optional": true },
-		"bulmaswatch": { "optional": true },
-		"d3": { "optional": true },
-		"rollup-plugin-css-only": { "optional": true },
-		"rollup-plugin-terser": { "optional": true },
-		"svelma": { "optional": true },
-		"svelte-jsoneditor": { "optional": true },
-		"svelte-markdown": { "optional": true },
-		"tiptap-markdown": { "optional": true }
+		"@fortawesome/fontawesome-free": {
+			"optional": true
+		},
+		"@tiptap/core": {
+			"optional": true
+		},
+		"@tiptap/extension-mention": {
+			"optional": true
+		},
+		"@tiptap/starter-kit": {
+			"optional": true
+		},
+		"@tiptap/suggestion": {
+			"optional": true
+		},
+		"@tomic/lib": {
+			"optional": true
+		},
+		"@tomic/svelte": {
+			"optional": true
+		},
+		"biome": {
+			"optional": true
+		},
+		"bulmaswatch": {
+			"optional": true
+		},
+		"d3": {
+			"optional": true
+		},
+		"rollup-plugin-css-only": {
+			"optional": true
+		},
+		"rollup-plugin-terser": {
+			"optional": true
+		},
+		"svelma": {
+			"optional": true
+		},
+		"svelte-jsoneditor": {
+			"optional": true
+		},
+		"svelte-markdown": {
+			"optional": true
+		},
+		"tiptap-markdown": {
+			"optional": true
+		}
 	}
 }

@@ -2,6 +2,8 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { createEventDispatcher, onDestroy } from 'svelte';
 import { CONFIG } from '../../config';
+import { Modal, Field, Input, Button, Message } from 'svelma';
+import { role, is_tauri } from '$lib/stores';
 
 export let active: boolean = false;
 export const initialQuery: string = '';
@@ -695,7 +697,7 @@ onDestroy(() => {
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-    <div class="kg-search-container" on:keydown={handleKeydown}>
+      <div class="kg-search-container" on:keydown={_handleKeydown}>
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 
@@ -712,11 +714,11 @@ onDestroy(() => {
             <Input
               bind:element={searchInput}
               bind:value={query}
-              on:input={handleInput}
-              on:keydown={handleKeydown}
+              on:input={_handleInput}
+              on:keydown={_handleKeydown}
               placeholder="Search knowledge graph terms..."
               type="search"
-              disabled={isSearching}
+              disabled={_isSearching}
               icon="search"
               expanded
               autofocus
@@ -749,13 +751,13 @@ onDestroy(() => {
         </Field>
       </div>
 
-      {#if searchError}
+      {#if _searchError}
         <Message type="is-danger" data-testid="kg-search-error">
-          {searchError}
+          {_searchError}
         </Message>
       {/if}
 
-      {#if isSearching}
+      {#if _isSearching}
         <div class="empty-state" data-testid="kg-search-loading">
           <div class="progress-container">
             <div class="progress-bar">
@@ -769,8 +771,8 @@ onDestroy(() => {
           {#each suggestions as suggestion}
             <button
               class="suggestion-item {selectedSuggestion?.term === suggestion.term ? 'is-active' : ''}"
-              on:click={() => selectSuggestion(suggestion)}
-              on:keydown={(e) => e.key === 'Enter' && selectSuggestion(suggestion)}
+              on:click={() => _selectSuggestion(suggestion)}
+              on:keydown={(e) => e.key === 'Enter' && _selectSuggestion(suggestion)}
               type="button"
               data-testid="kg-suggestion-item"
             >
@@ -835,7 +837,7 @@ onDestroy(() => {
           type="is-link"
           size="is-small"
           style="width: 100%;"
-          on:click={addKGIndexToContext}
+          on:click={_addKGIndexToContext}
           data-testid="kg-add-index-button"
         >
           Add Complete Thesaurus to Context
