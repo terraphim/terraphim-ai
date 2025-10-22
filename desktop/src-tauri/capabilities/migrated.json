@@ -1,0 +1,24 @@
+{
+  "identifier": "app-defaults",
+  "description": "Base capabilities required for Terraphim desktop runtime",
+  "local": true,
+  "windows": [
+    "main"
+  ],
+  "permissions": [
+    "core:default",
+    "cli:default",
+    "dialog:default",
+    "fs:default",
+    "fs:allow-app-read-recursive",
+    "fs:allow-app-write-recursive",
+    "fs:allow-app-meta-recursive",
+    "fs:read-all",
+    "fs:write-all",
+    "global-shortcut:allow-register",
+    "global-shortcut:allow-unregister",
+    "global-shortcut:allow-unregister-all",
+    "global-shortcut:allow-is-registered",
+    "updater:default"
+  ]
+}
