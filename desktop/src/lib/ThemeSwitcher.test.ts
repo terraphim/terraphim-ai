@@ -1,7 +1,12 @@
+<<<<<<< HEAD
 import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { render, fireEvent, screen, waitFor } from '@testing-library/svelte/svelte5';
+=======
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { is_tauri, role, theme } from './stores';
+>>>>>>> origin/main
 import ThemeSwitcher from './ThemeSwitcher.svelte';
-import { is_tauri, role, roles, theme } from './stores';
 
 // Test configuration
 const TEST_TIMEOUT = 5000; // 5 seconds for API calls
@@ -14,6 +19,7 @@ const mockFetch = vi.fn();
 global.fetch = mockFetch;
 
 describe('ThemeSwitcher Component - Real Integration', () => {
+<<<<<<< HEAD
   beforeAll(async () => {
     // Set up for web-based testing (not Tauri)
     is_tauri.set(false);
@@ -57,195 +63,246 @@ describe('ThemeSwitcher Component - Real Integration', () => {
       })
     });
   });
+=======
+	// Skip integration tests in CI environment where server setup is complex
+	const isCI = process.env.CI || process.env.GITHUB_ACTIONS;
 
-  it('renders role selector dropdown', () => {
-    render(ThemeSwitcher);
+	beforeAll(async () => {
+		// Set up for web-based testing (not Tauri)
+		is_tauri.set(false);
+	});
 
-    const selectElement = screen.getByRole('combobox');
-    expect(selectElement).toBeInTheDocument();
-  });
+	beforeEach(async () => {
+		// Reset to default state
+		role.set('Test Role');
+		theme.set('spacelab');
+	});
 
-  it('displays available roles in dropdown', async () => {
-    render(ThemeSwitcher);
+	it('renders role selector dropdown', () => {
+		render(ThemeSwitcher);
 
-    await waitFor(() => {
-      const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
-      expect(selectElement.options.length).toBeGreaterThan(0);
-    }, { timeout: TEST_TIMEOUT });
-  }, TEST_TIMEOUT);
+		const selectElement = screen.getByRole('combobox');
+		expect(selectElement).toBeInTheDocument();
+	});
 
-  it('changes role when option is selected', async () => {
-    render(ThemeSwitcher);
+	it(
+		'displays available roles in dropdown',
+		async () => {
+			if (isCI) {
+				console.log('Skipping ThemeSwitcher integration test in CI environment');
+				return;
+			}
 
-    const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
+			render(ThemeSwitcher);
 
-    // Wait for component to be ready
-    await waitFor(() => {
-      expect(selectElement).toBeInTheDocument();
-    });
+			await waitFor(
+				() => {
+					const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
+					expect(selectElement.options.length).toBeGreaterThan(0);
+				},
+				{ timeout: TEST_TIMEOUT }
+			);
+		},
+		TEST_TIMEOUT
+	);
 
-    // Get current value
-    const initialValue = selectElement.value;
+	it('changes role when option is selected', async () => {
+		render(ThemeSwitcher);
 
-    // Find a different option to select
-    const options = Array.from(selectElement.querySelectorAll('option'));
-    const differentOption = options.find(opt => opt.value !== initialValue);
+		const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
 
-    if (differentOption) {
-      await fireEvent.change(selectElement, { target: { value: differentOption.value } });
+		// Wait for component to be ready
+		await waitFor(() => {
+			expect(selectElement).toBeInTheDocument();
+		});
 
-      // Should update the select value
-      expect(selectElement.value).toBe(differentOption.value);
-    }
-  });
+		// Get current value
+		const initialValue = selectElement.value;
 
-  it('loads and displays configuration from server', async () => {
-    render(ThemeSwitcher);
+		// Find a different option to select
+		const options = Array.from(selectElement.querySelectorAll('option'));
+		const differentOption = options.find((opt) => opt.value !== initialValue);
 
-    // Wait for config to load
-    await waitFor(() => {
-      const selectElement = screen.getByRole('combobox');
-      const options = selectElement.querySelectorAll('option');
-      expect(options.length).toBeGreaterThan(0);
-    }, { timeout: TEST_TIMEOUT });
+		if (differentOption) {
+			await fireEvent.change(selectElement, { target: { value: differentOption.value } });
 
-    // Should have loaded roles from configuration
-    const selectElement = screen.getByRole('combobox');
-    expect(selectElement).toBeInTheDocument();
-  }, TEST_TIMEOUT);
+			// Should update the select value
+			expect(selectElement.value).toBe(differentOption.value);
+		}
+	});
 
-  it('handles role switching and theme updates', async () => {
-    render(ThemeSwitcher);
+	it(
+		'loads and displays configuration from server',
+		async () => {
+			if (isCI) {
+				console.log('Skipping ThemeSwitcher integration test in CI environment');
+				return;
+			}
 
-    const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
+			render(ThemeSwitcher);
 
-    // Wait for component to be ready
-    await waitFor(() => {
-      expect(selectElement).toBeInTheDocument();
-    });
+			// Wait for config to load
+			await waitFor(
+				() => {
+					const selectElement = screen.getByRole('combobox');
+					const options = selectElement.querySelectorAll('option');
+					expect(options.length).toBeGreaterThan(0);
+				},
+				{ timeout: TEST_TIMEOUT }
+			);
 
-    // Get all available options
-    const options = Array.from(selectElement.querySelectorAll('option')) as HTMLOptionElement[];
+			// Should have loaded roles from configuration
+			const selectElement = screen.getByRole('combobox');
+			expect(selectElement).toBeInTheDocument();
+		},
+		TEST_TIMEOUT
+	);
 
-    if (options.length > 1) {
-      // Switch to a different role
-      const newRole = options[1].value;
-      await fireEvent.change(selectElement, { target: { value: newRole } });
+	it('handles role switching and theme updates', async () => {
+		render(ThemeSwitcher);
 
-      // Should update without crashing
-      expect(selectElement.value).toBe(newRole);
-    }
-  });
+		const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
 
-  it('handles configuration fetch errors gracefully', async () => {
-    // Set invalid server URL to trigger error
-    const originalFetch = global.fetch;
-    global.fetch = () => Promise.reject(new Error('Network error'));
+		// Wait for component to be ready
+		await waitFor(() => {
+			expect(selectElement).toBeInTheDocument();
+		});
 
-    render(ThemeSwitcher);
+		// Get all available options
+		const options = Array.from(selectElement.querySelectorAll('option')) as HTMLOptionElement[];
 
-    // Should render without crashing even with network errors
-    await waitFor(() => {
-      const selectElement = screen.getByRole('combobox');
-      expect(selectElement).toBeInTheDocument();
-    });
+		if (options.length > 1) {
+			// Switch to a different role
+			const newRole = options[1].value;
+			await fireEvent.change(selectElement, { target: { value: newRole } });
 
-    // Restore original fetch
-    global.fetch = originalFetch;
-  });
+			// Should update without crashing
+			expect(selectElement.value).toBe(newRole);
+		}
+	});
 
-  it('maintains theme consistency across role changes', async () => {
-    render(ThemeSwitcher);
+	it('handles configuration fetch errors gracefully', async () => {
+		// Set invalid server URL to trigger error
+		const originalFetch = global.fetch;
+		global.fetch = () => Promise.reject(new Error('Network error'));
 
-    const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
+		render(ThemeSwitcher);
 
-    // Wait for component to load
-    await waitFor(() => {
-      expect(selectElement).toBeInTheDocument();
-    });
+		// Should render without crashing even with network errors
+		await waitFor(() => {
+			const selectElement = screen.getByRole('combobox');
+			expect(selectElement).toBeInTheDocument();
+		});
 
-    const options = Array.from(selectElement.querySelectorAll('option')) as HTMLOptionElement[];
+		// Restore original fetch
+		global.fetch = originalFetch;
+	});
 
-    // Test switching between multiple roles if available
-    for (let i = 0; i < Math.min(options.length, 3); i++) {
-      await fireEvent.change(selectElement, { target: { value: options[i].value } });
+	it('maintains theme consistency across role changes', async () => {
+		render(ThemeSwitcher);
 
-      // Should update successfully
-      expect(selectElement.value).toBe(options[i].value);
+		const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
 
-      // Small delay between changes
-      await new Promise(resolve => setTimeout(resolve, 100));
-    }
-  });
+		// Wait for component to load
+		await waitFor(() => {
+			expect(selectElement).toBeInTheDocument();
+		});
 
-  it('handles Tauri environment detection', () => {
-    // Test with simulated Tauri environment
-    window.__TAURI__ = { invoke: () => Promise.resolve() } as any;
+		const options = Array.from(selectElement.querySelectorAll('option')) as HTMLOptionElement[];
 
-    render(ThemeSwitcher);
+		// Test switching between multiple roles if available
+		for (let i = 0; i < Math.min(options.length, 3); i++) {
+			await fireEvent.change(selectElement, { target: { value: options[i].value } });
 
-    // Component should render without errors in Tauri environment
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
+			// Should update successfully
+			expect(selectElement.value).toBe(options[i].value);
 
-    // Clean up
-    delete (window as any).__TAURI__;
-  });
+			// Small delay between changes
+			await new Promise((resolve) => setTimeout(resolve, 100));
+		}
+	});
 
-  it('handles non-Tauri environment', () => {
-    // Ensure we're in non-Tauri environment
-    delete (window as any).__TAURI__;
+	it('handles Tauri environment detection', () => {
+		// Test with simulated Tauri environment
+		window.__TAURI__ = { invoke: () => Promise.resolve() } as any;
 
-    render(ThemeSwitcher);
+		render(ThemeSwitcher);
 
-    // Component should render without errors in non-Tauri environment
-    expect(screen.getByRole('combobox')).toBeInTheDocument();
-  });
+		// Component should render without errors in Tauri environment
+		expect(screen.getByRole('combobox')).toBeInTheDocument();
 
-  it('displays role names correctly', async () => {
-    render(ThemeSwitcher);
+		// Clean up
+		(window as any).__TAURI__ = undefined;
+	});
 
-    await waitFor(() => {
-      const selectElement = screen.getByRole('combobox');
-      const options = selectElement.querySelectorAll('option');
-      expect(options.length).toBeGreaterThan(0);
-    }, { timeout: TEST_TIMEOUT });
+	it('handles non-Tauri environment', () => {
+		// Ensure we're in non-Tauri environment
+		(window as any).__TAURI__ = undefined;
+>>>>>>> origin/main
 
-    // Should have meaningful role names
-    const selectElement = screen.getByRole('combobox');
-    const options = Array.from(selectElement.querySelectorAll('option'));
+		render(ThemeSwitcher);
 
-    options.forEach(option => {
-      expect(option.textContent).toBeTruthy();
-      expect(option.textContent!.length).toBeGreaterThan(0);
-    });
-  }, TEST_TIMEOUT);
+		// Component should render without errors in non-Tauri environment
+		expect(screen.getByRole('combobox')).toBeInTheDocument();
+	});
 
-  it('persists role selection across interactions', async () => {
-    render(ThemeSwitcher);
+	it(
+		'displays role names correctly',
+		async () => {
+			if (isCI) {
+				console.log('Skipping ThemeSwitcher integration test in CI environment');
+				return;
+			}
 
-    const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
+			render(ThemeSwitcher);
 
-    await waitFor(() => {
-      expect(selectElement).toBeInTheDocument();
-    });
+			await waitFor(
+				() => {
+					const selectElement = screen.getByRole('combobox');
+					const options = selectElement.querySelectorAll('option');
+					expect(options.length).toBeGreaterThan(0);
+				},
+				{ timeout: TEST_TIMEOUT }
+			);
 
-    const options = Array.from(selectElement.querySelectorAll('option')) as HTMLOptionElement[];
+			// Should have meaningful role names
+			const selectElement = screen.getByRole('combobox');
+			const options = Array.from(selectElement.querySelectorAll('option'));
 
-    if (options.length > 1) {
-      const selectedRole = options[1].value;
+			options.forEach((option) => {
+				expect(option.textContent).toBeTruthy();
+				expect(option.textContent?.length).toBeGreaterThan(0);
+			});
+		},
+		TEST_TIMEOUT
+	);
 
-      // Select a role
-      await fireEvent.change(selectElement, { target: { value: selectedRole } });
+	it('persists role selection across interactions', async () => {
+		render(ThemeSwitcher);
 
-      // Should maintain the selection
-      expect(selectElement.value).toBe(selectedRole);
+		const selectElement = screen.getByRole('combobox') as HTMLSelectElement;
 
-      // Interact with component again
-      await fireEvent.blur(selectElement);
-      await fireEvent.focus(selectElement);
+		await waitFor(() => {
+			expect(selectElement).toBeInTheDocument();
+		});
 
-      // Should still have the same selection
-      expect(selectElement.value).toBe(selectedRole);
-    }
-  });
+		const options = Array.from(selectElement.querySelectorAll('option')) as HTMLOptionElement[];
+
+		if (options.length > 1) {
+			const selectedRole = options[1].value;
+
+			// Select a role
+			await fireEvent.change(selectElement, { target: { value: selectedRole } });
+
+			// Should maintain the selection
+			expect(selectElement.value).toBe(selectedRole);
+
+			// Interact with component again
+			await fireEvent.blur(selectElement);
+			await fireEvent.focus(selectElement);
+
+			// Should still have the same selection
+			expect(selectElement.value).toBe(selectedRole);
+		}
+	});
 });

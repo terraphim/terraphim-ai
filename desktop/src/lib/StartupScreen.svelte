@@ -1,4 +1,5 @@
 <script lang="ts">
+<<<<<<< HEAD
   import { invoke } from "@tauri-apps/api/tauri";
   import { open } from "@tauri-apps/api/dialog";
   import { onMount } from "svelte";
@@ -39,31 +40,65 @@
       error = `Failed to open folder selector: ${errorObj.message}`;
     }
   }
+=======
+import { open } from '@tauri-apps/api/dialog';
+import { register as registerShortcut } from '@tauri-apps/api/globalShortcut';
+import { appDataDir } from '@tauri-apps/api/path';
+import { invoke } from '@tauri-apps/api/tauri';
+import { appWindow } from '@tauri-apps/api/window';
+import { onMount } from 'svelte';
+import { isInitialSetupComplete } from '$lib/stores';
 
-  function startCapturingShortcut() {
-    isCapturingShortcut = true;
-    globalShortcut = "Press your desired shortcut...";
-  }
+let dataFolder = '';
+let globalShortcut = 'CmdOrControl+X';
+let _error = '';
+let isCapturingShortcut = false;
+>>>>>>> origin/main
 
+async function _selectFolder() {
+	try {
+		const selected = await open({
+			directory: true,
+			multiple: false,
+			defaultPath: await appDataDir(),
+		});
+		console.log(selected);
+		console.log(typeof selected);
+		if (selected && typeof selected === 'string') {
+			dataFolder = selected;
+		} else {
+			_error = 'No folder selected or invalid selection';
+		}
+	} catch (err) {
+		console.error('Failed to open folder selector:', err);
+		_error = `Failed to open folder selector: ${err.message}`;
+	}
+}
+
+<<<<<<< HEAD
   function handleKeyDown(event: KeyboardEvent) {
     if (!isCapturingShortcut) return;
+=======
+function _startCapturingShortcut() {
+	isCapturingShortcut = true;
+	globalShortcut = 'Press your desired shortcut...';
+}
+>>>>>>> origin/main
 
-    event.preventDefault();
+function handleKeyDown(event) {
+	if (!isCapturingShortcut) return;
 
-    const key = event.key.toUpperCase();
-    const modifiers = [];
+	event.preventDefault();
 
-    if (event.ctrlKey) modifiers.push("Ctrl");
-    if (event.altKey) modifiers.push("Alt");
-    if (event.shiftKey) modifiers.push("Shift");
-    if (event.metaKey) modifiers.push("Cmd");
+	const key = event.key.toUpperCase();
+	const modifiers = [];
 
-    if (key !== "CONTROL" && key !== "ALT" && key !== "SHIFT" && key !== "META") {
-      globalShortcut = [...modifiers, key].join("+");
-      isCapturingShortcut = false;
-    }
-  }
+	if (event.ctrlKey) modifiers.push('Ctrl');
+	if (event.altKey) modifiers.push('Alt');
+	if (event.shiftKey) modifiers.push('Shift');
+	if (event.metaKey) modifiers.push('Cmd');
 
+<<<<<<< HEAD
   async function saveSettings() {
     // Register the global shortcut
     try {
@@ -83,32 +118,58 @@
       error = "Please fill in both fields";
       return;
     }
+=======
+	if (key !== 'CONTROL' && key !== 'ALT' && key !== 'SHIFT' && key !== 'META') {
+		globalShortcut = [...modifiers, key].join('+');
+		isCapturingShortcut = false;
+	}
+}
+>>>>>>> origin/main
 
-    try {
-      await invoke("save_initial_settings", {
-        newSettings: {
-          data_folder: dataFolder,
-          global_shortcut: globalShortcut,
-        },
-      });
-      alert("Settings saved successfully");
-      await invoke("close_splashscreen");
-    } catch (e) {
-      error = "Failed to save settings";
-      console.error(e);
-    } finally {
-      // set initial setup complete to true
-      isInitialSetupComplete.set(true);
-    }
-  }
+async function _saveSettings() {
+	// Register the global shortcut
+	try {
+		await registerShortcut(globalShortcut, () => {
+			if (appWindow.isVisible()) {
+				appWindow.hide();
+			}
+		});
+		console.log(`Global shortcut ${globalShortcut} registered successfully`);
+	} catch (err) {
+		_error = `Failed to register global shortcut: ${err.message}`;
+		console.error('Failed to register global shortcut:', err);
+		return;
+	}
+	if (!dataFolder || !globalShortcut) {
+		_error = 'Please fill in both fields';
+		return;
+	}
 
-  onMount(() => {
-    // unregisterAllShortcuts();
-    document.addEventListener("keydown", handleKeyDown);
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-    };
-  });
+	try {
+		await invoke('save_initial_settings', {
+			newSettings: {
+				data_folder: dataFolder,
+				global_shortcut: globalShortcut,
+			},
+		});
+		alert('Settings saved successfully');
+		await invoke('close_splashscreen');
+	} catch (e) {
+		_error = 'Failed to save settings';
+		console.error(e);
+	} finally {
+		// set initial setup complete to true
+		isInitialSetupComplete.set(true);
+	}
+}
+
+onMount(() => {
+	// unregisterAllShortcuts();
+	document.addEventListener('keydown', handleKeyDown);
+	return () => {
+		document.removeEventListener('keydown', handleKeyDown);
+	};
+});
 </script>
 <svelte:head>
   <meta

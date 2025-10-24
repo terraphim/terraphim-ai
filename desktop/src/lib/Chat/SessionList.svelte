@@ -1,177 +1,177 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { invoke } from '@tauri-apps/api/tauri';
-  import { role } from '../stores';
-  import { get } from 'svelte/store';
+import { invoke } from '@tauri-apps/api/tauri';
+import { onMount } from 'svelte';
+import { role } from '../stores';
 
-  // Types
-  type ConversationSummary = {
-    id: string;
-    title: string;
-    role: string;
-    message_count: number;
-    preview: string | null;
-    created_at: string;
-    updated_at: string;
-  };
+// Types
+type ConversationSummary = {
+	id: string;
+	title: string;
+	role: string;
+	message_count: number;
+	preview: string | null;
+	created_at: string;
+	updated_at: string;
+};
 
-  type ListPersistentConversationsResponse = {
-    status: 'success' | 'error';
-    conversations: ConversationSummary[];
-    total: number;
-    error: string | null;
-  };
+type ListPersistentConversationsResponse = {
+	status: 'success' | 'error';
+	conversations: ConversationSummary[];
+	total: number;
+	error: string | null;
+};
 
-  type DeletePersistentConversationResponse = {
-    status: 'success' | 'error';
-    error: string | null;
-  };
+type DeletePersistentConversationResponse = {
+	status: 'success' | 'error';
+	error: string | null;
+};
 
-  // Props
-  export let currentConversationId: string | null = null;
-  export let onSelectConversation: (conversationId: string) => void = () => {};
-  export let onNewConversation: () => void = () => {};
+// Props
+export const currentConversationId: string | null = null;
+export const onSelectConversation: (conversationId: string) => void = () => {};
+export const onNewConversation: () => void = () => {};
 
-  // State
-  let conversations: ConversationSummary[] = [];
-  let loading = false;
-  let error: string | null = null;
-  let searchQuery = '';
-  let filterRole: string | null = null;
-  let showDeleteConfirm: string | null = null;
-  let deleting = false;
+// State
+let conversations: ConversationSummary[] = [];
+let _loading = false;
+let _error: string | null = null;
+let searchQuery = '';
+let filterRole: string | null = null;
+let _showDeleteConfirm: string | null = null;
+let _deleting = false;
 
-  // Computed
-  $: filteredConversations = conversations.filter(conv => {
-    const matchesSearch = !searchQuery ||
-      conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (conv.preview && conv.preview.toLowerCase().includes(searchQuery.toLowerCase()));
-    const matchesRole = !filterRole || conv.role === filterRole;
-    return matchesSearch && matchesRole;
-  });
+// Computed
+$: filteredConversations = conversations.filter((conv) => {
+	const matchesSearch =
+		!searchQuery ||
+		conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+		conv.preview?.toLowerCase().includes(searchQuery.toLowerCase());
+	const matchesRole = !filterRole || conv.role === filterRole;
+	return matchesSearch && matchesRole;
+});
 
-  // Load conversations on mount
-  onMount(() => {
-    loadConversations();
-  });
+// Load conversations on mount
+onMount(() => {
+	loadConversations();
+});
 
-  // Load conversations from backend
-  async function loadConversations() {
-    loading = true;
-    error = null;
+// Load conversations from backend
+async function loadConversations() {
+	_loading = true;
+	_error = null;
 
-    try {
-      const response = await invoke<ListPersistentConversationsResponse>(
-        'list_persistent_conversations',
-        {
-          role: filterRole,
-          limit: 100
-        }
-      );
+	try {
+		const response = await invoke<ListPersistentConversationsResponse>(
+			'list_persistent_conversations',
+			{
+				role: filterRole,
+				limit: 100,
+			}
+		);
 
-      if (response.status === 'success') {
-        conversations = response.conversations;
-      } else {
-        error = response.error || 'Failed to load conversations';
-      }
-    } catch (e) {
-      console.error('Failed to load conversations:', e);
-      error = String(e);
-    } finally {
-      loading = false;
-    }
-  }
+		if (response.status === 'success') {
+			conversations = response.conversations;
+		} else {
+			_error = response.error || 'Failed to load conversations';
+		}
+	} catch (e) {
+		console.error('Failed to load conversations:', e);
+		_error = String(e);
+	} finally {
+		_loading = false;
+	}
+}
 
-  // Search conversations
-  async function searchConversations() {
-    if (!searchQuery.trim()) {
-      await loadConversations();
-      return;
-    }
+// Search conversations
+async function searchConversations() {
+	if (!searchQuery.trim()) {
+		await loadConversations();
+		return;
+	}
 
-    loading = true;
-    error = null;
+	_loading = true;
+	_error = null;
 
-    try {
-      const response = await invoke<ListPersistentConversationsResponse>(
-        'search_persistent_conversations',
-        { query: searchQuery }
-      );
+	try {
+		const response = await invoke<ListPersistentConversationsResponse>(
+			'search_persistent_conversations',
+			{ query: searchQuery }
+		);
 
-      if (response.status === 'success') {
-        conversations = response.conversations;
-      } else {
-        error = response.error || 'Search failed';
-      }
-    } catch (e) {
-      console.error('Search failed:', e);
-      error = String(e);
-    } finally {
-      loading = false;
-    }
-  }
+		if (response.status === 'success') {
+			conversations = response.conversations;
+		} else {
+			_error = response.error || 'Search failed';
+		}
+	} catch (e) {
+		console.error('Search failed:', e);
+		_error = String(e);
+	} finally {
+		_loading = false;
+	}
+}
 
-  // Delete conversation
-  async function deleteConversation(conversationId: string) {
-    deleting = true;
-    error = null;
+// Delete conversation
+async function _deleteConversation(conversationId: string) {
+	_deleting = true;
+	_error = null;
 
-    try {
-      const response = await invoke<DeletePersistentConversationResponse>(
-        'delete_persistent_conversation',
-        { conversationId }
-      );
+	try {
+		const response = await invoke<DeletePersistentConversationResponse>(
+			'delete_persistent_conversation',
+			{ conversationId }
+		);
 
-      if (response.status === 'success') {
-        // Remove from local list
-        conversations = conversations.filter(c => c.id !== conversationId);
-        showDeleteConfirm = null;
+		if (response.status === 'success') {
+			// Remove from local list
+			conversations = conversations.filter((c) => c.id !== conversationId);
+			_showDeleteConfirm = null;
 
-        // If we deleted the current conversation, trigger new conversation
-        if (currentConversationId === conversationId) {
-          onNewConversation();
-        }
-      } else {
-        error = response.error || 'Failed to delete conversation';
-      }
-    } catch (e) {
-      console.error('Failed to delete conversation:', e);
-      error = String(e);
-    } finally {
-      deleting = false;
-    }
-  }
+			// If we deleted the current conversation, trigger new conversation
+			if (currentConversationId === conversationId) {
+				onNewConversation();
+			}
+		} else {
+			_error = response.error || 'Failed to delete conversation';
+		}
+	} catch (e) {
+		console.error('Failed to delete conversation:', e);
+		_error = String(e);
+	} finally {
+		_deleting = false;
+	}
+}
 
-  // Format date for display
-  function formatDate(dateStr: string): string {
-    const date = new Date(dateStr);
-    const now = new Date();
-    const diffMs = now.getTime() - date.getTime();
-    const diffMins = Math.floor(diffMs / 60000);
-    const diffHours = Math.floor(diffMs / 3600000);
-    const diffDays = Math.floor(diffMs / 86400000);
+// Format date for display
+function _formatDate(dateStr: string): string {
+	const date = new Date(dateStr);
+	const now = new Date();
+	const diffMs = now.getTime() - date.getTime();
+	const diffMins = Math.floor(diffMs / 60000);
+	const diffHours = Math.floor(diffMs / 3600000);
+	const diffDays = Math.floor(diffMs / 86400000);
 
-    if (diffMins < 1) return 'Just now';
-    if (diffMins < 60) return `${diffMins}m ago`;
-    if (diffHours < 24) return `${diffHours}h ago`;
-    if (diffDays < 7) return `${diffDays}d ago`;
+	if (diffMins < 1) return 'Just now';
+	if (diffMins < 60) return `${diffMins}m ago`;
+	if (diffHours < 24) return `${diffHours}h ago`;
+	if (diffDays < 7) return `${diffDays}d ago`;
 
-    return date.toLocaleDateString();
-  }
+	return date.toLocaleDateString();
+}
 
-  // Handle search input
-  function handleSearchInput() {
-    if (searchQuery.trim()) {
-      searchConversations();
-    } else {
-      loadConversations();
-    }
-  }
+// Handle search input
+function _handleSearchInput() {
+	if (searchQuery.trim()) {
+		searchConversations();
+	} else {
+		loadConversations();
+	}
+}
 
-  // Handle role filter change
-  function handleRoleFilterChange() {
-    loadConversations();
-  }
+// Handle role filter change
+function _handleRoleFilterChange() {
+	loadConversations();
+}
 </script>
 
 <div class="session-list">
@@ -195,7 +195,7 @@
         class="form-control form-control-sm"
         placeholder="Search conversations..."
         bind:value={searchQuery}
-        on:input={handleSearchInput}
+        on:input={_handleSearchInput}
       />
       <i class="bi bi-search search-icon"></i>
     </div>
@@ -204,7 +204,7 @@
       <select
         class="form-select form-select-sm"
         bind:value={filterRole}
-        on:change={handleRoleFilterChange}
+        on:change={_handleRoleFilterChange}
       >
         <option value={null}>All Roles</option>
         <option value={$role}>{$role}</option>
@@ -213,20 +213,24 @@
   </div>
 
   <!-- Error Display -->
-  {#if error}
+  {#if _error}
     <div class="alert alert-danger alert-sm" role="alert">
-      {error}
+      {_error}
       <button
         type="button"
         class="btn-close btn-close-sm"
+<<<<<<< HEAD
         aria-label="Dismiss error"
         on:click={() => error = null}
+=======
+        on:click={() => _error = null}
+>>>>>>> origin/main
       ></button>
     </div>
   {/if}
 
   <!-- Loading State -->
-  {#if loading}
+  {#if _loading}
     <div class="loading-state">
       <div class="spinner-border spinner-border-sm" role="status">
         <span class="visually-hidden">Loading...</span>
@@ -237,7 +241,7 @@
 
   <!-- Conversation List -->
   <div class="conversation-list">
-    {#if !loading && filteredConversations.length === 0}
+    {#if !_loading && filteredConversations.length === 0}
       <div class="empty-state">
         <i class="bi bi-chat-dots"></i>
         <p>No conversations yet</p>
@@ -258,19 +262,19 @@
           <div class="conversation-header">
             <h4 class="conversation-title">{conversation.title}</h4>
             <div class="conversation-actions">
-              {#if showDeleteConfirm === conversation.id}
+              {#if _showDeleteConfirm === conversation.id}
                 <button
                   class="btn btn-sm btn-danger"
-                  on:click|stopPropagation={() => deleteConversation(conversation.id)}
-                  disabled={deleting}
+                  on:click|stopPropagation={() => _deleteConversation(conversation.id)}
+                  disabled={_deleting}
                   title="Confirm delete"
                 >
                   <i class="bi bi-check-lg"></i>
                 </button>
                 <button
                   class="btn btn-sm btn-secondary"
-                  on:click|stopPropagation={() => showDeleteConfirm = null}
-                  disabled={deleting}
+                  on:click|stopPropagation={() => _showDeleteConfirm = null}
+                  disabled={_deleting}
                   title="Cancel"
                 >
                   <i class="bi bi-x-lg"></i>
@@ -278,7 +282,7 @@
               {:else}
                 <button
                   class="btn btn-sm btn-ghost"
-                  on:click|stopPropagation={() => showDeleteConfirm = conversation.id}
+                  on:click|stopPropagation={() => _showDeleteConfirm = conversation.id}
                   title="Delete conversation"
                 >
                   <i class="bi bi-trash"></i>
@@ -292,7 +296,7 @@
             <span class="message-count">
               <i class="bi bi-chat-left-text"></i> {conversation.message_count}
             </span>
-            <span class="timestamp">{formatDate(conversation.updated_at)}</span>
+            <span class="timestamp">{_formatDate(conversation.updated_at)}</span>
           </div>
 
           {#if conversation.preview}

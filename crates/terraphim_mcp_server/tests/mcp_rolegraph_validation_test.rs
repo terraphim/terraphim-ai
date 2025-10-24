@@ -99,6 +99,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
             extra_parameters: std::collections::HashMap::new(),
             fetch_content: false,
         }],
+<<<<<<< HEAD
         #[cfg(feature = "openrouter")]
         llm_enabled: false,
         #[cfg(feature = "openrouter")]
@@ -112,6 +113,14 @@ async fn create_terraphim_engineer_config() -> Result<String> {
         #[cfg(feature = "openrouter")]
         llm_chat_system_prompt: None,
         #[cfg(feature = "openrouter")]
+=======
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+>>>>>>> origin/main
         llm_chat_model: None,
         llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),

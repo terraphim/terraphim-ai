@@ -68,6 +68,7 @@ Throughout all user interactions, maintain three key files:
 - **memories.md**: Interaction history and project status
 - **lessons-learned.md**: Knowledge retention and technical insights
 - **scratchpad.md**: Active task management and current work
+<<<<<<< HEAD
 
 ### Documentation Organization
 
@@ -75,11 +76,17 @@ All project documentation is organized in the `.docs/` folder:
 - **Individual File Summaries**: `.docs/summary-<normalized-path>.md` - Detailed summaries of each working file
 - **Comprehensive Overview**: `.docs/summary.md` - Consolidated project overview and architecture analysis
 - **Agent Instructions**: `.docs/agents_instructions.json` - Machine-readable agent configuration and workflows
+=======
+>>>>>>> origin/main
 
 ### Consolidated Agent Instructions
 
 For comprehensive project knowledge, patterns, and best practices, refer to:
+<<<<<<< HEAD
 - **.docs/agents_instructions.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
+=======
+- **agents_instructions.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
+>>>>>>> origin/main
   - Contains project context, status, and active features
   - Critical lessons on deployment patterns, UI development, security, Rust development, and TruthForge
   - Complete architecture overview with all crates and components
@@ -89,6 +96,7 @@ For comprehensive project knowledge, patterns, and best practices, refer to:
   - Troubleshooting guide and recent achievements
   - Use this as your primary reference for understanding project patterns and established practices
 
+<<<<<<< HEAD
 ### Documentation Organization
 
 All project documentation is organized in the `.docs/` folder:
@@ -119,6 +127,8 @@ Can you summarize your context files ".docs/summary-*.md" and save the result in
 
 Both steps are MANDATORY for every `/init` command execution.
 
+=======
+>>>>>>> origin/main
 ## Agent Systems Integration
 
 **Two Agent Systems Available**:

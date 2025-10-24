@@ -1,89 +1,85 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
-  import { Tag, Button } from "svelma";
+import { createEventDispatcher } from 'svelte';
+import { Tag, Button } from 'svelma';
 
-  export let contextItem: KGContextItem;
-  export let removable: boolean = true;
-  export let compact: boolean = false;
+export let contextItem: KGContextItem;
+export const removable: boolean = true;
+export const compact: boolean = false;
 
-  const dispatch = createEventDispatcher();
+const dispatch = createEventDispatcher();
 
-  interface KGContextItem {
-    id: string;
-    context_type: "KGTermDefinition" | "KGIndex" | string; // Allow string for compatibility
-    title: string;
-    summary?: string;
-    content: string;
-    metadata?: Record<string, string>; // Make optional to match Chat.svelte ContextItem
-    created_at: string;
-    relevance_score?: number;
+interface KGContextItem {
+	id: string;
+	context_type: 'KGTermDefinition' | 'KGIndex' | string; // Allow string for compatibility
+	title: string;
+	summary?: string;
+	content: string;
+	metadata?: Record<string, string>; // Make optional to match Chat.svelte ContextItem
+	created_at: string;
+	relevance_score?: number;
 
-    // KG-specific fields (optional for compatibility)
-    kg_term_definition?: KGTermDefinition;
-    kg_index_info?: KGIndexInfo;
-  }
+	// KG-specific fields (optional for compatibility)
+	kg_term_definition?: KGTermDefinition;
+	kg_index_info?: KGIndexInfo;
+}
 
-  interface KGTermDefinition {
-    term: string;
-    normalized_term: string;
-    id: number;
-    definition?: string;
-    synonyms: string[];
-    related_terms: string[];
-    usage_examples: string[];
-    url?: string;
-    metadata: Record<string, string>;
-    relevance_score?: number;
-  }
+interface KGTermDefinition {
+	term: string;
+	normalized_term: string;
+	id: number;
+	definition?: string;
+	synonyms: string[];
+	related_terms: string[];
+	usage_examples: string[];
+	url?: string;
+	metadata: Record<string, string>;
+	relevance_score?: number;
+}
 
-  interface KGIndexInfo {
-    name: string;
-    total_terms: number;
-    total_nodes: number;
-    total_edges: number;
-    last_updated: string;
-    source: string;
-    version?: string;
-  }
+interface KGIndexInfo {
+	name: string;
+	total_terms: number;
+	total_nodes: number;
+	total_edges: number;
+	last_updated: string;
+	source: string;
+	version?: string;
+}
 
-  // Helper function to format numbers
-  function formatNumber(num: number): string {
-    return new Intl.NumberFormat().format(num);
-  }
+// Helper function to format numbers
+function _formatNumber(num: number): string {
+	return new Intl.NumberFormat().format(num);
+}
 
-  // Helper function to format date
-  function formatDate(dateString: string): string {
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return dateString;
-    }
-  }
+// Helper function to format date
+function _formatDate(dateString: string): string {
+	try {
+		return new Date(dateString).toLocaleDateString();
+	} catch {
+		return dateString;
+	}
+}
 
-  // Handle remove context item
-  function handleRemove() {
-    dispatch("remove", { contextId: contextItem.id });
-  }
+// Handle remove context item
+function _handleRemove() {
+	dispatch('remove', { contextId: contextItem.id });
+}
 
-  // Handle view details
-  function handleViewDetails() {
-    // Pass the term explicitly when available for quick lookup
-    let term: string | null = null;
-    if (contextItem.kg_term_definition?.term) {
-      term = contextItem.kg_term_definition.term;
-    }
-    dispatch("viewDetails", { contextItem, term });
-  }
+// Handle view details
+function _handleViewDetails() {
+	// Pass the term explicitly when available for quick lookup
+	let term: string | null = null;
+	if (contextItem.kg_term_definition?.term) {
+		term = contextItem.kg_term_definition.term;
+	}
+	dispatch('viewDetails', { contextItem, term });
+}
 
-  // Get display icon based on context type
-  $: displayIcon = contextItem.context_type === "KGTermDefinition"
-    ? "🏷️"
-    : "🗺️";
+// Get display icon based on context type
+$: displayIcon = contextItem.context_type === 'KGTermDefinition' ? '🏷️' : '🗺️';
 
-  // Get display color based on context type
-  $: displayColor = contextItem.context_type === "KGTermDefinition"
-    ? "is-info"
-    : "is-primary";
+// Get display color based on context type
+$: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 'is-primary';
 </script>
 
 <style>
@@ -271,7 +267,7 @@
     <div class="context-actions">
       <Button
         type="is-ghost"
-        on:click={handleViewDetails}
+        on:click={_handleViewDetails}
         title="View details"
       >
         👁️
@@ -280,7 +276,7 @@
       {#if removable}
         <Button
           type="is-ghost"
-          on:click={handleRemove}
+          on:click={_handleRemove}
           title="Remove from context"
         >
           ❌
@@ -332,15 +328,15 @@
 
       <div class="kg-index-stats {compact ? 'compact' : ''}">
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_terms)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_terms)}</div>
           <div class="stat-label">Terms</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_nodes)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_nodes)}</div>
           <div class="stat-label">Nodes</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_edges)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_edges)}</div>
           <div class="stat-label">Edges</div>
         </div>
         <div class="stat-item">
@@ -366,7 +362,7 @@
   </div>
 
   <div class="context-meta {compact ? 'compact' : ''}">
-    <span>Added {formatDate(contextItem.created_at)}</span>
+    <span>Added {_formatDate(contextItem.created_at)}</span>
 
     {#if contextItem.relevance_score}
       <span class="relevance-score">

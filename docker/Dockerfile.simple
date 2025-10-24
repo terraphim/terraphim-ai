@@ -1,0 +1,46 @@
+# Simple Dockerfile for building Terraphim binaries
+FROM ubuntu:24.04
+
+ARG RUST_VERSION=1.85.0
+
+# Install system dependencies
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    build-essential \
+    bison \
+    flex \
+    ca-certificates \
+    openssl \
+    libssl-dev \
+    pkg-config \
+    git \
+    curl \
+    cmake \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain ${RUST_VERSION}
+ENV PATH="/root/.cargo/bin:$PATH"
+
+WORKDIR /code
+
+# Copy dependency files first for better caching
+COPY Cargo.toml Cargo.lock ./
+COPY crates/ ./crates/
+COPY terraphim_server/ ./terraphim_server/
+COPY desktop/ ./desktop/
+
+# Build the application
+RUN cargo build --release --package terraphim_server --package terraphim_tui
+
+# Test the binaries
+RUN ./target/release/terraphim_server --version && \
+    ./target/release/terraphim-tui --version
+
+# Copy binaries to output location
+RUN mkdir -p /release && \
+    cp target/release/terraphim_server /release/ && \
+    cp target/release/terraphim-tui /release/
+
+WORKDIR /release
+CMD ["bash"]

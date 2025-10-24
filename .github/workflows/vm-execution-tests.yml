@@ -29,8 +29,13 @@ env:
 jobs:
   unit-tests:
     name: Unit Tests
+<<<<<<< HEAD
     runs-on: ubuntu-latest
     timeout-minutes: 15
+=======
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 10
+>>>>>>> origin/main
 
     steps:
     - name: Platform check
@@ -93,8 +98,13 @@ jobs:
 
   integration-tests:
     name: Integration Tests
+<<<<<<< HEAD
     runs-on: ubuntu-latest
     timeout-minutes: 30
+=======
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 15
+>>>>>>> origin/main
 
     services:
       redis:
@@ -203,8 +213,8 @@ jobs:
 
   websocket-tests:
     name: WebSocket Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 10
     needs: integration-tests
 
     steps:
@@ -232,7 +242,21 @@ jobs:
           ${{ runner.os }}-cargo-websocket-
           ${{ runner.os }}-cargo-
 
+<<<<<<< HEAD
+=======
+    - name: Check if fcctl-web exists
+      id: check_fcctl_websocket
+      run: |
+        if [ -d "scratchpad/firecracker-rust/fcctl-web" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ fcctl-web not found - skipping WebSocket tests (experimental code is gitignored)"
+        fi
+
+>>>>>>> origin/main
     - name: Build and start fcctl-web
+      if: steps.check_fcctl_websocket.outputs.exists == 'true'
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo build --release
@@ -248,6 +272,7 @@ jobs:
         done
 
     - name: Run WebSocket tests
+      if: steps.check_fcctl_websocket.outputs.exists == 'true'
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo test websocket_tests \
@@ -255,6 +280,13 @@ jobs:
           --ignored \
           -- --nocapture
 
+<<<<<<< HEAD
+=======
+    - name: Skip message
+      if: steps.check_fcctl_websocket.outputs.exists == 'false'
+      run: echo "✅ Skipping WebSocket tests - fcctl-web experimental code not present (gitignored)"
+
+>>>>>>> origin/main
     - name: Stop server
       if: always()
       run: |
@@ -264,8 +296,8 @@ jobs:
 
   e2e-tests:
     name: End-to-End Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 20
     needs: [unit-tests, integration-tests]
 
     steps:
@@ -293,7 +325,21 @@ jobs:
           ${{ runner.os }}-cargo-e2e-
           ${{ runner.os }}-cargo-
 
+<<<<<<< HEAD
+=======
+    - name: Check if fcctl-web exists
+      id: check_fcctl_e2e
+      run: |
+        if [ -d "scratchpad/firecracker-rust/fcctl-web" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ fcctl-web not found - skipping E2E tests (experimental code is gitignored)"
+        fi
+
+>>>>>>> origin/main
     - name: Build all components
+      if: steps.check_fcctl_e2e.outputs.exists == 'true'
       run: |
         cargo build --release
         cd scratchpad/firecracker-rust/fcctl-web
@@ -301,6 +347,7 @@ jobs:
         cd -
 
     - name: Start fcctl-web server
+      if: steps.check_fcctl_e2e.outputs.exists == 'true'
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         ./target/release/fcctl-web &
@@ -316,6 +363,7 @@ jobs:
         done
 
     - name: Run end-to-end tests
+      if: steps.check_fcctl_e2e.outputs.exists == 'true'
       run: |
         cargo test agent_vm_integration_tests \
           --verbose \
@@ -324,12 +372,20 @@ jobs:
           --test-threads=1
 
     - name: Test agent configuration
+      if: steps.check_fcctl_e2e.outputs.exists == 'true'
       run: |
         cargo test test_agent_with_vm_execution \
           --verbose \
           --ignored \
           -- --nocapture
 
+<<<<<<< HEAD
+=======
+    - name: Skip message
+      if: steps.check_fcctl_e2e.outputs.exists == 'false'
+      run: echo "✅ Skipping E2E tests - fcctl-web experimental code not present (gitignored)"
+
+>>>>>>> origin/main
     - name: Stop server
       if: always()
       run: |
@@ -339,8 +395,13 @@ jobs:
 
   security-tests:
     name: Security Tests
+<<<<<<< HEAD
     runs-on: ubuntu-latest
     timeout-minutes: 25
+=======
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 15
+>>>>>>> origin/main
 
     steps:
     - name: Checkout code
@@ -431,8 +492,13 @@ jobs:
 
   performance-tests:
     name: Performance Tests
+<<<<<<< HEAD
     runs-on: ubuntu-latest
     timeout-minutes: 20
+=======
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 10
+>>>>>>> origin/main
 
     steps:
     - name: Checkout code
@@ -525,8 +591,13 @@ jobs:
 
   test-script:
     name: Test Runner Script
+<<<<<<< HEAD
     runs-on: ubuntu-latest
     timeout-minutes: 10
+=======
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 15
+>>>>>>> origin/main
 
     steps:
     - name: Checkout code
@@ -554,7 +625,7 @@ jobs:
       if: steps.check_script.outputs.exists == 'true'
       run: |
         ./scripts/test-vm-execution.sh unit \
-          --timeout 300 \
+          --timeout 600 \
           --verbose
 
     - name: Verify script creates logs
@@ -569,8 +640,8 @@ jobs:
 
   coverage:
     name: Test Coverage
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
+    runs-on: [self-hosted, linux, bigbox]
+    timeout-minutes: 30
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
@@ -605,6 +676,19 @@ jobs:
           ${{ runner.os }}-cargo-coverage-
           ${{ runner.os }}-cargo-
 
+<<<<<<< HEAD
+=======
+    - name: Check if fcctl-web exists for coverage
+      id: check_fcctl_coverage
+      run: |
+        if [ -d "scratchpad/firecracker-rust/fcctl-web" ]; then
+          echo "exists=true" >> $GITHUB_OUTPUT
+        else
+          echo "exists=false" >> $GITHUB_OUTPUT
+          echo "⚠️ fcctl-web not found - running coverage without integration tests (experimental code is gitignored)"
+        fi
+
+>>>>>>> origin/main
     - name: Run tests with coverage
       env:
         CARGO_INCREMENTAL: 0
@@ -614,6 +698,7 @@ jobs:
         # Unit tests
         cargo test -p terraphim_multi_agent vm_execution
 
+<<<<<<< HEAD
         # Build fcctl-web
         cd scratchpad/firecracker-rust/fcctl-web
         cargo build
@@ -636,6 +721,35 @@ jobs:
 
         # Stop server
         kill $FCCTL_WEB_PID || true
+=======
+        # Build fcctl-web and run integration tests if available
+        if [ "${{ steps.check_fcctl_coverage.outputs.exists }}" == "true" ]; then
+          # Build fcctl-web
+          cd scratchpad/firecracker-rust/fcctl-web
+          cargo build
+          ./target/debug/fcctl-web &
+          FCCTL_WEB_PID=$!
+          cd -
+
+          # Wait for server
+          for i in {1..30}; do
+            if curl -s http://localhost:8080/health > /dev/null 2>&1; then
+              break
+            fi
+            sleep 2
+          done
+
+          # Integration tests (with mock data to avoid needing real VMs)
+          cd scratchpad/firecracker-rust/fcctl-web
+          cargo test llm_api_tests || true # Allow failure for coverage
+          cd -
+
+          # Stop server
+          kill $FCCTL_WEB_PID || true
+        else
+          echo "Skipping fcctl-web integration tests for coverage - experimental code not present"
+        fi
+>>>>>>> origin/main
 
     - name: Generate coverage report
       run: |
@@ -666,7 +780,7 @@ jobs:
 
   summary:
     name: Test Summary
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [unit-tests, integration-tests, websocket-tests, e2e-tests, security-tests, performance-tests]
     if: always()
 

@@ -1,27 +1,33 @@
-import { CONFIG } from '../../config';
 import { invoke } from '@tauri-apps/api/tauri';
-import { is_tauri } from '../stores';
 import { get } from 'svelte/store';
+import { is_tauri } from '../stores';
 
+// Helper function to check if we're in Tauri mode
+function isTauriMode(): boolean {
+	// Check both the store value and the global window object for reliability
+	return (
+		get(is_tauri) || (typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined)
+	);
+}
 export interface NovelAutocompleteSuggestion {
-  text: string;
-  snippet?: string;
-  score?: number;
+	text: string;
+	snippet?: string;
+	score?: number;
 }
 
 export interface NovelAutocompleteRequest {
-  prompt: string;
-  context?: string;
-  maxTokens?: number;
+	prompt: string;
+	context?: string;
+	maxTokens?: number;
 }
 
 export interface NovelAutocompleteResponse {
-  text: string;
-  usage?: {
-    promptTokens: number;
-    completionTokens: number;
-    totalTokens: number;
-  };
+	text: string;
+	usage?: {
+		promptTokens: number;
+		completionTokens: number;
+		totalTokens: number;
+	};
 }
 
 /**

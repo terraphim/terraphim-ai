@@ -233,6 +233,10 @@ OLLAMA_MODEL_NAME="op://Terraphim-Dev/Ollama/MODEL_NAME"
 ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY"
 ANTHROPIC_MODEL_NAME="op://Terraphim-Dev/Anthropic/MODEL_NAME"
 
+# LLM Proxy Configuration (z.ai)
+ANTHROPIC_BASE_URL="op://Terraphim-Dev/Anthropic/BASE_URL"
+ANTHROPIC_AUTH_TOKEN="op://Terraphim-Dev/Anthropic/AUTH_TOKEN"
+
 # Search Services
 PERPLEXITY_API_KEY="op://Terraphim-Dev/Perplexity/API_KEY"
 ATOMIC_SERVER_URL="op://Terraphim-Dev/AtomicServer/URL"

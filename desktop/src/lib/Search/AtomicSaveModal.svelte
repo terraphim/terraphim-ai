@@ -1,4 +1,5 @@
 <script lang="ts">
+<<<<<<< HEAD
   import { Modal, Field, Input, Select, Button, Message } from "svelma";
   import { invoke } from "@tauri-apps/api/tauri";
   import { is_tauri, role, configStore } from "../stores";
@@ -232,9 +233,239 @@
       active = false;
     }
   }
+=======
+import { invoke } from '@tauri-apps/api/tauri';
+import { CONFIG } from '../../config';
+import type { Haystack, Role } from '../generated/types';
+import type { Document } from './SearchResult';
+import { Modal, Message, Button, Input, Field } from 'svelma';
+import { role, configStore, is_tauri } from '$lib/stores';
+
+export let active: boolean = false;
+export let document: Document;
+
+// State for the save process
+let saving = false;
+let _error: string | null = null;
+let _success = false;
+let selectedParent = '';
+let customParent = '';
+let useCustomParent = false;
+let articleTitle = '';
+let articleDescription = '';
+
+// Available atomic servers from current role
+let atomicHaystacks: Haystack[] = [];
+let selectedAtomicServer = '';
+
+// Predefined parent options
+const _predefinedParents = [
+	{ label: 'Root (Server Root)', value: '' },
+	{ label: 'Articles Collection', value: 'articles' },
+	{ label: 'Documents Collection', value: 'documents' },
+	{ label: 'Knowledge Base', value: 'knowledge-base' },
+	{ label: 'Research', value: 'research' },
+	{ label: 'Projects', value: 'projects' },
+];
+
+// Watch for active changes to reset state and load atomic servers
+$: if (active && document) {
+	resetModal();
+	loadAtomicServers();
+}
+
+function resetModal() {
+	saving = false;
+	_error = null;
+	_success = false;
+	selectedParent = '';
+	customParent = '';
+	useCustomParent = false;
+	articleTitle = document?.title || '';
+	articleDescription =
+		document?.description || `Article saved from Terraphim search: ${document?.title}`;
+	atomicHaystacks = [];
+	selectedAtomicServer = '';
+}
+
+function loadAtomicServers() {
+	// Find atomic server haystacks from current role configuration
+	const currentRoleName = $role;
+	const config = $configStore;
+
+	if (!config?.roles || !currentRoleName) {
+		console.warn('No role configuration found');
+		return;
+	}
+
+	// Find the current role object - handle the complex role structure
+	let currentRole: Role | null = null;
+
+	try {
+		// Handle both string keys and RoleName objects in the roles map
+		for (const [roleName, roleConfig] of Object.entries(config.roles)) {
+			// Cast roleConfig to Role type for proper access
+			const role = roleConfig as Role;
+
+			// Check various ways the role name might match
+			const roleNameStr = typeof role.name === 'object' ? role.name.original : String(role.name);
+
+			if (roleName === currentRoleName || roleNameStr === currentRoleName) {
+				currentRole = role;
+				break;
+			}
+		}
+	} catch (error) {
+		console.warn('Error checking role configuration:', error);
+		return;
+	}
+
+	if (!currentRole) {
+		console.warn(`Role "${currentRoleName}" not found in configuration`);
+		return;
+	}
+
+	// Filter haystacks to find atomic servers
+	atomicHaystacks =
+		currentRole.haystacks?.filter(
+			(haystack) => haystack.service === 'Atomic' && haystack.location && !haystack.read_only
+		) || [];
+
+	// Auto-select first atomic server if available
+	if (atomicHaystacks.length > 0) {
+		selectedAtomicServer = atomicHaystacks[0].location;
+	}
+
+	console.log('Loaded atomic servers:', atomicHaystacks);
+}
+
+function getAtomicServerSecret(): string | undefined {
+	const selectedHaystack = atomicHaystacks.find((h) => h.location === selectedAtomicServer);
+	return selectedHaystack?.atomic_server_secret;
+}
+
+function buildParentUrl(): string {
+	const baseUrl = selectedAtomicServer.replace(/\/$/, '');
+
+	if (useCustomParent && customParent.trim()) {
+		// Custom parent - ensure it doesn't start with server URL to avoid duplication
+		const parentPath = customParent.trim();
+		if (parentPath.startsWith('http://') || parentPath.startsWith('https://')) {
+			return parentPath; // Full URL provided
+		} else {
+			return `${baseUrl}/${parentPath.replace(/^\//, '')}`; // Relative path
+		}
+	} else if (selectedParent) {
+		return `${baseUrl}/${selectedParent}`;
+	} else {
+		return baseUrl; // Root
+	}
+}
+
+function generateArticleSlug(): string {
+	// Create URL-safe slug from title
+	return articleTitle
+		.toLowerCase()
+		.replace(/[^a-z0-9\s-]/g, '') // Remove special chars except spaces and hyphens
+		.replace(/\s+/g, '-') // Replace spaces with hyphens
+		.replace(/-+/g, '-') // Replace multiple hyphens with single
+		.replace(/^-|-$/g, '') // Remove leading/trailing hyphens
+		.substring(0, 50); // Limit length
+}
+
+function buildSubjectUrl(): string {
+	const baseUrl = selectedAtomicServer.replace(/\/$/, '');
+	const slug = generateArticleSlug();
+	const timestamp = Date.now();
+	return `${baseUrl}/${slug}-${timestamp}`;
+}
+
+async function _saveToAtomic() {
+	if (!selectedAtomicServer || !articleTitle.trim()) {
+		_error = 'Please select an atomic server and provide a title';
+		return;
+	}
+
+	saving = true;
+	_error = null;
+
+	try {
+		const subjectUrl = buildSubjectUrl();
+		const parentUrl = buildParentUrl();
+		const atomicSecret = getAtomicServerSecret();
+
+		console.log('🔄 Saving article to atomic server:', {
+			subject: subjectUrl,
+			parent: parentUrl,
+			server: selectedAtomicServer,
+			hasSecret: !!atomicSecret,
+		});
+
+		const atomicArticle = {
+			subject: subjectUrl,
+			title: articleTitle.trim(),
+			description: articleDescription.trim(),
+			body: document.body,
+			parent: parentUrl,
+			shortname: generateArticleSlug(),
+			// Preserve original metadata
+			original_id: document.id,
+			original_url: document.url,
+			original_rank: document.rank,
+			tags: document.tags || [],
+		};
+
+		if ($is_tauri) {
+			// Use Tauri command
+			await invoke('save_article_to_atomic', {
+				article: atomicArticle,
+				serverUrl: selectedAtomicServer,
+				atomicSecret: atomicSecret,
+			});
+		} else {
+			// Use HTTP API
+			const response = await fetch(`${CONFIG.ServerURL}/atomic/save`, {
+				method: 'POST',
+				headers: {
+					'Content-Type': 'application/json',
+				},
+				body: JSON.stringify({
+					article: atomicArticle,
+					server_url: selectedAtomicServer,
+					atomic_secret: atomicSecret,
+				}),
+			});
+
+			if (!response.ok) {
+				const errorData = await response.json().catch(() => ({ error: response.statusText }));
+				throw new Error(errorData.error || `HTTP ${response.status}: ${response.statusText}`);
+			}
+		}
+
+		_success = true;
+		console.log('✅ Article saved successfully to atomic server');
+
+		// Auto-close after 2 seconds
+		setTimeout(() => {
+			active = false;
+		}, 2000);
+	} catch (err) {
+		console.error('❌ Failed to save article to atomic server:', err);
+		_error = (err as Error).message || 'Failed to save article to atomic server';
+	} finally {
+		saving = false;
+	}
+}
+
+function _handleClose() {
+	if (!saving) {
+		active = false;
+	}
+}
+>>>>>>> origin/main
 </script>
 
-<Modal bind:active on:close={handleClose}>
+<Modal bind:active on:close={_handleClose}>
   <div class="box">
     <!-- Header -->
     <div class="level">
@@ -252,7 +483,7 @@
         <div class="level-item">
           <button
             class="delete is-large"
-            on:click={handleClose}
+            on:click={_handleClose}
             disabled={saving}
             aria-label="close"
           ></button>
@@ -261,7 +492,7 @@
     </div>
 
     <!-- Success Message -->
-    {#if success}
+    {#if _success}
       <Message type="is-success">
         <p><strong>Success!</strong> Article saved to atomic server successfully.</p>
         <p>The modal will close automatically...</p>
@@ -269,14 +500,14 @@
     {/if}
 
     <!-- Error Message -->
-    {#if error}
+    {#if _error}
       <Message type="is-danger">
-        <p><strong>Error:</strong> {error}</p>
+        <p><strong>Error:</strong> {_error}</p>
       </Message>
     {/if}
 
     <!-- Main Content -->
-    {#if !success}
+    {#if !_success}
       <!-- Document Preview -->
       <div class="field">
         <div class="label">Document to Save</div>
@@ -388,7 +619,7 @@
             <div class="control">
               <div class="select is-fullwidth">
                 <select bind:value={selectedParent} disabled={saving}>
-                  {#each predefinedParents as parent}
+                  {#each _predefinedParents as parent}
                     <option value={parent.value}>{parent.label}</option>
                   {/each}
                 </select>
@@ -418,7 +649,7 @@
               type="is-primary"
               loading={saving}
               disabled={saving || !articleTitle.trim() || !selectedAtomicServer}
-              on:click={saveToAtomic}
+              on:click={_saveToAtomic}
             >
               <span class="icon">
                 <i class="fas fa-cloud-upload-alt"></i>
@@ -430,7 +661,7 @@
             <Button
               type="is-light"
               disabled={saving}
-              on:click={handleClose}
+            on:click={_handleClose}
             >
               Cancel
             </Button>

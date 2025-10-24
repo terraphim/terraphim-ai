@@ -16,7 +16,7 @@ name = "terraphim-build-args"
 path = "src/bin/main.rs"
 
 [dependencies]
-clap = { version = "4.4", features = ["derive", "env"] }
+clap = { version = "4.5", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 serde_yaml = "0.9"
@@ -33,7 +33,7 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["serde", "v4"] }
 
 [dev-dependencies]
-tempfile = "3.8"
+tempfile = "3.23"
 tokio-test = "0.4"
 mockall = "0.13"
 

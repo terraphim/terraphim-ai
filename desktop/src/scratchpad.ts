@@ -5,30 +5,28 @@
 //     PostMessageDataResponse,
 // } from './workers/postmessage';
 
-import { onMount } from 'svelte';
+// const onWorkerMessage = ({
+//   data: { msg, data },
+// }: MessageEvent<PostMessage<PostMessageDataResponse>>) => {
+//   console.log(msg, data);
+// };
 
-  // const onWorkerMessage = ({
-  //   data: { msg, data },
-  // }: MessageEvent<PostMessage<PostMessageDataResponse>>) => {
-  //   console.log(msg, data);
-  // };
+// let syncWorker: Worker | undefined = undefined;
 
-  // let syncWorker: Worker | undefined = undefined;
+// const loadWorker = async () => {
+//   const SyncWorker = await import('$workers/fetcher.worker?worker');
+//   syncWorker = new SyncWorker.default();
 
-  // const loadWorker = async () => {
-  //   const SyncWorker = await import('$workers/fetcher.worker?worker');
-  //   syncWorker = new SyncWorker.default();
+//   syncWorker.onmessage = onWorkerMessage;
 
-  //   syncWorker.onmessage = onWorkerMessage;
+//   const message: PostMessage<PostMessageDataRequest> = {
+//     msg: 'request1',
+//     data: { text: 'Hello World v2 🤪' },
+//   };
+//   syncWorker.postMessage(message);
+// };
 
-  //   const message: PostMessage<PostMessageDataRequest> = {
-  //     msg: 'request1',
-  //     data: { text: 'Hello World v2 🤪' },
-  //   };
-  //   syncWorker.postMessage(message);
-  // };
-
-  // onMount(loadWorker);
+// onMount(loadWorker);
 
 // import { writable } from 'svelte/store'
 
@@ -51,6 +49,11 @@ import { onMount } from 'svelte';
 
 //     get()
 
+<<<<<<< HEAD
 //     return [data, loading, error, get]
 
 export {};
+=======
+//         return [data, loading, error, get]
+// }
+>>>>>>> origin/main

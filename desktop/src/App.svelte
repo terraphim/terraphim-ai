@@ -1,19 +1,19 @@
 <script lang="ts">
 import { Route, router, active } from "tinro";
 import "@fortawesome/fontawesome-free/css/all.css";
-  import Search from "./lib/Search/Search.svelte";
-  import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
-  import { theme } from "./lib/stores";
-  import ConfigWizard from "./lib/ConfigWizard.svelte";
-  import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
-  import RoleGraphVisualization from "./lib/RoleGraphVisualization.svelte";
-  import Chat from "./lib/Chat/Chat.svelte";
-  import logo from "/assets/terraphim_gray.png";
+import Search from "./lib/Search/Search.svelte";
+import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
+import { theme } from "./lib/stores";
+import ConfigWizard from "./lib/ConfigWizard.svelte";
+import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
+import RoleGraphVisualization from "./lib/RoleGraphVisualization.svelte";
+import Chat from "./lib/Chat/Chat.svelte";
+import logo from "/assets/terraphim_gray.png";
 
-  let visible = "is-hidden";
-  function toggleVissible() {
-    visible = "";
-  }
+let _visible = 'is-hidden';
+function _toggleVissible() {
+	_visible = '';
+}
 
   function goBack() {
     // Try to go back in browser history, fallback to home
@@ -35,18 +35,18 @@ import "@fortawesome/fontawesome-free/css/all.css";
     <div class="top-controls">
       <div class="main-navigation">
         <div class="navigation-row">
-          <button
-            class="logo-back-button"
-            on:click={goBack}
-            on:keydown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
-                goBack();
-              }
-            }}
-            title="Go back"
-            aria-label="Go back"
-          >
+  <button
+    class="logo-back-button"
+    on:click={goBack}
+    on:keydown={(e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        goBack();
+      }
+    }}
+    title="Go back"
+    aria-label="Go back"
+  >
             <img src={logo} alt="Terraphim" class="logo-image" />
           </button>
           <div class="tabs is-boxed">
@@ -88,8 +88,8 @@ import "@fortawesome/fontawesome-free/css/all.css";
     <Route path="/config/json"><ConfigJsonEditor /></Route>
   </main>
 
-  <footer on:mouseover={toggleVissible} on:focus={toggleVissible}>
-    <div class={visible}>
+  <footer on:mouseover={_toggleVissible} on:focus={_toggleVissible}>
+    <div class={_visible}>
       <Route path="/">
         <nav class="navbar">
           <div class="navbar-brand">

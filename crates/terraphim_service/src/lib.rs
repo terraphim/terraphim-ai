@@ -20,6 +20,9 @@ pub mod openrouter;
 // Generic LLM layer for multiple providers (OpenRouter, Ollama, etc.)
 pub mod llm;
 
+// LLM proxy service for unified provider management
+pub mod llm_proxy;
+
 // Centralized HTTP client creation and configuration
 pub mod http_client;
 
@@ -2936,19 +2939,12 @@ mod tests {
             terraphim_it: true,
             theme: "default".to_string(),
             relevance_function: terraphim_types::RelevanceFunction::TerraphimGraph,
-            #[cfg(feature = "openrouter")]
             llm_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_api_key: None,
-            #[cfg(feature = "openrouter")]
             llm_model: None,
-            #[cfg(feature = "openrouter")]
             llm_auto_summarize: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_enabled: false,
-            #[cfg(feature = "openrouter")]
             llm_chat_system_prompt: None,
-            #[cfg(feature = "openrouter")]
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
