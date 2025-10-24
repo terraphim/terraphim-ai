@@ -32,7 +32,7 @@ test_categories:
       - rust_crates
       - javascript_typescript
       - api_endpoints
-  
+
   integration_tests:
     priority: "high"
     timeout: "15m"
@@ -40,7 +40,7 @@ test_categories:
       - vm_execution_api
       - agent_system
       - llm_proxy_integration
-  
+
   security_tests:
     priority: "critical"
     timeout: "10m"
@@ -48,7 +48,7 @@ test_categories:
       - vulnerability_scanning
       - penetration_testing
       - dependency_audit
-  
+
   performance_tests:
     priority: "medium"
     timeout: "20m"
@@ -56,7 +56,7 @@ test_categories:
       - vm_boot_time
       - memory_usage
       - api_response_time
-  
+
   e2e_tests:
     priority: "high"
     timeout: "30m"
@@ -129,18 +129,18 @@ jobs:
         component: [rust-crates, javascript-typescript, api-endpoints]
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 10
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup Rust
         if: matrix.component == 'rust-crates'
         uses: actions-rs/toolchain@v1
         with:
           toolchain: stable
           components: rustfmt, clippy
-          
+
       - name: Setup Node.js
         if: matrix.component == 'javascript-typescript'
         uses: actions/setup-node@v4
@@ -148,14 +148,14 @@ jobs:
           node-version: '20'
           cache: 'npm'
           cache-dependency-path: 'desktop/package-lock.json'
-          
+
       - name: Run Rust unit tests
         if: matrix.component == 'rust-crates'
         run: |
           cargo fmt --all -- --check
           cargo clippy --workspace --all-targets --all-features -- -D warnings
           cargo test --workspace --lib --bins
-          
+
       - name: Run JavaScript/TypeScript tests
         if: matrix.component == 'javascript-typescript'
         run: |
@@ -164,7 +164,7 @@ jobs:
           npm run test
           npm run lint
           npm run type-check
-          
+
       - name: Run API endpoint tests
         if: matrix.component == 'api-endpoints'
         run: |
@@ -172,10 +172,10 @@ jobs:
           cargo run --bin terraphim_server &
           SERVER_PID=$!
           sleep 10
-          
+
           # Run API tests
           cargo test -p terraphim_multi_agent --test api_tests
-          
+
           # Cleanup
           kill $SERVER_PID || true
 
@@ -184,16 +184,16 @@ jobs:
     if: needs.determine-scope.outputs.run-integration == 'true'
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 20
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup environment
         run: |
           source ~/.cargo/env
           mkdir -p test-data/integration
-          
+
       - name: Test VM Execution API
         run: |
           if [ -d "scratchpad/firecracker-rust/fcctl-web" ]; then
@@ -202,11 +202,11 @@ jobs:
           else
             echo "⚠️ VM execution tests skipped (firecracker-rust not present)"
           fi
-          
+
       - name: Test Agent System Integration
         run: |
           cargo test -p terraphim_multi_agent --test integration_tests
-          
+
       - name: Test LLM Proxy Integration
         run: |
           # Mock LLM proxy for testing
@@ -218,26 +218,26 @@ jobs:
     if: needs.determine-scope.outputs.run-security == 'true'
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 15
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Run security audit
         run: |
           cargo audit
           cargo deny check
-          
+
       - name: Run security tests
         run: |
           cargo test -p terraphim_multi_agent --test security_tests
-          
+
       - name: Run penetration tests
         run: |
           if [ -f "scripts/security-penetration-test.sh" ]; then
             ./scripts/security-penetration-test.sh
           fi
-          
+
       - name: Check for secrets
         run: |
           detect-secrets --baseline .secrets.baseline --scan-all
@@ -247,24 +247,24 @@ jobs:
     if: needs.determine-scope.outputs.run-performance == 'true'
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 25
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Run performance benchmarks
         run: |
           if [ -d "benchmarks" ]; then
             cd benchmarks
             cargo bench --all
           fi
-          
+
       - name: Test VM performance
         run: |
           if [ -d "scratchpad/firecracker-rust" ]; then
             ./scripts/test-vm-performance.sh
           fi
-          
+
       - name: Generate performance report
         run: |
           python3 scripts/generate-performance-report.py
@@ -274,24 +274,24 @@ jobs:
     if: needs.determine-scope.outputs.run-e2e == 'true'
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 35
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup test environment
         run: |
           docker-compose -f docker-compose.test.yml up -d
           sleep 30
-          
+
       - name: Run E2E tests
         run: |
           cargo test -p terraphim_multi_agent --test e2e_tests
-          
+
       - name: Test complete workflows
         run: |
           ./scripts/test-complete-workflows.sh
-          
+
       - name: Cleanup
         run: |
           docker-compose -f docker-compose.test.yml down -v
@@ -331,7 +331,7 @@ repos:
         language: system
         types: [rust]
         pass_filenames: false
-        
+
       - id: cargo-clippy
         name: Cargo clippy
         entry: bash -c 'cargo clippy --workspace --all-targets --all-features -- -D warnings || (echo "⚠️ Clippy failed - run \"cargo clippy --fix\" to auto-fix" && exit 1)'
@@ -372,7 +372,7 @@ repos:
         entry: python3 scripts/security-pattern-scan.py
         language: system
         files: '\.(rs|js|ts)$'
-        
+
       - id: vm-execution-validation
         name: VM execution validation
         entry: bash scripts/validate-vm-execution-changes.sh
@@ -398,7 +398,7 @@ repos:
         entry: markdownlint
         language: system
         files: '\.md$'
-        
+
       - id: doc-link-check
         name: Documentation link check
         entry: bash scripts/check-doc-links.sh
@@ -453,20 +453,20 @@ SECURITY_PATTERNS = {
 def scan_file(file_path):
     """Scan a single file for security patterns"""
     issues = []
-    
+
     try:
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
             lines = content.split('\n')
     except UnicodeDecodeError:
         return issues  # Skip binary files
-    
+
     for category, patterns in SECURITY_PATTERNS.items():
         for pattern in patterns:
             for match in re.finditer(pattern, content, re.IGNORECASE):
                 line_num = content[:match.start()].count('\n') + 1
                 line_content = lines[line_num - 1].strip()
-                
+
                 issues.append({
                     'file': str(file_path),
                     'line': line_num,
@@ -474,7 +474,7 @@ def scan_file(file_path):
                     'pattern': pattern,
                     'content': line_content,
                 })
-    
+
     return issues
 
 def main():
@@ -482,14 +482,14 @@ def main():
     if len(sys.argv) != 2:
         print("Usage: python3 security-pattern-scan.py <file>")
         sys.exit(1)
-    
+
     file_path = Path(sys.argv[1])
     if not file_path.exists():
         print(f"File not found: {file_path}")
         sys.exit(1)
-    
+
     issues = scan_file(file_path)
-    
+
     if issues:
         print(f"🚨 Security issues found in {file_path}:")
         for issue in issues:
@@ -549,24 +549,24 @@ fi
 # Install Firecracker if not present
 if ! command -v firecracker &> /dev/null; then
     log "Installing Firecracker..."
-    
+
     # Download latest Firecracker binary
     FIRECRACKER_VERSION=$(curl -s https://api.github.com/repos/firecracker-microvm/firecracker/releases/latest | grep tag_name | cut -d '"' -f 4)
     ARCH=$(uname -m)
-    
+
     if [[ "$ARCH" == "x86_64" ]]; then
         FC_ARCH="x86_64"
     else
         error "Unsupported architecture: $ARCH"
         exit 1
     fi
-    
+
     wget "https://github.com/firecracker-microvm/firecracker/releases/download/${FIRECRACKER_VERSION}/firecracker-${FIRECRACKER_VERSION}-${FC_ARCH}.tgz"
     tar -xzf "firecracker-${FIRECRACKER_VERSION}-${FC_ARCH}.tgz"
     sudo mv release-v*/firecracker-${FC_ARCH}-v*/firecracker /usr/local/bin/
     sudo chmod +x /usr/local/bin/firecracker
     rm -rf firecracker-*
-    
+
     log "Firecracker installed successfully"
 else
     log "Firecracker already installed"
@@ -621,7 +621,7 @@ VM_POOL_SIZE=5
 # Test scenarios
 declare -a TEST_SCENARIOS=(
     "basic_execution"
-    "concurrent_execution" 
+    "concurrent_execution"
     "snapshot_rollback"
     "resource_limits"
     "security_isolation"
@@ -633,7 +633,7 @@ declare -a TEST_SCENARIOS=(
 run_test_scenario() {
     local scenario=$1
     local test_file="test-scenarios/${scenario}.sh"
-    
+
     if [[ -f "$test_file" ]]; then
         echo "🧪 Running scenario: $scenario"
         bash "$test_file" || {
@@ -653,10 +653,10 @@ main() {
     echo "Timeout: ${TEST_TIMEOUT}s"
     echo "Parallel jobs: $PARALLEL_JOBS"
     echo ""
-    
+
     # Setup test environment
     ./scripts/setup-vm-test-env.sh
-    
+
     # Start fcctl-web if not running
     if ! curl -s "$FCCTL_WEB_URL/health" > /dev/null; then
         echo "🔧 Starting fcctl-web..."
@@ -664,7 +664,7 @@ main() {
         cargo run -- --host 0.0.0.0 --port 8080 &
         FCCTL_PID=$!
         cd - > /dev/null
-        
+
         # Wait for startup
         for i in {1..30}; do
             if curl -s "$FCCTL_WEB_URL/health" > /dev/null; then
@@ -674,26 +674,26 @@ main() {
             sleep 1
         done
     fi
-    
+
     # Run test scenarios
     local failed_scenarios=()
-    
+
     for scenario in "${TEST_SCENARIOS[@]}"; do
         if ! run_test_scenario "$scenario"; then
             failed_scenarios+=("$scenario")
         fi
     done
-    
+
     # Cleanup
     if [[ -n "${FCCTL_PID:-}" ]]; then
         kill $FCCTL_PID || true
     fi
-    
+
     # Report results
     echo ""
     echo "📊 Test Results Summary"
     echo "======================"
-    
+
     if [[ ${#failed_scenarios[@]} -eq 0 ]]; then
         echo "🎉 All test scenarios passed!"
         exit 0
@@ -729,44 +729,44 @@ jobs:
   vm-performance:
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 30
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Setup benchmark environment
         run: |
           ./scripts/setup-vm-test-env.sh
           mkdir -p benchmark-results
-          
+
       - name: Run VM boot time benchmarks
         run: |
           cd benchmarks
           cargo run --bin vm-boot-time --release > ../benchmark-results/vm-boot-time.json
-          
+
       - name: Run execution performance benchmarks
         run: |
           cd benchmarks
           cargo run --bin execution-performance --release > ../benchmark-results/execution-performance.json
-          
+
       - name: Run memory usage benchmarks
         run: |
           cd benchmarks
           cargo run --bin memory-usage --release > ../benchmark-results/memory-usage.json
-          
+
       - name: Generate performance report
         run: |
           python3 scripts/generate-performance-report.py \
             --input benchmark-results/ \
             --output benchmark-results/report.html \
             --baseline benchmark-results/baseline.json
-            
+
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
           path: benchmark-results/
-          
+
       - name: Comment PR with performance changes
         if: github.event_name == 'pull_request'
         uses: actions/github-script@v7
@@ -774,7 +774,7 @@ jobs:
           script: |
             const fs = require('fs');
             const report = fs.readFileSync('benchmark-results/report.html', 'utf8');
-            
+
             github.rest.issues.createComment({
               issue_number: context.issue.number,
               owner: context.repo.owner,
@@ -803,17 +803,17 @@ def load_benchmark_results(file_path):
 def calculate_regression(current, baseline, threshold=0.1):
     """Calculate performance regression"""
     regressions = []
-    
+
     for metric in current:
         if metric in baseline:
             current_val = current[metric]
             baseline_val = baseline[metric]
-            
+
             if baseline_val == 0:
                 continue
-                
+
             change = (current_val - baseline_val) / baseline_val
-            
+
             if change > threshold:  # Performance got worse
                 regressions.append({
                     'metric': metric,
@@ -821,23 +821,23 @@ def calculate_regression(current, baseline, threshold=0.1):
                     'baseline': baseline_val,
                     'change_percent': change * 100
                 })
-    
+
     return regressions
 
 def main():
     if len(sys.argv) < 2:
         print("Usage: python3 performance-regression-check.py <results-file> [baseline-file]")
         sys.exit(1)
-    
+
     results_file = sys.argv[1]
     baseline_file = sys.argv[2] if len(sys.argv) > 2 else "benchmark-results/baseline.json"
-    
+
     if not os.path.exists(results_file):
         print(f"Results file not found: {results_file}")
         sys.exit(0)  # Not an error, just no results to check
-    
+
     current_results = load_benchmark_results(results_file)
-    
+
     if not os.path.exists(baseline_file):
         print(f"Baseline file not found: {baseline_file}")
         print("Creating baseline from current results...")
@@ -845,10 +845,10 @@ def main():
         with open(baseline_file, 'w') as f:
             json.dump(current_results, f, indent=2)
         sys.exit(0)
-    
+
     baseline_results = load_benchmark_results(baseline_file)
     regressions = calculate_regression(current_results, baseline_results)
-    
+
     if regressions:
         print("🚨 Performance regressions detected:")
         for regression in regressions:
@@ -883,39 +883,39 @@ jobs:
   vulnerability-scan:
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 15
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-        
+
       - name: Run Rust security audit
         run: |
           cargo install cargo-audit
           cargo audit
-          
+
       - name: Run dependency check
         run: |
           cargo install cargo-deny
           cargo deny check
-          
+
       - name: Run security tests
         run: |
           cargo test -p terraphim_multi_agent --test security_tests
-          
+
       - name: Run penetration tests
         run: |
           if [ -f "scripts/security-penetration-test.sh" ]; then
             sudo ./scripts/security-penetration-test.sh
           fi
-          
+
       - name: Scan for secrets
         run: |
           detect-secrets --baseline .secrets.baseline --scan-all
-          
+
       - name: Generate security report
         run: |
           python3 scripts/generate-security-report.py > security-report.html
-          
+
       - name: Upload security report
         uses: actions/upload-artifact@v4
         with:

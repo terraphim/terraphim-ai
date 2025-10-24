@@ -1,12 +1,12 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Field, Input, Tag, Taglist } from 'svelma';
 import { onDestroy, onMount } from 'svelte';
+import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
+import logo from '/assets/terraphim.png';
+import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
-import { Field, Input, Tag, Taglist } from 'svelma';
-import { input, typeahead, role, serverUrl, is_tauri, thesaurus } from '$lib/stores';
-import ResultItem from './ResultItem.svelte';
-import logo from '/assets/terraphim.png';
 
 let results: Document[] = [];
 let _error: string | null = null;

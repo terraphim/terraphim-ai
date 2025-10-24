@@ -1,0 +1,23 @@
+[package]
+name = "jmap_client"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+haystack_core = { path = "../haystack_core" }
+terraphim_types = { path = "../terraphim_types" }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = { version = "1.0", features = ["std"] }
+base64 = "0.21"
+clap = { version = "4.0", features = ["derive"] }
+
+[lib]
+name = "jmap_client"
+path = "src/lib.rs"
+
+[[bin]]
+name = "jmap_search"
+path = "src/main.rs"

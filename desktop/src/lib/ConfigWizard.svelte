@@ -141,7 +141,7 @@ const _availableThemes = [
 
 onMount(async () => {
 	try {
-		let schemaJson;
+		let schemaJson: unknown;
 		if (get(is_tauri)) {
 			schemaJson = await invoke('get_config_schema');
 		} else {

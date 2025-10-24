@@ -1,0 +1,22 @@
+[package]
+name = "atlassian_haystack"
+version = "0.2.0"
+edition = "2021"
+
+[dependencies]
+haystack_core = { path = "../haystack_core" }
+terraphim_types = { path = "../terraphim_types" }
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+clap = { version = "4.4", features = ["derive"] }
+dotenv = "0.15"
+anyhow = { version = "1.0", features = ["std"] }
+chrono = { version = "0.4", features = ["serde"] }
+base64 = "0.21"
+url = "2.5"
+
+[dev-dependencies]
+mockito = "1.5"
+tokio-test = "0.4"
