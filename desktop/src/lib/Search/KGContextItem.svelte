@@ -1,6 +1,6 @@
 <script lang="ts">
+import { Button, Tag } from 'svelma';
 import { createEventDispatcher } from 'svelte';
-import { Tag, Button } from 'svelma';
 
 export let contextItem: KGContextItem;
 export const removable: boolean = true;

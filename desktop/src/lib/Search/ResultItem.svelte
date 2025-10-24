@@ -1,17 +1,17 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Tag, Taglist } from 'svelma';
+import { fade } from 'svelte/transition';
+// @ts-expect-error
+import SvelteMarkdown from 'svelte-markdown';
 import { router } from 'tinro';
+import { is_tauri, role, configStore as roleConfigStore } from '$lib/stores';
 import { CONFIG } from '../../config';
 import type { DocumentListResponse, Role } from '../generated/types';
 import configStore from '../ThemeSwitcher.svelte';
-import type { Document } from './SearchResult';
-import { role, configStore as roleConfigStore, is_tauri } from '$lib/stores';
-import { Tag, Taglist } from 'svelma';
-import { fade } from 'svelte/transition';
-// @ts-ignore
-import SvelteMarkdown from 'svelte-markdown';
 import ArticleModal from './ArticleModal.svelte';
 import AtomicSaveModal from './AtomicSaveModal.svelte';
+import type { Document } from './SearchResult';
 
 // API Response interfaces
 interface ConversationsResponse {
@@ -377,7 +377,7 @@ async function _generateSummary() {
 
 		console.log('  📤 Summarization request:', requestBody);
 
-		let response;
+		let response: unknown;
 
 		if ($is_tauri) {
 			// For Tauri mode, we'll make an HTTP request directly

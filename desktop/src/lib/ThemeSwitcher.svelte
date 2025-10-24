@@ -1,7 +1,7 @@
 <script lang="ts">
-import { onMount } from 'svelte';
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/tauri';
+import { onMount } from 'svelte';
 import { CONFIG } from '../config';
 import type { Role as RoleInterface } from './generated/types';
 import { configStore, is_tauri, role, roles, theme } from './stores';
