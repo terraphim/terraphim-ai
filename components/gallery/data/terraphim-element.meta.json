@@ -1,0 +1,119 @@
+{
+  "name": "TerraphimElement",
+  "category": "base",
+  "tags": ["core", "lifecycle", "events", "base-class"],
+  "description": "Base class for all Terraphim Web Components. Provides lifecycle management, property reflection, event handling, and Shadow DOM utilities.",
+  "properties": [
+    {
+      "name": "observedAttributes",
+      "type": "Array<string>",
+      "default": "[]",
+      "description": "List of attributes to observe for changes. Override in subclasses."
+    },
+    {
+      "name": "properties",
+      "type": "Object",
+      "default": "{}",
+      "description": "Property definitions with type conversion and reflection configuration."
+    }
+  ],
+  "methods": [
+    {
+      "name": "onConnected",
+      "params": [],
+      "returns": "void",
+      "description": "Lifecycle hook called when element is connected to DOM. Override in subclasses."
+    },
+    {
+      "name": "onDisconnected",
+      "params": [],
+      "returns": "void",
+      "description": "Lifecycle hook called when element is disconnected from DOM. Override in subclasses."
+    },
+    {
+      "name": "render",
+      "params": [],
+      "returns": "void",
+      "description": "Render method called automatically on property changes. Override in subclasses."
+    },
+    {
+      "name": "emit",
+      "params": ["eventName: string", "detail?: any", "options?: Object"],
+      "returns": "boolean",
+      "description": "Emit a custom event from this element with Shadow DOM compatibility."
+    },
+    {
+      "name": "listen",
+      "params": ["eventName: string", "handler: Function", "options?: Object"],
+      "returns": "Function",
+      "description": "Add event listener with automatic cleanup on disconnect."
+    },
+    {
+      "name": "listenTo",
+      "params": ["target: EventTarget", "eventName: string", "handler: Function", "options?: Object"],
+      "returns": "Function",
+      "description": "Add event listener on another element with automatic cleanup."
+    },
+    {
+      "name": "$",
+      "params": ["selector: string"],
+      "returns": "Element|null",
+      "description": "Query selector within element or shadow root."
+    },
+    {
+      "name": "$$",
+      "params": ["selector: string"],
+      "returns": "NodeList",
+      "description": "Query selector all within element or shadow root."
+    },
+    {
+      "name": "setHTML",
+      "params": ["target: Element", "html: string"],
+      "returns": "void",
+      "description": "Safely set innerHTML with optional sanitization."
+    },
+    {
+      "name": "requestUpdate",
+      "params": [],
+      "returns": "void",
+      "description": "Request a re-render of the component."
+    },
+    {
+      "name": "bindState",
+      "params": ["state: TerraphimState", "statePath: string", "target: string|Function", "options?: Object"],
+      "returns": "Function",
+      "description": "Bind a state path to a component property or callback."
+    },
+    {
+      "name": "setState",
+      "params": ["state: TerraphimState", "path: string", "value: any"],
+      "returns": "void",
+      "description": "Set a value in state. Convenience method."
+    },
+    {
+      "name": "getState",
+      "params": ["state: TerraphimState", "path: string"],
+      "returns": "any",
+      "description": "Get a value from state. Convenience method."
+    }
+  ],
+  "events": [
+    {
+      "name": "custom-event",
+      "detail": "any",
+      "description": "Components can emit custom events using the emit() method."
+    }
+  ],
+  "slots": [],
+  "cssProperties": [],
+  "examples": [
+    {
+      "title": "Basic Component",
+      "code": "class MyComponent extends TerraphimElement {\n  static get observedAttributes() {\n    return ['title'];\n  }\n\n  static get properties() {\n    return {\n      title: { type: String, reflect: true }\n    };\n  }\n\n  constructor() {\n    super();\n    this.attachShadow({ mode: 'open' });\n  }\n\n  render() {\n    this.setHTML(this.shadowRoot, `\n      <h1>${this.title}</h1>\n    `);\n  }\n}\n\ncustomElements.define('my-component', MyComponent);"
+    },
+    {
+      "title": "With State Binding",
+      "code": "class StateComponent extends TerraphimElement {\n  onConnected() {\n    this.bindState(globalState, 'user.name', 'userName', {\n      immediate: true\n    });\n  }\n\n  render() {\n    this.setHTML(this.shadowRoot, `\n      <p>Hello, ${this.userName}!</p>\n    `);\n  }\n}"
+    }
+  ]
+}

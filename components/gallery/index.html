@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Component Gallery</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html, body {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    /* Theme variables */
+    :root[data-theme="light"] {
+      --color-bg: #ffffff;
+      --color-bg-secondary: #f5f5f5;
+      --color-text: #333333;
+      --color-text-secondary: #666666;
+      --color-border: #e0e0e0;
+      --color-primary: #3498db;
+      --color-primary-hover: #2980b9;
+    }
+
+    :root[data-theme="dark"] {
+      --color-bg: #1a1a1a;
+      --color-bg-secondary: #2a2a2a;
+      --color-text: #e0e0e0;
+      --color-text-secondary: #999999;
+      --color-border: #3a3a3a;
+      --color-primary: #3498db;
+      --color-primary-hover: #2980b9;
+    }
+
+    /* Gallery-specific styles */
+    .components-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 24px;
+      padding: 0;
+    }
+
+    .components-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      padding: 0;
+    }
+
+    .gallery-header-actions {
+      display: flex;
+      gap: 15px;
+      align-items: center;
+    }
+
+    .search-wrapper {
+      flex: 1;
+      max-width: 400px;
+    }
+
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--color-text-secondary);
+    }
+
+    .empty-state-icon {
+      font-size: 64px;
+      margin-bottom: 20px;
+      opacity: 0.5;
+    }
+
+    .empty-state-title {
+      font-size: 20px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--color-text);
+    }
+
+    .empty-state-description {
+      font-size: 14px;
+    }
+
+    /* Component detail view */
+    .component-detail {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .detail-header {
+      margin-bottom: 30px;
+    }
+
+    .detail-title {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: var(--color-text);
+    }
+
+    .detail-description {
+      font-size: 16px;
+      color: var(--color-text-secondary);
+      line-height: 1.6;
+    }
+
+    .detail-content {
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <terraphim-gallery>
+    <!-- Sidebar -->
+    <div slot="sidebar">
+      <terraphim-sidebar></terraphim-sidebar>
+    </div>
+
+    <!-- Header Actions -->
+    <div slot="header-actions" class="gallery-header-actions">
+      <div class="search-wrapper">
+        <terraphim-search></terraphim-search>
+      </div>
+      <terraphim-layout-switcher></terraphim-layout-switcher>
+      <terraphim-theme-switcher></terraphim-theme-switcher>
+    </div>
+
+    <!-- Main Content -->
+    <div slot="content" id="mainContent">
+      <!-- Dynamic content rendered here -->
+    </div>
+  </terraphim-gallery>
+
+  <script type="module">
+    import { galleryState } from './terraphim-gallery.js';
+    import './terraphim-sidebar.js';
+    import './terraphim-search.js';
+    import './terraphim-component-card.js';
+    import './terraphim-code-viewer.js';
+    import './terraphim-tabs.js';
+    import './terraphim-theme-switcher.js';
+    import './terraphim-layout-switcher.js';
+
+    // Get main content container
+    const mainContent = document.getElementById('mainContent');
+
+    /**
+     * Filter components based on current state
+     */
+    function filterComponents(components, category, searchQuery) {
+      let filtered = components;
+
+      // Filter by category
+      if (category && category !== 'all') {
+        filtered = filtered.filter(c => c.category === category);
+      }
+
+      // Filter by search query
+      if (searchQuery && searchQuery.trim()) {
+        const query = searchQuery.toLowerCase();
+        filtered = filtered.filter(c => {
+          const nameMatch = c.name.toLowerCase().includes(query);
+          const descMatch = c.description?.toLowerCase().includes(query);
+          const tagsMatch = c.tags?.some(tag => tag.toLowerCase().includes(query));
+          return nameMatch || descMatch || tagsMatch;
+        });
+      }
+
+      return filtered;
+    }
+
+    /**
+     * Render component list
+     */
+    function renderComponentList(components, view) {
+      if (!components || components.length === 0) {
+        mainContent.innerHTML = `
+          <div class="empty-state">
+            <div class="empty-state-icon">📭</div>
+            <div class="empty-state-title">No components found</div>
+            <div class="empty-state-description">
+              Try adjusting your search or category filter
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const containerClass = view === 'grid' ? 'components-grid' : 'components-list';
+      const container = document.createElement('div');
+      container.className = containerClass;
+
+      components.forEach(component => {
+        const card = document.createElement('terraphim-component-card');
+        card.component = component;
+        card.addEventListener('component-selected', () => {
+          renderComponentDetail(component);
+        });
+        container.appendChild(card);
+      });
+
+      mainContent.innerHTML = '';
+      mainContent.appendChild(container);
+    }
+
+    /**
+     * Render component detail view
+     */
+    function renderComponentDetail(component) {
+      const tabs = [
+        { id: 'demo', label: 'Demo', icon: '▶️' },
+        { id: 'code', label: 'Code', icon: '💻' },
+        { id: 'docs', label: 'Documentation', icon: '📖' }
+      ];
+
+      mainContent.innerHTML = `
+        <div class="component-detail">
+          <div class="detail-header">
+            <h1 class="detail-title">${component.name}</h1>
+            <p class="detail-description">${component.description || ''}</p>
+          </div>
+
+          <terraphim-tabs id="detailTabs"></terraphim-tabs>
+
+          <div class="detail-content" id="detailContent">
+            <!-- Tab content rendered here -->
+          </div>
+        </div>
+      `;
+
+      const tabsElement = mainContent.querySelector('#detailTabs');
+      tabsElement.tabs = tabs;
+
+      // Render initial tab content
+      renderTabContent(component, galleryState.get('currentTab'));
+
+      // Listen for tab changes
+      galleryState.subscribe('currentTab', (tab) => {
+        renderTabContent(component, tab);
+      });
+    }
+
+    /**
+     * Render tab content
+     */
+    function renderTabContent(component, tab) {
+      const detailContent = document.getElementById('detailContent');
+      if (!detailContent) return;
+
+      if (tab === 'demo') {
+        detailContent.innerHTML = `
+          <div style="padding: 20px; background: var(--color-bg-secondary); border-radius: 8px; margin-top: 20px;">
+            <p style="color: var(--color-text-secondary);">
+              Demo functionality coming soon. This will show live component examples.
+            </p>
+          </div>
+        `;
+      } else if (tab === 'code') {
+        const exampleCode = component.examples && component.examples.length > 0
+          ? component.examples[0].code
+          : '// No code examples available';
+
+        const codeViewer = document.createElement('terraphim-code-viewer');
+        codeViewer.code = exampleCode;
+        codeViewer.language = 'javascript';
+        codeViewer.filename = `${component.name}.js`;
+        codeViewer.showLineNumbers = true;
+        codeViewer.style.marginTop = '20px';
+
+        detailContent.innerHTML = '';
+        detailContent.appendChild(codeViewer);
+      } else if (tab === 'docs') {
+        renderDocumentation(component, detailContent);
+      }
+    }
+
+    /**
+     * Render documentation
+     */
+    function renderDocumentation(component, container) {
+      const sections = [];
+
+      // Properties
+      if (component.properties && component.properties.length > 0) {
+        sections.push(`
+          <h3 style="margin-top: 30px; margin-bottom: 15px; color: var(--color-text);">Properties</h3>
+          <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+              <tr style="border-bottom: 2px solid var(--color-border);">
+                <th style="text-align: left; padding: 8px; color: var(--color-text);">Name</th>
+                <th style="text-align: left; padding: 8px; color: var(--color-text);">Type</th>
+                <th style="text-align: left; padding: 8px; color: var(--color-text);">Default</th>
+                <th style="text-align: left; padding: 8px; color: var(--color-text);">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${component.properties.map(prop => `
+                <tr style="border-bottom: 1px solid var(--color-border);">
+                  <td style="padding: 8px; color: var(--color-text);"><code>${prop.name}</code></td>
+                  <td style="padding: 8px; color: var(--color-text-secondary);"><code>${prop.type}</code></td>
+                  <td style="padding: 8px; color: var(--color-text-secondary);"><code>${prop.default}</code></td>
+                  <td style="padding: 8px; color: var(--color-text-secondary);">${prop.description}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        `);
+      }
+
+      // Methods
+      if (component.methods && component.methods.length > 0) {
+        sections.push(`
+          <h3 style="margin-top: 30px; margin-bottom: 15px; color: var(--color-text);">Methods</h3>
+          ${component.methods.map(method => `
+            <div style="margin-bottom: 20px; padding: 15px; background: var(--color-bg-secondary); border-radius: 6px;">
+              <h4 style="margin-bottom: 8px; color: var(--color-text);"><code>${method.name}(${method.params.join(', ')})</code></h4>
+              <p style="color: var(--color-text-secondary); margin-bottom: 4px;">${method.description}</p>
+              <p style="color: var(--color-text-secondary); font-size: 13px;"><strong>Returns:</strong> <code>${method.returns}</code></p>
+            </div>
+          `).join('')}
+        `);
+      }
+
+      // Events
+      if (component.events && component.events.length > 0) {
+        sections.push(`
+          <h3 style="margin-top: 30px; margin-bottom: 15px; color: var(--color-text);">Events</h3>
+          ${component.events.map(event => `
+            <div style="margin-bottom: 15px; padding: 15px; background: var(--color-bg-secondary); border-radius: 6px;">
+              <h4 style="margin-bottom: 8px; color: var(--color-text);"><code>${event.name}</code></h4>
+              <p style="color: var(--color-text-secondary); margin-bottom: 4px;">${event.description}</p>
+              <p style="color: var(--color-text-secondary); font-size: 13px;"><strong>Detail:</strong> <code>${event.detail}</code></p>
+            </div>
+          `).join('')}
+        `);
+      }
+
+      container.innerHTML = `
+        <div style="margin-top: 20px;">
+          ${sections.join('')}
+        </div>
+      `;
+    }
+
+    /**
+     * Main render function
+     */
+    function render() {
+      const components = galleryState.get('components') || [];
+      const category = galleryState.get('selectedCategory');
+      const searchQuery = galleryState.get('searchQuery');
+      const view = galleryState.get('view');
+      const currentComponent = galleryState.get('currentComponent');
+
+      if (currentComponent) {
+        renderComponentDetail(currentComponent);
+      } else {
+        const filtered = filterComponents(components, category, searchQuery);
+        renderComponentList(filtered, view);
+      }
+    }
+
+    // Subscribe to state changes
+    galleryState.subscribe('components', render);
+    galleryState.subscribe('selectedCategory', () => {
+      galleryState.set('currentComponent', null);
+      render();
+    });
+    galleryState.subscribe('searchQuery', () => {
+      galleryState.set('currentComponent', null);
+      render();
+    });
+    galleryState.subscribe('view', render);
+    galleryState.subscribe('currentComponent', render);
+
+    // Initial render
+    render();
+
+    console.log('Terraphim Component Gallery loaded');
+  </script>
+</body>
+</html>

@@ -1,0 +1,109 @@
+{
+  "name": "TerraphimState",
+  "category": "base",
+  "tags": ["state", "reactive", "persistence", "core"],
+  "description": "Reactive state management system with path-based subscriptions, persistence, and debugging tools. Provides dot notation access, wildcard subscriptions, and batch updates.",
+  "properties": [
+    {
+      "name": "persist",
+      "type": "Boolean",
+      "default": "false",
+      "description": "Enable localStorage persistence for state."
+    },
+    {
+      "name": "storagePrefix",
+      "type": "String",
+      "default": "terraphim",
+      "description": "Prefix for localStorage keys."
+    },
+    {
+      "name": "debug",
+      "type": "Boolean",
+      "default": "false",
+      "description": "Enable debugging mode with history and time travel."
+    }
+  ],
+  "methods": [
+    {
+      "name": "get",
+      "params": ["path: string"],
+      "returns": "any",
+      "description": "Get value at path using dot notation (e.g., 'user.name')."
+    },
+    {
+      "name": "set",
+      "params": ["path: string", "value: any", "silent?: boolean"],
+      "returns": "void",
+      "description": "Set value at path. Silent option skips notifications."
+    },
+    {
+      "name": "subscribe",
+      "params": ["path: string", "callback: Function", "options?: Object"],
+      "returns": "Function",
+      "description": "Subscribe to changes at path. Supports wildcards and options like immediate, deep, debounce."
+    },
+    {
+      "name": "batch",
+      "params": ["fn: Function"],
+      "returns": "void",
+      "description": "Batch multiple updates into a single notification cycle."
+    },
+    {
+      "name": "use",
+      "params": ["middleware: Function"],
+      "returns": "Function",
+      "description": "Add middleware function for intercepting operations."
+    },
+    {
+      "name": "getSnapshot",
+      "params": [],
+      "returns": "Object",
+      "description": "Get a deep clone of current state."
+    },
+    {
+      "name": "restoreSnapshot",
+      "params": ["snapshot: Object"],
+      "returns": "void",
+      "description": "Restore state from a snapshot."
+    },
+    {
+      "name": "undo",
+      "params": ["steps?: number"],
+      "returns": "void",
+      "description": "Time travel to previous state (debug mode only)."
+    },
+    {
+      "name": "redo",
+      "params": ["steps?: number"],
+      "returns": "void",
+      "description": "Time travel to next state (debug mode only)."
+    }
+  ],
+  "events": [
+    {
+      "name": "state-changed",
+      "detail": "{ path: string, newValue: any, oldValue: any }",
+      "description": "Fired when any state value changes."
+    }
+  ],
+  "slots": [],
+  "cssProperties": [],
+  "examples": [
+    {
+      "title": "Basic Usage",
+      "code": "import { TerraphimState } from './terraphim-state.js';\n\nconst state = new TerraphimState({\n  user: { name: 'Alice', role: 'admin' }\n});\n\n// Subscribe to changes\nstate.subscribe('user.name', (value) => {\n  console.log('Name changed:', value);\n});\n\n// Update state\nstate.set('user.name', 'Bob');"
+    },
+    {
+      "title": "With Persistence",
+      "code": "const state = new TerraphimState({\n  theme: 'light'\n}, {\n  persist: true,\n  storagePrefix: 'myapp'\n});\n\n// State is automatically saved to localStorage"
+    },
+    {
+      "title": "Batch Updates",
+      "code": "state.batch(() => {\n  state.set('user.name', 'Charlie');\n  state.set('user.email', 'charlie@example.com');\n  state.set('user.role', 'user');\n});\n// Only one notification sent"
+    },
+    {
+      "title": "Wildcard Subscriptions",
+      "code": "// Watch all items in array\nstate.subscribe('items.*', (value, oldValue, path) => {\n  console.log(`Item changed at ${path}:`, value);\n});"
+    }
+  ]
+}

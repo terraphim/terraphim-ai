@@ -1,0 +1,420 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gallery Test Suite</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    .test-container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+      color: #333;
+    }
+
+    .test-section {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .test-section h2 {
+      font-size: 18px;
+      margin-bottom: 15px;
+      color: #2c3e50;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 8px;
+    }
+
+    .test-case {
+      margin: 15px 0;
+      padding: 15px;
+      background: #f8f9fa;
+      border-radius: 4px;
+      border-left: 4px solid #95a5a6;
+    }
+
+    .test-case.pass {
+      border-left-color: #27ae60;
+      background: #e8f8f0;
+    }
+
+    .test-case.fail {
+      border-left-color: #e74c3c;
+      background: #fdeaea;
+    }
+
+    .test-title {
+      font-weight: 600;
+      margin-bottom: 8px;
+      color: #2c3e50;
+    }
+
+    .test-result {
+      font-size: 14px;
+      color: #7f8c8d;
+    }
+
+    .test-result code {
+      background: white;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Consolas', monospace;
+    }
+
+    .summary {
+      display: flex;
+      gap: 20px;
+      margin-top: 20px;
+      padding: 20px;
+      background: #ecf0f1;
+      border-radius: 8px;
+    }
+
+    .summary-item {
+      flex: 1;
+      text-align: center;
+    }
+
+    .summary-value {
+      font-size: 32px;
+      font-weight: 600;
+      margin-bottom: 5px;
+    }
+
+    .summary-label {
+      font-size: 14px;
+      color: #7f8c8d;
+      text-transform: uppercase;
+    }
+
+    .pass { color: #27ae60; }
+    .fail { color: #e74c3c; }
+    .total { color: #3498db; }
+
+    .component-preview {
+      margin-top: 15px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+    }
+  </style>
+</head>
+<body>
+  <div class="test-container">
+    <h1>Terraphim Component Gallery - Test Suite</h1>
+
+    <div id="testResults"></div>
+
+    <div class="summary" id="summary">
+      <div class="summary-item">
+        <div class="summary-value total" id="totalTests">0</div>
+        <div class="summary-label">Total Tests</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value pass" id="passedTests">0</div>
+        <div class="summary-label">Passed</div>
+      </div>
+      <div class="summary-item">
+        <div class="summary-value fail" id="failedTests">0</div>
+        <div class="summary-label">Failed</div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import { galleryState } from './terraphim-gallery.js';
+    import './terraphim-sidebar.js';
+    import './terraphim-search.js';
+    import './terraphim-component-card.js';
+    import './terraphim-code-viewer.js';
+    import './terraphim-tabs.js';
+    import './terraphim-theme-switcher.js';
+    import './terraphim-layout-switcher.js';
+
+    // Test runner
+    class TestRunner {
+      constructor() {
+        this.tests = [];
+        this.results = [];
+      }
+
+      test(name, fn) {
+        this.tests.push({ name, fn });
+      }
+
+      async run() {
+        const resultsContainer = document.getElementById('testResults');
+
+        for (const test of this.tests) {
+          try {
+            await test.fn();
+            this.results.push({ name: test.name, status: 'pass', message: 'Test passed' });
+          } catch (error) {
+            this.results.push({ name: test.name, status: 'fail', message: error.message });
+          }
+        }
+
+        this.render(resultsContainer);
+        this.updateSummary();
+      }
+
+      render(container) {
+        const sections = {};
+
+        this.results.forEach(result => {
+          const section = result.name.split(' - ')[0];
+          if (!sections[section]) {
+            sections[section] = [];
+          }
+          sections[section].push(result);
+        });
+
+        let html = '';
+        for (const [section, results] of Object.entries(sections)) {
+          html += `<div class="test-section">`;
+          html += `<h2>${section}</h2>`;
+
+          results.forEach(result => {
+            html += `
+              <div class="test-case ${result.status}">
+                <div class="test-title">${result.name}</div>
+                <div class="test-result">${result.message}</div>
+              </div>
+            `;
+          });
+
+          html += `</div>`;
+        }
+
+        container.innerHTML = html;
+      }
+
+      updateSummary() {
+        const total = this.results.length;
+        const passed = this.results.filter(r => r.status === 'pass').length;
+        const failed = this.results.filter(r => r.status === 'fail').length;
+
+        document.getElementById('totalTests').textContent = total;
+        document.getElementById('passedTests').textContent = passed;
+        document.getElementById('failedTests').textContent = failed;
+      }
+    }
+
+    const runner = new TestRunner();
+
+    // State Tests
+    runner.test('State - Initial state is loaded', () => {
+      const state = galleryState.getSnapshot();
+      if (!state) throw new Error('State not initialized');
+      if (typeof state.view !== 'string') throw new Error('view not initialized');
+      if (typeof state.theme !== 'string') throw new Error('theme not initialized');
+    });
+
+    runner.test('State - Can set and get values', () => {
+      galleryState.set('testValue', 'hello');
+      const value = galleryState.get('testValue');
+      if (value !== 'hello') throw new Error(`Expected 'hello', got '${value}'`);
+    });
+
+    runner.test('State - Subscriptions work', (done) => {
+      return new Promise((resolve, reject) => {
+        const unsubscribe = galleryState.subscribe('testSubscription', (value) => {
+          if (value === 'test-value') {
+            unsubscribe();
+            resolve();
+          }
+        });
+
+        galleryState.set('testSubscription', 'test-value');
+
+        setTimeout(() => {
+          unsubscribe();
+          reject(new Error('Subscription did not fire'));
+        }, 1000);
+      });
+    });
+
+    // Component Tests
+    runner.test('Components - TerraphimGallery is defined', () => {
+      const element = document.createElement('terraphim-gallery');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimGallery not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimSidebar is defined', () => {
+      const element = document.createElement('terraphim-sidebar');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimSidebar not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimSearch is defined', () => {
+      const element = document.createElement('terraphim-search');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimSearch not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimComponentCard is defined', () => {
+      const element = document.createElement('terraphim-component-card');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimComponentCard not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimCodeViewer is defined', () => {
+      const element = document.createElement('terraphim-code-viewer');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimCodeViewer not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimTabs is defined', () => {
+      const element = document.createElement('terraphim-tabs');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimTabs not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimThemeSwitcher is defined', () => {
+      const element = document.createElement('terraphim-theme-switcher');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimThemeSwitcher not defined');
+      }
+    });
+
+    runner.test('Components - TerraphimLayoutSwitcher is defined', () => {
+      const element = document.createElement('terraphim-layout-switcher');
+      if (!(element instanceof HTMLElement)) {
+        throw new Error('TerraphimLayoutSwitcher not defined');
+      }
+    });
+
+    // Component Card Tests
+    runner.test('ComponentCard - Can render with component data', () => {
+      const card = document.createElement('terraphim-component-card');
+      card.component = {
+        name: 'TestComponent',
+        category: 'test',
+        description: 'Test description',
+        tags: ['test', 'example']
+      };
+      document.body.appendChild(card);
+
+      setTimeout(() => {
+        if (!card.shadowRoot) throw new Error('Shadow root not created');
+        const title = card.shadowRoot.querySelector('.card-title');
+        if (!title || title.textContent !== 'TestComponent') {
+          throw new Error('Component title not rendered correctly');
+        }
+        document.body.removeChild(card);
+      }, 100);
+    });
+
+    // Code Viewer Tests
+    runner.test('CodeViewer - Can display code', () => {
+      const viewer = document.createElement('terraphim-code-viewer');
+      viewer.code = 'const x = 42;';
+      viewer.language = 'javascript';
+      document.body.appendChild(viewer);
+
+      setTimeout(() => {
+        if (!viewer.shadowRoot) throw new Error('Shadow root not created');
+        const codeContent = viewer.shadowRoot.querySelector('.code-content');
+        if (!codeContent) throw new Error('Code content not rendered');
+        document.body.removeChild(viewer);
+      }, 100);
+    });
+
+    // Theme Tests
+    runner.test('Theme - Can toggle theme', () => {
+      const initialTheme = galleryState.get('theme');
+      const newTheme = initialTheme === 'light' ? 'dark' : 'light';
+
+      galleryState.set('theme', newTheme);
+      const currentTheme = galleryState.get('theme');
+
+      if (currentTheme !== newTheme) {
+        throw new Error(`Theme not updated. Expected '${newTheme}', got '${currentTheme}'`);
+      }
+
+      // Restore
+      galleryState.set('theme', initialTheme);
+    });
+
+    // View Tests
+    runner.test('View - Can switch between grid and list', () => {
+      galleryState.set('view', 'grid');
+      if (galleryState.get('view') !== 'grid') {
+        throw new Error('Failed to set grid view');
+      }
+
+      galleryState.set('view', 'list');
+      if (galleryState.get('view') !== 'list') {
+        throw new Error('Failed to set list view');
+      }
+    });
+
+    // Search Tests
+    runner.test('Search - Can set search query', () => {
+      galleryState.set('searchQuery', 'test search');
+      const query = galleryState.get('searchQuery');
+      if (query !== 'test search') {
+        throw new Error(`Search query not set correctly. Expected 'test search', got '${query}'`);
+      }
+
+      // Clear
+      galleryState.set('searchQuery', '');
+    });
+
+    // Category Tests
+    runner.test('Category - Can select category', () => {
+      galleryState.set('selectedCategory', 'base');
+      const category = galleryState.get('selectedCategory');
+      if (category !== 'base') {
+        throw new Error(`Category not set correctly. Expected 'base', got '${category}'`);
+      }
+
+      galleryState.set('selectedCategory', 'all');
+    });
+
+    // Metadata Loading Tests
+    runner.test('Metadata - Component metadata loads', async () => {
+      const components = galleryState.get('components');
+
+      // Wait a bit for async loading
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const loadedComponents = galleryState.get('components');
+      if (!Array.isArray(loadedComponents)) {
+        throw new Error('Components is not an array');
+      }
+    });
+
+    // Run all tests
+    console.log('Running test suite...');
+    runner.run().then(() => {
+      console.log('Test suite complete!');
+    });
+  </script>
+</body>
+</html>

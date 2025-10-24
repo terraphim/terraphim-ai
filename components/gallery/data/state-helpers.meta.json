@@ -1,0 +1,112 @@
+{
+  "name": "StateHelpers",
+  "category": "base",
+  "tags": ["utilities", "state", "helpers", "computed"],
+  "description": "State helper utilities providing computed values, action creators, validators, and derived stores for advanced state management patterns.",
+  "properties": [],
+  "methods": [
+    {
+      "name": "computed",
+      "params": ["state: TerraphimState", "dependencies: string[]", "computeFn: Function", "options?: Object"],
+      "returns": "{ value: any, unsubscribe: Function }",
+      "description": "Create a computed value that derives from state paths."
+    },
+    {
+      "name": "derived",
+      "params": ["state: TerraphimState", "dependencies: string[]", "deriveFn: Function", "initialValue?: any"],
+      "returns": "{ value: any, subscribe: Function, unsubscribe: Function }",
+      "description": "Create a derived store that maintains its own reactive value."
+    },
+    {
+      "name": "createAction",
+      "params": ["state: TerraphimState", "name: string", "actionFn: Function"],
+      "returns": "Function",
+      "description": "Create an action creator that encapsulates state mutations."
+    },
+    {
+      "name": "validate",
+      "params": ["schema: Object"],
+      "returns": "Function",
+      "description": "Create a validator middleware for state values."
+    },
+    {
+      "name": "createLogger",
+      "params": ["options?: Object"],
+      "returns": "Function",
+      "description": "Create a logger middleware for debugging state changes."
+    },
+    {
+      "name": "createPersistence",
+      "params": ["paths: string[]", "options?: Object"],
+      "returns": "Function",
+      "description": "Create persistence middleware for specific state paths."
+    },
+    {
+      "name": "restorePersistedState",
+      "params": ["state: TerraphimState", "paths: string[]", "prefix?: string"],
+      "returns": "void",
+      "description": "Restore persisted state from localStorage."
+    },
+    {
+      "name": "syncStates",
+      "params": ["source: TerraphimState", "target: TerraphimState", "mapping?: Object"],
+      "returns": "Function",
+      "description": "Create a synchronizer that keeps two state instances in sync."
+    },
+    {
+      "name": "createReadonly",
+      "params": ["state: TerraphimState", "allowedPaths?: string[]"],
+      "returns": "Object",
+      "description": "Create a readonly view of state."
+    },
+    {
+      "name": "batchUpdate",
+      "params": ["state: TerraphimState"],
+      "returns": "Function",
+      "description": "Create a batched update helper for cleaner batch API."
+    },
+    {
+      "name": "waitFor",
+      "params": ["state: TerraphimState", "path: string", "condition: Function", "timeout?: number"],
+      "returns": "Promise<any>",
+      "description": "Wait for a condition to be true in state."
+    },
+    {
+      "name": "createDebouncedSetter",
+      "params": ["state: TerraphimState", "delay: number"],
+      "returns": "Function",
+      "description": "Create a debounced setter for state updates."
+    },
+    {
+      "name": "createThrottledSetter",
+      "params": ["state: TerraphimState", "delay: number"],
+      "returns": "Function",
+      "description": "Create a throttled setter for state updates."
+    }
+  ],
+  "events": [],
+  "slots": [],
+  "cssProperties": [],
+  "examples": [
+    {
+      "title": "Computed Value",
+      "code": "import { computed } from './state-helpers.js';\n\nconst fullName = computed(\n  state,\n  ['user.firstName', 'user.lastName'],\n  (firstName, lastName) => `${firstName} ${lastName}`\n);\n\nconsole.log(fullName.value); // 'John Doe'"
+    },
+    {
+      "title": "Action Creator",
+      "code": "import { createAction } from './state-helpers.js';\n\nconst setTheme = createAction(state, 'setTheme', (state, theme) => {\n  if (!['light', 'dark'].includes(theme)) {\n    throw new Error('Invalid theme');\n  }\n  state.set('theme', theme);\n});\n\nsetTheme('dark');"
+    },
+    {
+      "title": "Validation Middleware",
+      "code": "import { validate } from './state-helpers.js';\n\nconst validator = validate({\n  'user.email': (value) => /^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$/.test(value),\n  'user.age': (value) => value >= 0 && value <= 120\n});\n\nstate.use(validator);"
+    },
+    {
+      "title": "Derived Store",
+      "code": "import { derived } from './state-helpers.js';\n\nconst userCount = derived(\n  state,\n  ['users'],\n  (users) => users.length,\n  0\n);\n\nuserCount.subscribe((count) => {\n  console.log('User count:', count);\n});"
+    },
+    {
+      "title": "Wait For Condition",
+      "code": "import { waitFor } from './state-helpers.js';\n\nawait waitFor(state, 'user', (user) => user !== null);\nconsole.log('User loaded!');"
+    }
+  ]
+}
