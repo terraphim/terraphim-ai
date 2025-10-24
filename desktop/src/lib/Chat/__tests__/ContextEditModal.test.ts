@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte/svelte5';
 import '@testing-library/jest-dom';
 
 // Test utilities for real API testing
@@ -7,7 +7,17 @@ import { startTestServer, stopTestServer } from '../../../__test-utils__/testSer
 import { createTestConfig } from '../../../__test-utils__/testConfig';
 
 import ContextEditModal from '../ContextEditModal.svelte';
-import type { ContextItem } from '../Chat.svelte';
+
+type TestContextItem = {
+  id: string;
+  context_type: string;
+  title: string;
+  summary?: string;
+  content: string;
+  metadata: Record<string, string>;
+  created_at: string;
+  relevance_score?: number;
+};
 
 describe('ContextEditModal Integration Tests', () => {
   let testServer: any;
@@ -29,7 +39,7 @@ describe('ContextEditModal Integration Tests', () => {
     }
   });
 
-  const createTestContextItem = (): ContextItem => ({
+  const createTestContextItem = (): TestContextItem => ({
     id: 'test-context-1',
     context_type: 'Document',
     title: 'Test Document',
@@ -98,7 +108,7 @@ describe('ContextEditModal Integration Tests', () => {
   });
 
   describe('Form Validation', () => {
-    it('should validate required fields', () => {
+    it('should validate required fields', async () => {
       render(ContextEditModal, {
         props: {
           active: true,
@@ -119,7 +129,9 @@ describe('ContextEditModal Integration Tests', () => {
       // Add content - should enable save
       const contentTextarea = screen.getByTestId('context-content-textarea');
       fireEvent.input(contentTextarea, { target: { value: 'Test content' } });
-      expect(saveButton).not.toBeDisabled();
+      await waitFor(() => {
+        expect(saveButton).not.toBeDisabled();
+      });
     });
 
     it('should show validation messages for empty required fields', async () => {
@@ -211,7 +223,11 @@ describe('ContextEditModal Integration Tests', () => {
       });
 
       // Open advanced options
-      const detailsElement = screen.getByText('Advanced Options').parentElement;
+      const detailsSummary = screen.getByText('Advanced Options');
+      const detailsElement = detailsSummary.parentElement as HTMLElement | null;
+      if (!detailsElement) {
+        throw new Error('Expected advanced options summary element to exist');
+      }
       fireEvent.click(detailsElement);
 
       // Check existing metadata is shown

@@ -16,44 +16,22 @@
   import ArticleModal from '../Search/ArticleModal.svelte';
   import SessionList from './SessionList.svelte';
   import Markdown from 'svelte-markdown';
+  import type {
+    ChatMessage,
+    ChatResponse,
+    ContextItem,
+    Conversation,
+    ConversationResponse,
+    ConversationListResponse,
+    ContextMutationResponse,
+    UpdateConversationResponse
+  } from './types';
   // Tauri APIs for saving files (only used in desktop)
   let tauriDialog: any = null;
   let tauriFs: any = null;
 
-  type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
-  type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
-  type ContextItem = {
-    id: string;
-    title: string;
-    summary?: string;
-    content: string;
-    context_type: string;
-    created_at: string;
-    relevance_score?: number;
-    metadata?: { [key: string]: string };
-    // KG-specific fields
-    kg_term_definition?: {
-      term: string;
-      normalized_term: string;
-      id: number;
-      definition?: string;
-      synonyms: string[];
-      related_terms: string[];
-      usage_examples: string[];
-      url?: string;
-      metadata: Record<string, string>;
-      relevance_score?: number;
-    };
-  };
-  type Conversation = {
-    id: string;
-    title: string;
-    role: string;
-    messages: any[];
-    global_context: ContextItem[];
-    created_at: string;
-    updated_at: string;
-  };
+  const toError = (error: unknown): Error =>
+    error instanceof Error ? error : new Error(String(error));
 
   let messages: ChatMessage[] = [];
   let input: string = '';
@@ -77,11 +55,23 @@
   let showContextPanel = false;
 
   // Manual context addition
-  let showAddContextForm = false;
-  let newContextTitle = '';
-  let newContextContent = '';
-  let newContextType = 'document';
-  let savingContext = false;
+let showAddContextForm = false;
+let newContextTitle = '';
+let newContextContent = '';
+let newContextType = 'document';
+let savingContext = false;
+const manualContextTypeId = 'manual-context-type';
+const manualContextTitleId = 'manual-context-title';
+const manualContextContentId = 'manual-context-content';
+
+  $: currentRoleLabel = (() => {
+    const current = get(role) as unknown;
+    if (current && typeof current === 'object') {
+      const name = (current as { original?: string }).original;
+      return name ?? '';
+    }
+    return String(current ?? '');
+  })();
 
   // Context editing
   let showContextEditModal = false;
@@ -100,8 +90,12 @@
 
   // --- Persistence helpers ---
   function chatStateKey(): string {
-    const r = get(role) as string;
-    return `terraphim:chatState:${r}`;
+    const current = get(role) as unknown;
+    if (current && typeof current === 'object') {
+      const name = (current as { original?: string }).original ?? 'default';
+      return `terraphim:chatState:${name}`;
+    }
+    return `terraphim:chatState:${current ?? 'default'}`;
   }
 
   function loadChatState() {
@@ -150,7 +144,7 @@
     try {
       if ($is_tauri) {
         // Try to get existing conversations
-        const result = await invoke('list_conversations');
+        const result = await invoke<ConversationListResponse>('list_conversations');
         if (result?.conversations && result.conversations.length > 0) {
           // Use the most recent conversation
           conversationId = result.conversations[0].id;
@@ -177,7 +171,8 @@
         }
       }
     } catch (error) {
-      console.error('❌ Error initializing conversation:', error);
+      const err = toError(error);
+      console.error('❌ Error initializing conversation:', err);
     }
   }
 
@@ -187,7 +182,7 @@
       const currentRole = get(role) as string;
 
       if ($is_tauri) {
-        const result = await invoke('create_conversation', {
+        const result = await invoke<ConversationResponse>('create_conversation', {
           title: 'Chat Conversation',
           role: currentRole
         });
@@ -215,7 +210,8 @@
         }
       }
     } catch (error) {
-      console.error('❌ Error creating conversation:', error);
+      const err = toError(error);
+      console.error('❌ Error creating conversation:', err);
     }
   }
 
@@ -239,8 +235,8 @@
 
         console.log(`Using ${command} for ${isPersistent ? 'persistent' : 'in-memory'} conversation`);
 
-        const result = await invoke(command, {
-          conversationId: isPersistent ? conversationId : conversationId
+        const result = await invoke<ConversationResponse>(command as any, {
+          conversationId
         });
 
         console.log('📥 Tauri response:', result);
@@ -249,8 +245,11 @@
           const newContextItems = result.conversation.global_context || [];
           contextItems = newContextItems;
           console.log(`✅ Loaded ${newContextItems.length} context items via Tauri (${isPersistent ? 'persistent' : 'in-memory'})`);
+        } else if (result.error) {
+          console.error(`❌ Failed to get conversation via Tauri (${command}):`, result.error);
+          contextItems = [];
         } else {
-          console.error(`❌ Failed to get conversation via Tauri (${command}):`, result.error || 'Unknown error');
+          console.error(`❌ Failed to get conversation via Tauri (${command}): Unknown error`);
           contextItems = [];
         }
       } else {
@@ -277,8 +276,9 @@
         }
       }
     } catch (error) {
+      const err = toError(error);
       console.error('❌ Error loading conversation context:', {
-        error: error.message || error,
+        error: err.message,
         conversationId,
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()
@@ -315,17 +315,15 @@
       };
 
       if ($is_tauri) {
-        const result = await invoke('add_context_to_conversation', {
+        const result = await invoke<ContextMutationResponse>('add_context_to_conversation', {
           conversationId,
-          contextData
+          context: contextData
         });
         if (result.status === 'success') {
           await loadConversationContext();
           toggleAddContextForm();
-
-          // Show success notification
           console.log('✅ Context added successfully via Tauri');
-        } else {
+        } else if (result.error) {
           console.error('❌ Failed to add context via Tauri:', result.error);
         }
       } else {
@@ -475,15 +473,15 @@
 
     try {
       if ($is_tauri) {
-        const result = await invoke('delete_context', {
+        const result = await invoke<UpdateConversationResponse>('delete_context', {
           conversationId,
           contextId
         });
-        if (result?.status === 'success') {
+        if (result.status === 'success') {
           console.log('✅ Context deleted successfully via Tauri');
           await loadConversationContext();
-        } else {
-          console.error('❌ Failed to delete context via Tauri:', result?.error);
+        } else if (result.error) {
+          console.error('❌ Failed to delete context via Tauri:', result.error);
         }
       } else {
         const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/${contextId}`, {
@@ -525,16 +523,16 @@
       };
 
       if ($is_tauri) {
-        const result = await invoke('update_context', {
+        const result = await invoke<UpdateConversationResponse>('update_context', {
           conversationId,
           contextId: updatedContext.id,
           request: updatePayload
         });
-        if (result?.status === 'success') {
+        if (result.status === 'success') {
           console.log('✅ Context updated successfully via Tauri');
           await loadConversationContext();
-        } else {
-          console.error('❌ Failed to update context via Tauri:', result?.error);
+        } else if (result.error) {
+          console.error('❌ Failed to update context via Tauri:', result.error);
         }
       } else {
         const response = await fetch(`${CONFIG.ServerURL}/conversations/${conversationId}/context/${updatedContext.id}`, {
@@ -813,7 +811,7 @@
   async function loadPersistentConversation(conversationIdToLoad: string) {
     try {
       if ($is_tauri) {
-        const result = await invoke('get_persistent_conversation', {
+        const result = await invoke<ConversationResponse>('get_persistent_conversation', {
           conversationId: conversationIdToLoad
         });
 
@@ -840,9 +838,10 @@
           console.error('❌ Failed to load persistent conversation:', error);
         }
       }
-    } catch (e) {
-      console.error('❌ Error loading persistent conversation:', e);
-      error = String(e);
+    } catch (error) {
+      const err = toError(error);
+      console.error('❌ Error loading persistent conversation:', err);
+      error = err.message;
     }
   }
 
@@ -855,14 +854,12 @@
 
     try {
       if ($is_tauri) {
-        // Get the current conversation
-        const result = await invoke('get_conversation', { conversationId });
+        const result = await invoke<ConversationResponse>('get_conversation', { conversationId });
 
         if (result.status === 'success' && result.conversation) {
           const conv = result.conversation;
 
-          // Save as persistent
-          const saveResult = await invoke('create_persistent_conversation', {
+          const saveResult = await invoke<ConversationResponse>('create_persistent_conversation', {
             title: conv.title || 'Chat Conversation',
             role: conv.role
           });
@@ -870,8 +867,7 @@
           if (saveResult.status === 'success' && saveResult.conversation) {
             const persistentConv = saveResult.conversation;
 
-            // Update the persistent conversation with current messages and context
-            const updateResult = await invoke('update_persistent_conversation', {
+            const updateResult = await invoke<UpdateConversationResponse>('update_persistent_conversation', {
               conversation: {
                 ...persistentConv,
                 messages: conv.messages,
@@ -882,12 +878,19 @@
             if (updateResult.status === 'success') {
               currentPersistentConversationId.set(persistentConv.id);
               console.log('✅ Saved persistent conversation:', persistentConv.id);
+            } else if (updateResult.error) {
+              console.error('❌ Failed to update persistent conversation:', updateResult.error);
             }
+          } else if (saveResult.error) {
+            console.error('❌ Failed to create persistent conversation:', saveResult.error);
           }
+        } else if (result.error) {
+          console.error('❌ Failed to load conversation for persistence:', result.error);
         }
       }
-    } catch (e) {
-      console.error('❌ Error saving persistent conversation:', e);
+    } catch (error) {
+      const err = toError(error);
+      console.error('❌ Error saving persistent conversation:', err);
     }
   }
 
@@ -915,6 +918,8 @@
   function toggleSessionList() {
     showSessionList.update(v => !v);
   }
+
+  export type { ContextItem };
 </script>
 
 <section class="section" data-testid="chat-interface">
@@ -936,7 +941,7 @@
         <div class="chat-header">
           <div>
             <h2 class="title is-4">Chat</h2>
-            <p class="subtitle is-6">Role: {typeof get(role) === 'object' ? get(role).original : get(role)}</p>
+            <p class="subtitle is-6">Role: {currentRoleLabel}</p>
             {#if conversationId}
               <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
             {/if}
@@ -1050,10 +1055,23 @@
 
         <div class="field has-addons chat-input">
           <div class="control is-expanded">
-            <textarea class="textarea" rows="3" bind:value={input} on:keydown={handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
+            <textarea
+              class="textarea"
+              rows="3"
+              bind:value={input}
+              on:keydown={handleKeydown}
+              placeholder="Type your message and press Enter..."
+              data-testid="chat-input"
+            ></textarea>
           </div>
           <div class="control">
-            <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button">
+            <button
+              class="button is-primary"
+              aria-label="Send message"
+              on:click={sendMessage}
+              disabled={sending || !input.trim()}
+              data-testid="send-message-button"
+            >
               <span class="icon"><i class="fas fa-paper-plane"></i></span>
             </button>
           </div>
@@ -1103,10 +1121,10 @@
           {#if showAddContextForm}
             <div class="box has-background-light mb-4" data-testid="add-context-form">
               <div class="field">
-                <label class="label is-small">Context Type</label>
+                <label class="label is-small" for={manualContextTypeId}>Context Type</label>
                 <div class="control">
                   <div class="select is-small is-fullwidth">
-                    <select bind:value={newContextType} data-testid="context-type-select">
+                    <select id={manualContextTypeId} bind:value={newContextType} data-testid="context-type-select">
                       <option value="document">Document</option>
                       <option value="search_result">Search Result</option>
                       <option value="user_input">User Input</option>
@@ -1117,16 +1135,30 @@
               </div>
 
               <div class="field">
-                <label class="label is-small">Title</label>
+                <label class="label is-small" for={manualContextTitleId}>Title</label>
                 <div class="control">
-                  <input class="input is-small" type="text" placeholder="Enter context title" bind:value={newContextTitle} data-testid="context-title-input" />
+                  <input
+                    class="input is-small"
+                    id={manualContextTitleId}
+                    type="text"
+                    placeholder="Enter context title"
+                    bind:value={newContextTitle}
+                    data-testid="context-title-input"
+                  />
                 </div>
               </div>
 
               <div class="field">
-                <label class="label is-small">Content</label>
+                <label class="label is-small" for={manualContextContentId}>Content</label>
                 <div class="control">
-                  <textarea class="textarea is-small" rows="4" placeholder="Enter context content" bind:value={newContextContent} data-testid="context-content-textarea"></textarea>
+                  <textarea
+                    class="textarea is-small"
+                    id={manualContextContentId}
+                    rows="4"
+                    placeholder="Enter context content"
+                    bind:value={newContextContent}
+                    data-testid="context-content-textarea"
+                  ></textarea>
                 </div>
               </div>
 
@@ -1278,7 +1310,19 @@
 <!-- Debug Request Modal -->
 {#if showDebugRequest}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => showDebugRequest = false}></div>
+    <div
+      class="modal-background"
+      role="button"
+      tabindex="0"
+      aria-label="Close debug request modal"
+      on:click={() => (showDebugRequest = false)}
+      on:keydown={(event) => {
+        if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          showDebugRequest = false;
+        }
+      }}
+    ></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">
@@ -1319,7 +1363,19 @@
 <!-- Debug Response Modal -->
 {#if showDebugResponse}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => showDebugResponse = false}></div>
+    <div
+      class="modal-background"
+      role="button"
+      tabindex="0"
+      aria-label="Close debug response modal"
+      on:click={() => (showDebugResponse = false)}
+      on:keydown={(event) => {
+        if (event.key === 'Escape' || event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          showDebugResponse = false;
+        }
+      }}
+    ></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">

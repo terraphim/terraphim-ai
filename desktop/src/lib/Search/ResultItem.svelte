@@ -5,11 +5,11 @@
   import ArticleModal from "./ArticleModal.svelte";
   import AtomicSaveModal from "./AtomicSaveModal.svelte";
   import type { Document } from "./SearchResult";
-  import configStore from "../ThemeSwitcher.svelte";
-  import { role, is_tauri, serverUrl, configStore as roleConfigStore } from "../stores";
+  import { role, is_tauri, configStore as roleConfigStore } from "../stores";
   import { CONFIG } from "../../config";
   import { invoke } from '@tauri-apps/api/tauri';
   import type { DocumentListResponse, Role, Haystack } from "../generated/types";
+  import type { ConversationListResponse, ConversationResponse, ContextMutationResponse } from "../Chat/types";
   import SvelteMarkdown from 'svelte-markdown';
 
   export let item: Document;
@@ -36,6 +36,148 @@
   // Chat with document state
   let chattingWithDocument = false;
   let chatStarted = false;
+
+  const toError = (value: unknown): Error =>
+    value instanceof Error ? value : new Error(String(value));
+
+  const resolveRoleName = (): string => {
+    const current = $role as unknown;
+    if (current && typeof current === 'object' && current !== null) {
+      const withOriginal = current as { original?: string };
+      return withOriginal.original ?? 'default';
+    }
+    if (typeof current === 'string') {
+      return current;
+    }
+    return 'default';
+  };
+
+  function buildContextMetadata(): Record<string, string> {
+    const metadata: Record<string, string> = {
+      source_type: 'document',
+      document_id: item.id
+    };
+
+    if (item.url) {
+      metadata.url = item.url;
+    }
+
+    if (item.tags?.length) {
+      metadata.tags = item.tags.join(', ');
+    }
+
+    if (item.rank !== undefined) {
+      metadata.rank = String(item.rank);
+    }
+
+    return metadata;
+  }
+
+  async function getOrCreateConversationId(preferredTitle: string): Promise<string> {
+    const targetRole = resolveRoleName();
+
+    if ($is_tauri) {
+      try {
+        const result = await invoke<ConversationListResponse>('list_conversations');
+        const existing = result?.conversations?.[0];
+        if (existing?.id) {
+          return existing.id;
+        }
+      } catch (error) {
+        console.error('❌ Failed to list conversations via Tauri:', toError(error));
+      }
+
+      const created = await invoke<ConversationResponse>('create_conversation', {
+        title: preferredTitle,
+        role: targetRole
+      });
+
+      if (created.status === 'success' && created.conversation_id) {
+        return created.conversation_id;
+      }
+
+      throw new Error(created.error ?? 'Unknown error creating conversation');
+    }
+
+    const baseUrl = CONFIG.ServerURL;
+
+    try {
+      const response = await fetch(`${baseUrl}/conversations`);
+      if (response.ok) {
+        const data: ConversationListResponse = await response.json();
+        const existing = data.conversations?.[0];
+        if (existing?.id) {
+          return existing.id;
+        }
+      } else {
+        console.warn('⚠️ Failed to list conversations:', response.status, response.statusText);
+      }
+    } catch (error) {
+      console.error('❌ Error fetching conversations:', toError(error));
+    }
+
+    const createResponse = await fetch(`${baseUrl}/conversations`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: preferredTitle,
+        role: targetRole
+      })
+    });
+
+    if (!createResponse.ok) {
+      throw new Error(`Failed to create conversation: ${createResponse.status} ${createResponse.statusText}`);
+    }
+
+    const created: ConversationResponse = await createResponse.json();
+
+    if (created.status === 'success' && created.conversation_id) {
+      return created.conversation_id;
+    }
+
+    throw new Error(created.error ?? 'Unknown error creating conversation');
+  }
+
+  async function addDocumentContext(conversationId: string, metadata: Record<string, string>): Promise<void> {
+    if ($is_tauri) {
+      const result = await invoke<ContextMutationResponse>('add_context_to_conversation', {
+        conversationId,
+        contextType: 'document',
+        title: item.title,
+        content: item.body,
+        metadata
+      });
+
+      if (result.status !== 'success') {
+        throw new Error(result.error ?? 'Unknown error adding document context');
+      }
+
+      return;
+    }
+
+    const baseUrl = CONFIG.ServerURL;
+    const url = `${baseUrl}/conversations/${conversationId}/context`;
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        context_type: 'document',
+        title: item.title,
+        content: item.body,
+        metadata
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error(`Failed to add context: ${response.status} ${response.statusText}`);
+    }
+
+    const data: ContextMutationResponse = await response.json();
+
+    if (data.status !== 'success') {
+      throw new Error(data.error ?? 'Unknown error adding document context');
+    }
+  }
 
   // Check if current role has atomic server configuration
   $: hasAtomicServer = checkAtomicServerAvailable();
@@ -171,102 +313,65 @@
     loadingKg = true;
     kgTerm = tag;
 
-    // Add debugging information
-    console.log('🔍 KG Search Debug Info:');
-    console.log('  Tag clicked:', tag);
-    console.log('  Current role:', $role);
-    console.log('  Is Tauri mode:', $is_tauri);
+    console.log('🔍 KG Search Debug Info:', { tag, role: $role, isTauri: $is_tauri });
 
     try {
       if ($is_tauri) {
-        // Use Tauri command for desktop app
-        console.log('  Making Tauri invoke call...');
-        console.log('  Tauri command: find_documents_for_kg_term');
-        console.log('  Tauri params:', { roleName: $role, term: tag });
-
-        const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
+        const response = await invoke<DocumentListResponse>('find_documents_for_kg_term', {
           roleName: $role,
           term: tag
         });
 
-        console.log('  📥 Tauri response received:');
-        console.log('    Status:', response.status);
-        console.log('    Results count:', response.results?.length || 0);
-        console.log('    Total:', response.total || 0);
-        console.log('    Full response:', JSON.stringify(response, null, 2));
+        console.log('  📥 Tauri response received:', response);
 
-        if (response.status === 'success' && response.results && response.results.length > 0) {
-          // Get the first (highest-ranked) document
-          kgDocument = response.results[0];
-          kgRank = kgDocument.rank || 0;
-          console.log('  ✅ Found KG document:');
-          console.log('    Title:', kgDocument.title);
-          console.log('    Rank:', kgRank);
-          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+        const doc = response.results?.[0];
+
+        if (response.status === 'success' && doc) {
+          kgDocument = doc;
+          kgRank = doc.rank ?? 0;
+          console.log('  ✅ Found KG document:', {
+            title: doc.title,
+            rank: kgRank,
+            bodyLength: doc.body?.length ?? 0
+          });
           showKgModal = true;
         } else {
           console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
-          console.warn('    This could indicate:');
-          console.warn('    1. Knowledge graph not built for this role');
-          console.warn('    2. Term not found in knowledge graph');
-          console.warn('    3. Role not configured with TerraphimGraph relevance function');
-          console.warn('    Suggestion: Check server logs for KG building status');
         }
       } else {
-        // Use HTTP fetch for web mode
-        console.log('  Making HTTP fetch call...');
         const baseUrl = CONFIG.ServerURL;
-        const encodedRole = encodeURIComponent($role);
-        const encodedTerm = encodeURIComponent(tag);
-        const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
+        const roleName = encodeURIComponent(resolveRoleName());
+        const url = `${baseUrl}/roles/${roleName}/kg_search?term=${encodeURIComponent(tag)}`;
 
-        console.log('  📤 HTTP Request details:');
-        console.log('    Base URL:', baseUrl);
-        console.log('    Role (encoded):', encodedRole);
-        console.log('    Term (encoded):', encodedTerm);
-        console.log('    Full URL:', url);
+        console.log('  📤 HTTP Request details:', { url });
 
         const response = await fetch(url);
-
-        console.log('  📥 HTTP Response received:');
-        console.log('    Status code:', response.status);
-        console.log('    Status text:', response.statusText);
-        console.log('    Headers:', Object.fromEntries(response.headers.entries()));
 
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         }
 
-        const data = await response.json();
-        console.log('  📄 Response data:');
-        console.log('    Status:', data.status);
-        console.log('    Results count:', data.results?.length || 0);
-        console.log('    Total:', data.total || 0);
-        console.log('    Full response:', JSON.stringify(data, null, 2));
+        const data: DocumentListResponse = await response.json();
+        console.log('  📄 Response data:', data);
 
-        if (data.status === 'success' && data.results && data.results.length > 0) {
-          // Get the first (highest-ranked) document
-          kgDocument = data.results[0];
-          kgRank = kgDocument.rank || 0;
-          console.log('  ✅ Found KG document:');
-          console.log('    Title:', kgDocument.title);
-          console.log('    Rank:', kgRank);
-          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+        const doc = data.results?.[0];
+
+        if (data.status === 'success' && doc) {
+          kgDocument = doc;
+          kgRank = doc.rank ?? 0;
+          console.log('  ✅ Found KG document:', {
+            title: doc.title,
+            rank: kgRank,
+            bodyLength: doc.body?.length ?? 0
+          });
           showKgModal = true;
         } else {
           console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
-          console.warn('    This could indicate:');
-          console.warn('    1. Server not configured with Terraphim Engineer role');
-          console.warn('    2. Knowledge graph not built on server');
-          console.warn('    3. Term not found in knowledge graph');
-          console.warn('    Suggestion: Check server logs at startup for KG building status');
-          console.warn('    API URL tested:', url);
         }
       }
     } catch (error) {
-      console.error('❌ Error fetching KG document:');
-      console.error('  Error type:', error.constructor.name);
-      console.error('  Error message:', error.message || error);
+      const err = toError(error);
+      console.error('❌ Error fetching KG document:', err);
       console.error('  Request details:', {
         tag,
         role: $role,
@@ -274,14 +379,13 @@
         timestamp: new Date().toISOString()
       });
 
-      if (!$is_tauri && error.message?.includes('Failed to fetch')) {
-        console.error('  💡 Network error suggestions:');
-        console.error('    1. Check if server is running on expected port');
-        console.error('    2. Check CORS configuration');
-        console.error('    3. Verify server URL in CONFIG.ServerURL');
+      if (!$is_tauri && err.message.includes('Failed to fetch')) {
+        console.error('  💡 Network error suggestions:', [
+          'Check if server is running on expected port',
+          'Check CORS configuration',
+          'Verify server URL in CONFIG.ServerURL'
+        ]);
       }
-
-      // Graceful fallback: could show error message or do nothing
     } finally {
       loadingKg = false;
     }
@@ -293,49 +397,34 @@
     summaryLoading = true;
     summaryError = null;
 
-    console.log('🤖 AI Summary Debug Info:');
-    console.log('  Document ID:', item.id);
-    console.log('  Current role:', $role);
-    console.log('  Is Tauri mode:', $is_tauri);
+    const roleName = resolveRoleName();
+
+    console.log('🤖 AI Summary Debug Info:', {
+      documentId: item.id,
+      role: roleName,
+      isTauri: $is_tauri
+    });
 
     try {
       const requestBody = {
         document_id: item.id,
-        role: $role,
+        role: roleName,
         max_length: 250,
         force_regenerate: false
       };
 
       console.log('  📤 Summarization request:', requestBody);
 
-      let response;
+      const baseUrl = CONFIG.ServerURL;
+      const url = `${baseUrl}/documents/summarize`;
 
-      if ($is_tauri) {
-        // For Tauri mode, we'll make an HTTP request directly
-        // as we don't have a Tauri command for summarization yet
-        const baseUrl = CONFIG.ServerURL;
-        const url = `${baseUrl}/documents/summarize`;
-
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
-        });
-      } else {
-        // Web mode - direct HTTP request
-        const baseUrl = CONFIG.ServerURL;
-        const url = `${baseUrl}/documents/summarize`;
-
-        response = await fetch(url, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody)
-        });
-      }
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(requestBody)
+      });
 
       console.log('  📥 Summary response received:');
       console.log('    Status code:', response.status);
@@ -348,12 +437,13 @@
       const data = await response.json();
       console.log('  📄 Summary response data:', data);
 
-      if (data.status === 'success' && data.summary) {
-        aiSummary = data.summary;
-        summaryFromCache = data.from_cache || false;
+      if (data.status === 'success' && typeof data.summary === 'string') {
+        const summary: string = data.summary;
+        aiSummary = summary;
+        summaryFromCache = Boolean(data.from_cache);
         showAiSummary = true;
         console.log('  ✅ Summary generated successfully');
-        console.log('    Summary length:', aiSummary.length, 'characters');
+        console.log('    Summary length:', summary.length, 'characters');
         console.log('    From cache:', summaryFromCache);
         console.log('    Model used:', data.model_used);
       } else {
@@ -361,24 +451,24 @@
         console.error('  ❌ Summary generation failed:', summaryError);
       }
     } catch (error) {
-      console.error('❌ Error generating summary:');
-      console.error('  Error type:', error.constructor.name);
-      console.error('  Error message:', error.message || error);
+      const err = toError(error);
+      console.error('❌ Error generating summary:', err);
       console.error('  Request details:', {
         document_id: item.id,
-        role: $role,
+        role: roleName,
         isTauri: $is_tauri,
         timestamp: new Date().toISOString()
       });
 
-      summaryError = error.message || 'Network error occurred';
+      summaryError = err.message || 'Network error occurred';
 
-      if (error.message?.includes('Failed to fetch')) {
-        console.error('  💡 Network error suggestions:');
-        console.error('    1. Check if server is running on expected port');
-        console.error('    2. Verify OpenRouter is enabled for this role');
-        console.error('    3. Check OPENROUTER_KEY environment variable');
-        console.error('    4. Verify server URL in CONFIG.ServerURL');
+      if (err.message.includes('Failed to fetch')) {
+        console.error('  💡 Network error suggestions:', [
+          'Check if server is running on expected port',
+          'Verify OpenRouter is enabled for this role',
+          'Check OPENROUTER_KEY environment variable',
+          'Verify server URL in CONFIG.ServerURL'
+        ]);
       }
     } finally {
       summaryLoading = false;
@@ -449,18 +539,18 @@
         console.log('✅ File downloaded via browser:', filename);
       }
     } catch (error) {
-      console.error('❌ Download failed:', error);
+      console.error('❌ Download failed:', toError(error));
 
       // Fallback to browser download even in Tauri if the above fails
       console.log('🔄 Falling back to browser download...');
       const blob = new Blob([markdownContent], { type: 'text/markdown;charset=utf-8' });
       const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      item.body.appendChild(a);
-      a.click();
-      item.body.removeChild(a);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
       URL.revokeObjectURL(url);
       console.log('✅ Fallback download completed:', filename);
     }
@@ -497,383 +587,132 @@
   }
 
   async function addToContext() {
+    if (addingToContext) {
+      return;
+    }
+
     console.log('📝 Adding document to LLM context:', item.title);
 
-    // Reset state and show loading
     addingToContext = true;
     contextAdded = false;
     contextError = null;
 
     try {
-      let conversationId = null;
+      const conversationIdValue = await getOrCreateConversationId('Search Context');
+      const metadata = buildContextMetadata();
 
-      if ($is_tauri) {
-        // First, try to get or create a conversation
-        try {
-          const conversations = await invoke('list_conversations');
-          console.log('📋 Available conversations:', conversations);
-
-          // Find an existing conversation or use the first one
-          if (conversations?.conversations && conversations.conversations.length > 0) {
-            conversationId = conversations.conversations[0].id;
-            console.log('🎯 Using existing conversation:', conversationId);
-          } else {
-            // Create a new conversation
-            const newConv = await invoke('create_conversation', {
-              title: 'Search Context',
-              role: $role || 'default'
-            });
-            if (newConv.status === 'success' && newConv.conversation_id) {
-              conversationId = newConv.conversation_id;
-              console.log('🆕 Created new conversation:', conversationId);
-            } else {
-              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
-            }
-          }
-        } catch (convError) {
-          console.error('❌ Failed to manage conversations:', convError);
-          throw new Error('Could not create or find conversation: ' + convError.message);
-        }
-
-        // Use Tauri command for desktop app
-        const metadata = {
-          source_type: 'document',
-          document_id: item.id,
-        };
-
-        if (item.url) metadata.url = item.url;
-        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
-        if (item.rank !== undefined) metadata.rank = item.rank.toString();
-
-        const contextResult = await invoke('add_context_to_conversation', {
-          conversationId: conversationId,
-          contextType: 'document',
-          title: item.title,
-          content: item.body,
-          metadata: metadata
-        });
-
-        console.log('✅ Document added to context via Tauri:', contextResult);
-
-      } else {
-        // Web mode - use HTTP API
-        const baseUrl = CONFIG.ServerURL;
-
-        // First, try to get or create a conversation
-        try {
-          const conversationsResponse = await fetch(`${baseUrl}/conversations`);
-          if (conversationsResponse.ok) {
-            const conversationsData = await conversationsResponse.json();
-            if (conversationsData.conversations && conversationsData.conversations.length > 0) {
-              conversationId = conversationsData.conversations[0].id;
-              console.log('🎯 Using existing conversation:', conversationId);
-            } else {
-              // Create a new conversation
-              const newConvResponse = await fetch(`${baseUrl}/conversations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  title: 'Search Context',
-                  role: $role || 'default'
-                })
-              });
-              if (newConvResponse.ok) {
-                const newConvData = await newConvResponse.json();
-                if (newConvData.status === 'success' && newConvData.conversation_id) {
-                  conversationId = newConvData.conversation_id;
-                  console.log('🆕 Created new conversation:', conversationId);
-                } else {
-                  throw new Error('Failed to create conversation: ' + (newConvData.error || 'Unknown error'));
-                }
-              } else {
-                throw new Error(`Failed to create conversation: ${newConvResponse.status} ${newConvResponse.statusText}`);
-              }
-            }
-          } else {
-            throw new Error(`Failed to list conversations: ${conversationsResponse.status} ${conversationsResponse.statusText}`);
-          }
-        } catch (convError) {
-          console.error('❌ Failed to manage conversations:', convError);
-          throw new Error('Could not create or find conversation: ' + convError.message);
-        }
-
-        // Add document context to conversation
-        const url = `${baseUrl}/conversations/${conversationId}/context`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            context_type: 'document',
-            title: item.title,
-            content: item.body,
-            metadata: {
-              source_type: 'document',
-              document_id: item.id,
-              url: item.url || '',
-              tags: item.tags ? item.tags.join(', ') : '',
-              rank: item.rank ? item.rank.toString() : '0'
-            }
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('✅ Document added to context via HTTP:', data);
-      }
+      await addDocumentContext(conversationIdValue, metadata);
 
       console.log('✅ Successfully added document to LLM context');
-
-      // Show success state
       contextAdded = true;
 
-      // Show success notification with navigation hint
       const notification = window.document.createElement('div');
       notification.className = 'notification is-success is-light';
       notification.innerHTML = `
-        <button class="delete" onclick="this.parentElement.remove()"></button>
+        <button class="delete" aria-label="Dismiss notification" onclick="this.parentElement.remove()"></button>
         <strong>✓ Added to Chat Context</strong><br>
         <small>Document added successfully. <a href="/chat" class="has-text-success has-text-weight-bold">Go to Chat →</a> to see it in the context panel.</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
       window.document.body.appendChild(notification);
 
-      // Auto-remove notification after 8 seconds
+      setTimeout(() => notification.remove(), 8000);
       setTimeout(() => {
-        notification.remove();
-      }, 8000);
-
-      // Reset success state after a delay to allow re-adding if needed
-      setTimeout(() => {
-        contextAdded = false;
+        if (!chattingWithDocument) {
+          contextAdded = false;
+        }
       }, 5000);
-
     } catch (error) {
-      console.error('❌ Error adding document to context:', error);
+      const err = toError(error);
+      console.error('❌ Error adding document to context:', err);
 
-      // Show error state
-      contextError = error.message || 'Failed to add document to context';
+      contextError = err.message || 'Failed to add document to context';
 
-      // Show error notification
       const notification = window.document.createElement('div');
       notification.className = 'notification is-danger is-light';
       notification.innerHTML = `
-        <button class="delete" onclick="this.parentElement.remove()"></button>
+        <button class="delete" aria-label="Dismiss notification" onclick="this.parentElement.remove()"></button>
         <strong>✗ Failed to Add Context</strong><br>
         <small>${contextError}</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
       window.document.body.appendChild(notification);
 
-      // Auto-remove notification after 8 seconds
-      setTimeout(() => {
-        notification.remove();
-      }, 8000);
-
-      // Clear error after a delay
+      setTimeout(() => notification.remove(), 8000);
       setTimeout(() => {
         contextError = null;
       }, 5000);
-
     } finally {
       addingToContext = false;
     }
   }
 
   async function addToContextAndChat() {
+    if (chattingWithDocument) {
+      return;
+    }
+
     console.log('💬 Adding document to context and opening chat:', item.title);
 
-    // Reset state and show loading
     chattingWithDocument = true;
     chatStarted = false;
     contextError = null;
 
     try {
-      let conversationId = null;
+      const conversationIdValue = await getOrCreateConversationId('Chat with Documents');
+      const metadata = buildContextMetadata();
 
-      if ($is_tauri) {
-        // First, try to get or create a conversation
-        try {
-          const conversations = await invoke('list_conversations');
-          console.log('📋 Available conversations:', conversations);
+      await addDocumentContext(conversationIdValue, metadata);
 
-          // Find an existing conversation or use the first one
-          if (conversations?.conversations && conversations.conversations.length > 0) {
-            conversationId = conversations.conversations[0].id;
-            console.log('🎯 Using existing conversation:', conversationId);
-          } else {
-            // Create a new conversation
-            const newConv = await invoke('create_conversation', {
-              title: 'Chat with Documents',
-              role: $role || 'default'
-            });
-            if (newConv.status === 'success' && newConv.conversation_id) {
-              conversationId = newConv.conversation_id;
-              console.log('🆕 Created new conversation:', conversationId);
-            } else {
-              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
-            }
-          }
-        } catch (convError) {
-          console.error('❌ Failed to manage conversations:', convError);
-          throw new Error('Could not create or find conversation: ' + convError.message);
-        }
+      console.log('✅ Successfully added document to context');
 
-        // Use Tauri command for desktop app
-        const metadata = {
-          source_type: 'document',
-          document_id: item.id,
-        };
-
-        if (item.url) metadata.url = item.url;
-        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
-        if (item.rank !== undefined) metadata.rank = item.rank.toString();
-
-        const contextResult = await invoke('add_context_to_conversation', {
-          conversationId: conversationId,
-          contextType: 'document',
-          title: item.title,
-          content: item.body,
-          metadata: metadata
-        });
-
-        console.log('✅ Document added to context via Tauri:', contextResult);
-
-      } else {
-        // Web mode - use HTTP API
-        const baseUrl = CONFIG.ServerURL;
-
-        // First, try to get or create a conversation
-        try {
-          const conversationsResponse = await fetch(`${baseUrl}/conversations`);
-          if (conversationsResponse.ok) {
-            const conversationsData = await conversationsResponse.json();
-            if (conversationsData.conversations && conversationsData.conversations.length > 0) {
-              conversationId = conversationsData.conversations[0].id;
-              console.log('🎯 Using existing conversation:', conversationId);
-            } else {
-              // Create a new conversation
-              const newConvResponse = await fetch(`${baseUrl}/conversations`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                  title: 'Chat with Documents',
-                  role: $role || 'default'
-                })
-              });
-              if (newConvResponse.ok) {
-                const newConvData = await newConvResponse.json();
-                if (newConvData.status === 'success' && newConvData.conversation_id) {
-                  conversationId = newConvData.conversation_id;
-                  console.log('🆕 Created new conversation:', conversationId);
-                } else {
-                  throw new Error('Failed to create conversation: ' + (newConvData.error || 'Unknown error'));
-                }
-              } else {
-                throw new Error(`Failed to create conversation: ${newConvResponse.status} ${newConvResponse.statusText}`);
-              }
-            }
-          } else {
-            throw new Error(`Failed to list conversations: ${conversationsResponse.status} ${conversationsResponse.statusText}`);
-          }
-        } catch (convError) {
-          console.error('❌ Failed to manage conversations:', convError);
-          throw new Error('Could not create or find conversation: ' + convError.message);
-        }
-
-        // Add document context to conversation
-        const url = `${baseUrl}/conversations/${conversationId}/context`;
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            context_type: 'document',
-            title: item.title,
-            content: item.body,
-            metadata: {
-              source_type: 'document',
-              document_id: item.id,
-              url: item.url || '',
-              tags: item.tags ? item.tags.join(', ') : '',
-              rank: item.rank ? item.rank.toString() : '0'
-            }
-          })
-        });
-
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('✅ Document added to context via HTTP:', data);
-      }
-
-      console.log('✅ Successfully added document to chat context, navigating to chat...');
-
-      // Show success state briefly
+      contextAdded = true;
       chatStarted = true;
 
-      // Show brief success notification before navigation
       const notification = window.document.createElement('div');
       notification.className = 'notification is-success is-light';
       notification.innerHTML = `
-        <strong>💬 Opening Chat with Document</strong><br>
-        <small>Context added successfully. Redirecting to chat...</small>
+        <button class="delete" aria-label="Dismiss notification" onclick="this.parentElement.remove()"></button>
+        <strong>✓ Document Ready in Chat</strong><br>
+        <small>Opening chat so you can continue the conversation.</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
       window.document.body.appendChild(notification);
 
-      // Navigate to chat after a brief delay
       setTimeout(() => {
         notification.remove();
         router.goto('/chat');
       }, 1500);
 
-      // Reset states after navigation
       setTimeout(() => {
         chatStarted = false;
       }, 2000);
 
+      setTimeout(() => {
+        contextAdded = false;
+      }, 5000);
     } catch (error) {
-      console.error('❌ Error adding document to context and opening chat:', error);
+      const err = toError(error);
+      console.error('❌ Error adding document to context and opening chat:', err);
 
-      // Show error state
-      contextError = error.message || 'Failed to add document to context';
+      contextError = err.message || 'Failed to add document to context';
 
-      // Show error notification
       const notification = window.document.createElement('div');
       notification.className = 'notification is-danger is-light';
       notification.innerHTML = `
-        <button class="delete" onclick="this.parentElement.remove()"></button>
+        <button class="delete" aria-label="Dismiss notification" onclick="this.parentElement.remove()"></button>
         <strong>✗ Failed to Open Chat with Document</strong><br>
         <small>${contextError}</small>
       `;
       notification.style.cssText = 'position: fixed; top: 20px; right: 20px; z-index: 1000; max-width: 350px;';
       window.document.body.appendChild(notification);
 
-      // Auto-remove notification after 8 seconds
-      setTimeout(() => {
-        notification.remove();
-      }, 8000);
-
-      // Clear error after a delay
+      setTimeout(() => notification.remove(), 8000);
       setTimeout(() => {
         contextError = null;
       }, 5000);
-
     } finally {
       chattingWithDocument = false;
-    }
-  }
-
-  if (configStore[$role] !== undefined) {
-    console.log("Have attribute", configStore[$role]);
-    if (configStore[$role].hasOwnProperty("enableLogseq")) {
-      console.log("enable logseq True");
-    } else {
-      console.log("Didn't make it");
     }
   }
 </script>
@@ -1022,21 +861,9 @@
                     disabled={true}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </button>
-                {:else if item.isLink}
-                  <a
-                    href={item.href}
-                    target="_blank"
-                    class="level-item"
-                    aria-label={item.title}
-                    title={item.title}
-                  >
-                    <span class="icon is-medium" class:has-text-primary={item.className}>
-                      <i class={item.icon} />
-                    </span>
-                  </a>
                 {:else}
                   <button
                     type="button"
@@ -1047,7 +874,7 @@
                     data-testid={item.testId || ''}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className?.includes('primary')} class:has-text-success={item.className?.includes('success')} class:has-text-danger={item.className?.includes('danger')}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </button>
                 {/if}
@@ -1062,7 +889,11 @@
   <!-- Context addition feedback -->
   {#if contextError}
     <div class="notification is-danger is-light mt-2">
-      <button class="delete" on:click={() => contextError = null}></button>
+      <button
+        class="delete"
+        aria-label="Dismiss error notification"
+        on:click={() => contextError = null}
+      ></button>
       {contextError}
     </div>
   {/if}

@@ -1,5 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { render, screen, fireEvent, waitFor } from '@testing-library/svelte/svelte5';
 import '@testing-library/jest-dom';
 
 // Test utilities for real API testing
@@ -13,22 +13,33 @@ describe('Context Management Integration Tests', () => {
   let serverUrl: string;
 
   beforeEach(async () => {
-    // Start a real test server instance
-    testServer = await startTestServer(createTestConfig());
-    serverUrl = testServer.address();
+    try {
+      // Start a real test server instance
+      testServer = await startTestServer(createTestConfig());
+      if (!testServer) {
+        throw new Error('Failed to start test server');
+      }
+      serverUrl = testServer.address();
+      if (!serverUrl) {
+        throw new Error('Failed to get server address');
+      }
 
-    // Update CONFIG for tests
-    (global as any).CONFIG = { ServerURL: serverUrl };
+      // Update CONFIG for tests
+      (global as any).CONFIG = { ServerURL: serverUrl };
 
-    // Set test mode to use HTTP instead of Tauri
-    (global as any).__IS_TAURI__ = false;
-  });
+      // Set test mode to use HTTP instead of Tauri
+      (global as any).__IS_TAURI__ = false;
+    } catch (error) {
+      console.error('Test server setup failed:', error);
+      throw error;
+    }
+  }, 20000);
 
   afterEach(async () => {
     if (testServer) {
       await stopTestServer(testServer);
     }
-  });
+  }, 20000);
 
   describe('Conversation Lifecycle', () => {
     it('should create and manage conversations through real API', async () => {
@@ -52,7 +63,7 @@ describe('Context Management Integration Tests', () => {
       await stopTestServer(testServer);
       testServer = null;
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       render(Chat);
 
@@ -203,7 +214,7 @@ describe('Context Management Integration Tests', () => {
       await stopTestServer(testServer);
       testServer = null;
 
-      const consoleSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       const addButton = screen.getByTestId('show-add-context-button');
       await fireEvent.click(addButton);

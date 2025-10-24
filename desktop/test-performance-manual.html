@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Performance Test - All Roles</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .test-container {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .test-section {
+            margin-bottom: 30px;
+            padding: 15px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+        }
+        .test-results {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-family: monospace;
+        }
+        .success { color: #28a745; }
+        .error { color: #dc3545; }
+        .warning { color: #ffc107; }
+        .info { color: #17a2b8; }
+        button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            margin: 5px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        .role-selector {
+            margin-bottom: 20px;
+        }
+        .role-selector select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin-right: 10px;
+        }
+        .search-input {
+            width: 300px;
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            margin-right: 10px;
+        }
+        .metrics {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+        .metric-card {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            text-align: center;
+        }
+        .metric-value {
+            font-size: 24px;
+            font-weight: bold;
+            color: #007bff;
+        }
+        .metric-label {
+            font-size: 14px;
+            color: #6c757d;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>🚀 Terraphim Performance Test - All Roles</h1>
+    <p>This page tests the performance improvements across all three roles: Default, Rust Engineer, and Terraphim Engineer.</p>
+
+    <div class="test-container">
+        <h2>🎯 Test Controls</h2>
+        <div class="role-selector">
+            <label for="roleSelect">Select Role:</label>
+            <select id="roleSelect">
+                <option value="Default">Default</option>
+                <option value="Rust Engineer">Rust Engineer</option>
+                <option value="Terraphim Engineer">Terraphim Engineer</option>
+            </select>
+            <button onclick="switchRole()">Switch Role</button>
+        </div>
+        
+        <div>
+            <input type="text" id="searchInput" class="search-input" placeholder="Enter search query..." />
+            <button onclick="performSearch()">Search</button>
+            <button onclick="runAllTests()">Run All Tests</button>
+            <button onclick="clearResults()">Clear Results</button>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>📊 Performance Metrics</h2>
+        <div class="metrics">
+            <div class="metric-card">
+                <div class="metric-value" id="avgSearchTime">-</div>
+                <div class="metric-label">Avg Search Time (ms)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="maxSearchTime">-</div>
+                <div class="metric-label">Max Search Time (ms)</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="totalTests">0</div>
+                <div class="metric-label">Tests Run</div>
+            </div>
+            <div class="metric-card">
+                <div class="metric-value" id="successRate">-</div>
+                <div class="metric-label">Success Rate</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="test-container">
+        <h2>🧪 Test Results</h2>
+        <div id="testResults" class="test-results">
+            <div class="info">Click "Run All Tests" to start performance validation...</div>
+        </div>
+    </div>
+
+    <script>
+        let testResults = [];
+        let currentRole = 'Default';
+
+        // Test configurations for each role
+        const testConfigs = {
+            'Default': {
+                queries: ['artificial intelligence', 'machine learning', 'data science'],
+                expectedMinResults: 0,
+                maxSearchTime: 2000
+            },
+            'Rust Engineer': {
+                queries: ['async tokio', 'rust programming', 'cargo build'],
+                expectedMinResults: 0,
+                maxSearchTime: 2000
+            },
+            'Terraphim Engineer': {
+                queries: ['knowledge graph', 'terraphim system', 'haystack service'],
+                expectedMinResults: 0,
+                maxSearchTime: 2000
+            }
+        };
+
+        function log(message, type = 'info') {
+            const timestamp = new Date().toLocaleTimeString();
+            const logElement = document.createElement('div');
+            logElement.className = type;
+            logElement.textContent = `[${timestamp}] ${message}`;
+            document.getElementById('testResults').appendChild(logElement);
+            document.getElementById('testResults').scrollTop = document.getElementById('testResults').scrollHeight;
+        }
+
+        function updateMetrics() {
+            if (testResults.length === 0) return;
+
+            const searchTimes = testResults.map(r => r.searchTime);
+            const avgTime = Math.round(searchTimes.reduce((a, b) => a + b, 0) / searchTimes.length);
+            const maxTime = Math.max(...searchTimes);
+            const successCount = testResults.filter(r => r.success).length;
+            const successRate = Math.round((successCount / testResults.length) * 100);
+
+            document.getElementById('avgSearchTime').textContent = avgTime;
+            document.getElementById('maxSearchTime').textContent = maxTime;
+            document.getElementById('totalTests').textContent = testResults.length;
+            document.getElementById('successRate').textContent = successRate + '%';
+        }
+
+        async function switchRole() {
+            const roleSelect = document.getElementById('roleSelect');
+            currentRole = roleSelect.value;
+            log(`Switched to role: ${currentRole}`, 'info');
+        }
+
+        async function performSearch() {
+            const query = document.getElementById('searchInput').value;
+            if (!query.trim()) {
+                log('Please enter a search query', 'warning');
+                return;
+            }
+
+            log(`🔍 Testing search: "${query}" with role: ${currentRole}`, 'info');
+            
+            const startTime = Date.now();
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/documents/search', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        needle: query,
+                        role: currentRole,
+                        limit: 10
+                    })
+                });
+
+                const searchTime = Date.now() - startTime;
+                
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                const resultCount = data.results ? data.results.length : 0;
+                
+                const testResult = {
+                    role: currentRole,
+                    query: query,
+                    searchTime: searchTime,
+                    resultCount: resultCount,
+                    success: searchTime < 2000 && data.status === 'success',
+                    timestamp: new Date().toISOString()
+                };
+
+                testResults.push(testResult);
+                updateMetrics();
+
+                if (testResult.success) {
+                    log(`✅ Search successful: ${searchTime}ms, ${resultCount} results`, 'success');
+                } else {
+                    log(`❌ Search failed or too slow: ${searchTime}ms, ${resultCount} results`, 'error');
+                }
+
+            } catch (error) {
+                const searchTime = Date.now() - startTime;
+                log(`❌ Search error: ${error.message} (${searchTime}ms)`, 'error');
+                
+                testResults.push({
+                    role: currentRole,
+                    query: query,
+                    searchTime: searchTime,
+                    resultCount: 0,
+                    success: false,
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                });
+                updateMetrics();
+            }
+        }
+
+        async function runAllTests() {
+            log('🚀 Starting comprehensive performance test for all roles...', 'info');
+            testResults = [];
+            updateMetrics();
+
+            const roles = ['Default', 'Rust Engineer', 'Terraphim Engineer'];
+            
+            for (const role of roles) {
+                log(`\n📋 Testing role: ${role}`, 'info');
+                currentRole = role;
+                document.getElementById('roleSelect').value = role;
+
+                const config = testConfigs[role];
+                
+                for (const query of config.queries) {
+                    document.getElementById('searchInput').value = query;
+                    await performSearch();
+                    await new Promise(resolve => setTimeout(resolve, 500)); // Small delay between tests
+                }
+            }
+
+            // Final summary
+            log('\n📊 Performance Test Summary:', 'info');
+            log('='.repeat(50), 'info');
+            
+            const successCount = testResults.filter(r => r.success).length;
+            const totalCount = testResults.length;
+            const avgTime = Math.round(testResults.reduce((sum, r) => sum + r.searchTime, 0) / totalCount);
+            const maxTime = Math.max(...testResults.map(r => r.searchTime));
+            
+            log(`Total tests: ${totalCount}`, 'info');
+            log(`Successful: ${successCount}`, successCount === totalCount ? 'success' : 'warning');
+            log(`Success rate: ${Math.round((successCount / totalCount) * 100)}%`, 'info');
+            log(`Average search time: ${avgTime}ms`, avgTime < 1000 ? 'success' : 'warning');
+            log(`Max search time: ${maxTime}ms`, maxTime < 2000 ? 'success' : 'error');
+            
+            if (successCount === totalCount && maxTime < 2000) {
+                log('\n🎉 ALL TESTS PASSED! Performance optimizations are working correctly.', 'success');
+            } else {
+                log('\n⚠️  Some tests failed or were too slow. Check the results above.', 'warning');
+            }
+        }
+
+        function clearResults() {
+            testResults = [];
+            document.getElementById('testResults').innerHTML = '<div class="info">Results cleared. Ready for new tests...</div>';
+            updateMetrics();
+        }
+
+        // Initialize
+        log('Performance test page loaded. Ready to test all three roles!', 'info');
+        log('Make sure the Terraphim server is running on localhost:8000', 'info');
+    </script>
+</body>
+</html>

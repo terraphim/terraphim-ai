@@ -117,6 +117,7 @@ pub struct Role {
     pub llm_context_window: Option<u64>,
     #[serde(flatten)]
     #[schemars(skip)]
+    #[cfg_attr(feature = "typescript", tsify(type = "Record<string, unknown>"))]
     pub extra: AHashMap<String, Value>,
 }
 

@@ -57,8 +57,9 @@
         edges = data.edges;
       }
     } catch (e) {
-      error = e.message;
-      console.error("Error fetching rolegraph:", e);
+      const err = e instanceof Error ? e : new Error(String(e));
+      error = err.message;
+      console.error("Error fetching rolegraph:", err);
     } finally {
       loading = false;
     }
@@ -73,7 +74,9 @@
       description: `Knowledge graph concept: ${node.label}`,
       tags: ['knowledge-graph', 'concept'],
       rank: node.rank,
-      stub: `Knowledge graph concept: ${node.label}`
+      stub: `Knowledge graph concept: ${node.label}`,
+      summarization: undefined,
+      source_haystack: 'knowledge-graph'
     };
   }
 
@@ -137,12 +140,12 @@
     container.innerHTML = '';
 
     const svg = d3.select(container)
-      .append('svg')
+      .append<SVGSVGElement>('svg')
       .attr('width', width)
       .attr('height', height);
 
     // Zoom and pan behavior
-    const zoom = d3.zoom()
+    const zoom = d3.zoom<SVGSVGElement, unknown>()
       .scaleExtent([0.1, 10])
       .on('zoom', (event) => {
         g.attr('transform', event.transform);
@@ -215,7 +218,7 @@
             return Math.max(6, Math.min(20, rank * 2));
           });
       })
-      .call(d3.drag()
+      .call(d3.drag<SVGCircleElement, unknown>()
         .on('start', dragstarted)
         .on('drag', dragged)
         .on('end', dragended));

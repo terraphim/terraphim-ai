@@ -1,0 +1,16 @@
+# Summary: crates/terraphim_kg_agents/Cargo.toml
+
+## Purpose
+This Cargo.toml file configures the terraphim_kg_agents crate, which implements specialized knowledge graph-based agent functionality.
+
+## Key Functionality
+- Defines crate for specialized knowledge graph agent implementations
+- Depends on core Terraphim crates (agent_registry, supervisor, automata, rolegraph, task_decomposition, types)
+- Includes async runtime support (Tokio), error handling (thiserror), and serialization (serde)
+- Provides development dependencies for testing (tokio-test)
+
+## Important Details
+- Uses edition 2021 with MIT OR Apache-2.0 dual licensing
+- Focuses on knowledge graph operations and agent coordination
+- Integrates with broader Terraphim ecosystem for multi-agent workflows
+- Supports concurrent and parallel agent execution patterns

@@ -1,6 +1,6 @@
 <script lang="ts">
-  import { Route, router, active } from "tinro";
-  import FetchTabs from "./lib/Fetchers/FetchTabs.svelte";
+import { Route, router, active } from "tinro";
+import "@fortawesome/fontawesome-free/css/all.css";
   import Search from "./lib/Search/Search.svelte";
   import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
   import { theme } from "./lib/stores";
@@ -13,10 +13,6 @@
   let visible = "is-hidden";
   function toggleVissible() {
     visible = "";
-  }
-
-  function navigateTo(path: string) {
-    router.goto(path);
   }
 
   function goBack() {
@@ -88,7 +84,6 @@
     </div>
     <br />
 
-    <Route path="/fetch/*"><FetchTabs /></Route>
     <Route path="/config/wizard"><ConfigWizard /></Route>
     <Route path="/config/json"><ConfigJsonEditor /></Route>
   </main>
@@ -98,7 +93,7 @@
       <Route path="/">
         <nav class="navbar">
           <div class="navbar-brand">
-            <a class="navbar-item" href="/">
+            <a class="navbar-item" href="/" aria-label="Go to home search">
               <span class="icon" style="color: #333;">
                 <i class="fas fa-home"> </i>
               </span>
@@ -115,7 +110,6 @@
 </div>
 
 <style>
-  @import "@fortawesome/fontawesome-free/css/all.css";
   :global(body) {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
       Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
@@ -200,17 +194,17 @@
   }
 
   /* Active navigation tab styles */
-  .tabs li:has(a.active) {
+  :global(.tabs li:has(a.active)) {
     border-bottom-color: #3273dc;
   }
-  .tabs a.active {
+  :global(.tabs a.active) {
     color: #3273dc !important;
     border-bottom-color: #3273dc !important;
   }
 
   /* Fallback for browsers that don't support :has() selector */
   @supports not (selector(:has(*))) {
-    .tabs a.active {
+    :global(.tabs a.active) {
       background-color: #f5f5f5;
       border-bottom: 3px solid #3273dc;
     }

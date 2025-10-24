@@ -26,9 +26,9 @@ function validateRipgrepTag(tag: string): { isValid: boolean; errors: string[]; 
   }
 
   // Check for invalid characters that could break ripgrep
-  const invalidChars = /["\\\n\r\t]/;
+  const invalidChars = /["\\\n\r\t!@#$%^&*()+={}[\]|;:'"<>,.?/]/;
   if (invalidChars.test(trimmedTag)) {
-    errors.push('Tag contains invalid characters (quotes, backslashes, or control characters)');
+    errors.push('Tag contains invalid characters (quotes, backslashes, control characters, or special symbols)');
   } else {
     // Only check format if no invalid characters are present
     // Check for valid tag format (alphanumeric, dash, underscore after #)
