@@ -1,0 +1,666 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Base Components - Examples</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      color: #2c3e50;
+    }
+
+    .example-section {
+      background: white;
+      padding: 30px;
+      margin-bottom: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    .example-section h2 {
+      margin-top: 0;
+      color: #34495e;
+      border-bottom: 2px solid #3498db;
+      padding-bottom: 10px;
+    }
+
+    .example-section p {
+      color: #7f8c8d;
+      line-height: 1.6;
+    }
+
+    code {
+      background: #ecf0f1;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.9em;
+    }
+
+    pre {
+      background: #2c3e50;
+      color: #ecf0f1;
+      padding: 15px;
+      border-radius: 5px;
+      overflow-x: auto;
+    }
+
+    pre code {
+      background: none;
+      padding: 0;
+      color: #ecf0f1;
+    }
+  </style>
+</head>
+<body>
+  <h1>Terraphim Base Components - Live Examples</h1>
+
+  <div class="example-section">
+    <h2>1. Simple Counter (TerraphimElement + TerraphimObservable)</h2>
+    <p>Demonstrates reactive state management with observable properties.</p>
+    <simple-counter></simple-counter>
+  </div>
+
+  <div class="example-section">
+    <h2>2. User Profile Editor (Properties + Reflection)</h2>
+    <p>Shows property/attribute synchronization and type conversion.</p>
+    <user-profile name="Alice Smith" age="30" admin="true"></user-profile>
+  </div>
+
+  <div class="example-section">
+    <h2>3. Event Communication (TerraphimEvents)</h2>
+    <p>Demonstrates global event bus for cross-component communication.</p>
+    <event-emitter></event-emitter>
+    <event-listener></event-listener>
+  </div>
+
+  <div class="example-section">
+    <h2>4. Todo List (All Features Combined)</h2>
+    <p>Complete example using all features: observables, events, and lifecycle.</p>
+    <todo-list filter="all"></todo-list>
+  </div>
+
+  <script type="module">
+    import { TerraphimElement, TerraphimObservable, TerraphimEvents, TerraphimEventBus } from './index.js';
+
+    // Example 1: Simple Counter
+    class SimpleCounter extends TerraphimObservable(TerraphimElement) {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+
+        this.state = this.observe({
+          count: 0
+        });
+
+        this.subscribe('*', () => this.render());
+      }
+
+      onConnected() {
+        this.listen('click', (e) => {
+          if (e.target.matches('.increment')) {
+            this.state.count++;
+          } else if (e.target.matches('.decrement')) {
+            this.state.count--;
+          } else if (e.target.matches('.reset')) {
+            this.state.count = 0;
+          }
+        });
+
+        this.render();
+      }
+
+      render() {
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .counter {
+              text-align: center;
+              padding: 20px;
+              font-family: inherit;
+            }
+            .count {
+              font-size: 48px;
+              font-weight: bold;
+              color: #3498db;
+              margin: 20px 0;
+            }
+            button {
+              padding: 10px 20px;
+              margin: 0 5px;
+              background: #3498db;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 16px;
+            }
+            button:hover {
+              background: #2980b9;
+            }
+            .reset {
+              background: #95a5a6;
+            }
+            .reset:hover {
+              background: #7f8c8d;
+            }
+          </style>
+          <div class="counter">
+            <div class="count">${this.state.count}</div>
+            <button class="decrement">-</button>
+            <button class="increment">+</button>
+            <button class="reset">Reset</button>
+          </div>
+        `);
+      }
+    }
+
+    customElements.define('simple-counter', SimpleCounter);
+
+    // Example 2: User Profile
+    class UserProfile extends TerraphimElement {
+      static get observedAttributes() {
+        return ['name', 'age', 'admin'];
+      }
+
+      static get properties() {
+        return {
+          name: { type: String, reflect: true, default: 'Anonymous' },
+          age: { type: Number, reflect: true, default: 0 },
+          admin: { type: Boolean, reflect: true, default: false }
+        };
+      }
+
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        this.listen('input', (e) => {
+          if (e.target.matches('.name-input')) {
+            this.name = e.target.value;
+          } else if (e.target.matches('.age-input')) {
+            this.age = parseInt(e.target.value) || 0;
+          } else if (e.target.matches('.admin-checkbox')) {
+            this.admin = e.target.checked;
+          }
+        });
+
+        this.render();
+      }
+
+      render() {
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .profile {
+              padding: 20px;
+              font-family: inherit;
+            }
+            .field {
+              margin-bottom: 15px;
+            }
+            label {
+              display: block;
+              margin-bottom: 5px;
+              font-weight: 600;
+              color: #34495e;
+            }
+            input[type="text"],
+            input[type="number"] {
+              width: 100%;
+              padding: 8px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              font-size: 14px;
+            }
+            .badge {
+              display: inline-block;
+              padding: 4px 12px;
+              background: #e74c3c;
+              color: white;
+              border-radius: 12px;
+              font-size: 12px;
+              font-weight: bold;
+              margin-left: 10px;
+            }
+            .info {
+              background: #ecf0f1;
+              padding: 10px;
+              border-radius: 4px;
+              margin-top: 15px;
+              font-size: 12px;
+              color: #7f8c8d;
+            }
+          </style>
+          <div class="profile">
+            <h3>
+              ${this.name}
+              ${this.admin ? '<span class="badge">ADMIN</span>' : ''}
+            </h3>
+
+            <div class="field">
+              <label>Name:</label>
+              <input type="text" class="name-input" value="${this.name}">
+            </div>
+
+            <div class="field">
+              <label>Age:</label>
+              <input type="number" class="age-input" value="${this.age}">
+            </div>
+
+            <div class="field">
+              <label>
+                <input type="checkbox" class="admin-checkbox" ${this.admin ? 'checked' : ''}>
+                Administrator
+              </label>
+            </div>
+
+            <div class="info">
+              Try changing values and inspect the element's attributes in DevTools.
+              Properties automatically sync to attributes!
+            </div>
+          </div>
+        `);
+      }
+    }
+
+    customElements.define('user-profile', UserProfile);
+
+    // Example 3: Event Communication
+    class EventEmitter extends TerraphimEventBus(TerraphimElement) {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        this.listen('click', (e) => {
+          if (e.target.matches('.emit-btn')) {
+            const message = this.$('.message-input').value;
+            this.emitGlobal('message:sent', {
+              text: message,
+              timestamp: new Date().toLocaleTimeString()
+            });
+          }
+        });
+
+        this.render();
+      }
+
+      render() {
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .emitter {
+              padding: 20px;
+              font-family: inherit;
+            }
+            input {
+              padding: 8px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              width: 300px;
+              margin-right: 10px;
+            }
+            button {
+              padding: 8px 20px;
+              background: #3498db;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+            }
+          </style>
+          <div class="emitter">
+            <input type="text" class="message-input" placeholder="Enter a message...">
+            <button class="emit-btn">Send Message</button>
+          </div>
+        `);
+      }
+    }
+
+    customElements.define('event-emitter', EventEmitter);
+
+    class EventListener extends TerraphimEventBus(TerraphimElement) {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+        this.messages = [];
+      }
+
+      onConnected() {
+        this.onGlobal('message:sent', (data) => {
+          this.messages.push(data);
+          this.render();
+        });
+
+        this.render();
+      }
+
+      render() {
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .listener {
+              padding: 20px;
+              font-family: inherit;
+            }
+            .messages {
+              background: #ecf0f1;
+              padding: 15px;
+              border-radius: 4px;
+              min-height: 100px;
+              max-height: 200px;
+              overflow-y: auto;
+            }
+            .message {
+              padding: 8px;
+              background: white;
+              margin-bottom: 8px;
+              border-radius: 4px;
+              border-left: 3px solid #3498db;
+            }
+            .timestamp {
+              font-size: 11px;
+              color: #95a5a6;
+            }
+            .empty {
+              color: #95a5a6;
+              font-style: italic;
+              text-align: center;
+              padding: 20px;
+            }
+          </style>
+          <div class="listener">
+            <h4>Received Messages:</h4>
+            <div class="messages">
+              ${this.messages.length === 0
+                ? '<div class="empty">No messages yet. Send one above!</div>'
+                : this.messages.map(msg => `
+                    <div class="message">
+                      <div>${msg.text}</div>
+                      <div class="timestamp">${msg.timestamp}</div>
+                    </div>
+                  `).join('')
+              }
+            </div>
+          </div>
+        `);
+      }
+    }
+
+    customElements.define('event-listener', EventListener);
+
+    // Example 4: Todo List
+    class TodoList extends TerraphimEventBus(TerraphimObservable(TerraphimElement)) {
+      static get observedAttributes() {
+        return ['filter'];
+      }
+
+      static get properties() {
+        return {
+          filter: { type: String, reflect: true, default: 'all' }
+        };
+      }
+
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+
+        this.state = this.observe({
+          todos: [],
+          newTodoText: ''
+        });
+
+        this.subscribe('*', () => this.render());
+      }
+
+      onConnected() {
+        this.listen('submit', (e) => {
+          e.preventDefault();
+          if (this.state.newTodoText.trim()) {
+            this.addTodo();
+          }
+        });
+
+        this.listen('click', (e) => {
+          if (e.target.matches('.delete-btn')) {
+            const id = parseInt(e.target.dataset.id);
+            this.deleteTodo(id);
+          } else if (e.target.matches('.filter-btn')) {
+            this.filter = e.target.dataset.filter;
+          } else if (e.target.matches('.clear-completed')) {
+            this.clearCompleted();
+          }
+        });
+
+        this.listen('change', (e) => {
+          if (e.target.matches('.todo-checkbox')) {
+            const id = parseInt(e.target.dataset.id);
+            this.toggleTodo(id);
+          }
+        });
+
+        this.listen('input', (e) => {
+          if (e.target.matches('.new-todo-input')) {
+            this.state.newTodoText = e.target.value;
+          }
+        });
+
+        this.render();
+      }
+
+      addTodo() {
+        const todo = {
+          id: Date.now(),
+          text: this.state.newTodoText,
+          done: false
+        };
+
+        this.state.todos.push(todo);
+        this.state.newTodoText = '';
+        this.emitGlobal('todo:added', todo);
+      }
+
+      toggleTodo(id) {
+        const todo = this.state.todos.find(t => t.id === id);
+        if (todo) {
+          todo.done = !todo.done;
+        }
+      }
+
+      deleteTodo(id) {
+        const index = this.state.todos.findIndex(t => t.id === id);
+        if (index > -1) {
+          this.state.todos.splice(index, 1);
+        }
+      }
+
+      clearCompleted() {
+        this.state.todos = this.state.todos.filter(t => !t.done);
+      }
+
+      get filteredTodos() {
+        switch (this.filter) {
+          case 'active':
+            return this.state.todos.filter(t => !t.done);
+          case 'completed':
+            return this.state.todos.filter(t => t.done);
+          default:
+            return this.state.todos;
+        }
+      }
+
+      get stats() {
+        return {
+          total: this.state.todos.length,
+          active: this.state.todos.filter(t => !t.done).length,
+          completed: this.state.todos.filter(t => t.done).length
+        };
+      }
+
+      render() {
+        const stats = this.stats;
+
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .todo-app {
+              padding: 20px;
+              font-family: inherit;
+            }
+            form {
+              margin-bottom: 20px;
+            }
+            .new-todo-input {
+              width: calc(100% - 100px);
+              padding: 12px;
+              border: 2px solid #ddd;
+              border-radius: 4px 0 0 4px;
+              font-size: 16px;
+            }
+            .add-btn {
+              width: 100px;
+              padding: 12px;
+              background: #27ae60;
+              color: white;
+              border: none;
+              border-radius: 0 4px 4px 0;
+              cursor: pointer;
+              font-size: 16px;
+            }
+            .filters {
+              margin-bottom: 15px;
+              display: flex;
+              gap: 10px;
+            }
+            .filter-btn {
+              padding: 8px 16px;
+              background: #ecf0f1;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+            }
+            .filter-btn.active {
+              background: #3498db;
+              color: white;
+            }
+            .todo-list {
+              list-style: none;
+              padding: 0;
+              margin: 0;
+            }
+            .todo-item {
+              display: flex;
+              align-items: center;
+              padding: 12px;
+              background: white;
+              margin-bottom: 8px;
+              border-radius: 4px;
+              border: 1px solid #ecf0f1;
+            }
+            .todo-item.done .todo-text {
+              text-decoration: line-through;
+              opacity: 0.6;
+            }
+            .todo-checkbox {
+              margin-right: 12px;
+            }
+            .todo-text {
+              flex: 1;
+            }
+            .delete-btn {
+              padding: 4px 12px;
+              background: #e74c3c;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 12px;
+            }
+            .stats {
+              margin-top: 15px;
+              padding: 12px;
+              background: #ecf0f1;
+              border-radius: 4px;
+              display: flex;
+              justify-content: space-between;
+              font-size: 14px;
+            }
+            .clear-completed {
+              padding: 6px 12px;
+              background: #95a5a6;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 12px;
+            }
+            .empty {
+              text-align: center;
+              padding: 40px;
+              color: #95a5a6;
+              font-style: italic;
+            }
+          </style>
+          <div class="todo-app">
+            <form>
+              <input type="text" class="new-todo-input"
+                     placeholder="What needs to be done?"
+                     value="${this.state.newTodoText}">
+              <button type="submit" class="add-btn">Add</button>
+            </form>
+
+            <div class="filters">
+              <button class="filter-btn ${this.filter === 'all' ? 'active' : ''}"
+                      data-filter="all">All</button>
+              <button class="filter-btn ${this.filter === 'active' ? 'active' : ''}"
+                      data-filter="active">Active</button>
+              <button class="filter-btn ${this.filter === 'completed' ? 'active' : ''}"
+                      data-filter="completed">Completed</button>
+            </div>
+
+            <ul class="todo-list">
+              ${this.filteredTodos.length === 0
+                ? '<div class="empty">No todos to show</div>'
+                : this.filteredTodos.map(todo => `
+                    <li class="todo-item ${todo.done ? 'done' : ''}">
+                      <input type="checkbox" class="todo-checkbox"
+                             data-id="${todo.id}"
+                             ${todo.done ? 'checked' : ''}>
+                      <span class="todo-text">${todo.text}</span>
+                      <button class="delete-btn" data-id="${todo.id}">Delete</button>
+                    </li>
+                  `).join('')
+              }
+            </ul>
+
+            <div class="stats">
+              <div>
+                Total: ${stats.total} |
+                Active: ${stats.active} |
+                Completed: ${stats.completed}
+              </div>
+              ${stats.completed > 0
+                ? '<button class="clear-completed">Clear Completed</button>'
+                : ''
+              }
+            </div>
+          </div>
+        `);
+      }
+    }
+
+    customElements.define('todo-list', TodoList);
+
+    // Log to console
+    console.log('All examples loaded successfully!');
+    console.log('Open DevTools to inspect the components and see event logs.');
+  </script>
+</body>
+</html>

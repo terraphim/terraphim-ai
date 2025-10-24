@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Base Components - Test Runner</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+      padding: 20px;
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      margin-bottom: 10px;
+      color: #2c3e50;
+      font-size: 28px;
+    }
+
+    .subtitle {
+      color: #7f8c8d;
+      margin-bottom: 30px;
+      font-size: 14px;
+    }
+
+    .controls {
+      margin-bottom: 30px;
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #2980b9;
+    }
+
+    button:active {
+      transform: translateY(1px);
+    }
+
+    button.secondary {
+      background: #95a5a6;
+    }
+
+    button.secondary:hover {
+      background: #7f8c8d;
+    }
+
+    .test-suite {
+      margin-bottom: 30px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+
+    .test-suite-header {
+      padding: 15px 20px;
+      background: #ecf0f1;
+      font-weight: 600;
+      color: #2c3e50;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .test-suite-status {
+      font-size: 12px;
+      padding: 4px 12px;
+      border-radius: 12px;
+      background: #95a5a6;
+      color: white;
+    }
+
+    .test-suite-status.running {
+      background: #f39c12;
+    }
+
+    .test-suite-status.passed {
+      background: #27ae60;
+    }
+
+    .test-suite-status.failed {
+      background: #e74c3c;
+    }
+
+    .test-suite-output {
+      padding: 20px;
+      font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      max-height: 400px;
+      overflow-y: auto;
+      background: #fafafa;
+    }
+
+    .test-suite-output:empty::before {
+      content: 'No tests run yet. Click "Run Tests" to start.';
+      color: #95a5a6;
+      font-style: italic;
+    }
+
+    .summary {
+      padding: 20px;
+      background: #ecf0f1;
+      border-radius: 4px;
+      margin-top: 20px;
+    }
+
+    .summary h2 {
+      margin-bottom: 15px;
+      color: #2c3e50;
+      font-size: 20px;
+    }
+
+    .summary-stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 15px;
+    }
+
+    .stat {
+      padding: 15px;
+      background: white;
+      border-radius: 4px;
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 32px;
+      font-weight: 700;
+      margin-bottom: 5px;
+    }
+
+    .stat-label {
+      color: #7f8c8d;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .stat.passed .stat-value {
+      color: #27ae60;
+    }
+
+    .stat.failed .stat-value {
+      color: #e74c3c;
+    }
+
+    .stat.total .stat-value {
+      color: #3498db;
+    }
+
+    pre {
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .loading {
+      display: inline-block;
+      width: 14px;
+      height: 14px;
+      border: 2px solid #f39c12;
+      border-radius: 50%;
+      border-top-color: transparent;
+      animation: spin 0.6s linear infinite;
+      margin-left: 8px;
+      vertical-align: middle;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .footer {
+      margin-top: 40px;
+      padding-top: 20px;
+      border-top: 1px solid #e0e0e0;
+      color: #7f8c8d;
+      font-size: 13px;
+      text-align: center;
+    }
+
+    .error-details {
+      color: #e74c3c;
+      margin-top: 5px;
+      padding-left: 20px;
+      font-size: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Terraphim Base Components</h1>
+    <p class="subtitle">Test Suite Runner - Pure Vanilla JavaScript Web Components</p>
+
+    <div class="controls">
+      <button id="runAll">Run All Tests</button>
+      <button id="runElement" class="secondary">Run TerraphimElement Tests</button>
+      <button id="runObservable" class="secondary">Run TerraphimObservable Tests</button>
+      <button id="runEvents" class="secondary">Run TerraphimEvents Tests</button>
+      <button id="clearResults" class="secondary">Clear Results</button>
+    </div>
+
+    <div class="test-suite">
+      <div class="test-suite-header">
+        <span>TerraphimElement Tests</span>
+        <span id="elementStatus" class="test-suite-status">Ready</span>
+      </div>
+      <div id="elementOutput" class="test-suite-output"></div>
+    </div>
+
+    <div class="test-suite">
+      <div class="test-suite-header">
+        <span>TerraphimObservable Tests</span>
+        <span id="observableStatus" class="test-suite-status">Ready</span>
+      </div>
+      <div id="observableOutput" class="test-suite-output"></div>
+    </div>
+
+    <div class="test-suite">
+      <div class="test-suite-header">
+        <span>TerraphimEvents Tests</span>
+        <span id="eventsStatus" class="test-suite-status">Ready</span>
+      </div>
+      <div id="eventsOutput" class="test-suite-output"></div>
+    </div>
+
+    <div class="summary">
+      <h2>Summary</h2>
+      <div class="summary-stats">
+        <div class="stat total">
+          <div class="stat-value" id="totalTests">0</div>
+          <div class="stat-label">Total Tests</div>
+        </div>
+        <div class="stat passed">
+          <div class="stat-value" id="passedTests">0</div>
+          <div class="stat-label">Passed</div>
+        </div>
+        <div class="stat failed">
+          <div class="stat-value" id="failedTests">0</div>
+          <div class="stat-label">Failed</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="footer">
+      <p>Terraphim Base Components - Pure Vanilla JavaScript, No Build Tools Required</p>
+      <p>Open the browser console for detailed output</p>
+    </div>
+  </div>
+
+  <script type="module">
+    import { runTests as runElementTests } from './terraphim-element.test.js';
+    import { runTests as runObservableTests } from './terraphim-observable.test.js';
+    import { runTests as runEventsTests } from './terraphim-events.test.js';
+
+    // State
+    let totalPassed = 0;
+    let totalFailed = 0;
+    let totalTests = 0;
+
+    // Update summary
+    function updateSummary() {
+      document.getElementById('totalTests').textContent = totalTests;
+      document.getElementById('passedTests').textContent = totalPassed;
+      document.getElementById('failedTests').textContent = totalFailed;
+    }
+
+    // Clear results
+    function clearResults() {
+      document.getElementById('elementOutput').innerHTML = '';
+      document.getElementById('observableOutput').innerHTML = '';
+      document.getElementById('eventsOutput').innerHTML = '';
+
+      document.getElementById('elementStatus').textContent = 'Ready';
+      document.getElementById('elementStatus').className = 'test-suite-status';
+      document.getElementById('observableStatus').textContent = 'Ready';
+      document.getElementById('observableStatus').className = 'test-suite-status';
+      document.getElementById('eventsStatus').textContent = 'Ready';
+      document.getElementById('eventsStatus').className = 'test-suite-status';
+
+      totalPassed = 0;
+      totalFailed = 0;
+      totalTests = 0;
+      updateSummary();
+    }
+
+    // Capture console output
+    function captureConsole(outputElement) {
+      const originalLog = console.log;
+      const originalError = console.error;
+      const logs = [];
+
+      console.log = (...args) => {
+        logs.push(args.join(' '));
+        originalLog.apply(console, args);
+      };
+
+      console.error = (...args) => {
+        logs.push(`ERROR: ${args.join(' ')}`);
+        originalError.apply(console, args);
+      };
+
+      return () => {
+        console.log = originalLog;
+        console.error = originalError;
+        outputElement.innerHTML = `<pre>${logs.join('\n')}</pre>`;
+      };
+    }
+
+    // Run TerraphimElement tests
+    async function runElement() {
+      const statusEl = document.getElementById('elementStatus');
+      const outputEl = document.getElementById('elementOutput');
+
+      statusEl.textContent = 'Running...';
+      statusEl.className = 'test-suite-status running';
+      outputEl.innerHTML = '<div class="loading"></div> Running tests...';
+
+      const restore = captureConsole(outputEl);
+
+      try {
+        const result = await runElementTests();
+        restore();
+
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        totalTests += result.total;
+        updateSummary();
+
+        if (result.failed === 0) {
+          statusEl.textContent = 'All Passed';
+          statusEl.className = 'test-suite-status passed';
+        } else {
+          statusEl.textContent = `${result.failed} Failed`;
+          statusEl.className = 'test-suite-status failed';
+        }
+      } catch (error) {
+        restore();
+        statusEl.textContent = 'Error';
+        statusEl.className = 'test-suite-status failed';
+        outputEl.innerHTML += `<div class="error-details">Error running tests: ${error.message}</div>`;
+      }
+    }
+
+    // Run TerraphimObservable tests
+    async function runObservable() {
+      const statusEl = document.getElementById('observableStatus');
+      const outputEl = document.getElementById('observableOutput');
+
+      statusEl.textContent = 'Running...';
+      statusEl.className = 'test-suite-status running';
+      outputEl.innerHTML = '<div class="loading"></div> Running tests...';
+
+      const restore = captureConsole(outputEl);
+
+      try {
+        const result = await runObservableTests();
+        restore();
+
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        totalTests += result.total;
+        updateSummary();
+
+        if (result.failed === 0) {
+          statusEl.textContent = 'All Passed';
+          statusEl.className = 'test-suite-status passed';
+        } else {
+          statusEl.textContent = `${result.failed} Failed`;
+          statusEl.className = 'test-suite-status failed';
+        }
+      } catch (error) {
+        restore();
+        statusEl.textContent = 'Error';
+        statusEl.className = 'test-suite-status failed';
+        outputEl.innerHTML += `<div class="error-details">Error running tests: ${error.message}</div>`;
+      }
+    }
+
+    // Run TerraphimEvents tests
+    async function runEvents() {
+      const statusEl = document.getElementById('eventsStatus');
+      const outputEl = document.getElementById('eventsOutput');
+
+      statusEl.textContent = 'Running...';
+      statusEl.className = 'test-suite-status running';
+      outputEl.innerHTML = '<div class="loading"></div> Running tests...';
+
+      const restore = captureConsole(outputEl);
+
+      try {
+        const result = await runEventsTests();
+        restore();
+
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        totalTests += result.total;
+        updateSummary();
+
+        if (result.failed === 0) {
+          statusEl.textContent = 'All Passed';
+          statusEl.className = 'test-suite-status passed';
+        } else {
+          statusEl.textContent = `${result.failed} Failed`;
+          statusEl.className = 'test-suite-status failed';
+        }
+      } catch (error) {
+        restore();
+        statusEl.textContent = 'Error';
+        statusEl.className = 'test-suite-status failed';
+        outputEl.innerHTML += `<div class="error-details">Error running tests: ${error.message}</div>`;
+      }
+    }
+
+    // Run all tests
+    async function runAll() {
+      clearResults();
+      await runElement();
+      await runObservable();
+      await runEvents();
+    }
+
+    // Event listeners
+    document.getElementById('runAll').addEventListener('click', runAll);
+    document.getElementById('runElement').addEventListener('click', runElement);
+    document.getElementById('runObservable').addEventListener('click', runObservable);
+    document.getElementById('runEvents').addEventListener('click', runEvents);
+    document.getElementById('clearResults').addEventListener('click', clearResults);
+
+    // Auto-run on load
+    console.log('Test runner loaded. Click "Run All Tests" to start.');
+  </script>
+</body>
+</html>
