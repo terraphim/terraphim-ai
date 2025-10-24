@@ -1,4 +1,3 @@
-// @ts-nocheck
 // import type {
 //     PostMessage,
 //     PostMessageDataRequest,
@@ -49,11 +48,5 @@
 
 //     get()
 
-<<<<<<< HEAD
-//     return [data, loading, error, get]
-
-export {};
-=======
 //         return [data, loading, error, get]
 // }
->>>>>>> origin/main

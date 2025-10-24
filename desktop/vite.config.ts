@@ -12,7 +12,28 @@ export default defineConfig(({ command, mode }) => {
 
   return {
   plugins: [
-    svelte(),
+    svelte({
+      compilerOptions: {
+        css: 'injected'
+      },
+      onwarn: (warning, handler) => {
+        // Ignore svelma warnings
+        if (warning.code === 'css_nesting_selector_invalid_placement') return;
+        if (warning.code === 'css_invalid_global') return;
+        handler(warning);
+      },
+      preprocess: {
+        style: ({ content, filename }) => {
+          // Handle problematic CSS nesting in svelma
+          if (filename && filename.includes('svelma')) {
+            return {
+              code: content.replace(/:global\(&\[([^\]]+)\]\)/g, '&[$1]')
+            };
+          }
+          return { code: content };
+        }
+      }
+    }),
     // Temporarily disabled splashscreen plugin to fix build completion
     // {
     //   name: 'splashscreen',
@@ -97,15 +118,16 @@ export default defineConfig(({ command, mode }) => {
       '$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
       // Map specific Svelte sub-paths back to the real runtime so they are **not** redirected to
       // our shim (which would cause ENOTDIR errors like svelte-shim.js/store).
-      'svelte/internal': resolve(__dirname, 'node_modules/svelte/src/runtime/internal'),
-      'svelte/store': resolve(__dirname, 'node_modules/svelte/src/runtime/store'),
-      'svelte/transition': resolve(__dirname, 'node_modules/svelte/src/runtime/transition'),
-      'svelte/animate': resolve(__dirname, 'node_modules/svelte/src/runtime/animate'),
-      'svelte/easing': resolve(__dirname, 'node_modules/svelte/src/runtime/easing'),
-      'svelte/motion': resolve(__dirname, 'node_modules/svelte/src/runtime/motion'),
+      'svelte/internal': resolve(__dirname, 'node_modules/svelte/src/internal'),
+      'svelte/store': resolve(__dirname, 'node_modules/svelte/src/store/index-client.js'),
+      'svelte/transition': resolve(__dirname, 'node_modules/svelte/src/transition/index.js'),
+      'svelte/animate': resolve(__dirname, 'node_modules/svelte/src/animate/index.js'),
+      'svelte/easing': resolve(__dirname, 'node_modules/svelte/src/easing/index.js'),
+      'svelte/motion': resolve(__dirname, 'node_modules/svelte/src/motion/index.js'),
+      'svelte/reactivity': resolve(__dirname, 'node_modules/svelte/src/reactivity/index-client.js'),
 
       // Real runtime entry alias so the shim can import without causing an alias loop.
-      'svelte-original': resolve(__dirname, 'node_modules/svelte/src/runtime/index.js'),
+      'svelte-original': resolve(__dirname, 'node_modules/svelte/src/index-client.js'),
 
       // Any other bare `import "svelte"` should go to our shim that adds mount/unmount.
       'svelte': fileURLToPath(new URL('./src/svelte-shim.js', import.meta.url)),
@@ -126,7 +148,11 @@ export default defineConfig(({ command, mode }) => {
         // Silence deprecation warnings for all known categories
         silenceDeprecations: ['legacy-js-api', 'import', 'global-builtin', 'color-functions', 'mixed-decls'],
         // Add verbose flag to control output
-        verbose: false
+        verbose: false,
+        // Add additional load paths for imports
+        loadPaths: [resolve(__dirname, 'node_modules')],
+        // Use legacy API for better compatibility with svelma
+        api: 'legacy'
       }
     }
   },

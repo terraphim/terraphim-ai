@@ -116,12 +116,12 @@
     "rollup-plugin-css-only": "^4.5.2",
     "rollup-plugin-terser": "^7.0.2",
     "svelma": "^0.4.5",
-    "svelte-jsoneditor": "^3.10.0",
+    "svelte-jsoneditor": "^0.21.6",
     "svelte-markdown": "^0.4.1",
     "svelte-routing": "^2.13.0",
     "tinro": "^0.6.12",
-    "tiptap-markdown": "^0.8.10",
-    "tippy.js": "^6.3.7"
+    "tippy.js": "^6.3.7",
+    "tiptap-markdown": "^0.8.10"
   },
   "peerDependencies": {
     "@fortawesome/fontawesome-free": "^7.0.1",
@@ -138,8 +138,7 @@
     "rollup-plugin-terser": "^7.0.2",
     "svelma": "^0.4.5",
     "svelte-jsoneditor": "^0.21.6",
-    "svelte-markdown": "^0.4.1",
-    "tiptap-markdown": "^0.8.10"
+    "svelte-markdown": "^0.4.1"
   },
   "peerDependenciesMeta": {
     "@fortawesome/fontawesome-free": {

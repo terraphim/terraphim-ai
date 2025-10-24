@@ -7,127 +7,27 @@ on:
         description: 'Node.js version'
         required: false
         type: string
-<<<<<<< HEAD
-        default: '20'
-      working-directory:
-        description: 'Working directory for the frontend build'
-=======
         default: '18'
       cache-key:
         description: 'Cache key for dependencies'
->>>>>>> origin/main
         required: false
         type: string
-        default: 'desktop'
-      build-command:
-        description: 'Build command to run'
-        required: false
-        type: string
-        default: 'yarn build'
-      test-command:
-        description: 'Test command to run'
-        required: false
-        type: string
-        default: 'yarn test'
-      check-command:
-        description: 'Type check command to run'
-        required: false
-        type: string
-        default: 'yarn check'
     outputs:
-      build-success:
-        description: 'Whether the build was successful'
-        value: ${{ steps.build.outcome }}
-      test-success:
-        description: 'Whether the tests passed'
-        value: ${{ steps.test.outcome }}
-      check-success:
-        description: 'Whether the type check passed'
-        value: ${{ steps.check.outcome }}
+      dist-path:
+        description: 'Path to built frontend dist'
+        value: ${{ jobs.build.outputs.dist-path }}
 
 jobs:
-<<<<<<< HEAD
-  frontend-build:
-    runs-on: ubuntu-latest
-    
-=======
   build:
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 20  # Reduced timeout with faster runner
     outputs:
       dist-path: ${{ steps.build.outputs.dist-path }}
 
->>>>>>> origin/main
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v5
 
-<<<<<<< HEAD
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ inputs.node-version }}
-        cache: 'yarn'
-        cache-dependency-path: ${{ inputs.working-directory }}/yarn.lock
-
-    - name: Install dependencies
-      working-directory: ${{ inputs.working-directory }}
-      run: yarn install --frozen-lockfile
-
-    - name: Type check
-      id: check
-      working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.check-command }}
-
-    - name: Run tests
-      id: test
-      working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.test-command }}
-
-    - name: Build frontend
-      id: build
-      working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.build-command }}
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: frontend-build-${{ github.run_id }}
-        path: ${{ inputs.working-directory }}/dist/
-        retention-days: 7
-
-  frontend-build-matrix:
-    runs-on: ubuntu-latest
-    if: inputs.node-version == 'matrix'
-    
-    strategy:
-      matrix:
-        node-version: [18, 20, 22]
-    
-    steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
-
-    - name: Setup Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'yarn'
-        cache-dependency-path: ${{ inputs.working-directory }}/yarn.lock
-
-    - name: Install dependencies
-      working-directory: ${{ inputs.working-directory }}
-      run: yarn install --frozen-lockfile
-
-    - name: Type check
-      working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.check-command }}
-
-    - name: Run tests
-      working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.test-command }}
-=======
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -192,16 +92,15 @@ jobs:
             echo '<html><body><h1>Build Failed</h1></body></html>' > desktop/dist/index.html
             echo "dist-path=desktop/dist" >> $GITHUB_OUTPUT
           fi
->>>>>>> origin/main
 
-    - name: Build frontend
-      working-directory: ${{ inputs.working-directory }}
-      run: ${{ inputs.build-command }}
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
+          retention-days: 30
 
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v4
-      if: success()
-      with:
-        name: frontend-build-node-${{ matrix.node-version }}-${{ github.run_id }}
-        path: ${{ inputs.working-directory }}/dist/
-        retention-days: 7
+      - name: Verify build output
+        run: |
+          ls -la desktop/dist
+          echo "Frontend build completed successfully"

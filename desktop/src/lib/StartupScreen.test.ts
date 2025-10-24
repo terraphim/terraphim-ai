@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-import { render, screen } from '@testing-library/svelte/svelte5';
-import { describe, it, expect, vi } from 'vitest';
-=======
 import { render, screen } from '@testing-library/svelte';
 import { describe, expect, it, vi } from 'vitest';
 import { theme } from '../stores';
->>>>>>> origin/main
 import StartupScreen from './StartupScreen.svelte';
 
 // Mock Tauri APIs

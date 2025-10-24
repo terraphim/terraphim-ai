@@ -219,12 +219,7 @@ function _handleRoleFilterChange() {
       <button
         type="button"
         class="btn-close btn-close-sm"
-<<<<<<< HEAD
-        aria-label="Dismiss error"
-        on:click={() => error = null}
-=======
         on:click={() => _error = null}
->>>>>>> origin/main
       ></button>
     </div>
   {/if}

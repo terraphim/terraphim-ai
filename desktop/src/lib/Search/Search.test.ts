@@ -1,11 +1,5 @@
-<<<<<<< HEAD
-import { describe, it, expect, beforeEach, beforeAll, afterAll } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@testing-library/svelte/svelte5';
-import Search from './Search.svelte';
-=======
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
->>>>>>> origin/main
 import { input, is_tauri, role, serverUrl, typeahead } from '../stores';
 import Search from './Search.svelte';
 

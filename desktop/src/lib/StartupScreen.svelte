@@ -1,46 +1,4 @@
 <script lang="ts">
-<<<<<<< HEAD
-  import { invoke } from "@tauri-apps/api/tauri";
-  import { open } from "@tauri-apps/api/dialog";
-  import { onMount } from "svelte";
-  import { readDir } from "@tauri-apps/api/fs";
-  import { resolve, appDir, appDataDir } from "@tauri-apps/api/path";
-  import { isInitialSetupComplete, theme } from "$lib/stores";
-  import { readBinaryFile } from '@tauri-apps/api/fs'
-  import {
-    register as registerShortcut,
-    unregisterAll as unregisterAllShortcuts,
-    unregister as unregisterShortcut,
-  } from "@tauri-apps/api/globalShortcut";
-  import { appWindow } from "@tauri-apps/api/window";
-  let dataFolder = "";
-  let globalShortcut = "CmdOrControl+X";
-  let error = "";
-  let isCapturingShortcut = false;
-  const toError = (err: unknown): Error =>
-    err instanceof Error ? err : new Error(String(err));
-
-  async function selectFolder() {
-    try {
-      const selected = await open({
-        directory: true,
-        multiple: false,
-        defaultPath: await appDataDir()
-      });
-      console.log(selected);
-      console.log(typeof selected);
-      if (selected && typeof selected === "string") {
-        dataFolder = selected;
-      } else {
-        error = "No folder selected or invalid selection";
-      }
-    } catch (err) {
-      const errorObj = toError(err);
-      console.error("Failed to open folder selector:", errorObj);
-      error = `Failed to open folder selector: ${errorObj.message}`;
-    }
-  }
-=======
 import { open } from '@tauri-apps/api/dialog';
 import { register as registerShortcut } from '@tauri-apps/api/globalShortcut';
 import { appDataDir } from '@tauri-apps/api/path';
@@ -53,7 +11,6 @@ let dataFolder = '';
 let globalShortcut = 'CmdOrControl+X';
 let _error = '';
 let isCapturingShortcut = false;
->>>>>>> origin/main
 
 async function _selectFolder() {
 	try {
@@ -75,15 +32,10 @@ async function _selectFolder() {
 	}
 }
 
-<<<<<<< HEAD
-  function handleKeyDown(event: KeyboardEvent) {
-    if (!isCapturingShortcut) return;
-=======
 function _startCapturingShortcut() {
 	isCapturingShortcut = true;
 	globalShortcut = 'Press your desired shortcut...';
 }
->>>>>>> origin/main
 
 function handleKeyDown(event) {
 	if (!isCapturingShortcut) return;
@@ -98,33 +50,11 @@ function handleKeyDown(event) {
 	if (event.shiftKey) modifiers.push('Shift');
 	if (event.metaKey) modifiers.push('Cmd');
 
-<<<<<<< HEAD
-  async function saveSettings() {
-    // Register the global shortcut
-    try {
-      await registerShortcut(globalShortcut, async () => {
-        if (await appWindow.isVisible()) {
-          await appWindow.hide();
-        }
-      });
-      console.log(`Global shortcut ${globalShortcut} registered successfully`);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      error = `Failed to register global shortcut: ${message}`;
-      console.error("Failed to register global shortcut:", err);
-      return;
-    }
-    if (!dataFolder || !globalShortcut) {
-      error = "Please fill in both fields";
-      return;
-    }
-=======
 	if (key !== 'CONTROL' && key !== 'ALT' && key !== 'SHIFT' && key !== 'META') {
 		globalShortcut = [...modifiers, key].join('+');
 		isCapturingShortcut = false;
 	}
 }
->>>>>>> origin/main
 
 async function _saveSettings() {
 	// Register the global shortcut
