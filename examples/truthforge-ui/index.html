@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthForge - Crisis Communication Vulnerability Analysis</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <h1>🎭 TruthForge</h1>
+                    <p class="tagline">Two-Pass Debate Arena for Crisis Communications</p>
+                </div>
+                <div class="server-status">
+                    <span class="status-indicator" id="serverStatus"></span>
+                    <span class="status-text">Connecting...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Input Section -->
+            <section class="input-section" id="inputSection">
+                <div class="section-card">
+                    <h2>📝 Narrative Input</h2>
+                    <p class="section-description">
+                        Submit your crisis communication narrative for adversarial vulnerability analysis.
+                        TruthForge will identify omissions, simulate debates, and generate strategic responses.
+                    </p>
+
+                    <div class="narrative-form">
+                        <div class="form-group">
+                            <label for="narrativeText">Crisis Narrative</label>
+                            <textarea
+                                id="narrativeText"
+                                class="narrative-textarea"
+                                placeholder="Enter the narrative you want to analyze... (e.g., 'We achieved a 40% cost reduction this quarter through process optimization. This will improve our operational efficiency and deliver value to shareholders.')"
+                                maxlength="10000"
+                                rows="8"
+                            ></textarea>
+                            <div class="char-count">
+                                <span id="charCount">0</span> / 10,000 characters
+                            </div>
+                        </div>
+
+                        <div class="context-controls">
+                            <div class="control-group">
+                                <label>Urgency Level</label>
+                                <div class="radio-group">
+                                    <label class="radio-option">
+                                        <input type="radio" name="urgency" value="Low" checked>
+                                        <span>Low</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="urgency" value="High">
+                                        <span>High</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="control-group">
+                                <label>Stakes (select all that apply)</label>
+                                <div class="checkbox-group">
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" name="stakes" value="Reputational" checked>
+                                        <span>Reputational</span>
+                                    </label>
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" name="stakes" value="Financial">
+                                        <span>Financial</span>
+                                    </label>
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" name="stakes" value="Legal">
+                                        <span>Legal</span>
+                                    </label>
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" name="stakes" value="Operational">
+                                        <span>Operational</span>
+                                    </label>
+                                    <label class="checkbox-option">
+                                        <input type="checkbox" name="stakes" value="SocialLicense">
+                                        <span>Social License</span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="control-group">
+                                <label>Target Audience</label>
+                                <div class="radio-group">
+                                    <label class="radio-option">
+                                        <input type="radio" name="audience" value="Internal" checked>
+                                        <span>Internal</span>
+                                    </label>
+                                    <label class="radio-option">
+                                        <input type="radio" name="audience" value="PublicMedia">
+                                        <span>Public Media</span>
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <button class="btn-primary" id="analyzeBtn">
+                            <span class="btn-icon">🚀</span>
+                            Analyze Narrative
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Analysis Pipeline Section -->
+            <section class="pipeline-section hidden" id="pipelineSection">
+                <div class="section-card">
+                    <h2>⚙️ Analysis Pipeline</h2>
+                    <div class="pipeline-visualization" id="pipelineViz">
+                        <!-- Stage 1: Pass One -->
+                        <div class="pipeline-stage" data-stage="pass_one">
+                            <div class="stage-header">
+                                <span class="stage-number">1</span>
+                                <h3>Pass One: Initial Analysis</h3>
+                            </div>
+                            <div class="stage-steps">
+                                <div class="step" data-step="omissions">
+                                    <span class="step-icon">🔍</span>
+                                    <span class="step-name">Omission Detection</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="bias">
+                                    <span class="step-icon">⚖️</span>
+                                    <span class="step-name">Bias Analysis</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="scct">
+                                    <span class="step-icon">🗂️</span>
+                                    <span class="step-name">SCCT Classification</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="debate1">
+                                    <span class="step-icon">💬</span>
+                                    <span class="step-name">Pass 1 Debate</span>
+                                    <span class="step-status"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stage 2: Pass Two -->
+                        <div class="pipeline-stage" data-stage="pass_two">
+                            <div class="stage-header">
+                                <span class="stage-number">2</span>
+                                <h3>Pass Two: Exploitation</h3>
+                            </div>
+                            <div class="stage-steps">
+                                <div class="step" data-step="defense">
+                                    <span class="step-icon">🛡️</span>
+                                    <span class="step-name">Defensive Strategy</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="exploit">
+                                    <span class="step-icon">⚔️</span>
+                                    <span class="step-name">Exploitation Attack</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="vulnerability">
+                                    <span class="step-icon">📊</span>
+                                    <span class="step-name">Vulnerability Delta</span>
+                                    <span class="step-status"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stage 3: Response -->
+                        <div class="pipeline-stage" data-stage="response">
+                            <div class="stage-header">
+                                <span class="stage-number">3</span>
+                                <h3>Response Strategies</h3>
+                            </div>
+                            <div class="stage-steps">
+                                <div class="step" data-step="reframe">
+                                    <span class="step-icon">🔄</span>
+                                    <span class="step-name">Reframe</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="counterargue">
+                                    <span class="step-icon">🎯</span>
+                                    <span class="step-name">Counter-Argue</span>
+                                    <span class="step-status"></span>
+                                </div>
+                                <div class="step" data-step="bridge">
+                                    <span class="step-icon">🌉</span>
+                                    <span class="step-name">Bridge</span>
+                                    <span class="step-status"></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="progress-info">
+                        <span id="progressText">Analysis started...</span>
+                        <span id="progressTime"></span>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section hidden" id="resultsSection">
+                <div class="section-card">
+                    <h2>📈 Analysis Results</h2>
+
+                    <!-- Session Info -->
+                    <div class="session-info">
+                        <div class="info-item">
+                            <span class="info-label">Session ID:</span>
+                            <span class="info-value" id="sessionId">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Processing Time:</span>
+                            <span class="info-value" id="processingTime">-</span>
+                        </div>
+                        <div class="info-item">
+                            <span class="info-label">Total Risk Score:</span>
+                            <span class="info-value risk-score" id="totalRisk">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Tabs -->
+                    <div class="tabs-container">
+                        <div class="tabs-header">
+                            <button class="tab-btn active" data-tab="summary">Executive Summary</button>
+                            <button class="tab-btn" data-tab="omissions">Omissions</button>
+                            <button class="tab-btn" data-tab="debate">Debate</button>
+                            <button class="tab-btn" data-tab="vulnerability">Vulnerability</button>
+                            <button class="tab-btn" data-tab="strategies">Response Strategies</button>
+                        </div>
+
+                        <div class="tabs-content">
+                            <!-- Summary Tab -->
+                            <div class="tab-panel active" data-panel="summary">
+                                <div class="summary-content" id="summaryContent">
+                                    <p class="loading-text">Generating executive summary...</p>
+                                </div>
+                            </div>
+
+                            <!-- Omissions Tab -->
+                            <div class="tab-panel" data-panel="omissions">
+                                <div class="omissions-list" id="omissionsList">
+                                    <p class="loading-text">Loading omissions...</p>
+                                </div>
+                            </div>
+
+                            <!-- Debate Tab -->
+                            <div class="tab-panel" data-panel="debate">
+                                <div class="debate-selector">
+                                    <button class="debate-toggle active" data-debate="pass1">Pass 1 Debate</button>
+                                    <button class="debate-toggle" data-debate="pass2">Pass 2 Debate</button>
+                                </div>
+                                <div class="debate-transcript" id="debateTranscript">
+                                    <p class="loading-text">Loading debate transcript...</p>
+                                </div>
+                            </div>
+
+                            <!-- Vulnerability Tab -->
+                            <div class="tab-panel" data-panel="vulnerability">
+                                <div class="vulnerability-analysis" id="vulnerabilityAnalysis">
+                                    <p class="loading-text">Analyzing vulnerability amplification...</p>
+                                </div>
+                            </div>
+
+                            <!-- Strategies Tab -->
+                            <div class="tab-panel" data-panel="strategies">
+                                <div class="strategies-list" id="strategiesList">
+                                    <p class="loading-text">Generating response strategies...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="results-actions">
+                        <button class="btn-secondary" id="newAnalysisBtn">
+                            New Analysis
+                        </button>
+                        <button class="btn-secondary" id="exportBtn">
+                            Export Results
+                        </button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer -->
+        <footer class="app-footer">
+            <p>TruthForge Two-Pass Debate Arena | Powered by Terraphim AI | <a href="https://github.com/terraphim/terraphim-ai">GitHub</a></p>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="websocket-client.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

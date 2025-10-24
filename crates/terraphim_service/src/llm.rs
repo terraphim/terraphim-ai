@@ -48,98 +48,26 @@ pub trait LlmClient: Send + Sync {
 
 /// Determine if the role requests AI summarization via generic LLM config in `extra`.
 pub fn role_wants_ai_summarize(role: &terraphim_config::Role) -> bool {
-    let result = get_bool_extra(&role.extra, "llm_auto_summarize").unwrap_or(false);
-
-    log::debug!(
-        "role_wants_ai_summarize for role '{}': result={}, extra keys: {:?}",
-        role.name,
-        result,
-        role.extra.keys().collect::<Vec<_>>()
-    );
-
-    if let Some(value) = role.extra.get("llm_auto_summarize") {
-        log::debug!("llm_auto_summarize raw value: {:?}", value);
-    }
-
-    result
+    // Look for `llm_auto_summarize: true` in role.extra
+    get_bool_extra(&role.extra, "llm_auto_summarize").unwrap_or(false)
 }
 
 /// Best-effort builder that inspects role settings and returns an LLM client if configured.
 pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
-    build_llm_from_role_with_config(role, None)
-}
-
-/// Build an LLM client for chat purposes with config-level fallbacks
-pub fn build_llm_for_chat(
-    role: &terraphim_config::Role,
-    config: Option<&terraphim_config::Config>,
-) -> Option<Arc<dyn LlmClient>> {
-    build_llm_from_role_with_config_and_model(
-        role,
-        config,
-        config.and_then(|c| c.default_chat_model.as_deref()),
-    )
-}
-
-/// Build an LLM client for summarization purposes with config-level fallbacks
-pub fn build_llm_for_summarization(
-    role: &terraphim_config::Role,
-    config: Option<&terraphim_config::Config>,
-) -> Option<Arc<dyn LlmClient>> {
-    let preferred_model = config.and_then(|c| c.default_summarization_model.as_deref());
-    log::debug!(
-        "[DEBUGGER:llm:{}] build_llm_for_summarization for role '{}', preferred_model={:?}, config_provider={:?}",
-        line!(),
-        role.name,
-        preferred_model,
-        config.and_then(|c| c.default_model_provider.as_ref())
+    eprintln!("🔧 Building LLM client for role: {}", role.name);
+    eprintln!(
+        "🔧 Role extra keys: {:?}",
+        role.extra.keys().collect::<Vec<_>>()
     );
-    let result = build_llm_from_role_with_config_and_model(role, config, preferred_model);
+    log::debug!("Building LLM client for role: {}", role.name);
     log::debug!(
-        "[DEBUGGER:llm:{}] build_llm_for_summarization result: {}",
-        line!(),
-        if result.is_some() {
-            "SUCCESS"
-        } else {
-            "FAILED"
-        }
-    );
-    result
-}
-
-/// Internal helper that builds LLM client with config fallbacks
-fn build_llm_from_role_with_config(
-    role: &terraphim_config::Role,
-    config: Option<&terraphim_config::Config>,
-) -> Option<Arc<dyn LlmClient>> {
-    build_llm_from_role_with_config_and_model(role, config, None)
-}
-
-/// Internal helper that builds LLM client with config fallbacks and specific model preference
-fn build_llm_from_role_with_config_and_model(
-    role: &terraphim_config::Role,
-    config: Option<&terraphim_config::Config>,
-    preferred_model: Option<&str>,
-) -> Option<Arc<dyn LlmClient>> {
-    log::debug!(
-        "[DEBUGGER:llm:{}] build_llm_from_role_with_config_and_model for role '{}', preferred_model={:?}",
-        line!(),
-        role.name,
-        preferred_model
-    );
-    log::debug!("[DEBUGGER:llm:{}] role.extra={:?}", line!(), role.extra);
-
-    // Determine the provider from role config or config fallbacks
-    let provider = get_string_extra(&role.extra, "llm_provider")
-        .or_else(|| config.and_then(|c| c.default_model_provider.clone()));
-    log::debug!(
-        "[DEBUGGER:llm:{}] determined provider={:?}",
-        line!(),
-        provider
+        "Role extra keys: {:?}",
+        role.extra.keys().collect::<Vec<_>>()
     );
 
     // Check if there's a nested "extra" key (this handles a serialization issue)
     if let Some(nested_extra) = role.extra.get("extra") {
+        log::debug!("Found nested extra field");
         // Try to extract from nested extra
         if let Some(nested_obj) = nested_extra.as_object() {
             let nested_map: AHashMap<String, Value> = nested_obj
@@ -148,16 +76,19 @@ fn build_llm_from_role_with_config_and_model(
                 .collect();
 
             if let Some(provider) = get_string_extra(&nested_map, "llm_provider") {
+                log::debug!("Found nested llm_provider: {}", provider);
                 match provider.as_str() {
                     "ollama" => {
-                        return build_ollama_from_nested_extra_with_model(
-                            &nested_map,
-                            preferred_model,
+                        let client = build_ollama_from_nested_extra(&nested_map);
+                        log::debug!(
+                            "Built Ollama client from nested extra: {:?}",
+                            client.is_some()
                         );
+                        return client;
                     }
                     "openrouter" => {
                         // Would implement similar nested extraction for OpenRouter
-                        return build_openrouter_from_role_with_model(role, preferred_model);
+                        return None;
                     }
                     _ => {}
                 }
@@ -165,50 +96,42 @@ fn build_llm_from_role_with_config_and_model(
         }
     }
 
-    // Try role-specific provider or config fallback
-    if let Some(provider) = provider {
+    // Prefer explicit `llm_provider` in `extra`
+    if let Some(provider) = get_string_extra(&role.extra, "llm_provider") {
+        log::debug!("Found llm_provider: {}", provider);
         match provider.as_str() {
             "ollama" => {
-                return build_ollama_from_role_with_model(role, preferred_model, config)
-                    .or_else(|| build_openrouter_from_role_with_model(role, preferred_model))
+                let client =
+                    build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role));
+                log::debug!(
+                    "Built Ollama client from role extra: {:?}",
+                    client.is_some()
+                );
+                return client;
             }
             "openrouter" => {
-                return build_openrouter_from_role_with_model(role, preferred_model)
-                    .or_else(|| build_ollama_from_role_with_model(role, preferred_model, config))
+                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role))
             }
             _ => {}
         }
     }
 
-    // Fallbacks: use OpenRouter if configured, else Ollama if extra hints exist, else try config defaults
+    // Fallbacks: use OpenRouter if configured, else Ollama if extra hints exist
     if role_has_openrouter_config(role) {
-        if let Some(client) = build_openrouter_from_role_with_model(role, preferred_model) {
+        if let Some(client) = build_openrouter_from_role(role) {
             return Some(client);
         }
     }
 
     if has_ollama_hints(&role.extra) {
-        if let Some(client) = build_ollama_from_role_with_model(role, preferred_model, config) {
+        log::debug!("Found Ollama hints in extra");
+        if let Some(client) = build_ollama_from_role(role) {
+            log::debug!("Built Ollama client from hints");
             return Some(client);
         }
     }
 
-    // Final fallback: try to build with config defaults if no role hints
-    if let Some(config) = config {
-        if let Some(default_provider) = &config.default_model_provider {
-            match default_provider.as_str() {
-                "ollama" => {
-                    return build_ollama_from_config_defaults(config, preferred_model);
-                }
-                "openrouter" => {
-                    // Would need OpenRouter defaults in config
-                    return None;
-                }
-                _ => {}
-            }
-        }
-    }
-
+    log::debug!("No LLM client could be built for role: {}", role.name);
     None
 }
 
@@ -219,24 +142,7 @@ fn get_string_extra(extra: &AHashMap<String, Value>, key: &str) -> Option<String
 }
 
 fn get_bool_extra(extra: &AHashMap<String, Value>, key: &str) -> Option<bool> {
-    extra.get(key).and_then(|v| {
-        // Try direct boolean first
-        if let Some(b) = v.as_bool() {
-            Some(b)
-        }
-        // Try string parsing for "true"/"false"
-        else if let Some(s) = v.as_str() {
-            match s.to_lowercase().as_str() {
-                "true" | "1" | "yes" | "on" => Some(true),
-                "false" | "0" | "no" | "off" => Some(false),
-                _ => None,
-            }
-        }
-        // Try number parsing (non-zero = true)
-        else {
-            v.as_f64().map(|n| n != 0.0)
-        }
-    })
+    extra.get(key).and_then(|v| v.as_bool())
 }
 
 fn has_ollama_hints(extra: &AHashMap<String, Value>) -> bool {
@@ -249,7 +155,7 @@ fn has_ollama_hints(extra: &AHashMap<String, Value>) -> bool {
 
 #[cfg(feature = "openrouter")]
 fn role_has_openrouter_config(role: &terraphim_config::Role) -> bool {
-    role.has_openrouter_config()
+    role.has_llm_config()
 }
 
 #[cfg(not(feature = "openrouter"))]
@@ -295,6 +201,24 @@ impl LlmClient for OpenRouterClient {
             .await?;
         Ok(response)
     }
+}
+
+#[cfg(feature = "openrouter")]
+fn build_openrouter_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    let api_key = role.llm_api_key.as_deref()?;
+    let model = role.llm_model.as_deref().unwrap_or("openai/gpt-3.5-turbo");
+    match crate::openrouter::OpenRouterService::new(api_key, model) {
+        Ok(inner) => Some(Arc::new(OpenRouterClient { inner }) as Arc<dyn LlmClient>),
+        Err(e) => {
+            log::warn!("Failed to init OpenRouter client: {}", e);
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "openrouter"))]
+fn build_openrouter_from_role(_role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    None
 }
 
 // ---------------- Ollama Adapter ----------------
@@ -541,23 +465,21 @@ impl LlmClient for OllamaClient {
 }
 
 #[cfg(feature = "ollama")]
-fn build_ollama_from_role_with_model(
-    role: &terraphim_config::Role,
-    preferred_model: Option<&str>,
-    config: Option<&terraphim_config::Config>,
-) -> Option<Arc<dyn LlmClient>> {
-    // Try preferred model, then role models, then config defaults, then hardcoded default
-    let model = preferred_model
-        .map(|s| s.to_string())
-        .or_else(|| get_string_extra(&role.extra, "llm_model"))
+fn build_ollama_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
+    // Try llm_model or ollama_model, and base url
+    let model = get_string_extra(&role.extra, "llm_model")
         .or_else(|| get_string_extra(&role.extra, "ollama_model"))
-        .or_else(|| config.and_then(|c| c.default_chat_model.clone()))
-        .unwrap_or_else(|| "gemma2:2b".to_string());
-
+        .unwrap_or_else(|| "llama3.1".to_string());
     let base_url = get_string_extra(&role.extra, "llm_base_url")
         .or_else(|| get_string_extra(&role.extra, "ollama_base_url"))
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
+    log::debug!(
+        "Building Ollama client: model={}, base_url={}",
+        model,
+        base_url
+    );
+
     let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
     Some(Arc::new(OllamaClient {
         http,
@@ -567,37 +489,25 @@ fn build_ollama_from_role_with_model(
 }
 
 #[cfg(feature = "ollama")]
-fn build_ollama_from_nested_extra_with_model(
+fn build_ollama_from_nested_extra(
     nested_extra: &AHashMap<String, Value>,
-    preferred_model: Option<&str>,
 ) -> Option<Arc<dyn LlmClient>> {
-    let model = preferred_model
-        .map(|s| s.to_string())
-        .or_else(|| get_string_extra(nested_extra, "llm_model"))
+    let model = get_string_extra(nested_extra, "llm_model")
         .or_else(|| get_string_extra(nested_extra, "ollama_model"))
-        .unwrap_or_else(|| "gemma2:2b".to_string());
+        .unwrap_or_else(|| "llama3.1".to_string());
     let base_url = get_string_extra(nested_extra, "llm_base_url")
         .or_else(|| get_string_extra(nested_extra, "ollama_base_url"))
         .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
 
-    let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
-    Some(Arc::new(OllamaClient {
-        http,
-        base_url,
+    log::debug!(
+        "Building Ollama client from nested extra: model={}, base_url={}",
         model,
-    }) as Arc<dyn LlmClient>)
-}
-
-#[cfg(feature = "ollama")]
-fn build_ollama_from_config_defaults(
-    config: &terraphim_config::Config,
-    preferred_model: Option<&str>,
-) -> Option<Arc<dyn LlmClient>> {
-    let model = preferred_model
-        .map(|s| s.to_string())
-        .or_else(|| config.default_chat_model.clone())
-        .unwrap_or_else(|| "gemma2:2b".to_string());
-    let base_url = "http://127.0.0.1:11434".to_string();
+        base_url
+    );
+    log::debug!(
+        "Nested extra keys: {:?}",
+        nested_extra.keys().collect::<Vec<_>>()
+    );
 
     let http = crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
     Some(Arc::new(OllamaClient {
@@ -608,62 +518,13 @@ fn build_ollama_from_config_defaults(
 }
 
 #[cfg(not(feature = "ollama"))]
-fn build_ollama_from_role_with_model(
-    _role: &terraphim_config::Role,
-    _preferred_model: Option<&str>,
-    _config: Option<&terraphim_config::Config>,
-) -> Option<Arc<dyn LlmClient>> {
-    None
-}
-
-#[cfg(not(feature = "ollama"))]
-fn build_ollama_from_nested_extra_with_model(
+fn build_ollama_from_nested_extra(
     _nested_extra: &AHashMap<String, Value>,
-    _preferred_model: Option<&str>,
 ) -> Option<Arc<dyn LlmClient>> {
     None
 }
 
 #[cfg(not(feature = "ollama"))]
-fn build_ollama_from_config_defaults(
-    _config: &terraphim_config::Config,
-    _preferred_model: Option<&str>,
-) -> Option<Arc<dyn LlmClient>> {
-    None
-}
-
-// ---------------- OpenRouter Builders ----------------
-
-#[cfg(feature = "openrouter")]
-fn build_openrouter_from_role_with_model(
-    role: &terraphim_config::Role,
-    preferred_model: Option<&str>,
-) -> Option<Arc<dyn LlmClient>> {
-    // Get API key from role config or environment
-    let api_key = get_string_extra(&role.extra, "openrouter_api_key")
-        .or_else(|| std::env::var("OPENROUTER_API_KEY").ok())?;
-
-    // Get model from preferred_model, then role config, then default
-    let model = preferred_model
-        .map(|s| s.to_string())
-        .or_else(|| get_string_extra(&role.extra, "openrouter_model"))
-        .or_else(|| get_string_extra(&role.extra, "llm_model"))
-        .unwrap_or_else(|| "openai/gpt-3.5-turbo".to_string());
-
-    // Create OpenRouter service
-    match crate::openrouter::OpenRouterService::new(&api_key, &model) {
-        Ok(service) => Some(Arc::new(OpenRouterClient { inner: service }) as Arc<dyn LlmClient>),
-        Err(e) => {
-            log::warn!("Failed to create OpenRouter client: {}", e);
-            None
-        }
-    }
-}
-
-#[cfg(not(feature = "openrouter"))]
-fn build_openrouter_from_role_with_model(
-    _role: &terraphim_config::Role,
-    _preferred_model: Option<&str>,
-) -> Option<Arc<dyn LlmClient>> {
+fn build_ollama_from_role(_role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
     None
 }

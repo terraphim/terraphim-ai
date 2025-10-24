@@ -1,33 +1,7 @@
 {
   "id": "Server",
   "global_shortcut": "Ctrl+Shift+T",
-  "default_model_provider": "ollama",
-  "default_chat_model": "gemma2:2b",
-  "default_summarization_model": "gemma3:270m",
   "roles": {
-    "Default": {
-      "shortname": "Default",
-      "name": "Default",
-      "relevance_function": "title-scorer",
-      "terraphim_it": false,
-      "theme": "spacelab",
-      "kg": null,
-      "haystacks": [
-        {
-          "location": "docs/src",
-          "service": "Ripgrep",
-          "read_only": true,
-          "atomic_server_secret": null,
-          "extra_parameters": {}
-        }
-      ],
-      "extra": {
-        "llm_provider": "ollama",
-        "ollama_base_url": "http://127.0.0.1:11434",
-        "ollama_model": "gemma2:2b",
-        "llm_auto_summarize": true
-      }
-    },
     "Terraphim Engineer": {
       "shortname": "TerraEng",
       "name": "Terraphim Engineer",
@@ -52,29 +26,19 @@
           "extra_parameters": {}
         }
       ],
-      "extra": {
-        "llm_provider": "ollama",
-        "ollama_base_url": "http://127.0.0.1:11434",
-        "ollama_model": "gemma2:2b",
-        "llm_auto_summarize": true
-      },
-      "llm_system_prompt": "You are a Terraphim Engineer, an expert in Rust, async programming, knowledge graphs, and the Terraphim AI system architecture. You help with development, debugging, and optimization of the Terraphim platform. Focus on technical accuracy, performance, and following Rust best practices."
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Terraphim Engineer specializing in knowledge graphs, semantic search, and AI-powered information retrieval. Focus on understanding context, relationships between concepts, and providing comprehensive technical documentation summaries.",
+      "extra": {}
     },
-    "Engineer": {
-      "shortname": "Engineer",
-      "name": "Engineer",
-      "relevance_function": "terraphim-graph",
-      "terraphim_it": true,
-      "theme": "lumen",
-      "kg": {
-        "automata_path": null,
-        "knowledge_graph_local": {
-          "input_type": "markdown",
-          "path": "docs/src/kg"
-        },
-        "public": true,
-        "publish": true
-      },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
       "haystacks": [
         {
           "location": "docs/src",
@@ -84,36 +48,12 @@
           "extra_parameters": {}
         }
       ],
-      "extra": {
-        "llm_provider": "ollama",
-        "ollama_base_url": "http://127.0.0.1:11434",
-        "ollama_model": "gemma2:2b",
-        "llm_auto_summarize": true
-      },
-      "llm_system_prompt": "You are an Engineer specializing in knowledge graphs, semantic search, and the Terraphim system. You help with system architecture, data modeling, and technical implementation. Focus on building robust, scalable solutions."
-    },
-    "Rust Engineer": {
-      "shortname": "rust-engineer",
-      "name": "Rust Engineer",
-      "relevance_function": "title-scorer",
-      "terraphim_it": false,
-      "theme": "cosmo",
-      "kg": null,
-      "haystacks": [
-        {
-          "location": "https://query.rs",
-          "service": "QueryRs",
-          "read_only": true,
-          "atomic_server_secret": null,
-          "extra_parameters": {}
-        }
-      ],
-      "extra": {
-        "llm_provider": "ollama",
-        "ollama_base_url": "http://127.0.0.1:11434",
-        "ollama_model": "gemma2:2b",
-        "llm_auto_summarize": true
-      }
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
     }
   },
   "default_role": "Terraphim Engineer",

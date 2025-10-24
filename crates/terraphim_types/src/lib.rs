@@ -218,6 +218,8 @@ pub struct Document {
     pub tags: Option<Vec<String>>,
     /// Rank of the document in the search results
     pub rank: Option<u64>,
+    /// Source haystack location that this document came from
+    pub source_haystack: Option<String>,
 }
 
 impl fmt::Display for Document {
@@ -238,6 +240,19 @@ impl fmt::Display for Document {
         }
 
         Ok(())
+    }
+}
+
+impl Document {
+    /// Set the source haystack for this document
+    pub fn with_source_haystack(mut self, haystack_location: String) -> Self {
+        self.source_haystack = Some(haystack_location);
+        self
+    }
+
+    /// Get the source haystack location
+    pub fn get_source_haystack(&self) -> Option<&String> {
+        self.source_haystack.as_ref()
     }
 }
 
@@ -500,6 +515,7 @@ pub enum LogicalOperator {
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct SearchQuery {
     /// Primary search term for backward compatibility
+    #[serde(alias = "query")]
     pub search_term: NormalizedTermValue,
     /// Multiple search terms for logical operations
     pub search_terms: Option<Vec<NormalizedTermValue>>,
@@ -514,8 +530,10 @@ impl SearchQuery {
     /// Get all search terms (both single and multiple)
     pub fn get_all_terms(&self) -> Vec<&NormalizedTermValue> {
         if let Some(ref multiple_terms) = self.search_terms {
-            // For multi-term queries, use search_terms (which should contain all terms)
-            multiple_terms.iter().collect()
+            // For multi-term queries, include primary term + additional terms
+            let mut all_terms = vec![&self.search_term];
+            all_terms.extend(multiple_terms.iter());
+            all_terms
         } else {
             // For single-term queries, use search_term
             vec![&self.search_term]
@@ -629,6 +647,27 @@ impl Display for ConversationId {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.0)
     }
+}
+
+/// Types of context that can be added to conversations
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum ContextType {
+    /// System-level context
+    System,
+    /// User-provided context
+    UserInput,
+    /// Document-based context
+    Document,
+    /// Search result context
+    SearchResult,
+    /// External data or API context
+    External,
+    /// Context from KG term definition with synonyms and metadata
+    KGTermDefinition,
+    /// Context from complete knowledge graph index
+    KGIndex,
 }
 
 /// Unique identifier for messages within conversations
@@ -891,25 +930,6 @@ impl ContextItem {
     }
 }
 
-/// Types of context that can be added to conversations
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
-pub enum ContextType {
-    /// Context from a single document
-    Document,
-    /// User-provided context
-    UserInput,
-    /// System-generated context
-    System,
-    /// Context from external tools or APIs
-    External,
-    /// Context from KG term definition with synonyms and metadata
-    KGTermDefinition,
-    /// Context from complete knowledge graph index
-    KGIndex,
-}
-
 /// Knowledge Graph term definition with comprehensive metadata
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
@@ -958,7 +978,6 @@ pub struct KGIndexInfo {
     pub version: Option<String>,
 }
 
-/// Enhanced chat message with context support
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]

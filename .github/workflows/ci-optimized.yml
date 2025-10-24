@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
@@ -70,7 +70,7 @@ jobs:
           fi
 
   build-base-image:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: setup
     if: needs.setup.outputs.should-build == 'true'
     outputs:
@@ -101,14 +101,36 @@ jobs:
           docker run --rm "${IMAGE_TAG}" rustc --version
           docker run --rm "${IMAGE_TAG}" cargo --version
 
+      - name: Save Docker image
+        run: |
+          IMAGE_TAG="terraphim-builder:${{ github.run_number }}-${{ github.sha }}"
+          docker save "${IMAGE_TAG}" | gzip > terraphim-builder-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: terraphim-builder-image.tar.gz
+          retention-days: 1
+
   lint-and-format:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-base-image]
     if: needs.setup.outputs.should-build == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
 
       - name: Run format check
         run: |
@@ -135,7 +157,7 @@ jobs:
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-base-image, build-frontend, lint-and-format]
     if: needs.setup.outputs.should-build == 'true'
     strategy:
@@ -153,6 +175,16 @@ jobs:
         with:
           name: frontend-dist
           path: frontend-dist
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
 
       - name: Build Rust project
         run: |
@@ -203,13 +235,23 @@ jobs:
           retention-days: 30
 
   test:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-base-image, build-rust]
     if: needs.setup.outputs.should-build == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
 
       - name: Run tests
         run: |
@@ -222,7 +264,7 @@ jobs:
   summary:
     needs: [lint-and-format, build-frontend, build-rust, test]
     if: always()
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
 
     steps:
       - name: Check all jobs succeeded
