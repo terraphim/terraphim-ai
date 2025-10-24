@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen } from '@testing-library/svelte/svelte5';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import NovelWrapper from '../NovelWrapper.svelte';
 
 // Mock the novelAutocompleteService

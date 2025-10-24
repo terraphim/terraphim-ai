@@ -3,7 +3,7 @@ import { get } from 'svelte/store';
 import { is_tauri } from '../stores';
 
 // Helper function to check if we're in Tauri mode
-function isTauriMode(): boolean {
+function _isTauriMode(): boolean {
 	// Check both the store value and the global window object for reliability
 	return (
 		get(is_tauri) || (typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined)
@@ -40,8 +40,6 @@ export class NovelAutocompleteService {
 	private sessionId: string;
 	private currentRole: string = 'Default';
 	private connectionRetries: number = 0;
-	private maxRetries: number = 3;
-	private retryDelay: number = 1000;
 	private isConnecting: boolean = false;
 
 	constructor() {
@@ -85,7 +83,7 @@ export class NovelAutocompleteService {
 							window.location.hostname +
 							':' +
 							port
-						: 'http://localhost:' + port;
+						: `http://localhost:${port}`;
 
 				const response = await fetch(`${testUrl}/health`, {
 					method: 'GET',
@@ -98,10 +96,7 @@ export class NovelAutocompleteService {
 					console.log(`NovelAutocompleteService: Detected server at ${testUrl}`);
 					return;
 				}
-			} catch (error) {
-				// Continue trying other ports
-				continue;
-			}
+			} catch (_error) {}
 		}
 
 		console.warn(
@@ -291,7 +286,7 @@ export class NovelAutocompleteService {
 				.filter((s: NovelAutocompleteSuggestion) => s.text.length > 0);
 		}
 
-		if (response && response.error) {
+		if (response?.error) {
 			console.error('Tauri autocomplete error:', response.error);
 		}
 

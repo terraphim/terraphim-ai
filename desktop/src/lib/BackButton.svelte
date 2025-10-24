@@ -37,6 +37,7 @@ onMount(() => {
 	const handleVisibilityUpdate = () => {
 		updateVisibility();
 		// Force Svelte to re-render by updating a reactive variable
+		// biome-ignore lint/correctness/noSelfAssign: Intentional for Svelte reactivity
 		_isVisible = _isVisible; // This triggers reactivity
 	};
 

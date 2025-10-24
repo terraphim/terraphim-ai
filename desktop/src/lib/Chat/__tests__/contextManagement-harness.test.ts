@@ -1,11 +1,12 @@
 // This is a new test file
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte/svelte5';
+
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte/svelte5';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import '@testing-library/jest-dom';
 
+import { createTestConfig } from '../../../__test-utils__/testConfig';
 // Test utilities for real API testing
 import { startTestServer, stopTestServer } from '../../../__test-utils__/testServer';
-import { createTestConfig } from '../../../__test-utils__/testConfig';
 
 import ContextManagementHarness from './ContextManagementHarness.svelte';
 

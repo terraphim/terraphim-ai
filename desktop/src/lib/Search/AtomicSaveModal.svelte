@@ -1,10 +1,10 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Button, Field, Input, Message, Modal } from 'svelma';
+import { configStore, is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
 import type { Haystack, Role } from '../generated/types';
 import type { Document } from './SearchResult';
-import { Modal, Message, Button, Input, Field } from 'svelma';
-import { role, configStore, is_tauri } from '$lib/stores';
 
 export let active: boolean = false;
 export let document: Document;

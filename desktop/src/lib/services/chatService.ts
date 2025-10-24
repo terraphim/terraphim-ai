@@ -1,6 +1,7 @@
 // src/lib/services/chatService.ts
+
+import { contexts, currentPersistentConversationId, persistentConversations } from '$lib/stores';
 import { CONFIG } from '../../config';
-import { persistentConversations, currentPersistentConversationId, contexts } from '$lib/stores';
 
 // Define types used in this service
 // Duplicating from Chat.svelte for now, can be centralized later
