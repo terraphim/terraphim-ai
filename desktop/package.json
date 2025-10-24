@@ -81,7 +81,7 @@
 		"jsdom": "^24.1.0",
 		"sass": "1.92.1",
 		"selenium-webdriver": "^4.34.0",
-		"svelte-typeahead": "^4.4.1",
+		"svelte-typeahead": "^5.0.1",
 		"vitest": "^1.6.0"
 	},
 	"dependencies": {
