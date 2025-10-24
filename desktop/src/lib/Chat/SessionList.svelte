@@ -219,6 +219,7 @@
       <button
         type="button"
         class="btn-close btn-close-sm"
+        aria-label="Dismiss error"
         on:click={() => error = null}
       ></button>
     </div>

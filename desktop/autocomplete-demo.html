@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terraphim Autocomplete Demo</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .demo-container {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        .demo-header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .demo-header h1 {
+            color: #2c3e50;
+            margin-bottom: 10px;
+        }
+        .demo-header p {
+            color: #7f8c8d;
+            font-size: 16px;
+        }
+        .feature-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .feature-card {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 6px;
+            border-left: 4px solid #3498db;
+        }
+        .feature-card h3 {
+            color: #2c3e50;
+            margin-top: 0;
+        }
+        .feature-card ul {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .feature-card li {
+            margin: 5px 0;
+            color: #555;
+        }
+        .status-section {
+            background: #e8f5e8;
+            border: 1px solid #4caf50;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .status-section h3 {
+            color: #2e7d32;
+            margin-top: 0;
+        }
+        .status-item {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            padding: 5px 0;
+            border-bottom: 1px solid #c8e6c9;
+        }
+        .status-item:last-child {
+            border-bottom: none;
+        }
+        .status-label {
+            font-weight: 500;
+            color: #2e7d32;
+        }
+        .status-value {
+            color: #555;
+            font-family: monospace;
+        }
+        .demo-actions {
+            text-align: center;
+            margin: 30px 0;
+        }
+        .demo-button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            font-size: 16px;
+            cursor: pointer;
+            margin: 0 10px;
+            text-decoration: none;
+            display: inline-block;
+        }
+        .demo-button:hover {
+            background: #2980b9;
+        }
+        .demo-button.secondary {
+            background: #95a5a6;
+        }
+        .demo-button.secondary:hover {
+            background: #7f8c8d;
+        }
+        .integration-info {
+            background: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .integration-info h3 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .code-block {
+            background: #2c3e50;
+            color: #ecf0f1;
+            padding: 15px;
+            border-radius: 6px;
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 14px;
+            overflow-x: auto;
+            margin: 10px 0;
+        }
+        .success-badge {
+            background: #27ae60;
+            color: white;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: bold;
+            display: inline-block;
+            margin-left: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="demo-container">
+        <div class="demo-header">
+            <h1>🎯 Terraphim Autocomplete Integration</h1>
+            <p>Successfully implemented Novel Editor autocomplete system with knowledge graph integration</p>
+        </div>
+
+        <div class="status-section">
+            <h3>✅ Integration Status</h3>
+            <div class="status-item">
+                <span class="status-label">Backend Server:</span>
+                <span class="status-value" id="backend-status">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Frontend Dev Server:</span>
+                <span class="status-value" id="frontend-status">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Autocomplete API:</span>
+                <span class="status-value" id="api-status">Checking...</span>
+            </div>
+            <div class="status-item">
+                <span class="status-label">Knowledge Graph:</span>
+                <span class="status-value" id="kg-status">Checking...</span>
+            </div>
+        </div>
+
+        <div class="feature-grid">
+            <div class="feature-card">
+                <h3>🔧 Novel Editor Integration</h3>
+                <ul>
+                    <li>TipTap extension for autocomplete</li>
+                    <li>Custom TerraphimSuggestion component</li>
+                    <li>Real-time knowledge graph suggestions</li>
+                    <li>Configurable trigger characters</li>
+                    <li>Debounced search with snippets</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>🌐 Service Layer</h3>
+                <ul>
+                    <li>novelAutocompleteService.ts</li>
+                    <li>Dual backend support (Tauri + REST API)</li>
+                    <li>Automatic port detection</li>
+                    <li>Connection testing and retry logic</li>
+                    <li>Role-based configuration</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>🎨 UI Components</h3>
+                <ul>
+                    <li>NovelWrapper.svelte component</li>
+                    <li>Status display and controls</li>
+                    <li>Test and rebuild functionality</li>
+                    <li>Demo mode with sample content</li>
+                    <li>Real-time configuration display</li>
+                </ul>
+            </div>
+
+            <div class="feature-card">
+                <h3>⚡ Performance & Quality</h3>
+                <ul>
+                    <li>Updated dependencies (15+ packages)</li>
+                    <li>Rust dependency updates (tower, dirs, memoize)</li>
+                    <li>GitHub Actions CI/CD workflow</li>
+                    <li>Svelte 5 compatibility maintained</li>
+                    <li>TypeScript type safety</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="integration-info">
+            <h3>🚀 How to Use the Autocomplete System</h3>
+            <p><strong>1. Start the backend server:</strong></p>
+            <div class="code-block">cargo run --bin terraphim_server -- --config terraphim_server/default/terraphim_engineer_config.json</div>
+            
+            <p><strong>2. Start the frontend dev server:</strong></p>
+            <div class="code-block">cd desktop && yarn dev</div>
+            
+            <p><strong>3. Use the NovelWrapper component in your Svelte app:</strong></p>
+            <div class="code-block">&lt;NovelWrapper 
+  bind:html={content}
+  enableAutocomplete={true}
+  suggestionTrigger="/"
+  maxSuggestions={8}
+/&gt;</div>
+            
+            <p><strong>4. Type "/" followed by any term to see autocomplete suggestions!</strong></p>
+        </div>
+
+        <div class="demo-actions">
+            <a href="http://localhost:5173" class="demo-button" target="_blank">
+                🖥️ Open Frontend App
+            </a>
+            <a href="http://localhost:8000/health" class="demo-button secondary" target="_blank">
+                🔍 Check Backend API
+            </a>
+            <button class="demo-button secondary" onclick="testAutocomplete()">
+                🧪 Test Autocomplete API
+            </button>
+        </div>
+
+        <div id="test-results" style="margin-top: 20px;"></div>
+    </div>
+
+    <script>
+        // Check system status
+        async function checkStatus() {
+            // Check backend
+            try {
+                const backendResponse = await fetch('http://localhost:8000/health');
+                if (backendResponse.ok) {
+                    document.getElementById('backend-status').innerHTML = 'Running <span class="success-badge">✓</span>';
+                } else {
+                    document.getElementById('backend-status').innerHTML = 'Error';
+                }
+            } catch (error) {
+                document.getElementById('backend-status').innerHTML = 'Not running';
+            }
+
+            // Check frontend
+            try {
+                const frontendResponse = await fetch('http://localhost:5173');
+                if (frontendResponse.ok) {
+                    document.getElementById('frontend-status').innerHTML = 'Running <span class="success-badge">✓</span>';
+                } else {
+                    document.getElementById('frontend-status').innerHTML = 'Error';
+                }
+            } catch (error) {
+                document.getElementById('frontend-status').innerHTML = 'Not running';
+            }
+
+            // Check autocomplete API
+            try {
+                const apiResponse = await fetch('http://localhost:8000/autocomplete/Engineer/terraphim');
+                if (apiResponse.ok) {
+                    const data = await apiResponse.json();
+                    if (data.status === 'success') {
+                        document.getElementById('api-status').innerHTML = `Working (${data.suggestions.length} suggestions) <span class="success-badge">✓</span>`;
+                        document.getElementById('kg-status').innerHTML = 'Loaded <span class="success-badge">✓</span>';
+                    } else {
+                        document.getElementById('api-status').innerHTML = 'API Error';
+                    }
+                } else {
+                    document.getElementById('api-status').innerHTML = 'API Error';
+                }
+            } catch (error) {
+                document.getElementById('api-status').innerHTML = 'Not available';
+                document.getElementById('kg-status').innerHTML = 'Not loaded';
+            }
+        }
+
+        // Test autocomplete functionality
+        async function testAutocomplete() {
+            const resultsDiv = document.getElementById('test-results');
+            resultsDiv.innerHTML = '<div style="background: #e3f2fd; padding: 15px; border-radius: 6px; margin: 10px 0;"><strong>🧪 Testing Autocomplete API...</strong></div>';
+
+            try {
+                const response = await fetch('http://localhost:8000/autocomplete/Engineer/terraphim');
+                const data = await response.json();
+
+                if (data.status === 'success' && data.suggestions.length > 0) {
+                    let suggestionsHtml = '<div style="background: #e8f5e8; padding: 15px; border-radius: 6px; margin: 10px 0;"><strong>✅ Autocomplete Test Successful!</strong><br><br>';
+                    suggestionsHtml += '<strong>Found ' + data.suggestions.length + ' suggestions for "terraphim":</strong><br><br>';
+                    
+                    data.suggestions.slice(0, 5).forEach((suggestion, index) => {
+                        suggestionsHtml += `${index + 1}. <strong>${suggestion.text}</strong> (score: ${suggestion.score.toFixed(2)})<br>`;
+                    });
+                    
+                    if (data.suggestions.length > 5) {
+                        suggestionsHtml += `... and ${data.suggestions.length - 5} more suggestions<br>`;
+                    }
+                    
+                    suggestionsHtml += '</div>';
+                    resultsDiv.innerHTML = suggestionsHtml;
+                } else {
+                    resultsDiv.innerHTML = '<div style="background: #ffebee; padding: 15px; border-radius: 6px; margin: 10px 0;"><strong>❌ No suggestions found</strong><br>This might be normal if the knowledge graph is empty or the term isn\'t indexed.</div>';
+                }
+            } catch (error) {
+                resultsDiv.innerHTML = '<div style="background: #ffebee; padding: 15px; border-radius: 6px; margin: 10px 0;"><strong>❌ Test Failed:</strong><br>' + error.message + '</div>';
+            }
+        }
+
+        // Initialize status check
+        checkStatus();
+    </script>
+</body>
+</html>

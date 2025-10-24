@@ -1,0 +1,18 @@
+# Summary: build_config.toml
+
+## Purpose
+This TOML file configures the build process for Terraphim AI, defining targets, features, environment settings, and deployment parameters.
+
+## Key Functionality
+- Specifies native release target with enabled features (openrouter, typescript, native)
+- Defines production environment configuration with logging and server settings
+- Provides Docker build arguments for base image, context, and platform
+- Includes workspace configuration for build management
+- Supports custom build arguments and metadata tracking
+
+## Important Details
+- Targets production environment with RUST_LOG=info
+- Configures server to listen on 0.0.0.0:8000
+- Uses Ubuntu 24.04 as base Docker image
+- Tracks build metadata including ID, timestamp, and tags
+- Supports feature constraints and environment-specific settings

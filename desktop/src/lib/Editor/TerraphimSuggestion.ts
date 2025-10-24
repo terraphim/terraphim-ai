@@ -1,7 +1,26 @@
 import { Extension } from '@tiptap/core';
 import { PluginKey } from 'prosemirror-state';
 import { Suggestion } from '@tiptap/suggestion';
-import type { SuggestionOptions } from '@tiptap/suggestion';
+
+// Define the SuggestionOptions type based on the Suggestion function parameters
+interface SuggestionOptions {
+  pluginKey?: any;
+  editor: any;
+  char?: string;
+  allowSpaces?: boolean;
+  allowToIncludeChar?: boolean;
+  allowedPrefixes?: string[];
+  startOfLine?: boolean;
+  decorationTag?: string;
+  decorationClass?: string;
+  decorationContent?: string;
+  decorationEmptyClass?: string;
+  command?: (props: any) => any;
+  items?: (props: any) => Promise<any[]>;
+  render?: () => any;
+  allow?: (props: any) => boolean;
+  findSuggestionMatch?: any;
+}
 import { novelAutocompleteService, type NovelAutocompleteSuggestion } from '../services/novelAutocompleteService';
 import tippy, { type Instance, type Props } from 'tippy.js';
 
@@ -54,7 +73,7 @@ export const TerraphimSuggestion = Extension.create<TerraphimSuggestionOptions>(
 
   addOptions() {
     return {
-      trigger: '++',
+      trigger: '/',
       pluginKey: new PluginKey('terraphimSuggestion'),
       allowSpaces: false,
       limit: 8,
@@ -181,24 +200,25 @@ export const TerraphimSuggestion = Extension.create<TerraphimSuggestionOptions>(
 });
 
 /**
- * Suggestion dropdown renderer component
+ * Custom renderer for Terraphim suggestions
  */
 class TerraphimSuggestionRenderer {
   public element: HTMLElement;
   private items: NovelAutocompleteSuggestion[] = [];
-  private selectedIndex = 0;
-  private command: (props: { id: string; [key: string]: any }) => void;
+  private selectedIndex: number = 0;
+  private command: (props: { editor: any; range: any; props: NovelAutocompleteSuggestion }) => void;
 
-  constructor(options: {
-    items: NovelAutocompleteSuggestion[];
-    command: (props: { id: string; [key: string]: any }) => void;
-  }) {
-    this.items = options.items;
-    this.command = options.command;
+  constructor({ items, command }: { items: NovelAutocompleteSuggestion[]; command: any }) {
+    this.items = items;
+    this.command = command;
+    this.element = this.createElement();
+  }
 
-    this.element = document.createElement('div');
-    this.element.className = 'terraphim-suggestion-dropdown';
-    this.render();
+  private createElement(): HTMLElement {
+    const element = document.createElement('div');
+    element.className = 'terraphim-suggestion-list';
+    this.updateItems(this.items);
+    return element;
   }
 
   updateItems(items: NovelAutocompleteSuggestion[]) {
@@ -207,86 +227,76 @@ class TerraphimSuggestionRenderer {
     this.render();
   }
 
-  onKeyDown({ event }: { event: KeyboardEvent }): boolean {
-    if (event.key === 'ArrowUp') {
-      this.selectPrevious();
-      return true;
-    }
-
-    if (event.key === 'ArrowDown') {
-      this.selectNext();
-      return true;
-    }
-
-    if (event.key === 'Enter' || event.key === 'Tab') {
-      this.selectItem(this.selectedIndex);
-      return true;
-    }
-
-    return false;
-  }
-
-  selectPrevious() {
-    this.selectedIndex = Math.max(0, this.selectedIndex - 1);
-    this.render();
-  }
-
-  selectNext() {
-    this.selectedIndex = Math.min(this.items.length - 1, this.selectedIndex + 1);
-    this.render();
-  }
-
-  selectItem(index: number) {
-    const item = this.items[index];
-    if (item) {
-      // Pass the item as props object with id property as expected by TipTap
-      this.command({ id: item.text, ...item });
-    }
-  }
-
   private render() {
-    this.element.innerHTML = '';
-
     if (this.items.length === 0) {
-      this.element.innerHTML = `
-        <div class="terraphim-suggestion-item terraphim-suggestion-empty">
-          <div class="terraphim-suggestion-text">No suggestions found</div>
-          <div class="terraphim-suggestion-hint">Try a different search term</div>
-        </div>
-      `;
+      this.element.innerHTML = '<div class="terraphim-suggestion-item no-results">No suggestions found</div>';
       return;
     }
 
-    const header = document.createElement('div');
-    header.className = 'terraphim-suggestion-header';
-    header.innerHTML = `
-      <div class="terraphim-suggestion-count">${this.items.length} suggestions</div>
-      <div class="terraphim-suggestion-hint">↑↓ Navigate • Tab/Enter Select • Esc Cancel</div>
-    `;
-    this.element.appendChild(header);
+    this.element.innerHTML = this.items
+      .map((item, index) => {
+        const isSelected = index === this.selectedIndex;
+        return `
+          <div class="terraphim-suggestion-item ${isSelected ? 'selected' : ''}" data-index="${index}">
+            <div class="terraphim-suggestion-text">${this.escapeHtml(item.text)}</div>
+            ${item.snippet ? `<div class="terraphim-suggestion-snippet">${this.escapeHtml(item.snippet)}</div>` : ''}
+            ${item.score ? `<div class="terraphim-suggestion-score">${item.score.toFixed(2)}</div>` : ''}
+          </div>
+        `;
+      })
+      .join('');
 
-    this.items.forEach((item, index) => {
-      const itemEl = document.createElement('div');
-      itemEl.className = `terraphim-suggestion-item ${
-        index === this.selectedIndex ? 'terraphim-suggestion-selected' : ''
-      }`;
-
-      itemEl.innerHTML = `
-        <div class="terraphim-suggestion-main">
-          <div class="terraphim-suggestion-text">${this.escapeHtml(item.text)}</div>
-          ${item.snippet ? `<div class="terraphim-suggestion-snippet">${this.escapeHtml(item.snippet)}</div>` : ''}
-        </div>
-        ${item.score ? `<div class="terraphim-suggestion-score">${Math.round(item.score * 100)}%</div>` : ''}
-      `;
-
-      itemEl.addEventListener('click', () => this.selectItem(index));
-      itemEl.addEventListener('mouseenter', () => {
-        this.selectedIndex = index;
-        this.render();
+    // Add click handlers
+    this.element.querySelectorAll('.terraphim-suggestion-item').forEach((item, index) => {
+      item.addEventListener('click', () => {
+        this.selectItem(index);
       });
-
-      this.element.appendChild(itemEl);
     });
+  }
+
+  private selectItem(index: number) {
+    if (index >= 0 && index < this.items.length) {
+      this.selectedIndex = index;
+      this.render();
+      this.command({
+        editor: null,
+        range: null,
+        props: this.items[index],
+      });
+    }
+  }
+
+  onKeyDown(props: { event: KeyboardEvent }): boolean {
+    if (this.items.length === 0) {
+      return false;
+    }
+
+    switch (props.event.key) {
+      case 'ArrowDown':
+        props.event.preventDefault();
+        this.selectedIndex = (this.selectedIndex + 1) % this.items.length;
+        this.render();
+        return true;
+
+      case 'ArrowUp':
+        props.event.preventDefault();
+        this.selectedIndex = this.selectedIndex === 0 ? this.items.length - 1 : this.selectedIndex - 1;
+        this.render();
+        return true;
+
+      case 'Enter':
+      case 'Tab':
+        props.event.preventDefault();
+        this.selectItem(this.selectedIndex);
+        return true;
+
+      case 'Escape':
+        props.event.preventDefault();
+        return true;
+
+      default:
+        return false;
+    }
   }
 
   private escapeHtml(text: string): string {
@@ -296,133 +306,118 @@ class TerraphimSuggestionRenderer {
   }
 
   destroy() {
-    this.element.remove();
+    // Cleanup if needed
   }
 }
 
-// CSS styles for the suggestion dropdown
+/**
+ * CSS styles for the Terraphim suggestion popup
+ */
 export const terraphimSuggestionStyles = `
-.terraphim-suggestion-dropdown {
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  box-shadow: 0 10px 38px -10px rgba(22, 23, 24, 0.35), 0 10px 20px -15px rgba(22, 23, 24, 0.2);
-  max-height: 300px;
-  min-width: 300px;
-  overflow-y: auto;
-  z-index: 1000;
-}
-
-.terraphim-suggestion-header {
-  padding: 8px 12px;
-  border-bottom: 1px solid #f1f5f9;
-  background: #f8fafc;
-  font-size: 12px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.terraphim-suggestion-count {
-  font-weight: 600;
-  color: #475569;
-}
-
-.terraphim-suggestion-hint {
-  color: #64748b;
-}
-
-.terraphim-suggestion-item {
-  padding: 8px 12px;
-  cursor: pointer;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  border-bottom: 1px solid #f1f5f9;
-}
-
-.terraphim-suggestion-item:hover {
-  background: #f8fafc;
-}
-
-.terraphim-suggestion-selected {
-  background: #eff6ff !important;
-  border-left: 3px solid #3b82f6;
-}
-
-.terraphim-suggestion-empty {
-  color: #64748b;
-  font-style: italic;
-  text-align: center;
-  cursor: default;
-}
-
-.terraphim-suggestion-main {
-  flex: 1;
-}
-
-.terraphim-suggestion-text {
-  font-weight: 500;
-  color: #1e293b;
-  margin-bottom: 2px;
-}
-
-.terraphim-suggestion-snippet {
-  font-size: 12px;
-  color: #64748b;
-  line-height: 1.3;
-}
-
-.terraphim-suggestion-score {
-  font-size: 11px;
-  color: #10b981;
-  font-weight: 600;
-  background: #ecfdf5;
-  padding: 2px 6px;
-  border-radius: 4px;
-  margin-left: 8px;
-}
-
-/* Dark theme support */
-@media (prefers-color-scheme: dark) {
-  .terraphim-suggestion-dropdown {
-    background: #1e293b;
-    border-color: #334155;
+  .terraphim-suggestion-list {
+    background: white;
+    border: 1px solid #e1e5e9;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    max-height: 300px;
+    overflow-y: auto;
+    padding: 4px 0;
+    min-width: 200px;
+    max-width: 400px;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-size: 14px;
+    z-index: 1000;
   }
 
-  .terraphim-suggestion-header {
-    background: #0f172a;
-    border-color: #334155;
+  .terraphim-suggestion-item {
+    padding: 8px 12px;
+    cursor: pointer;
+    border-bottom: 1px solid #f1f3f4;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
   }
 
-  .terraphim-suggestion-item:hover {
-    background: #334155;
+  .terraphim-suggestion-item:last-child {
+    border-bottom: none;
   }
 
-  .terraphim-suggestion-selected {
-    background: #1e40af !important;
+  .terraphim-suggestion-item:hover,
+  .terraphim-suggestion-item.selected {
+    background-color: #f8f9fa;
+  }
+
+  .terraphim-suggestion-item.selected {
+    background-color: #e3f2fd;
   }
 
   .terraphim-suggestion-text {
-    color: #f1f5f9;
+    font-weight: 500;
+    color: #1a1a1a;
+    line-height: 1.4;
   }
 
   .terraphim-suggestion-snippet {
-    color: #94a3b8;
+    font-size: 12px;
+    color: #666;
+    line-height: 1.3;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
   }
-}
 
-/* Tippy.js theme */
-.tippy-box[data-theme~='terraphim-suggestion'] {
-  background: transparent;
-  box-shadow: none;
-}
+  .terraphim-suggestion-score {
+    font-size: 11px;
+    color: #999;
+    font-weight: 500;
+  }
 
-.tippy-box[data-theme~='terraphim-suggestion'] > .tippy-backdrop {
-  background: transparent;
-}
+  .terraphim-suggestion-item.no-results {
+    color: #666;
+    font-style: italic;
+    cursor: default;
+  }
 
-.tippy-box[data-theme~='terraphim-suggestion'] > .tippy-arrow {
-  display: none;
-}
+  .terraphim-suggestion-item.no-results:hover {
+    background-color: transparent;
+  }
+
+  /* Dark theme support */
+  @media (prefers-color-scheme: dark) {
+    .terraphim-suggestion-list {
+      background: #2d3748;
+      border-color: #4a5568;
+      color: #e2e8f0;
+    }
+
+    .terraphim-suggestion-item {
+      border-bottom-color: #4a5568;
+    }
+
+    .terraphim-suggestion-item:hover,
+    .terraphim-suggestion-item.selected {
+      background-color: #4a5568;
+    }
+
+    .terraphim-suggestion-item.selected {
+      background-color: #2b6cb0;
+    }
+
+    .terraphim-suggestion-text {
+      color: #e2e8f0;
+    }
+
+    .terraphim-suggestion-snippet {
+      color: #a0aec0;
+    }
+
+    .terraphim-suggestion-score {
+      color: #718096;
+    }
+
+    .terraphim-suggestion-item.no-results {
+      color: #a0aec0;
+    }
+  }
 `;

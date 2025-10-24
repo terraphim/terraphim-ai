@@ -24,7 +24,6 @@ export default defineConfig({
           console.log('Compiling Svelte component...');
           const { js, css } = compile(input, {
             generate: 'dom',
-            format: 'esm',
             name: 'SplashScreen'
           });
 
@@ -64,10 +63,13 @@ export default defineConfig({
             </div>
             <script type="module">
               import SplashScreen from './splashscreen.js'; // Import the compiled Svelte component
+              import { mount } from 'svelte';
               const target = document.querySelector('.splash-content');
-              new SplashScreen({
-                target
-              });
+              if (target) {
+                mount(SplashScreen, {
+                  target
+                });
+              }
             </script>
           </body>
           `;
@@ -89,21 +91,6 @@ export default defineConfig({
     alias: {
       '$lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
       '$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
-
-      // Map specific Svelte sub-paths back to the real runtime so they are **not** redirected to
-      // our shim (which would cause ENOTDIR errors like svelte-shim.js/store).
-      'svelte/internal': resolve(__dirname, 'node_modules/svelte/internal'),
-      'svelte/store': resolve(__dirname, 'node_modules/svelte/store'),
-      'svelte/transition': resolve(__dirname, 'node_modules/svelte/transition'),
-      'svelte/animate': resolve(__dirname, 'node_modules/svelte/animate'),
-      'svelte/easing': resolve(__dirname, 'node_modules/svelte/easing'),
-      'svelte/motion': resolve(__dirname, 'node_modules/svelte/motion'),
-
-      // Real runtime entry alias so the shim can import without causing an alias loop.
-      'svelte-original': resolve(__dirname, 'node_modules/svelte/index.mjs'),
-
-      // Any other bare `import "svelte"` should go to our shim that adds mount/unmount.
-      'svelte': fileURLToPath(new URL('./src/svelte-shim.js', import.meta.url)),
     }
   },
   clearScreen: false,
@@ -125,6 +112,18 @@ export default defineConfig({
       }
     }
   },
+  test: {
+    environment: 'jsdom',
+    setupFiles: ['./src/test-utils/setup.ts'],
+    globals: true,
+    deps: {
+      inline: [/svelte-jsoneditor/]
+    },
+    // Add ssr.noExternal to process svelma on the client-side
+    ssr: {
+      noExternal: ['svelma']
+    }
+  },
   build: {
     rollupOptions: {
       output: {
@@ -133,7 +132,7 @@ export default defineConfig({
           'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
           'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
           'vendor-charts': ['d3'],
-          'vendor-atomic': ['@tomic/lib', '@tomic/svelte'],
+          'vendor-atomic': ['@tomic/lib'],
           'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
           // Large components
           'novel-editor': ['@paralect/novel-svelte']

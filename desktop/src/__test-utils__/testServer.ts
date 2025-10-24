@@ -8,6 +8,17 @@ export async function startTestServer(config: any): Promise<any> {
   let nextConversationId = 1;
   let nextContextId = 1;
 
+  // Create a default conversation on startup
+  const defaultConversationId = `conv-${nextConversationId++}`;
+  conversations.set(defaultConversationId, {
+    id: defaultConversationId,
+    title: 'Default Conversation',
+    role: 'default',
+    created_at: new Date().toISOString(),
+    contexts: [], // Changed from global_context
+    messages: [],
+  });
+
   const server = createServer((req, res) => {
     const url = new URL(req.url!, `http://${req.headers.host}`);
     const method = req.method;
@@ -62,7 +73,7 @@ export async function startTestServer(config: any): Promise<any> {
               title: (requestData as any).title || 'Untitled Conversation',
               role: (requestData as any).role || 'default',
               created_at: new Date().toISOString(),
-              global_context: [],
+              contexts: [], // Changed from global_context
               messages: [],
             };
             conversations.set(conversationId, conversation);
@@ -116,7 +127,7 @@ export async function startTestServer(config: any): Promise<any> {
             };
 
             // Add to conversation's context
-            conversation.global_context.push(contextItem);
+            conversation.contexts.push(contextItem); // Changed from global_context
             conversations.set(conversationId, conversation);
 
             res.writeHead(200);
@@ -150,12 +161,12 @@ export async function startTestServer(config: any): Promise<any> {
             return;
           }
 
-          const contextIndex = conversation.global_context.findIndex((ctx: any) => ctx.id === contextId);
+          const contextIndex = conversation.contexts.findIndex((ctx: any) => ctx.id === contextId); // Changed from global_context
 
           if (method === 'DELETE') {
             if (contextIndex !== -1) {
               // Remove context
-              conversation.global_context.splice(contextIndex, 1);
+              conversation.contexts.splice(contextIndex, 1); // Changed from global_context
               conversations.set(conversationId, conversation);
 
               res.writeHead(200);
@@ -176,7 +187,7 @@ export async function startTestServer(config: any): Promise<any> {
           if (method === 'PUT') {
             if (contextIndex !== -1) {
               // Update context
-              const existingContext = conversation.global_context[contextIndex];
+              const existingContext = conversation.contexts[contextIndex]; // Changed from global_context
               const updatedContext = {
                 ...existingContext,
                 context_type: (requestData as any).context_type || existingContext.context_type,
@@ -186,7 +197,7 @@ export async function startTestServer(config: any): Promise<any> {
                 metadata: (requestData as any).metadata !== undefined ? (requestData as any).metadata : existingContext.metadata,
               };
 
-              conversation.global_context[contextIndex] = updatedContext;
+              conversation.contexts[contextIndex] = updatedContext; // Changed from global_context
               conversations.set(conversationId, conversation);
 
               res.writeHead(200);
@@ -221,10 +232,11 @@ export async function startTestServer(config: any): Promise<any> {
           error: 'Not Found',
         }));
       } catch (error) {
+        const err = error instanceof Error ? error : new Error(String(error));
         res.writeHead(500);
         res.end(JSON.stringify({
           status: 'Error',
-          error: error.message,
+          error: err.message,
         }));
       }
     });

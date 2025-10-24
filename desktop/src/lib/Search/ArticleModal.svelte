@@ -15,6 +15,12 @@
   export let kgTerm: string | null = null;
   export let kgRank: number | null = null;
 
+  type KgDocumentResponse = DocumentListResponse;
+  type ContentFormat = 'markdown' | 'html';
+
+  const toError = (error: unknown): Error =>
+    error instanceof Error ? error : new Error(String(error));
+
   let editing = false;
   let contentElement: HTMLElement;
 
@@ -24,6 +30,8 @@
   let kgTermForModal: string | null = null;
   let kgRankForModal: number | null = null;
   let loadingKg = false;
+  let isHtml = false;
+  let originalFormat: ContentFormat = 'markdown';
 
   // Set initial edit mode when modal becomes active
   $: if (active && initialEdit) {
@@ -50,12 +58,12 @@
   async function loadDocument() {
     if (!$is_tauri) return;
     try {
-      const resp: any = await invoke('get_document', { documentId: item.id });
+      const resp = await invoke<{ document?: Document }>('get_document', { documentId: item.id });
       if (resp?.document) {
         item = resp.document;
       }
-    } catch (e) {
-      console.error('Failed to load document', e);
+    } catch (error) {
+      console.error('Failed to load document', error);
     }
   }
 
@@ -67,8 +75,8 @@
     try {
       await invoke('create_document', { document: item });
       editing = false;
-    } catch (e) {
-      console.error('Failed to save document', e);
+    } catch (error) {
+      console.error('Failed to save document', error);
     }
   }
 
@@ -90,7 +98,7 @@
         console.log('  Tauri command: find_documents_for_kg_term');
         console.log('  Tauri params:', { roleName: $role, term: term });
 
-        const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
+        const response = await invoke<DocumentListResponse>('find_documents_for_kg_term', {
           roleName: $role,
           term: term
         });
@@ -101,14 +109,14 @@
         console.log('    Total:', response.total || 0);
         console.log('    Full response:', JSON.stringify(response, null, 2));
 
-        if (response.status === 'success' && response.results && response.results.length > 0) {
-          // Get the first (highest-ranked) document
-          kgDocument = response.results[0];
-          kgRankForModal = kgDocument.rank || 0;
+        const doc = response.results?.[0];
+        if (response.status === 'success' && doc) {
+          kgDocument = doc;
+          kgRankForModal = doc.rank || 0;
           console.log('  ✅ Found KG document:');
-          console.log('    Title:', kgDocument.title);
+          console.log('    Title:', doc.title);
           console.log('    Rank:', kgRankForModal);
-          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+          console.log('    Body length:', doc.body?.length || 0, 'characters');
           showKgModal = true;
         } else {
           console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
@@ -143,21 +151,21 @@
           throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
         }
 
-        const data = await response.json();
+        const data: KgDocumentResponse = await response.json();
         console.log('  📄 Response data:');
         console.log('    Status:', data.status);
         console.log('    Results count:', data.results?.length || 0);
         console.log('    Total:', data.total || 0);
         console.log('    Full response:', JSON.stringify(data, null, 2));
 
-        if (data.status === 'success' && data.results && data.results.length > 0) {
-          // Get the first (highest-ranked) document
-          kgDocument = data.results[0];
-          kgRankForModal = kgDocument.rank || 0;
+        const doc = data.results?.[0];
+        if (data.status === 'success' && doc) {
+          kgDocument = doc;
+          kgRankForModal = doc.rank || 0;
           console.log('  ✅ Found KG document:');
-          console.log('    Title:', kgDocument.title);
+          console.log('    Title:', doc.title);
           console.log('    Rank:', kgRankForModal);
-          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+          console.log('    Body length:', doc.body?.length || 0, 'characters');
           showKgModal = true;
         } else {
           console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
@@ -170,9 +178,10 @@
         }
       }
     } catch (error) {
+      const err = toError(error);
       console.error('❌ Error fetching KG document:');
-      console.error('  Error type:', error.constructor.name);
-      console.error('  Error message:', error.message || error);
+      console.error('  Error type:', err.constructor.name);
+      console.error('  Error message:', err.message);
       console.error('  Request details:', {
         term,
         role: $role,
@@ -180,7 +189,7 @@
         timestamp: new Date().toISOString()
       });
 
-      if (!$is_tauri && error.message?.includes('Failed to fetch')) {
+      if (!$is_tauri && err.message.includes('Failed to fetch')) {
         console.error('  💡 Network error suggestions:');
         console.error('    1. Check if server is running on expected port');
         console.error('    2. Check CORS configuration');
@@ -194,17 +203,22 @@
   }
 
   // Handle clicks on KG links (kg: protocol)
-  function handleContentClick(event: MouseEvent) {
-    const target = event.target as HTMLElement;
+  function handleContentInteraction(event: MouseEvent | KeyboardEvent) {
+    const target = event.target as HTMLElement | null;
+    const anchor = target?.closest('a');
+    const href = anchor?.getAttribute('href');
+    if (!href || !href.startsWith('kg:')) {
+      return;
+    }
 
-    // Check if the clicked element is a link with kg: protocol
-    if (target.tagName === 'A') {
-      const href = target.getAttribute('href');
-      if (href && href.startsWith('kg:')) {
-        event.preventDefault();
-        const term = href.substring(3); // Remove 'kg:' prefix
-        handleKgClick(term);
-      }
+    event.preventDefault();
+    const term = href.substring(3);
+    handleKgClick(term);
+  }
+
+  function handleContentKeyDown(event: KeyboardEvent) {
+    if (event.key === 'Enter' || event.key === ' ') {
+      handleContentInteraction(event);
     }
   }
 
@@ -277,7 +291,7 @@
         bind:this={contentElement}
         on:dblclick={handleDoubleClick}
         on:keydown={handleKeyDown}
-        on:click={handleContentClick}
+        on:click={handleContentInteraction}
         tabindex="0"
         role="button"
         aria-label="Double-click to edit article content"
@@ -319,8 +333,8 @@
 
       <div
         class="content-viewer"
-        on:click={handleContentClick}
-        on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleContentClick(e)}
+        on:click={handleContentInteraction}
+        on:keydown={handleContentKeyDown}
         tabindex="0"
         role="button"
         aria-label="KG document content - click KG links to explore further"

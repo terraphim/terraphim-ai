@@ -1,3 +1,4 @@
+// @ts-nocheck
 // import type {
 //     PostMessage,
 //     PostMessageDataRequest,
@@ -51,4 +52,5 @@ import { onMount } from 'svelte';
 //     get()
 
 //     return [data, loading, error, get]
-}
+
+export {};

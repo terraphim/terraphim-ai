@@ -218,7 +218,8 @@
         active = false;
       }, 2000);
 
-    } catch (err) {
+    } catch (error) {
+      const err = error instanceof Error ? error : new Error(String(error));
       console.error('❌ Failed to save article to atomic server:', err);
       error = err.message || 'Failed to save article to atomic server';
     } finally {
@@ -309,11 +310,7 @@
                 {#each atomicHaystacks as haystack}
                   <option value={haystack.location}>
                     {haystack.location}
-                    {#if haystack.atomic_server_secret}
-                      <span class="has-text-success">🔐</span>
-                    {:else}
-                      <span class="has-text-warning">⚠️ No Auth</span>
-                    {/if}
+                    {haystack.atomic_server_secret ? ' 🔐' : ' ⚠️ No Auth'}
                   </option>
                 {/each}
               </select>

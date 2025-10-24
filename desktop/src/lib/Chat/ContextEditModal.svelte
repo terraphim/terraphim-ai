@@ -1,7 +1,7 @@
 <script lang="ts">
   import { Modal } from "svelma";
   import { createEventDispatcher } from 'svelte';
-  import type { ContextItem } from './Chat.svelte';
+  import type { ContextItem, ContextMetadata } from './types';
 
   export let active: boolean = false;
   export let context: ContextItem | null = null;
@@ -10,7 +10,56 @@
   const dispatch = createEventDispatcher();
 
   // Form data
-  let editingContext: ContextItem | null = null;
+  type EditableContext = ContextItem & { metadata: ContextMetadata };
+
+  let editingContext: EditableContext | null = null;
+  
+  // Form state variables
+  let contextType = 'UserInput';
+  let title = '';
+  let summary = '';
+  let content = '';
+  
+  // Update form values when editingContext changes
+  $: if (editingContext) {
+    contextType = editingContext.context_type || 'UserInput';
+    title = editingContext.title || '';
+    summary = editingContext.summary || '';
+    content = editingContext.content || '';
+  }
+  
+  // Event handlers to update editingContext
+  function updateContextType(event: Event) {
+    const target = event.target as HTMLSelectElement;
+    contextType = target.value;
+    if (editingContext) {
+      editingContext.context_type = contextType;
+    }
+  }
+  
+  function updateTitle(event: Event) {
+    const target = event.target as HTMLInputElement;
+    title = target.value;
+    if (editingContext) {
+      editingContext.title = title;
+    }
+  }
+  
+  function updateSummary(event: Event) {
+    const target = event.target as HTMLTextAreaElement;
+    summary = target.value;
+    if (editingContext) {
+      editingContext.summary = summary;
+    }
+  }
+  
+  function updateContent(event: Event) {
+    const target = event.target as HTMLTextAreaElement;
+    content = target.value;
+    if (editingContext) {
+      editingContext.content = content;
+    }
+  }
   let contextTypeOptions = [
     { value: 'Document', label: 'Document' },
     { value: 'SearchResult', label: 'Search Result' },
@@ -20,30 +69,32 @@
   ];
 
   // Initialize form data when modal becomes active
-  $: if (active && context) {
-    editingContext = {
-      ...context,
-      // Ensure we have a proper copy
-      metadata: { ...context.metadata }
-    };
-  } else if (active && mode === 'create') {
-    // Initialize new context item
-    editingContext = {
-      id: '',
-      context_type: 'UserInput',
-      title: '',
-      summary: '',
-      content: '',
-      metadata: {},
-      created_at: new Date().toISOString(),
-      relevance_score: null
-    };
+  $: if (active) {
+    if (context) {
+      editingContext = {
+        ...context,
+        metadata: { ...(context.metadata ?? {}) }
+      };
+    } else if (mode === 'create') {
+      editingContext = {
+        id: '',
+        context_type: 'UserInput',
+        title: '',
+        summary: '',
+        content: '',
+        metadata: {},
+        created_at: new Date().toISOString(),
+        relevance_score: undefined
+      };
+    }
+  } else {
+    editingContext = null;
   }
 
   // Validation
   $: isValid = editingContext &&
-    editingContext.title.trim() !== '' &&
-    editingContext.content.trim() !== '';
+    title.trim() !== '' &&
+    content.trim() !== '';
 
   function handleClose() {
     active = false;
@@ -61,6 +112,49 @@
     }
 
     handleClose();
+  }
+
+  function handleMetadataInput(key: string, value: string) {
+    if (!editingContext) return;
+    const metadata: ContextMetadata = { ...editingContext.metadata };
+    metadata[key] = value;
+    editingContext = { ...editingContext, metadata };
+  }
+
+  function handleMetadataKeyInput(event: Event, originalKey: string, currentValue: string) {
+    if (!editingContext) return;
+    const target = event.target as HTMLInputElement | null;
+    if (!target) return;
+    const newKey = target.value;
+    const metadata: ContextMetadata = { ...editingContext.metadata };
+    delete metadata[originalKey];
+    metadata[newKey] = currentValue;
+    editingContext = { ...editingContext, metadata };
+  }
+
+  function handleMetadataValueInput(event: Event, key: string) {
+    if (!editingContext) return;
+    const target = event.target as HTMLInputElement | null;
+    if (!target) return;
+    handleMetadataInput(key, target.value);
+  }
+
+  function removeMetadataEntry(key: string) {
+    if (!editingContext) return;
+    const metadata: ContextMetadata = { ...editingContext.metadata };
+    delete metadata[key];
+    editingContext = { ...editingContext, metadata };
+  }
+
+  function addMetadataEntry() {
+    if (!editingContext) return;
+    editingContext = {
+      ...editingContext,
+      metadata: {
+        ...editingContext.metadata,
+        [`key_${Date.now()}`]: ''
+      }
+    };
   }
 
   function handleDelete() {
@@ -100,7 +194,8 @@
             <div class="select is-fullwidth">
               <select
                 id="context-type"
-                bind:value={editingContext.context_type}
+                bind:value={contextType}
+                on:change={updateContextType}
                 data-testid="context-type-select"
               >
                 {#each contextTypeOptions as option}
@@ -120,12 +215,13 @@
               class="input"
               type="text"
               placeholder="Enter title..."
-              bind:value={editingContext.title}
+              bind:value={title}
+              on:input={updateTitle}
               data-testid="context-title-input"
               required
             >
           </div>
-          {#if editingContext.title.trim() === ''}
+          {#if title.trim() === ''}
             <p class="help is-danger">Title is required</p>
           {/if}
         </div>
@@ -138,15 +234,16 @@
               id="context-summary"
               class="textarea"
               placeholder="Brief summary of the content (optional)..."
-              bind:value={editingContext.summary}
+              bind:value={summary}
+              on:input={updateSummary}
               data-testid="context-summary-textarea"
               rows="3"
               maxlength="500"
             ></textarea>
           </div>
           <p class="help">
-            {#if editingContext.summary}
-              {editingContext.summary.length}/500 characters
+            {#if summary}
+              {summary.length}/500 characters
             {:else}
               Optional brief summary (up to 500 characters)
             {/if}
@@ -161,13 +258,14 @@
               id="context-content"
               class="textarea"
               placeholder="Enter the full content..."
-              bind:value={editingContext.content}
+              bind:value={content}
+              on:input={updateContent}
               data-testid="context-content-textarea"
               rows="8"
               required
             ></textarea>
           </div>
-          {#if editingContext.content.trim() === ''}
+          {#if content.trim() === ''}
             <p class="help is-danger">Content is required</p>
           {/if}
         </div>
@@ -184,14 +282,14 @@
           </summary>
 
           <div class="field mt-4">
-            <label class="label">Metadata</label>
+            <p class="label">Metadata</p>
             <div class="content">
               <p class="help">Additional key-value pairs for this context item</p>
 
-              {#if Object.keys(editingContext.metadata).length === 0}
+              {#if Object.keys(editingContext?.metadata || {}).length === 0}
                 <p class="has-text-grey-light">No metadata defined</p>
               {:else}
-                {#each Object.entries(editingContext.metadata) as [key, value], index}
+                {#each Object.entries(editingContext?.metadata || {}) as [key, value], index}
                   <div class="field is-grouped">
                     <div class="control is-expanded">
                       <input
@@ -199,12 +297,7 @@
                         type="text"
                         placeholder="Key"
                         value={key}
-                        on:input={(e) => {
-                          const newMetadata = { ...editingContext.metadata };
-                          delete newMetadata[key];
-                          newMetadata[e.target.value] = value;
-                          editingContext.metadata = newMetadata;
-                        }}
+                        on:input={(event) => handleMetadataKeyInput(event, key, value)}
                       >
                     </div>
                     <div class="control is-expanded">
@@ -212,17 +305,15 @@
                         class="input is-small"
                         type="text"
                         placeholder="Value"
-                        bind:value={editingContext.metadata[key]}
+                        value={editingContext?.metadata?.[key] || ''}
+                        on:input={(event) => handleMetadataValueInput(event, key)}
                       >
                     </div>
                     <div class="control">
                       <button
                         class="button is-small is-danger is-outlined"
-                        on:click={() => {
-                          const newMetadata = { ...editingContext.metadata };
-                          delete newMetadata[key];
-                          editingContext.metadata = newMetadata;
-                        }}
+                        aria-label="Remove metadata entry"
+                        on:click={() => removeMetadataEntry(key)}
                       >
                         <span class="icon">
                           <i class="fas fa-times"></i>
@@ -235,12 +326,7 @@
 
               <button
                 class="button is-small is-light"
-                on:click={() => {
-                  editingContext.metadata = {
-                    ...editingContext.metadata,
-                    [`key_${Date.now()}`]: ''
-                  };
-                }}
+                on:click={addMetadataEntry}
               >
                 <span class="icon">
                   <i class="fas fa-plus"></i>

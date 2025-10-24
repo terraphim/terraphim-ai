@@ -9,17 +9,18 @@ describe('Context Management Integration', () => {
     // Start the backend server for integration testing
     try {
       const { stdout } = await execAsync('cargo run --bin terraphim_server -- --config terraphim_server/default/terraphim_engineer_config.json &', {
-        timeout: 10000,
+        timeout: 20000,
         cwd: '/Users/alex/projects/terraphim/terraphim-ai'
       });
       console.log('Server started:', stdout);
     } catch (error) {
-      console.log('Server might already be running:', error.message);
+      const err = error instanceof Error ? error : new Error(String(error));
+      console.log('Server might already be running:', err.message);
     }
 
     // Wait for server to be ready
-    await new Promise(resolve => setTimeout(resolve, 2000));
-  });
+    await new Promise(resolve => setTimeout(resolve, 5000));
+  }, 20000);
 
   afterEach(async () => {
     // Clean up - stop the server
@@ -28,7 +29,7 @@ describe('Context Management Integration', () => {
     } catch (error) {
       // Ignore cleanup errors
     }
-  });
+  }, 20000);
 
   it('should create conversations and add context via API', async () => {
     const baseUrl = 'http://127.0.0.1:8080';

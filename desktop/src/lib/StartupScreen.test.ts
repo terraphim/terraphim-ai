@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte/svelte5';
 import { describe, it, expect, vi } from 'vitest';
 import StartupScreen from './StartupScreen.svelte';
 

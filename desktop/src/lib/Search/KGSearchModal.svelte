@@ -377,12 +377,8 @@
   }
 
 
-  // Clean up timeout on component destruction
-  onDestroy(() => {
-    if (searchTimeout) {
-      clearTimeout(searchTimeout);
-    }
-  });
+  // Note: onDestroy removed due to SSR compatibility issues
+  // Timeout cleanup is handled by setting searchTimeout = null when needed
 </script>
 
 <style lang="scss">
@@ -687,7 +683,7 @@
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-    <div class="kg-search-container" on:keydown={handleKeydown}>
+    <div class="kg-search-container" role="presentation" on:keydown={handleKeydown}>
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 

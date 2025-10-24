@@ -448,14 +448,14 @@ async function fetchLlmModels(roleIdx: number) {
 
   {#if saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
-      <button class="delete" on:click={() => saveStatus = ''}></button>
+      <button class="delete" aria-label="Dismiss success notification" on:click={() => saveStatus = ''}></button>
       Configuration saved successfully!
     </div>
   {/if}
 
   {#if saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
-      <button class="delete" on:click={() => saveStatus = ''}></button>
+      <button class="delete" aria-label="Dismiss error notification" on:click={() => saveStatus = ''}></button>
       Failed to save configuration. Please try again.
     </div>
   {/if}
@@ -622,7 +622,7 @@ async function fetchLlmModels(roleIdx: number) {
             <!-- Extra Parameters (only for Ripgrep service) -->
             {#if $draft.roles[idx].haystacks[hIdx].service === "Ripgrep"}
               <div class="field">
-                <label class="label">Extra Parameters (for filtering)</label>
+                <p class="label">Extra Parameters (for filtering)</p>
                 <!-- Dedicated Hashtag field mapped to extra_parameters.tag -->
                 <div class="field is-grouped">
                   <div class="control">
@@ -881,7 +881,13 @@ async function fetchLlmModels(roleIdx: number) {
             <div class="field">
               <label class="label" for={`openrouter-chat-system-${idx}`}>System Prompt (optional)</label>
               <div class="control">
-                <textarea class="textarea" id={`openrouter-chat-system-${idx}`} rows="3" placeholder="You are a helpful Rust engineer assistant..." bind:value={$draft.roles[idx].openrouter_chat_system_prompt} />
+                <textarea
+                  class="textarea"
+                  id={`openrouter-chat-system-${idx}`}
+                  rows="3"
+                  placeholder="You are a helpful Rust engineer assistant..."
+                  bind:value={$draft.roles[idx].openrouter_chat_system_prompt}
+                ></textarea>
               </div>
             </div>
           {/if}
