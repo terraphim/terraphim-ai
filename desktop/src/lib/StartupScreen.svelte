@@ -16,6 +16,8 @@
   let globalShortcut = "CmdOrControl+X";
   let error = "";
   let isCapturingShortcut = false;
+  const toError = (err: unknown): Error =>
+    err instanceof Error ? err : new Error(String(err));
 
   async function selectFolder() {
     try {
@@ -32,8 +34,9 @@
         error = "No folder selected or invalid selection";
       }
     } catch (err) {
-      console.error("Failed to open folder selector:", err);
-      error = `Failed to open folder selector: ${err.message}`;
+      const errorObj = toError(err);
+      console.error("Failed to open folder selector:", errorObj);
+      error = `Failed to open folder selector: ${errorObj.message}`;
     }
   }
 
@@ -42,7 +45,7 @@
     globalShortcut = "Press your desired shortcut...";
   }
 
-  function handleKeyDown(event) {
+  function handleKeyDown(event: KeyboardEvent) {
     if (!isCapturingShortcut) return;
 
     event.preventDefault();
@@ -64,14 +67,15 @@
   async function saveSettings() {
     // Register the global shortcut
     try {
-      await registerShortcut(globalShortcut, () => {
-        if (appWindow.isVisible()) {
-          appWindow.hide();
+      await registerShortcut(globalShortcut, async () => {
+        if (await appWindow.isVisible()) {
+          await appWindow.hide();
         }
       });
       console.log(`Global shortcut ${globalShortcut} registered successfully`);
     } catch (err) {
-      error = `Failed to register global shortcut: ${err.message}`;
+      const message = err instanceof Error ? err.message : String(err);
+      error = `Failed to register global shortcut: ${message}`;
       console.error("Failed to register global shortcut:", err);
       return;
     }

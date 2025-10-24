@@ -18,6 +18,16 @@
 		}
 	}
 
+	// Make isVisible reactive to path changes
+	$: {
+		try {
+			const path = window.location?.pathname || '/';
+			isVisible = !hideOnPaths.includes(path);
+		} catch (_) {
+			isVisible = true;
+		}
+	}
+
 	function goBack() {
 		// Try to go back in browser history, fallback to specified path
 		if (window.history.length > 1) {

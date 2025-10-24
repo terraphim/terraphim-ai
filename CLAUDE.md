@@ -69,10 +69,17 @@ Throughout all user interactions, maintain three key files:
 - **lessons-learned.md**: Knowledge retention and technical insights
 - **scratchpad.md**: Active task management and current work
 
+### Documentation Organization
+
+All project documentation is organized in the `.docs/` folder:
+- **Individual File Summaries**: `.docs/summary-<normalized-path>.md` - Detailed summaries of each working file
+- **Comprehensive Overview**: `.docs/summary.md` - Consolidated project overview and architecture analysis
+- **Agent Instructions**: `.docs/agents_instructions.json` - Machine-readable agent configuration and workflows
+
 ### Consolidated Agent Instructions
 
 For comprehensive project knowledge, patterns, and best practices, refer to:
-- **agents_instructions.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
+- **.docs/agents_instructions.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
   - Contains project context, status, and active features
   - Critical lessons on deployment patterns, UI development, security, Rust development, and TruthForge
   - Complete architecture overview with all crates and components
@@ -81,6 +88,36 @@ For comprehensive project knowledge, patterns, and best practices, refer to:
   - Common patterns for extending the system
   - Troubleshooting guide and recent achievements
   - Use this as your primary reference for understanding project patterns and established practices
+
+### Documentation Organization
+
+All project documentation is organized in the `.docs/` folder:
+- **Individual File Summaries**: `.docs/summary-<normalized-path>.md` - Detailed summaries of each working file
+- **Comprehensive Overview**: `.docs/summary.md` - Consolidated project overview and architecture analysis
+- **Agent Instructions**: `.docs/agents_instructions.json` - Machine-readable agent configuration and workflows
+
+### Mandatory /init Command Steps
+
+When user executes `/init` command, you MUST perform these two steps in order:
+
+#### Step 1: Summarize Working Files
+Can you summarize the working files? Save each file's summary in `.docs/summary-<normalized-path>.md`
+
+- Identify all relevant working files in the project
+- Create individual summaries for each file
+- Save summaries using the pattern: `.docs/summary-<normalized-path>.md`
+- Include file purpose, key functionality, and important details
+- Normalize file paths (replace slashes with hyphens, remove special characters)
+
+#### Step 2: Create Comprehensive Summary
+Can you summarize your context files ".docs/summary-*.md" and save the result in `.docs/summary.md`
+- Read all individual summary files created in Step 1
+- Synthesize into a comprehensive project overview
+- Include architecture, security, testing, and business value analysis
+- Save the consolidated summary as `.docs/summary.md`
+- Update any relevant documentation references
+
+Both steps are MANDATORY for every `/init` command execution.
 
 ## Agent Systems Integration
 

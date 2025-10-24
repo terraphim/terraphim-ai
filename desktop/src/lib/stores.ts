@@ -57,6 +57,14 @@ export type ConversationStatistics = {
   conversations_by_role: Record<string, number>;
 };
 
+export type ContextItem = {
+  id: string;
+  title: string;
+  content: string;
+  context_type: string;
+  // Add other fields from your type definition if necessary
+};
+
 // Store for persistent conversations list
 const persistentConversations = writable<ConversationSummary[]>([]);
 
@@ -73,6 +81,9 @@ const conversationStatistics = writable<ConversationStatistics>({
 // Store for showing/hiding session list panel
 const showSessionList = writable<boolean>(false);
 
+// Store for the contexts of the currently active conversation
+const contexts = writable<ContextItem[]>([]);
+
 export {
   configStore,
   input,
@@ -87,5 +98,6 @@ export {
   persistentConversations,
   currentPersistentConversationId,
   conversationStatistics,
-  showSessionList
+  showSessionList,
+  contexts
 };

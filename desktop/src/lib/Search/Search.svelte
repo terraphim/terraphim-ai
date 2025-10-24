@@ -68,7 +68,7 @@
   // Reactive statement to parse input and update chips when user types
   // Only parse when input contains operators to avoid constant parsing
   // Add a small delay to prevent aggressive parsing during autocomplete
-  let parseTimeout: number | null = null;
+  let parseTimeout: ReturnType<typeof setTimeout> | null = null;
   $: if ($input && !isUpdatingFromChips && ($input.includes(' AND ') || $input.includes(' OR ') || $input.includes(' and ') || $input.includes(' or '))) {
     if (parseTimeout) {
       clearTimeout(parseTimeout);
@@ -88,17 +88,19 @@
   onDestroy(() => {
     if (parseTimeout) {
       clearTimeout(parseTimeout);
+      parseTimeout = null;
     }
     if (sseConnection) {
       sseConnection.close();
       sseConnection = null;
     }
-    stopPollingForSummaries();
+    stopPollingForSummaries?.();
   });
 
 
   // SSE connection management
   function startSummarizationStreaming() {
+    if (typeof window === 'undefined') return; // Skip in SSR
     if ($is_tauri) {
       // For Tauri, use polling instead of SSE
       startPollingForSummaries();
@@ -148,7 +150,7 @@
   }
 
   // Polling fallback for Tauri (since EventSource isn't supported)
-  let pollingInterval: number | null = null;
+  let pollingInterval: ReturnType<typeof setInterval> | null = null;
 
   function startPollingForSummaries() {
     console.log('Starting polling for summary updates (Tauri mode)');
@@ -537,6 +539,9 @@
 
   async function handleSearchInputEvent() {
     error = null; // Clear previous errors
+    const startTime = Date.now();
+
+    console.time('🔍 Search API Request');
 
     if ($is_tauri) {
       if (!$input.trim()) return; // Skip if input is empty
@@ -550,16 +555,20 @@
         });
         if (response.status === "success") {
           results = response.results;
+          console.timeEnd('🔍 Search API Request');
+          console.log(`✅ Tauri search completed in ${Date.now() - startTime}ms`);
           console.log("Response results");
           console.log(results);
           saveSearchState();
           // Start SSE streaming for summarization updates (Tauri doesn't support SSE)
           // SSE will be available when using web interface
         } else {
+          console.timeEnd('🔍 Search API Request');
           error = `Search failed: ${response.status}`;
           console.error("Search failed:", response);
         }
       } catch (e) {
+        console.timeEnd('🔍 Search API Request');
         error = `Error in Tauri search: ${e}`;
         console.error("Error in Tauri search:", e);
       }
@@ -585,11 +594,15 @@
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
         results = data.results;
+        console.timeEnd('🔍 Search API Request');
+        console.log(`✅ Web search completed in ${Date.now() - startTime}ms`);
+        console.log(`📊 Results: ${data.results.length} documents`);
         saveSearchState();
 
         // Start SSE streaming for real-time summarization updates
         startSummarizationStreaming();
       } catch (err) {
+        console.timeEnd('🔍 Search API Request');
         console.error("Error fetching data:", err);
         error = `Error fetching data: ${err}`;
       }

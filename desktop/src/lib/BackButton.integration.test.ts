@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte/svelte5';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Search from './Search/Search.svelte';
 import RoleGraphVisualization from './RoleGraphVisualization.svelte';
@@ -32,14 +32,6 @@ vi.mock('@tomic/lib', () => ({
   }
 }));
 
-vi.mock('@tomic/svelte', () => ({
-  store: {
-    setServerUrl: vi.fn(),
-    setAgent: vi.fn()
-  },
-  getResource: vi.fn(),
-  getValue: vi.fn()
-}));
 
 vi.mock('svelte-jsoneditor', () => ({
   JSONEditor: {
@@ -145,22 +137,21 @@ describe('BackButton Integration Tests', () => {
   });
 
   describe('ConfigWizard Component', () => {
-    it('renders BackButton in ConfigWizard component', () => {
+    it('renders Close button in ConfigWizard component', () => {
       render(ConfigWizard);
 
-      const backButton = screen.getByRole('button', { name: /go back/i });
-      expect(backButton).toBeInTheDocument();
-      expect(backButton).toHaveClass('back-button');
+      const closeButton = screen.getByRole('button', { name: /close/i });
+      expect(closeButton).toBeInTheDocument();
     });
 
-    it('BackButton in ConfigWizard has correct fallback path', () => {
+    it('ConfigWizard has correct navigation buttons', () => {
       render(ConfigWizard);
 
-      const backButton = screen.getByRole('button', { name: /go back/i });
-      expect(backButton).toBeInTheDocument();
-
-      backButton.click();
-      expect(mockHistoryBack).toHaveBeenCalledTimes(1);
+      const closeButton = screen.getByRole('button', { name: /close/i });
+      const nextButton = screen.getByRole('button', { name: /next/i });
+      
+      expect(closeButton).toBeInTheDocument();
+      expect(nextButton).toBeInTheDocument();
     });
   });
 

@@ -1278,7 +1278,9 @@ pub enum ContextUsageType {
 
 /// Priority level for routing rules and decisions
 /// Higher numeric values indicate higher priority
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, JsonSchema, Default)]
+#[derive(
+    Debug, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, JsonSchema, Default,
+)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Priority(pub u8);
@@ -1311,16 +1313,16 @@ impl Priority {
 
     /// Maximum priority value
     pub const MAX: Self = Self(100);
-    
+
     /// High priority (default for fast/expensive rules)
     pub const HIGH: Self = Self(80);
-    
+
     /// Medium priority (default for standard rules)
     pub const MEDIUM: Self = Self(50);
-    
+
     /// Low priority (default for fallback rules)
     pub const LOW: Self = Self(20);
-    
+
     /// Minimum priority value
     pub const MIN: Self = Self(0);
 }
@@ -1350,34 +1352,34 @@ impl From<i32> for Priority {
 pub struct RoutingRule {
     /// Unique identifier for this rule
     pub id: String,
-    
+
     /// Name of the rule (human-readable)
     pub name: String,
-    
+
     /// Pattern to match (can be regex, exact string, or concept name)
     pub pattern: String,
-    
+
     /// Priority of this rule (higher = more important)
     pub priority: Priority,
-    
+
     /// Provider to route to when this rule matches
     pub provider: String,
-    
+
     /// Model to use when this rule matches
     pub model: String,
-    
+
     /// Optional description of when this rule applies
     pub description: Option<String>,
-    
+
     /// Tags for categorizing rules
     pub tags: Vec<String>,
-    
+
     /// Whether this rule is enabled
     pub enabled: bool,
-    
+
     /// When this rule was created
     pub created_at: chrono::DateTime<chrono::Utc>,
-    
+
     /// When this rule was last updated
     pub updated_at: chrono::DateTime<chrono::Utc>,
 }
@@ -1450,22 +1452,22 @@ impl RoutingRule {
 pub struct PatternMatch {
     /// The concept that was matched
     pub concept: String,
-    
+
     /// Provider to route to
     pub provider: String,
-    
+
     /// Model to use
     pub model: String,
-    
+
     /// Match score (0.0 to 1.0)
     pub score: f64,
-    
+
     /// Priority of the matched rule
     pub priority: Priority,
-    
+
     /// Combined weighted score (score * priority_factor)
     pub weighted_score: f64,
-    
+
     /// The rule that was matched
     pub rule_id: String,
 }
@@ -1482,7 +1484,7 @@ impl PatternMatch {
     ) -> Self {
         let priority_factor = priority.value() as f64 / 100.0;
         let weighted_score = score * priority_factor;
-        
+
         Self {
             concept,
             provider,
@@ -1495,12 +1497,7 @@ impl PatternMatch {
     }
 
     /// Create a simple pattern match with default priority
-    pub fn simple(
-        concept: String,
-        provider: String,
-        model: String,
-        score: f64,
-    ) -> Self {
+    pub fn simple(concept: String, provider: String, model: String, score: f64) -> Self {
         Self::new(
             concept,
             provider,
@@ -1519,22 +1516,22 @@ impl PatternMatch {
 pub struct RoutingDecision {
     /// Provider to route to
     pub provider: String,
-    
+
     /// Model to use
     pub model: String,
-    
+
     /// The scenario that was matched
     pub scenario: RoutingScenario,
-    
+
     /// Priority of this decision
     pub priority: Priority,
-    
+
     /// Confidence score (0.0 to 1.0)
     pub confidence: f64,
-    
+
     /// The rule that led to this decision (if any)
     pub rule_id: Option<String>,
-    
+
     /// Reason for this decision
     pub reason: String,
 }
@@ -1602,35 +1599,35 @@ pub enum RoutingScenario {
     /// Default routing scenario
     #[serde(rename = "default")]
     Default,
-    
+
     /// Background processing (low priority, cost-optimized)
     #[serde(rename = "background")]
     Background,
-    
+
     /// Thinking/reasoning tasks (high quality)
     #[serde(rename = "think")]
     Think,
-    
+
     /// Long context tasks
     #[serde(rename = "long_context")]
     LongContext,
-    
+
     /// Web search required
     #[serde(rename = "web_search")]
     WebSearch,
-    
+
     /// Image processing required
     #[serde(rename = "image")]
     Image,
-    
+
     /// Pattern-based routing with concept name
     #[serde(rename = "pattern")]
     Pattern(String),
-    
+
     /// Priority-based routing
     #[serde(rename = "priority")]
     Priority,
-    
+
     /// Custom scenario
     #[serde(rename = "custom")]
     Custom(String),
@@ -1904,7 +1901,10 @@ mod tests {
         assert_eq!(rule.priority, Priority::HIGH);
         assert_eq!(rule.provider, "openai");
         assert_eq!(rule.model, "gpt-4");
-        assert_eq!(rule.description, Some("A test rule for unit testing".to_string()));
+        assert_eq!(
+            rule.description,
+            Some("A test rule for unit testing".to_string())
+        );
         assert_eq!(rule.tags, vec!["test", "example"]);
         assert!(rule.enabled);
     }
@@ -1942,7 +1942,7 @@ mod tests {
         assert_eq!(pattern_match.score, 0.95);
         assert_eq!(pattern_match.priority, Priority::HIGH);
         assert_eq!(pattern_match.rule_id, "ml-rule");
-        
+
         // Weighted score should be score * priority_factor
         assert_eq!(pattern_match.weighted_score, 0.95 * 0.8);
     }
@@ -1994,7 +1994,10 @@ mod tests {
         );
 
         assert_eq!(decision.rule_id, Some("web-rule".to_string()));
-        assert_eq!(decision.scenario, RoutingScenario::Pattern("web-search".to_string()));
+        assert_eq!(
+            decision.scenario,
+            RoutingScenario::Pattern("web-search".to_string())
+        );
     }
 
     #[test]
@@ -2034,8 +2037,14 @@ mod tests {
     fn test_routing_scenario_display() {
         assert_eq!(format!("{}", RoutingScenario::Default), "default");
         assert_eq!(format!("{}", RoutingScenario::Think), "think");
-        assert_eq!(format!("{}", RoutingScenario::Pattern("ml".to_string())), "pattern:ml");
-        assert_eq!(format!("{}", RoutingScenario::Custom("test".to_string())), "custom:test");
+        assert_eq!(
+            format!("{}", RoutingScenario::Pattern("ml".to_string())),
+            "pattern:ml"
+        );
+        assert_eq!(
+            format!("{}", RoutingScenario::Custom("test".to_string())),
+            "custom:test"
+        );
     }
 
     #[test]
