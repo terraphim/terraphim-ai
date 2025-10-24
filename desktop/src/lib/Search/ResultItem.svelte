@@ -583,7 +583,7 @@ async function addToContext() {
 		if ($is_tauri) {
 			// First, try to get or create a conversation
 			try {
-				const conversations = await invoke('list_conversations') as ConversationsResponse;
+				const conversations = (await invoke('list_conversations')) as ConversationsResponse;
 				console.log('📋 Available conversations:', conversations);
 
 				// Find an existing conversation or use the first one
@@ -592,10 +592,10 @@ async function addToContext() {
 					console.log('🎯 Using existing conversation:', conversationId);
 				} else {
 					// Create a new conversation
-					const newConv = await invoke('create_conversation', {
+					const newConv = (await invoke('create_conversation', {
 						title: 'Search Context',
 						role: $role || 'default',
-					}) as CreateConversationResponse;
+					})) as CreateConversationResponse;
 					if (newConv.status === 'success' && newConv.conversation_id) {
 						conversationId = newConv.conversation_id;
 						console.log('🆕 Created new conversation:', conversationId);
@@ -617,7 +617,8 @@ async function addToContext() {
 			};
 
 			if (enhancedItem.url) metadata.url = enhancedItem.url;
-			if (enhancedItem.tags && enhancedItem.tags.length > 0) metadata.tags = enhancedItem.tags.join(', ');
+			if (enhancedItem.tags && enhancedItem.tags.length > 0)
+				metadata.tags = enhancedItem.tags.join(', ');
 			if (enhancedItem.rank !== undefined) metadata.rank = enhancedItem.rank.toString();
 
 			const contextResult = await invoke('add_context_to_conversation', {
@@ -777,7 +778,7 @@ async function addToContextAndChat() {
 		if ($is_tauri) {
 			// First, try to get or create a conversation
 			try {
-				const conversations = await invoke('list_conversations') as ConversationsResponse;
+				const conversations = (await invoke('list_conversations')) as ConversationsResponse;
 				console.log('📋 Available conversations:', conversations);
 
 				// Find an existing conversation or use the first one
@@ -786,10 +787,10 @@ async function addToContextAndChat() {
 					console.log('🎯 Using existing conversation:', conversationId);
 				} else {
 					// Create a new conversation
-					const newConv = await invoke('create_conversation', {
+					const newConv = (await invoke('create_conversation', {
 						title: 'Chat with Documents',
 						role: $role || 'default',
-					}) as CreateConversationResponse;
+					})) as CreateConversationResponse;
 					if (newConv.status === 'success' && newConv.conversation_id) {
 						conversationId = newConv.conversation_id;
 						console.log('🆕 Created new conversation:', conversationId);
@@ -811,7 +812,8 @@ async function addToContextAndChat() {
 			};
 
 			if (enhancedItem.url) metadata.url = enhancedItem.url;
-			if (enhancedItem.tags && enhancedItem.tags.length > 0) metadata.tags = enhancedItem.tags.join(', ');
+			if (enhancedItem.tags && enhancedItem.tags.length > 0)
+				metadata.tags = enhancedItem.tags.join(', ');
 			if (enhancedItem.rank !== undefined) metadata.rank = enhancedItem.rank.toString();
 
 			const contextResult = await invoke('add_context_to_conversation', {

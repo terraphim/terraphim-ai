@@ -59,7 +59,7 @@ function updateStoresFromConfig(config: ConfigResponse['config']) {
 	// Update roles store
 	const roleArray = Object.entries(config.roles).map(([key, value]) => ({
 		...value,
-		name: key
+		name: key,
 	}));
 	roles.set(roleArray);
 
@@ -86,9 +86,9 @@ export async function saveConfig(config: any) {
 			const response = await fetch(`${CONFIG.ServerURL}/config`, {
 				method: 'POST',
 				headers: {
-					'Content-Type': 'application/json'
+					'Content-Type': 'application/json',
 				},
-				body: JSON.stringify(config)
+				body: JSON.stringify(config),
 			});
 			const data = await response.json();
 			console.log('save config API response', data);
@@ -104,8 +104,9 @@ export async function saveConfig(config: any) {
 export function switchTheme(newTheme: string) {
 	theme.set(newTheme);
 	if ($is_tauri) {
-		invoke('set_theme', { theme: newTheme })
-			.catch(err => console.error('Error setting theme:', err));
+		invoke('set_theme', { theme: newTheme }).catch((err) =>
+			console.error('Error setting theme:', err)
+		);
 	}
 	// For web mode, theme is handled by CSS variables
 }

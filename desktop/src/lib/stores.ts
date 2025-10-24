@@ -53,11 +53,11 @@ export type ConversationStatistics = {
 };
 
 export type ContextItem = {
-  id: string;
-  title: string;
-  content: string;
-  context_type: string;
-  // Add other fields from your type definition if necessary
+	id: string;
+	title: string;
+	content: string;
+	context_type: string;
+	// Add other fields from your type definition if necessary
 };
 
 // Store for persistent conversations list
@@ -80,19 +80,19 @@ const showSessionList = writable<boolean>(false);
 const contexts = writable<ContextItem[]>([]);
 
 export {
-  configStore,
-  input,
-  is_tauri,
-  role,
-  roles,
-  serverUrl,
-  theme,
-  typeahead,
-  thesaurus,
-  isInitialSetupComplete,
-  persistentConversations,
-  currentPersistentConversationId,
-  conversationStatistics,
-  showSessionList,
-  contexts
+	configStore,
+	input,
+	is_tauri,
+	role,
+	roles,
+	serverUrl,
+	theme,
+	typeahead,
+	thesaurus,
+	isInitialSetupComplete,
+	persistentConversations,
+	currentPersistentConversationId,
+	conversationStatistics,
+	showSessionList,
+	contexts,
 };

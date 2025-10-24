@@ -8,7 +8,7 @@ I've implemented the **exact architecture you requested**:
 1. **Check cache first** - Try to load cached results instantly (< 50ms)
 2. **If cache hit** - Return cached results immediately ⚡
 3. **If cache miss** - Execute fresh search across all haystack services
-4. **Return results** - Stream results back to user immediately  
+4. **Return results** - Stream results back to user immediately
 5. **Update cache** - Background task updates cache without blocking response
 
 ## Code Changes
@@ -42,9 +42,9 @@ if let Some(cached) = cached_docs {
         self.search_crates_io(needle),
         self.search_docs_rs(needle),
     );
-    
+
     // Collect results...
-    
+
     // 4. Update cache in background WITHOUT blocking
     tokio::spawn(async move {
         let _ = cache_doc.save().await; // Ignore errors
@@ -61,7 +61,7 @@ User Query → Check Cache → Cache Found → Return Results ✅
 
 ### Cache Miss Path (100-500ms)
 ```
-User Query → Check Cache → Cache Miss → 
+User Query → Check Cache → Cache Miss →
     ↓
 Fresh Search (all services concurrently) →
     ↓
@@ -72,11 +72,11 @@ Background Cache Update (non-blocking)
 
 ## Benefits
 
-✅ **Instant responses** when cache exists  
-✅ **Fast fresh searches** when cache missing  
-✅ **No blocking** on cache save operations  
-✅ **Concurrent search** across all services  
-✅ **Background caching** doesn't slow response  
+✅ **Instant responses** when cache exists
+✅ **Fast fresh searches** when cache missing
+✅ **No blocking** on cache save operations
+✅ **Concurrent search** across all services
+✅ **Background caching** doesn't slow response
 
 ## Testing
 
@@ -93,7 +93,7 @@ The server is now rebuilt with this implementation. Test it:
 - **Cache updates** happen in background tasks
 - **All three roles** use this optimized path:
   - Default (Ripgrep)
-  - Rust Engineer (QueryRs)  
+  - Rust Engineer (QueryRs)
   - Terraphim Engineer (Ripgrep + KG)
 
 The implementation is **super fast** exactly as you requested! 🚀

@@ -1,18 +1,6 @@
-# Summary: desktop/package.json
-
-## Purpose
-This is the package.json file for the Terraphim AI desktop application, defining dependencies, scripts, and build configuration for the Svelte-based frontend.
-
-## Key Functionality
-- Defines project as private module with Svelte and TypeScript setup
-- Provides comprehensive npm scripts for development (dev, build, preview), testing (test, e2e, coverage), and Tauri desktop app (tauri dev, build)
-- Includes specialized test scripts for Atomic haystack integration, WebDriver testing, and benchmarking
-- Lists devDependencies including Playwright for E2E testing, Vitest for unit testing, and TypeScript tooling
-- Specifies runtime dependencies including Svelte, Bulma CSS framework, Tauri API, and various integrations (Atomic Data, TipTap editor, D3 for visualizations)
-
-## Important Details
-- Uses Yarn as package manager (referenced in scripts)
-- Integrates with Atomic Server for haystack functionality and secret authentication
-- Supports both web and desktop (Tauri) deployment modes
-- Includes comprehensive testing infrastructure with multiple test types (unit, E2E, integration, WebDriver)
-- Features benchmarking capabilities and UI testing tools
+{
+  "name": "terraphim-search-ui",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module"
+}

@@ -16,8 +16,8 @@ export const initialEdit: boolean = false;
 export const kgTerm: string | null = null;
 export const kgRank: number | null = null;
 
- let editing = false;
- let contentElement: HTMLElement;
+let editing = false;
+let contentElement: HTMLElement;
 
 // KG modal state (similar to ResultItem.svelte)
 let _showKgModal = false;

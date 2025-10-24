@@ -1,19 +1,9 @@
-# Summary: terraphim_server/Cargo.toml
+[package]
+name = "terraphim_server"
+version = "0.1.0"
+edition = "2021"
 
-## Purpose
-This Cargo.toml file defines the configuration for the Terraphim server binary, specifying dependencies, features, and build settings for the main API server.
-
-## Key Functionality
-- Defines terraphim_server as a binary crate with version 0.2.0
-- Depends on multiple Terraphim crates including persistence, config, middleware, rolegraph, settings, types, automata, service, multi_agent, and truthforge
-- Includes web framework dependencies (Axum, Tower) for HTTP API and WebSocket support
-- Features optional database backends (SQLite, RocksDB, Redis) with full-db feature enabling all
-- Supports AI provider integrations (OpenRouter, Ollama) via feature flags
-- Includes development dependencies for testing (serial_test, tempfile, axum-test)
-
-## Important Details
-- Uses Tokio 1.35.1 as async runtime with full features
-- Includes build dependencies for static file embedding and directory copying
-- Provides Debian package metadata for system packaging
-- Supports multiple storage profiles and AI provider configurations
-- Integrates with Terraphim's multi-agent and truthforge systems
+[dependencies]
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+thiserror = "1.0"

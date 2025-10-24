@@ -4,13 +4,13 @@ index 374b95c..0fe2a26 100644
 +++ b/node_modules/svelma/src/components/Dialog/Dialog.svelte
 @@ -155,7 +155,9 @@
  </script>
- 
+
  <style lang="scss">
 -@import 'node_modules/bulma/sass/utilities/all';
 +@use '../../../../bulma/sass/utilities/initial-variables' as *;
 +@use '../../../../bulma/sass/utilities/mixins' as *;
 +@use '../../../../bulma/sass/utilities/controls' as *;
- 
+
   .dialog {
     .modal-card {
 diff --git a/node_modules/svelma/src/components/Input.svelte b/node_modules/svelma/src/components/Input.svelte
@@ -23,13 +23,13 @@ index 01a90cb..6293126 100644
 -  import { omit, getEventsAction } from '../utils'
 -  import { current_component } from 'svelte/internal'
 +  import { omit } from '../utils'
- 	
+
    import Icon from './Icon.svelte'
- 
+
 @@ -128,7 +127,21 @@
    const onFocus = () => (isFocused = true)
    const onBlur = () => (isFocused = false)
- 
+
 -  const events = getEventsAction(current_component);
 +  const forwardableEvents = ['focus', 'blur', 'keyup', 'keydown', 'keypress', 'click']
 +
@@ -47,10 +47,10 @@ index 01a90cb..6293126 100644
 +    }
 +  }
  </script>
- 
+
  <style>
 @@ -142,7 +155,7 @@
- 
+
    {#if type !== 'textarea'}
      <input
 -      use:events
@@ -73,19 +73,19 @@ index f819966..74b9970 100644
 +++ b/node_modules/svelma/src/components/Switch.svelte
 @@ -41,7 +41,9 @@
  </script>
- 
+
  <style lang="scss">
 -@import 'node_modules/bulma/sass/utilities/all';
 +@use '../../../bulma/sass/utilities/initial-variables' as *;
 +@use '../../../bulma/sass/utilities/mixins' as *;
 +@use '../../../bulma/sass/utilities/controls' as *;
- 
+
  .switch {
    position: relative;
 @@ -49,11 +51,6 @@
    user-select: none;
    display: inline-flex;
- 
+
 -  :global(&[disabled]) {
 -    opacity: .5;
 -    cursor: not-allowed;
@@ -104,7 +104,7 @@ index f819966..74b9970 100644
 +  cursor: not-allowed;
 +}
  </style>
- 
+
  <label ref="label" class="switch {size}" bind:this={label}>
 diff --git a/node_modules/svelma/src/utils/index.js b/node_modules/svelma/src/utils/index.js
 index 248fa3d..6d3667a 100644
@@ -113,7 +113,7 @@ index 248fa3d..6d3667a 100644
 @@ -1,5 +1,4 @@
  import * as transitions from 'svelte/transition'
 -import { bubble, listen } from "svelte/internal";
- 
+
  export function chooseAnimation(animation) {
    return typeof animation === 'function' ? animation : transitions[animation]
 @@ -38,18 +37,3 @@ export function typeToIcon(type) {

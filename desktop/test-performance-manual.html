@@ -107,7 +107,7 @@
             </select>
             <button onclick="switchRole()">Switch Role</button>
         </div>
-        
+
         <div>
             <input type="text" id="searchInput" class="search-input" placeholder="Enter search query..." />
             <button onclick="performSearch()">Search</button>
@@ -206,9 +206,9 @@
             }
 
             log(`🔍 Testing search: "${query}" with role: ${currentRole}`, 'info');
-            
+
             const startTime = Date.now();
-            
+
             try {
                 const response = await fetch('http://localhost:8000/api/documents/search', {
                     method: 'POST',
@@ -223,14 +223,14 @@
                 });
 
                 const searchTime = Date.now() - startTime;
-                
+
                 if (!response.ok) {
                     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                 }
 
                 const data = await response.json();
                 const resultCount = data.results ? data.results.length : 0;
-                
+
                 const testResult = {
                     role: currentRole,
                     query: query,
@@ -252,7 +252,7 @@
             } catch (error) {
                 const searchTime = Date.now() - startTime;
                 log(`❌ Search error: ${error.message} (${searchTime}ms)`, 'error');
-                
+
                 testResults.push({
                     role: currentRole,
                     query: query,
@@ -272,14 +272,14 @@
             updateMetrics();
 
             const roles = ['Default', 'Rust Engineer', 'Terraphim Engineer'];
-            
+
             for (const role of roles) {
                 log(`\n📋 Testing role: ${role}`, 'info');
                 currentRole = role;
                 document.getElementById('roleSelect').value = role;
 
                 const config = testConfigs[role];
-                
+
                 for (const query of config.queries) {
                     document.getElementById('searchInput').value = query;
                     await performSearch();
@@ -290,18 +290,18 @@
             // Final summary
             log('\n📊 Performance Test Summary:', 'info');
             log('='.repeat(50), 'info');
-            
+
             const successCount = testResults.filter(r => r.success).length;
             const totalCount = testResults.length;
             const avgTime = Math.round(testResults.reduce((sum, r) => sum + r.searchTime, 0) / totalCount);
             const maxTime = Math.max(...testResults.map(r => r.searchTime));
-            
+
             log(`Total tests: ${totalCount}`, 'info');
             log(`Successful: ${successCount}`, successCount === totalCount ? 'success' : 'warning');
             log(`Success rate: ${Math.round((successCount / totalCount) * 100)}%`, 'info');
             log(`Average search time: ${avgTime}ms`, avgTime < 1000 ? 'success' : 'warning');
             log(`Max search time: ${maxTime}ms`, maxTime < 2000 ? 'success' : 'error');
-            
+
             if (successCount === totalCount && maxTime < 2000) {
                 log('\n🎉 ALL TESTS PASSED! Performance optimizations are working correctly.', 'success');
             } else {

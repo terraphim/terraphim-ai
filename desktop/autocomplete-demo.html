@@ -219,18 +219,18 @@
             <h3>🚀 How to Use the Autocomplete System</h3>
             <p><strong>1. Start the backend server:</strong></p>
             <div class="code-block">cargo run --bin terraphim_server -- --config terraphim_server/default/terraphim_engineer_config.json</div>
-            
+
             <p><strong>2. Start the frontend dev server:</strong></p>
             <div class="code-block">cd desktop && yarn dev</div>
-            
+
             <p><strong>3. Use the NovelWrapper component in your Svelte app:</strong></p>
-            <div class="code-block">&lt;NovelWrapper 
+            <div class="code-block">&lt;NovelWrapper
   bind:html={content}
   enableAutocomplete={true}
   suggestionTrigger="/"
   maxSuggestions={8}
 /&gt;</div>
-            
+
             <p><strong>4. Type "/" followed by any term to see autocomplete suggestions!</strong></p>
         </div>
 
@@ -308,15 +308,15 @@
                 if (data.status === 'success' && data.suggestions.length > 0) {
                     let suggestionsHtml = '<div style="background: #e8f5e8; padding: 15px; border-radius: 6px; margin: 10px 0;"><strong>✅ Autocomplete Test Successful!</strong><br><br>';
                     suggestionsHtml += '<strong>Found ' + data.suggestions.length + ' suggestions for "terraphim":</strong><br><br>';
-                    
+
                     data.suggestions.slice(0, 5).forEach((suggestion, index) => {
                         suggestionsHtml += `${index + 1}. <strong>${suggestion.text}</strong> (score: ${suggestion.score.toFixed(2)})<br>`;
                     });
-                    
+
                     if (data.suggestions.length > 5) {
                         suggestionsHtml += `... and ${data.suggestions.length - 5} more suggestions<br>`;
                     }
-                    
+
                     suggestionsHtml += '</div>';
                     resultsDiv.innerHTML = suggestionsHtml;
                 } else {
