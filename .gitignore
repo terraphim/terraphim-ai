@@ -33,3 +33,4 @@ rust-sdk
 .env
 .aider*
 scratchpad/firecracker-rust
+test_commands_simple
