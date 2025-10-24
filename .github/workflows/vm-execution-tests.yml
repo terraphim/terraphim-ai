@@ -29,13 +29,8 @@ env:
 jobs:
   unit-tests:
     name: Unit Tests
-<<<<<<< HEAD
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-=======
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 10
->>>>>>> origin/main
 
     steps:
     - name: Platform check
@@ -98,13 +93,8 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-<<<<<<< HEAD
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-=======
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 15
->>>>>>> origin/main
 
     services:
       redis:
@@ -242,8 +232,6 @@ jobs:
           ${{ runner.os }}-cargo-websocket-
           ${{ runner.os }}-cargo-
 
-<<<<<<< HEAD
-=======
     - name: Check if fcctl-web exists
       id: check_fcctl_websocket
       run: |
@@ -254,7 +242,6 @@ jobs:
           echo "⚠️ fcctl-web not found - skipping WebSocket tests (experimental code is gitignored)"
         fi
 
->>>>>>> origin/main
     - name: Build and start fcctl-web
       if: steps.check_fcctl_websocket.outputs.exists == 'true'
       run: |
@@ -280,13 +267,10 @@ jobs:
           --ignored \
           -- --nocapture
 
-<<<<<<< HEAD
-=======
     - name: Skip message
       if: steps.check_fcctl_websocket.outputs.exists == 'false'
       run: echo "✅ Skipping WebSocket tests - fcctl-web experimental code not present (gitignored)"
 
->>>>>>> origin/main
     - name: Stop server
       if: always()
       run: |
@@ -325,8 +309,6 @@ jobs:
           ${{ runner.os }}-cargo-e2e-
           ${{ runner.os }}-cargo-
 
-<<<<<<< HEAD
-=======
     - name: Check if fcctl-web exists
       id: check_fcctl_e2e
       run: |
@@ -337,7 +319,6 @@ jobs:
           echo "⚠️ fcctl-web not found - skipping E2E tests (experimental code is gitignored)"
         fi
 
->>>>>>> origin/main
     - name: Build all components
       if: steps.check_fcctl_e2e.outputs.exists == 'true'
       run: |
@@ -379,13 +360,10 @@ jobs:
           --ignored \
           -- --nocapture
 
-<<<<<<< HEAD
-=======
     - name: Skip message
       if: steps.check_fcctl_e2e.outputs.exists == 'false'
       run: echo "✅ Skipping E2E tests - fcctl-web experimental code not present (gitignored)"
 
->>>>>>> origin/main
     - name: Stop server
       if: always()
       run: |
@@ -395,13 +373,8 @@ jobs:
 
   security-tests:
     name: Security Tests
-<<<<<<< HEAD
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-=======
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 15
->>>>>>> origin/main
 
     steps:
     - name: Checkout code
@@ -492,13 +465,8 @@ jobs:
 
   performance-tests:
     name: Performance Tests
-<<<<<<< HEAD
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-=======
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 10
->>>>>>> origin/main
 
     steps:
     - name: Checkout code
@@ -591,13 +559,8 @@ jobs:
 
   test-script:
     name: Test Runner Script
-<<<<<<< HEAD
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-=======
     runs-on: [self-hosted, linux, bigbox]
     timeout-minutes: 15
->>>>>>> origin/main
 
     steps:
     - name: Checkout code
@@ -676,8 +639,6 @@ jobs:
           ${{ runner.os }}-cargo-coverage-
           ${{ runner.os }}-cargo-
 
-<<<<<<< HEAD
-=======
     - name: Check if fcctl-web exists for coverage
       id: check_fcctl_coverage
       run: |
@@ -688,7 +649,6 @@ jobs:
           echo "⚠️ fcctl-web not found - running coverage without integration tests (experimental code is gitignored)"
         fi
 
->>>>>>> origin/main
     - name: Run tests with coverage
       env:
         CARGO_INCREMENTAL: 0
@@ -698,30 +658,6 @@ jobs:
         # Unit tests
         cargo test -p terraphim_multi_agent vm_execution
 
-<<<<<<< HEAD
-        # Build fcctl-web
-        cd scratchpad/firecracker-rust/fcctl-web
-        cargo build
-        ./target/debug/fcctl-web &
-        FCCTL_WEB_PID=$!
-        cd -
-
-        # Wait for server
-        for i in {1..30}; do
-          if curl -s http://localhost:8080/health > /dev/null 2>&1; then
-            break
-          fi
-          sleep 2
-        done
-
-        # Integration tests (with mock data to avoid needing real VMs)
-        cd scratchpad/firecracker-rust/fcctl-web
-        cargo test llm_api_tests || true # Allow failure for coverage
-        cd -
-
-        # Stop server
-        kill $FCCTL_WEB_PID || true
-=======
         # Build fcctl-web and run integration tests if available
         if [ "${{ steps.check_fcctl_coverage.outputs.exists }}" == "true" ]; then
           # Build fcctl-web
@@ -749,7 +685,6 @@ jobs:
         else
           echo "Skipping fcctl-web integration tests for coverage - experimental code not present"
         fi
->>>>>>> origin/main
 
     - name: Generate coverage report
       run: |

@@ -1,10 +1,5 @@
-<<<<<<< HEAD
-import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/svelte/svelte5';
-=======
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
->>>>>>> origin/main
 import '@testing-library/jest-dom';
 
 import { createTestConfig } from '../__test-utils__/testConfig';
