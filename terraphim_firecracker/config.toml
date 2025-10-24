@@ -1,0 +1,175 @@
+# Terraphim Firecracker Configuration
+# Sub-2 Second VM Boot Optimization System
+
+[general]
+# Log level: trace, debug, info, warn, error
+log_level = "info"
+
+# Maximum concurrent VM operations
+max_concurrent_operations = 10
+
+# Health check interval in seconds
+health_check_interval = 60
+
+# Metrics collection enabled
+enable_metrics = true
+
+[pool]
+# VM pool configuration
+min_pool_size = 5
+max_pool_size = 50
+target_pool_size = 20
+
+# Prewarming configuration
+prewarming_strategy = "UltraFast"  # Minimal, Standard, Aggressive, UltraFast
+prewarming_timeout = 30  # seconds
+prewarming_concurrency = 3
+
+# Allocation strategy
+allocation_strategy = "BestPerformance"  # FirstAvailable, BestPerformance, LeastRecentlyUsed, RoundRobin, WeightedRandom
+
+# Maintenance configuration
+maintenance_interval = 3600  # seconds (1 hour)
+health_check_interval = 60   # seconds
+max_maintenance_concurrency = 5
+
+# Pool auto-scaling
+enable_auto_scaling = true
+scale_up_threshold = 0.8     # Scale up when 80% of pool is in use
+scale_down_threshold = 0.3   # Scale down when 30% of pool is in use
+scale_up_step = 5            # Add 5 VMs when scaling up
+scale_down_step = 3          # Remove 3 VMs when scaling down
+
+[performance]
+# Performance optimization settings
+optimization_level = "Sub2Second"  # Standard, Fast, UltraFast, Sub2Second
+
+# Boot time targets (in milliseconds)
+target_boot_time = 2000      # Sub-2 second target
+fast_boot_time = 1500        # UltraFast target
+prewarmed_boot_time = 500    # Prewarmed target
+instant_boot_time = 100      # Instant target
+
+# Resource prewarming
+enable_memory_prewarming = true
+enable_filesystem_prewarming = true
+enable_network_prewarming = true
+enable_cpu_cache_prewarming = true
+enable_jit_prewarming = true
+enable_allocator_prewarming = true
+
+# Performance monitoring
+enable_boot_time_tracking = true
+enable_memory_usage_tracking = true
+enable_cpu_usage_tracking = true
+enable_network_latency_tracking = true
+
+[firecracker]
+# Firecracker binary configuration
+firecracker_binary = "/usr/local/bin/firecracker"
+jailer_binary = "/usr/local/bin/jailer"
+
+# Base directory for Firecracker operations
+base_dir = "/var/lib/firecracker"
+socket_dir = "/run/firecracker"
+log_dir = "/var/log/firecracker"
+
+# VM resource defaults
+default_vcpus = 2
+default_memory_mb = 512
+default_boot_timeout = 30  # seconds
+
+# Kernel configuration
+kernel_path = "/var/lib/firecracker/vmlinux"
+kernel_args = "console=ttyS0 noapic reboot=k panic=1 pci=off nomodules quiet systemd.log_level=err systemd.show_status=0 mitigations=0 transparent_hugepage=never"
+
+# Root filesystem
+rootfs_path = "/var/lib/firecracker/rootfs.ext4"
+rootfs_readonly = true
+
+# Network configuration
+network_interface = "tap0"
+network_bridge = "br0"
+enable_network = true
+
+# Security settings
+enable_jailer = true
+jailer_uid = 1000
+jailer_gid = 1000
+jailer_chroot_base = "/var/lib/jailer"
+
+[storage]
+# Storage backend configuration
+storage_type = "Memory"  # Memory, File, Database
+
+# In-memory storage settings
+max_memory_vms = 100
+cleanup_interval = 300  # seconds
+max_vm_age = 86400      # seconds (24 hours)
+
+# File storage settings (if used)
+storage_dir = "/var/lib/terraphim-firecracker"
+backup_enabled = true
+backup_interval = 3600  # seconds
+
+[monitoring]
+# Metrics and monitoring
+metrics_port = 9090
+metrics_endpoint = "/metrics"
+enable_prometheus = true
+
+# Health check endpoints
+health_port = 8080
+health_endpoint = "/health"
+
+# Performance profiling
+enable_profiling = false
+profiling_port = 6060
+profiling_endpoint = "/debug/pprof"
+
+# Logging
+log_format = "json"  # json, text
+log_file = "/var/log/terraphim-firecracker.log"
+max_log_size = "100MB"
+max_log_files = 10
+
+[security]
+# Security settings
+enable_authentication = false
+# pragma: allowlist secret
+api_key_required = false # pragma: allowlist secret
+
+# Rate limiting
+enable_rate_limiting = true
+rate_limit_requests_per_minute = 100
+rate_limit_burst = 20
+
+# TLS/SSL settings
+enable_tls = false
+cert_file = ""
+key_file = ""
+
+[experimental]
+# Experimental features (use with caution)
+enable_snapshot_restore = false
+enable_live_migration = false
+enable_nested_virtualization = false
+enable_custom_kernel_args = false
+
+# Advanced optimization settings
+enable_aggressive_memory_optimization = true
+enable_cpu_pinning = false
+enable_huge_pages = false
+enable_io_uring = false
+
+[development]
+# Development and debugging settings
+debug_mode = false
+enable_debug_logs = false
+mock_firecracker = false
+skip_prewarming = false
+
+# Test configuration
+test_mode = false
+test_vm_count = 3
+test_boot_timeout = 60  # seconds

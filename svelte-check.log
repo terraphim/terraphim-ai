@@ -1,0 +1,386 @@
+yarn run v1.22.22
+$ svelte-check --tsconfig ./tsconfig.json
+Loading svelte-check in workspace: /Users/alex/projects/terraphim/terraphim-ai/desktop
+Getting Svelte diagnostics...
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:1025:23
+Warn: Self-closing HTML tags for non-void elements are ambiguous — use `<i ...></i>` rather than `<i ... />`
+https://svelte.dev/e/element_invalid_self_closing_tag (svelte)
+                    <span class="icon is-medium" class:has-text-primary={item.className}>
+                      <i class={item.icon} />
+                    </span>
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:1037:23
+Warn: Self-closing HTML tags for non-void elements are ambiguous — use `<i ...></i>` rather than `<i ... />`
+https://svelte.dev/e/element_invalid_self_closing_tag (svelte)
+                    <span class="icon is-medium" class:has-text-primary={item.className}>
+                      <i class={item.icon} />
+                    </span>
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:1050:23
+Warn: Self-closing HTML tags for non-void elements are ambiguous — use `<i ...></i>` rather than `<i ... />`
+https://svelte.dev/e/element_invalid_self_closing_tag (svelte)
+                    <span class="icon is-medium" class:has-text-primary={item.className?.includes('primary')} class:has-text-success={item.className?.includes('success')} class:has-text-danger={item.className?.includes('danger')}>
+                      <i class={item.icon} />
+                    </span>
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:1065:7
+Warn: Buttons and links should either contain text or have an `aria-label`, `aria-labelledby` or `title` attribute
+https://svelte.dev/e/a11y_consider_explicit_label (svelte)
+    <div class="notification is-danger is-light mt-2">
+      <button class="delete" on:click={() => contextError = null}></button>
+      {contextError}
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:250:20
+Error: 'kgDocument' is possibly 'null'. (ts)
+          kgDocument = data.results[0];
+          kgRank = kgDocument.rank || 0;
+          console.log('  ✅ Found KG document:');
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:252:37
+Error: 'kgDocument' is possibly 'null'. (ts)
+          console.log('  ✅ Found KG document:');
+          console.log('    Title:', kgDocument.title);
+          console.log('    Rank:', kgRank);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:254:43
+Error: 'kgDocument' is possibly 'null'. (ts)
+          console.log('    Rank:', kgRank);
+          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+          showKgModal = true;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:268:38
+Error: 'error' is of type 'unknown'. (ts)
+      console.error('❌ Error fetching KG document:');
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:269:41
+Error: 'error' is of type 'unknown'. (ts)
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+      console.error('  Request details:', {
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:277:25
+Error: 'error' is of type 'unknown'. (ts)
+
+      if (!$is_tauri && error.message?.includes('Failed to fetch')) {
+        console.error('  💡 Network error suggestions:');
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:356:44
+Error: 'aiSummary' is possibly 'null'. (ts)
+        console.log('  ✅ Summary generated successfully');
+        console.log('    Summary length:', aiSummary.length, 'characters');
+        console.log('    From cache:', summaryFromCache);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:365:38
+Error: 'error' is of type 'unknown'. (ts)
+      console.error('❌ Error generating summary:');
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:366:41
+Error: 'error' is of type 'unknown'. (ts)
+      console.error('  Error type:', error.constructor.name);
+      console.error('  Error message:', error.message || error);
+      console.error('  Request details:', {
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:374:22
+Error: 'error' is of type 'unknown'. (ts)
+
+      summaryError = error.message || 'Network error occurred';
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:376:11
+Error: 'error' is of type 'unknown'. (ts)
+
+      if (error.message?.includes('Failed to fetch')) {
+        console.error('  💡 Network error suggestions:');
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:461:17
+Error: Property 'appendChild' does not exist on type 'string'. (ts)
+      a.download = filename;
+      item.body.appendChild(a);
+      a.click();
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:463:17
+Error: Property 'removeChild' does not exist on type 'string'. (ts)
+      a.click();
+      item.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:517:30
+Error: Property 'conversations' does not exist on type '{}'. (ts)
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:517:61
+Error: Property 'conversations' does not exist on type '{}'. (ts)
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:518:44
+Error: Property 'conversations' does not exist on type '{}'. (ts)
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+            console.log('🎯 Using existing conversation:', conversationId);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:526:17
+Error: 'newConv' is of type 'unknown'. (ts)
+            });
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:526:49
+Error: 'newConv' is of type 'unknown'. (ts)
+            });
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:527:32
+Error: 'newConv' is of type 'unknown'. (ts)
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+              console.log('🆕 Created new conversation:', conversationId);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:530:68
+Error: 'newConv' is of type 'unknown'. (ts)
+            } else {
+              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
+            }
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:535:71
+Error: 'convError' is of type 'unknown'. (ts)
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:544:32
+Error: Property 'url' does not exist on type '{ source_type: string; document_id: string; }'. (ts)
+
+        if (item.url) metadata.url = item.url;
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:545:57
+Error: Property 'tags' does not exist on type '{ source_type: string; document_id: string; }'. (ts)
+        if (item.url) metadata.url = item.url;
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+        if (item.rank !== undefined) metadata.rank = item.rank.toString();
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:546:47
+Error: Property 'rank' does not exist on type '{ source_type: string; document_id: string; }'. (ts)
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+        if (item.rank !== undefined) metadata.rank = item.rank.toString();
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:597:71
+Error: 'convError' is of type 'unknown'. (ts)
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:657:22
+Error: 'error' is of type 'unknown'. (ts)
+      // Show error state
+      contextError = error.message || 'Failed to add document to context';
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:703:30
+Error: Property 'conversations' does not exist on type '{}'. (ts)
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:703:61
+Error: Property 'conversations' does not exist on type '{}'. (ts)
+          // Find an existing conversation or use the first one
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:704:44
+Error: Property 'conversations' does not exist on type '{}'. (ts)
+          if (conversations?.conversations && conversations.conversations.length > 0) {
+            conversationId = conversations.conversations[0].id;
+            console.log('🎯 Using existing conversation:', conversationId);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:712:17
+Error: 'newConv' is of type 'unknown'. (ts)
+            });
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:712:49
+Error: 'newConv' is of type 'unknown'. (ts)
+            });
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:713:32
+Error: 'newConv' is of type 'unknown'. (ts)
+            if (newConv.status === 'success' && newConv.conversation_id) {
+              conversationId = newConv.conversation_id;
+              console.log('🆕 Created new conversation:', conversationId);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:716:68
+Error: 'newConv' is of type 'unknown'. (ts)
+            } else {
+              throw new Error('Failed to create conversation: ' + (newConv.error || 'Unknown error'));
+            }
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:721:71
+Error: 'convError' is of type 'unknown'. (ts)
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:730:32
+Error: Property 'url' does not exist on type '{ source_type: string; document_id: string; }'. (ts)
+
+        if (item.url) metadata.url = item.url;
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:731:57
+Error: Property 'tags' does not exist on type '{ source_type: string; document_id: string; }'. (ts)
+        if (item.url) metadata.url = item.url;
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+        if (item.rank !== undefined) metadata.rank = item.rank.toString();
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:732:47
+Error: Property 'rank' does not exist on type '{ source_type: string; document_id: string; }'. (ts)
+        if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
+        if (item.rank !== undefined) metadata.rank = item.rank.toString();
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:783:71
+Error: 'convError' is of type 'unknown'. (ts)
+          console.error('❌ Failed to manage conversations:', convError);
+          throw new Error('Could not create or find conversation: ' + convError.message);
+        }
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:843:22
+Error: 'error' is of type 'unknown'. (ts)
+      // Show error state
+      contextError = error.message || 'Failed to add document to context';
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:871:7
+Error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '__sveltets_2_IsomorphicComponent<{ loadConfig?: (() => Promise<void>) | undefined; }, { [evt: string]: CustomEvent<any>; }, {}, { loadConfig: () => Promise<void>; }, string>'.
+  No index signature with a parameter of type 'string' was found on type '__sveltets_2_IsomorphicComponent<{ loadConfig?: (() => Promise<void>) | undefined; }, { [evt: string]: CustomEvent<any>; }, {}, { loadConfig: () => Promise<void>; }, string>'. (ts)
+
+  if (configStore[$role] !== undefined) {
+    console.log("Have attribute", configStore[$role]);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:872:35
+Error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '__sveltets_2_IsomorphicComponent<{ loadConfig?: (() => Promise<void>) | undefined; }, { [evt: string]: CustomEvent<any>; }, {}, { loadConfig: () => Promise<void>; }, string>'.
+  No index signature with a parameter of type 'string' was found on type '__sveltets_2_IsomorphicComponent<{ loadConfig?: (() => Promise<void>) | undefined; }, { [evt: string]: CustomEvent<any>; }, {}, { loadConfig: () => Promise<void>; }, string>'. (ts)
+  if (configStore[$role] !== undefined) {
+    console.log("Have attribute", configStore[$role]);
+    if (configStore[$role].hasOwnProperty("enableLogseq")) {
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:873:9
+Error: Element implicitly has an 'any' type because expression of type 'string' can't be used to index type '__sveltets_2_IsomorphicComponent<{ loadConfig?: (() => Promise<void>) | undefined; }, { [evt: string]: CustomEvent<any>; }, {}, { loadConfig: () => Promise<void>; }, string>'.
+  No index signature with a parameter of type 'string' was found on type '__sveltets_2_IsomorphicComponent<{ loadConfig?: (() => Promise<void>) | undefined; }, { [evt: string]: CustomEvent<any>; }, {}, { loadConfig: () => Promise<void>; }, string>'. (ts)
+    console.log("Have attribute", configStore[$role]);
+    if (configStore[$role].hasOwnProperty("enableLogseq")) {
+      console.log("enable logseq True");
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:1028:32
+Error: Property 'isLink' does not exist on type '{ id: string; label: string; icon: string; action: () => void; visible: boolean; title: string; className: string; disabled?: undefined; testId?: undefined; } | { id: string; label: string; icon: string; ... 5 more ...; testId?: undefined; } | { ...; }'.
+  Property 'isLink' does not exist on type '{ id: string; label: string; icon: string; action: () => void; visible: boolean; title: string; className: string; disabled?: undefined; testId?: undefined; }'. (ts)
+                  </button>
+                {:else if item.isLink}
+                  <a
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/ResultItem.svelte:1030:32
+Error: Property 'href' does not exist on type '{ id: string; label: string; icon: string; action: () => void; visible: boolean; title: string; className: string; disabled?: undefined; testId?: undefined; } | { id: string; label: string; icon: string; ... 5 more ...; testId?: undefined; } | { ...; }'.
+  Property 'href' does not exist on type '{ id: string; label: string; icon: string; action: () => void; visible: boolean; title: string; className: string; disabled?: undefined; testId?: undefined; }'. (ts)
+                  <a
+                    href={item.href}
+                    target="_blank"
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/Search.svelte:76:5
+Error: Type 'Timeout' is not assignable to type 'number'. (ts)
+    }
+    parseTimeout = setTimeout(() => {
+      parseAndUpdateChips($input);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Search/Search.svelte:162:5
+Error: Type 'Timeout' is not assignable to type 'number'. (ts)
+    // Poll every 2 seconds for summary updates
+    pollingInterval = setInterval(async () => {
+      if (results.length === 0) return;
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/ConfigJsonEditor.svelte:14:25
+Error: Parameter 'updatedContent' implicitly has an 'any' type. (ts)
+
+  function handleChange(updatedContent) {
+    console.log("contents changed:", updatedContent);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/RoleGraphVisualization.svelte:60:15
+Error: 'e' is of type 'unknown'. (ts)
+    } catch (e) {
+      error = e.message;
+      console.error("Error fetching rolegraph:", e);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/RoleGraphVisualization.svelte:68:5
+Error: Type '{ id: string; url: string; title: any; body: string; description: string; tags: string[]; rank: any; stub: string; }' is missing the following properties from type 'Document': summarization, source_haystack (ts)
+  function nodeToDocument(node: any): Document {
+    return {
+      id: `kg-node-${node.id}`,
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/RoleGraphVisualization.svelte:151:14
+Error: Argument of type 'ZoomBehavior<Element, unknown>' is not assignable to parameter of type '(selection: Selection<SVGSVGElement, unknown, null, undefined>) => void'.
+  Types of parameters 'selection' and 'selection' are incompatible.
+    Type 'Selection<SVGSVGElement, unknown, null, undefined>' is not assignable to type 'Selection<Element, unknown, any, any>'.
+      Types of property 'merge' are incompatible.
+        Type '(other: Selection<SVGSVGElement, unknown, null, undefined> | TransitionLike<SVGSVGElement, unknown>) => Selection<SVGSVGElement, unknown, null, undefined>' is not assignable to type '(other: Selection<Element, unknown, any, any> | TransitionLike<Element, unknown>) => Selection<Element, unknown, any, any>'.
+          Types of parameters 'other' and 'other' are incompatible.
+            Type 'Selection<Element, unknown, any, any> | TransitionLike<Element, unknown>' is not assignable to type 'Selection<SVGSVGElement, unknown, null, undefined> | TransitionLike<SVGSVGElement, unknown>'.
+              Type 'Selection<Element, unknown, any, any>' is not assignable to type 'Selection<SVGSVGElement, unknown, null, undefined> | TransitionLike<SVGSVGElement, unknown>'.
+                Type 'Selection<Element, unknown, any, any>' is not assignable to type 'Selection<SVGSVGElement, unknown, null, undefined>'.
+                  Types of property 'select' are incompatible.
+                    Type '{ <DescElement extends BaseType>(selector: string): Selection<DescElement, unknown, any, any>; <DescElement extends BaseType>(selector: null): Selection<null, undefined, any, any>; <DescElement extends BaseType>(selector: ValueFn<...>): Selection<...>; }' is not assignable to type '{ <DescElement extends BaseType>(selector: string): Selection<DescElement, unknown, null, undefined>; <DescElement extends BaseType>(selector: null): Selection<null, undefined, null, undefined>; <DescElement extends BaseType>(selector: ValueFn<...>): Selection<...>; }'.
+                      Types of parameters 'selector' and 'selector' are incompatible.
+                        Types of parameters 'groups' and 'groups' are incompatible.
+                          Type 'Element[] | ArrayLike<Element>' is not assignable to type 'SVGSVGElement[] | ArrayLike<SVGSVGElement>'.
+                            Type 'Element[]' is not assignable to type 'SVGSVGElement[] | ArrayLike<SVGSVGElement>'.
+                              Type 'Element[]' is not assignable to type 'SVGSVGElement[]'.
+                                Type 'Element' is missing the following properties from type 'SVGSVGElement': currentScale, currentTranslate, height, width, and 154 more. (ts)
+
+    svg.call(zoom);
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/RoleGraphVisualization.svelte:218:13
+Error: Argument of type 'DragBehavior<Element, unknown, unknown>' is not assignable to parameter of type '(selection: Selection<SVGCircleElement, any, SVGGElement, unknown>) => void'.
+  Types of parameters 'selection' and 'selection' are incompatible.
+    Type 'Selection<SVGCircleElement, any, SVGGElement, unknown>' is not assignable to type 'Selection<Element, unknown, any, any>'.
+      Types of property 'merge' are incompatible.
+        Type '(other: Selection<SVGCircleElement, any, SVGGElement, unknown> | TransitionLike<SVGCircleElement, any>) => Selection<...>' is not assignable to type '(other: Selection<Element, unknown, any, any> | TransitionLike<Element, unknown>) => Selection<Element, unknown, any, any>'.
+          Types of parameters 'other' and 'other' are incompatible.
+            Type 'Selection<Element, unknown, any, any> | TransitionLike<Element, unknown>' is not assignable to type 'Selection<SVGCircleElement, any, SVGGElement, unknown> | TransitionLike<SVGCircleElement, any>'.
+              Type 'Selection<Element, unknown, any, any>' is not assignable to type 'Selection<SVGCircleElement, any, SVGGElement, unknown> | TransitionLike<SVGCircleElement, any>'.
+                Type 'Selection<Element, unknown, any, any>' is not assignable to type 'Selection<SVGCircleElement, any, SVGGElement, unknown>'.
+                  Types of property 'select' are incompatible.
+                    Type '{ <DescElement extends BaseType>(selector: string): Selection<DescElement, unknown, any, any>; <DescElement extends BaseType>(selector: null): Selection<null, undefined, any, any>; <DescElement extends BaseType>(selector: ValueFn<...>): Selection<...>; }' is not assignable to type '{ <DescElement extends BaseType>(selector: string): Selection<DescElement, any, SVGGElement, unknown>; <DescElement extends BaseType>(selector: null): Selection<null, undefined, SVGGElement, unknown>; <DescElement extends BaseType>(selector: ValueFn<...>): Selection<...>; }'.
+                      Types of parameters 'selector' and 'selector' are incompatible.
+                        Types of parameters 'groups' and 'groups' are incompatible.
+                          Type 'Element[] | ArrayLike<Element>' is not assignable to type 'SVGCircleElement[] | ArrayLike<SVGCircleElement>'.
+                            Type 'Element[]' is not assignable to type 'SVGCircleElement[] | ArrayLike<SVGCircleElement>'.
+                              Type 'Element[]' is not assignable to type 'SVGCircleElement[]'.
+                                Type 'Element' is missing the following properties from type 'SVGCircleElement': cx, cy, r, pathLength, and 113 more. (ts)
+      })
+      .call(d3.drag()
+        .on('start', dragstarted)
+        .on('drag', dragged)
+        .on('end', dragended));
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Chat/ContextEditModal.svelte:4:17
+Error: Module '"./Chat.svelte"' has no exported member 'ContextItem'. Did you mean to use 'import ContextItem from "./Chat.svelte"' instead? (ts)
+  import { createEventDispatcher } from 'svelte';
+  import type { ContextItem } from './Chat.svelte';
+
+/Users/alex/projects/terraphim/terraphim-ai/desktop/src/lib/Chat/ContextEditModal.svelte:227:81
+Error: Argument of type 'unknown' is not assignable to parameter of type 'string'. (ts)
+                        value={key}
+                        on:input={(event) => handleMetadataKeyInput(event, key, value)}
+                      >
+
+====================================
+svelte-check found 53 errors and 4 warnings in 5 files
+info Visit https://yarnpkg.com/en/docs/cli/run for documentation about this command.
