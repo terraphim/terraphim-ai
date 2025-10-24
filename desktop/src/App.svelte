@@ -1,14 +1,14 @@
 <script lang="ts">
-import { Route, router, active } from 'tinro';
+import { active, Route, router } from 'tinro';
 import '@fortawesome/fontawesome-free/css/all.css';
-import Search from './lib/Search/Search.svelte';
-import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
-import { theme } from './lib/stores';
-import ConfigWizard from './lib/ConfigWizard.svelte';
-import ConfigJsonEditor from './lib/ConfigJsonEditor.svelte';
-import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
-import Chat from './lib/Chat/Chat.svelte';
 import logo from '/assets/terraphim_gray.png';
+import Chat from './lib/Chat/Chat.svelte';
+import ConfigJsonEditor from './lib/ConfigJsonEditor.svelte';
+import ConfigWizard from './lib/ConfigWizard.svelte';
+import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
+import Search from './lib/Search/Search.svelte';
+import { theme } from './lib/stores';
+import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
 
 let _visible = 'is-hidden';
 function _toggleVissible() {

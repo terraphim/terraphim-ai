@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { TerraphimSuggestion } from '../TerraphimSuggestion';
 
 // Mock the novelAutocompleteService
@@ -62,8 +62,8 @@ describe('TerraphimSuggestion', () => {
 
 describe('TerraphimSuggestionRenderer', () => {
 	it('should create element with correct class', () => {
-		const mockCommand = vi.fn();
-		const mockItems = [{ text: 'test', snippet: 'test snippet', score: 1.0 }];
+		const _mockCommand = vi.fn();
+		const _mockItems = [{ text: 'test', snippet: 'test snippet', score: 1.0 }];
 
 		// We need to access the renderer class through the extension
 		const extension = TerraphimSuggestion.create();

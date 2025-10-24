@@ -613,15 +613,15 @@ variable in env for z.ai under ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN
 
 ● Update(templates/env.terraphim.template)
   ⎿  Updated templates/env.terraphim.template with 4 additions
-       13    ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY"
+       13    ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY" # pragma: allowlist secret
        14    ANTHROPIC_MODEL_NAME="op://Terraphim-Dev/Anthropic/MODEL_NAME"
        15
        16 +  # LLM Proxy Configuration (z.ai)
-       17 +  ANTHROPIC_BASE_URL="op://Terraphim-Dev/Anthropic/BASE_URL"
-       18 +  ANTHROPIC_AUTH_TOKEN="op://Terraphim-Dev/Anthropic/AUTH_TOKEN"
+       17 +  ANTHROPIC_BASE_URL="op://Terraphim-Dev/Anthropic/BASE_URL" # pragma: allowlist secret
+       18 +  ANTHROPIC_AUTH_TOKEN="op://Terraphim-Dev/Anthropic/AUTH_TOKEN" # pragma: allowlist secret
        19 +
        20    # Search Services
-       21    PERPLEXITY_API_KEY="op://Terraphim-Dev/Perplexity/API_KEY"
+       21    PERPLEXITY_API_KEY="op://Terraphim-Dev/Perplexity/API_KEY" # pragma: allowlist secret
        22    ATOMIC_SERVER_URL="op://Terraphim-Dev/AtomicServer/URL"
 
 ● Now let me update the setup script to include the new proxy variables:
@@ -649,7 +649,7 @@ variable in env for z.ai under ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN
 ● Let me search for the exact pattern in the script:
 
 ● Bash(grep -n "ANTHROPIC_API_KEY\|ANTHROPIC_MODEL_NAME" /home/alex/projects/terraphim-ai/scripts/setup-1password-terraphim.sh)
-  ⎿  233:ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY"
+  ⎿  233:ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY" # pragma: allowlist secret
      234:ANTHROPIC_MODEL_NAME="op://Terraphim-Dev/Anthropic/MODEL_NAME"
 
 ● Read(scripts/setup-1password-terraphim.sh)
@@ -657,7 +657,7 @@ variable in env for z.ai under ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN
 
 ● Update(scripts/setup-1password-terraphim.sh)
   ⎿  Updated scripts/setup-1password-terraphim.sh with 4 additions
-       233    ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY"
+       233    ANTHROPIC_API_KEY="op://Terraphim-Dev/Anthropic/API_KEY" # pragma: allowlist secret
        234    ANTHROPIC_MODEL_NAME="op://Terraphim-Dev/Anthropic/MODEL_NAME"
        235
        236 +  # LLM Proxy Configuration (z.ai)
@@ -665,7 +665,7 @@ variable in env for z.ai under ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN
        238 +  ANTHROPIC_AUTH_TOKEN="op://Terraphim-Dev/Anthropic/AUTH_TOKEN"
        239 +
        240    # Search Services
-       241    PERPLEXITY_API_KEY="op://Terraphim-Dev/Perplexity/API_KEY"
+       241    PERPLEXITY_API_KEY="op://Terraphim-Dev/Perplexity/API_KEY" # pragma: allowlist secret
        242    ATOMIC_SERVER_URL="op://Terraphim-Dev/AtomicServer/URL"
 
 ● Now let me update the GitHub Actions template to include the proxy variables:
