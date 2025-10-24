@@ -1,17 +1,12 @@
-import { writable } from "svelte/store";
-import { CONFIG } from "../config";
+import { writable } from 'svelte/store';
+import { CONFIG } from '../config';
 // Import generated types instead of manual definitions
-import type {
-  Role,
-  Config,
-  ConfigResponse,
-  RoleName
-} from "./generated/types";
+import type { Config, Role, RoleName } from './generated/types';
 
 // Custom interface for thesaurus (not in generated types)
 interface NormalisedThesaurus {
-  id: string;
-  term: string;
+	id: string;
+	term: string;
 }
 
 // writable key value store for thesaurus, where value is id and normalised term
@@ -19,17 +14,17 @@ const thesaurus = writable<Array<Record<string, NormalisedThesaurus>>>([]);
 
 // Default empty configuration - updated to match generated Config type
 const defaultConfig: Config = {
-  id: "Desktop" as const,
-  global_shortcut: "",
-  roles: {} as Record<string, Role>,
-  default_role: { original: "", lowercase: "" } as RoleName,
-  selected_role: { original: "", lowercase: "" } as RoleName
+	id: 'Desktop' as const,
+	global_shortcut: '',
+	roles: {} as Record<string, Role>,
+	default_role: { original: '', lowercase: '' } as RoleName,
+	selected_role: { original: '', lowercase: '' } as RoleName,
 };
 
-const theme = writable<string>("spacelab");
-const role = writable<string>("selected"); // Updated to be empty by default, set upon config load
+const theme = writable<string>('spacelab');
+const role = writable<string>('selected'); // Updated to be empty by default, set upon config load
 const is_tauri = writable<boolean>(false);
-const atomic_configured = writable<boolean>(false);
+const _atomic_configured = writable<boolean>(false);
 const serverUrl = writable<string>(`${CONFIG.ServerURL}/documents/search`);
 const configStore = writable<Config>(defaultConfig); // Store the whole config object
 const isInitialSetupComplete = writable<boolean>(false);
@@ -37,24 +32,24 @@ const isInitialSetupComplete = writable<boolean>(false);
 // Roles should be an array of Role objects - using generated Role type
 const roles = writable<Role[]>([]);
 
-let input = writable<string>("");
+const input = writable<string>('');
 const typeahead = writable<boolean>(false);
 
 // Conversation management stores
 export type ConversationSummary = {
-  id: string;
-  title: string;
-  role: string;
-  message_count: number;
-  preview: string | null;
-  created_at: string;
-  updated_at: string;
+	id: string;
+	title: string;
+	role: string;
+	message_count: number;
+	preview: string | null;
+	created_at: string;
+	updated_at: string;
 };
 
 export type ConversationStatistics = {
-  total_conversations: number;
-  total_messages: number;
-  conversations_by_role: Record<string, number>;
+	total_conversations: number;
+	total_messages: number;
+	conversations_by_role: Record<string, number>;
 };
 
 export type ContextItem = {
@@ -73,9 +68,9 @@ const currentPersistentConversationId = writable<string | null>(null);
 
 // Store for conversation statistics
 const conversationStatistics = writable<ConversationStatistics>({
-  total_conversations: 0,
-  total_messages: 0,
-  conversations_by_role: {}
+	total_conversations: 0,
+	total_messages: 0,
+	conversations_by_role: {},
 });
 
 // Store for showing/hiding session list panel

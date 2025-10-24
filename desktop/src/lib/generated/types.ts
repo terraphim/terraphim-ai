@@ -8,8 +8,8 @@ export type AHashMap<K = string | number, V = unknown> = Record<string, V> & Par
 
 // === Core Types ===
 export interface RoleName {
-    original: string;
-    lowercase: string;
+	original: string;
+	lowercase: string;
 }
 /**
  * The value of a normalized term
@@ -24,6 +24,7 @@ export type NormalizedTermValue = string;
  * The `id` is a unique identifier for the document.
  */
 export interface Document {
+<<<<<<< HEAD
     /**
      * Unique identifier for the document
      */
@@ -64,6 +65,17 @@ export interface Document {
      * Source haystack location that this document came from
      */
     source_haystack: string | undefined;
+=======
+	id: string;
+	url: string;
+	title: string;
+	body: string;
+	description: string | undefined;
+	stub: string | undefined;
+	tags: string[] | undefined;
+	rank: number | undefined;
+	summarization?: string;
+>>>>>>> origin/main
 }
 /**
  * Logical operators for combining multiple search terms
@@ -74,6 +86,7 @@ export type LogicalOperator = "and" | "or";
  * It contains the search term(s), logical operators, skip and limit parameters.
  */
 export interface SearchQuery {
+<<<<<<< HEAD
     /**
      * Primary search term for backward compatibility
      */
@@ -102,6 +115,15 @@ export type RelevanceFunction = "terraphim-graph" | "title-scorer" | "bm25" | "b
  * or JSON files.
  */
 export type KnowledgeGraphInputType = "markdown" | "json";
+=======
+	search_term: NormalizedTermValue;
+	skip: number | undefined;
+	limit: number | undefined;
+	role: RoleName | undefined;
+}
+export type RelevanceFunction = 'terraphim-graph' | 'title-scorer' | 'bm25' | 'bm25f' | 'bm25plus';
+export type KnowledgeGraphInputType = 'markdown' | 'json';
+>>>>>>> origin/main
 // === Automata Types ===
 /**
  * AutomataPath is a path to the automata file
@@ -110,6 +132,7 @@ export type KnowledgeGraphInputType = "markdown" | "json";
  */
 export type AutomataPath = { Local: string } | { Remote: string };
 // === Configuration Types ===
+<<<<<<< HEAD
 /**
  * The service used for indexing documents
  *
@@ -155,16 +178,26 @@ export interface Haystack {
      * For Atomic: can include additional API parameters.
      */
     extra_parameters?: Map<string, string>;
+=======
+export type ServiceType = 'Ripgrep' | 'Atomic' | 'QueryRs' | 'ClickUp' | 'Mcp';
+export interface Haystack {
+	location: string;
+	service: ServiceType;
+	read_only?: boolean;
+	atomic_server_secret?: string | undefined;
+	extra_parameters?: Map<string, string>;
+>>>>>>> origin/main
 }
 export interface KnowledgeGraphLocal {
-    input_type: KnowledgeGraphInputType;
-    path: string;
+	input_type: KnowledgeGraphInputType;
+	path: string;
 }
 /**
  * A knowledge graph is the collection of documents which were indexed
  * using a specific service
  */
 export interface KnowledgeGraph {
+<<<<<<< HEAD
     /**
      * automata path refering to the published automata and can be online url or local file with pre-build automata
      */
@@ -224,6 +257,36 @@ export interface ConfigResponse {
      * The config
      */
     config: Config;
+=======
+	automata_path: AutomataPath | undefined;
+	knowledge_graph_local: KnowledgeGraphLocal | undefined;
+	public: boolean;
+	publish: boolean;
+}
+export interface Role {
+	shortname?: string;
+	name: RoleName & Value;
+	relevance_function: RelevanceFunction;
+	terraphim_it: boolean;
+	theme: string;
+	kg?: (KnowledgeGraph & Value);
+	haystacks: Haystack[] & Value;
+	[key: string]: Value; // Allow additional properties
+}
+export type ConfigId = 'Server' | 'Desktop' | 'Embedded';
+export interface Config {
+	id: ConfigId;
+	global_shortcut: string;
+	roles: Record<string, Role>;
+	default_role: RoleName;
+	selected_role: RoleName;
+}
+// === Command Response Types ===
+export type Status = 'success' | 'error';
+export interface ConfigResponse {
+	status: Status;
+	config: Config;
+>>>>>>> origin/main
 }
 /**
  * Response type for showing the search results
@@ -232,6 +295,7 @@ export interface ConfigResponse {
  * and returning the results
  */
 export interface SearchResponse {
+<<<<<<< HEAD
     /**
      * Status of the search
      */
@@ -254,31 +318,40 @@ export interface DocumentListResponse {
      * The total number of documents found
      */
     total: number;
+=======
+	status: Status;
+	results: Document[];
+}
+export interface DocumentListResponse {
+	status: Status;
+	results: Document[];
+	total: number;
+>>>>>>> origin/main
 }
 /**
  * Response type for a single document
  */
 export interface DocumentResponse {
-    status: Status;
-    document: Document | undefined;
+	status: Status;
+	document: Document | undefined;
 }
 export interface InitialSettings {
-    data_folder: string;
-    global_shortcut: string;
+	data_folder: string;
+	global_shortcut: string;
 }
 // === Role Graph Visualization Types ===
 export interface GraphNodeDto {
-    id: number;
-    label: string;
-    rank: number;
+	id: number;
+	label: string;
+	rank: number;
 }
 export interface GraphEdgeDto {
-    source: number;
-    target: number;
-    weight: number;
+	source: number;
+	target: number;
+	weight: number;
 }
 export interface RoleGraphResponse {
-    status: Status;
-    nodes: GraphNodeDto[];
-    edges: GraphEdgeDto[];
+	status: Status;
+	nodes: GraphNodeDto[];
+	edges: GraphEdgeDto[];
 }

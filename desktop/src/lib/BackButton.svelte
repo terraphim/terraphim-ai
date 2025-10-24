@@ -1,23 +1,24 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+import { onMount } from 'svelte';
 
-	export let fallbackPath: string = '/';
-	export let showText: boolean = true;
-	export let customClass: string = '';
-	// Hide button on these paths (home by default)
-	export let hideOnPaths: string[] = ['/'];
+export let fallbackPath: string = '/';
+export let showText: boolean = true;
+export let customClass: string = '';
+// Hide button on these paths (home by default)
+export let hideOnPaths: string[] = ['/'];
 
-	let isVisible = true;
+let _isVisible = true;
 
-	function updateVisibility() {
-		try {
-			const path = window.location?.pathname || '/';
-			isVisible = !hideOnPaths.includes(path);
-		} catch (_) {
-			isVisible = true;
-		}
+function updateVisibility() {
+	try {
+		const path = window.location?.pathname || '/';
+		_isVisible = !hideOnPaths.includes(path);
+	} catch (_) {
+		_isVisible = true;
 	}
+}
 
+<<<<<<< HEAD
 	// Make isVisible reactive to path changes
 	$: {
 		try {
@@ -35,27 +36,48 @@
 		} else {
 			window.location.href = fallbackPath;
 		}
+=======
+function _goBack() {
+	// Try to go back in browser history, fallback to specified path
+	if (window.history.length > 1) {
+		window.history.back();
+	} else {
+		window.location.href = fallbackPath;
+>>>>>>> origin/main
 	}
+}
 
-	onMount(() => {
+// Initialize visibility immediately
+updateVisibility();
+
+onMount(() => {
+	// Update visibility again on mount in case window object is ready
+	updateVisibility();
+
+	const handleVisibilityUpdate = () => {
 		updateVisibility();
-		window.addEventListener('popstate', updateVisibility);
-		window.addEventListener('hashchange', updateVisibility);
-		return () => {
-			window.removeEventListener('popstate', updateVisibility);
-			window.removeEventListener('hashchange', updateVisibility);
-		};
-	});
+		// Force Svelte to re-render by updating a reactive variable
+		_isVisible = _isVisible; // This triggers reactivity
+	};
+
+	window.addEventListener('popstate', handleVisibilityUpdate);
+	window.addEventListener('hashchange', handleVisibilityUpdate);
+
+	return () => {
+		window.removeEventListener('popstate', handleVisibilityUpdate);
+		window.removeEventListener('hashchange', handleVisibilityUpdate);
+	};
+});
 </script>
 
-{#if isVisible}
+{#if _isVisible}
 	<button
 		class="button is-light back-button {customClass}"
-		on:click={goBack}
+		on:click={_goBack}
 		on:keydown={(e) => {
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
-				goBack();
+				_goBack();
 			}
 		}}
 		title="Go back"

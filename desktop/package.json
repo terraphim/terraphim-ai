@@ -3,16 +3,25 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "build:ci": "NODE_OPTIONS='--max-old-space-size=8192' npm run build",
+    "build:minimal": "vite build --mode minimal",
+    "build:ultra-minimal": "vite build --mode ultra-minimal",
     "preview": "vite preview",
     "tauri": "tauri",
     "tauri:dev": "tauri dev",
     "tauri:build": "tauri build",
     "dev:tauri": "./scripts/dev-tauri.sh",
     "check": "svelte-check --tsconfig ./tsconfig.json",
+    "check:ci": "svelte-check --tsconfig ./tsconfig.json --workspace src",
     "test": "vitest",
+    "test:ci": "CI=true vitest run --reporter=verbose --no-coverage",
     "test:watch": "vitest --watch",
     "test:coverage": "vitest --coverage",
     "test:ui": "vitest --ui",
@@ -42,6 +51,10 @@
     "benchmark": "vitest --config vitest.benchmark.config.ts --run",
     "benchmark:watch": "vitest --config vitest.benchmark.config.ts",
     "benchmark:ui": "vitest --config vitest.benchmark.config.ts --ui",
+    "install:prod": "npm install --production --no-optional",
+    "install:ci": "npm ci --prefer-offline --no-audit --no-fund",
+    "clean": "rm -rf node_modules dist .svelte-kit .vite",
+    "clean:all": "npm run clean && rm -rf package-lock.json",
     "postinstall": "patch-package"
   },
   "devDependencies": {
@@ -54,7 +67,7 @@
     "@tsconfig/svelte": "^5.0.0",
     "@types/d3": "^7.4.3",
     "@types/node": "^22.9.0",
-    "@vitest/coverage-v8": "^3.2.4",
+    "@vitest/coverage-v8": "^1.6.0",
     "@vitest/ui": "^1.6.0",
     "dotenv": "^16.4.5",
     "jsdom": "^25.0.1",
@@ -68,6 +81,22 @@
     "tslib": "^2.8.1",
     "typescript": "^5.0.4",
     "vite": "^5.3.4",
+    "vitest": "^1.6.0"
+  },
+  "optionalDependencies": {
+    "@playwright/test": "^1.44.1",
+    "@tauri-apps/cli": "^1.5.11",
+    "@testing-library/jest-dom": "^6.8.0",
+    "@testing-library/svelte": "^5.2.8",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/d3": "^7.4.3",
+    "@vitest/coverage-v8": "^1.6.0",
+    "@vitest/ui": "^1.6.0",
+    "dotenv": "^17.2.3",
+    "jsdom": "^24.1.0",
+    "sass": "1.92.1",
+    "selenium-webdriver": "^4.34.0",
+    "svelte-typeahead": "^5.0.1",
     "vitest": "^1.6.0"
   },
   "dependencies": {
@@ -93,5 +122,73 @@
     "tinro": "^0.6.12",
     "tiptap-markdown": "^0.8.10",
     "tippy.js": "^6.3.7"
+  },
+  "peerDependencies": {
+    "@fortawesome/fontawesome-free": "^7.0.1",
+    "@tiptap/core": "^2.22.1",
+    "@tiptap/extension-mention": "^2.22.1",
+    "@tiptap/starter-kit": "^2.22.1",
+    "@tiptap/suggestion": "^2.22.1",
+    "@tomic/lib": "^0.40.0",
+    "@tomic/svelte": "^0.35.2",
+    "biome": "^0.3.3",
+    "bulmaswatch": "^0.8.1",
+    "d3": "^7.9.0",
+    "rollup-plugin-css-only": "^4.5.2",
+    "rollup-plugin-terser": "^7.0.2",
+    "svelma": "^0.4.5",
+    "svelte-jsoneditor": "^0.21.6",
+    "svelte-markdown": "^0.4.1",
+    "tiptap-markdown": "^0.8.10"
+  },
+  "peerDependenciesMeta": {
+    "@fortawesome/fontawesome-free": {
+      "optional": true
+    },
+    "@tiptap/core": {
+      "optional": true
+    },
+    "@tiptap/extension-mention": {
+      "optional": true
+    },
+    "@tiptap/starter-kit": {
+      "optional": true
+    },
+    "@tiptap/suggestion": {
+      "optional": true
+    },
+    "@tomic/lib": {
+      "optional": true
+    },
+    "@tomic/svelte": {
+      "optional": true
+    },
+    "biome": {
+      "optional": true
+    },
+    "bulmaswatch": {
+      "optional": true
+    },
+    "d3": {
+      "optional": true
+    },
+    "rollup-plugin-css-only": {
+      "optional": true
+    },
+    "rollup-plugin-terser": {
+      "optional": true
+    },
+    "svelma": {
+      "optional": true
+    },
+    "svelte-jsoneditor": {
+      "optional": true
+    },
+    "svelte-markdown": {
+      "optional": true
+    },
+    "tiptap-markdown": {
+      "optional": true
+    }
   }
 }
