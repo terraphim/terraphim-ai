@@ -227,6 +227,9 @@
       <button id="runElement" class="secondary">Run TerraphimElement Tests</button>
       <button id="runObservable" class="secondary">Run TerraphimObservable Tests</button>
       <button id="runEvents" class="secondary">Run TerraphimEvents Tests</button>
+      <button id="runState" class="secondary">Run TerraphimState Tests</button>
+      <button id="runStateHelpers" class="secondary">Run State Helpers Tests</button>
+      <button id="runStateIntegration" class="secondary">Run State Integration Tests</button>
       <button id="clearResults" class="secondary">Clear Results</button>
     </div>
 
@@ -252,6 +255,30 @@
         <span id="eventsStatus" class="test-suite-status">Ready</span>
       </div>
       <div id="eventsOutput" class="test-suite-output"></div>
+    </div>
+
+    <div class="test-suite">
+      <div class="test-suite-header">
+        <span>TerraphimState Tests</span>
+        <span id="stateStatus" class="test-suite-status">Ready</span>
+      </div>
+      <div id="stateOutput" class="test-suite-output"></div>
+    </div>
+
+    <div class="test-suite">
+      <div class="test-suite-header">
+        <span>State Helpers Tests</span>
+        <span id="stateHelpersStatus" class="test-suite-status">Ready</span>
+      </div>
+      <div id="stateHelpersOutput" class="test-suite-output"></div>
+    </div>
+
+    <div class="test-suite">
+      <div class="test-suite-header">
+        <span>State Integration Tests</span>
+        <span id="stateIntegrationStatus" class="test-suite-status">Ready</span>
+      </div>
+      <div id="stateIntegrationOutput" class="test-suite-output"></div>
     </div>
 
     <div class="summary">
@@ -282,6 +309,9 @@
     import { runTests as runElementTests } from './terraphim-element.test.js';
     import { runTests as runObservableTests } from './terraphim-observable.test.js';
     import { runTests as runEventsTests } from './terraphim-events.test.js';
+    import { runTests as runStateTests } from './terraphim-state.test.js';
+    import { runTests as runStateHelpersTests } from './state-helpers.test.js';
+    import { runTests as runStateIntegrationTests } from './state-integration.test.js';
 
     // State
     let totalPassed = 0;
@@ -300,6 +330,9 @@
       document.getElementById('elementOutput').innerHTML = '';
       document.getElementById('observableOutput').innerHTML = '';
       document.getElementById('eventsOutput').innerHTML = '';
+      document.getElementById('stateOutput').innerHTML = '';
+      document.getElementById('stateHelpersOutput').innerHTML = '';
+      document.getElementById('stateIntegrationOutput').innerHTML = '';
 
       document.getElementById('elementStatus').textContent = 'Ready';
       document.getElementById('elementStatus').className = 'test-suite-status';
@@ -307,6 +340,12 @@
       document.getElementById('observableStatus').className = 'test-suite-status';
       document.getElementById('eventsStatus').textContent = 'Ready';
       document.getElementById('eventsStatus').className = 'test-suite-status';
+      document.getElementById('stateStatus').textContent = 'Ready';
+      document.getElementById('stateStatus').className = 'test-suite-status';
+      document.getElementById('stateHelpersStatus').textContent = 'Ready';
+      document.getElementById('stateHelpersStatus').className = 'test-suite-status';
+      document.getElementById('stateIntegrationStatus').textContent = 'Ready';
+      document.getElementById('stateIntegrationStatus').className = 'test-suite-status';
 
       totalPassed = 0;
       totalFailed = 0;
@@ -442,12 +481,120 @@
       }
     }
 
+    // Run TerraphimState tests
+    async function runState() {
+      const statusEl = document.getElementById('stateStatus');
+      const outputEl = document.getElementById('stateOutput');
+
+      statusEl.textContent = 'Running...';
+      statusEl.className = 'test-suite-status running';
+      outputEl.innerHTML = '<div class="loading"></div> Running tests...';
+
+      const restore = captureConsole(outputEl);
+
+      try {
+        const result = await runStateTests();
+        restore();
+
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        totalTests += result.total;
+        updateSummary();
+
+        if (result.failed === 0) {
+          statusEl.textContent = 'All Passed';
+          statusEl.className = 'test-suite-status passed';
+        } else {
+          statusEl.textContent = `${result.failed} Failed`;
+          statusEl.className = 'test-suite-status failed';
+        }
+      } catch (error) {
+        restore();
+        statusEl.textContent = 'Error';
+        statusEl.className = 'test-suite-status failed';
+        outputEl.innerHTML += `<div class="error-details">Error running tests: ${error.message}</div>`;
+      }
+    }
+
+    // Run State Helpers tests
+    async function runStateHelpers() {
+      const statusEl = document.getElementById('stateHelpersStatus');
+      const outputEl = document.getElementById('stateHelpersOutput');
+
+      statusEl.textContent = 'Running...';
+      statusEl.className = 'test-suite-status running';
+      outputEl.innerHTML = '<div class="loading"></div> Running tests...';
+
+      const restore = captureConsole(outputEl);
+
+      try {
+        const result = await runStateHelpersTests();
+        restore();
+
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        totalTests += result.total;
+        updateSummary();
+
+        if (result.failed === 0) {
+          statusEl.textContent = 'All Passed';
+          statusEl.className = 'test-suite-status passed';
+        } else {
+          statusEl.textContent = `${result.failed} Failed`;
+          statusEl.className = 'test-suite-status failed';
+        }
+      } catch (error) {
+        restore();
+        statusEl.textContent = 'Error';
+        statusEl.className = 'test-suite-status failed';
+        outputEl.innerHTML += `<div class="error-details">Error running tests: ${error.message}</div>`;
+      }
+    }
+
+    // Run State Integration tests
+    async function runStateIntegration() {
+      const statusEl = document.getElementById('stateIntegrationStatus');
+      const outputEl = document.getElementById('stateIntegrationOutput');
+
+      statusEl.textContent = 'Running...';
+      statusEl.className = 'test-suite-status running';
+      outputEl.innerHTML = '<div class="loading"></div> Running tests...';
+
+      const restore = captureConsole(outputEl);
+
+      try {
+        const result = await runStateIntegrationTests();
+        restore();
+
+        totalPassed += result.passed;
+        totalFailed += result.failed;
+        totalTests += result.total;
+        updateSummary();
+
+        if (result.failed === 0) {
+          statusEl.textContent = 'All Passed';
+          statusEl.className = 'test-suite-status passed';
+        } else {
+          statusEl.textContent = `${result.failed} Failed`;
+          statusEl.className = 'test-suite-status failed';
+        }
+      } catch (error) {
+        restore();
+        statusEl.textContent = 'Error';
+        statusEl.className = 'test-suite-status failed';
+        outputEl.innerHTML += `<div class="error-details">Error running tests: ${error.message}</div>`;
+      }
+    }
+
     // Run all tests
     async function runAll() {
       clearResults();
       await runElement();
       await runObservable();
       await runEvents();
+      await runState();
+      await runStateHelpers();
+      await runStateIntegration();
     }
 
     // Event listeners
@@ -455,6 +602,9 @@
     document.getElementById('runElement').addEventListener('click', runElement);
     document.getElementById('runObservable').addEventListener('click', runObservable);
     document.getElementById('runEvents').addEventListener('click', runEvents);
+    document.getElementById('runState').addEventListener('click', runState);
+    document.getElementById('runStateHelpers').addEventListener('click', runStateHelpers);
+    document.getElementById('runStateIntegration').addEventListener('click', runStateIntegration);
     document.getElementById('clearResults').addEventListener('click', clearResults);
 
     // Auto-run on load

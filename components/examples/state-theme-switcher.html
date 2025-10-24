@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>State Management Example: Theme Switcher</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+      padding: 40px;
+      transition: background 0.3s, color 0.3s;
+    }
+
+    body[data-theme="light"] {
+      background: #f5f5f5;
+      color: #333;
+    }
+
+    body[data-theme="dark"] {
+      background: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 10px;
+    }
+
+    .subtitle {
+      color: #7f8c8d;
+      margin-bottom: 40px;
+      font-size: 14px;
+    }
+
+    .demo {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 30px;
+    }
+
+    body[data-theme="dark"] .demo {
+      background: #2a2a2a;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+    }
+
+    .info {
+      background: #ecf0f1;
+      padding: 20px;
+      border-radius: 4px;
+      margin-bottom: 20px;
+      font-size: 14px;
+    }
+
+    body[data-theme="dark"] .info {
+      background: #333;
+    }
+
+    code {
+      background: #f8f8f8;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 13px;
+    }
+
+    body[data-theme="dark"] code {
+      background: #444;
+    }
+  </style>
+</head>
+<body data-theme="light">
+  <div class="container">
+    <h1>State Management Example</h1>
+    <p class="subtitle">Theme Switcher using TerraphimState</p>
+
+    <div class="demo">
+      <div class="info">
+        This example demonstrates:
+        <ul>
+          <li>Creating global state with <code>createGlobalState()</code></li>
+          <li>Binding state to component properties with <code>bindState()</code></li>
+          <li>Updating state with <code>setState()</code></li>
+          <li>Automatic cleanup on component disconnect</li>
+          <li>Persistence to localStorage</li>
+        </ul>
+      </div>
+
+      <theme-switcher></theme-switcher>
+      <br><br>
+      <theme-display></theme-display>
+    </div>
+
+    <div class="demo">
+      <h3>State Inspector</h3>
+      <state-inspector></state-inspector>
+    </div>
+  </div>
+
+  <script type="module">
+    import { TerraphimElement } from '../base/terraphim-element.js';
+    import { createGlobalState } from '../base/terraphim-state.js';
+
+    // Create global state with persistence
+    const globalState = createGlobalState({
+      theme: 'light',
+      lastChanged: null
+    }, {
+      persist: true,
+      storagePrefix: 'example'
+    });
+
+    // Restore from localStorage on load
+    const stored = localStorage.getItem('example:state');
+    if (stored) {
+      try {
+        const state = JSON.parse(stored);
+        if (state.theme) {
+          globalState.set('theme', state.theme, true);
+          document.body.setAttribute('data-theme', state.theme);
+        }
+      } catch (e) {
+        console.error('Failed to restore state:', e);
+      }
+    }
+
+    // Theme Switcher Component
+    class ThemeSwitcher extends TerraphimElement {
+      static get properties() {
+        return {
+          currentTheme: { type: String }
+        };
+      }
+
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        // Bind state to property
+        this.bindState(globalState, 'theme', 'currentTheme', {
+          immediate: true
+        });
+      }
+
+      handleToggle() {
+        const newTheme = this.currentTheme === 'light' ? 'dark' : 'light';
+
+        // Update state (triggers all subscribers)
+        this.setState(globalState, 'theme', newTheme);
+        this.setState(globalState, 'lastChanged', new Date().toISOString());
+
+        // Update body attribute
+        document.body.setAttribute('data-theme', newTheme);
+      }
+
+      render() {
+        const buttonText = this.currentTheme === 'light'
+          ? 'Switch to Dark Mode'
+          : 'Switch to Light Mode';
+
+        this.setHTML(this.shadowRoot, `
+          <style>
+            button {
+              padding: 12px 24px;
+              background: #3498db;
+              color: white;
+              border: none;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+              transition: background 0.2s;
+            }
+
+            button:hover {
+              background: #2980b9;
+            }
+
+            button:active {
+              transform: translateY(1px);
+            }
+          </style>
+
+          <button id="toggleBtn">${buttonText}</button>
+        `);
+
+        this.$('#toggleBtn').addEventListener('click', () => this.handleToggle());
+      }
+    }
+
+    customElements.define('theme-switcher', ThemeSwitcher);
+
+    // Theme Display Component
+    class ThemeDisplay extends TerraphimElement {
+      static get properties() {
+        return {
+          theme: { type: String },
+          lastChanged: { type: String }
+        };
+      }
+
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        // Multiple state bindings
+        this.bindState(globalState, 'theme', 'theme', { immediate: true });
+        this.bindState(globalState, 'lastChanged', 'lastChanged', { immediate: true });
+      }
+
+      render() {
+        const lastChangedText = this.lastChanged
+          ? `Last changed: ${new Date(this.lastChanged).toLocaleString()}`
+          : 'Never changed';
+
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .display {
+              padding: 20px;
+              background: #ecf0f1;
+              border-radius: 4px;
+              font-size: 14px;
+            }
+
+            :host([theme="dark"]) .display {
+              background: #333;
+              color: #e0e0e0;
+            }
+
+            .theme {
+              font-size: 20px;
+              font-weight: 600;
+              margin-bottom: 10px;
+              text-transform: capitalize;
+            }
+
+            .timestamp {
+              color: #7f8c8d;
+              font-size: 12px;
+            }
+          </style>
+
+          <div class="display">
+            <div class="theme">Current Theme: ${this.theme}</div>
+            <div class="timestamp">${lastChangedText}</div>
+          </div>
+        `);
+
+        // Update host attribute for styling
+        this.setAttribute('theme', this.theme);
+      }
+    }
+
+    customElements.define('theme-display', ThemeDisplay);
+
+    // State Inspector Component
+    class StateInspector extends TerraphimElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        // Subscribe to all state changes
+        this.bindState(globalState, 'theme', () => this.requestUpdate());
+        this.bindState(globalState, 'lastChanged', () => this.requestUpdate());
+      }
+
+      render() {
+        const snapshot = globalState.getSnapshot();
+        const stateJSON = JSON.stringify(snapshot, null, 2);
+
+        this.setHTML(this.shadowRoot, `
+          <style>
+            pre {
+              background: #f8f8f8;
+              padding: 15px;
+              border-radius: 4px;
+              overflow-x: auto;
+              font-family: 'Consolas', 'Monaco', monospace;
+              font-size: 13px;
+              line-height: 1.5;
+            }
+
+            :host {
+              display: block;
+            }
+          </style>
+
+          <pre>${stateJSON}</pre>
+        `);
+      }
+    }
+
+    customElements.define('state-inspector', StateInspector);
+
+    console.log('Theme Switcher Example loaded. Try switching themes!');
+    console.log('Global state:', globalState.getSnapshot());
+  </script>
+</body>
+</html>

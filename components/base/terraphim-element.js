@@ -114,6 +114,13 @@ export class TerraphimElement extends HTMLElement {
      */
     this._propertiesInitialized = false;
 
+    /**
+     * State bindings for this component
+     * @private
+     * @type {Map<string, Object>}
+     */
+    this._stateBindings = new Map();
+
     // Initialize properties from property definitions
     this._initializeProperties();
   }
@@ -298,6 +305,9 @@ export class TerraphimElement extends HTMLElement {
     if (typeof this.onDisconnected === 'function') {
       this.onDisconnected();
     }
+
+    // Cleanup state bindings
+    this._cleanupStateBindings();
 
     // Execute all cleanup functions
     this._cleanupFunctions.forEach(fn => {
@@ -548,5 +558,97 @@ export class TerraphimElement extends HTMLElement {
    */
   requestUpdate() {
     this._scheduleRender();
+  }
+
+  /**
+   * Bind a state path to a component property or callback
+   *
+   * @param {Object} state - TerraphimState instance
+   * @param {string} statePath - Path in state to bind (e.g., "user.name")
+   * @param {string|Function} target - Property name or callback function
+   * @param {Object} [options={}] - Subscription options
+   * @returns {Function} Unsubscribe function
+   *
+   * @example
+   * // Bind to property
+   * this.bindState(globalState, 'theme', 'currentTheme');
+   *
+   * // Bind to callback
+   * this.bindState(globalState, 'user.name', (value) => {
+   *   this.$('.username').textContent = value;
+   * });
+   *
+   * // With options
+   * this.bindState(globalState, 'config', this.updateConfig, {
+   *   immediate: true,
+   *   deep: true
+   * });
+   */
+  bindState(state, statePath, target, options = {}) {
+    const callback = typeof target === 'function'
+      ? target
+      : (value) => { this[target] = value; };
+
+    // Subscribe to state changes
+    const unsubscribe = state.subscribe(statePath, (value, oldValue, path) => {
+      callback.call(this, value, oldValue, path);
+    }, options);
+
+    // Store binding for cleanup
+    const bindingKey = `${statePath}:${typeof target === 'string' ? target : 'callback'}`;
+    this._stateBindings.set(bindingKey, { unsubscribe, state, statePath, target });
+
+    // Add to cleanup functions
+    this.addCleanup(unsubscribe);
+
+    return unsubscribe;
+  }
+
+  /**
+   * Set a value in state
+   * Convenience method for updating state from components
+   *
+   * @param {Object} state - TerraphimState instance
+   * @param {string} path - Path to update
+   * @param {*} value - New value
+   *
+   * @example
+   * this.setState(globalState, 'theme', 'dark');
+   * this.setState(globalState, 'user.name', 'Alice');
+   */
+  setState(state, path, value) {
+    state.set(path, value);
+  }
+
+  /**
+   * Get a value from state
+   * Convenience method for reading state in components
+   *
+   * @param {Object} state - TerraphimState instance
+   * @param {string} path - Path to read
+   * @returns {*} Value at path
+   *
+   * @example
+   * const theme = this.getState(globalState, 'theme');
+   * const userName = this.getState(globalState, 'user.name');
+   */
+  getState(state, path) {
+    return state.get(path);
+  }
+
+  /**
+   * Cleanup all state bindings
+   * Called automatically on disconnect
+   * @private
+   */
+  _cleanupStateBindings() {
+    this._stateBindings.forEach(({ unsubscribe }) => {
+      try {
+        unsubscribe();
+      } catch (e) {
+        console.error('Error cleaning up state binding:', e);
+      }
+    });
+    this._stateBindings.clear();
   }
 }

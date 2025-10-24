@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Theme Switcher - State Management Example</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      margin: 0;
+      padding: 20px;
+      transition: background-color 0.3s, color 0.3s;
+    }
+
+    body.light {
+      background-color: #ffffff;
+      color: #333333;
+    }
+
+    body.dark {
+      background-color: #1a1a1a;
+      color: #e0e0e0;
+    }
+
+    body.spacelab {
+      background-color: #f8f8f8;
+      color: #2c3e50;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      margin-bottom: 30px;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.1);
+      padding: 20px;
+      border-radius: 8px;
+      margin-bottom: 20px;
+      border: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    body.dark .card {
+      background: rgba(255, 255, 255, 0.05);
+      border-color: rgba(255, 255, 255, 0.1);
+    }
+  </style>
+</head>
+<body class="spacelab">
+  <div class="container">
+    <h1>Theme Switcher Example</h1>
+
+    <div class="card">
+      <h2>Current Theme: <span id="current-theme">spacelab</span></h2>
+      <theme-switcher></theme-switcher>
+    </div>
+
+    <div class="card">
+      <h3>State Inspector</h3>
+      <pre id="state-output"></pre>
+    </div>
+  </div>
+
+  <script type="module">
+    import { TerraphimState, createGlobalState } from '../base/terraphim-state.js';
+    import { TerraphimElement } from '../base/terraphim-element.js';
+
+    // Create global state with initial theme
+    const globalState = createGlobalState({
+      theme: 'spacelab',
+      user: {
+        name: 'Guest',
+        preferences: {
+          darkMode: false
+        }
+      }
+    }, {
+      persist: true,
+      debug: true
+    });
+
+    // Theme Switcher Component
+    class ThemeSwitcher extends TerraphimElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        // Bind to theme state
+        this.bindState(globalState, 'theme', (theme) => {
+          this.currentTheme = theme;
+          this.render();
+        }, { immediate: true });
+
+        this.render();
+      }
+
+      render() {
+        this.setHTML(this.shadowRoot, `
+          <style>
+            :host {
+              display: block;
+            }
+
+            .theme-buttons {
+              display: flex;
+              gap: 10px;
+              flex-wrap: wrap;
+            }
+
+            button {
+              padding: 10px 20px;
+              border: 2px solid currentColor;
+              background: transparent;
+              color: inherit;
+              border-radius: 4px;
+              cursor: pointer;
+              font-size: 14px;
+              font-weight: 500;
+              transition: all 0.2s;
+            }
+
+            button:hover {
+              transform: translateY(-2px);
+              box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            button.active {
+              background: currentColor;
+              color: white;
+            }
+
+            button:disabled {
+              opacity: 0.5;
+              cursor: not-allowed;
+            }
+          </style>
+
+          <div class="theme-buttons">
+            <button
+              class="${this.currentTheme === 'light' ? 'active' : ''}"
+              data-theme="light"
+            >
+              Light
+            </button>
+            <button
+              class="${this.currentTheme === 'dark' ? 'active' : ''}"
+              data-theme="dark"
+            >
+              Dark
+            </button>
+            <button
+              class="${this.currentTheme === 'spacelab' ? 'active' : ''}"
+              data-theme="spacelab"
+            >
+              Spacelab
+            </button>
+          </div>
+        `);
+
+        // Add event listeners
+        this.$$('button').forEach(button => {
+          button.addEventListener('click', () => {
+            const theme = button.dataset.theme;
+            this.setState(globalState, 'theme', theme);
+          });
+        });
+      }
+    }
+
+    customElements.define('theme-switcher', ThemeSwitcher);
+
+    // Update body class based on theme
+    globalState.subscribe('theme', (theme) => {
+      document.body.className = theme;
+      document.getElementById('current-theme').textContent = theme;
+    }, { immediate: true });
+
+    // Update state inspector
+    globalState.subscribe('*', () => {
+      const stateOutput = document.getElementById('state-output');
+      stateOutput.textContent = JSON.stringify(globalState.getSnapshot(), null, 2);
+    }, { immediate: true, debounce: 100 });
+
+    // Make state available for debugging
+    window.globalState = globalState;
+  </script>
+</body>
+</html>

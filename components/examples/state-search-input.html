@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>State Management Example: Search Input</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 40px;
+      background: #f5f5f5;
+    }
+    .container { max-width: 800px; margin: 0 auto; }
+    h1 { margin-bottom: 10px; }
+    .subtitle { color: #7f8c8d; margin-bottom: 40px; font-size: 14px; }
+    .demo {
+      background: white;
+      padding: 30px;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>Search Input Example</h1>
+    <p class="subtitle">Demonstrates debounced input, derived values, and async updates</p>
+
+    <div class="demo">
+      <search-input></search-input>
+    </div>
+
+    <div class="demo">
+      <search-results></search-results>
+    </div>
+
+    <div class="demo">
+      <h3>State Inspector</h3>
+      <state-inspector></state-inspector>
+    </div>
+  </div>
+
+  <script type="module">
+    import { TerraphimElement } from '../base/terraphim-element.js';
+    import { createGlobalState } from '../base/terraphim-state.js';
+    import { derived, createAction, createDebouncedSetter } from '../base/state-helpers.js';
+
+    // Create global state
+    const globalState = createGlobalState({
+      search: {
+        query: '',
+        loading: false,
+        results: []
+      }
+    });
+
+    // Debounced setter for search query
+    const debouncedSetQuery = createDebouncedSetter(globalState, 300);
+
+    // Derived value: has results
+    const hasResults = derived(
+      globalState,
+      ['search.results'],
+      (results) => results.length > 0,
+      false
+    );
+
+    // Action: perform search (simulated)
+    const performSearch = createAction(globalState, 'performSearch', async (state, query) => {
+      if (!query) {
+        state.batch(() => {
+          state.set('search.loading', false);
+          state.set('search.results', []);
+        });
+        return;
+      }
+
+      state.set('search.loading', true);
+
+      // Simulate API call
+      await new Promise(resolve => setTimeout(resolve, 500));
+
+      const mockResults = [
+        `Result for "${query}" #1`,
+        `Result for "${query}" #2`,
+        `Result for "${query}" #3`,
+        `Result for "${query}" #4`,
+        `Result for "${query}" #5`
+      ];
+
+      state.batch(() => {
+        state.set('search.loading', false);
+        state.set('search.results', mockResults);
+      });
+    });
+
+    // Watch query changes and trigger search
+    globalState.subscribe('search.query', (query) => {
+      performSearch(query);
+    }, { debounce: 300 });
+
+    // Search Input Component
+    class SearchInput extends TerraphimElement {
+      static get properties() {
+        return {
+          query: { type: String },
+          loading: { type: Boolean }
+        };
+      }
+
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        this.bindState(globalState, 'search.query', 'query', { immediate: true });
+        this.bindState(globalState, 'search.loading', 'loading', { immediate: true });
+      }
+
+      handleInput(event) {
+        const value = event.target.value;
+        debouncedSetQuery('search.query', value);
+      }
+
+      render() {
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .search-box {
+              position: relative;
+            }
+
+            input {
+              width: 100%;
+              padding: 15px;
+              font-size: 16px;
+              border: 2px solid #e0e0e0;
+              border-radius: 4px;
+              outline: none;
+              transition: border-color 0.2s;
+            }
+
+            input:focus {
+              border-color: #3498db;
+            }
+
+            .loading {
+              position: absolute;
+              right: 15px;
+              top: 50%;
+              transform: translateY(-50%);
+              width: 20px;
+              height: 20px;
+              border: 2px solid #3498db;
+              border-radius: 50%;
+              border-top-color: transparent;
+              animation: spin 0.6s linear infinite;
+            }
+
+            @keyframes spin {
+              to { transform: translateY(-50%) rotate(360deg); }
+            }
+
+            .info {
+              margin-top: 10px;
+              font-size: 13px;
+              color: #7f8c8d;
+            }
+          </style>
+
+          <div class="search-box">
+            <input type="text"
+                   placeholder="Type to search..."
+                   value="${this.query}">
+            ${this.loading ? '<div class="loading"></div>' : ''}
+          </div>
+          <div class="info">
+            Query is debounced by 300ms
+          </div>
+        `);
+
+        this.$('input').addEventListener('input', (e) => this.handleInput(e));
+      }
+    }
+
+    customElements.define('search-input', SearchInput);
+
+    // Search Results Component
+    class SearchResults extends TerraphimElement {
+      static get properties() {
+        return {
+          results: { type: Array },
+          loading: { type: Boolean }
+        };
+      }
+
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        this.bindState(globalState, 'search.results', 'results', { immediate: true });
+        this.bindState(globalState, 'search.loading', 'loading', { immediate: true });
+      }
+
+      render() {
+        let content = '';
+
+        if (this.loading) {
+          content = '<p class="message">Searching...</p>';
+        } else if (this.results.length === 0) {
+          content = '<p class="message">No results. Try searching for something!</p>';
+        } else {
+          content = `
+            <ul>
+              ${this.results.map(result => `<li>${result}</li>`).join('')}
+            </ul>
+          `;
+        }
+
+        this.setHTML(this.shadowRoot, `
+          <style>
+            .message {
+              color: #7f8c8d;
+              font-style: italic;
+              text-align: center;
+              padding: 40px;
+            }
+
+            ul {
+              list-style: none;
+            }
+
+            li {
+              padding: 15px;
+              border-bottom: 1px solid #ecf0f1;
+              transition: background 0.2s;
+            }
+
+            li:last-child {
+              border-bottom: none;
+            }
+
+            li:hover {
+              background: #f8f9fa;
+            }
+          </style>
+
+          <div class="results">
+            ${content}
+          </div>
+        `);
+      }
+    }
+
+    customElements.define('search-results', SearchResults);
+
+    // State Inspector Component
+    class StateInspector extends TerraphimElement {
+      constructor() {
+        super();
+        this.attachShadow({ mode: 'open' });
+      }
+
+      onConnected() {
+        this.bindState(globalState, 'search', () => this.requestUpdate(), { deep: true });
+      }
+
+      render() {
+        const snapshot = globalState.getSnapshot();
+        const stateJSON = JSON.stringify(snapshot, null, 2);
+
+        this.setHTML(this.shadowRoot, `
+          <style>
+            pre {
+              background: #f8f8f8;
+              padding: 15px;
+              border-radius: 4px;
+              overflow-x: auto;
+              font-family: 'Consolas', monospace;
+              font-size: 13px;
+            }
+          </style>
+          <pre>${stateJSON}</pre>
+        `);
+      }
+    }
+
+    customElements.define('state-inspector', StateInspector);
+
+    console.log('Search Input Example loaded.');
+  </script>
+</body>
+</html>

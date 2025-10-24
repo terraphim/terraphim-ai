@@ -4,11 +4,12 @@ Pure vanilla JavaScript foundation for building modern web components with react
 
 ## Overview
 
-This library provides three core building blocks for creating sophisticated web components:
+This library provides four core building blocks for creating sophisticated web components:
 
 1. **TerraphimElement** - Base class with lifecycle hooks, property reflection, and DOM utilities
 2. **TerraphimObservable** - Mixin for reactive state management with proxy-based observation
 3. **TerraphimEvents** - Global event bus and mixin for cross-component communication
+4. **TerraphimState** - Global state management with path-based subscriptions and persistence
 
 ## Installation
 
@@ -18,6 +19,7 @@ No installation required. Simply import the modules directly:
 import { TerraphimElement } from './base/terraphim-element.js';
 import { TerraphimObservable } from './base/terraphim-observable.js';
 import { TerraphimEvents, TerraphimEventBus } from './base/terraphim-events.js';
+import { TerraphimState } from './base/terraphim-state.js';
 ```
 
 Or use the barrel export:
@@ -26,7 +28,8 @@ Or use the barrel export:
 import {
   TerraphimElement,
   TerraphimObservable,
-  TerraphimEvents
+  TerraphimEvents,
+  TerraphimState
 } from './base/index.js';
 ```
 
@@ -497,6 +500,185 @@ class TodoList extends TerraphimEventBus(TerraphimObservable(TerraphimElement)) 
 
 customElements.define('todo-list', TodoList);
 ```
+
+## TerraphimState
+
+Global state management system with path-based access, subscriptions, and persistence. Ideal for application-wide state that needs to be shared across components.
+
+### Features
+
+- **Path-Based Access**: Get/set values using dot notation (`user.name`, `config.haystacks.0`)
+- **Reactive Subscriptions**: Subscribe to specific paths with wildcard support
+- **Persistence**: Built-in localStorage integration
+- **Batch Updates**: Group multiple changes into single notifications
+- **Debugging Tools**: Snapshots, time travel, history tracking
+- **Middleware System**: Plugin architecture for validation, logging, etc.
+- **Component Integration**: Seamless binding with TerraphimElement
+
+### Basic Usage
+
+```javascript
+import { TerraphimState, createGlobalState } from './base/terraphim-state.js';
+
+// Create global state instance
+const globalState = createGlobalState({
+  theme: 'light',
+  user: { name: 'Alice', role: 'admin' },
+  config: { haystacks: [] }
+}, {
+  persist: true,
+  storagePrefix: 'terraphim'
+});
+
+// Subscribe to changes
+globalState.subscribe('theme', (value) => {
+  console.log('Theme changed:', value);
+});
+
+// Update state
+globalState.set('theme', 'dark');
+
+// Get values
+const theme = globalState.get('theme');
+const userName = globalState.get('user.name');
+
+// Batch updates
+globalState.batch(() => {
+  globalState.set('user.name', 'Bob');
+  globalState.set('user.role', 'user');
+});
+```
+
+### Component Integration
+
+TerraphimElement provides built-in methods for state binding:
+
+```javascript
+class ThemeComponent extends TerraphimElement {
+  static get properties() {
+    return {
+      currentTheme: { type: String }
+    };
+  }
+
+  onConnected() {
+    // Bind state to property (automatic cleanup on disconnect)
+    this.bindState(globalState, 'theme', 'currentTheme', {
+      immediate: true
+    });
+
+    // Or bind to callback
+    this.bindState(globalState, 'user.name', (value) => {
+      this.$('.username').textContent = value;
+    });
+  }
+
+  handleClick() {
+    // Update state
+    const current = this.getState(globalState, 'theme');
+    const newTheme = current === 'light' ? 'dark' : 'light';
+    this.setState(globalState, 'theme', newTheme);
+  }
+}
+```
+
+### Helper Utilities
+
+```javascript
+import {
+  computed,
+  derived,
+  createAction,
+  validate,
+  waitFor
+} from './base/state-helpers.js';
+
+// Computed values
+const fullName = computed(
+  globalState,
+  ['user.firstName', 'user.lastName'],
+  (first, last) => `${first} ${last}`
+);
+
+// Derived stores
+const userCount = derived(
+  globalState,
+  ['users'],
+  (users) => users.length,
+  0
+);
+
+// Actions
+const setTheme = createAction(globalState, 'setTheme', (state, theme) => {
+  if (!['light', 'dark'].includes(theme)) {
+    throw new Error('Invalid theme');
+  }
+  state.set('theme', theme);
+});
+
+// Validation
+const validator = validate({
+  'user.email': (value) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
+});
+globalState.use(validator);
+
+// Wait for condition
+await waitFor(globalState, 'user', (user) => user !== null);
+```
+
+### Wildcard Subscriptions
+
+```javascript
+// Subscribe to all items in array
+globalState.subscribe('config.haystacks.*', (value, oldValue, path) => {
+  console.log(`Haystack changed at ${path}`);
+});
+
+// Subscribe to parent (with deep option)
+globalState.subscribe('user', (value, oldValue, path) => {
+  console.log('User or nested property changed');
+}, { deep: true });
+```
+
+### Advanced Features
+
+```javascript
+// Debounced subscriptions
+globalState.subscribe('search.query', handleSearch, {
+  debounce: 300
+});
+
+// RequestAnimationFrame subscriptions
+globalState.subscribe('animation.progress', updateUI, {
+  useRAF: true
+});
+
+// Once subscriptions
+globalState.subscribe('initialized', onInit, {
+  once: true
+});
+
+// Snapshots and time travel (debug mode)
+const state = new TerraphimState({ value: 0 }, { debug: true });
+state.set('value', 1);
+state.set('value', 2);
+state.undo(1); // Go back to value: 1
+```
+
+### Documentation
+
+For complete API reference and migration guide:
+
+- **[STATE-MANAGEMENT.md](./STATE-MANAGEMENT.md)** - Complete API documentation
+- **[MIGRATION-GUIDE.md](./MIGRATION-GUIDE.md)** - Migrating from Svelte stores
+
+### Examples
+
+See `components/examples/` for working examples:
+
+- `state-theme-switcher.html` - Theme switching with persistence
+- `state-role-selector.html` - Role selection with derived values
+- `state-search-input.html` - Debounced search with async updates
 
 ## Testing
 
