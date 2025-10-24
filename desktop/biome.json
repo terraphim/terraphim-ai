@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.2.6/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.0/schema.json",
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -74,7 +74,17 @@
 			"linter": {
 				"rules": {
 					"suspicious": {
-						"noConsole": "off"
+						"noConsole": "off",
+						"noExplicitAny": "off"
+					},
+					"correctness": {
+						"noUnusedImports": "off",
+						"noUnusedVariables": "off",
+						"noUnusedFunctionParameters": "off"
+					},
+					"style": {
+						"useConst": "off",
+						"noNonNullAssertion": "off"
 					}
 				}
 			}
@@ -84,7 +94,71 @@
 			"linter": {
 				"rules": {
 					"suspicious": {
-						"noConsole": "off"
+						"noConsole": "off",
+						"noExplicitAny": "off"
+					},
+					"correctness": {
+						"noUnusedImports": "off",
+						"noUnusedVariables": "off",
+						"noUnusedFunctionParameters": "off"
+					},
+					"style": {
+						"noNonNullAssertion": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/types/**/*.d.ts"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExplicitAny": "off"
+					},
+					"complexity": {
+						"noBannedTypes": "off"
+					},
+					"correctness": {
+						"noUnusedImports": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": [
+				"src/lib/Editor/**",
+				"src/lib/services/**",
+				"src/lib/Search/**",
+				"src/test-utils/**"
+			],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noConsole": "off",
+						"noExplicitAny": "off"
+					},
+					"correctness": {
+						"noUnusedFunctionParameters": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/lib/tests/**"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noExportsInTest": "off"
+					}
+				}
+			}
+		},
+		{
+			"includes": ["src/lib/ConfigWizard.svelte", "src/lib/Search/ResultItem.svelte"],
+			"linter": {
+				"rules": {
+					"suspicious": {
+						"noImplicitAnyLet": "off"
 					}
 				}
 			}

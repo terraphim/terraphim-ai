@@ -136,7 +136,8 @@ max_log_files = 10
 [security]
 # Security settings
 enable_authentication = false
-api_key_required = false
+# pragma: allowlist secret
+api_key_required = false # pragma: allowlist secret
 
 # Rate limiting
 enable_rate_limiting = true

@@ -40,8 +40,8 @@
 		"test:atomic:secret": "CI=true playwright test tests/e2e/atomic-secret-authentication.spec.ts --workers=1 --retries=3",
 		"test:atomic:save": "CI=true playwright test tests/e2e/atomic-save-widget.spec.ts --workers=1 --retries=3",
 		"test:haystack": "CI=true playwright test tests/e2e/atomic-server-haystack.spec.ts tests/e2e/rolegraph-search-validation.spec.ts --workers=1 --retries=3",
-		"test:all": "CI=true npm run test && npm run e2e:ci",
-		"test:all:ci": "CI=true npm run test:ci && npm run test:e2e:ci",
+		"test:all": "CI=true yarn run test && yarn run e2e:ci",
+		"test:all:ci": "CI=true yarn run test:coverage && yarn run test:e2e:ci && yarn run test:atomic:ci",
 		"test:webdriver": "playwright test --config=playwright.webdriver.config.ts",
 		"test:webdriver:headed": "playwright test --config=playwright.webdriver.config.ts --headed",
 		"test:webdriver:ui": "playwright test --config=playwright.webdriver.config.ts --ui",
@@ -54,19 +54,34 @@
 		"install:prod": "npm install --production --no-optional",
 		"install:ci": "npm ci --prefer-offline --no-audit --no-fund",
 		"clean": "rm -rf node_modules dist .svelte-kit .vite",
-		"clean:all": "npm run clean && rm -rf package-lock.json"
+		"clean:all": "npm run clean && rm -rf package-lock.json",
+		"postinstall": "patch-package"
 	},
 	"devDependencies": {
-		"@sveltejs/vite-plugin-svelte": "^3.1.2",
-		"@tsconfig/svelte": "^5.0.4",
-		"@types/node": "^24.7.2",
-		"svelte": "^4.2.19",
-		"svelte-check": "^3.8.6",
-		"svelte-preprocess": "^6.0.2",
-		"terser": "^5.44.0",
-		"tslib": "^2.5.0",
+		"@playwright/test": "^1.44.1",
+		"@sveltejs/vite-plugin-svelte": "^4.0.0",
+		"@tauri-apps/cli": "^1.5.11",
+		"@testing-library/jest-dom": "^6.9.1",
+		"@testing-library/svelte": "^4.0.0",
+		"@testing-library/user-event": "^14.5.2",
+		"@tsconfig/svelte": "^5.0.0",
+		"@types/d3": "^7.4.3",
+		"@types/node": "^22.9.0",
+		"@vitest/coverage-v8": "^1.6.0",
+		"@vitest/ui": "^1.6.0",
+		"dotenv": "^16.4.5",
+		"jsdom": "^25.0.1",
+		"patch-package": "^8.0.0",
+		"sass": "^1.83.0",
+		"selenium-webdriver": "^4.21.0",
+		"svelte": "^5.2.8",
+		"svelte-check": "^4.0.0",
+		"svelte-preprocess": "^5.1.0",
+		"svelte-typeahead": "^4.4.1",
+		"tslib": "^2.8.1",
 		"typescript": "^5.0.4",
-		"vite": "^5.4.20"
+		"vite": "^5.3.4",
+		"vitest": "^1.6.0"
 	},
 	"optionalDependencies": {
 		"@playwright/test": "^1.44.1",
@@ -85,12 +100,28 @@
 		"vitest": "^1.6.0"
 	},
 	"dependencies": {
+		"@fortawesome/fontawesome-free": "^7.0.1",
+		"@paralect/novel-svelte": "0.0.7",
 		"@tauri-apps/api": "^1.2.0",
-		"bulma": "^0.9.4",
+		"@tiptap/core": "^2.22.1",
+		"@tiptap/extension-mention": "^2.22.1",
+		"@tiptap/starter-kit": "^2.22.1",
+		"@tiptap/suggestion": "^2.22.1",
+		"@tomic/lib": "^0.40.0",
+		"biome": "^0.3.3",
+		"bulma": "^1.0.2",
+		"bulmaswatch": "^0.8.1",
 		"comlink-fetch": "^0.1.2",
+		"d3": "^7.9.0",
+		"rollup-plugin-css-only": "^4.5.2",
+		"rollup-plugin-terser": "^7.0.2",
+		"svelma": "^0.4.5",
+		"svelte-jsoneditor": "^0.21.6",
+		"svelte-markdown": "^0.4.1",
 		"svelte-routing": "^2.13.0",
 		"tinro": "^0.6.12",
-		"tippy.js": "^6.3.7"
+		"tippy.js": "^6.3.7",
+		"tiptap-markdown": "^0.8.10"
 	},
 	"peerDependencies": {
 		"@fortawesome/fontawesome-free": "^7.0.1",
@@ -107,8 +138,7 @@
 		"rollup-plugin-terser": "^7.0.2",
 		"svelma": "^0.4.5",
 		"svelte-jsoneditor": "^0.21.6",
-		"svelte-markdown": "^0.4.1",
-		"tiptap-markdown": "^0.8.10"
+		"svelte-markdown": "^0.4.1"
 	},
 	"peerDependenciesMeta": {
 		"@fortawesome/fontawesome-free": {

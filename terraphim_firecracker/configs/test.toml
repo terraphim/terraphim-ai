@@ -87,7 +87,8 @@ max_log_files = 3
 
 [security]
 enable_authentication = false
-api_key_required = false
+# pragma: allowlist secret
+api_key_required = false # pragma: allowlist secret
 enable_rate_limiting = false
 rate_limit_requests_per_minute = 60
 rate_limit_burst = 10
