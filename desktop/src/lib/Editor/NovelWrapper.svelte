@@ -1,11 +1,14 @@
 <script lang="ts">
 import { onDestroy, onMount } from 'svelte';
+// @ts-expect-error
+import { JSONEditor } from 'svelte-jsoneditor';
+import { is_tauri, role } from '$lib/stores';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
-import { terraphimSuggestionStyles } from './TerraphimSuggestion';
+import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
 
 export let html: string = ''; // initial content in HTML/JSON
 export const readOnly: boolean = false;
-export const outputFormat: 'html' | 'markdown' = 'html'; // New prop to control output format
+export let outputFormat: 'html' | 'markdown' = 'html'; // New prop to control output format
 export const enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
 export const showSnippets: boolean = true; // New prop to show snippets in autocomplete
 export const suggestionTrigger: string = '++'; // Character that triggers autocomplete
@@ -18,6 +21,8 @@ let _autocompleteStatus = '⏳ Initializing...';
 let autocompleteReady = false;
 let connectionTested = false;
 let styleElement: HTMLStyleElement | null = null;
+
+// Markdown plugin removed - not available in svelte-jsoneditor
 
 onMount(async () => {
 	if (enableAutocomplete) {
@@ -89,16 +94,16 @@ async function initializeAutocomplete() {
 
 /** Handler called by Novel editor on every update; we translate it to the
  *  wrapper's `html` variable so the parent can bind to it. */
-const _handleUpdate = (editorInstance: unknown) => {
+const _handleUpdate = (editorInstance: any) => {
 	editor = editorInstance;
 
 	// Choose output format based on the outputFormat prop
 	// For markdown content, use getMarkdown() to preserve markdown syntax
 	// For HTML content, use getHTML() to preserve rich formatting
 	if (outputFormat === 'markdown') {
-		html = editorInstance.storage.markdown.getMarkdown();
+		html = editorInstance.storage?.markdown?.getMarkdown?.() || '';
 	} else {
-		html = editorInstance.getHTML();
+		html = editorInstance.getHTML?.() || '';
 	}
 };
 
@@ -141,7 +146,7 @@ const _testAutocomplete = async () => {
 		}
 	} catch (error) {
 		console.error('Autocomplete test failed:', error);
-		alert(`❌ Autocomplete test failed: ${error.message}`);
+		alert(`❌ Autocomplete test failed: ${(error as Error).message}`);
 		_autocompleteStatus = '❌ Test failed - check console for details';
 	}
 };
@@ -202,11 +207,11 @@ The autocomplete system uses your local knowledge graph to provide intelligent s
 
 Start typing below:`;
 
-	editor.commands.setContent(demoText);
+	(editor as any).commands?.setContent?.(demoText);
 
 	// Focus the editor and position cursor at the end
 	setTimeout(() => {
-		editor.commands.focus('end');
+		(editor as any).commands?.focus?.('end');
 	}, 100);
 
 	alert(
@@ -215,13 +220,12 @@ Start typing below:`;
 };
 </script>
 
-<NovelEditor
+<JSONEditor
   defaultValue={html}
   isEditable={!readOnly}
   disableLocalStorage={true}
-  onUpdate={handleUpdate}
+  onUpdate={_handleUpdate}
   extensions={[
-    Markdown,
     ...(enableAutocomplete ? [
       TerraphimSuggestion.configure({
         trigger: suggestionTrigger,
@@ -241,7 +245,7 @@ Start typing below:`;
       <strong style="color: #495057;">Local Autocomplete Status:</strong>
       <div style="display: flex; gap: 8px;">
         <button
-          on:click={testAutocomplete}
+          on:click={_testAutocomplete}
           style="
             padding: 4px 8px;
             background: #007bff;
@@ -256,7 +260,7 @@ Start typing below:`;
           Test
         </button>
         <button
-          on:click={rebuildIndex}
+          on:click={_rebuildIndex}
           style="
             padding: 4px 8px;
             background: #28a745;
@@ -270,7 +274,7 @@ Start typing below:`;
           Rebuild Index
         </button>
         <button
-          on:click={demonstrateAutocomplete}
+          on:click={_demonstrateAutocomplete}
           style="
             padding: 4px 8px;
             background: #ffc107;
@@ -288,7 +292,7 @@ Start typing below:`;
     </div>
 
     <div style="font-size: 13px; color: #6c757d; margin-bottom: 8px; font-family: monospace;">
-      {autocompleteStatus}
+      {_autocompleteStatus}
     </div>
 
     {#if connectionTested && !autocompleteReady}

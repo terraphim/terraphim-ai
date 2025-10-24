@@ -53,12 +53,12 @@ export interface KnowledgeGraph {
 	publish: boolean;
 }
 export interface Role {
-	shortname: string | undefined;
+	shortname?: string;
 	name: RoleName & Value;
 	relevance_function: RelevanceFunction;
 	terraphim_it: boolean;
 	theme: string;
-	kg: (KnowledgeGraph & Value) | undefined;
+	kg?: KnowledgeGraph & Value;
 	haystacks: Haystack[] & Value;
 	[key: string]: Value; // Allow additional properties
 }

@@ -1,29 +1,5 @@
-<script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
-import { onMount } from 'svelte';
-import { get } from 'svelte/store';
-import { CONFIG } from '../../config';
-import {
-	configStore,
-	currentPersistentConversationId,
-	is_tauri,
-	role,
-	showSessionList,
-} from '../stores';
-import SessionList from './SessionList.svelte';
-import ContextEditModal from './ContextEditModal.svelte';
-import ArticleModal from '../Search/ArticleModal.svelte';
-import KGSearchModal from '../Search/KGSearchModal.svelte';
-import KGContextItem from '../Search/KGContextItem.svelte';
-import Markdown from 'svelte-markdown';
-
-// Tauri APIs for saving files (only used in desktop)
-let tauriDialog: any = null;
-let tauriFs: any = null;
-
-type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
-type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
-type ContextItem = {
+<script context="module" lang="ts">
+export type ContextItem = {
 	id: string;
 	title: string;
 	summary?: string;
@@ -45,6 +21,51 @@ type ContextItem = {
 		metadata: Record<string, string>;
 		relevance_score?: number;
 	};
+};
+</script>
+
+<script lang="ts">
+import { invoke } from '@tauri-apps/api/tauri';
+import { onMount } from 'svelte';
+import { get } from 'svelte/store';
+import { CONFIG } from '../../config';
+import {
+	configStore,
+	currentPersistentConversationId,
+	is_tauri,
+	role,
+	showSessionList,
+} from '../stores';
+import SessionList from './SessionList.svelte';
+import ContextEditModal from './ContextEditModal.svelte';
+import KGContextItem from '../Search/KGContextItem.svelte';
+import KGSearchModal from '../Search/KGSearchModal.svelte';
+import ArticleModal from '../Search/ArticleModal.svelte';
+// @ts-ignore
+import Markdown from 'svelte-markdown';
+
+// Tauri APIs for saving files (only used in desktop)
+let tauriDialog: any = null;
+let tauriFs: any = null;
+
+type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
+
+// API response types
+type ConversationsResponse = {
+	conversations: Array<{ id: string; created_at: string; title?: string }>;
+};
+type CreateConversationResponse = {
+	status: string;
+	conversation_id?: string;
+	error?: string;
+};
+type ConversationResponse = {
+	status: string;
+	conversation?: {
+		global_context: ContextItem[];
+	};
+	error?: string;
 };
 type Conversation = {
 	id: string;
@@ -68,8 +89,8 @@ let renderMarkdown: boolean = false;
 let _debugMode: boolean = false;
 let _lastRequest: any = null;
 let _lastResponse: any = null;
-let __showDebugRequest: boolean = false;
-let __showDebugResponse: boolean = false;
+let _showDebugRequest: boolean = false;
+let _showDebugResponse: boolean = false;
 
 // Conversation and context management
 let conversationId: string | null = null;
@@ -99,15 +120,6 @@ let kgDocument: any = null;
 let _kgTerm: string | null = null;
 let _kgRank: number | null = null;
 
-// Create reactive aliases without underscores for template usage
-$: savingContext = _savingContext;
-$: editingContext = _editingContext;
-$: contextEditMode = _contextEditMode;
-$: kgTerm = _kgTerm;
-$: kgRank = _kgRank;
-$: _showDebugRequest = __showDebugRequest;
-$: _showDebugResponse = __showDebugResponse;
-
 // --- Persistence helpers ---
 function chatStateKey(): string {
 	const r = get(role) as string;
@@ -129,6 +141,14 @@ function loadChatState() {
 	} catch (e) {
 		console.warn('Failed to load chat state:', e);
 	}
+}
+
+function getRoleDisplay() {
+	const currentRole = get(role);
+	if (typeof currentRole === 'object' && currentRole && 'original' in currentRole) {
+		return (currentRole as any).original;
+	}
+	return String(currentRole);
 }
 
 function saveChatState() {
@@ -167,7 +187,7 @@ async function initializeConversation() {
 	try {
 		if ($is_tauri) {
 			// Try to get existing conversations
-			const result = await invoke('list_conversations');
+			const result = await invoke('list_conversations') as ConversationsResponse;
 			if (result?.conversations && result.conversations.length > 0) {
 				// Use the most recent conversation
 				conversationId = result.conversations[0].id;
@@ -207,7 +227,7 @@ async function createNewConversation() {
 			const result = await invoke('create_conversation', {
 				title: 'Chat Conversation',
 				role: currentRole,
-			});
+			}) as CreateConversationResponse;
 			if (result.status === 'success' && result.conversation_id) {
 				conversationId = result.conversation_id;
 				console.log('🆕 Created new conversation:', conversationId);
@@ -258,7 +278,7 @@ async function loadConversationContext() {
 
 			const result = await invoke(command, {
 				conversationId: isPersistent ? conversationId : conversationId,
-			});
+			}) as ConversationResponse;
 
 			console.log('📥 Tauri response:', result);
 
@@ -300,7 +320,7 @@ async function loadConversationContext() {
 		}
 	} catch (error) {
 		console.error('❌ Error loading conversation context:', {
-			error: error.message || error,
+			error: error instanceof Error ? error.message : String(error),
 			conversationId,
 			isTauri: $is_tauri,
 			timestamp: new Date().toISOString(),
@@ -340,7 +360,7 @@ async function _addManualContext() {
 			const result = await invoke('add_context_to_conversation', {
 				conversationId,
 				contextData,
-			});
+			}) as { status: string; error?: string };
 			if (result.status === 'success') {
 				await loadConversationContext();
 				toggleAddContextForm();
@@ -500,7 +520,7 @@ async function deleteContext(contextId: string) {
 			const result = await invoke('delete_context', {
 				conversationId,
 				contextId,
-			});
+			}) as { status?: string; error?: string };
 			if (result?.status === 'success') {
 				console.log('✅ Context deleted successfully via Tauri');
 				await loadConversationContext();
@@ -554,7 +574,7 @@ async function _updateContext(updatedContext: ContextItem) {
 				conversationId,
 				contextId: updatedContext.id,
 				request: updatePayload,
-			});
+			}) as { status?: string; error?: string };
 			if (result?.status === 'success') {
 				console.log('✅ Context updated successfully via Tauri');
 				await loadConversationContext();
@@ -848,7 +868,7 @@ async function loadPersistentConversation(conversationIdToLoad: string) {
 		if ($is_tauri) {
 			const result = await invoke('get_persistent_conversation', {
 				conversationId: conversationIdToLoad,
-			});
+			}) as { status: string; conversation?: any; error?: string };
 
 			if (result.status === 'success' && result.conversation) {
 				const conv = result.conversation;
@@ -889,7 +909,7 @@ async function _savePersistentConversation() {
 	try {
 		if ($is_tauri) {
 			// Get the current conversation
-			const result = await invoke('get_conversation', { conversationId });
+			const result = await invoke('get_conversation', { conversationId }) as { status: string; conversation?: any; error?: string };
 
 			if (result.status === 'success' && result.conversation) {
 				const conv = result.conversation;
@@ -898,7 +918,7 @@ async function _savePersistentConversation() {
 				const saveResult = await invoke('create_persistent_conversation', {
 					title: conv.title || 'Chat Conversation',
 					role: conv.role,
-				});
+				}) as { status: string; conversation?: any; error?: string };
 
 				if (saveResult.status === 'success' && saveResult.conversation) {
 					const persistentConv = saveResult.conversation;
@@ -910,7 +930,7 @@ async function _savePersistentConversation() {
 							messages: conv.messages,
 							global_context: conv.global_context,
 						},
-					});
+					}) as { status: string; error?: string };
 
 					if (updateResult.status === 'success') {
 						currentPersistentConversationId.set(persistentConv.id);
@@ -948,14 +968,6 @@ function _handleNewConversation() {
 function _toggleSessionList() {
 	showSessionList.update((v) => !v);
 }
-
-// Create function aliases without underscores for template usage
-const addManualContext = _addManualContext;
-const editContext = _editContext;
-const confirmDeleteContext = _confirmDeleteContext;
-const updateContext = _updateContext;
-const handleKGTermAdded = _handleKGTermAdded;
-const handleKGIndexAdded = _handleKGIndexAdded;
 </script>
 
 <section class="section" data-testid="chat-interface">
@@ -977,7 +989,7 @@ const handleKGIndexAdded = _handleKGIndexAdded;
         <div class="chat-header">
           <div>
             <h2 class="title is-4">Chat</h2>
-            <p class="subtitle is-6">Role: {typeof get(role) === 'object' ? get(role).original : get(role)}</p>
+            <p class="subtitle is-6">Role: {getRoleDisplay()}</p>
             {#if conversationId}
               <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
             {/if}
@@ -1048,7 +1060,7 @@ const handleKGIndexAdded = _handleKGIndexAdded;
                   <button
                     class="button is-small is-warning"
                     title="Show debug request (sent to LLM)"
-                    on:click={() => __showDebugRequest = true}
+                    on:click={() => _showDebugRequest = true}
                     disabled={!_lastRequest}
                   >
                     <span class="icon is-small"><i class="fas fa-bug"></i></span>
@@ -1057,7 +1069,7 @@ const handleKGIndexAdded = _handleKGIndexAdded;
                   <button
                     class="button is-small is-info"
                     title="Show debug response (from LLM)"
-                    on:click={() => __showDebugResponse = true}
+                    on:click={() => _showDebugResponse = true}
                     disabled={!_lastResponse}
                   >
                     <span class="icon is-small"><i class="fas fa-code"></i></span>
@@ -1173,17 +1185,16 @@ const handleKGIndexAdded = _handleKGIndexAdded;
 
               <div class="field is-grouped">
                 <div class="control">
-                  <button class="button is-primary is-small" on:click={addManualContext} disabled={savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
-                    {#if savingContext}
+                  <button class="button is-primary is-small" on:click={_addManualContext} disabled={_savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
+                    {#if _savingContext}
                       <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
                     {:else}
-                      <span class="icon is-small"><i class="fas fa-save"></i></span>
+                      <span class="icon is-small"><i class="fas fa-plus"></i></span>
                     {/if}
-                    <span>Save Context</span>
                   </button>
                 </div>
                 <div class="control">
-                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={savingContext}>
+                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={_savingContext}>
                     <span class="icon is-small"><i class="fas fa-times"></i></span>
                     <span>Cancel</span>
                   </button>
@@ -1209,7 +1220,7 @@ const handleKGIndexAdded = _handleKGIndexAdded;
                     contextItem={item}
                     compact={true}
                     on:remove={e => deleteContext(e.detail.contextId)}
-                    on:viewDetails={e => editContext(e.detail.contextItem, e.detail.term)}
+                    on:viewDetails={e => _editContext(e.detail.contextItem, e.detail.term)}
                   />
                 {:else}
                   <!-- Use default context item rendering for non-KG items -->
@@ -1239,7 +1250,7 @@ const handleKGIndexAdded = _handleKGIndexAdded;
                             <div class="control">
                               <button
                                 class="button is-small is-light"
-                                on:click={() => editContext(item)}
+                                on:click={() => _editContext(item)}
                                 data-testid={`edit-context-${index}`}
                                 title="Edit context"
                               >
@@ -1251,7 +1262,7 @@ const handleKGIndexAdded = _handleKGIndexAdded;
                             <div class="control">
                               <button
                                 class="button is-small is-light is-danger"
-                                on:click={() => confirmDeleteContext(item)}
+                                on:click={() => _confirmDeleteContext(item)}
                                 data-testid={`delete-context-${index}`}
                                 title="Delete context"
                               >
@@ -1406,13 +1417,13 @@ const handleKGIndexAdded = _handleKGIndexAdded;
 <!-- Context Edit Modal -->
 <ContextEditModal
   bind:active={_showContextEditModal}
-  context={editingContext}
-  mode={contextEditMode}
-  on:update={e => updateContext(e.detail)}
+  context={_editingContext}
+  mode={_contextEditMode}
+  on:update={e => _updateContext(e.detail)}
   on:delete={e => deleteContext(e.detail)}
   on:close={() => {
     _showContextEditModal = false;
-    editingContext = null;
+    _editingContext = null;
   }}
 />
 
@@ -1420,8 +1431,8 @@ const handleKGIndexAdded = _handleKGIndexAdded;
 <KGSearchModal
   bind:active={_showKGSearchModal}
   conversationId={conversationId}
-  on:termAdded={handleKGTermAdded}
-  on:kgIndexAdded={handleKGIndexAdded}
+  on:termAdded={_handleKGTermAdded}
+  on:kgIndexAdded={_handleKGIndexAdded}
 />
 
 <!-- KG Document Modal -->
@@ -1429,8 +1440,8 @@ const handleKGIndexAdded = _handleKGIndexAdded;
   <ArticleModal
     bind:active={_showKgModal}
     item={kgDocument}
-    kgTerm={kgTerm}
-    kgRank={kgRank}
+    kgTerm={_kgTerm}
+    kgRank={_kgRank}
   />
 {/if}
 

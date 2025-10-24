@@ -86,10 +86,54 @@ For detailed installation instructions, see our [Installation Guide](https://git
 
    **Terminal Interface (TUI):**
    ```bash
+   # Build with all features (recommended)
+   cargo build -p terraphim_tui --features repl-full --release
+   ./target/release/terraphim-tui
+
+   # Or run minimal version
    cargo run --bin terraphim-tui
    ```
 
-(See the [desktop README](desktop/README.md) and [development setup guide](docs/src/development-setup.md) for more details.)
+(See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
+
+## Terminal User Interface (TUI)
+
+Terraphim includes a comprehensive TUI that provides both interactive REPL functionality and CLI commands for advanced operations:
+
+### Key Features
+
+- **🤖 AI Chat Integration**: OpenRouter and Ollama support for intelligent conversations
+- **⚡ Sub-2 Second VM Boot**: Advanced VM optimization system with sub-500ms allocation
+- **🖥️ Enhanced VM Management**: Firecracker microVM pools with intelligent allocation
+- **📝 Markdown Command System**: Extensible commands defined in YAML frontmatter
+- **🔒 Security-First Execution**: Three execution modes (Local, Firecracker, Hybrid) with knowledge graph validation
+- **🌐 Web Operations**: Secure web requests through VM sandboxing
+- **📁 File Operations**: Semantic file analysis and intelligent content management
+- **🔍 Knowledge Graph**: Interactive rolegraph visualization and navigation
+- **⚙️ Configuration**: Real-time role and configuration management
+
+### Quick Start
+
+```bash
+# Build with all features
+cargo build -p terraphim_tui --features repl-full --release
+
+# Launch interactive REPL
+./target/release/terraphim-tui
+
+# Available REPL commands:
+/help           # Show all commands
+/search "query" # Semantic search
+/chat "message" # AI conversation
+/commands list  # List available markdown commands
+/deploy staging # Execute deployment (Firecracker mode)
+/search "TODO"  # Execute search command (Local mode)
+/vm list        # VM management with sub-2s boot
+/web get URL    # Web operations
+/file search    # Semantic file operations
+```
+
+For detailed documentation, see [TUI Usage Guide](docs/tui-usage.md).
 
 ## Terminology
 

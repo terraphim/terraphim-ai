@@ -177,7 +177,7 @@ jobs:
         run: sed -i 's/# panic = "abort"/panic = "abort"/' .cargo/config.toml
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           name: Release ${{ github.ref_name }}
           body: |

@@ -8,6 +8,7 @@ use crate::{LlmRequest, LlmResponse, MessageRole, MultiAgentError, MultiAgentRes
 use chrono::Utc;
 use genai::chat::{ChatMessage, ChatOptions, ChatRequest};
 use genai::Client;
+use std::env;
 use uuid::Uuid;
 
 /// Rust-GenAI LLM client that works with multiple providers
@@ -209,15 +210,81 @@ impl GenAiLlmClient {
     }
 
     /// Create client from provider configuration with custom base URL
-    /// Note: rust-genai handles provider URLs automatically via environment variables
+    ///
+    /// This method properly handles custom base URLs, particularly for the z.ai proxy.
+    /// It sets appropriate environment variables before creating the genai client.
     pub fn from_config_with_url(
         provider: &str,
         model: Option<String>,
-        _base_url: Option<String>, // Ignored - rust-genai uses env vars
+        base_url: Option<String>,
     ) -> MultiAgentResult<Self> {
-        // Base URL configuration is handled by rust-genai via environment variables
-        // like OLLAMA_BASE_URL, OPENAI_API_BASE, etc.
+        // Handle z.ai proxy configuration for Anthropic
+        if provider.to_lowercase() == "anthropic" {
+            if let Some(ref url) = base_url {
+                if url.contains("z.ai") {
+                    // Set environment variables for z.ai proxy
+                    unsafe {
+                        env::set_var("ANTHROPIC_API_BASE", url);
+                    }
+
+                    // Use ANTHROPIC_AUTH_TOKEN if available, otherwise look for ANTHROPIC_API_KEY
+                    let api_key = env::var("ANTHROPIC_AUTH_TOKEN")
+                        .or_else(|_| env::var("ANTHROPIC_API_KEY"))
+                        .unwrap_or_default();
+
+                    if !api_key.is_empty() {
+                        unsafe {
+                            env::set_var("ANTHROPIC_API_KEY", &api_key);
+                        }
+                    }
+
+                    log::info!("🔗 Configured Anthropic client with z.ai proxy: {}", url);
+                }
+            }
+        }
+
+        // Handle OpenRouter with custom URL
+        if provider.to_lowercase() == "openrouter" {
+            if let Some(ref url) = base_url {
+                unsafe {
+                    env::set_var("OPENROUTER_API_BASE", url);
+                }
+                log::info!("🔗 Configured OpenRouter client with custom URL: {}", url);
+            }
+        }
+
+        // Handle Ollama with custom URL
+        if provider.to_lowercase() == "ollama" {
+            if let Some(ref url) = base_url {
+                unsafe {
+                    env::set_var("OLLAMA_BASE_URL", url);
+                }
+                log::info!("🔗 Configured Ollama client with custom URL: {}", url);
+            }
+        }
+
         Self::from_config(provider, model)
+    }
+
+    /// Create client with automatic z.ai proxy detection
+    ///
+    /// This method automatically detects and configures z.ai proxy settings
+    /// for Anthropic models when the appropriate environment variables are set.
+    pub fn from_config_with_auto_proxy(
+        provider: &str,
+        model: Option<String>,
+    ) -> MultiAgentResult<Self> {
+        let base_url = if provider.to_lowercase() == "anthropic" {
+            env::var("ANTHROPIC_BASE_URL").ok()
+        } else if provider.to_lowercase() == "openrouter" {
+            env::var("OPENROUTER_BASE_URL").ok()
+        } else if provider.to_lowercase() == "ollama" {
+            env::var("OLLAMA_BASE_URL").ok()
+        } else {
+            None
+        };
+
+        Self::from_config_with_url(provider, model, base_url)
     }
 }
 

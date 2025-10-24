@@ -20,6 +20,9 @@ pub mod openrouter;
 // Generic LLM layer for multiple providers (OpenRouter, Ollama, etc.)
 pub mod llm;
 
+// LLM proxy service for unified provider management
+pub mod llm_proxy;
+
 // Centralized HTTP client creation and configuration
 pub mod http_client;
 

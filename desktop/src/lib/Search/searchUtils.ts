@@ -234,7 +234,7 @@ export async function getSuggestions(
 		// Call the Tauri backend for autocomplete suggestions
 		const backendSuggestions = await invoke('get_autocomplete_suggestions', {
 			query: query.trim(),
-			role: role
+			role: role,
 		});
 
 		// Handle undefined or null responses

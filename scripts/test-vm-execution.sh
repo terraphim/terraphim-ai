@@ -202,6 +202,16 @@ check_dependencies() {
         exit 1
     fi
 
+<<<<<<< HEAD
+    # Check for fcctl-web binary if we need to start server
+    if [ "$START_SERVER" = true ]; then
+        if [ ! -f "scratchpad/firecracker-rust/fcctl-web/target/debug/fcctl-web" ] &&
+           [ ! -f "scratchpad/firecracker-rust/fcctl-web/target/release/fcctl-web" ]; then
+            log_info "Building fcctl-web server..."
+            cd scratchpad/firecracker-rust/fcctl-web
+            cargo build --release
+            cd - > /dev/null
+=======
     # Check if fcctl-web directory exists
     if [ ! -d "scratchpad/firecracker-rust/fcctl-web" ]; then
         log_warning "fcctl-web directory not found (scratchpad/firecracker-rust/fcctl-web)"
@@ -218,6 +228,7 @@ check_dependencies() {
                 cargo build --release
                 cd - > /dev/null
             fi
+>>>>>>> origin/main
         fi
     fi
 
@@ -230,11 +241,14 @@ start_server() {
         return
     fi
 
+<<<<<<< HEAD
+=======
     if [ "${NO_FCCTL_WEB:-false}" = true ]; then
         log_warning "Skipping fcctl-web server start - directory not present (expected for CI)"
         return
     fi
 
+>>>>>>> origin/main
     log_info "Starting fcctl-web server..."
 
     cd scratchpad/firecracker-rust/fcctl-web
@@ -270,11 +284,14 @@ start_server() {
 check_server() {
     log_info "Checking fcctl-web server availability..."
 
+<<<<<<< HEAD
+=======
     if [ "${NO_FCCTL_WEB:-false}" = true ]; then
         log_warning "Skipping server check - fcctl-web not present (expected for CI)"
         return
     fi
 
+>>>>>>> origin/main
     if curl -s "$FCCTL_WEB_URL/health" > /dev/null 2>&1; then
         log_success "fcctl-web server is available at $FCCTL_WEB_URL"
     else
@@ -308,11 +325,14 @@ run_unit_tests() {
 run_integration_tests() {
     log_info "Running integration tests..."
 
+<<<<<<< HEAD
+=======
     if [ "${NO_FCCTL_WEB:-false}" = true ]; then
         log_warning "Skipping integration tests - fcctl-web not present (expected for CI)"
         return 0
     fi
 
+>>>>>>> origin/main
     cd scratchpad/firecracker-rust/fcctl-web
 
     local test_args=()
@@ -336,11 +356,14 @@ run_integration_tests() {
 run_websocket_tests() {
     log_info "Running WebSocket tests..."
 
+<<<<<<< HEAD
+=======
     if [ "${NO_FCCTL_WEB:-false}" = true ]; then
         log_warning "Skipping WebSocket tests - fcctl-web not present (expected for CI)"
         return 0
     fi
 
+>>>>>>> origin/main
     cd scratchpad/firecracker-rust/fcctl-web
 
     local test_args=("--ignored")
@@ -364,11 +387,14 @@ run_websocket_tests() {
 run_e2e_tests() {
     log_info "Running end-to-end tests..."
 
+<<<<<<< HEAD
+=======
     if [ "${NO_FCCTL_WEB:-false}" = true ]; then
         log_warning "Skipping end-to-end tests - fcctl-web not present (expected for CI)"
         return 0
     fi
 
+>>>>>>> origin/main
     local test_args=("--ignored")
     if [ "$VERBOSE" = true ]; then
         test_args+=("--" "--nocapture")
@@ -406,6 +432,10 @@ run_security_tests() {
     else
         log_warning "Skipping integration security tests - fcctl-web not present (expected for CI)"
     fi
+<<<<<<< HEAD
+    cd - > /dev/null
+=======
+>>>>>>> origin/main
 
     if [ $result -eq 0 ]; then
         log_success "Security tests passed"
@@ -437,6 +467,10 @@ run_performance_tests() {
     else
         log_warning "Skipping integration performance tests - fcctl-web not present (expected for CI)"
     fi
+<<<<<<< HEAD
+    cd - > /dev/null
+=======
+>>>>>>> origin/main
 
     # Agent performance tests
     if ! cargo test agent_performance_tests --ignored --release 2>&1 | tee -a "$LOG_FILE"; then

@@ -1,245 +1,248 @@
 <script lang="ts">
-  import { Modal } from "svelma";
-  import NovelWrapper from '$lib/Editor/NovelWrapper.svelte';
-  import { invoke } from '@tauri-apps/api/tauri';
-  import { is_tauri, role } from '../stores';
-  import { CONFIG } from "../../config";
-  import type { Document } from "./SearchResult";
-  import type { DocumentListResponse } from "../generated/types";
-  import SvelteMarkdown from 'svelte-markdown';
+import { invoke } from '@tauri-apps/api/tauri';
+import { Modal } from 'svelma';
+// @ts-expect-error
+import SvelteMarkdown from 'svelte-markdown';
+import { is_tauri, role } from '$lib/stores';
+import { CONFIG } from '../../config';
+import NovelWrapper from '../Editor/NovelWrapper.svelte';
+import type { DocumentListResponse } from '../generated/types';
+import type { Document } from './SearchResult';
 
-  export let active: boolean = false;
-  export let item: Document;
-  export let initialEdit: boolean = false;
-  // New props for KG context
-  export let kgTerm: string | null = null;
-  export let kgRank: number | null = null;
+export let active: boolean = false;
+export let item: Document;
+export const initialEdit: boolean = false;
+// New props for KG context
+export const kgTerm: string | null = null;
+export const kgRank: number | null = null;
 
-  let editing = false;
-  let contentElement: HTMLElement;
+let editing = false;
+let contentElement: HTMLElement;
 
-  // KG modal state (similar to ResultItem.svelte)
-  let showKgModal = false;
-  let kgDocument: Document | null = null;
-  let kgTermForModal: string | null = null;
-  let kgRankForModal: number | null = null;
-  let loadingKg = false;
+// KG modal state (similar to ResultItem.svelte)
+let _showKgModal = false;
+let kgDocument: Document | null = null;
+let _kgTermForModal: string | null = null;
+let kgRankForModal: number | null = null;
+let _loadingKg = false;
 
-  // Set initial edit mode when modal becomes active
-  $: if (active && initialEdit) {
-    editing = true;
-  }
+// Set initial edit mode when modal becomes active
+$: if (active && initialEdit) {
+	editing = true;
+}
 
-  // Whenever the modal becomes active for a given item, refresh its content from persistence.
-  // Only load document if not in edit mode to avoid interfering with initialEdit
-  $: if (active && item && !editing) {
-    loadDocument();
-  }
+// Whenever the modal becomes active for a given item, refresh its content from persistence.
+// Only load document if not in edit mode to avoid interfering with initialEdit
+$: if (active && item && !editing) {
+	loadDocument();
+}
 
-  // More precise HTML detection - only treat as HTML if it looks like actual HTML document structure
-  $: isHtml = item?.body ? (
-    // Check for common HTML document patterns, not just any < tag
-    (/<html/i.test(item.body) || /<body/i.test(item.body) || /<head/i.test(item.body)) ||
-    // Or if it starts with HTML-like structure (not markdown)
-    /^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
-  ) : false;
+// More precise HTML detection - only treat as HTML if it looks like actual HTML document structure
+$: isHtml = item?.body
+	? // Check for common HTML document patterns, not just any < tag
+		/<html/i.test(item.body) ||
+		/<body/i.test(item.body) ||
+		/<head/i.test(item.body) ||
+		// Or if it starts with HTML-like structure (not markdown)
+		/^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
+	: false;
 
-  // Determine the original format for editing to preserve it
-  $: originalFormat = isHtml ? 'html' : 'markdown';
+// Determine the original format for editing to preserve it
+$: originalFormat = isHtml ? 'html' : 'markdown';
 
-  async function loadDocument() {
-    if (!$is_tauri) return;
-    try {
-      const resp: any = await invoke('get_document', { documentId: item.id });
-      if (resp?.document) {
-        item = resp.document;
-      }
-    } catch (e) {
-      console.error('Failed to load document', e);
-    }
-  }
+async function loadDocument() {
+	if (!$is_tauri) return;
+	try {
+		const resp: any = await invoke('get_document', { documentId: item.id });
+		if (resp?.document) {
+			item = resp.document;
+		}
+	} catch (e) {
+		console.error('Failed to load document', e);
+	}
+}
 
-  async function saveDocument() {
-    if (!$is_tauri) {
-      editing = false;
-      return;
-    }
-    try {
-      await invoke('create_document', { document: item });
-      editing = false;
-    } catch (e) {
-      console.error('Failed to save document', e);
-    }
-  }
+async function saveDocument() {
+	if (!$is_tauri) {
+		editing = false;
+		return;
+	}
+	try {
+		await invoke('create_document', { document: item });
+		editing = false;
+	} catch (e) {
+		console.error('Failed to save document', e);
+	}
+}
 
-  // Handle KG link clicks (similar to ResultItem's handleTagClick)
-  async function handleKgClick(term: string) {
-    loadingKg = true;
-    kgTermForModal = term;
+// Handle KG link clicks (similar to ResultItem's handleTagClick)
+async function handleKgClick(term: string) {
+	_loadingKg = true;
+	_kgTermForModal = term;
 
-    // Add debugging information
-    console.log('🔍 KG Link Click Debug Info:');
-    console.log('  Term clicked:', term);
-    console.log('  Current role:', $role);
-    console.log('  Is Tauri mode:', $is_tauri);
+	// Add debugging information
+	console.log('🔍 KG Link Click Debug Info:');
+	console.log('  Term clicked:', term);
+	console.log('  Current role:', $role);
+	console.log('  Is Tauri mode:', $is_tauri);
 
-    try {
-      if ($is_tauri) {
-        // Use Tauri command for desktop app
-        console.log('  Making Tauri invoke call...');
-        console.log('  Tauri command: find_documents_for_kg_term');
-        console.log('  Tauri params:', { roleName: $role, term: term });
+	try {
+		if ($is_tauri) {
+			// Use Tauri command for desktop app
+			console.log('  Making Tauri invoke call...');
+			console.log('  Tauri command: find_documents_for_kg_term');
+			console.log('  Tauri params:', { roleName: $role, term: term });
 
-        const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
-          roleName: $role,
-          term: term
-        });
+			const response: DocumentListResponse = await invoke('find_documents_for_kg_term', {
+				roleName: $role,
+				term: term,
+			});
 
-        console.log('  📥 Tauri response received:');
-        console.log('    Status:', response.status);
-        console.log('    Results count:', response.results?.length || 0);
-        console.log('    Total:', response.total || 0);
-        console.log('    Full response:', JSON.stringify(response, null, 2));
+			console.log('  📥 Tauri response received:');
+			console.log('    Status:', response.status);
+			console.log('    Results count:', response.results?.length || 0);
+			console.log('    Total:', response.total || 0);
+			console.log('    Full response:', JSON.stringify(response, null, 2));
 
-        if (response.status === 'success' && response.results && response.results.length > 0) {
-          // Get the first (highest-ranked) document
-          kgDocument = response.results[0];
-          kgRankForModal = kgDocument.rank || 0;
-          console.log('  ✅ Found KG document:');
-          console.log('    Title:', kgDocument.title);
-          console.log('    Rank:', kgRankForModal);
-          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-          showKgModal = true;
-        } else {
-          console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
-          console.warn('    This could indicate:');
-          console.warn('    1. Knowledge graph not built for this role');
-          console.warn('    2. Term not found in knowledge graph');
-          console.warn('    3. Role not configured with TerraphimGraph relevance function');
-          console.warn('    Suggestion: Check server logs for KG building status');
-        }
-      } else {
-        // Use HTTP fetch for web mode
-        console.log('  Making HTTP fetch call...');
-        const baseUrl = CONFIG.ServerURL;
-        const encodedRole = encodeURIComponent($role);
-        const encodedTerm = encodeURIComponent(term);
-        const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
+			if (response.status === 'success' && response.results && response.results.length > 0) {
+				// Get the first (highest-ranked) document
+				kgDocument = response.results[0];
+				kgRankForModal = kgDocument.rank || 0;
+				console.log('  ✅ Found KG document:');
+				console.log('    Title:', kgDocument?.title);
+				console.log('    Rank:', kgRankForModal);
+				console.log('    Body length:', kgDocument?.body?.length || 0, 'characters');
+				_showKgModal = true;
+			} else {
+				console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
+				console.warn('    This could indicate:');
+				console.warn('    1. Knowledge graph not built for this role');
+				console.warn('    2. Term not found in knowledge graph');
+				console.warn('    3. Role not configured with TerraphimGraph relevance function');
+				console.warn('    Suggestion: Check server logs for KG building status');
+			}
+		} else {
+			// Use HTTP fetch for web mode
+			console.log('  Making HTTP fetch call...');
+			const baseUrl = CONFIG.ServerURL;
+			const encodedRole = encodeURIComponent($role);
+			const encodedTerm = encodeURIComponent(term);
+			const url = `${baseUrl}/roles/${encodedRole}/kg_search?term=${encodedTerm}`;
 
-        console.log('  📤 HTTP Request details:');
-        console.log('    Base URL:', baseUrl);
-        console.log('    Role (encoded):', encodedRole);
-        console.log('    Term (encoded):', encodedTerm);
-        console.log('    Full URL:', url);
+			console.log('  📤 HTTP Request details:');
+			console.log('    Base URL:', baseUrl);
+			console.log('    Role (encoded):', encodedRole);
+			console.log('    Term (encoded):', encodedTerm);
+			console.log('    Full URL:', url);
 
-        const response = await fetch(url);
+			const response = await fetch(url);
 
-        console.log('  📥 HTTP Response received:');
-        console.log('    Status code:', response.status);
-        console.log('    Status text:', response.statusText);
-        console.log('    Headers:', Object.fromEntries(response.headers.entries()));
+			console.log('  📥 HTTP Response received:');
+			console.log('    Status code:', response.status);
+			console.log('    Status text:', response.statusText);
+			console.log('    Headers:', Object.fromEntries(response.headers.entries()));
 
-        if (!response.ok) {
-          throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
-        }
+			if (!response.ok) {
+				throw new Error(`HTTP error! Status: ${response.status} - ${response.statusText}`);
+			}
 
-        const data = await response.json();
-        console.log('  📄 Response data:');
-        console.log('    Status:', data.status);
-        console.log('    Results count:', data.results?.length || 0);
-        console.log('    Total:', data.total || 0);
-        console.log('    Full response:', JSON.stringify(data, null, 2));
+			const data = await response.json();
+			console.log('  📄 Response data:');
+			console.log('    Status:', data.status);
+			console.log('    Results count:', data.results?.length || 0);
+			console.log('    Total:', data.total || 0);
+			console.log('    Full response:', JSON.stringify(data, null, 2));
 
-        if (data.status === 'success' && data.results && data.results.length > 0) {
-          // Get the first (highest-ranked) document
-          kgDocument = data.results[0];
-          kgRankForModal = kgDocument.rank || 0;
-          console.log('  ✅ Found KG document:');
-          console.log('    Title:', kgDocument.title);
-          console.log('    Rank:', kgRankForModal);
-          console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-          showKgModal = true;
-        } else {
-          console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
-          console.warn('    This could indicate:');
-          console.warn('    1. Server not configured with Terraphim Engineer role');
-          console.warn('    2. Knowledge graph not built on server');
-          console.warn('    3. Term not found in knowledge graph');
-          console.warn('    Suggestion: Check server logs at startup for KG building status');
-          console.warn('    API URL tested:', url);
-        }
-      }
-    } catch (error) {
-      console.error('❌ Error fetching KG document:');
-      console.error('  Error type:', error.constructor.name);
-      console.error('  Error message:', error.message || error);
-      console.error('  Request details:', {
-        term,
-        role: $role,
-        isTauri: $is_tauri,
-        timestamp: new Date().toISOString()
-      });
+			if (data.status === 'success' && data.results && data.results.length > 0) {
+				// Get the first (highest-ranked) document
+				kgDocument = data.results[0];
+				kgRankForModal = kgDocument?.rank || 0;
+				console.log('  ✅ Found KG document:');
+				console.log('    Title:', kgDocument?.title);
+				console.log('    Rank:', kgRankForModal);
+				console.log('    Body length:', kgDocument?.body?.length || 0, 'characters');
+				_showKgModal = true;
+			} else {
+				console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
+				console.warn('    This could indicate:');
+				console.warn('    1. Server not configured with Terraphim Engineer role');
+				console.warn('    2. Knowledge graph not built on server');
+				console.warn('    3. Term not found in knowledge graph');
+				console.warn('    Suggestion: Check server logs at startup for KG building status');
+				console.warn('    API URL tested:', url);
+			}
+		}
+	} catch (error) {
+		console.error('❌ Error fetching KG document:');
+		console.error('  Error type:', (error as Error).constructor.name);
+		console.error('  Error message:', (error as Error).message || error);
+		console.error('  Request details:', {
+			term,
+			role: $role,
+			isTauri: $is_tauri,
+			timestamp: new Date().toISOString(),
+		});
 
-      if (!$is_tauri && error.message?.includes('Failed to fetch')) {
-        console.error('  💡 Network error suggestions:');
-        console.error('    1. Check if server is running on expected port');
-        console.error('    2. Check CORS configuration');
-        console.error('    3. Verify server URL in CONFIG.ServerURL');
-      }
+		if (!$is_tauri && (error as Error).message?.includes('Failed to fetch')) {
+			console.error('  💡 Network error suggestions:');
+			console.error('    1. Check if server is running on expected port');
+			console.error('    2. Check CORS configuration');
+			console.error('    3. Verify server URL in CONFIG.ServerURL');
+		}
 
-      // Graceful fallback: could show error message or do nothing
-    } finally {
-      loadingKg = false;
-    }
-  }
+		// Graceful fallback: could show error message or do nothing
+	} finally {
+		_loadingKg = false;
+	}
+}
 
-  // Handle clicks on KG links (kg: protocol)
-  function handleContentClick(event: MouseEvent) {
-    const target = event.target as HTMLElement;
+// Handle clicks on KG links (kg: protocol)
+function _handleContentClick(event: MouseEvent) {
+	const target = event.target as HTMLElement;
 
-    // Check if the clicked element is a link with kg: protocol
-    if (target.tagName === 'A') {
-      const href = target.getAttribute('href');
-      if (href && href.startsWith('kg:')) {
-        event.preventDefault();
-        const term = href.substring(3); // Remove 'kg:' prefix
-        handleKgClick(term);
-      }
-    }
-  }
+	// Check if the clicked element is a link with kg: protocol
+	if (target.tagName === 'A') {
+		const href = target.getAttribute('href');
+		if (href?.startsWith('kg:')) {
+			event.preventDefault();
+			const term = href.substring(3); // Remove 'kg:' prefix
+			handleKgClick(term);
+		}
+	}
+}
 
-  function handleDoubleClick() {
-    editing = true;
-  }
+function _handleDoubleClick() {
+	editing = true;
+}
 
-  function handleKeyDown(event: KeyboardEvent) {
-    // Allow double-click to work by not preventing default on double-click events
-    if (event.type === 'dblclick') {
-      return;
-    }
+function _handleKeyDown(event: KeyboardEvent) {
+	// Allow double-click to work by not preventing default on double-click events
+	if (event.type === 'dblclick') {
+		return;
+	}
 
-    // Enable editing with Ctrl+E or Cmd+E
-    if ((event.ctrlKey || event.metaKey) && event.key === 'e') {
-      event.preventDefault();
-      editing = true;
-    }
+	// Enable editing with Ctrl+E or Cmd+E
+	if ((event.ctrlKey || event.metaKey) && event.key === 'e') {
+		event.preventDefault();
+		editing = true;
+	}
 
-    // Save with Ctrl+S or Cmd+S when editing
-    if (editing && (event.ctrlKey || event.metaKey) && event.key === 's') {
-      event.preventDefault();
-      saveDocument();
-    }
+	// Save with Ctrl+S or Cmd+S when editing
+	if (editing && (event.ctrlKey || event.metaKey) && event.key === 's') {
+		event.preventDefault();
+		saveDocument();
+	}
 
-    // Escape to exit edit mode or close modal
-    if (event.key === 'Escape') {
-      event.preventDefault();
-      if (editing) {
-        editing = false;
-      } else {
-        active = false; // Close the modal
-      }
-    }
-  }
+	// Escape to exit edit mode or close modal
+	if (event.key === 'Escape') {
+		event.preventDefault();
+		if (editing) {
+			editing = false;
+		} else {
+			active = false; // Close the modal
+		}
+	}
+}
 </script>
 
 <Modal bind:active>
@@ -262,7 +265,7 @@
 
     {#if editing}
       <!-- Pass the article body as default content and bind back for updates -->
-      <NovelWrapper bind:html={item.body} outputFormat={originalFormat}/>
+      <NovelWrapper bind:html={item.body} outputFormat={isHtml ? 'html' : 'markdown'} />
       <div class="edit-controls">
         <button class="button is-primary" on:click={saveDocument}>
           Save
@@ -275,9 +278,9 @@
       <div
         class="content-viewer"
         bind:this={contentElement}
-        on:dblclick={handleDoubleClick}
-        on:keydown={handleKeyDown}
-        on:click={handleContentClick}
+        on:dblclick={_handleDoubleClick}
+        on:keydown={_handleKeyDown}
+        on:click={_handleContentClick}
         tabindex="0"
         role="button"
         aria-label="Double-click to edit article content"
@@ -299,36 +302,36 @@
 
 <!-- KG document modal -->
 {#if kgDocument}
-  <Modal bind:active={showKgModal}>
+  <Modal bind:active={_showKgModal}>
     <div class="box wrapper">
       <!-- Close button following Bulma styling -->
-      <button class="delete is-large modal-close-btn" on:click={() => showKgModal = false} aria-label="close"></button>
+      <button class="delete is-large modal-close-btn" on:click={() => _showKgModal = false} aria-label="close"></button>
 
       <!-- KG Context Header -->
-      {#if kgTermForModal && kgRankForModal !== null}
+      {#if _kgTermForModal && kgRankForModal !== null}
         <div class="kg-context">
           <h3 class="subtitle is-6">
             <span class="tag is-info">Knowledge Graph</span>
-            Term: <strong>{kgTermForModal}</strong> | Rank: <strong>{kgRankForModal}</strong>
+            Term: <strong>{_kgTermForModal}</strong> | Rank: <strong>{kgRankForModal}</strong>
           </h3>
           <hr />
         </div>
       {/if}
 
-      <h2>{kgDocument.title}</h2>
+      <h2>{kgDocument?.title}</h2>
 
       <div
         class="content-viewer"
-        on:click={handleContentClick}
+        on:click={_handleContentClick}
         tabindex="0"
         role="button"
         aria-label="KG document content - click KG links to explore further"
       >
-        {#if kgDocument.body && (/<html/i.test(kgDocument.body) || /<body/i.test(kgDocument.body) || /<head/i.test(kgDocument.body))}
+        {#if kgDocument?.body && (/<html/i.test(kgDocument.body) || /<body/i.test(kgDocument.body) || /<head/i.test(kgDocument.body))}
           <div class="prose">{@html kgDocument.body}</div>
         {:else}
           <div class="markdown-content">
-            <SvelteMarkdown source={kgDocument.body} />
+            <SvelteMarkdown source={kgDocument?.body || ''} />
           </div>
         {/if}
         <div class="edit-hint">
