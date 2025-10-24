@@ -1,17 +1,17 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Tag, Taglist } from 'svelma';
+import { fade } from 'svelte/transition';
+// @ts-expect-error
+import SvelteMarkdown from 'svelte-markdown';
 import { router } from 'tinro';
+import { is_tauri, role, configStore as roleConfigStore } from '$lib/stores';
 import { CONFIG } from '../../config';
 import type { DocumentListResponse, Role } from '../generated/types';
 import configStore from '../ThemeSwitcher.svelte';
-import type { Document } from './SearchResult';
-import { role, configStore as roleConfigStore, is_tauri } from '$lib/stores';
-import { Tag, Taglist } from 'svelma';
-import { fade } from 'svelte/transition';
-// @ts-ignore
-import SvelteMarkdown from 'svelte-markdown';
 import ArticleModal from './ArticleModal.svelte';
 import AtomicSaveModal from './AtomicSaveModal.svelte';
+import type { Document } from './SearchResult';
 
 // API Response interfaces
 interface ConversationsResponse {
@@ -377,7 +377,7 @@ async function _generateSummary() {
 
 		console.log('  📤 Summarization request:', requestBody);
 
-		let response;
+		let response: unknown;
 
 		if ($is_tauri) {
 			// For Tauri mode, we'll make an HTTP request directly
@@ -583,7 +583,7 @@ async function addToContext() {
 		if ($is_tauri) {
 			// First, try to get or create a conversation
 			try {
-				const conversations = await invoke('list_conversations') as ConversationsResponse;
+				const conversations = (await invoke('list_conversations')) as ConversationsResponse;
 				console.log('📋 Available conversations:', conversations);
 
 				// Find an existing conversation or use the first one
@@ -592,10 +592,10 @@ async function addToContext() {
 					console.log('🎯 Using existing conversation:', conversationId);
 				} else {
 					// Create a new conversation
-					const newConv = await invoke('create_conversation', {
+					const newConv = (await invoke('create_conversation', {
 						title: 'Search Context',
 						role: $role || 'default',
-					}) as CreateConversationResponse;
+					})) as CreateConversationResponse;
 					if (newConv.status === 'success' && newConv.conversation_id) {
 						conversationId = newConv.conversation_id;
 						console.log('🆕 Created new conversation:', conversationId);
@@ -617,7 +617,8 @@ async function addToContext() {
 			};
 
 			if (enhancedItem.url) metadata.url = enhancedItem.url;
-			if (enhancedItem.tags && enhancedItem.tags.length > 0) metadata.tags = enhancedItem.tags.join(', ');
+			if (enhancedItem.tags && enhancedItem.tags.length > 0)
+				metadata.tags = enhancedItem.tags.join(', ');
 			if (enhancedItem.rank !== undefined) metadata.rank = enhancedItem.rank.toString();
 
 			const contextResult = await invoke('add_context_to_conversation', {
@@ -777,7 +778,7 @@ async function addToContextAndChat() {
 		if ($is_tauri) {
 			// First, try to get or create a conversation
 			try {
-				const conversations = await invoke('list_conversations') as ConversationsResponse;
+				const conversations = (await invoke('list_conversations')) as ConversationsResponse;
 				console.log('📋 Available conversations:', conversations);
 
 				// Find an existing conversation or use the first one
@@ -786,10 +787,10 @@ async function addToContextAndChat() {
 					console.log('🎯 Using existing conversation:', conversationId);
 				} else {
 					// Create a new conversation
-					const newConv = await invoke('create_conversation', {
+					const newConv = (await invoke('create_conversation', {
 						title: 'Chat with Documents',
 						role: $role || 'default',
-					}) as CreateConversationResponse;
+					})) as CreateConversationResponse;
 					if (newConv.status === 'success' && newConv.conversation_id) {
 						conversationId = newConv.conversation_id;
 						console.log('🆕 Created new conversation:', conversationId);
@@ -811,7 +812,8 @@ async function addToContextAndChat() {
 			};
 
 			if (enhancedItem.url) metadata.url = enhancedItem.url;
-			if (enhancedItem.tags && enhancedItem.tags.length > 0) metadata.tags = enhancedItem.tags.join(', ');
+			if (enhancedItem.tags && enhancedItem.tags.length > 0)
+				metadata.tags = enhancedItem.tags.join(', ');
 			if (enhancedItem.rank !== undefined) metadata.rank = enhancedItem.rank.toString();
 
 			const contextResult = await invoke('add_context_to_conversation', {
@@ -1230,7 +1232,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
   .description-content {
     display: inline;
 
-    // Style markdown content within description
+    /* Style markdown content within description */
     :global(p) {
       display: inline;
       margin: 0;
@@ -1317,7 +1319,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
   .ai-summary-content {
     margin-bottom: 0.5rem;
 
-    // Style markdown content within AI summary
+    /* Style markdown content within AI summary */
     :global(p) {
       margin: 0 0 0.5rem 0;
       line-height: 1.4;

@@ -1,12 +1,12 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
-import { configStore, is_tauri } from '$lib/stores';
 import { store } from '@tomic/svelte';
-import { CONFIG } from '../../config';
-import { Route } from 'tinro';
-import { Field, Input, Button, Switch, Select } from 'svelma';
+import { Button, Field, Input, Select, Switch } from 'svelma';
 import { JSONEditor } from 'svelte-jsoneditor';
+import { Route } from 'tinro';
+import { configStore, is_tauri } from '$lib/stores';
+import { CONFIG } from '../../config';
 import FetchRole from './FetchRole.svelte';
 
 let _content = {

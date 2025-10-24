@@ -1,13 +1,13 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Modal } from 'svelma';
+// @ts-expect-error
+import SvelteMarkdown from 'svelte-markdown';
+import { is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
+import NovelWrapper from '../Editor/NovelWrapper.svelte';
 import type { DocumentListResponse } from '../generated/types';
 import type { Document } from './SearchResult';
-import { Modal } from 'svelma';
-import NovelWrapper from '../Editor/NovelWrapper.svelte';
-// @ts-ignore
-import SvelteMarkdown from 'svelte-markdown';
-import { role, is_tauri } from '$lib/stores';
 
 export let active: boolean = false;
 export let item: Document;
@@ -16,8 +16,8 @@ export const initialEdit: boolean = false;
 export const kgTerm: string | null = null;
 export const kgRank: number | null = null;
 
- let editing = false;
- let contentElement: HTMLElement;
+let editing = false;
+let contentElement: HTMLElement;
 
 // KG modal state (similar to ResultItem.svelte)
 let _showKgModal = false;

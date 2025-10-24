@@ -12,7 +12,7 @@
 
 **Critical Vulnerabilities Addressed:**
 1. **Prompt Injection Attacks** - 9 tests implemented
-2. **Command Injection Vulnerabilities** - 8 tests implemented  
+2. **Command Injection Vulnerabilities** - 8 tests implemented
 3. **Unsafe Memory Access** - 7 tests implemented
 4. **Network Interface Injection** - 6 tests implemented
 
