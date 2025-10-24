@@ -29,11 +29,20 @@ function goBack() {
 
 onMount(() => {
 	updateVisibility();
-	window.addEventListener('popstate', updateVisibility);
-	window.addEventListener('hashchange', updateVisibility);
+
+	const handleVisibilityUpdate = () => {
+		updateVisibility();
+		// Force Svelte to re-render by updating a reactive variable
+		// biome-ignore lint/correctness/noSelfAssign: Intentional for Svelte reactivity
+		isVisible = isVisible; // This triggers reactivity
+	};
+
+	window.addEventListener('popstate', handleVisibilityUpdate);
+	window.addEventListener('hashchange', handleVisibilityUpdate);
+
 	return () => {
-		window.removeEventListener('popstate', updateVisibility);
-		window.removeEventListener('hashchange', updateVisibility);
+		window.removeEventListener('popstate', handleVisibilityUpdate);
+		window.removeEventListener('hashchange', handleVisibilityUpdate);
 	};
 });
 </script>

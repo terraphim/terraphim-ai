@@ -1,0 +1,137 @@
+diff --git a/node_modules/svelma/src/components/Dialog/Dialog.svelte b/node_modules/svelma/src/components/Dialog/Dialog.svelte
+index 374b95c..0fe2a26 100644
+--- a/node_modules/svelma/src/components/Dialog/Dialog.svelte
++++ b/node_modules/svelma/src/components/Dialog/Dialog.svelte
+@@ -155,7 +155,9 @@
+ </script>
+
+ <style lang="scss">
+-@import 'node_modules/bulma/sass/utilities/all';
++@use '../../../../bulma/sass/utilities/initial-variables' as *;
++@use '../../../../bulma/sass/utilities/mixins' as *;
++@use '../../../../bulma/sass/utilities/controls' as *;
+
+  .dialog {
+    .modal-card {
+diff --git a/node_modules/svelma/src/components/Input.svelte b/node_modules/svelma/src/components/Input.svelte
+index 01a90cb..6293126 100644
+--- a/node_modules/svelma/src/components/Input.svelte
++++ b/node_modules/svelma/src/components/Input.svelte
+@@ -1,7 +1,6 @@
+ <script>
+   import { createEventDispatcher, onMount, getContext, tick } from 'svelte'
+-  import { omit, getEventsAction } from '../utils'
+-  import { current_component } from 'svelte/internal'
++  import { omit } from '../utils'
+
+   import Icon from './Icon.svelte'
+
+@@ -128,7 +127,21 @@
+   const onFocus = () => (isFocused = true)
+   const onBlur = () => (isFocused = false)
+
+-  const events = getEventsAction(current_component);
++  const forwardableEvents = ['focus', 'blur', 'keyup', 'keydown', 'keypress', 'click']
++
++  function forwardEvents(node) {
++    const listeners = forwardableEvents.map(eventName => {
++      const handler = event => dispatch(eventName, event)
++      node.addEventListener(eventName, handler)
++      return () => node.removeEventListener(eventName, handler)
++    })
++
++    return {
++      destroy() {
++        listeners.forEach(unsub => unsub())
++      }
++    }
++  }
+ </script>
+
+ <style>
+@@ -142,7 +155,7 @@
+
+   {#if type !== 'textarea'}
+     <input
+-      use:events
++      use:forwardEvents
+       {...props}
+       type={newType}
+       {value}
+@@ -155,7 +168,7 @@
+       {disabled} />
+   {:else}
+     <textarea
+-      use:events
++      use:forwardEvents
+       {...props}
+       {value}
+       class="textarea {statusType}
+diff --git a/node_modules/svelma/src/components/Switch.svelte b/node_modules/svelma/src/components/Switch.svelte
+index f819966..74b9970 100644
+--- a/node_modules/svelma/src/components/Switch.svelte
++++ b/node_modules/svelma/src/components/Switch.svelte
+@@ -41,7 +41,9 @@
+ </script>
+
+ <style lang="scss">
+-@import 'node_modules/bulma/sass/utilities/all';
++@use '../../../bulma/sass/utilities/initial-variables' as *;
++@use '../../../bulma/sass/utilities/mixins' as *;
++@use '../../../bulma/sass/utilities/controls' as *;
+
+ .switch {
+   position: relative;
+@@ -49,11 +51,6 @@
+   user-select: none;
+   display: inline-flex;
+
+-  :global(&[disabled]) {
+-    opacity: .5;
+-    cursor: not-allowed;
+-  }
+-
+   input {
+     position: absolute;
+     opacity: 0;
+@@ -114,6 +111,11 @@
+     @include control-large;
+   }
+ }
++
++:global(.switch[disabled]) {
++  opacity: .5;
++  cursor: not-allowed;
++}
+ </style>
+
+ <label ref="label" class="switch {size}" bind:this={label}>
+diff --git a/node_modules/svelma/src/utils/index.js b/node_modules/svelma/src/utils/index.js
+index 248fa3d..6d3667a 100644
+--- a/node_modules/svelma/src/utils/index.js
++++ b/node_modules/svelma/src/utils/index.js
+@@ -1,5 +1,4 @@
+ import * as transitions from 'svelte/transition'
+-import { bubble, listen } from "svelte/internal";
+
+ export function chooseAnimation(animation) {
+   return typeof animation === 'function' ? animation : transitions[animation]
+@@ -38,18 +37,3 @@ export function typeToIcon(type) {
+       return null
+   }
+ }
+-
+-export function getEventsAction(component) {
+-  return node => {
+-    const events = Object.keys(component.$$.callbacks);
+-    const listeners = [];
+-    events.forEach(event =>
+-      listeners.push(listen(node, event, e => bubble(component, e)))
+-    );
+-    return {
+-      destroy: () => {
+-        listeners.forEach(listener => listener());
+-      }
+-    };
+-  };
+-}
