@@ -59,6 +59,7 @@ fn dummy_document(id: String, body: String) -> Document {
         rank: None,
         tags: None,
         body,
+        source_haystack: None,
     }
 }
 

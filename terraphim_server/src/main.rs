@@ -23,6 +23,8 @@ use terraphim_config::{ConfigBuilder, ConfigId};
 use terraphim_persistence::Persistable;
 use terraphim_server::{axum_server, Result};
 use terraphim_settings::DeviceSettings;
+// TODO: Re-enable auto-update when terraphim_update is added to workspace
+// use terraphim_update::{check_for_updates, update_binary};
 
 /// Terraphim AI server with role-based deployment support
 #[derive(Parser, Debug)]
@@ -35,11 +37,25 @@ struct Args {
     /// Custom config file path (overrides role selection)
     #[arg(long)]
     config: Option<String>,
+
+    /// Check for updates without installing
+    #[arg(long)]
+    check_update: bool,
+
+    /// Update to latest version if available
+    #[arg(long)]
+    update: bool,
 }
 
 #[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
+
+    // Handle update operations before starting server
+    if args.check_update || args.update {
+        return handle_update_commands(&args).await;
+    }
+
     match run_server(args).await {
         Ok(()) => Ok(()),
         Err(e) => {
@@ -47,6 +63,14 @@ async fn main() -> Result<()> {
             std::process::exit(1)
         }
     }
+}
+
+/// Handle update-related commands
+#[allow(clippy::unused_async)]
+async fn handle_update_commands(_args: &Args) -> Result<()> {
+    // TODO: Re-enable when terraphim_update is added to workspace
+    eprintln!("Auto-update feature temporarily disabled");
+    std::process::exit(1);
 }
 
 #[allow(clippy::too_many_lines)]

@@ -1,3 +1,4 @@
+pub mod conversation;
 pub mod document;
 pub mod error;
 pub mod memory;
@@ -11,12 +12,14 @@ use serde::{de::DeserializeOwned, Serialize};
 use terraphim_settings::DeviceSettings;
 
 use std::collections::HashMap;
+use std::sync::Arc;
 use terraphim_types::Document;
 
 pub use error::{Error, Result};
 
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
 
+#[derive(Debug)]
 pub struct DeviceStorage {
     pub ops: HashMap<String, (Operator, u128)>,
     pub fastest_op: Operator,
@@ -45,6 +48,37 @@ impl DeviceStorage {
             })
             .await?;
         Ok(storage)
+    }
+
+    /// Get an Arc<DeviceStorage> instance safely
+    ///
+    /// This is a safe alternative to using unsafe ptr::read operations.
+    /// It initializes storage if needed and returns an Arc clone.
+    pub async fn arc_instance() -> Result<Arc<DeviceStorage>> {
+        let storage_ref = Self::instance().await?;
+
+        // Create a new DeviceStorage with cloned data rather than using unsafe code
+        let safe_storage = DeviceStorage {
+            ops: storage_ref.ops.clone(),
+            fastest_op: storage_ref.fastest_op.clone(),
+        };
+
+        Ok(Arc::new(safe_storage))
+    }
+
+    /// Get an Arc<DeviceStorage> instance using memory-only backend safely
+    ///
+    /// This is a safe alternative to using unsafe ptr::read operations for tests.
+    pub async fn arc_memory_only() -> Result<Arc<DeviceStorage>> {
+        let storage_ref = Self::init_memory_only().await?;
+
+        // Create a new DeviceStorage with cloned data rather than using unsafe code
+        let safe_storage = DeviceStorage {
+            ops: storage_ref.ops.clone(),
+            fastest_op: storage_ref.fastest_op.clone(),
+        };
+
+        Ok(Arc::new(safe_storage))
     }
 }
 
@@ -202,7 +236,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
 
         // First try the fastest operator as before
         match fastest_op.read(key).await {
-            Ok(bs) => match serde_json::from_slice(&bs) {
+            Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
                 Ok(obj) => {
                     log::debug!("✅ Loaded '{}' from fastest operator", key);
                     return Ok(obj);
@@ -241,7 +275,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
             );
 
             match op.read(key).await {
-                Ok(bs) => match serde_json::from_slice(&bs) {
+                Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
                     Ok(obj) => {
                         log::info!(
                             "✅ Successfully loaded '{}' from fallback profile '{}'",
@@ -272,7 +306,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
 
         // If all operators failed, return the original error from the fastest operator
         let bs = fastest_op.read(key).await?;
-        let obj = serde_json::from_slice(&bs)?;
+        let obj = serde_json::from_slice(&bs.to_vec())?;
         Ok(obj)
     }
 

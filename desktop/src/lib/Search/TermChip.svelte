@@ -1,7 +1,7 @@
 <script lang="ts">
-  export let term: string;
-  export let isFromKG: boolean = false;
-  export let onRemove: (() => void) | null = null;
+export let term: string;
+export const isFromKG: boolean = false;
+export const onRemove: (() => void) | null = null;
 </script>
 
 <span class="term-chip" class:from-kg={isFromKG}>

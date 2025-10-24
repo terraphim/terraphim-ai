@@ -24,10 +24,9 @@ terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", featur
 terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "0.2.0" }
 
-opendal = { version = "0.44.2", features = [
+opendal = { version = "0.54", features = [
     "services-dashmap",
     "services-sled",
-    "services-atomicserver",
 ] }
 tokio = { version = "1.35.1", features = [
     "full",
@@ -62,5 +61,6 @@ typescript = ["tsify", "wasm-bindgen"]
 openrouter = []
 
 [dev-dependencies]
-tempfile = "3.10.1"
+tempfile = "3.23.0"
 env_logger = "0.11"
+terraphim_multi_agent = { path = "../terraphim_multi_agent" }

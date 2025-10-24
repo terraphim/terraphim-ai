@@ -23,20 +23,22 @@ tracing-subscriber = { version = "0.3", features = [
 async-once-cell = "0.5.3"
 async-trait = "0.1.74"
 log = "0.4"
-opendal = { version = "0.44.2", default-features = false, features = [
+opendal = { version = "0.54", default-features = false, features = [
     "services-memory",  # Always needed
 ] }
 serde = { version = "1.0.182", features = ["derive"] }
 serde_json = "1.0.104"
 thiserror = "1.0.56"
-tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
+tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread", "sync"] }
 regex = "1.11.0"
-rusqlite = { version = "0.29", optional = true }
+rusqlite = { version = "0.32", optional = true }
+chrono = { version = "0.4", features = ["serde"] }
 
 
 [dev-dependencies]
-tempfile = "3.7.1"
+tempfile = "3.23.0"
 terraphim_config = { path = "../terraphim_config" }
+terraphim_multi_agent = { path = "../terraphim_multi_agent" }
 temp-env = "0.3.6"
 serial_test = "3.1.1"
 tokio = { version = "1", features = ["full"] }
@@ -53,7 +55,7 @@ dashmap = ["opendal/services-dashmap"]
 
 # Optional cloud backends (NOT in default - server only)
 s3 = ["opendal/services-s3"]  # Only for server deployments
-atomicserver = ["opendal/services-atomicserver"]
+# atomicserver = ["opendal/services-atomicserver"]  # Removed in opendal 0.54
 
 # Optional local backends
 redis = ["opendal/services-redis"]
@@ -62,13 +64,13 @@ redb = ["opendal/services-redb"]
 ipfs = ["opendal/services-ipfs"]
 
 # Server profile with cloud support
-server = ["s3", "atomicserver"]
+server = ["s3"]  # Removed atomicserver (not available in opendal 0.54)
 all-backends = ["server", "redis", "rocksdb", "redb", "ipfs"]
 
 # Legacy feature names for backwards compatibility
 services-dashmap = ["dashmap"]
 services-sqlite = ["sqlite"]
-services-atomicserver = ["atomicserver"]
+# services-atomicserver = ["atomicserver"]  # Removed - atomicserver not available in opendal 0.54
 services-s3 = ["s3"]
 services-redis = ["redis"]
 services-rocksdb = ["rocksdb"]

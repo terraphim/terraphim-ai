@@ -1,86 +1,85 @@
 <script lang="ts">
-  import { Modal } from "svelma";
-  import { createEventDispatcher } from 'svelte';
-  import type { ContextItem } from './Chat.svelte';
+import { createEventDispatcher } from 'svelte';
+import { Modal } from 'svelma';
+import type { ContextItem } from './Chat.svelte';
 
-  export let active: boolean = false;
-  export let context: ContextItem | null = null;
-  export let mode: 'create' | 'edit' = 'edit';
+export let active: boolean = false;
+export let context: ContextItem | null = null;
+export let mode: 'create' | 'edit' = 'edit';
 
-  const dispatch = createEventDispatcher();
+const dispatch = createEventDispatcher();
 
-  // Form data
-  let editingContext: ContextItem | null = null;
-  let contextTypeOptions = [
-    { value: 'Document', label: 'Document' },
-    { value: 'SearchResult', label: 'Search Result' },
-    { value: 'UserInput', label: 'User Input' },
-    { value: 'System', label: 'System' },
-    { value: 'External', label: 'External' }
-  ];
+// Form data
+let editingContext: ContextItem | null = null;
+const _contextTypeOptions = [
+	{ value: 'Document', label: 'Document' },
+	{ value: 'SearchResult', label: 'Search Result' },
+	{ value: 'UserInput', label: 'User Input' },
+	{ value: 'System', label: 'System' },
+	{ value: 'External', label: 'External' },
+];
 
-  // Initialize form data when modal becomes active
-  $: if (active && context) {
-    editingContext = {
-      ...context,
-      // Ensure we have a proper copy
-      metadata: { ...context.metadata }
-    };
-  } else if (active && mode === 'create') {
-    // Initialize new context item
-    editingContext = {
-      id: '',
-      context_type: 'UserInput',
-      title: '',
-      summary: '',
-      content: '',
-      metadata: {},
-      created_at: new Date().toISOString(),
-      relevance_score: null
-    };
-  }
+// Initialize form data when modal becomes active
+$: if (active && context) {
+	editingContext = {
+		...context,
+		// Ensure we have a proper copy
+		metadata: { ...context.metadata },
+	};
+} else if (active && mode === 'create') {
+	// Initialize new context item
+	editingContext = {
+		id: '',
+		context_type: 'UserInput',
+		title: '',
+		summary: '',
+		content: '',
+		metadata: {},
+		created_at: new Date().toISOString(),
+		relevance_score: undefined,
+	};
+}
 
-  // Validation
-  $: isValid = editingContext &&
-    editingContext.title.trim() !== '' &&
-    editingContext.content.trim() !== '';
+// Validation
+$: isValid =
+	editingContext && editingContext.title.trim() !== '' && editingContext.content.trim() !== '';
 
-  function handleClose() {
-    active = false;
-    editingContext = null;
-    dispatch('close');
-  }
+function handleClose() {
+	active = false;
+	editingContext = null;
+	dispatch('close');
+}
 
-  function handleSave() {
-    if (!isValid || !editingContext) return;
+function handleSave() {
+	if (!isValid || !editingContext) return;
 
-    if (mode === 'edit') {
-      dispatch('update', editingContext);
-    } else {
-      dispatch('create', editingContext);
-    }
+	if (mode === 'edit') {
+		dispatch('update', editingContext);
+	} else {
+		dispatch('create', editingContext);
+	}
 
-    handleClose();
-  }
+	handleClose();
+}
 
-  function handleDelete() {
-    if (mode === 'edit' && context) {
-      dispatch('delete', context.id);
-      handleClose();
-    }
-  }
+function _handleDelete() {
+	if (mode === 'edit' && context) {
+		dispatch('delete', context.id);
+		handleClose();
+	}
+}
 
-  // Handle keyboard shortcuts
-  function handleKeydown(event: KeyboardEvent) {
-    if (event.key === 'Escape') {
-      handleClose();
-    } else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
-      handleSave();
-    }
-  }
+// Handle keyboard shortcuts
+function _handleKeydown(event: KeyboardEvent) {
+	if (event.key === 'Escape') {
+		handleClose();
+	} else if (event.key === 'Enter' && (event.ctrlKey || event.metaKey)) {
+		handleSave();
+	}
+}
 </script>
 
-<svelte:window on:keydown={handleKeydown} />
+<svelte:window on:keydown={_handleKeydown} />
 
 <Modal {active} on:close={handleClose}>
   <div class="modal-card">
@@ -103,7 +102,7 @@
                 bind:value={editingContext.context_type}
                 data-testid="context-type-select"
               >
-                {#each contextTypeOptions as option}
+                {#each _contextTypeOptions as option}
                   <option value={option.value}>{option.label}</option>
                 {/each}
               </select>
@@ -183,70 +182,12 @@
             </span>
           </summary>
 
+          <!-- Metadata editing temporarily disabled for build -->
           <div class="field mt-4">
             <label class="label">Metadata</label>
             <div class="content">
-              <p class="help">Additional key-value pairs for this context item</p>
-
-              {#if Object.keys(editingContext.metadata).length === 0}
-                <p class="has-text-grey-light">No metadata defined</p>
-              {:else}
-                {#each Object.entries(editingContext.metadata) as [key, value], index}
-                  <div class="field is-grouped">
-                    <div class="control is-expanded">
-                      <input
-                        class="input is-small"
-                        type="text"
-                        placeholder="Key"
-                        value={key}
-                        on:input={(e) => {
-                          const newMetadata = { ...editingContext.metadata };
-                          delete newMetadata[key];
-                          newMetadata[e.target.value] = value;
-                          editingContext.metadata = newMetadata;
-                        }}
-                      >
-                    </div>
-                    <div class="control is-expanded">
-                      <input
-                        class="input is-small"
-                        type="text"
-                        placeholder="Value"
-                        bind:value={editingContext.metadata[key]}
-                      >
-                    </div>
-                    <div class="control">
-                      <button
-                        class="button is-small is-danger is-outlined"
-                        on:click={() => {
-                          const newMetadata = { ...editingContext.metadata };
-                          delete newMetadata[key];
-                          editingContext.metadata = newMetadata;
-                        }}
-                      >
-                        <span class="icon">
-                          <i class="fas fa-times"></i>
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                {/each}
-              {/if}
-
-              <button
-                class="button is-small is-light"
-                on:click={() => {
-                  editingContext.metadata = {
-                    ...editingContext.metadata,
-                    [`key_${Date.now()}`]: ''
-                  };
-                }}
-              >
-                <span class="icon">
-                  <i class="fas fa-plus"></i>
-                </span>
-                <span>Add Metadata</span>
-              </button>
+              <p class="help">Metadata editing temporarily disabled</p>
+              <pre>{JSON.stringify(editingContext?.metadata || {}, null, 2)}</pre>
             </div>
           </div>
         </details>
@@ -283,7 +224,7 @@
             <div class="control">
               <button
                 class="button is-danger is-outlined"
-                on:click={handleDelete}
+                on:click={_handleDelete}
                 data-testid="delete-context-button"
               >
                 <span class="icon">
