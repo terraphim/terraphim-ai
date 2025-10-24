@@ -1,0 +1,306 @@
+/**
+ * Markdown Syntax Highlighting - CSS-based syntax highlighting for markdown
+ *
+ * Provides visual highlighting for markdown syntax patterns in the editor
+ * content area. Uses CSS attribute selectors and pseudo-elements where possible.
+ */
+
+/* Heading Styles */
+.editor-content {
+  /* Use data attributes for syntax highlighting if needed */
+}
+
+/* Inline bold detection - **text** */
+.editor-content strong,
+.editor-content b {
+  font-weight: bold;
+  color: var(--editor-text-primary);
+}
+
+/* Inline italic detection - *text* or _text_ */
+.editor-content em,
+.editor-content i {
+  font-style: italic;
+  color: var(--editor-text-primary);
+}
+
+/* Inline code detection - `code` */
+.editor-content code {
+  font-family: var(--editor-font-family-mono);
+  font-size: 0.9em;
+  background: var(--editor-bg-code);
+  color: var(--syntax-code-text, #d73a49);
+  padding: 2px 6px;
+  border-radius: var(--editor-border-radius-sm);
+}
+
+/* Link styling - [text](url) */
+.editor-content a {
+  color: var(--syntax-link, var(--editor-color-primary));
+  text-decoration: underline;
+}
+
+/* Markdown-specific syntax colors */
+:root {
+  --syntax-heading: #005cc5;
+  --syntax-bold: #24292e;
+  --syntax-italic: #6a737d;
+  --syntax-code-text: #d73a49;
+  --syntax-code-bg: #f6f8fa;
+  --syntax-link: #0366d6;
+  --syntax-list-marker: #6a737d;
+  --syntax-blockquote: #6a737d;
+  --syntax-hr: #e1e4e8;
+}
+
+[theme="dark"],
+.theme-dark {
+  --syntax-heading: #79b8ff;
+  --syntax-bold: #e1e4e8;
+  --syntax-italic: #959da5;
+  --syntax-code-text: #f97583;
+  --syntax-code-bg: #2d333b;
+  --syntax-link: #58a6ff;
+  --syntax-list-marker: #8b949e;
+  --syntax-blockquote: #8b949e;
+  --syntax-hr: #30363d;
+}
+
+/* Enhanced heading detection via custom class injection (optional) */
+.markdown-h1 {
+  font-size: 2em;
+  font-weight: bold;
+  color: var(--syntax-heading);
+  border-bottom: 2px solid var(--editor-border-primary);
+  padding-bottom: 0.3em;
+  margin: 0.67em 0;
+  line-height: var(--editor-line-height-tight);
+}
+
+.markdown-h2 {
+  font-size: 1.5em;
+  font-weight: bold;
+  color: var(--syntax-heading);
+  border-bottom: 1px solid var(--editor-border-primary);
+  padding-bottom: 0.3em;
+  margin: 0.75em 0;
+  line-height: var(--editor-line-height-tight);
+}
+
+.markdown-h3 {
+  font-size: 1.25em;
+  font-weight: bold;
+  color: var(--syntax-heading);
+  margin: 0.83em 0;
+  line-height: var(--editor-line-height-tight);
+}
+
+.markdown-h4 {
+  font-size: 1.1em;
+  font-weight: bold;
+  color: var(--syntax-heading);
+  margin: 1em 0;
+  line-height: var(--editor-line-height-tight);
+}
+
+.markdown-h5 {
+  font-size: 1em;
+  font-weight: bold;
+  color: var(--syntax-heading);
+  margin: 1.17em 0;
+  line-height: var(--editor-line-height-tight);
+}
+
+.markdown-h6 {
+  font-size: 0.9em;
+  font-weight: bold;
+  color: var(--syntax-heading);
+  margin: 1.33em 0;
+  line-height: var(--editor-line-height-tight);
+}
+
+/* List markers */
+.markdown-list-item {
+  margin: 0.5em 0;
+}
+
+.markdown-list-item::marker {
+  color: var(--syntax-list-marker);
+  font-weight: bold;
+}
+
+/* Blockquote styling */
+.markdown-blockquote {
+  border-left: 4px solid var(--editor-border-primary);
+  padding-left: var(--editor-spacing-lg);
+  margin: 1em 0;
+  color: var(--syntax-blockquote);
+  font-style: italic;
+}
+
+/* Horizontal rule */
+.markdown-hr {
+  border: none;
+  border-top: 2px solid var(--syntax-hr);
+  margin: 2em 0;
+}
+
+/* Code block (multi-line) */
+.markdown-code-block {
+  font-family: var(--editor-font-family-mono);
+  font-size: 0.9em;
+  background: var(--syntax-code-bg);
+  padding: var(--editor-spacing-lg);
+  border-radius: var(--editor-border-radius);
+  overflow-x: auto;
+  margin: 1em 0;
+  white-space: pre;
+  color: var(--editor-text-primary);
+}
+
+/* Task list items (GitHub-flavored markdown) */
+.markdown-task-list-item {
+  list-style-type: none;
+  margin-left: -1.5em;
+}
+
+.markdown-task-checkbox {
+  margin-right: 0.5em;
+}
+
+/* Table styling */
+.markdown-table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1em 0;
+}
+
+.markdown-table th,
+.markdown-table td {
+  border: 1px solid var(--editor-border-primary);
+  padding: var(--editor-spacing-sm) var(--editor-spacing-md);
+  text-align: left;
+}
+
+.markdown-table th {
+  background: var(--editor-bg-secondary);
+  font-weight: bold;
+}
+
+/* Strikethrough - ~~text~~ */
+.markdown-strikethrough {
+  text-decoration: line-through;
+  color: var(--editor-text-secondary);
+}
+
+/* Highlight - ==text== (some markdown flavors) */
+.markdown-highlight {
+  background: var(--editor-color-warning);
+  color: var(--editor-text-primary);
+  padding: 2px 0;
+}
+
+/* Footnote reference */
+.markdown-footnote-ref {
+  color: var(--syntax-link);
+  text-decoration: none;
+  font-size: 0.8em;
+  vertical-align: super;
+}
+
+/* Image placeholder */
+.markdown-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: var(--editor-border-radius);
+  margin: 1em 0;
+}
+
+/* Enhanced syntax highlighting for raw markdown (contenteditable text patterns) */
+
+/* This is a simplified approach - full syntax highlighting would require */
+/* JavaScript to parse and inject span elements around markdown patterns */
+
+/* Heading markers: # ## ### etc */
+.editor-content[data-syntax="markdown"] {
+  /* Future enhancement: JavaScript-based syntax tokenization */
+}
+
+/* Simple pattern-based highlighting using CSS counters and generated content */
+/* Note: ContentEditable limitations mean full syntax highlighting requires JS */
+
+/* Selection within code blocks */
+.markdown-code-block::selection {
+  background: var(--editor-color-primary);
+  color: var(--editor-bg-primary);
+}
+
+/* Placeholder for empty code blocks */
+.markdown-code-block:empty::before {
+  content: "Code block...";
+  color: var(--editor-text-placeholder);
+  font-style: italic;
+}
+
+/* Line numbers for code blocks (optional feature) */
+.markdown-code-block[data-line-numbers="true"] {
+  counter-reset: line-number;
+}
+
+.markdown-code-block[data-line-numbers="true"] .line::before {
+  counter-increment: line-number;
+  content: counter(line-number);
+  display: inline-block;
+  width: 3em;
+  margin-right: 1em;
+  text-align: right;
+  color: var(--editor-text-placeholder);
+  user-select: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .markdown-h1 {
+    font-size: 1.75em;
+  }
+
+  .markdown-h2 {
+    font-size: 1.5em;
+  }
+
+  .markdown-h3 {
+    font-size: 1.25em;
+  }
+
+  .markdown-code-block {
+    font-size: 0.85em;
+    padding: var(--editor-spacing-md);
+  }
+
+  .markdown-table {
+    font-size: 0.9em;
+  }
+
+  .markdown-table th,
+  .markdown-table td {
+    padding: var(--editor-spacing-xs) var(--editor-spacing-sm);
+  }
+}
+
+/* Print styles */
+@media print {
+  .markdown-code-block {
+    border: 1px solid var(--editor-border-primary);
+    page-break-inside: avoid;
+  }
+
+  .markdown-table {
+    page-break-inside: avoid;
+  }
+
+  .markdown-h1,
+  .markdown-h2,
+  .markdown-h3 {
+    page-break-after: avoid;
+  }
+}

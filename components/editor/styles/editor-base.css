@@ -1,0 +1,426 @@
+/**
+ * Editor Base Styles - Core editor styling with CSS custom properties
+ *
+ * Provides foundational styles for the Terraphim editor with full theming
+ * support via CSS custom properties. Includes light and dark theme variants.
+ */
+
+/* CSS Custom Properties - Design Tokens */
+:root {
+  /* Colors - Light Theme */
+  --editor-bg-primary: #ffffff;
+  --editor-bg-secondary: #f5f5f5;
+  --editor-bg-hover: #e8e8e8;
+  --editor-bg-focus: #fafafa;
+  --editor-bg-disabled: #f5f5f5;
+  --editor-bg-code: #f0f0f0;
+
+  --editor-text-primary: #333333;
+  --editor-text-secondary: #666666;
+  --editor-text-placeholder: #999999;
+
+  --editor-border-primary: #dddddd;
+  --editor-border-secondary: #cccccc;
+  --editor-border-focus: #0066cc;
+
+  --editor-color-primary: #0066cc;
+  --editor-color-primary-hover: #0052a3;
+  --editor-color-success: #28a745;
+  --editor-color-warning: #ffc107;
+  --editor-color-error: #dc3545;
+
+  /* Typography */
+  --editor-font-family-base: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+  --editor-font-family-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Fira Code', 'Courier New', monospace;
+
+  --editor-font-size-xs: 11px;
+  --editor-font-size-sm: 12px;
+  --editor-font-size-base: 14px;
+  --editor-font-size-md: 16px;
+  --editor-font-size-lg: 18px;
+  --editor-font-size-xl: 20px;
+
+  --editor-line-height-tight: 1.4;
+  --editor-line-height-base: 1.6;
+  --editor-line-height-relaxed: 1.8;
+
+  /* Spacing */
+  --editor-spacing-xs: 4px;
+  --editor-spacing-sm: 8px;
+  --editor-spacing-md: 12px;
+  --editor-spacing-lg: 16px;
+  --editor-spacing-xl: 24px;
+  --editor-spacing-xxl: 32px;
+
+  /* Layout */
+  --editor-border-radius: 4px;
+  --editor-border-radius-sm: 3px;
+  --editor-border-radius-lg: 6px;
+
+  --editor-toolbar-height: 44px;
+  --editor-min-height: 200px;
+
+  /* Shadows */
+  --editor-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --editor-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --editor-shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.15);
+
+  /* Transitions */
+  --editor-transition-fast: 0.15s ease;
+  --editor-transition-base: 0.2s ease;
+  --editor-transition-slow: 0.3s ease;
+
+  /* Z-index */
+  --editor-z-toolbar: 10;
+  --editor-z-dropdown: 100;
+  --editor-z-modal: 1000;
+}
+
+/* Dark Theme */
+[theme="dark"],
+.theme-dark {
+  --editor-bg-primary: #1e1e1e;
+  --editor-bg-secondary: #2d2d2d;
+  --editor-bg-hover: #3e3e3e;
+  --editor-bg-focus: #252525;
+  --editor-bg-disabled: #2a2a2a;
+  --editor-bg-code: #2a2a2a;
+
+  --editor-text-primary: #d4d4d4;
+  --editor-text-secondary: #a0a0a0;
+  --editor-text-placeholder: #6a6a6a;
+
+  --editor-border-primary: #3e3e3e;
+  --editor-border-secondary: #4e4e4e;
+  --editor-border-focus: #0078d4;
+
+  --editor-color-primary: #0078d4;
+  --editor-color-primary-hover: #1084d8;
+
+  --editor-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --editor-shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --editor-shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+/* Base Reset */
+.vanilla-markdown-editor *,
+.vanilla-markdown-editor *::before,
+.vanilla-markdown-editor *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Editor Container */
+.vanilla-markdown-editor {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: var(--editor-min-height);
+  background: var(--editor-bg-primary);
+  border: 1px solid var(--editor-border-primary);
+  border-radius: var(--editor-border-radius);
+  overflow: hidden;
+  font-family: var(--editor-font-family-base);
+  color: var(--editor-text-primary);
+}
+
+/* Toolbar */
+.editor-toolbar {
+  display: flex;
+  align-items: center;
+  gap: var(--editor-spacing-xs);
+  padding: var(--editor-spacing-sm);
+  background: var(--editor-bg-secondary);
+  border-bottom: 1px solid var(--editor-border-primary);
+  height: var(--editor-toolbar-height);
+  flex-shrink: 0;
+  z-index: var(--editor-z-toolbar);
+}
+
+.toolbar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 var(--editor-spacing-md);
+  border: 1px solid var(--editor-border-secondary);
+  background: var(--editor-bg-primary);
+  color: var(--editor-text-primary);
+  font-family: var(--editor-font-family-base);
+  font-size: var(--editor-font-size-sm);
+  font-weight: 600;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: var(--editor-border-radius-sm);
+  transition: all var(--editor-transition-base);
+  user-select: none;
+}
+
+.toolbar-button:hover {
+  background: var(--editor-bg-hover);
+  border-color: var(--editor-color-primary);
+}
+
+.toolbar-button:active {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.toolbar-button:focus {
+  outline: 2px solid var(--editor-border-focus);
+  outline-offset: 2px;
+}
+
+.toolbar-button:disabled {
+  background: var(--editor-bg-disabled);
+  color: var(--editor-text-placeholder);
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Toolbar button variants */
+.toolbar-button-bold {
+  font-weight: bold;
+}
+
+.toolbar-button-italic {
+  font-style: italic;
+}
+
+.toolbar-button-code {
+  font-family: var(--editor-font-family-mono);
+  font-size: var(--editor-font-size-xs);
+}
+
+/* Editor Container */
+.editor-container {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Content Editable Area */
+.editor-content {
+  flex: 1;
+  padding: var(--editor-spacing-lg);
+  overflow-y: auto;
+  font-family: var(--editor-font-family-base);
+  font-size: var(--editor-font-size-base);
+  line-height: var(--editor-line-height-base);
+  color: var(--editor-text-primary);
+  background: var(--editor-bg-primary);
+  outline: none;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  tab-size: 2;
+}
+
+.editor-content:focus {
+  background: var(--editor-bg-focus);
+}
+
+.editor-content[contenteditable="false"],
+.editor-content[aria-readonly="true"] {
+  background: var(--editor-bg-disabled);
+  color: var(--editor-text-secondary);
+  cursor: not-allowed;
+}
+
+.editor-content:empty::before {
+  content: attr(placeholder);
+  color: var(--editor-text-placeholder);
+  pointer-events: none;
+  position: absolute;
+}
+
+/* Scrollbar Styling */
+.editor-content::-webkit-scrollbar {
+  width: 12px;
+  height: 12px;
+}
+
+.editor-content::-webkit-scrollbar-track {
+  background: var(--editor-bg-secondary);
+}
+
+.editor-content::-webkit-scrollbar-thumb {
+  background: var(--editor-border-secondary);
+  border-radius: var(--editor-border-radius);
+}
+
+.editor-content::-webkit-scrollbar-thumb:hover {
+  background: var(--editor-border-primary);
+}
+
+/* Preview Pane */
+.editor-preview {
+  flex: 1;
+  padding: var(--editor-spacing-lg);
+  overflow-y: auto;
+  border-left: 1px solid var(--editor-border-primary);
+  background: var(--editor-bg-secondary);
+  font-family: var(--editor-font-family-base);
+  font-size: var(--editor-font-size-base);
+  line-height: var(--editor-line-height-base);
+  color: var(--editor-text-primary);
+}
+
+/* Preview Content Styling */
+.editor-preview h1,
+.editor-preview h2,
+.editor-preview h3,
+.editor-preview h4,
+.editor-preview h5,
+.editor-preview h6 {
+  font-weight: bold;
+  line-height: var(--editor-line-height-tight);
+  margin-top: 1em;
+  margin-bottom: 0.5em;
+}
+
+.editor-preview h1 {
+  font-size: 2em;
+  border-bottom: 2px solid var(--editor-border-primary);
+  padding-bottom: 0.3em;
+}
+
+.editor-preview h2 {
+  font-size: 1.5em;
+  border-bottom: 1px solid var(--editor-border-primary);
+  padding-bottom: 0.3em;
+}
+
+.editor-preview h3 {
+  font-size: 1.25em;
+}
+
+.editor-preview h4 {
+  font-size: 1em;
+}
+
+.editor-preview p {
+  margin: 1em 0;
+}
+
+.editor-preview strong {
+  font-weight: bold;
+}
+
+.editor-preview em {
+  font-style: italic;
+}
+
+.editor-preview code {
+  font-family: var(--editor-font-family-mono);
+  font-size: 0.9em;
+  background: var(--editor-bg-code);
+  padding: 2px 6px;
+  border-radius: var(--editor-border-radius-sm);
+}
+
+.editor-preview pre {
+  background: var(--editor-bg-code);
+  padding: var(--editor-spacing-lg);
+  border-radius: var(--editor-border-radius);
+  overflow-x: auto;
+  margin: 1em 0;
+}
+
+.editor-preview pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.editor-preview a {
+  color: var(--editor-color-primary);
+  text-decoration: underline;
+  transition: color var(--editor-transition-fast);
+}
+
+.editor-preview a:hover {
+  color: var(--editor-color-primary-hover);
+}
+
+.editor-preview ul,
+.editor-preview ol {
+  margin: 1em 0;
+  padding-left: 2em;
+}
+
+.editor-preview li {
+  margin: 0.5em 0;
+}
+
+.editor-preview blockquote {
+  border-left: 4px solid var(--editor-border-primary);
+  padding-left: var(--editor-spacing-lg);
+  margin: 1em 0;
+  color: var(--editor-text-secondary);
+}
+
+/* Selection Styling */
+.editor-content::selection,
+.editor-preview::selection {
+  background: var(--editor-color-primary);
+  color: var(--editor-bg-primary);
+}
+
+/* Focus Indicators */
+.vanilla-markdown-editor:focus-within {
+  border-color: var(--editor-border-focus);
+  box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.1);
+}
+
+[theme="dark"] .vanilla-markdown-editor:focus-within {
+  box-shadow: 0 0 0 3px rgba(0, 120, 212, 0.2);
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .editor-toolbar {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: var(--editor-toolbar-height);
+  }
+
+  .toolbar-button {
+    min-width: 28px;
+    height: 28px;
+    padding: 0 var(--editor-spacing-sm);
+    font-size: var(--editor-font-size-xs);
+  }
+
+  .editor-container {
+    flex-direction: column;
+  }
+
+  .editor-preview {
+    border-left: none;
+    border-top: 1px solid var(--editor-border-primary);
+    max-height: 50vh;
+  }
+
+  .editor-content,
+  .editor-preview {
+    padding: var(--editor-spacing-md);
+  }
+}
+
+/* Print Styles */
+@media print {
+  .editor-toolbar {
+    display: none;
+  }
+
+  .editor-content {
+    border: none;
+    padding: 0;
+  }
+
+  .editor-preview {
+    border: none;
+  }
+}

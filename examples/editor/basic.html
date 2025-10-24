@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Editor - Basic Example</title>
+  <style>
+    /* Page Styling */
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 40px 20px;
+      background: #f9f9f9;
+      color: #333;
+    }
+
+    header {
+      margin-bottom: 40px;
+    }
+
+    h1 {
+      font-size: 2.5em;
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #0066cc;
+    }
+
+    .subtitle {
+      font-size: 1.2em;
+      color: #666;
+      margin-bottom: 20px;
+    }
+
+    .info-badge {
+      display: inline-block;
+      padding: 6px 12px;
+      background: #e3f2fd;
+      color: #1976d2;
+      border-radius: 4px;
+      font-size: 0.9em;
+      font-weight: 600;
+      margin-bottom: 20px;
+    }
+
+    .example-section {
+      background: white;
+      border-radius: 8px;
+      padding: 30px;
+      margin-bottom: 30px;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .section-title {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin-bottom: 20px;
+      color: #333;
+    }
+
+    .editor-wrapper {
+      border: 2px solid #e0e0e0;
+      border-radius: 6px;
+      overflow: hidden;
+      margin-bottom: 20px;
+    }
+
+    terraphim-editor {
+      min-height: 300px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 20px;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 10px 20px;
+      border: none;
+      border-radius: 4px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+
+    .btn-primary {
+      background: #0066cc;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #0052a3;
+    }
+
+    .btn-secondary {
+      background: #f5f5f5;
+      color: #333;
+      border: 1px solid #ddd;
+    }
+
+    .btn-secondary:hover {
+      background: #e8e8e8;
+    }
+
+    .output-box {
+      background: #f5f5f5;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      padding: 15px;
+      font-family: 'Courier New', monospace;
+      font-size: 13px;
+      max-height: 200px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .output-label {
+      font-weight: 600;
+      margin-bottom: 10px;
+      color: #666;
+    }
+
+    .feature-list {
+      list-style-type: none;
+      padding-left: 0;
+    }
+
+    .feature-list li {
+      padding: 8px 0;
+      padding-left: 24px;
+      position: relative;
+    }
+
+    .feature-list li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: #28a745;
+      font-weight: bold;
+    }
+
+    .note {
+      background: #fff3cd;
+      border-left: 4px solid #ffc107;
+      padding: 15px;
+      margin-top: 20px;
+      border-radius: 4px;
+    }
+
+    .note strong {
+      color: #856404;
+    }
+
+    @media (max-width: 768px) {
+      body {
+        padding: 20px 10px;
+      }
+
+      h1 {
+        font-size: 2em;
+      }
+
+      .example-section {
+        padding: 20px;
+      }
+
+      .controls {
+        flex-direction: column;
+      }
+
+      .btn {
+        width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Terraphim Editor - Basic Example</h1>
+    <p class="subtitle">Vanilla Web Component Markdown Editor (Core Tier)</p>
+    <div class="info-badge">Tier: Core - No dependencies, always available</div>
+  </header>
+
+  <div class="example-section">
+    <h2 class="section-title">Features</h2>
+    <ul class="feature-list">
+      <li>Pure vanilla JavaScript Web Component</li>
+      <li>ContentEditable-based markdown editor</li>
+      <li>Formatting toolbar (Bold, Italic, Code, Link, Heading, List)</li>
+      <li>Keyboard shortcuts (Ctrl+B for bold, Ctrl+I for italic)</li>
+      <li>Real-time content change events</li>
+      <li>Read-only mode support</li>
+      <li>Zero build step - works via file:// protocol</li>
+      <li>Shadow DOM encapsulation</li>
+    </ul>
+  </div>
+
+  <div class="example-section">
+    <h2 class="section-title">Basic Editor</h2>
+
+    <div class="controls">
+      <button class="btn btn-primary" id="get-content">Get Content</button>
+      <button class="btn btn-secondary" id="set-content">Set Sample Content</button>
+      <button class="btn btn-secondary" id="clear-content">Clear</button>
+      <button class="btn btn-secondary" id="toggle-readonly">Toggle Read-Only</button>
+      <button class="btn btn-secondary" id="toggle-preview">Toggle Preview</button>
+    </div>
+
+    <div class="editor-wrapper">
+      <terraphim-editor
+        id="editor"
+        content="# Welcome to Terraphim Editor
+
+This is a **pure vanilla JavaScript** markdown editor with *zero dependencies*.
+
+## Features
+
+- Formatting toolbar
+- Keyboard shortcuts
+- Real-time updates
+- Shadow DOM encapsulation
+
+Try editing this text or use the toolbar buttons!
+
+`Code blocks` are supported too.
+
+[Links work as well](https://example.com)"
+        output-format="markdown">
+      </terraphim-editor>
+    </div>
+
+    <div>
+      <div class="output-label">Content Output:</div>
+      <div class="output-box" id="output">Content will appear here...</div>
+    </div>
+
+    <div>
+      <div class="output-label">Events Log:</div>
+      <div class="output-box" id="events-log">Events will appear here...</div>
+    </div>
+  </div>
+
+  <div class="example-section">
+    <h2 class="section-title">Read-Only Mode</h2>
+
+    <div class="editor-wrapper">
+      <terraphim-editor
+        id="readonly-editor"
+        content="# Read-Only Editor
+
+This editor is in read-only mode.
+You cannot edit this content.
+
+**Try clicking** - nothing will happen!"
+        read-only="true"
+        output-format="markdown">
+      </terraphim-editor>
+    </div>
+  </div>
+
+  <div class="example-section">
+    <h2 class="section-title">With Preview Pane</h2>
+
+    <div class="editor-wrapper">
+      <terraphim-editor
+        id="preview-editor"
+        content="# Editor with Preview
+
+Type in the left pane and see the **rendered output** on the right.
+
+## Try It
+
+- Add a list
+- Make text **bold** or *italic*
+- Create a `code block`
+- Add a [link](https://example.com)"
+        show-preview="true"
+        output-format="markdown">
+      </terraphim-editor>
+    </div>
+  </div>
+
+  <div class="note">
+    <strong>Note:</strong> This is the <strong>Core Tier</strong> implementation.
+    Phase 2 will add autocomplete support (Enhanced Tier), and Phase 3 will add
+    Novel rich text editor integration (Premium Tier).
+  </div>
+
+  <script type="module">
+    // Import the editor component
+    import '../../components/editor/terraphim-editor.js';
+
+    // Get editor reference
+    const editor = document.getElementById('editor');
+    const outputBox = document.getElementById('output');
+    const eventsLog = document.getElementById('events-log');
+
+    // Event logger helper
+    const eventsList = [];
+    function logEvent(message) {
+      const timestamp = new Date().toLocaleTimeString();
+      eventsList.push(`[${timestamp}] ${message}`);
+      if (eventsList.length > 10) {
+        eventsList.shift(); // Keep only last 10 events
+      }
+      eventsLog.textContent = eventsList.join('\n');
+    }
+
+    // Listen to content-changed event
+    editor.addEventListener('content-changed', (event) => {
+      const { content, format } = event.detail;
+      outputBox.textContent = content;
+      logEvent(`Content changed (${format}): ${content.length} characters`);
+    });
+
+    // Listen to tier-detected event
+    editor.addEventListener('tier-detected', (event) => {
+      const { tier } = event.detail;
+      logEvent(`Editor tier detected: ${tier}`);
+    });
+
+    // Listen to editor-keydown event
+    editor.addEventListener('editor-keydown', (event) => {
+      const { key, ctrlKey, metaKey } = event.detail;
+      if (ctrlKey || metaKey) {
+        logEvent(`Keyboard shortcut: ${key}`);
+      }
+    });
+
+    // Button handlers
+    document.getElementById('get-content').addEventListener('click', () => {
+      const content = editor.getContent('markdown');
+      outputBox.textContent = content;
+      logEvent('Content retrieved via getContent()');
+    });
+
+    document.getElementById('set-content').addEventListener('click', () => {
+      const sampleContent = `# Sample Content
+
+This content was set programmatically using **setContent()**.
+
+## Features Demonstrated
+
+- *Programmatic content update*
+- **Bold and italic** formatting
+- \`Inline code\`
+- [External links](https://example.com)
+
+Current time: ${new Date().toLocaleTimeString()}`;
+
+      editor.setContent(sampleContent);
+      logEvent('Sample content set');
+    });
+
+    document.getElementById('clear-content').addEventListener('click', () => {
+      editor.setContent('');
+      outputBox.textContent = '';
+      logEvent('Content cleared');
+    });
+
+    document.getElementById('toggle-readonly').addEventListener('click', () => {
+      const isReadOnly = editor.getAttribute('read-only') === 'true';
+      editor.setAttribute('read-only', (!isReadOnly).toString());
+      logEvent(`Read-only mode: ${!isReadOnly}`);
+    });
+
+    document.getElementById('toggle-preview').addEventListener('click', () => {
+      const showPreview = editor.getAttribute('show-preview') === 'true';
+      editor.setAttribute('show-preview', (!showPreview).toString());
+      logEvent(`Preview mode: ${!showPreview}`);
+    });
+
+    // Log initial tier detection
+    window.addEventListener('load', () => {
+      logEvent(`Editor initialized with tier: ${editor.getEditorTier()}`);
+      logEvent('All event listeners attached');
+    });
+  </script>
+</body>
+</html>

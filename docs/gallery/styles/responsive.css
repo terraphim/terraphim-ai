@@ -1,0 +1,198 @@
+/**
+ * Responsive Styles
+ * Mobile-first breakpoint system
+ */
+
+/* Breakpoint Variables (for reference in comments) */
+/* --breakpoint-sm: 640px  - Mobile landscape */
+/* --breakpoint-md: 768px  - Tablet portrait */
+/* --breakpoint-lg: 1024px - Tablet landscape / Small desktop */
+/* --breakpoint-xl: 1280px - Desktop */
+/* --breakpoint-2xl: 1536px - Large desktop */
+
+/* Mobile First - Base styles above apply to mobile */
+
+/* Small devices and up (640px) */
+@media (min-width: 640px) {
+  :root {
+    --font-size-base: 1rem;
+  }
+}
+
+/* Medium devices and up (768px) - Tablet portrait */
+@media (min-width: 768px) {
+  :root {
+    --sidebar-width: 280px;
+    --header-height: 64px;
+  }
+
+  /* Stack layout becomes side-by-side */
+  terraphim-gallery {
+    display: grid;
+    grid-template-columns: var(--sidebar-width) 1fr;
+    grid-template-rows: var(--header-height) 1fr;
+  }
+}
+
+/* Large devices and up (1024px) - Tablet landscape */
+@media (min-width: 1024px) {
+  :root {
+    --sidebar-width: 320px;
+    --content-max-width: 1200px;
+  }
+}
+
+/* Extra large devices and up (1280px) - Desktop */
+@media (min-width: 1280px) {
+  :root {
+    --sidebar-width: 320px;
+    --content-max-width: 1400px;
+  }
+}
+
+/* 2X large devices and up (1536px) - Large desktop */
+@media (min-width: 1536px) {
+  :root {
+    --content-max-width: 1600px;
+  }
+}
+
+/* Mobile-specific overrides (below 768px) */
+@media (max-width: 767px) {
+  /* Hide sidebar by default on mobile */
+  gallery-sidebar {
+    position: fixed;
+    top: var(--header-height);
+    left: -100%;
+    width: 80%;
+    max-width: 320px;
+    height: calc(100vh - var(--header-height));
+    z-index: var(--z-fixed);
+    transition: left var(--transition-base);
+    box-shadow: var(--shadow-xl);
+  }
+
+  gallery-sidebar[data-open="true"] {
+    left: 0;
+  }
+
+  /* Mobile overlay when sidebar is open */
+  .sidebar-overlay {
+    display: none;
+    position: fixed;
+    top: var(--header-height);
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: calc(var(--z-fixed) - 1);
+  }
+
+  .sidebar-overlay[data-visible="true"] {
+    display: block;
+  }
+
+  /* Full width main content on mobile */
+  gallery-main {
+    width: 100%;
+    padding: var(--space-md);
+  }
+
+  /* Smaller header elements */
+  gallery-header {
+    padding: var(--space-sm) var(--space-md);
+  }
+
+  /* Adjust typography for mobile */
+  h1 { font-size: var(--font-size-3xl); }
+  h2 { font-size: var(--font-size-2xl); }
+  h3 { font-size: var(--font-size-xl); }
+}
+
+/* Print styles */
+@media print {
+  gallery-sidebar,
+  gallery-header,
+  theme-toggle {
+    display: none !important;
+  }
+
+  gallery-main {
+    width: 100%;
+    max-width: 100%;
+    padding: 0;
+  }
+
+  a {
+    text-decoration: underline;
+  }
+
+  a[href]:after {
+    content: " (" attr(href) ")";
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+  }
+
+  pre, code {
+    border: 1px solid var(--color-border);
+    page-break-inside: avoid;
+  }
+}
+
+/* Reduced motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --color-border: #000000;
+    --color-text-secondary: var(--color-text-primary);
+  }
+
+  [data-theme="dark"] {
+    --color-border: #ffffff;
+  }
+
+  button:focus-visible,
+  a:focus-visible,
+  input:focus {
+    outline-width: 3px;
+  }
+}
+
+/* Dark mode preference detection */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme]) {
+    /* Auto-apply dark theme if no explicit theme is set */
+    --color-primary: #ecf0f1;
+    --color-primary-hover: #ffffff;
+    --color-accent: #3498db;
+    --color-accent-hover: #5dade2;
+
+    --color-background: #1a1a1a;
+    --color-surface: #2c2c2c;
+    --color-surface-elevated: #363636;
+
+    --color-text-primary: #ecf0f1;
+    --color-text-secondary: #bdc3c7;
+    --color-text-tertiary: #95a5a6;
+    --color-text-inverse: #1a1a1a;
+
+    --color-border: #404040;
+
+    --color-code-background: #2c2c2c;
+    --color-code-text: #ecf0f1;
+    --color-code-keyword: #ff79c6;
+    --color-code-string: #50fa7b;
+    --color-code-function: #bd93f9;
+    --color-code-comment: #6272a4;
+  }
+}

@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Web Components Test Verification</title>
+  <style>
+    body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+    .pass { color: #4ec9b0; }
+    .fail { color: #f48771; }
+    .summary { font-weight: bold; margin-top: 20px; padding: 20px; background: #2d2d2d; }
+    h1 { color: #569cd6; }
+  </style>
+</head>
+<body>
+  <h1>🧪 Web Components Live Test</h1>
+  <div id="results"></div>
+  <script type="module">
+    const results = document.getElementById('results');
+    let passCount = 0, failCount = 0;
+    function log(msg, pass = true) {
+      const div = document.createElement('div');
+      div.className = pass ? 'pass' : 'fail';
+      div.textContent = (pass ? '✅' : '❌') + ' ' + msg;
+      results.appendChild(div);
+      if (pass) passCount++; else failCount++;
+    }
+    try {
+      const cacheBust = Date.now();
+      const { TerraphimElement, TerraphimObservable, TerraphimEvents } = await import(`/components/base/index.js?v=${cacheBust}`);
+      log('✓ Imported base classes');
+
+      class TC extends TerraphimElement {
+        constructor() {
+          super();
+          this.attachShadow({ mode: 'open' });
+        }
+        onConnected() { this.setHTML(this.shadowRoot, '<div class="t">Mounted</div>'); }
+      }
+      customElements.define('tc-test', TC);
+      const c = document.createElement('tc-test');
+      document.body.appendChild(c);
+      await new Promise(r => setTimeout(r, 50));
+      log(c.shadowRoot?.querySelector('.t') ? '✓ Shadow DOM working' : '✗ Shadow DOM failed', !!c.shadowRoot?.querySelector('.t'));
+
+      let evt = false;
+      c.addEventListener('test-event', () => evt = true);
+      c.emit('test-event');
+      await new Promise(r => setTimeout(r, 10));
+      log(evt ? '✓ Events working' : '✗ Events failed', evt);
+
+      class OC extends TerraphimObservable(TerraphimElement) {
+        constructor() { super(); this.state = this.observe({ count: 0 }); }
+      }
+      customElements.define('oc-test', OC);
+      const oc = new OC();
+      let observed = null;
+      oc.subscribe('count', (path, oldVal, newVal) => observed = newVal);
+      oc.state.count = 42;
+      await new Promise(r => setTimeout(r, 10));
+      log(observed === 42 ? '✓ Observable reactivity working' : '✗ Observable failed', observed === 42);
+
+      let busEvent = false;
+      TerraphimEvents.on('test:msg', d => busEvent = d.val === 'ok');
+      TerraphimEvents.emit('test:msg', { val: 'ok' });
+      await new Promise(r => setTimeout(r, 10));
+      log(busEvent ? '✓ Event bus working' : '✗ Event bus failed', busEvent);
+
+      const { TerraphimState } = await import(`/components/base/terraphim-state.js?v=${cacheBust}`);
+      const state = new TerraphimState();
+      state.set('test.path', 'value');
+      log(state.get('test.path') === 'value' ? '✓ State get/set working' : '✗ State failed', state.get('test.path') === 'value');
+
+      let subFired = false;
+      state.subscribe('test.path', v => subFired = v === 'new');
+      state.set('test.path', 'new');
+      await new Promise(r => setTimeout(r, 10));
+      log(subFired ? '✓ State subscriptions working' : '✗ Subscriptions failed', subFired);
+
+      let wildcardCount = 0;
+      state.subscribe('items.*', () => wildcardCount++);
+      state.set('items.0', 'a');
+      state.set('items.1', 'b');
+      await new Promise(r => setTimeout(r, 10));
+      log(wildcardCount === 2 ? '✓ Wildcard subscriptions working' : '✗ Wildcards failed', wildcardCount === 2);
+
+      let batchCount = 0;
+      state.subscribe('batch.test', () => batchCount++);
+      state.batch(() => {
+        state.set('batch.test', 1);
+        state.set('batch.test', 2);
+        state.set('batch.test', 3);
+      });
+      await new Promise(r => setTimeout(r, 10));
+      log(batchCount === 1 ? '✓ Batch updates working (3→1)' : '✗ Batch failed', batchCount === 1);
+
+      const { computed } = await import(`/components/base/state-helpers.js?v=${cacheBust}`);
+      state.set('user.first', 'John');
+      state.set('user.last', 'Doe');
+      const fullName = computed(state, ['user.first', 'user.last'], (f, l) => f + ' ' + l);
+      await new Promise(r => setTimeout(r, 10));
+      const compValue = fullName.value;
+      log(compValue === 'John Doe' ? '✓ Computed values working' : '✗ Computed failed', compValue === 'John Doe');
+
+
+      const sum = document.createElement('div');
+      sum.className = 'summary';
+      sum.innerHTML = '<hr><h2>Test Results</h2><div>Total: ' + (passCount + failCount) + '</div><div class="pass">✅ Passed: ' + passCount + '</div><div class="fail">❌ Failed: ' + failCount + '</div><div style="font-size:20px;margin-top:10px">' + (failCount === 0 ? '🎉 ALL TESTS PASSED!' : '⚠️ SOME TESTS FAILED') + '</div>';
+      results.appendChild(sum);
+      window.testResults = { passed: passCount, failed: failCount, total: passCount + failCount };
+    } catch (e) {
+      log('FATAL ERROR: ' + e.message, false);
+      console.error(e);
+    }
+  </script>
+</body>
+</html>

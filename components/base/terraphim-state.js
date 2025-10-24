@@ -415,7 +415,8 @@ export class TerraphimState extends EventTarget {
     }
 
     if (this._pathCache.has(path)) {
-      return this._pathCache.get(path);
+      // Return a copy to prevent cache corruption from array mutations
+      return [...this._pathCache.get(path)];
     }
 
     const parts = path.split('.').map(part => {
@@ -425,7 +426,8 @@ export class TerraphimState extends EventTarget {
     });
 
     this._pathCache.set(path, parts);
-    return parts;
+    // Return a copy to prevent cache corruption
+    return [...parts];
   }
 
   /**

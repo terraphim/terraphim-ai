@@ -1,0 +1,93 @@
+{
+  "navigation": [
+    {
+      "id": "getting-started",
+      "label": "Getting Started",
+      "icon": "🚀",
+      "path": "/getting-started",
+      "items": [
+        {
+          "id": "introduction",
+          "label": "Introduction",
+          "path": "/getting-started/introduction"
+        },
+        {
+          "id": "installation",
+          "label": "Installation",
+          "path": "/getting-started/installation"
+        },
+        {
+          "id": "quick-start",
+          "label": "Quick Start",
+          "path": "/getting-started/quick-start"
+        }
+      ]
+    },
+    {
+      "id": "base",
+      "label": "Base Components",
+      "icon": "📦",
+      "path": "/components/base",
+      "items": [
+        {
+          "id": "terraphim-element",
+          "label": "TerraphimElement",
+          "path": "/components/base/terraphim-element"
+        },
+        {
+          "id": "terraphim-state",
+          "label": "TerraphimState",
+          "path": "/components/base/terraphim-state"
+        },
+        {
+          "id": "state-helpers",
+          "label": "State Helpers",
+          "path": "/components/base/state-helpers"
+        }
+      ]
+    },
+    {
+      "id": "gallery",
+      "label": "Gallery Components",
+      "icon": "🎨",
+      "path": "/components/gallery",
+      "items": [
+        {
+          "id": "terraphim-gallery",
+          "label": "Gallery App",
+          "path": "/components/gallery/terraphim-gallery"
+        },
+        {
+          "id": "gallery-header",
+          "label": "Gallery Header",
+          "path": "/components/gallery/gallery-header"
+        },
+        {
+          "id": "gallery-sidebar",
+          "label": "Gallery Sidebar",
+          "path": "/components/gallery/gallery-sidebar"
+        },
+        {
+          "id": "gallery-main",
+          "label": "Gallery Main",
+          "path": "/components/gallery/gallery-main"
+        },
+        {
+          "id": "nav-category",
+          "label": "Nav Category",
+          "path": "/components/gallery/nav-category"
+        },
+        {
+          "id": "nav-item",
+          "label": "Nav Item",
+          "path": "/components/gallery/nav-item"
+        },
+        {
+          "id": "theme-toggle",
+          "label": "Theme Toggle",
+          "path": "/components/gallery/theme-toggle"
+        }
+      ]
+    }
+  ]
+}

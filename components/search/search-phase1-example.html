@@ -1,0 +1,483 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="api-url" content="http://localhost:3000">
+  <title>Search Phase 1 - Infrastructure Components</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      line-height: 1.6;
+      padding: 2rem;
+      max-width: 1200px;
+      margin: 0 auto;
+      background: #f5f5f5;
+    }
+
+    h1 {
+      color: #333;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 1.125rem;
+      margin-bottom: 2rem;
+    }
+
+    .section {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .section h2 {
+      color: #333;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #3273dc;
+    }
+
+    .section h3 {
+      color: #555;
+      margin-top: 1.5rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .test-controls {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+
+    button {
+      padding: 0.5rem 1rem;
+      background: #3273dc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+
+    button:hover {
+      background: #2366d1;
+    }
+
+    button.secondary {
+      background: #48c774;
+    }
+
+    button.secondary:hover {
+      background: #3ec46d;
+    }
+
+    button.danger {
+      background: #f14668;
+    }
+
+    button.danger:hover {
+      background: #ef2e55;
+    }
+
+    .code-block {
+      background: #282c34;
+      color: #abb2bf;
+      padding: 1rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-family: 'Courier New', Courier, monospace;
+      font-size: 0.875rem;
+    }
+
+    .output {
+      background: #f9f9f9;
+      border: 1px solid #ddd;
+      padding: 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+      min-height: 50px;
+    }
+
+    .output.empty {
+      color: #999;
+      font-style: italic;
+    }
+
+    .status {
+      padding: 0.5rem 1rem;
+      border-radius: 4px;
+      margin: 1rem 0;
+      font-weight: 500;
+    }
+
+    .status.success {
+      background: #d4edda;
+      color: #155724;
+      border: 1px solid #c3e6cb;
+    }
+
+    .status.error {
+      background: #f8d7da;
+      color: #721c24;
+      border: 1px solid #f5c6cb;
+    }
+
+    .status.info {
+      background: #d1ecf1;
+      color: #0c5460;
+      border: 1px solid #bee5eb;
+    }
+
+    .demo-area {
+      margin: 1.5rem 0;
+      padding: 1.5rem;
+      background: #fafafa;
+      border: 2px dashed #ddd;
+      border-radius: 4px;
+    }
+
+    .input-group {
+      margin-bottom: 1rem;
+    }
+
+    .input-group label {
+      display: block;
+      margin-bottom: 0.5rem;
+      font-weight: 500;
+      color: #555;
+    }
+
+    .input-group input[type="text"] {
+      width: 100%;
+      padding: 0.75rem;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      font-size: 1rem;
+    }
+
+    .input-group input[type="text"]:focus {
+      outline: none;
+      border-color: #3273dc;
+      box-shadow: 0 0 0 3px rgba(50, 115, 220, 0.1);
+    }
+
+    pre {
+      background: #f4f4f4;
+      padding: 0.5rem;
+      border-radius: 4px;
+      overflow-x: auto;
+      font-size: 0.875rem;
+    }
+  </style>
+</head>
+<body>
+  <h1>Search Phase 1: Infrastructure Components</h1>
+  <p class="subtitle">Testing search-utils, search-api, and terraphim-term-chips</p>
+
+  <!-- Section 1: Search Utils Testing -->
+  <section class="section">
+    <h2>1. Search Utils (search-utils.js)</h2>
+    <p>Test the operator parsing and query building utilities.</p>
+
+    <div class="demo-area">
+      <div class="input-group">
+        <label for="parse-input">Enter search query:</label>
+        <input
+          type="text"
+          id="parse-input"
+          placeholder="Try: rust AND async, tokio OR actix, or simple search"
+          value="rust AND async"
+        >
+      </div>
+
+      <div class="test-controls">
+        <button id="btn-parse">Parse Input</button>
+        <button id="btn-build-query" class="secondary">Build Query</button>
+        <button id="btn-format-terms" class="secondary">Format Terms</button>
+      </div>
+
+      <h3>Parsed Result:</h3>
+      <div id="parse-output" class="output empty">Click "Parse Input" to see results</div>
+
+      <h3>Search Query:</h3>
+      <div id="query-output" class="output empty">Click "Build Query" to see results</div>
+    </div>
+  </section>
+
+  <!-- Section 2: Term Chips Component -->
+  <section class="section">
+    <h2>2. Term Chips Component (terraphim-term-chips.js)</h2>
+    <p>Interactive chip display for search terms with operators.</p>
+
+    <div class="demo-area">
+      <h3>Term Chips Demo:</h3>
+      <terraphim-term-chips id="term-chips" operator="AND"></terraphim-term-chips>
+
+      <div class="test-controls" style="margin-top: 1rem;">
+        <button id="btn-add-rust">Add "rust" (KG)</button>
+        <button id="btn-add-async">Add "async" (KG)</button>
+        <button id="btn-add-tokio">Add "tokio"</button>
+        <button id="btn-toggle-op" class="secondary">Toggle Operator</button>
+        <button id="btn-clear-chips" class="danger">Clear All</button>
+      </div>
+
+      <h3>Events Log:</h3>
+      <div id="chips-events" class="output empty">No events yet</div>
+    </div>
+  </section>
+
+  <!-- Section 3: Search API Client -->
+  <section class="section">
+    <h2>3. Search API Client (search-api.js)</h2>
+    <p>Test API communication (note: requires backend running on localhost:3000).</p>
+
+    <div class="demo-area">
+      <div class="input-group">
+        <label for="search-input">Search query:</label>
+        <input
+          type="text"
+          id="search-input"
+          placeholder="Enter search query"
+          value="rust async"
+        >
+      </div>
+
+      <div class="test-controls">
+        <button id="btn-search">Execute Search</button>
+        <button id="btn-autocomplete" class="secondary">Get Suggestions</button>
+        <button id="btn-detect-env" class="secondary">Detect Environment</button>
+      </div>
+
+      <div id="api-status" class="status info">
+        Ready to test API. Make sure backend is running on localhost:3000.
+      </div>
+
+      <h3>API Response:</h3>
+      <div id="api-output" class="output empty">No API calls yet</div>
+    </div>
+  </section>
+
+  <!-- Section 4: Integration Test -->
+  <section class="section">
+    <h2>4. Integration Test</h2>
+    <p>Test all Phase 1 components working together.</p>
+
+    <div class="demo-area">
+      <div class="input-group">
+        <label for="integration-input">Search query with operators:</label>
+        <input
+          type="text"
+          id="integration-input"
+          placeholder="Try: rust AND async AND tokio"
+          value="rust AND async"
+        >
+      </div>
+
+      <div class="test-controls">
+        <button id="btn-integration">Parse & Display</button>
+      </div>
+
+      <h3>Parsed Terms:</h3>
+      <terraphim-term-chips id="integration-chips" operator="AND"></terraphim-term-chips>
+
+      <h3>Query Object:</h3>
+      <pre id="integration-query" class="output empty">No query built yet</pre>
+    </div>
+  </section>
+
+  <!-- Import Phase 1 Components -->
+  <script type="module">
+    import {
+      parseSearchInput,
+      buildSearchQuery,
+      formatSearchTerms,
+      isValidSearchQuery,
+      getCurrentTerm,
+      endsWithOperator,
+      suggestOperators
+    } from './search-utils.js';
+
+    import { SearchAPI, createSearchAPI } from './search-api.js';
+    import './terraphim-term-chips.js';
+
+    // Section 1: Search Utils Testing
+    const parseInput = document.getElementById('parse-input');
+    const parseOutput = document.getElementById('parse-output');
+    const queryOutput = document.getElementById('query-output');
+
+    document.getElementById('btn-parse').addEventListener('click', () => {
+      const input = parseInput.value;
+      const parsed = parseSearchInput(input);
+      parseOutput.className = 'output';
+      parseOutput.innerHTML = `<pre>${JSON.stringify(parsed, null, 2)}</pre>`;
+    });
+
+    document.getElementById('btn-build-query').addEventListener('click', () => {
+      const input = parseInput.value;
+      const parsed = parseSearchInput(input);
+      const query = buildSearchQuery(parsed, 'engineer');
+      queryOutput.className = 'output';
+      queryOutput.innerHTML = `<pre>${JSON.stringify(query, null, 2)}</pre>`;
+    });
+
+    document.getElementById('btn-format-terms').addEventListener('click', () => {
+      const input = parseInput.value;
+      const parsed = parseSearchInput(input);
+      const formatted = formatSearchTerms(parsed.terms, parsed.operator || 'AND');
+      queryOutput.className = 'output';
+      queryOutput.textContent = `Formatted: "${formatted}"`;
+    });
+
+    // Section 2: Term Chips Testing
+    const termChips = document.getElementById('term-chips');
+    const chipsEvents = document.getElementById('chips-events');
+    let eventLog = [];
+
+    function logEvent(eventName, detail) {
+      eventLog.unshift(`[${new Date().toLocaleTimeString()}] ${eventName}: ${JSON.stringify(detail)}`);
+      chipsEvents.className = 'output';
+      chipsEvents.innerHTML = eventLog.slice(0, 10).join('<br>');
+    }
+
+    termChips.addEventListener('term-removed', (e) => {
+      logEvent('term-removed', e.detail);
+    });
+
+    termChips.addEventListener('operator-changed', (e) => {
+      logEvent('operator-changed', e.detail);
+    });
+
+    termChips.addEventListener('clear-all', () => {
+      logEvent('clear-all', {});
+    });
+
+    document.getElementById('btn-add-rust').addEventListener('click', () => {
+      termChips.addTerm('rust', true);
+    });
+
+    document.getElementById('btn-add-async').addEventListener('click', () => {
+      termChips.addTerm('async', true);
+    });
+
+    document.getElementById('btn-add-tokio').addEventListener('click', () => {
+      termChips.addTerm('tokio', false);
+    });
+
+    document.getElementById('btn-toggle-op').addEventListener('click', () => {
+      termChips.toggleOperator();
+    });
+
+    document.getElementById('btn-clear-chips').addEventListener('click', () => {
+      termChips.clearAll();
+    });
+
+    // Section 3: Search API Testing
+    const searchInput = document.getElementById('search-input');
+    const apiStatus = document.getElementById('api-status');
+    const apiOutput = document.getElementById('api-output');
+
+    const searchAPI = createSearchAPI({
+      baseUrl: 'http://localhost:3000',
+      onError: (error) => {
+        console.error('API Error:', error);
+      }
+    });
+
+    document.getElementById('btn-search').addEventListener('click', async () => {
+      const query = searchInput.value;
+      apiStatus.className = 'status info';
+      apiStatus.textContent = 'Searching...';
+      apiOutput.className = 'output';
+      apiOutput.textContent = 'Loading...';
+
+      try {
+        const result = await searchAPI.search(query, { role: 'engineer' });
+        apiStatus.className = 'status success';
+        apiStatus.textContent = `Success! Found ${result.results?.length || 0} results`;
+        apiOutput.innerHTML = `<pre>${JSON.stringify(result, null, 2)}</pre>`;
+      } catch (error) {
+        apiStatus.className = 'status error';
+        apiStatus.textContent = `Error: ${error.message}`;
+        apiOutput.textContent = 'Check that backend is running on localhost:3000';
+      }
+    });
+
+    document.getElementById('btn-autocomplete').addEventListener('click', async () => {
+      const query = searchInput.value;
+      apiStatus.className = 'status info';
+      apiStatus.textContent = 'Getting suggestions...';
+
+      try {
+        const suggestions = await searchAPI.getAutocompleteSuggestions(query, { role: 'engineer' });
+        apiStatus.className = 'status success';
+        apiStatus.textContent = `Found ${suggestions.length} suggestions`;
+        apiOutput.innerHTML = `<pre>${JSON.stringify(suggestions, null, 2)}</pre>`;
+      } catch (error) {
+        apiStatus.className = 'status error';
+        apiStatus.textContent = `Error: ${error.message}`;
+        apiOutput.textContent = 'Check that backend is running on localhost:3000';
+      }
+    });
+
+    document.getElementById('btn-detect-env').addEventListener('click', () => {
+      const isTauri = searchAPI.isTauri;
+      const baseUrl = searchAPI.baseUrl;
+      apiOutput.className = 'output';
+      apiOutput.innerHTML = `
+        <strong>Environment Detection:</strong><br>
+        Is Tauri: ${isTauri}<br>
+        Base URL: ${baseUrl}<br>
+        <br>
+        <strong>Available Features:</strong><br>
+        - EventSource (SSE): ${typeof EventSource !== 'undefined'}<br>
+        - Fetch API: ${typeof fetch !== 'undefined'}<br>
+        - Tauri API: ${typeof window.__TAURI__ !== 'undefined'}
+      `;
+    });
+
+    // Section 4: Integration Testing
+    const integrationInput = document.getElementById('integration-input');
+    const integrationChips = document.getElementById('integration-chips');
+    const integrationQuery = document.getElementById('integration-query');
+
+    document.getElementById('btn-integration').addEventListener('click', () => {
+      const input = integrationInput.value;
+
+      // Parse input
+      const parsed = parseSearchInput(input);
+
+      // Update chips
+      integrationChips.terms = parsed.terms.map(term => ({
+        value: term,
+        isFromKG: Math.random() > 0.5 // Random KG status for demo
+      }));
+      integrationChips.operator = parsed.operator || 'AND';
+
+      // Build query
+      const query = buildSearchQuery(parsed, 'engineer');
+      integrationQuery.className = 'output';
+      integrationQuery.textContent = JSON.stringify(query, null, 2);
+    });
+
+    // Initialize with example
+    window.addEventListener('load', () => {
+      // Auto-populate some chips
+      termChips.addTerm('rust', true);
+      termChips.addTerm('async', true);
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,43 @@
+/**
+ * Dark Theme - Design Tokens Override
+ * Applied when [data-theme="dark"] on root element
+ */
+
+[data-theme="dark"] {
+  /* Color Palette - Dark Mode */
+  --color-primary: #ecf0f1;
+  --color-primary-hover: #ffffff;
+  --color-accent: #3498db;
+  --color-accent-hover: #5dade2;
+
+  --color-background: #1a1a1a;
+  --color-surface: #2c2c2c;
+  --color-surface-elevated: #363636;
+
+  --color-text-primary: #ecf0f1;
+  --color-text-secondary: #bdc3c7;
+  --color-text-tertiary: #95a5a6;
+  --color-text-inverse: #1a1a1a;
+
+  --color-border: #404040;
+  --color-border-focus: #3498db;
+
+  --color-success: #2ecc71;
+  --color-warning: #f39c12;
+  --color-error: #e74c3c;
+  --color-info: #3498db;
+
+  /* Code Highlighting - Dark Mode */
+  --color-code-background: #2c2c2c;
+  --color-code-text: #ecf0f1;
+  --color-code-keyword: #ff79c6;
+  --color-code-string: #50fa7b;
+  --color-code-function: #bd93f9;
+  --color-code-comment: #6272a4;
+
+  /* Shadows - Adjusted for dark mode */
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.4), 0 2px 4px -1px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.5), 0 4px 6px -2px rgba(0, 0, 0, 0.3);
+  --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.6), 0 10px 10px -5px rgba(0, 0, 0, 0.4);
+}

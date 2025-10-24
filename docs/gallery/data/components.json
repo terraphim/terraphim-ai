@@ -1,0 +1,130 @@
+{
+  "components": [
+    {
+      "id": "terraphim-element",
+      "name": "TerraphimElement",
+      "category": "base",
+      "description": "Base class for all Terraphim Web Components with lifecycle management and utility methods",
+      "tags": ["base", "foundation", "lifecycle"],
+      "status": "stable",
+      "version": "1.0.0",
+      "path": "/components/base/terraphim-element",
+      "file": "components/base/terraphim-element.js",
+      "dependencies": [],
+      "properties": [],
+      "methods": [
+        {
+          "name": "setState",
+          "description": "Update component state and trigger re-render",
+          "signature": "setState(updates: Object): void"
+        },
+        {
+          "name": "getState",
+          "description": "Get current component state",
+          "signature": "getState(key?: string): any"
+        },
+        {
+          "name": "emit",
+          "description": "Emit custom event",
+          "signature": "emit(eventName: string, detail: any): void"
+        }
+      ],
+      "events": [],
+      "cssCustomProperties": [],
+      "examples": [
+        {
+          "title": "Basic Usage",
+          "description": "Extending TerraphimElement to create a custom component",
+          "code": "class MyComponent extends TerraphimElement {\n  constructor() {\n    super();\n    this.state = { count: 0 };\n  }\n\n  connectedCallback() {\n    super.connectedCallback();\n    this.render();\n  }\n\n  render() {\n    this.shadowRoot.innerHTML = `\n      <div>Count: ${this.state.count}</div>\n    `;\n  }\n}\n\ncustomElements.define('my-component', MyComponent);"
+        }
+      ]
+    },
+    {
+      "id": "terraphim-state",
+      "name": "TerraphimState",
+      "category": "base",
+      "description": "Global state management mixin for Terraphim Web Components with reactive updates",
+      "tags": ["base", "state", "reactive"],
+      "status": "stable",
+      "version": "1.0.0",
+      "path": "/components/base/terraphim-state",
+      "file": "components/base/terraphim-state.js",
+      "dependencies": [],
+      "properties": [],
+      "methods": [
+        {
+          "name": "connectToGlobalState",
+          "description": "Connect component to global state store",
+          "signature": "connectToGlobalState(stateKeys: string[]): void"
+        },
+        {
+          "name": "updateGlobalState",
+          "description": "Update global state and notify subscribers",
+          "signature": "updateGlobalState(updates: Object): void"
+        }
+      ],
+      "events": [
+        {
+          "name": "state-changed",
+          "description": "Fired when global state changes",
+          "detail": "{ key: string, value: any, previousValue: any }"
+        }
+      ],
+      "cssCustomProperties": [],
+      "examples": [
+        {
+          "title": "Using Global State",
+          "description": "Component connected to global state",
+          "code": "class StateAwareComponent extends TerraphimState(TerraphimElement) {\n  constructor() {\n    super();\n    this.connectToGlobalState(['user', 'theme']);\n  }\n\n  onGlobalStateChange(key, value) {\n    if (key === 'theme') {\n      this.updateTheme(value);\n    }\n  }\n}"
+        }
+      ]
+    },
+    {
+      "id": "state-helpers",
+      "name": "State Helpers",
+      "category": "base",
+      "description": "Utility functions for state management operations",
+      "tags": ["utilities", "state", "helpers"],
+      "status": "stable",
+      "version": "1.0.0",
+      "path": "/components/base/state-helpers",
+      "file": "components/base/state-helpers.js",
+      "dependencies": [],
+      "properties": [],
+      "methods": [
+        {
+          "name": "deepClone",
+          "description": "Create deep copy of state object",
+          "signature": "deepClone(obj: Object): Object"
+        },
+        {
+          "name": "deepMerge",
+          "description": "Deep merge two objects",
+          "signature": "deepMerge(target: Object, source: Object): Object"
+        },
+        {
+          "name": "shallowEqual",
+          "description": "Compare two objects for shallow equality",
+          "signature": "shallowEqual(obj1: Object, obj2: Object): boolean"
+        }
+      ],
+      "events": [],
+      "cssCustomProperties": [],
+      "examples": []
+    }
+  ],
+  "categories": [
+    {
+      "id": "base",
+      "name": "Base Components",
+      "description": "Foundation components and utilities for building Terraphim applications",
+      "icon": "📦"
+    },
+    {
+      "id": "gallery",
+      "name": "Gallery Components",
+      "description": "Components that make up the gallery and documentation system",
+      "icon": "🎨"
+    }
+  ]
+}
