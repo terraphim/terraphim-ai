@@ -1,4 +1,5 @@
 {
+  "$schema": "../node_modules/@tauri-apps/cli/schema.json",
   "package": {
     "productName": "Terraphim Desktop",
     "version": "0.2.0"
@@ -35,6 +36,14 @@
     },
     "systemTray": {
       "iconPath": "icons/icon.png"
+    },
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/terraphim/terraphim-ai/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": "PLACEHOLDER_PUBLIC_KEY"
     },
     "windows": [
       {

@@ -1,14 +1,16 @@
 [package]
 name = "terraphim_tui"
-version = "0.2.0"
+version = "0.2.3"
 edition = "2021"
 
 [features]
 default = []
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
-repl-full = ["repl", "repl-chat", "repl-mcp"]
+repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom"]
 repl-chat = ["repl"]  # Chat functionality
 repl-mcp = ["repl"]   # MCP tools integration
+repl-file = ["repl"]  # Enhanced file operations
+repl-custom = ["repl"]  # Markdown-defined custom commands
 
 [dependencies]
 anyhow = "1.0"
@@ -20,18 +22,26 @@ crossterm = "0.27"
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+serde_yaml = "0.9"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = "0.4"
 jiff = "0.1"
 urlencoding = "2.1"
+terraphim_update = { path = "../terraphim_update", version = "0.2.0" }
+pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
+handlebars = "6.0"
+regex = "1.0"
+walkdir = "2.0"
+async-trait = "0.1"
+chrono = { version = "0.4", features = ["serde"] }
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "14.0", optional = true }
 colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
-indicatif = { version = "0.17", optional = true }
+indicatif = { version = "0.18", optional = true }
 dirs = { version = "5.0", optional = true }
 
 terraphim_types = { path = "../terraphim_types" }
@@ -49,6 +59,7 @@ futures = "0.3"
 portpicker = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 tokio = { version = "1", features = ["full"] }
+tempfile = "3.0"
 
 [[bin]]
 name = "terraphim-tui"
@@ -57,7 +68,7 @@ path = "src/main.rs"
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"
 copyright = "2024, Terraphim Contributors"
-license-file = ["../../LICENSE", "4"]
+license-file = ["../../LICENSE-Apache-2.0", "4"]
 extended-description = """
 Terraphim TUI - Terminal User Interface for Terraphim AI.
 Command-line interface with interactive REPL and ASCII graph visualization.

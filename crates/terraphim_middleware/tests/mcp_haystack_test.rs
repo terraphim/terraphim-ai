@@ -4,7 +4,7 @@ use terraphim_types::{RelevanceFunction, SearchQuery};
 
 /// Live MCP haystack test using SSE server-everything
 ///
-/// Requires MCP_SERVER_URL (e.g., http://127.0.0.1:3001)
+/// Requires MCP_SERVER_URL (e.g., http://127.0.0.1:8001)
 #[tokio::test]
 #[ignore]
 async fn mcp_live_haystack_smoke() {
@@ -27,8 +27,15 @@ async fn mcp_live_haystack_smoke() {
         haystacks: vec![Haystack::new(base_url.clone(), ServiceType::Mcp, true)
             .with_extra_parameter("base_url".into(), base_url.clone())
             .with_extra_parameter("transport".into(), "sse".into())],
+        llm_enabled: false,
+        llm_api_key: None,
+        llm_model: None,
+        llm_auto_summarize: false,
+        llm_chat_enabled: false,
+        llm_chat_system_prompt: None,
+        llm_chat_model: None,
+        llm_context_window: None,
         extra: ahash::AHashMap::new(),
-        ..Default::default()
     };
 
     let mut config = ConfigBuilder::new()

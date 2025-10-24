@@ -26,6 +26,7 @@ mod repl;
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_update::{check_for_updates, update_binary};
 
 #[derive(clap::ValueEnum, Debug, Clone)]
 enum LogicalOperatorCli {
@@ -124,6 +125,13 @@ enum Command {
         #[arg(long, default_value_t = false)]
         exclude_term: bool,
     },
+    Replace {
+        text: String,
+        #[arg(long)]
+        role: Option<String>,
+        #[arg(long)]
+        format: Option<String>,
+    },
     Interactive,
 
     /// Start REPL (Read-Eval-Print-Loop) interface
@@ -136,6 +144,12 @@ enum Command {
         #[arg(long, default_value = "http://localhost:8000")]
         server_url: String,
     },
+
+    /// Check for updates without installing
+    CheckUpdate,
+
+    /// Update to latest version if available
+    Update,
 }
 
 #[derive(Subcommand, Debug)]
@@ -351,6 +365,53 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
+        Command::Replace { text, role, format } => {
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+
+            let link_type = match format.as_deref() {
+                Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
+                Some("wiki") => terraphim_automata::LinkType::WikiLinks,
+                Some("html") => terraphim_automata::LinkType::HTMLLinks,
+                _ => terraphim_automata::LinkType::PlainText,
+            };
+
+            let result = service
+                .replace_matches(&role_name, &text, link_type)
+                .await?;
+            println!("{}", result);
+
+            Ok(())
+        }
+        Command::CheckUpdate => {
+            println!("🔍 Checking for terraphim-tui updates...");
+            match check_for_updates("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Update => {
+            println!("🚀 Updating terraphim-tui...");
+            match update_binary("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Update failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -555,6 +616,36 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             }
 
             Ok(())
+        }
+        Command::CheckUpdate => {
+            println!("🔍 Checking for terraphim-tui updates...");
+            match check_for_updates("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Failed to check for updates: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Update => {
+            println!("🚀 Updating terraphim-tui...");
+            match update_binary("terraphim-tui").await {
+                Ok(status) => {
+                    println!("{}", status);
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("❌ Update failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::Replace { .. } => {
+            eprintln!("Replace command is only available in offline mode");
+            std::process::exit(1);
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")

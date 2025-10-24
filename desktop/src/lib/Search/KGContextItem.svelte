@@ -1,84 +1,85 @@
 <script lang="ts">
-  import { createEventDispatcher } from "svelte";
-  import { Tag, Button, Icon } from "svelma";
+import { createEventDispatcher } from 'svelte';
+import { Tag, Button } from 'svelma';
 
-  export let contextItem: KGContextItem;
-  export let removable: boolean = true;
-  export let compact: boolean = false;
+export let contextItem: KGContextItem;
+export const removable: boolean = true;
+export const compact: boolean = false;
 
-  const dispatch = createEventDispatcher();
+const dispatch = createEventDispatcher();
 
-  interface KGContextItem {
-    id: string;
-    context_type: "KGTermDefinition" | "KGIndex";
-    title: string;
-    summary?: string;
-    content: string;
-    metadata: Record<string, string>;
-    created_at: string;
-    relevance_score?: number;
+interface KGContextItem {
+	id: string;
+	context_type: 'KGTermDefinition' | 'KGIndex' | string; // Allow string for compatibility
+	title: string;
+	summary?: string;
+	content: string;
+	metadata?: Record<string, string>; // Make optional to match Chat.svelte ContextItem
+	created_at: string;
+	relevance_score?: number;
 
-    // KG-specific fields
-    kg_term_definition?: KGTermDefinition;
-    kg_index_info?: KGIndexInfo;
-  }
+	// KG-specific fields (optional for compatibility)
+	kg_term_definition?: KGTermDefinition;
+	kg_index_info?: KGIndexInfo;
+}
 
-  interface KGTermDefinition {
-    term: string;
-    normalized_term: string;
-    id: number;
-    definition?: string;
-    synonyms: string[];
-    related_terms: string[];
-    usage_examples: string[];
-    url?: string;
-    metadata: Record<string, string>;
-    relevance_score?: number;
-  }
+interface KGTermDefinition {
+	term: string;
+	normalized_term: string;
+	id: number;
+	definition?: string;
+	synonyms: string[];
+	related_terms: string[];
+	usage_examples: string[];
+	url?: string;
+	metadata: Record<string, string>;
+	relevance_score?: number;
+}
 
-  interface KGIndexInfo {
-    name: string;
-    total_terms: number;
-    total_nodes: number;
-    total_edges: number;
-    last_updated: string;
-    source: string;
-    version?: string;
-  }
+interface KGIndexInfo {
+	name: string;
+	total_terms: number;
+	total_nodes: number;
+	total_edges: number;
+	last_updated: string;
+	source: string;
+	version?: string;
+}
 
-  // Helper function to format numbers
-  function formatNumber(num: number): string {
-    return new Intl.NumberFormat().format(num);
-  }
+// Helper function to format numbers
+function _formatNumber(num: number): string {
+	return new Intl.NumberFormat().format(num);
+}
 
-  // Helper function to format date
-  function formatDate(dateString: string): string {
-    try {
-      return new Date(dateString).toLocaleDateString();
-    } catch {
-      return dateString;
-    }
-  }
+// Helper function to format date
+function _formatDate(dateString: string): string {
+	try {
+		return new Date(dateString).toLocaleDateString();
+	} catch {
+		return dateString;
+	}
+}
 
-  // Handle remove context item
-  function handleRemove() {
-    dispatch("remove", { contextId: contextItem.id });
-  }
+// Handle remove context item
+function _handleRemove() {
+	dispatch('remove', { contextId: contextItem.id });
+}
 
-  // Handle view details
-  function handleViewDetails() {
-    dispatch("viewDetails", { contextItem });
-  }
+// Handle view details
+function _handleViewDetails() {
+	// Pass the term explicitly when available for quick lookup
+	let term: string | null = null;
+	if (contextItem.kg_term_definition?.term) {
+		term = contextItem.kg_term_definition.term;
+	}
+	dispatch('viewDetails', { contextItem, term });
+}
 
-  // Get display icon based on context type
-  $: displayIcon = contextItem.context_type === "KGTermDefinition"
-    ? "fas fa-tag"
-    : "fas fa-sitemap";
+// Get display icon based on context type
+$: displayIcon = contextItem.context_type === 'KGTermDefinition' ? '🏷️' : '🗺️';
 
-  // Get display color based on context type
-  $: displayColor = contextItem.context_type === "KGTermDefinition"
-    ? "is-info"
-    : "is-primary";
+// Get display color based on context type
+$: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 'is-primary';
 </script>
 
 <style>
@@ -117,6 +118,11 @@
     align-items: center;
     gap: 0.5rem;
     flex: 1;
+  }
+
+  .context-icon {
+    font-size: 1rem;
+    line-height: 1;
   }
 
   .context-title-text {
@@ -223,10 +229,6 @@
     line-height: 1.4;
   }
 
-  .context-summary.compact {
-    font-size: 0.75rem;
-  }
-
   .context-meta {
     font-size: 0.75rem;
     color: #9e9e9e;
@@ -253,33 +255,31 @@
 <div class="kg-context-item {compact ? 'compact' : ''}">
   <div class="context-header {compact ? 'compact' : ''}">
     <div class="context-title">
-      <Icon icon={displayIcon} size="is-small" />
+      <span class="context-icon">{displayIcon}</span>
       <span class="context-title-text {compact ? 'compact' : ''}">
         {contextItem.title}
       </span>
-      <Tag type={displayColor} size="is-small">
+      <Tag type={displayColor} rounded>
         {contextItem.context_type === "KGTermDefinition" ? "KG Term" : "KG Index"}
       </Tag>
     </div>
 
     <div class="context-actions">
       <Button
-        size="is-small"
         type="is-ghost"
-        on:click={handleViewDetails}
+        on:click={_handleViewDetails}
         title="View details"
       >
-        <Icon icon="fas fa-eye" size="is-small" />
+        👁️
       </Button>
 
       {#if removable}
         <Button
-          size="is-small"
           type="is-ghost"
-          on:click={handleRemove}
+          on:click={_handleRemove}
           title="Remove from context"
         >
-          <Icon icon="fas fa-times" size="is-small" />
+          ❌
         </Button>
       {/if}
     </div>
@@ -297,31 +297,27 @@
         {/if}
 
         <div class="term-metadata {compact ? 'compact' : ''}">
-          {#if term.synonyms.length > 0}
-            <Tag type="is-light" size="is-small" title="Synonyms">
-              <Icon icon="fas fa-equals" size="is-small" />
-              <span>{term.synonyms.length} synonym{term.synonyms.length !== 1 ? 's' : ''}</span>
+          {#if term.synonyms && term.synonyms.length > 0}
+            <Tag type="is-light" rounded title="Synonyms">
+              ≈ {term.synonyms.length} synonym{term.synonyms.length !== 1 ? 's' : ''}
             </Tag>
           {/if}
 
-          {#if term.related_terms.length > 0}
-            <Tag type="is-light" size="is-small" title="Related Terms">
-              <Icon icon="fas fa-link" size="is-small" />
-              <span>{term.related_terms.length} related</span>
+          {#if term.related_terms && term.related_terms.length > 0}
+            <Tag type="is-light" rounded title="Related Terms">
+              🔗 {term.related_terms.length} related
             </Tag>
           {/if}
 
-          {#if term.usage_examples.length > 0}
-            <Tag type="is-light" size="is-small" title="Usage Examples">
-              <Icon icon="fas fa-quote-left" size="is-small" />
-              <span>{term.usage_examples.length} example{term.usage_examples.length !== 1 ? 's' : ''}</span>
+          {#if term.usage_examples && term.usage_examples.length > 0}
+            <Tag type="is-light" rounded title="Usage Examples">
+              💬 {term.usage_examples.length} example{term.usage_examples.length !== 1 ? 's' : ''}
             </Tag>
           {/if}
 
           {#if term.url}
-            <Tag type="is-link" size="is-small">
-              <Icon icon="fas fa-external-link-alt" size="is-small" />
-              <span>Source</span>
+            <Tag type="is-link" rounded>
+              🔗 Source
             </Tag>
           {/if}
         </div>
@@ -332,15 +328,15 @@
 
       <div class="kg-index-stats {compact ? 'compact' : ''}">
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_terms)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_terms)}</div>
           <div class="stat-label">Terms</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_nodes)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_nodes)}</div>
           <div class="stat-label">Nodes</div>
         </div>
         <div class="stat-item">
-          <div class="stat-value {compact ? 'compact' : ''}">{formatNumber(index.total_edges)}</div>
+          <div class="stat-value {compact ? 'compact' : ''}">{_formatNumber(index.total_edges)}</div>
           <div class="stat-label">Edges</div>
         </div>
         <div class="stat-item">
@@ -366,7 +362,7 @@
   </div>
 
   <div class="context-meta {compact ? 'compact' : ''}">
-    <span>Added {formatDate(contextItem.created_at)}</span>
+    <span>Added {_formatDate(contextItem.created_at)}</span>
 
     {#if contextItem.relevance_score}
       <span class="relevance-score">
@@ -374,10 +370,9 @@
       </span>
     {/if}
 
-    {#if contextItem.metadata.source_document}
+    {#if contextItem.metadata?.source_document}
       <span title="Source Document">
-        <Icon icon="fas fa-file-alt" size="is-small" />
-        {contextItem.metadata.document_title || contextItem.metadata.source_document}
+        📄 {contextItem.metadata.document_title || contextItem.metadata.source_document}
       </span>
     {/if}
   </div>

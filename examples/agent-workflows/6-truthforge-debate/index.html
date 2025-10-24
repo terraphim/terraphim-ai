@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TruthForge - Two-Pass Debate Arena</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="settings-modal.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="stylesheet" href="https://unpkg.com/@antonz/codapi@0.19.7/dist/snippet.css">
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            overflow-x: hidden;
+            max-width: 100%;
+            margin: 0;
+            padding: 0;
+        }
+
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 0 1rem;
+        }
+
+        .debate-arena {
+            display: grid;
+            grid-template-columns: minmax(300px, 400px) 1fr;
+            gap: 1.5rem;
+            margin-top: 2rem;
+            max-width: 100%;
+        }
+
+        .control-panel {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            height: fit-content;
+            max-width: 100%;
+        }
+
+        .results-area {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 1.5rem;
+            box-shadow: var(--shadow-md);
+            min-height: 600px;
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        .narrative-input {
+            margin-bottom: 2rem;
+        }
+
+        .pass-section {
+            margin-bottom: 2rem;
+            padding: 1.5rem;
+            border-radius: var(--radius-md);
+            border: 2px solid var(--border);
+        }
+
+        .pass-section.pass1 {
+            background: linear-gradient(135deg, #dbeafe 0%, #e0e7ff 100%);
+            border-color: #3b82f6;
+        }
+
+        .pass-section.pass2 {
+            background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
+            border-color: #f59e0b;
+        }
+
+        .pass-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 1rem;
+            border-bottom: 2px solid rgba(0, 0, 0, 0.1);
+        }
+
+        .pass-icon {
+            font-size: 2rem;
+            color: var(--primary);
+        }
+
+        .pass-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .agent-results {
+            display: grid;
+            gap: 1rem;
+        }
+
+        .agent-card {
+            padding: 1.25rem;
+            background: white;
+            border-radius: var(--radius-md);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            transition: var(--transition);
+        }
+
+        .agent-card:hover {
+            box-shadow: var(--shadow-md);
+        }
+
+        .agent-header {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .agent-icon {
+            font-size: 1.25rem;
+            color: var(--primary);
+        }
+
+        .agent-name {
+            font-weight: 600;
+            color: var(--text);
+            font-size: 1.1rem;
+        }
+
+        .agent-content {
+            color: var(--text);
+            line-height: 1.6;
+        }
+
+        .metric-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+        }
+
+        .metric-row:last-child {
+            border-bottom: none;
+        }
+
+        .metric-label {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .metric-value {
+            font-weight: 600;
+            font-size: 1.1rem;
+            color: var(--primary);
+        }
+
+        .metric-value.high {
+            color: #dc2626;
+        }
+
+        .metric-value.medium {
+            color: #f59e0b;
+        }
+
+        .metric-value.success {
+            color: #10b981;
+        }
+
+        .debate-flow {
+            margin: 2rem 0;
+            text-align: center;
+        }
+
+        .flow-arrow {
+            font-size: 2rem;
+            color: var(--primary);
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% {
+                opacity: 1;
+            }
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .omissions-list {
+            margin-top: 0.75rem;
+        }
+
+        .omission-item {
+            padding: 0.5rem;
+            background: #fef3c7;
+            border-left: 3px solid #f59e0b;
+            margin-bottom: 0.5rem;
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+        }
+
+        .vulnerability-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            padding: 0.5rem 1rem;
+            border-radius: var(--radius-full);
+            font-weight: 600;
+            font-size: 1.1rem;
+        }
+
+        .vulnerability-badge.high {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .vulnerability-badge.medium {
+            background: #fef3c7;
+            color: #f59e0b;
+        }
+
+        .vulnerability-badge.low {
+            background: #d1fae5;
+            color: #10b981;
+        }
+
+        .loading-spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(0, 0, 0, 0.1);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.75rem;
+            border-radius: var(--radius-full);
+            font-size: 0.875rem;
+            font-weight: 600;
+        }
+
+        .status-badge.analyzing {
+            background: #dbeafe;
+            color: #3b82f6;
+        }
+
+        .status-badge.complete {
+            background: #d1fae5;
+            color: #10b981;
+        }
+
+        .status-badge.error {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .form-textarea {
+            width: 100%;
+            max-width: 100%;
+            resize: vertical;
+            min-height: 120px;
+        }
+
+        .narrative-input textarea {
+            min-height: 150px;
+        }
+
+        .workflow-container {
+            max-width: 100%;
+            overflow-x: hidden;
+        }
+
+        @media (max-width: 968px) {
+            .debate-arena {
+                grid-template-columns: 1fr;
+                gap: 1rem;
+            }
+
+            .control-panel {
+                order: 2;
+            }
+
+            .container {
+                padding: 0 0.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header class="header">
+        <div class="container">
+            <h1><i class="fas fa-fire"></i> TruthForge Debate Arena</h1>
+            <p>Two-Pass Crisis Communication Analysis - Identify vulnerabilities through adversarial debate</p>
+        </div>
+    </header>
+
+    <main class="container">
+        <div class="workflow-container">
+            <div class="workflow-header">
+                <h2 class="workflow-title">Two-Pass Debate Pipeline</h2>
+                <span id="workflow-status" class="workflow-status idle">Ready to Analyze</span>
+            </div>
+
+            <div id="pipeline-container"></div>
+            <div id="progress-container"></div>
+        </div>
+
+        <div class="debate-arena">
+            <div class="control-panel">
+                <h3><i class="fas fa-file-alt"></i> Crisis Narrative</h3>
+
+                <div class="form-group narrative-input">
+                    <label class="form-label" for="crisis-narrative">Enter Crisis Communication:</label>
+                    <textarea
+                        id="crisis-narrative"
+                        class="form-input form-textarea"
+                        placeholder="Example: Our company experienced a data breach affecting 10,000 customer records. We discovered unauthorized access to our customer database on March 15th due to an unpatched security vulnerability in our legacy system. We have notified affected customers and are offering free credit monitoring services for 12 months."
+                    ></textarea>
+                </div>
+
+                <div class="sidebar-section">
+                    <h3 class="sidebar-title"><i class="fas fa-cog"></i> Analysis Configuration</h3>
+                    <div class="form-group">
+                        <label class="form-label">Analysis Depth:</label>
+                        <select id="analysis-depth" class="form-input">
+                            <option value="standard">Standard</option>
+                            <option value="deep">Deep Analysis</option>
+                            <option value="rapid">Rapid Assessment</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="form-label">
+                            <input type="checkbox" id="include-taxonomy" checked>
+                            Include Taxonomy Linking
+                        </label>
+                    </div>
+                </div>
+
+                <div class="execution-controls">
+                    <button id="start-analysis" class="btn primary">
+                        <i class="fas fa-play"></i> Start Analysis
+                    </button>
+                    <button id="reset-analysis" class="btn">
+                        <i class="fas fa-redo"></i> Reset
+                    </button>
+                </div>
+            </div>
+
+            <div class="results-area" id="results-container">
+                <div class="empty-state">
+                    <div style="text-align: center; padding: 4rem 2rem; color: var(--text-muted);">
+                        <i class="fas fa-comments" style="font-size: 4rem; margin-bottom: 1rem; opacity: 0.3;"></i>
+                        <h3>No Analysis Yet</h3>
+                        <p>Enter a crisis narrative and click "Start Analysis" to begin the two-pass debate process.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Debug Panel Container -->
+    <div id="debug-panel-container"></div>
+
+    <link rel="stylesheet" href="../shared/debug-panel.css">
+    <script src="../shared/debug-panel.js"></script>
+    <script src="../shared/workflow-visualizer.js"></script>
+    <script src="../shared/api-client.js"></script>
+    <script src="../shared/server-discovery.js"></script>
+    <script src="../shared/settings-manager.js"></script>
+    <script src="../shared/settings-ui.js"></script>
+    <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/agent-config-manager.js"></script>
+    <script src="../shared/connection-status.js"></script>
+    <script src="app.js"></script>
+</body>
+</html>

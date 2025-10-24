@@ -122,6 +122,7 @@ async fn test_knowledge_graph_ranking_expansion() {
                 stub: None,
                 tags: None,
                 rank: None,
+                source_haystack: None,
             };
 
             initial_rolegraph.insert_document(&document.id, document.clone());
@@ -237,6 +238,7 @@ The Graph Analysis component works closely with existing graph processing system
                 stub: None,
                 tags: None,
                 rank: None,
+                source_haystack: None,
             };
 
             expanded_rolegraph.insert_document(&document.id, document.clone());
