@@ -81,9 +81,8 @@ impl OpenRouterService {
         let client =
             crate::http_client::create_api_client().unwrap_or_else(|_| reqwest::Client::new());
 
-        // Allow overriding base URL for testing via env var
-        let base_url = std::env::var("OPENROUTER_BASE_URL")
-            .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string());
+        // Determine base URL based on model and environment configuration
+        let base_url = Self::determine_base_url(model);
 
         Ok(Self {
             client,
@@ -91,6 +90,48 @@ impl OpenRouterService {
             model: model.to_string(),
             base_url,
         })
+    }
+
+    /// Determine the appropriate base URL based on model and environment configuration
+    ///
+    /// This method supports the z.ai proxy for Anthropic models when the
+    /// ANTHROPIC_BASE_URL environment variable is configured.
+    fn determine_base_url(model: &str) -> String {
+        // Check if this is an Anthropic model and z.ai proxy is configured
+        if model.starts_with("anthropic/") || model.contains("claude") {
+            // Check for z.ai proxy configuration
+            if let Ok(anthropic_base_url) = std::env::var("ANTHROPIC_BASE_URL") {
+                log::info!(
+                    "🔗 Using z.ai proxy for Anthropic model: {} -> {}",
+                    model,
+                    anthropic_base_url
+                );
+                return anthropic_base_url;
+            }
+        }
+
+        // Default to OpenRouter base URL (with environment override support)
+        std::env::var("OPENROUTER_BASE_URL")
+            .unwrap_or_else(|_| "https://openrouter.ai/api/v1".to_string())
+    }
+
+    /// Get the appropriate API key based on the model and configuration
+    ///
+    /// For Anthropic models using z.ai proxy, prefer ANTHROPIC_AUTH_TOKEN
+    fn get_api_key(&self, provided_key: &str) -> String {
+        // Check if this is an Anthropic model using z.ai proxy
+        if (self.model.starts_with("anthropic/") || self.model.contains("claude"))
+            && self.base_url.contains("z.ai")
+        {
+            // Prefer the z.ai auth token if available
+            if let Ok(anthropic_token) = std::env::var("ANTHROPIC_AUTH_TOKEN") {
+                log::info!("🔑 Using ANTHROPIC_AUTH_TOKEN for z.ai proxy");
+                return anthropic_token;
+            }
+        }
+
+        // Fall back to the provided API key
+        provided_key.to_string()
     }
 
     /// Generate a summary for the given article content
@@ -154,11 +195,14 @@ impl OpenRouterService {
 
         log::debug!("Sending OpenRouter API request for model: {}", self.model);
 
+        // Get the appropriate API key for this request
+        let api_key = self.get_api_key(&self.api_key);
+
         // Make the API call
         let response = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .header("HTTP-Referer", "https://terraphim.ai") // Required by OpenRouter
             .header("X-Title", "Terraphim AI") // Optional but recommended
@@ -271,10 +315,13 @@ impl OpenRouterService {
             "stream": false
         });
 
+        // Get the appropriate API key for this request
+        let api_key = self.get_api_key(&self.api_key);
+
         let response = self
             .client
             .post(format!("{}/chat/completions", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Authorization", format!("Bearer {}", api_key))
             .header("Content-Type", "application/json")
             .header("HTTP-Referer", "https://terraphim.ai")
             .header("X-Title", "Terraphim AI")
@@ -307,10 +354,13 @@ impl OpenRouterService {
 
     /// Fetch available models from OpenRouter
     pub async fn list_models(&self) -> Result<Vec<String>> {
+        // Get the appropriate API key for this request
+        let api_key = self.get_api_key(&self.api_key);
+
         let response = self
             .client
             .get(format!("{}/models", self.base_url))
-            .header("Authorization", format!("Bearer {}", self.api_key))
+            .header("Authorization", format!("Bearer {}", api_key))
             .header("HTTP-Referer", "https://terraphim.ai")
             .header("X-Title", "Terraphim AI")
             .send()

@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
+members = ["crates/*", "terraphim_server", "desktop/src-tauri", "terraphim_firecracker"]
 exclude = ["crates/terraphim_agent_application"]  # Experimental crate with incomplete API implementations
 default-members = ["terraphim_server"]
 
