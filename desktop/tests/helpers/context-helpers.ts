@@ -119,7 +119,6 @@ export class ContextTestHelpers {
 
     // Wait for deletion to complete
     await expect(this.page.locator(`[data-testid="conversation-${conversationId}"]`)).not.toBeVisible();
-  }
     await this.page.waitForLoadState('networkidle');
   }
 

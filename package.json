@@ -1,5 +1,17 @@
 {
+  "license": "Apache-2.0 OR MIT",
   "devDependencies": {
     "@types/node": "^24.1.0"
+  },
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^7.1.0",
+    "@tiptap/core": "^3.7.2",
+    "@tiptap/extension-mention": "^3.7.2",
+    "@tiptap/starter-kit": "^3.7.2",
+    "@tiptap/suggestion": "^3.7.2",
+    "prosemirror-model": "^1.25.3",
+    "prosemirror-state": "^1.4.3",
+    "prosemirror-view": "^1.41.3",
+    "svelte-markdown": "^0.4.1"
   }
 }

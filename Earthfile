@@ -89,7 +89,7 @@ install-native:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
@@ -119,6 +119,7 @@ source-native:
   COPY --keep-ts Cargo.toml Cargo.lock ./
   COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
+  COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml

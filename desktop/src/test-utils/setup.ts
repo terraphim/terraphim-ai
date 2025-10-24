@@ -5,12 +5,14 @@ import '@testing-library/jest-dom';
 
 // Basic DOM compatibility fixes for JSDOM
 Object.defineProperty(HTMLInputElement.prototype, 'selectionStart', {
-  get() { return 0; },
-  set() {},
-  configurable: true
+	get() {
+		return 0;
+	},
+	set() {},
+	configurable: true,
 });
 
 Object.defineProperty(HTMLInputElement.prototype, 'setSelectionRange', {
-  value: () => {},
-  configurable: true
+	value: () => {},
+	configurable: true,
 });
