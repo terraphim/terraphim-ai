@@ -58,7 +58,7 @@ export interface Role {
 	relevance_function: RelevanceFunction;
 	terraphim_it: boolean;
 	theme: string;
-	kg?: (KnowledgeGraph & Value);
+	kg?: KnowledgeGraph & Value;
 	haystacks: Haystack[] & Value;
 	[key: string]: Value; // Allow additional properties
 }
