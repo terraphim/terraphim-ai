@@ -67,7 +67,7 @@ These are from:
 
 2. **Rust Engineer Role**:
    - Switch role using theme/role switcher
-   - Type: "async tokio"  
+   - Type: "async tokio"
    - Press Enter
    - ✅ Results appear in < 1 second (may be slower due to external API)
    - ✅ No UI freeze
@@ -75,7 +75,7 @@ These are from:
 3. **Terraphim Engineer Role**:
    - Switch to Terraphim Engineer role
    - Type: "knowledge graph"
-   - Press Enter  
+   - Press Enter
    - ✅ Results appear in < 1 second
    - ✅ No UI freeze
    - ✅ Knowledge graph rankings work
@@ -100,7 +100,7 @@ tokio::spawn(async move {
 
 ### After (Fast + No Warnings):
 ```rust
-// Line 98-100: Skip all persistence  
+// Line 98-100: Skip all persistence
 // Skip cache loading to eliminate persistence operations from search path
 // This prevents NotFound warnings and improves search performance
 let use_cached_results = false;

@@ -37,7 +37,7 @@ if ! curl -s http://localhost:5173 > /dev/null 2>&1; then
     echo "🚀 Starting dev server..."
     yarn run dev &
     DEV_PID=$!
-    
+
     # Wait for dev server to start
     echo "⏳ Waiting for dev server to start..."
     for i in {1..30}; do
@@ -47,7 +47,7 @@ if ! curl -s http://localhost:5173 > /dev/null 2>&1; then
         fi
         sleep 1
     done
-    
+
     if ! curl -s http://localhost:5173 > /dev/null 2>&1; then
         echo "❌ Failed to start dev server"
         exit 1

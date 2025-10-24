@@ -1,28 +1,28 @@
 <script lang="ts">
-import { Route, router, active } from "tinro";
-import "@fortawesome/fontawesome-free/css/all.css";
-import Search from "./lib/Search/Search.svelte";
-import ThemeSwitcher from "./lib/ThemeSwitcher.svelte";
-import { theme } from "./lib/stores";
-import ConfigWizard from "./lib/ConfigWizard.svelte";
-import ConfigJsonEditor from "./lib/ConfigJsonEditor.svelte";
-import RoleGraphVisualization from "./lib/RoleGraphVisualization.svelte";
-import Chat from "./lib/Chat/Chat.svelte";
-import logo from "/assets/terraphim_gray.png";
+import { Route, router, active } from 'tinro';
+import '@fortawesome/fontawesome-free/css/all.css';
+import Search from './lib/Search/Search.svelte';
+import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
+import { theme } from './lib/stores';
+import ConfigWizard from './lib/ConfigWizard.svelte';
+import ConfigJsonEditor from './lib/ConfigJsonEditor.svelte';
+import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
+import Chat from './lib/Chat/Chat.svelte';
+import logo from '/assets/terraphim_gray.png';
 
 let _visible = 'is-hidden';
 function _toggleVissible() {
 	_visible = '';
 }
 
-  function goBack() {
-    // Try to go back in browser history, fallback to home
-    if (window.history.length > 1) {
-      window.history.back();
-    } else {
-      router.goto('/');
-    }
-  }
+function goBack() {
+	// Try to go back in browser history, fallback to home
+	if (window.history.length > 1) {
+		window.history.back();
+	} else {
+		router.goto('/');
+	}
+}
 </script>
 
 <svelte:head>

@@ -1,19 +1,4 @@
-# Summary: agents_instructions.json
-
-## Purpose
-This JSON file contains machine-readable instructions for AI agents working with Terraphim, defining the system architecture, agent definitions, and development workflows.
-
-## Key Functionality
-- Describes core system architecture including Rust backend with multi-crate workspace, Svelte frontend, and server components
-- Defines agent system with TypeScript interfaces, available tools (read_files, write_file, grep, run_terminal_command, etc.), and workflow patterns
-- Documents search and knowledge systems with relevance functions (TitleScorer, BM25, TerraphimGraph) and haystack types (Ripgrep, AtomicServer, QueryRs)
-- Specifies AI integration with providers (OpenRouter, Ollama) and MCP server capabilities
-- Outlines development workflow with build commands, quality assurance processes, and configuration management
-- Provides best practices for Rust and frontend code, testing strategies, and common implementation patterns
-
-## Important Details
-- Supports dynamic model selection with 4-level priority system (request > role > global > default)
-- Includes 13 example agent configurations with specific models and tool sets
-- Features comprehensive error handling and graceful degradation patterns
-- Documents deployment patterns for development and production environments
-- Establishes patterns for adding new search providers and relevance functions
+{
+  "version": "1.0.0",
+  "description": "Terraphim AI agent instructions and configuration"
+}
