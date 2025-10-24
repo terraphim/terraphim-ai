@@ -1,11 +1,6 @@
-<<<<<<< HEAD
-import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
-import { render, fireEvent, screen, waitFor } from '@testing-library/svelte/svelte5';
-=======
 import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { is_tauri, role, theme } from './stores';
->>>>>>> origin/main
 import ThemeSwitcher from './ThemeSwitcher.svelte';
 
 // Test configuration
@@ -14,56 +9,7 @@ const TEST_TIMEOUT = 5000; // 5 seconds for API calls
 // Stub TAURI IPC to prevent invoke errors
 (global as any).__TAURI_IPC__ = () => {};
 
-// Mock fetch for config loading
-const mockFetch = vi.fn();
-global.fetch = mockFetch;
-
 describe('ThemeSwitcher Component - Real Integration', () => {
-<<<<<<< HEAD
-  beforeAll(async () => {
-    // Set up for web-based testing (not Tauri)
-    is_tauri.set(false);
-  });
-
-  beforeEach(async () => {
-    // Reset to default state
-    role.set('Test Role');
-    theme.set('spacelab');
-    
-    // Mock successful config response
-    mockFetch.mockResolvedValue({
-      ok: true,
-      json: () => Promise.resolve({
-        status: 'success',
-        config: {
-          id: 'test-config',
-          global_shortcut: 'Ctrl+Shift+S',
-          roles: {
-            'Test Role': {
-              name: 'Test Role',
-              shortname: 'test',
-              relevance_function: 'TitleScorer',
-              terraphim_it: false,
-              theme: 'spacelab',
-              haystacks: [],
-              kg: { url: '', local_path: '', local_type: 'json', public: false, publish: false }
-            },
-            'Engineer': {
-              name: 'Engineer',
-              shortname: 'engineer',
-              relevance_function: 'TitleScorer',
-              terraphim_it: false,
-              theme: 'spacelab',
-              haystacks: [],
-              kg: { url: '', local_path: '', local_type: 'json', public: false, publish: false }
-            }
-          },
-          selected_role: 'Test Role'
-        }
-      })
-    });
-  });
-=======
 	// Skip integration tests in CI environment where server setup is complex
 	const isCI = process.env.CI || process.env.GITHUB_ACTIONS;
 
@@ -238,7 +184,6 @@ describe('ThemeSwitcher Component - Real Integration', () => {
 	it('handles non-Tauri environment', () => {
 		// Ensure we're in non-Tauri environment
 		(window as any).__TAURI__ = undefined;
->>>>>>> origin/main
 
 		render(ThemeSwitcher);
 

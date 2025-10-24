@@ -1,187 +1,4 @@
 <script lang="ts">
-<<<<<<< HEAD
-  import { Editor as NovelEditor } from '@paralect/novel-svelte';
-  import { Markdown } from 'tiptap-markdown';
-  import { onMount, onDestroy } from 'svelte';
-  import { novelAutocompleteService } from '../services/novelAutocompleteService';
-  import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
-  import { is_tauri, role } from '../stores';
-
-  export let html: any = '';          // initial content in HTML/JSON
-  export let readOnly: boolean = false;
-  export let outputFormat: 'html' | 'markdown' = 'html';  // New prop to control output format
-  export let enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
-  export let showSnippets: boolean = true; // New prop to show snippets in autocomplete
-  export let suggestionTrigger: string = '/'; // Character that triggers autocomplete
-  export let maxSuggestions: number = 8; // Maximum number of suggestions to show
-  export let minQueryLength: number = 1; // Minimum query length before showing suggestions
-  export let debounceDelay: number = 300; // Debounce delay in milliseconds
-
-  let editor: any = null;
-  let autocompleteStatus = '⏳ Initializing...';
-  let autocompleteReady = false;
-  let connectionTested = false;
-  let styleElement: HTMLStyleElement | null = null;
-
-  onMount(async () => {
-    if (enableAutocomplete) {
-      await initializeAutocomplete();
-    }
-
-    // Inject CSS styles for suggestions
-    if (typeof document !== 'undefined') {
-      styleElement = document.createElement('style');
-      styleElement.textContent = terraphimSuggestionStyles;
-      document.head.appendChild(styleElement);
-    }
-  });
-
-  onDestroy(() => {
-    // Cleanup styles
-    if (styleElement && styleElement.parentNode) {
-      styleElement.parentNode.removeChild(styleElement);
-    }
-  });
-
-  // Watch for role changes and reinitialize
-  $: if ($role && enableAutocomplete && autocompleteReady) {
-    novelAutocompleteService.setRole($role);
-    initializeAutocomplete();
-  }
-
-  async function initializeAutocomplete() {
-    autocompleteStatus = '⏳ Initializing autocomplete...';
-    autocompleteReady = false;
-    connectionTested = false;
-
-    try {
-      // Set the current role in the autocomplete service
-      novelAutocompleteService.setRole($role);
-
-      // Test connection first
-      autocompleteStatus = '🔗 Testing connection...';
-      const connectionOk = await novelAutocompleteService.testConnection();
-      connectionTested = true;
-
-      if (connectionOk) {
-        // Build the autocomplete index
-        autocompleteStatus = '🔨 Building autocomplete index...';
-        const success = await novelAutocompleteService.buildAutocompleteIndex();
-
-        if (success) {
-          if ($is_tauri) {
-            autocompleteStatus = '✅ Ready - Using Tauri backend';
-          } else {
-            autocompleteStatus = '✅ Ready - Using MCP server backend';
-          }
-          autocompleteReady = true;
-        } else {
-          autocompleteStatus = '❌ Failed to build autocomplete index';
-        }
-      } else {
-        if ($is_tauri) {
-          autocompleteStatus = '❌ Tauri backend not available';
-        } else {
-          autocompleteStatus = '❌ REST API server not responding';
-        }
-      }
-    } catch (error) {
-      console.error('Error initializing autocomplete:', error);
-      autocompleteStatus = '❌ Autocomplete initialization error';
-    }
-  }
-
-  /** Handler called by Novel editor on every update; we translate it to the
-   *  wrapper's `html` variable so the parent can bind to it. */
-  const handleUpdate = (editorInstance: any) => {
-    editor = editorInstance;
-
-    // Choose output format based on the outputFormat prop
-    // For markdown content, use getMarkdown() to preserve markdown syntax
-    // For HTML content, use getHTML() to preserve rich formatting
-    if (outputFormat === 'markdown') {
-      html = editorInstance.storage.markdown.getMarkdown();
-    } else {
-      html = editorInstance.getHTML();
-    }
-  };
-
-  // Function to manually test autocomplete
-  const testAutocomplete = async () => {
-    if (!connectionTested) {
-      alert('Please wait for connection test to complete');
-      return;
-    }
-
-    if (!autocompleteReady) {
-      alert('Autocomplete service not ready. Check the status above.');
-      return;
-    }
-
-    try {
-      autocompleteStatus = '🧪 Testing autocomplete...';
-
-      const testQuery = 'terraphim';
-      const suggestions = await novelAutocompleteService.getSuggestions(testQuery, 5);
-
-      console.log('Autocomplete test results:', suggestions);
-
-      if (suggestions.length > 0) {
-        const suggestionText = suggestions
-          .map((s, i) => `${i + 1}. ${s.text}${s.snippet ? ` (${s.snippet})` : ''}`)
-          .join('\n');
-
-        alert(`✅ Found ${suggestions.length} suggestions for '${testQuery}':\n\n${suggestionText}`);
-
-        if ($is_tauri) {
-          autocompleteStatus = '✅ Ready - Using Tauri backend';
-        } else {
-          autocompleteStatus = '✅ Ready - Using REST API backend';
-        }
-      } else {
-        alert(`⚠️ No suggestions found for '${testQuery}'. This might be normal if the term isn't in your knowledge graph.`);
-      }
-    } catch (error) {
-      console.error('Autocomplete test failed:', error);
-      alert(`❌ Autocomplete test failed: ${error.message}`);
-      autocompleteStatus = '❌ Test failed - check console for details';
-    }
-  };
-
-  // Function to rebuild autocomplete index
-  const rebuildIndex = async () => {
-    autocompleteStatus = '⏳ Rebuilding index...';
-    autocompleteReady = false;
-
-    try {
-      const success = await novelAutocompleteService.refreshIndex();
-
-      if (success) {
-        if ($is_tauri) {
-          autocompleteStatus = '✅ Ready - Tauri index rebuilt successfully';
-        } else {
-          autocompleteStatus = '✅ Ready - REST API connection verified';
-        }
-        autocompleteReady = true;
-      } else {
-        autocompleteStatus = '❌ Failed to rebuild index';
-      }
-    } catch (error) {
-      console.error('Error rebuilding index:', error);
-      autocompleteStatus = '❌ Index rebuild failed - check console for details';
-    }
-  };
-
-  // Function to demonstrate autocomplete in action
-  const demonstrateAutocomplete = () => {
-    if (!editor) {
-      alert('Editor not ready yet');
-      return;
-    }
-
-    // Insert demo text that explains the new autocomplete system
-    const demoText = `# Terraphim Autocomplete Demo
-=======
 import { onDestroy, onMount } from 'svelte';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
 import { terraphimSuggestionStyles } from './TerraphimSuggestion';
@@ -368,7 +185,6 @@ const _demonstrateAutocomplete = () => {
 
 	// Insert demo text that explains the new autocomplete system
 	const demoText = `# Terraphim Autocomplete Demo
->>>>>>> origin/main
 
 This is a demonstration of the integrated Terraphim autocomplete system.
 
@@ -486,14 +302,14 @@ Start typing below:`;
         {#if $is_tauri}
           Tauri backend connection failed. Ensure the application has proper permissions.
         {:else}
-          REST API server not responding. Ensure the server is running on {novelAutocompleteService.getStatus().baseUrl}
+          MCP server not responding. Ensure the server is running on {novelAutocompleteService.getStatus().baseUrl}
         {/if}
       </div>
     {/if}
 
     <div style="font-size: 12px; color: #6c757d;">
       <strong>Configuration:</strong>
-      <br>• <strong>Backend:</strong> {$is_tauri ? 'Tauri (native)' : `REST API (${novelAutocompleteService.getStatus().baseUrl})`}
+      <br>• <strong>Backend:</strong> {$is_tauri ? 'Tauri (native)' : `MCP Server (${novelAutocompleteService.getStatus().baseUrl})`}
       <br>• <strong>Role:</strong> {$role}
       <br>• <strong>Trigger:</strong> "{suggestionTrigger}" + text
       <br>• <strong>Min Length:</strong> {minQueryLength} character{minQueryLength !== 1 ? 's' : ''}

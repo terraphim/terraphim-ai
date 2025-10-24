@@ -465,25 +465,15 @@ function _closeWizard() {
 
   {#if __saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
-<<<<<<< HEAD
-      <button class="delete" aria-label="Dismiss success notification" on:click={() => saveStatus = ''}></button>
-      Configuration saved successfully!
-=======
       <button class="delete" on:click={() => __saveStatus = ''}></button>
       Configuration _saved successfully!
->>>>>>> origin/main
     </div>
   {/if}
 
   {#if __saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
-<<<<<<< HEAD
-      <button class="delete" aria-label="Dismiss error notification" on:click={() => saveStatus = ''}></button>
-      Failed to save configuration. Please try again.
-=======
       <button class="delete" on:click={() => __saveStatus = ''}></button>
       Failed to _save configuration. Please try again.
->>>>>>> origin/main
     </div>
   {/if}
   {#if currentStep === 1}
@@ -649,7 +639,7 @@ function _closeWizard() {
             <!-- Extra Parameters (only for Ripgrep service) -->
             {#if $draft.roles[idx].haystacks[hIdx].service === "Ripgrep"}
               <div class="field">
-                <p class="label">Extra Parameters (for filtering)</p>
+                <label class="label">Extra Parameters (for filtering)</label>
                 <!-- Dedicated Hashtag field mapped to extra_parameters.tag -->
                 <div class="field is-grouped">
                   <div class="control">
@@ -908,13 +898,7 @@ function _closeWizard() {
             <div class="field">
               <label class="label" for={`openrouter-chat-system-${idx}`}>System Prompt (optional)</label>
               <div class="control">
-                <textarea
-                  class="textarea"
-                  id={`openrouter-chat-system-${idx}`}
-                  rows="3"
-                  placeholder="You are a helpful Rust engineer assistant..."
-                  bind:value={$draft.roles[idx].openrouter_chat_system_prompt}
-                ></textarea>
+                <textarea class="textarea" id={`openrouter-chat-system-${idx}`} rows="3" placeholder="You are a helpful Rust engineer assistant..." bind:value={$draft.roles[idx].openrouter_chat_system_prompt} />
               </div>
             </div>
           {/if}
