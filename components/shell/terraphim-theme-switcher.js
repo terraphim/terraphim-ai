@@ -220,7 +220,7 @@ export class TerraphimThemeSwitcher extends TerraphimElement {
     // Initialize ThemeManager
     this._themeManager = new ThemeManager({
       storageKey: this.storageKey,
-      assetPath: '/assets/bulmaswatch'
+      assetPath: '/desktop/public/assets/bulmaswatch'
     });
 
     // Register callbacks
