@@ -1,0 +1,641 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Theme System Demo</title>
+
+  <!-- Load CSS variables -->
+  <link rel="stylesheet" href="../styles/variables.css">
+
+  <!-- FOUC Prevention: Apply saved theme immediately -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('terraphim-theme') || 'spacelab';
+      document.documentElement.setAttribute('data-theme', theme);
+    })();
+  </script>
+
+  <!-- Preload Bulmaswatch CSS for saved theme -->
+  <script>
+    (function() {
+      const theme = localStorage.getItem('terraphim-theme') || 'spacelab';
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = `/assets/bulmaswatch/${theme}/bulmaswatch.min.css`;
+      document.head.appendChild(link);
+    })();
+  </script>
+
+  <style>
+    /* Global styles using CSS variables */
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: var(--font-family-sans);
+      background-color: var(--bg-page);
+      color: var(--text-primary);
+      transition: var(--transition-theme);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: var(--spacing-xl);
+    }
+
+    .header {
+      text-align: center;
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-xl);
+      background-color: var(--bg-primary);
+      border-radius: var(--border-radius-lg);
+      transition: var(--transition-theme);
+    }
+
+    .header h1 {
+      margin: 0 0 var(--spacing-sm);
+      font-size: var(--font-size-3xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+    }
+
+    .header p {
+      margin: 0;
+      font-size: var(--font-size-lg);
+      color: var(--text-secondary);
+    }
+
+    .theme-controls {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: var(--spacing-lg);
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-lg);
+      background-color: var(--bg-elevated);
+      border-radius: var(--border-radius-md);
+      box-shadow: var(--shadow-md);
+      transition: var(--transition-theme);
+    }
+
+    .section {
+      margin-bottom: var(--spacing-2xl);
+      padding: var(--spacing-xl);
+      background-color: var(--bg-primary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-lg);
+      transition: var(--transition-theme);
+    }
+
+    .section h2 {
+      margin: 0 0 var(--spacing-md);
+      font-size: var(--font-size-2xl);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+      border-bottom: 2px solid var(--color-primary);
+      padding-bottom: var(--spacing-sm);
+    }
+
+    .variable-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+    }
+
+    .variable-item {
+      padding: var(--spacing-md);
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      transition: var(--transition-theme);
+    }
+
+    .variable-item:hover {
+      background-color: var(--bg-hover);
+      box-shadow: var(--shadow-sm);
+    }
+
+    .variable-name {
+      font-family: var(--font-family-mono);
+      font-size: var(--font-size-sm);
+      color: var(--color-primary);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .variable-value {
+      margin-top: var(--spacing-xs);
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      word-break: break-all;
+    }
+
+    .color-swatch {
+      display: inline-block;
+      width: 20px;
+      height: 20px;
+      border-radius: var(--border-radius-sm);
+      border: 1px solid var(--border-primary);
+      vertical-align: middle;
+      margin-right: var(--spacing-xs);
+    }
+
+    .example-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+    }
+
+    .btn {
+      padding: var(--spacing-sm) var(--spacing-lg);
+      border: none;
+      border-radius: var(--border-radius-md);
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-medium);
+      cursor: pointer;
+      transition: var(--transition-base);
+    }
+
+    .btn-primary {
+      background-color: var(--color-primary);
+      color: var(--color-primary-contrast);
+    }
+
+    .btn-primary:hover {
+      background-color: var(--color-primary-dark);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-success {
+      background-color: var(--color-success);
+      color: white;
+    }
+
+    .btn-success:hover {
+      background-color: var(--color-success-dark);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-warning {
+      background-color: var(--color-warning);
+      color: rgba(0, 0, 0, 0.7);
+    }
+
+    .btn-warning:hover {
+      background-color: var(--color-warning-dark);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn-danger {
+      background-color: var(--color-danger);
+      color: white;
+    }
+
+    .btn-danger:hover {
+      background-color: var(--color-danger-dark);
+      box-shadow: var(--shadow-md);
+    }
+
+    .btn:focus-visible {
+      outline: 2px solid var(--border-focus);
+      outline-offset: 2px;
+    }
+
+    .example-cards {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: var(--spacing-lg);
+      margin-top: var(--spacing-lg);
+    }
+
+    .card {
+      padding: var(--spacing-lg);
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-lg);
+      box-shadow: var(--shadow-md);
+      transition: var(--transition-theme);
+    }
+
+    .card:hover {
+      box-shadow: var(--shadow-lg);
+      transform: translateY(-2px);
+    }
+
+    .card h3 {
+      margin: 0 0 var(--spacing-sm);
+      font-size: var(--font-size-xl);
+      color: var(--text-primary);
+    }
+
+    .card p {
+      margin: 0;
+      color: var(--text-secondary);
+      line-height: var(--line-height-normal);
+    }
+
+    .event-log {
+      margin-top: var(--spacing-lg);
+      padding: var(--spacing-md);
+      background-color: var(--bg-code);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: var(--font-family-mono);
+      font-size: var(--font-size-sm);
+      transition: var(--transition-theme);
+    }
+
+    .event-log__item {
+      padding: var(--spacing-xs);
+      border-bottom: 1px solid var(--border-primary);
+      color: var(--text-secondary);
+    }
+
+    .event-log__item:last-child {
+      border-bottom: none;
+    }
+
+    .event-log__time {
+      color: var(--text-tertiary);
+      font-size: var(--font-size-xs);
+    }
+
+    .event-log__type {
+      color: var(--color-primary);
+      font-weight: var(--font-weight-medium);
+    }
+
+    .stats {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-lg);
+    }
+
+    .stat-card {
+      padding: var(--spacing-lg);
+      background-color: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      text-align: center;
+      transition: var(--transition-theme);
+    }
+
+    .stat-card__value {
+      font-size: var(--font-size-3xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--color-primary);
+      margin: 0;
+    }
+
+    .stat-card__label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin: var(--spacing-xs) 0 0;
+    }
+
+    .code-block {
+      margin-top: var(--spacing-md);
+      padding: var(--spacing-md);
+      background-color: var(--bg-code);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      overflow-x: auto;
+      font-family: var(--font-family-mono);
+      font-size: var(--font-size-sm);
+      transition: var(--transition-theme);
+    }
+
+    .code-block code {
+      color: var(--text-primary);
+    }
+
+    @media (max-width: 768px) {
+      .container {
+        padding: var(--spacing-md);
+      }
+
+      .theme-controls {
+        flex-direction: column;
+      }
+
+      .variable-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="header">
+      <h1>Terraphim Theme System Demo</h1>
+      <p>Interactive demonstration of CSS custom properties and theme switching</p>
+    </header>
+
+    <!-- Theme Controls -->
+    <div class="theme-controls">
+      <terraphim-theme-switcher></terraphim-theme-switcher>
+      <button class="btn btn-primary" id="detect-system-btn">Detect System Theme</button>
+      <button class="btn btn-primary" id="clear-storage-btn">Clear Storage</button>
+    </div>
+
+    <!-- Stats Section -->
+    <section class="section">
+      <h2>Theme Statistics</h2>
+      <div class="stats">
+        <div class="stat-card">
+          <p class="stat-card__value" id="current-theme-name">Loading...</p>
+          <p class="stat-card__label">Current Theme</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-card__value" id="theme-type">-</p>
+          <p class="stat-card__label">Theme Type</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-card__value" id="total-themes">22</p>
+          <p class="stat-card__label">Total Themes</p>
+        </div>
+        <div class="stat-card">
+          <p class="stat-card__value" id="load-time">-</p>
+          <p class="stat-card__label">Load Time (ms)</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Color Variables Section -->
+    <section class="section">
+      <h2>Color Variables</h2>
+      <div class="variable-grid" id="color-variables"></div>
+    </section>
+
+    <!-- Example Components Section -->
+    <section class="section">
+      <h2>Example Components</h2>
+
+      <h3>Buttons</h3>
+      <div class="example-buttons">
+        <button class="btn btn-primary">Primary Button</button>
+        <button class="btn btn-success">Success Button</button>
+        <button class="btn btn-warning">Warning Button</button>
+        <button class="btn btn-danger">Danger Button</button>
+      </div>
+
+      <h3 style="margin-top: var(--spacing-lg);">Cards</h3>
+      <div class="example-cards">
+        <div class="card">
+          <h3>Card Title 1</h3>
+          <p>This card demonstrates how components adapt to theme changes using CSS custom properties. All colors, spacing, and shadows update automatically.</p>
+        </div>
+        <div class="card">
+          <h3>Card Title 2</h3>
+          <p>Notice the smooth transitions when switching themes. This is controlled by the --transition-theme variable.</p>
+        </div>
+        <div class="card">
+          <h3>Card Title 3</h3>
+          <p>Try switching between light and dark themes to see how the design system adapts seamlessly.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- CSS Variables Reference -->
+    <section class="section">
+      <h2>Spacing Scale</h2>
+      <div class="variable-grid" id="spacing-variables"></div>
+    </section>
+
+    <section class="section">
+      <h2>Typography Scale</h2>
+      <div class="variable-grid" id="typography-variables"></div>
+    </section>
+
+    <!-- Event Log Section -->
+    <section class="section">
+      <h2>Event Log</h2>
+      <p>Real-time log of theme-related events</p>
+      <div class="event-log" id="event-log">
+        <div class="event-log__item">
+          <span class="event-log__time">Waiting for events...</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="clear-log-btn" style="margin-top: var(--spacing-md);">Clear Log</button>
+    </section>
+
+    <!-- Code Example Section -->
+    <section class="section">
+      <h2>Usage Example</h2>
+      <p>Example code showing how to use CSS variables in your components:</p>
+      <div class="code-block">
+<code>.my-component {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-primary);
+  padding: var(--spacing-md);
+  border-radius: var(--border-radius-md);
+  transition: var(--transition-theme);
+}
+
+.my-component:hover {
+  background-color: var(--bg-hover);
+  box-shadow: var(--shadow-md);
+}</code>
+      </div>
+    </section>
+  </div>
+
+  <!-- Load theme switcher component -->
+  <script type="module" src="../shell/terraphim-theme-switcher.js"></script>
+
+  <!-- Demo page logic -->
+  <script type="module">
+    // Get reference to theme switcher
+    const themeSwitcher = document.querySelector('terraphim-theme-switcher');
+    const eventLog = document.getElementById('event-log');
+
+    // Color variables to display
+    const colorVariables = [
+      '--color-primary',
+      '--color-primary-light',
+      '--color-primary-dark',
+      '--color-success',
+      '--color-warning',
+      '--color-danger',
+      '--color-info',
+      '--bg-page',
+      '--bg-primary',
+      '--bg-elevated',
+      '--text-primary',
+      '--text-secondary',
+      '--border-primary'
+    ];
+
+    // Spacing variables to display
+    const spacingVariables = [
+      '--spacing-xs',
+      '--spacing-sm',
+      '--spacing-md',
+      '--spacing-lg',
+      '--spacing-xl',
+      '--spacing-2xl'
+    ];
+
+    // Typography variables to display
+    const typographyVariables = [
+      '--font-size-xs',
+      '--font-size-sm',
+      '--font-size-base',
+      '--font-size-lg',
+      '--font-size-xl',
+      '--font-size-2xl'
+    ];
+
+    // Helper function to get computed CSS variable value
+    function getCSSVariable(name) {
+      return getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+    }
+
+    // Helper function to log events
+    function logEvent(type, detail) {
+      const time = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = 'event-log__item';
+      item.innerHTML = `
+        <span class="event-log__time">[${time}]</span>
+        <span class="event-log__type">${type}</span>: ${JSON.stringify(detail, null, 2)}
+      `;
+      eventLog.insertBefore(item, eventLog.firstChild);
+
+      // Limit log to 20 items
+      while (eventLog.children.length > 20) {
+        eventLog.removeChild(eventLog.lastChild);
+      }
+    }
+
+    // Display color variables
+    function displayColorVariables() {
+      const container = document.getElementById('color-variables');
+      container.innerHTML = '';
+
+      colorVariables.forEach(varName => {
+        const value = getCSSVariable(varName);
+        const item = document.createElement('div');
+        item.className = 'variable-item';
+
+        // Check if it's a color (for swatch display)
+        const isColor = value.startsWith('#') || value.startsWith('rgb');
+
+        item.innerHTML = `
+          <div class="variable-name">${varName}</div>
+          <div class="variable-value">
+            ${isColor ? `<span class="color-swatch" style="background-color: ${value};"></span>` : ''}
+            ${value}
+          </div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Display spacing variables
+    function displaySpacingVariables() {
+      const container = document.getElementById('spacing-variables');
+      container.innerHTML = '';
+
+      spacingVariables.forEach(varName => {
+        const value = getCSSVariable(varName);
+        const item = document.createElement('div');
+        item.className = 'variable-item';
+        item.innerHTML = `
+          <div class="variable-name">${varName}</div>
+          <div class="variable-value">${value}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Display typography variables
+    function displayTypographyVariables() {
+      const container = document.getElementById('typography-variables');
+      container.innerHTML = '';
+
+      typographyVariables.forEach(varName => {
+        const value = getCSSVariable(varName);
+        const item = document.createElement('div');
+        item.className = 'variable-item';
+        item.innerHTML = `
+          <div class="variable-name">${varName}</div>
+          <div class="variable-value">${value}</div>
+        `;
+        container.appendChild(item);
+      });
+    }
+
+    // Update stats
+    function updateStats(themeName, isDark) {
+      document.getElementById('current-theme-name').textContent = themeName;
+      document.getElementById('theme-type').textContent = isDark ? 'Dark' : 'Light';
+    }
+
+    // Event listeners for theme switcher
+    themeSwitcher.addEventListener('theme-changed', (event) => {
+      const { oldTheme, newTheme, isDark } = event.detail;
+      logEvent('theme-changed', event.detail);
+      updateStats(newTheme, isDark);
+      displayColorVariables();
+    });
+
+    themeSwitcher.addEventListener('theme-loaded', (event) => {
+      const { theme, loadTime } = event.detail;
+      logEvent('theme-loaded', event.detail);
+      document.getElementById('load-time').textContent = loadTime.toFixed(2);
+    });
+
+    themeSwitcher.addEventListener('theme-error', (event) => {
+      logEvent('theme-error', event.detail);
+      alert(`Failed to load theme: ${event.detail.theme}`);
+    });
+
+    // Detect system theme button
+    document.getElementById('detect-system-btn').addEventListener('click', () => {
+      const systemPreference = themeSwitcher.detectSystemTheme();
+      const defaultTheme = systemPreference === 'dark' ? 'darkly' : 'spacelab';
+      logEvent('system-detection', { preference: systemPreference, theme: defaultTheme });
+      themeSwitcher.switchTheme(defaultTheme);
+    });
+
+    // Clear storage button
+    document.getElementById('clear-storage-btn').addEventListener('click', () => {
+      localStorage.removeItem('terraphim-theme');
+      logEvent('storage-cleared', { key: 'terraphim-theme' });
+      alert('Theme storage cleared! Refresh to see default theme.');
+    });
+
+    // Clear log button
+    document.getElementById('clear-log-btn').addEventListener('click', () => {
+      eventLog.innerHTML = '<div class="event-log__item"><span class="event-log__time">Log cleared</span></div>';
+    });
+
+    // Initialize displays
+    window.addEventListener('DOMContentLoaded', () => {
+      const currentTheme = themeSwitcher.getCurrentTheme();
+      const themes = themeSwitcher.getThemes();
+      const themeInfo = themes.find(t => t.name === currentTheme);
+
+      updateStats(currentTheme, themeInfo?.type === 'dark');
+      displayColorVariables();
+      displaySpacingVariables();
+      displayTypographyVariables();
+
+      logEvent('page-loaded', {
+        theme: currentTheme,
+        totalThemes: themes.length
+      });
+    });
+  </script>
+</body>
+</html>

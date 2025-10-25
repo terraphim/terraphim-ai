@@ -1,0 +1,269 @@
+/**
+ * Terraphim CSS Custom Properties
+ * Base theme variables with semantic naming and dark mode support
+ *
+ * Usage:
+ *   background: var(--bg-primary);
+ *   color: var(--text-primary);
+ *   border: 1px solid var(--border-primary);
+ *
+ * Theme switching is controlled via data-theme attribute on <html>
+ * Example: <html data-theme="darkly">
+ */
+
+:root {
+  /* ============================================
+     PRIMARY COLORS
+     ============================================ */
+  --color-primary: #3273dc;
+  --color-primary-light: #4a86e8;
+  --color-primary-dark: #2366d1;
+  --color-primary-contrast: #ffffff;
+
+  /* ============================================
+     SEMANTIC COLORS
+     ============================================ */
+  --color-success: #48c774;
+  --color-success-light: #5dd68d;
+  --color-success-dark: #3db865;
+
+  --color-warning: #ffdd57;
+  --color-warning-light: #ffe76f;
+  --color-warning-dark: #ffd83f;
+
+  --color-danger: #f14668;
+  --color-danger-light: #f45f7e;
+  --color-danger-dark: #ed2f55;
+
+  --color-info: #3298dc;
+  --color-info-light: #4aa8e8;
+  --color-info-dark: #2588d0;
+
+  /* ============================================
+     BACKGROUNDS
+     ============================================ */
+  --bg-page: #ffffff;
+  --bg-primary: #f5f5f5;
+  --bg-secondary: #fafafa;
+  --bg-elevated: #ffffff;
+  --bg-hover: rgba(0, 0, 0, 0.05);
+  --bg-active: rgba(0, 0, 0, 0.08);
+  --bg-code: #f5f5f5;
+  --bg-overlay: rgba(0, 0, 0, 0.4);
+
+  /* ============================================
+     TEXT COLORS
+     ============================================ */
+  --text-primary: #363636;
+  --text-secondary: #4a4a4a;
+  --text-tertiary: #7a7a7a;
+  --text-link: #3273dc;
+  --text-link-hover: #2366d1;
+  --text-disabled: #b5b5b5;
+  --text-inverse: #ffffff;
+
+  /* ============================================
+     BORDERS
+     ============================================ */
+  --border-primary: #dbdbdb;
+  --border-hover: #b5b5b5;
+  --border-focus: #3273dc;
+  --border-error: #f14668;
+  --border-success: #48c774;
+
+  /* ============================================
+     SPACING SCALE
+     ============================================ */
+  --spacing-xs: 0.25rem;    /* 4px */
+  --spacing-sm: 0.5rem;     /* 8px */
+  --spacing-md: 1rem;       /* 16px */
+  --spacing-lg: 1.5rem;     /* 24px */
+  --spacing-xl: 2rem;       /* 32px */
+  --spacing-2xl: 3rem;      /* 48px */
+  --spacing-3xl: 4rem;      /* 64px */
+
+  /* ============================================
+     BORDER RADIUS
+     ============================================ */
+  --border-radius-sm: 2px;
+  --border-radius-md: 4px;
+  --border-radius-lg: 6px;
+  --border-radius-xl: 8px;
+  --border-radius-full: 9999px;
+
+  /* ============================================
+     SHADOWS
+     ============================================ */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.15);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.2);
+  --shadow-focus: 0 0 0 3px rgba(50, 115, 220, 0.25);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.06);
+
+  /* ============================================
+     TYPOGRAPHY
+     ============================================ */
+  --font-family-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-mono: "SF Mono", Monaco, "Cascadia Code", "Roboto Mono", Consolas, "Courier New", monospace;
+
+  --font-size-xs: 0.75rem;    /* 12px */
+  --font-size-sm: 0.875rem;   /* 14px */
+  --font-size-base: 1rem;     /* 16px */
+  --font-size-lg: 1.125rem;   /* 18px */
+  --font-size-xl: 1.25rem;    /* 20px */
+  --font-size-2xl: 1.5rem;    /* 24px */
+  --font-size-3xl: 1.875rem;  /* 30px */
+
+  --font-weight-normal: 400;
+  --font-weight-medium: 500;
+  --font-weight-semibold: 600;
+  --font-weight-bold: 700;
+
+  --line-height-tight: 1.25;
+  --line-height-normal: 1.5;
+  --line-height-relaxed: 1.75;
+
+  /* ============================================
+     TRANSITIONS
+     ============================================ */
+  --transition-fast: 100ms ease;
+  --transition-base: 200ms ease;
+  --transition-slow: 300ms ease;
+  --transition-theme: background-color 200ms ease, color 200ms ease, border-color 200ms ease;
+
+  /* ============================================
+     Z-INDEX SCALE
+     ============================================ */
+  --z-dropdown: 1000;
+  --z-sticky: 1020;
+  --z-fixed: 1030;
+  --z-modal-backdrop: 1040;
+  --z-modal: 1050;
+  --z-popover: 1060;
+  --z-tooltip: 1070;
+}
+
+/* ============================================
+   DARK THEME OVERRIDES
+   Applied to all 6 dark Bulmaswatch themes
+   ============================================ */
+[data-theme="darkly"],
+[data-theme="cyborg"],
+[data-theme="nuclear"],
+[data-theme="slate"],
+[data-theme="solar"],
+[data-theme="superhero"] {
+  /* Dark Backgrounds */
+  --bg-page: #1a1a1a;
+  --bg-primary: #2a2a2a;
+  --bg-secondary: #1f1f1f;
+  --bg-elevated: #333333;
+  --bg-hover: rgba(255, 255, 255, 0.1);
+  --bg-active: rgba(255, 255, 255, 0.15);
+  --bg-code: #2a2a2a;
+  --bg-overlay: rgba(0, 0, 0, 0.7);
+
+  /* Dark Text Colors */
+  --text-primary: #f5f5f5;
+  --text-secondary: #e0e0e0;
+  --text-tertiary: #b5b5b5;
+  --text-disabled: #5a5a5a;
+  --text-inverse: #1a1a1a;
+
+  /* Dark Borders */
+  --border-primary: #4a4a4a;
+  --border-hover: #5a5a5a;
+
+  /* Dark Shadows (more subtle) */
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 2px 4px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 4px 8px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.6);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   THEME-SPECIFIC ADJUSTMENTS
+   ============================================ */
+
+/* Cyborg theme (blue tint) */
+[data-theme="cyborg"] {
+  --color-primary: #2a9fd6;
+  --color-primary-light: #3cb3ea;
+  --color-primary-dark: #1e8bc3;
+}
+
+/* Nuclear theme (green tint) */
+[data-theme="nuclear"] {
+  --color-primary: #00bc8c;
+  --color-primary-light: #00d9a1;
+  --color-primary-dark: #009f75;
+}
+
+/* Slate theme (purple tint) */
+[data-theme="slate"] {
+  --color-primary: #9b59b6;
+  --color-primary-light: #af6dc5;
+  --color-primary-dark: #8e44ad;
+}
+
+/* Solar theme (orange tint) */
+[data-theme="solar"] {
+  --color-primary: #d33682;
+  --color-primary-light: #e04494;
+  --color-primary-dark: #c22870;
+  --bg-page: #002b36;
+  --bg-primary: #073642;
+  --bg-secondary: #002b36;
+}
+
+/* Superhero theme (red accent) */
+[data-theme="superhero"] {
+  --color-primary: #df691a;
+  --color-primary-light: #e87e31;
+  --color-primary-dark: #c85a0f;
+}
+
+/* ============================================
+   UTILITY CLASSES
+   Using CSS custom properties
+   ============================================ */
+
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-tertiary { color: var(--text-tertiary); }
+.text-link { color: var(--text-link); }
+
+.bg-primary { background-color: var(--bg-primary); }
+.bg-secondary { background-color: var(--bg-secondary); }
+.bg-elevated { background-color: var(--bg-elevated); }
+
+.border-primary { border-color: var(--border-primary); }
+.border-focus { border-color: var(--border-focus); }
+
+.shadow-sm { box-shadow: var(--shadow-sm); }
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+
+.transition-theme { transition: var(--transition-theme); }
+.transition-base { transition: var(--transition-base); }
+
+/* ============================================
+   ACCESSIBILITY
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --transition-fast: 0ms;
+    --transition-base: 0ms;
+    --transition-slow: 0ms;
+    --transition-theme: none;
+  }
+}
+
+/* Focus-visible styling */
+:focus-visible {
+  outline: 2px solid var(--border-focus);
+  outline-offset: 2px;
+}
