@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim JSON Editor - Demo</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      background: #f5f5f5;
+      padding: 2rem;
+    }
+
+    .demo-container {
+      max-width: 1400px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+
+    .demo-header {
+      background: #3273dc;
+      color: white;
+      padding: 2rem;
+      text-align: center;
+    }
+
+    .demo-header h1 {
+      font-size: 2rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .demo-header p {
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+
+    .demo-content {
+      display: grid;
+      grid-template-columns: 300px 1fr;
+      gap: 0;
+      min-height: 600px;
+    }
+
+    .demo-sidebar {
+      background: #f9f9f9;
+      border-right: 1px solid #dbdbdb;
+      padding: 1.5rem;
+    }
+
+    .demo-sidebar h2 {
+      font-size: 1.25rem;
+      margin-bottom: 1rem;
+      color: #363636;
+    }
+
+    .demo-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    .control-group {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .control-group label {
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #363636;
+    }
+
+    .control-group select,
+    .control-group input[type="number"] {
+      padding: 0.5rem;
+      border: 1px solid #dbdbdb;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    .control-group input[type="checkbox"] {
+      margin-right: 0.5rem;
+    }
+
+    .checkbox-label {
+      display: flex;
+      align-items: center;
+      font-size: 0.875rem;
+      cursor: pointer;
+    }
+
+    .demo-button {
+      padding: 0.75rem 1rem;
+      background: #3273dc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.875rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .demo-button:hover {
+      background: #275fbe;
+    }
+
+    .demo-button.secondary {
+      background: #48c774;
+    }
+
+    .demo-button.secondary:hover {
+      background: #3aa65d;
+    }
+
+    .demo-button.danger {
+      background: #f14668;
+    }
+
+    .demo-button.danger:hover {
+      background: #e0334d;
+    }
+
+    .demo-main {
+      padding: 1.5rem;
+    }
+
+    .editor-wrapper {
+      height: 100%;
+      min-height: 500px;
+    }
+
+    terraphim-json-editor {
+      height: 100%;
+    }
+
+    .event-log {
+      margin-top: 1.5rem;
+      padding: 1rem;
+      background: #f9f9f9;
+      border: 1px solid #dbdbdb;
+      border-radius: 4px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+
+    .event-log h3 {
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+      color: #363636;
+    }
+
+    .event-log-entry {
+      font-size: 0.75rem;
+      font-family: 'Courier New', monospace;
+      padding: 0.25rem 0;
+      border-bottom: 1px solid #e0e0e0;
+    }
+
+    .event-log-entry:last-child {
+      border-bottom: none;
+    }
+
+    .event-log-entry .timestamp {
+      color: #7a7a7a;
+      margin-right: 0.5rem;
+    }
+
+    .event-log-entry .event-name {
+      color: #3273dc;
+      font-weight: 500;
+      margin-right: 0.5rem;
+    }
+
+    .separator {
+      height: 1px;
+      background: #dbdbdb;
+      margin: 1rem 0;
+    }
+
+    .info-box {
+      background: #eff5fb;
+      border: 1px solid #3273dc;
+      border-radius: 4px;
+      padding: 0.75rem;
+      margin-bottom: 1rem;
+      font-size: 0.875rem;
+      color: #363636;
+    }
+
+    .info-box strong {
+      color: #3273dc;
+    }
+  </style>
+</head>
+<body>
+  <div class="demo-container">
+    <div class="demo-header">
+      <h1>Terraphim JSON Editor</h1>
+      <p>Vanilla Web Component with vanilla-jsoneditor and AJV validation</p>
+    </div>
+
+    <div class="demo-content">
+      <!-- Sidebar Controls -->
+      <div class="demo-sidebar">
+        <h2>Controls</h2>
+
+        <div class="info-box">
+          <strong>Keyboard Shortcuts:</strong><br>
+          Ctrl+S (or Cmd+S): Save configuration
+        </div>
+
+        <div class="demo-controls">
+          <!-- Mode Selection -->
+          <div class="control-group">
+            <label for="mode-select">Editor Mode</label>
+            <select id="mode-select">
+              <option value="tree">Tree View</option>
+              <option value="text">Text View</option>
+              <option value="table">Table View</option>
+            </select>
+          </div>
+
+          <!-- Auto-save -->
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="auto-save">
+              Auto-save
+            </label>
+          </div>
+
+          <!-- Auto-save delay -->
+          <div class="control-group">
+            <label for="auto-save-delay">Auto-save Delay (ms)</label>
+            <input type="number" id="auto-save-delay" value="1000" min="100" step="100">
+          </div>
+
+          <!-- Read-only -->
+          <div class="control-group">
+            <label class="checkbox-label">
+              <input type="checkbox" id="read-only">
+              Read-only mode
+            </label>
+          </div>
+
+          <div class="separator"></div>
+
+          <!-- Action Buttons -->
+          <button class="demo-button" id="btn-save">Save Now</button>
+          <button class="demo-button secondary" id="btn-load">Load Config</button>
+          <button class="demo-button secondary" id="btn-validate">Validate</button>
+          <button class="demo-button secondary" id="btn-format">Format JSON</button>
+          <button class="demo-button" id="btn-get-value">Get Current Value</button>
+          <button class="demo-button danger" id="btn-set-sample">Load Sample Data</button>
+          <button class="demo-button danger" id="btn-clear-log">Clear Event Log</button>
+        </div>
+      </div>
+
+      <!-- Main Editor Area -->
+      <div class="demo-main">
+        <div class="editor-wrapper">
+          <terraphim-json-editor
+            id="editor"
+            mode="tree"
+            auto-save="false"
+            auto-save-delay="1000"
+            main-menu-bar="true"
+            navigation-bar="true"
+            status-bar="true"
+            api-endpoint="/config/"
+            tauri-command="update_config">
+          </terraphim-json-editor>
+        </div>
+
+        <div class="event-log" id="event-log">
+          <h3>Event Log</h3>
+          <div id="event-log-entries"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module">
+    import './terraphim-json-editor.js';
+
+    // Get DOM elements
+    const editor = document.getElementById('editor');
+    const modeSelect = document.getElementById('mode-select');
+    const autoSaveCheckbox = document.getElementById('auto-save');
+    const autoSaveDelayInput = document.getElementById('auto-save-delay');
+    const readOnlyCheckbox = document.getElementById('read-only');
+    const eventLogEntries = document.getElementById('event-log-entries');
+
+    // Sample configuration data
+    const sampleConfig = {
+      "name": "Terraphim Engineer",
+      "theme": "light",
+      "relevance_function": "BM25Plus",
+      "haystacks": [
+        {
+          "name": "Local Files",
+          "service": "Ripgrep",
+          "extra_parameters": {
+            "path": "/home/user/projects",
+            "extensions": ["rs", "toml", "md"]
+          }
+        },
+        {
+          "name": "Documentation",
+          "service": "QueryRs",
+          "extra_parameters": {
+            "crate": "tokio"
+          }
+        }
+      ],
+      "extra": {
+        "llm_provider": "ollama",
+        "ollama_base_url": "http://127.0.0.1:11434",
+        "ollama_model": "llama3.2:3b"
+      }
+    };
+
+    // JSON Schema for validation
+    const configSchema = {
+      type: "object",
+      required: ["name", "relevance_function"],
+      properties: {
+        name: { type: "string", minLength: 1 },
+        theme: { type: "string", enum: ["light", "dark"] },
+        relevance_function: {
+          type: "string",
+          enum: ["TitleScorer", "BM25", "BM25F", "BM25Plus", "TerraphimGraph"]
+        },
+        haystacks: {
+          type: "array",
+          items: {
+            type: "object",
+            required: ["name", "service"],
+            properties: {
+              name: { type: "string" },
+              service: { type: "string" },
+              extra_parameters: { type: "object" }
+            }
+          }
+        },
+        extra: { type: "object" }
+      }
+    };
+
+    // Initialize editor with sample data
+    function initializeEditor() {
+      editor.value = sampleConfig;
+      editor.schema = configSchema;
+    }
+
+    // Log events to the event log
+    function logEvent(eventName, detail = null) {
+      const timestamp = new Date().toLocaleTimeString();
+      const entry = document.createElement('div');
+      entry.className = 'event-log-entry';
+
+      let detailText = '';
+      if (detail) {
+        try {
+          detailText = JSON.stringify(detail).substring(0, 100);
+          if (JSON.stringify(detail).length > 100) {
+            detailText += '...';
+          }
+        } catch (e) {
+          detailText = String(detail);
+        }
+      }
+
+      entry.innerHTML = `
+        <span class="timestamp">[${timestamp}]</span>
+        <span class="event-name">${eventName}</span>
+        ${detailText}
+      `;
+
+      eventLogEntries.insertBefore(entry, eventLogEntries.firstChild);
+
+      // Keep only last 50 entries
+      while (eventLogEntries.children.length > 50) {
+        eventLogEntries.removeChild(eventLogEntries.lastChild);
+      }
+    }
+
+    // Setup event listeners on editor
+    function setupEditorEvents() {
+      editor.addEventListener('change', (e) => {
+        logEvent('change', { hasValue: !!e.detail?.value });
+      });
+
+      editor.addEventListener('blur', () => {
+        logEvent('blur');
+      });
+
+      editor.addEventListener('focus', () => {
+        logEvent('focus');
+      });
+
+      editor.addEventListener('validation-error', (e) => {
+        logEvent('validation-error', {
+          errors: e.detail?.errors?.length || 0
+        });
+      });
+
+      editor.addEventListener('config-saved', () => {
+        logEvent('config-saved', { success: true });
+      });
+
+      editor.addEventListener('config-loaded', () => {
+        logEvent('config-loaded', { success: true });
+      });
+
+      editor.addEventListener('save-error', (e) => {
+        logEvent('save-error', {
+          error: e.detail?.error?.message || 'Unknown error'
+        });
+      });
+
+      editor.addEventListener('load-error', (e) => {
+        logEvent('load-error', {
+          error: e.detail?.error?.message || 'Unknown error'
+        });
+      });
+    }
+
+    // Setup control listeners
+    function setupControls() {
+      // Mode selection
+      modeSelect.addEventListener('change', (e) => {
+        editor.setAttribute('mode', e.target.value);
+        logEvent('mode-changed', { mode: e.target.value });
+      });
+
+      // Auto-save toggle
+      autoSaveCheckbox.addEventListener('change', (e) => {
+        editor.setAttribute('auto-save', e.target.checked);
+        logEvent('auto-save-toggled', { enabled: e.target.checked });
+      });
+
+      // Auto-save delay
+      autoSaveDelayInput.addEventListener('change', (e) => {
+        editor.setAttribute('auto-save-delay', e.target.value);
+        logEvent('auto-save-delay-changed', { delay: e.target.value });
+      });
+
+      // Read-only toggle
+      readOnlyCheckbox.addEventListener('change', (e) => {
+        editor.setAttribute('read-only', e.target.checked);
+        logEvent('read-only-toggled', { enabled: e.target.checked });
+      });
+
+      // Save button
+      document.getElementById('btn-save').addEventListener('click', () => {
+        editor.save();
+        logEvent('save-triggered', { manual: true });
+      });
+
+      // Load button
+      document.getElementById('btn-load').addEventListener('click', () => {
+        editor.load();
+        logEvent('load-triggered', { manual: true });
+      });
+
+      // Validate button
+      document.getElementById('btn-validate').addEventListener('click', () => {
+        const valid = editor.validate();
+        logEvent('validate-triggered', { valid });
+      });
+
+      // Format button
+      document.getElementById('btn-format').addEventListener('click', () => {
+        editor.format();
+        logEvent('format-triggered');
+      });
+
+      // Get value button
+      document.getElementById('btn-get-value').addEventListener('click', () => {
+        const value = editor.get();
+        console.log('Current editor value:', value);
+        logEvent('get-value-triggered', {
+          name: value?.name || 'N/A'
+        });
+      });
+
+      // Set sample data button
+      document.getElementById('btn-set-sample').addEventListener('click', () => {
+        editor.set(sampleConfig);
+        logEvent('set-sample-triggered');
+      });
+
+      // Clear log button
+      document.getElementById('btn-clear-log').addEventListener('click', () => {
+        eventLogEntries.innerHTML = '';
+        logEvent('log-cleared');
+      });
+    }
+
+    // Mock backend for testing
+    function setupMockBackend() {
+      // Intercept fetch calls for demo
+      const originalFetch = window.fetch;
+      window.fetch = function(url, options = {}) {
+        // Mock save endpoint
+        if (url === '/config/' && options.method === 'POST') {
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              console.log('Mock save:', JSON.parse(options.body));
+              resolve({
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+                json: async () => ({ success: true, message: 'Config saved (mock)' })
+              });
+            }, 500);
+          });
+        }
+
+        // Mock load endpoint
+        if (url === '/config/' && options.method === 'GET') {
+          return new Promise((resolve) => {
+            setTimeout(() => {
+              resolve({
+                ok: true,
+                status: 200,
+                statusText: 'OK',
+                json: async () => sampleConfig
+              });
+            }, 500);
+          });
+        }
+
+        // For other requests, use original fetch
+        return originalFetch(url, options);
+      };
+    }
+
+    // Initialize demo
+    window.addEventListener('DOMContentLoaded', () => {
+      initializeEditor();
+      setupEditorEvents();
+      setupControls();
+      setupMockBackend();
+      logEvent('demo-initialized');
+    });
+  </script>
+</body>
+</html>
