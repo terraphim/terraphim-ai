@@ -1,7 +1,7 @@
 {
 	"name": "terraphim-search-ui",
 	"private": true,
-	"version": "0.0.0",
+	"version": "0.3.0",
 	"type": "module",
 	"engines": {
 		"node": ">=18.0.0",
@@ -85,7 +85,7 @@
 	},
 	"optionalDependencies": {
 		"@playwright/test": "^1.44.1",
-		"@tauri-apps/cli": "^1.5.11",
+		"@tauri-apps/cli": "^1.6.3",
 		"@testing-library/jest-dom": "^6.8.0",
 		"@testing-library/svelte": "^5.2.8",
 		"@testing-library/user-event": "^14.5.2",

@@ -30,14 +30,12 @@ fn create_atomic_server_agent_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(16000),
-        haystacks: vec![
-            Haystack::new(
-                "http://localhost:9883".to_string(), // Atomic server URL
-                ServiceType::Atomic,
-                true, // read-only
-            )
-            .with_atomic_secret(Some("your-base64-secret-here".to_string())),
-        ],
+        haystacks: vec![Haystack::new(
+            "http://localhost:9883".to_string(), // Atomic server URL
+            ServiceType::Atomic,
+            true, // read-only
+        )
+        .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
         extra: {
             let mut extra = AHashMap::new();
             // Multi-agent specific configuration

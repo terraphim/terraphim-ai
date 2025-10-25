@@ -6,8 +6,8 @@
 
 use crate::{LlmRequest, LlmResponse, MessageRole, MultiAgentError, MultiAgentResult, TokenUsage};
 use chrono::Utc;
-use genai::Client;
 use genai::chat::{ChatMessage, ChatOptions, ChatRequest};
+use genai::Client;
 use std::env;
 use uuid::Uuid;
 
@@ -139,28 +139,12 @@ impl GenAiLlmClient {
         let end_time = Utc::now();
         let duration_ms = (end_time - start_time).num_milliseconds() as u64;
 
-        // Extract content from response
-        let content = match &chat_res.content {
-            Some(genai::chat::MessageContent::Text(text)) => text.clone(),
-            Some(genai::chat::MessageContent::Parts(parts)) => {
-                // For multi-part content, concatenate text parts
-                parts
-                    .iter()
-                    .filter_map(|part| match part {
-                        genai::chat::ContentPart::Text(text) => Some(text.clone()),
-                        _ => None,
-                    })
-                    .collect::<Vec<_>>()
-                    .join(" ")
-            }
-            Some(genai::chat::MessageContent::ToolCalls(_)) => {
-                "Tool calls not supported".to_string()
-            }
-            Some(genai::chat::MessageContent::ToolResponses(_)) => {
-                "Tool responses not supported".to_string()
-            }
-            None => "No response".to_string(),
-        };
+        // Extract content from response - MessageContent is now a struct with accessor methods
+        let content = chat_res
+            .content
+            .joined_texts()
+            .or_else(|| chat_res.content.first_text().map(|s| s.to_string()))
+            .unwrap_or_else(|| "No text content in response".to_string());
 
         // Extract token usage if available
         let (input_tokens, output_tokens) = (

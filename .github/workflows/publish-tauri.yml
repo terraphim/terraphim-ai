@@ -54,13 +54,12 @@ jobs:
         working-directory: ${{env.working-directory}}
         run: |
           # Inject secrets into Tauri configuration
-          op inject -i src-tauri/tauri.conf.json.template -o src-tauri/tauri.conf.json
+          op inject --force -i src-tauri/tauri.conf.json.template -o src-tauri/tauri.conf.json
           chmod 600 src-tauri/tauri.conf.json
 
           # Create environment file for signing
           cat > .env.ci << 'EOF'
-          TAURI_PRIVATE_KEY="op://Terraphim-Deployment/Tauri Update Signing/TAURI_PRIVATE_KEY"
-          TAURI_KEY_PASSWORD="op://Terraphim-Deployment/Tauri Update Signing/TAURI_KEY_PASSWORD"
+          TAURI_PRIVATE_KEY="op://TerraphimPlatform/tauri.update.signing/TAURI_PRIVATE_KEY"
           EOF
 
           # Build with injected signing keys

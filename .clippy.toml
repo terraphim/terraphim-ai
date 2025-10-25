@@ -5,8 +5,6 @@ allow-mixed-uninlined-format-args = true
 allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-dbg-in-tests = true
-too-many-arguments-threshold = 12
-type-complexity-threshold = 250
 cognitive-complexity-threshold = 30
 # Reduce false positives and focus on important issues
 disallowed-names = []
