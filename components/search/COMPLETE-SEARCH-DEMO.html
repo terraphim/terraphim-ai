@@ -1,0 +1,655 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="api-url" content="http://localhost:3000">
+  <title>Complete Search System Demo - Terraphim AI</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+    }
+
+    /* Hero Section */
+    .hero {
+      text-align: center;
+      color: white;
+      margin-bottom: 3rem;
+      padding: 3rem 1rem;
+    }
+
+    .hero h1 {
+      font-size: 3.5rem;
+      margin-bottom: 1rem;
+      text-shadow: 2px 2px 8px rgba(0, 0, 0, 0.3);
+      animation: fadeInDown 0.8s ease;
+    }
+
+    .hero .subtitle {
+      font-size: 1.5rem;
+      opacity: 0.95;
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.8s ease 0.2s both;
+    }
+
+    .hero .features {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      flex-wrap: wrap;
+      margin-top: 2rem;
+      animation: fadeInUp 0.8s ease 0.4s both;
+    }
+
+    .feature-badge {
+      background: rgba(255, 255, 255, 0.2);
+      padding: 0.75rem 1.5rem;
+      border-radius: 50px;
+      backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      font-weight: 600;
+      transition: all 0.3s ease;
+    }
+
+    .feature-badge:hover {
+      background: rgba(255, 255, 255, 0.3);
+      transform: translateY(-2px);
+    }
+
+    /* Main Search Area */
+    .search-section {
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      padding: 2rem;
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.8s ease 0.6s both;
+    }
+
+    .search-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 1.5rem;
+      padding-bottom: 1rem;
+      border-bottom: 2px solid #e9ecef;
+    }
+
+    .search-title {
+      font-size: 1.5rem;
+      color: #2c3e50;
+      font-weight: 700;
+    }
+
+    .role-switcher {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    .role-switcher label {
+      font-weight: 600;
+      color: #495057;
+    }
+
+    .role-switcher select {
+      padding: 0.5rem 1rem;
+      border: 2px solid #dbdbdb;
+      border-radius: 6px;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: border-color 0.2s ease;
+    }
+
+    .role-switcher select:focus {
+      outline: none;
+      border-color: #3273dc;
+    }
+
+    /* Dashboard Grid */
+    .dashboard {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+      animation: fadeInUp 0.8s ease 0.8s both;
+    }
+
+    .dashboard-card {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      transition: all 0.3s ease;
+    }
+
+    .dashboard-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    }
+
+    .dashboard-card h3 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+
+    .dashboard-card .icon {
+      font-size: 1.5rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      color: #3273dc;
+      margin-bottom: 0.5rem;
+    }
+
+    .stat-label {
+      color: #6c757d;
+      font-size: 0.9rem;
+    }
+
+    /* Quick Actions */
+    .quick-actions {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .quick-actions button {
+      flex: 1;
+      min-width: 120px;
+      padding: 0.75rem;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+    }
+
+    .quick-actions button:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+    }
+
+    .quick-actions button:active {
+      transform: translateY(0);
+    }
+
+    /* Example Queries */
+    .example-queries {
+      background: #f8f9fa;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .example-queries h3 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .query-chips {
+      display: flex;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+
+    .query-chip {
+      padding: 0.5rem 1rem;
+      background: white;
+      border: 2px solid #dee2e6;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-size: 0.9rem;
+      font-weight: 500;
+    }
+
+    .query-chip:hover {
+      border-color: #3273dc;
+      color: #3273dc;
+      transform: scale(1.05);
+    }
+
+    /* Analytics Panel */
+    .analytics-panel {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .analytics-panel h3 {
+      color: #2c3e50;
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+    }
+
+    .analytics-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+
+    .metric {
+      text-align: center;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 8px;
+    }
+
+    .metric-value {
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #3273dc;
+      margin-bottom: 0.25rem;
+    }
+
+    .metric-label {
+      color: #6c757d;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    /* Developer Tools */
+    .dev-tools {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 12px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .dev-tools h3 {
+      color: #4ec9b0;
+      margin-bottom: 1rem;
+      font-size: 1.2rem;
+    }
+
+    .dev-tools pre {
+      background: #252526;
+      padding: 1rem;
+      border-radius: 6px;
+      overflow-x: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      line-height: 1.6;
+    }
+
+    /* Animations */
+    @keyframes fadeInDown {
+      from {
+        opacity: 0;
+        transform: translateY(-30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes fadeInUp {
+      from {
+        opacity: 0;
+        transform: translateY(30px);
+      }
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes pulse {
+      0%, 100% {
+        opacity: 1;
+      }
+      50% {
+        opacity: 0.7;
+      }
+    }
+
+    .pulse {
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    /* Status Indicators */
+    .status-indicator {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.5rem 1rem;
+      background: #f8f9fa;
+      border-radius: 6px;
+      margin-bottom: 1rem;
+    }
+
+    .status-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: #48c774;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    .status-dot.inactive {
+      background: #dbdbdb;
+      animation: none;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+      .hero h1 {
+        font-size: 2rem;
+      }
+
+      .hero .subtitle {
+        font-size: 1rem;
+      }
+
+      .dashboard {
+        grid-template-columns: 1fr;
+      }
+
+      .search-header {
+        flex-direction: column;
+        gap: 1rem;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Hero Section -->
+    <div class="hero">
+      <h1>🔍 Terraphim Search System</h1>
+      <p class="subtitle">Complete Web Component Implementation - Phase 2.1</p>
+      <div class="features">
+        <div class="feature-badge">🎯 Pure Vanilla JS</div>
+        <div class="feature-badge">⚡ Web Components</div>
+        <div class="feature-badge">🎨 Shadow DOM</div>
+        <div class="feature-badge">🔄 SSE Streaming</div>
+        <div class="feature-badge">💾 State Persistence</div>
+      </div>
+    </div>
+
+    <!-- Main Search Section -->
+    <div class="search-section">
+      <div class="search-header">
+        <div class="search-title">🔎 Semantic Knowledge Search</div>
+        <div class="role-switcher">
+          <label for="roleSelector">Role:</label>
+          <select id="roleSelector" onchange="changeRole(this.value)">
+            <option value="engineer">🔧 Engineer</option>
+            <option value="researcher">🔬 Researcher</option>
+            <option value="designer">🎨 Designer</option>
+            <option value="writer">✍️ Writer</option>
+            <option value="analyst">📊 Analyst</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- System Status -->
+      <div class="status-indicator">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">System Ready - All Components Loaded</span>
+      </div>
+
+      <!-- Main Search Component -->
+      <terraphim-search
+        id="mainSearch"
+        role="engineer"
+        auto-search
+      ></terraphim-search>
+    </div>
+
+    <!-- Example Queries -->
+    <div class="example-queries">
+      <h3>📝 Example Queries</h3>
+      <div class="query-chips">
+        <div class="query-chip" onclick="runQuery('rust async')">rust async</div>
+        <div class="query-chip" onclick="runQuery('rust AND tokio')">rust AND tokio</div>
+        <div class="query-chip" onclick="runQuery('javascript OR typescript')">javascript OR typescript</div>
+        <div class="query-chip" onclick="runQuery('web components AND shadow dom')">web components AND shadow dom</div>
+        <div class="query-chip" onclick="runQuery('python machine learning')">python machine learning</div>
+        <div class="query-chip" onclick="runQuery('docker AND kubernetes')">docker AND kubernetes</div>
+      </div>
+    </div>
+
+    <!-- Dashboard -->
+    <div class="dashboard">
+      <!-- Search Stats -->
+      <div class="dashboard-card">
+        <h3><span class="icon">📊</span> Search Statistics</h3>
+        <div class="stat-value" id="searchCount">0</div>
+        <div class="stat-label">Total Searches</div>
+        <div style="margin-top: 1rem;">
+          <div class="stat-value" style="font-size: 1.5rem;" id="resultCount">0</div>
+          <div class="stat-label">Results Found</div>
+        </div>
+      </div>
+
+      <!-- Performance -->
+      <div class="dashboard-card">
+        <h3><span class="icon">⚡</span> Performance</h3>
+        <div class="stat-value" id="avgDuration">0ms</div>
+        <div class="stat-label">Average Search Time</div>
+        <div style="margin-top: 1rem;">
+          <div class="stat-value" style="font-size: 1.5rem;" id="lastDuration">-</div>
+          <div class="stat-label">Last Search</div>
+        </div>
+      </div>
+
+      <!-- Quick Actions -->
+      <div class="dashboard-card">
+        <h3><span class="icon">⚙️</span> Quick Actions</h3>
+        <div class="quick-actions">
+          <button onclick="clearSearch()">Clear</button>
+          <button onclick="showState()">State</button>
+          <button onclick="testSSE()">SSE</button>
+          <button onclick="resetStats()">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Analytics Panel -->
+    <div class="analytics-panel">
+      <h3>📈 Real-time Analytics</h3>
+      <div class="analytics-grid">
+        <div class="metric">
+          <div class="metric-value" id="termsCount">0</div>
+          <div class="metric-label">Active Terms</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="operatorType">AND</div>
+          <div class="metric-label">Operator</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="historySize">0</div>
+          <div class="metric-label">History Items</div>
+        </div>
+        <div class="metric">
+          <div class="metric-value" id="cacheHits">0</div>
+          <div class="metric-label">Cache Hits</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Developer Tools -->
+    <div class="dev-tools">
+      <h3>🛠️ Developer Console</h3>
+      <pre id="devConsole">Waiting for search activity...</pre>
+    </div>
+  </div>
+
+  <!-- Import search component -->
+  <script type="module">
+    import './terraphim-search.js';
+
+    // Global state
+    window.searchStats = {
+      totalSearches: 0,
+      totalResults: 0,
+      searchTimes: [],
+      lastDuration: null
+    };
+
+    // Get component reference
+    const search = document.getElementById('mainSearch');
+    window.searchComponent = search;
+
+    // Update UI metrics
+    function updateMetrics() {
+      const stats = window.searchStats;
+      document.getElementById('searchCount').textContent = stats.totalSearches;
+      document.getElementById('resultCount').textContent = stats.totalResults;
+
+      const avgTime = stats.searchTimes.length > 0
+        ? Math.round(stats.searchTimes.reduce((a, b) => a + b, 0) / stats.searchTimes.length)
+        : 0;
+      document.getElementById('avgDuration').textContent = `${avgTime}ms`;
+
+      document.getElementById('lastDuration').textContent =
+        stats.lastDuration ? `${stats.lastDuration}ms` : '-';
+
+      // Update analytics
+      const state = search.getState();
+      document.getElementById('termsCount').textContent = state.terms.length;
+      document.getElementById('operatorType').textContent = state.operator;
+
+      // History size (from localStorage)
+      try {
+        const history = JSON.parse(localStorage.getItem('terraphim:searchHistory') || '[]');
+        document.getElementById('historySize').textContent = history.length;
+      } catch (e) {
+        document.getElementById('historySize').textContent = '0';
+      }
+    }
+
+    // Log to dev console
+    function logToConsole(message) {
+      const console = document.getElementById('devConsole');
+      const timestamp = new Date().toLocaleTimeString();
+      console.textContent = `[${timestamp}] ${message}\n${console.textContent}`;
+
+      // Limit console size
+      const lines = console.textContent.split('\n');
+      if (lines.length > 20) {
+        console.textContent = lines.slice(0, 20).join('\n');
+      }
+    }
+
+    // Event listeners
+    search.addEventListener('search-started', (e) => {
+      logToConsole(`🔍 Search started: "${e.detail.query}"`);
+      document.getElementById('statusDot').classList.add('pulse');
+      document.getElementById('statusText').textContent = 'Searching...';
+    });
+
+    search.addEventListener('search-completed', (e) => {
+      window.searchStats.totalSearches++;
+      window.searchStats.totalResults += e.detail.count;
+      window.searchStats.searchTimes.push(e.detail.duration);
+      window.searchStats.lastDuration = e.detail.duration;
+
+      logToConsole(`✅ Search completed: ${e.detail.count} results in ${e.detail.duration}ms`);
+      document.getElementById('statusDot').classList.remove('pulse');
+      document.getElementById('statusText').textContent = `Found ${e.detail.count} results`;
+
+      updateMetrics();
+    });
+
+    search.addEventListener('search-failed', (e) => {
+      logToConsole(`❌ Search failed: ${e.detail.error}`);
+      document.getElementById('statusDot').classList.remove('pulse');
+      document.getElementById('statusText').textContent = 'Search Failed';
+    });
+
+    search.addEventListener('role-changed', (e) => {
+      logToConsole(`👤 Role changed: ${e.detail.role}`);
+      updateMetrics();
+    });
+
+    // Initial metrics update
+    updateMetrics();
+
+    // Export functions globally
+    window.updateMetrics = updateMetrics;
+    window.logToConsole = logToConsole;
+  </script>
+
+  <!-- Global functions -->
+  <script>
+    // Change role
+    function changeRole(role) {
+      window.searchComponent.setRole(role);
+      window.logToConsole(`Role switched to: ${role}`);
+    }
+
+    // Run query
+    async function runQuery(query) {
+      window.logToConsole(`Executing query: "${query}"`);
+      await window.searchComponent.executeSearch(query);
+    }
+
+    // Clear search
+    function clearSearch() {
+      window.searchComponent.clearSearch();
+      window.logToConsole('Search cleared');
+      window.updateMetrics();
+    }
+
+    // Show state
+    function showState() {
+      const state = window.searchComponent.getState();
+      window.logToConsole('Current state:\n' + JSON.stringify(state, null, 2));
+      alert('State logged to developer console');
+    }
+
+    // Test SSE
+    async function testSSE() {
+      window.logToConsole('Testing SSE streaming...');
+      await window.searchComponent.executeSearch('documentation', { limit: 3 });
+      alert('SSE stream initiated. Watch the results for live summary updates!');
+    }
+
+    // Reset stats
+    function resetStats() {
+      window.searchStats = {
+        totalSearches: 0,
+        totalResults: 0,
+        searchTimes: [],
+        lastDuration: null
+      };
+      window.updateMetrics();
+      window.logToConsole('Statistics reset');
+    }
+  </script>
+</body>
+</html>

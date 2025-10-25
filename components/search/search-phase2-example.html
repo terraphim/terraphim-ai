@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="api-url" content="http://localhost:3000">
+  <title>Search Phase 2 - Search Input with Autocomplete</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', sans-serif;
+      line-height: 1.6;
+      color: #333;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .header {
+      background: white;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    h1 {
+      color: #667eea;
+      margin-bottom: 0.5rem;
+      font-size: 2rem;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 1.1rem;
+      margin-bottom: 1rem;
+    }
+
+    .status-badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: #10b981;
+      color: white;
+      border-radius: 12px;
+      font-size: 0.875rem;
+      font-weight: 600;
+    }
+
+    .demo-section {
+      background: white;
+      border-radius: 8px;
+      padding: 2rem;
+      margin-bottom: 2rem;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+
+    .demo-section h2 {
+      color: #667eea;
+      margin-bottom: 1.5rem;
+      font-size: 1.5rem;
+    }
+
+    .search-container {
+      margin-bottom: 1.5rem;
+    }
+
+    .controls {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-top: 1rem;
+    }
+
+    .btn {
+      padding: 0.5rem 1rem;
+      border: none;
+      border-radius: 4px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      font-weight: 500;
+    }
+
+    .btn-primary {
+      background: #667eea;
+      color: white;
+    }
+
+    .btn-primary:hover {
+      background: #5568d3;
+    }
+
+    .btn-secondary {
+      background: #e5e7eb;
+      color: #374151;
+    }
+
+    .btn-secondary:hover {
+      background: #d1d5db;
+    }
+
+    .event-log {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+    }
+
+    .event-log-item {
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      background: white;
+      border-radius: 4px;
+      border-left: 3px solid #667eea;
+    }
+
+    .event-log-item .event-type {
+      font-weight: 600;
+      color: #667eea;
+    }
+
+    .event-log-item .event-time {
+      color: #999;
+      font-size: 0.75rem;
+    }
+
+    .event-log-item .event-detail {
+      color: #666;
+      margin-top: 0.25rem;
+    }
+
+    .keyboard-hints {
+      background: #fef3c7;
+      border: 1px solid #fbbf24;
+      border-radius: 4px;
+      padding: 1rem;
+      margin-top: 1rem;
+    }
+
+    .keyboard-hints h3 {
+      color: #92400e;
+      font-size: 1rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .keyboard-hints ul {
+      list-style: none;
+    }
+
+    .keyboard-hints li {
+      padding: 0.25rem 0;
+      color: #78350f;
+    }
+
+    .keyboard-hints kbd {
+      background: white;
+      border: 1px solid #d97706;
+      border-radius: 3px;
+      padding: 0.125rem 0.375rem;
+      font-family: monospace;
+      font-size: 0.875rem;
+      margin: 0 0.25rem;
+    }
+
+    .integration-demo {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1.5rem;
+      margin-top: 1.5rem;
+    }
+
+    @media (max-width: 768px) {
+      .integration-demo {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .demo-card {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 1rem;
+    }
+
+    .demo-card h3 {
+      color: #667eea;
+      font-size: 1rem;
+      margin-bottom: 0.75rem;
+    }
+
+    .current-value {
+      background: white;
+      border: 1px solid #e5e7eb;
+      border-radius: 4px;
+      padding: 0.75rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      word-break: break-all;
+      min-height: 60px;
+    }
+
+    .empty-state {
+      color: #999;
+      font-style: italic;
+    }
+
+    /* Dark mode support */
+    @media (prefers-color-scheme: dark) {
+      body {
+        background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
+      }
+
+      .header,
+      .demo-section {
+        background: #1e293b;
+        color: #e2e8f0;
+      }
+
+      h1,
+      .demo-section h2,
+      .demo-card h3 {
+        color: #818cf8;
+      }
+
+      .subtitle {
+        color: #94a3b8;
+      }
+
+      .event-log,
+      .demo-card,
+      .current-value {
+        background: #0f172a;
+        border-color: #334155;
+        color: #e2e8f0;
+      }
+
+      .event-log-item {
+        background: #1e293b;
+        border-left-color: #818cf8;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>Search Phase 2: Search Input with Autocomplete</h1>
+      <p class="subtitle">Demonstrating ARIA combobox pattern, keyboard navigation, and autocomplete functionality</p>
+      <span class="status-badge">Phase 2 Complete</span>
+    </div>
+
+    <!-- Demo 1: Basic Autocomplete -->
+    <div class="demo-section">
+      <h2>1. Basic Autocomplete Functionality</h2>
+      <p>Type at least 2 characters to see autocomplete suggestions. Knowledge graph terms are marked with a blue dot.</p>
+
+      <div class="search-container">
+        <terraphim-search-input
+          id="basic-input"
+          placeholder="Search for Rust, async, tokio..."
+          role="engineer"
+        ></terraphim-search-input>
+      </div>
+
+      <div class="keyboard-hints">
+        <h3>Keyboard Navigation</h3>
+        <ul>
+          <li><kbd>↓</kbd> / <kbd>↑</kbd> - Navigate suggestions</li>
+          <li><kbd>Enter</kbd> - Select suggestion or submit search</li>
+          <li><kbd>Tab</kbd> - Select highlighted suggestion</li>
+          <li><kbd>Esc</kbd> - Close dropdown</li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Demo 2: Query Parsing with Operators -->
+    <div class="demo-section">
+      <h2>2. Query Parsing with AND/OR Operators</h2>
+      <p>Type "rust AND async" or "tokio OR actix" to test operator parsing. Try autocomplete after typing the operator.</p>
+
+      <div class="search-container">
+        <terraphim-search-input
+          id="parsing-input"
+          placeholder="Try: rust AND async"
+          role="engineer"
+        ></terraphim-search-input>
+      </div>
+
+      <div class="integration-demo">
+        <div class="demo-card">
+          <h3>Parsed Query</h3>
+          <div id="parsed-output" class="current-value">
+            <span class="empty-state">Type to see parsed query</span>
+          </div>
+        </div>
+
+        <div class="demo-card">
+          <h3>Current Term</h3>
+          <div id="current-term-output" class="current-value">
+            <span class="empty-state">Current term being typed</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Demo 3: Term Chip Integration -->
+    <div class="demo-section">
+      <h2>3. Term Chip Integration</h2>
+      <p>Select terms using autocomplete to see them added as chips below.</p>
+
+      <div class="search-container">
+        <terraphim-search-input
+          id="chips-input"
+          placeholder="Select terms to add chips"
+          role="engineer"
+        ></terraphim-search-input>
+      </div>
+
+      <terraphim-term-chips
+        id="term-chips"
+        operator="AND"
+      ></terraphim-term-chips>
+
+      <div class="controls">
+        <button class="btn btn-secondary" onclick="clearChips()">Clear All Chips</button>
+        <button class="btn btn-secondary" onclick="toggleOperator()">Toggle Operator</button>
+      </div>
+    </div>
+
+    <!-- Demo 4: Programmatic Control -->
+    <div class="demo-section">
+      <h2>4. Programmatic Control</h2>
+      <p>Test the component's API methods.</p>
+
+      <div class="search-container">
+        <terraphim-search-input
+          id="api-input"
+          placeholder="Test API methods"
+          role="engineer"
+        ></terraphim-search-input>
+      </div>
+
+      <div class="controls">
+        <button class="btn btn-primary" onclick="testFocus()">Focus Input</button>
+        <button class="btn btn-primary" onclick="testBlur()">Blur Input</button>
+        <button class="btn btn-primary" onclick="testSetValue()">Set Value</button>
+        <button class="btn btn-primary" onclick="testClear()">Clear Input</button>
+        <button class="btn btn-primary" onclick="testDisable()">Toggle Disabled</button>
+      </div>
+    </div>
+
+    <!-- Event Log -->
+    <div class="demo-section">
+      <h2>5. Event Log</h2>
+      <p>All events from the components are logged here.</p>
+
+      <div class="controls" style="margin-bottom: 1rem;">
+        <button class="btn btn-secondary" onclick="clearEventLog()">Clear Log</button>
+      </div>
+
+      <div id="event-log" class="event-log">
+        <div class="empty-state">No events yet. Start typing to see events.</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import components -->
+  <script type="module">
+    import './terraphim-search-input.js';
+    import './terraphim-term-chips.js';
+    import { parseSearchInput, getCurrentTerm } from './search-utils.js';
+
+    // Setup event logging
+    const eventLog = document.getElementById('event-log');
+    let eventCount = 0;
+
+    function logEvent(eventType, detail) {
+      eventCount++;
+      const time = new Date().toLocaleTimeString();
+
+      const logItem = document.createElement('div');
+      logItem.className = 'event-log-item';
+      logItem.innerHTML = `
+        <div>
+          <span class="event-type">${eventType}</span>
+          <span class="event-time">${time}</span>
+        </div>
+        <div class="event-detail">${JSON.stringify(detail, null, 2)}</div>
+      `;
+
+      if (eventLog.querySelector('.empty-state')) {
+        eventLog.innerHTML = '';
+      }
+
+      eventLog.insertBefore(logItem, eventLog.firstChild);
+
+      // Keep only last 20 events
+      if (eventLog.children.length > 20) {
+        eventLog.removeChild(eventLog.lastChild);
+      }
+    }
+
+    // Setup all inputs with event listeners
+    const inputs = document.querySelectorAll('terraphim-search-input');
+    inputs.forEach(input => {
+      input.addEventListener('input-changed', (e) => {
+        logEvent('input-changed', { value: e.detail.value });
+      });
+
+      input.addEventListener('term-added', (e) => {
+        logEvent('term-added', e.detail);
+      });
+
+      input.addEventListener('search-submit', (e) => {
+        logEvent('search-submit', e.detail);
+      });
+
+      input.addEventListener('dropdown-opened', () => {
+        logEvent('dropdown-opened', {});
+      });
+
+      input.addEventListener('dropdown-closed', () => {
+        logEvent('dropdown-closed', {});
+      });
+    });
+
+    // Demo 2: Query parsing
+    const parsingInput = document.getElementById('parsing-input');
+    const parsedOutput = document.getElementById('parsed-output');
+    const currentTermOutput = document.getElementById('current-term-output');
+
+    parsingInput.addEventListener('input-changed', (e) => {
+      const value = e.detail.value;
+      const parsed = parseSearchInput(value);
+      const currentTerm = getCurrentTerm(value);
+
+      parsedOutput.innerHTML = `
+        <strong>Has Operator:</strong> ${parsed.hasOperator}<br>
+        <strong>Operator:</strong> ${parsed.operator || 'null'}<br>
+        <strong>Terms:</strong> ${JSON.stringify(parsed.terms)}
+      `;
+
+      currentTermOutput.textContent = currentTerm || '(empty)';
+    });
+
+    // Demo 3: Term chip integration
+    const chipsInput = document.getElementById('chips-input');
+    const termChips = document.getElementById('term-chips');
+
+    chipsInput.addEventListener('term-added', (e) => {
+      termChips.addTerm(e.detail.term, e.detail.isFromKG);
+      chipsInput.clear();
+    });
+
+    termChips.addEventListener('term-removed', (e) => {
+      logEvent('term-removed', e.detail);
+    });
+
+    termChips.addEventListener('operator-changed', (e) => {
+      logEvent('operator-changed', e.detail);
+    });
+
+    // Make functions available globally
+    window.clearChips = () => {
+      termChips.clearAll();
+    };
+
+    window.toggleOperator = () => {
+      termChips.toggleOperator();
+    };
+
+    window.clearEventLog = () => {
+      eventLog.innerHTML = '<div class="empty-state">No events yet. Start typing to see events.</div>';
+      eventCount = 0;
+    };
+
+    // Demo 4: API methods
+    const apiInput = document.getElementById('api-input');
+    let isDisabled = false;
+
+    window.testFocus = () => {
+      apiInput.focus();
+      logEvent('API Call', { method: 'focus()' });
+    };
+
+    window.testBlur = () => {
+      apiInput.blur();
+      logEvent('API Call', { method: 'blur()' });
+    };
+
+    window.testSetValue = () => {
+      apiInput.setValue('rust AND async');
+      logEvent('API Call', { method: 'setValue("rust AND async")' });
+    };
+
+    window.testClear = () => {
+      apiInput.clear();
+      logEvent('API Call', { method: 'clear()' });
+    };
+
+    window.testDisable = () => {
+      isDisabled = !isDisabled;
+      apiInput.disabled = isDisabled;
+      logEvent('API Call', { method: 'disabled', value: isDisabled });
+    };
+
+    console.log('✅ Search Phase 2 demo initialized');
+    console.log('📝 All components loaded and event listeners attached');
+  </script>
+</body>
+</html>

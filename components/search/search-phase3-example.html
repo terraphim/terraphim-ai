@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Search Phase 3: Results Display - Test Page</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: #f8f9fa;
+      padding: 2rem;
+      line-height: 1.5;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    header {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    h1 {
+      color: #363636;
+      margin-bottom: 0.5rem;
+    }
+
+    .subtitle {
+      color: #666;
+      font-size: 1.1rem;
+    }
+
+    .test-section {
+      background: white;
+      padding: 2rem;
+      border-radius: 8px;
+      margin-bottom: 2rem;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+
+    .test-section h2 {
+      color: #363636;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid #3273dc;
+    }
+
+    .test-section p {
+      color: #666;
+      margin-bottom: 1rem;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 1rem;
+      margin: 1rem 0;
+      padding: 1rem;
+      background: #f8f9fa;
+      border-radius: 4px;
+    }
+
+    .btn {
+      padding: 0.75rem 1.5rem;
+      background: #3273dc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background-color 0.2s ease;
+    }
+
+    .btn:hover {
+      background: #2366d1;
+    }
+
+    .btn.secondary {
+      background: #48c774;
+    }
+
+    .btn.secondary:hover {
+      background: #3ec46d;
+    }
+
+    .btn.danger {
+      background: #ff6b6b;
+    }
+
+    .btn.danger:hover {
+      background: #ee5a52;
+    }
+
+    .event-log {
+      background: #f8f9fa;
+      border: 1px solid #dbdbdb;
+      border-radius: 4px;
+      padding: 1rem;
+      margin-top: 1rem;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+    }
+
+    .event-log-item {
+      padding: 0.5rem;
+      margin-bottom: 0.5rem;
+      background: white;
+      border-left: 3px solid #3273dc;
+      border-radius: 2px;
+    }
+
+    .event-log-item.success {
+      border-left-color: #48c774;
+    }
+
+    .event-log-item.error {
+      border-left-color: #ff6b6b;
+    }
+
+    .timestamp {
+      color: #999;
+      font-size: 0.75rem;
+    }
+
+    .demo-container {
+      margin-top: 1.5rem;
+    }
+
+    code {
+      background: #f5f5f5;
+      padding: 0.2rem 0.4rem;
+      border-radius: 3px;
+      font-family: 'Courier New', monospace;
+      font-size: 0.9em;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.75rem;
+      background: #3273dc;
+      color: white;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <h1>Search Phase 3: Results Display with SSE Streaming <span class="badge">COMPLETE</span></h1>
+      <p class="subtitle">Testing terraphim-result-item and terraphim-search-results components</p>
+    </header>
+
+    <!-- Test 1: Single Result Item -->
+    <section class="test-section">
+      <h2>Test 1: Single Result Item Display</h2>
+      <p>Display a single result with all features: title, description, tags, rank, actions</p>
+
+      <div class="demo-container">
+        <terraphim-result-item id="result-item-1"></terraphim-result-item>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="loadSampleResult()">Load Sample Result</button>
+        <button class="btn secondary" onclick="toggleExpanded()">Toggle Expanded</button>
+        <button class="btn" onclick="highlightTerms()">Highlight Terms</button>
+      </div>
+
+      <div class="event-log" id="log-item"></div>
+    </section>
+
+    <!-- Test 2: Multiple Results Container -->
+    <section class="test-section">
+      <h2>Test 2: Multiple Results Container</h2>
+      <p>Display multiple results with loading, empty, and error states</p>
+
+      <div class="demo-container">
+        <terraphim-search-results id="results-container" query="rust async programming"></terraphim-search-results>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="loadMultipleResults()">Load Multiple Results</button>
+        <button class="btn" onclick="showLoadingState()">Show Loading</button>
+        <button class="btn" onclick="showEmptyState()">Show Empty</button>
+        <button class="btn danger" onclick="showErrorState()">Show Error</button>
+        <button class="btn" onclick="clearAllResults()">Clear Results</button>
+      </div>
+
+      <div class="event-log" id="log-results"></div>
+    </section>
+
+    <!-- Test 3: SSE Streaming Simulation -->
+    <section class="test-section">
+      <h2>Test 3: SSE Streaming Simulation</h2>
+      <p>Simulate real-time AI summarization updates via SSE</p>
+
+      <div class="demo-container">
+        <terraphim-search-results id="sse-results" query="machine learning" role="engineer"></terraphim-search-results>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="startSSESimulation()">Load Results & Start SSE</button>
+        <button class="btn secondary" onclick="simulateSummaryUpdate()">Simulate Summary Update</button>
+        <button class="btn danger" onclick="stopSSESimulation()">Stop SSE</button>
+      </div>
+
+      <div class="event-log" id="log-sse"></div>
+    </section>
+
+    <!-- Test 4: Term Highlighting -->
+    <section class="test-section">
+      <h2>Test 4: Term Highlighting</h2>
+      <p>Test search term highlighting in results</p>
+
+      <div class="demo-container">
+        <terraphim-result-item id="highlight-item"></terraphim-result-item>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="testHighlighting('rust async')">Highlight: rust async</button>
+        <button class="btn" onclick="testHighlighting('programming language')">Highlight: programming language</button>
+        <button class="btn" onclick="testHighlighting('async AND await')">Highlight: async AND await</button>
+      </div>
+    </section>
+
+    <!-- Test 5: Action Buttons -->
+    <section class="test-section">
+      <h2>Test 5: Action Buttons & Events</h2>
+      <p>Test all action buttons: View Details, Copy URL, Tag Clicks</p>
+
+      <div class="demo-container">
+        <terraphim-result-item id="actions-item"></terraphim-result-item>
+      </div>
+
+      <div class="event-log" id="log-actions"></div>
+    </section>
+
+    <!-- Test 6: Expandable Description -->
+    <section class="test-section">
+      <h2>Test 6: Expandable Description</h2>
+      <p>Test description truncation and expand/collapse functionality</p>
+
+      <div class="demo-container">
+        <terraphim-result-item id="expand-item"></terraphim-result-item>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="loadLongDescription()">Load Long Description</button>
+        <button class="btn" onclick="loadShortDescription()">Load Short Description</button>
+      </div>
+    </section>
+
+    <!-- Test 7: Summarization States -->
+    <section class="test-section">
+      <h2>Test 7: AI Summarization States</h2>
+      <p>Test all summarization states: none, pending, in-progress, complete</p>
+
+      <div class="demo-container">
+        <terraphim-result-item id="summary-item"></terraphim-result-item>
+      </div>
+
+      <div class="controls">
+        <button class="btn" onclick="setSummaryStatus('none')">None</button>
+        <button class="btn" onclick="setSummaryStatus('pending')">Pending</button>
+        <button class="btn" onclick="setSummaryStatus('in-progress')">In Progress</button>
+        <button class="btn secondary" onclick="setSummaryStatus('complete')">Complete</button>
+      </div>
+    </section>
+  </div>
+
+  <!-- Import components -->
+  <script type="module">
+    import './terraphim-result-item.js';
+    import './terraphim-search-results.js';
+  </script>
+
+  <script>
+    // Helper: Log event
+    function logEvent(logId, message, type = 'info') {
+      const log = document.getElementById(logId);
+      const timestamp = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = `event-log-item ${type}`;
+      item.innerHTML = `<span class="timestamp">[${timestamp}]</span> ${message}`;
+      log.insertBefore(item, log.firstChild);
+    }
+
+    // Sample data
+    const sampleResult = {
+      id: 'doc-001',
+      title: 'Asynchronous Programming in Rust',
+      description: 'A comprehensive guide to async programming in Rust, covering async/await syntax, futures, and tokio runtime.',
+      url: 'https://docs.rust-lang.org/book/async-await.html',
+      tags: ['rust', 'async', 'programming', 'futures', 'tokio'],
+      rank: 95,
+      body: 'Full document body with lots of content about async Rust programming...'
+    };
+
+    const sampleResults = [
+      {
+        id: 'doc-001',
+        title: 'Rust Async Programming Guide',
+        description: 'Learn async/await in Rust with practical examples',
+        url: 'https://example.com/rust-async',
+        tags: ['rust', 'async'],
+        rank: 98
+      },
+      {
+        id: 'doc-002',
+        title: 'Understanding Tokio Runtime',
+        description: 'Deep dive into the Tokio async runtime for Rust',
+        url: 'https://example.com/tokio',
+        tags: ['rust', 'tokio', 'async'],
+        rank: 92
+      },
+      {
+        id: 'doc-003',
+        title: 'Async Patterns in Modern Programming',
+        description: 'Exploring async patterns across different programming languages',
+        url: 'https://example.com/async-patterns',
+        tags: ['async', 'programming', 'patterns'],
+        rank: 85
+      }
+    ];
+
+    // Test 1: Single Result Item
+    function loadSampleResult() {
+      const item = document.getElementById('result-item-1');
+      item.result = sampleResult;
+      item.query = 'rust async';
+      logEvent('log-item', 'Loaded sample result', 'success');
+    }
+
+    function toggleExpanded() {
+      const item = document.getElementById('result-item-1');
+      item.toggleExpanded();
+      logEvent('log-item', `Expanded state: ${item.expanded}`, 'info');
+    }
+
+    function highlightTerms() {
+      const item = document.getElementById('result-item-1');
+      item.highlightTerms(['rust', 'async']);
+      logEvent('log-item', 'Highlighted terms: rust, async', 'success');
+    }
+
+    // Test 2: Multiple Results
+    function loadMultipleResults() {
+      const container = document.getElementById('results-container');
+      container.setResults(sampleResults);
+      logEvent('log-results', `Loaded ${sampleResults.length} results`, 'success');
+    }
+
+    function showLoadingState() {
+      const container = document.getElementById('results-container');
+      container.loading = true;
+      container.clearResults();
+      logEvent('log-results', 'Showing loading state', 'info');
+    }
+
+    function showEmptyState() {
+      const container = document.getElementById('results-container');
+      container.loading = false;
+      container.clearResults();
+      logEvent('log-results', 'Showing empty state', 'info');
+    }
+
+    function showErrorState() {
+      const container = document.getElementById('results-container');
+      container.loading = false;
+      container.error = 'Failed to fetch search results. Network error occurred.';
+      logEvent('log-results', 'Showing error state', 'error');
+    }
+
+    function clearAllResults() {
+      const container = document.getElementById('results-container');
+      container.clearResults();
+      container.loading = false;
+      container.error = '';
+      logEvent('log-results', 'Cleared all results', 'info');
+    }
+
+    // Test 3: SSE Simulation
+    function startSSESimulation() {
+      const container = document.getElementById('sse-results');
+      container.setResults(sampleResults.map(r => ({ ...r, summarization: null })));
+      container.startSummarization('machine learning', 'engineer');
+      logEvent('log-sse', 'Started SSE simulation', 'success');
+    }
+
+    function simulateSummaryUpdate() {
+      const container = document.getElementById('sse-results');
+      const summaries = [
+        'This guide provides a comprehensive introduction to asynchronous programming in Rust, covering the fundamentals of async/await syntax.',
+        'Tokio is a powerful asynchronous runtime for Rust that enables writing fast, reliable network applications.',
+        'Async patterns have become essential in modern programming for handling concurrent operations efficiently.'
+      ];
+
+      const randomSummary = summaries[Math.floor(Math.random() * summaries.length)];
+      container._handleSummaryUpdate('task-' + Date.now(), randomSummary);
+      logEvent('log-sse', 'Simulated summary update', 'success');
+    }
+
+    function stopSSESimulation() {
+      const container = document.getElementById('sse-results');
+      container.stopSummarization();
+      logEvent('log-sse', 'Stopped SSE simulation', 'info');
+    }
+
+    // Test 4: Term Highlighting
+    function testHighlighting(query) {
+      const item = document.getElementById('highlight-item');
+      item.result = {
+        id: 'doc-highlight',
+        title: 'Rust Programming Language Guide',
+        description: 'Complete guide to Rust programming language, including async/await patterns and advanced concepts.',
+        url: 'https://example.com/rust',
+        tags: ['rust', 'programming'],
+        rank: 90
+      };
+      item.query = query;
+      logEvent('log-item', `Applied highlighting for: "${query}"`, 'success');
+    }
+
+    // Test 5: Action Buttons
+    function setupActionsItem() {
+      const item = document.getElementById('actions-item');
+      item.result = sampleResult;
+
+      item.addEventListener('result-clicked', (e) => {
+        logEvent('log-actions', `Result clicked: ${e.detail.result.title}`, 'success');
+      });
+
+      item.addEventListener('copy-url', (e) => {
+        const status = e.detail.success ? 'SUCCESS' : 'FAILED';
+        logEvent('log-actions', `Copy URL ${status}: ${e.detail.url}`, e.detail.success ? 'success' : 'error');
+      });
+
+      item.addEventListener('view-details', (e) => {
+        logEvent('log-actions', `View details: ${e.detail.result.title}`, 'success');
+      });
+
+      item.addEventListener('tag-clicked', (e) => {
+        logEvent('log-actions', `Tag clicked: ${e.detail.tag}`, 'success');
+      });
+
+      item.addEventListener('request-summary', (e) => {
+        logEvent('log-actions', `Summary requested for: ${e.detail.result.title}`, 'success');
+      });
+    }
+
+    // Test 6: Expandable Description
+    function loadLongDescription() {
+      const item = document.getElementById('expand-item');
+      item.result = {
+        id: 'doc-long',
+        title: 'Very Long Document',
+        description: 'This is a very long description that will be truncated. '.repeat(20),
+        url: 'https://example.com/long',
+        tags: ['test'],
+        rank: 80
+      };
+      logEvent('log-item', 'Loaded long description (should be truncated)', 'info');
+    }
+
+    function loadShortDescription() {
+      const item = document.getElementById('expand-item');
+      item.result = {
+        id: 'doc-short',
+        title: 'Short Document',
+        description: 'This is a short description.',
+        url: 'https://example.com/short',
+        tags: ['test'],
+        rank: 80
+      };
+      logEvent('log-item', 'Loaded short description (no truncation)', 'info');
+    }
+
+    // Test 7: Summarization States
+    function setSummaryStatus(status) {
+      const item = document.getElementById('summary-item');
+
+      if (!item.result) {
+        item.result = sampleResult;
+      }
+
+      item.setSummarizationStatus(status);
+
+      if (status === 'complete') {
+        item.updateSummary('This is a comprehensive guide to asynchronous programming in Rust, covering the fundamentals of async/await syntax, futures, and the Tokio runtime ecosystem.');
+      }
+
+      logEvent('log-item', `Set summarization status to: ${status}`, 'success');
+    }
+
+    // Initialize on page load
+    document.addEventListener('DOMContentLoaded', () => {
+      // Load initial states
+      loadSampleResult();
+      loadMultipleResults();
+      setupActionsItem();
+      testHighlighting('rust async');
+      loadLongDescription();
+      setSummaryStatus('none');
+
+      // Setup event listeners for results container
+      const container = document.getElementById('results-container');
+      container.addEventListener('results-loaded', (e) => {
+        logEvent('log-results', `Results loaded: ${e.detail.count} items`, 'success');
+      });
+
+      container.addEventListener('result-clicked', (e) => {
+        logEvent('log-results', `Result clicked: ${e.detail.result.title}`, 'success');
+      });
+
+      container.addEventListener('sse-connected', () => {
+        logEvent('log-sse', 'SSE connection established', 'success');
+      });
+
+      container.addEventListener('sse-disconnected', () => {
+        logEvent('log-sse', 'SSE connection closed', 'info');
+      });
+
+      container.addEventListener('sse-error', (e) => {
+        logEvent('log-sse', `SSE error: ${e.detail.error}`, 'error');
+      });
+
+      console.log('Phase 3 components loaded and initialized successfully!');
+    });
+  </script>
+</body>
+</html>

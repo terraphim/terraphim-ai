@@ -1,0 +1,548 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="api-url" content="http://localhost:3000">
+  <title>Phase 4: Main Search Orchestrator - Integration Test</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 2rem;
+    }
+
+    .container {
+      max-width: 1400px;
+      margin: 0 auto;
+    }
+
+    .header {
+      text-align: center;
+      color: white;
+      margin-bottom: 2rem;
+    }
+
+    .header h1 {
+      font-size: 2.5rem;
+      margin-bottom: 0.5rem;
+      text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+    }
+
+    .header p {
+      font-size: 1.1rem;
+      opacity: 0.9;
+    }
+
+    .main-content {
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      padding: 2rem;
+      margin-bottom: 2rem;
+    }
+
+    .test-panel {
+      background: #f8f9fa;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .test-panel h2 {
+      color: #495057;
+      margin-bottom: 1rem;
+      font-size: 1.3rem;
+    }
+
+    .button-group {
+      display: flex;
+      gap: 1rem;
+      flex-wrap: wrap;
+      margin-bottom: 1rem;
+    }
+
+    button {
+      padding: 0.75rem 1.5rem;
+      background: #3273dc;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    button:hover {
+      background: #2366d1;
+      transform: translateY(-2px);
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    button:active {
+      transform: translateY(0);
+    }
+
+    button.secondary {
+      background: #48c774;
+    }
+
+    button.secondary:hover {
+      background: #3ec46d;
+    }
+
+    button.danger {
+      background: #f14668;
+    }
+
+    button.danger:hover {
+      background: #ef2e55;
+    }
+
+    button.info {
+      background: #3298dc;
+    }
+
+    button.info:hover {
+      background: #2489ce;
+    }
+
+    .event-log {
+      background: #1e1e1e;
+      color: #d4d4d4;
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+      max-height: 300px;
+      overflow-y: auto;
+      margin-top: 1rem;
+    }
+
+    .event-log .event {
+      padding: 0.25rem 0;
+      border-bottom: 1px solid #333;
+    }
+
+    .event-log .event:last-child {
+      border-bottom: none;
+    }
+
+    .event-log .timestamp {
+      color: #858585;
+      margin-right: 0.5rem;
+    }
+
+    .event-log .event-name {
+      color: #4ec9b0;
+      font-weight: 600;
+    }
+
+    .event-log .event-detail {
+      color: #ce9178;
+    }
+
+    .state-display {
+      background: #f8f9fa;
+      border: 1px solid #dee2e6;
+      border-radius: 6px;
+      padding: 1rem;
+      margin-top: 1rem;
+      font-family: 'Courier New', monospace;
+      font-size: 0.875rem;
+    }
+
+    .state-display pre {
+      margin: 0;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .role-selector {
+      display: flex;
+      gap: 0.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .role-selector select {
+      flex: 1;
+      padding: 0.5rem;
+      font-size: 1rem;
+      border: 1px solid #dbdbdb;
+      border-radius: 4px;
+    }
+
+    .search-container {
+      margin-top: 2rem;
+    }
+
+    .info-box {
+      background: #e7f3ff;
+      border-left: 4px solid #3273dc;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 4px;
+    }
+
+    .info-box h3 {
+      color: #2366d1;
+      margin-bottom: 0.5rem;
+      font-size: 1rem;
+    }
+
+    .info-box p {
+      color: #495057;
+      font-size: 0.9rem;
+      line-height: 1.5;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.25rem 0.5rem;
+      background: #3273dc;
+      color: white;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      margin-left: 0.5rem;
+    }
+
+    .badge.success {
+      background: #48c774;
+    }
+
+    .badge.warning {
+      background: #ffdd57;
+      color: #333;
+    }
+
+    .badge.danger {
+      background: #f14668;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <div class="header">
+      <h1>🔍 Phase 4: Main Search Orchestrator</h1>
+      <p>Complete integration of all search components with state management and SSE streaming</p>
+    </div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+      <!-- Info Box -->
+      <div class="info-box">
+        <h3>Component Integration Test</h3>
+        <p>
+          This example demonstrates the complete search workflow with:
+          <strong>terraphim-search-input</strong> (Phase 2),
+          <strong>terraphim-term-chips</strong> (Phase 1),
+          <strong>terraphim-search-results</strong> (Phase 3), and
+          <strong>terraphim-search</strong> (Phase 4 - Main Orchestrator).
+        </p>
+      </div>
+
+      <!-- Role Selector -->
+      <div class="test-panel">
+        <h2>Role Configuration <span class="badge">Required</span></h2>
+        <div class="role-selector">
+          <select id="roleSelect">
+            <option value="engineer">Engineer</option>
+            <option value="researcher">Researcher</option>
+            <option value="designer">Designer</option>
+            <option value="writer">Writer</option>
+          </select>
+          <button onclick="updateRole()">Update Role</button>
+        </div>
+      </div>
+
+      <!-- Main Search Component -->
+      <div class="search-container">
+        <terraphim-search
+          id="mainSearch"
+          role="engineer"
+          auto-search
+        ></terraphim-search>
+      </div>
+
+      <!-- Test Controls -->
+      <div class="test-panel">
+        <h2>Programmatic API Tests <span class="badge info">Phase 4</span></h2>
+        <div class="button-group">
+          <button onclick="testExecuteSearch()">Execute Search</button>
+          <button class="secondary" onclick="testClearSearch()">Clear Search</button>
+          <button class="info" onclick="testGetState()">Get State</button>
+          <button class="info" onclick="testSetState()">Set State</button>
+          <button class="danger" onclick="testErrorHandling()">Test Error</button>
+        </div>
+      </div>
+
+      <!-- Workflow Tests -->
+      <div class="test-panel">
+        <h2>Workflow Integration Tests <span class="badge success">Complete</span></h2>
+        <div class="button-group">
+          <button onclick="testCompleteWorkflow()">Complete Workflow</button>
+          <button onclick="testTermChipsIntegration()">Term Chips Flow</button>
+          <button onclick="testOperatorSwitch()">Operator Switch</button>
+          <button onclick="testStatePersistence()">State Persistence</button>
+          <button onclick="testSSEStreaming()">SSE Streaming</button>
+        </div>
+      </div>
+
+      <!-- State Display -->
+      <div class="test-panel">
+        <h2>Current State <span class="badge warning">Live</span></h2>
+        <div class="state-display">
+          <pre id="stateDisplay">No state captured yet</pre>
+        </div>
+      </div>
+
+      <!-- Event Log -->
+      <div class="test-panel">
+        <h2>Event Log <span class="badge">Real-time</span></h2>
+        <button onclick="clearEventLog()" style="margin-bottom: 0.5rem;">Clear Log</button>
+        <div class="event-log" id="eventLog">
+          <div class="event">
+            <span class="timestamp">[READY]</span>
+            <span class="event-name">System initialized</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Import search component (Phase 4) -->
+  <script type="module">
+    import './terraphim-search.js';
+
+    // Store reference globally for test functions
+    window.searchComponent = document.getElementById('mainSearch');
+
+    // Event logging
+    const eventLog = document.getElementById('eventLog');
+    const stateDisplay = document.getElementById('stateDisplay');
+
+    function logEvent(eventName, detail) {
+      const timestamp = new Date().toLocaleTimeString();
+      const eventDiv = document.createElement('div');
+      eventDiv.className = 'event';
+      eventDiv.innerHTML = `
+        <span class="timestamp">[${timestamp}]</span>
+        <span class="event-name">${eventName}</span>
+        <span class="event-detail">${JSON.stringify(detail, null, 2)}</span>
+      `;
+      eventLog.insertBefore(eventDiv, eventLog.firstChild);
+
+      // Limit log size
+      if (eventLog.children.length > 50) {
+        eventLog.removeChild(eventLog.lastChild);
+      }
+    }
+
+    function updateStateDisplay() {
+      const state = window.searchComponent.getState();
+      stateDisplay.textContent = JSON.stringify(state, null, 2);
+    }
+
+    // Listen to all search component events
+    const search = window.searchComponent;
+
+    search.addEventListener('search-started', (e) => {
+      logEvent('search-started', e.detail);
+      updateStateDisplay();
+    });
+
+    search.addEventListener('search-completed', (e) => {
+      logEvent('search-completed', {
+        query: e.detail.query,
+        count: e.detail.count,
+        duration: `${e.detail.duration}ms`
+      });
+      updateStateDisplay();
+    });
+
+    search.addEventListener('search-failed', (e) => {
+      logEvent('search-failed', e.detail);
+      updateStateDisplay();
+    });
+
+    search.addEventListener('role-changed', (e) => {
+      logEvent('role-changed', e.detail);
+      updateStateDisplay();
+    });
+
+    search.addEventListener('state-updated', (e) => {
+      logEvent('state-updated', e.detail);
+      updateStateDisplay();
+    });
+
+    search.addEventListener('result-clicked', (e) => {
+      logEvent('result-clicked', { url: e.detail.result.url });
+    });
+
+    search.addEventListener('load-more', (e) => {
+      logEvent('load-more', e.detail);
+    });
+
+    // Initial state display
+    updateStateDisplay();
+
+    // Make functions available globally
+    window.logEvent = logEvent;
+    window.updateStateDisplay = updateStateDisplay;
+  </script>
+
+  <!-- Test functions -->
+  <script>
+    // Update role
+    function updateRole() {
+      const role = document.getElementById('roleSelect').value;
+      window.searchComponent.setRole(role);
+      window.updateStateDisplay();
+    }
+
+    // Execute search test
+    async function testExecuteSearch() {
+      window.logEvent('TEST', 'Executing search: "rust async"');
+      await window.searchComponent.executeSearch('rust async', { limit: 10 });
+    }
+
+    // Clear search test
+    function testClearSearch() {
+      window.logEvent('TEST', 'Clearing search');
+      window.searchComponent.clearSearch();
+      window.updateStateDisplay();
+    }
+
+    // Get state test
+    function testGetState() {
+      const state = window.searchComponent.getState();
+      window.logEvent('TEST', 'Get state result');
+      console.log('Current state:', state);
+      alert('State captured! Check console and state display.');
+    }
+
+    // Set state test
+    function testSetState() {
+      const testState = {
+        query: 'javascript promises',
+        terms: ['javascript', 'promises'],
+        operator: 'AND',
+        role: 'engineer',
+        timestamp: Date.now()
+      };
+      window.logEvent('TEST', 'Setting state to predefined values');
+      window.searchComponent.setState(testState);
+      window.updateStateDisplay();
+    }
+
+    // Error handling test
+    async function testErrorHandling() {
+      window.logEvent('TEST', 'Testing error handling with invalid query');
+      // This should fail gracefully
+      await window.searchComponent.executeSearch('__INVALID__QUERY__', { limit: 1 });
+    }
+
+    // Complete workflow test
+    async function testCompleteWorkflow() {
+      window.logEvent('TEST', 'Starting complete workflow test');
+
+      // Step 1: Clear everything
+      window.searchComponent.clearSearch();
+      await sleep(500);
+
+      // Step 2: Set role
+      window.searchComponent.setRole('engineer');
+      await sleep(500);
+
+      // Step 3: Execute search
+      await window.searchComponent.executeSearch('rust AND async', { limit: 5 });
+      await sleep(1000);
+
+      // Step 4: Get results
+      const state = window.searchComponent.getState();
+      window.logEvent('TEST', 'Workflow complete - state captured');
+      console.log('Final state:', state);
+    }
+
+    // Term chips integration test
+    function testTermChipsIntegration() {
+      window.logEvent('TEST', 'Testing term chips integration');
+
+      // Simulate adding terms through input
+      const input = window.searchComponent.shadowRoot.querySelector('terraphim-search-input');
+      if (input) {
+        input.setValue('rust AND async AND tokio');
+        input.dispatchEvent(new CustomEvent('search-submit', {
+          bubbles: true,
+          composed: true,
+          detail: { query: 'rust AND async AND tokio' }
+        }));
+      }
+    }
+
+    // Operator switch test
+    function testOperatorSwitch() {
+      window.logEvent('TEST', 'Testing operator switch');
+
+      const chips = window.searchComponent.shadowRoot.querySelector('terraphim-term-chips');
+      if (chips) {
+        chips.toggleOperator();
+        window.updateStateDisplay();
+      }
+    }
+
+    // State persistence test
+    function testStatePersistence() {
+      window.logEvent('TEST', 'Testing state persistence');
+
+      // Set a specific state
+      window.searchComponent.setState({
+        query: 'persistence test',
+        terms: ['persistence', 'test'],
+        operator: 'OR',
+        role: 'engineer'
+      });
+
+      alert('State saved! Reload the page to verify persistence works.');
+    }
+
+    // SSE streaming test
+    async function testSSEStreaming() {
+      window.logEvent('TEST', 'Testing SSE streaming');
+
+      // Execute search which should trigger SSE
+      await window.searchComponent.executeSearch('documentation', { limit: 3 });
+
+      window.logEvent('TEST', 'SSE stream should be active - watch for summary updates');
+    }
+
+    // Clear event log
+    function clearEventLog() {
+      const eventLog = document.getElementById('eventLog');
+      eventLog.innerHTML = `
+        <div class="event">
+          <span class="timestamp">[CLEARED]</span>
+          <span class="event-name">Event log cleared</span>
+        </div>
+      `;
+    }
+
+    // Helper: sleep function
+    function sleep(ms) {
+      return new Promise(resolve => setTimeout(resolve, ms));
+    }
+  </script>
+</body>
+</html>
