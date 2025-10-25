@@ -4,11 +4,25 @@ use crate::agents::omission_detector::{OmissionDetectorAgent, OmissionDetectorCo
 use crate::agents::taxonomy_linker::{TaxonomyLinkerAgent, TaxonomyLinkerConfig};
 use crate::error::{Result, TruthForgeError};
 use crate::types::*;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use terraphim_multi_agent::{GenAiLlmClient, LlmMessage, LlmRequest};
+use tokio::sync::broadcast;
 use tokio::task::JoinSet;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
+
+/// Progress update for WebSocket streaming
+/// This is a simplified version to avoid cross-repository dependencies
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProgressUpdate {
+    pub session_id: Uuid,
+    pub pillar: Option<String>,
+    pub stage: String,
+    pub progress: f32,
+    pub message: String,
+    pub timestamp: chrono::DateTime<chrono::Utc>,
+}
 
 enum PassOneAgentResult {
     OmissionCatalog(OmissionCatalog),
@@ -724,6 +738,7 @@ pub struct TwoPassDebateWorkflow {
     pass_two: PassTwoOptimizer,
     response_generator: ResponseGenerator,
     llm_client: Option<Arc<GenAiLlmClient>>,
+    progress_tx: Option<broadcast::Sender<ProgressUpdate>>,
 }
 
 impl TwoPassDebateWorkflow {
@@ -733,6 +748,7 @@ impl TwoPassDebateWorkflow {
             pass_two: PassTwoOptimizer::new(),
             response_generator: ResponseGenerator::new(),
             llm_client: None,
+            progress_tx: None,
         }
     }
 
@@ -744,6 +760,25 @@ impl TwoPassDebateWorkflow {
         self
     }
 
+    pub fn with_progress_sender(mut self, tx: broadcast::Sender<ProgressUpdate>) -> Self {
+        self.progress_tx = Some(tx);
+        self
+    }
+
+    fn emit_progress(&self, session_id: Uuid, stage: &str, message: &str, progress: f32) {
+        if let Some(tx) = &self.progress_tx {
+            let update = ProgressUpdate {
+                session_id,
+                pillar: None,
+                stage: stage.to_string(),
+                progress,
+                message: message.to_string(),
+                timestamp: chrono::Utc::now(),
+            };
+            let _ = tx.send(update);
+        }
+    }
+
     pub async fn execute(&self, narrative: &NarrativeInput) -> Result<TruthForgeAnalysisResult> {
         let start_time = std::time::Instant::now();
 
@@ -751,10 +786,41 @@ impl TwoPassDebateWorkflow {
             "Starting TwoPassDebateWorkflow for session {}",
             narrative.session_id
         );
+        self.emit_progress(
+            narrative.session_id,
+            "workflow_start",
+            "Starting TwoPassDebateWorkflow",
+            0.0,
+        );
+
+        self.emit_progress(
+            narrative.session_id,
+            "pass_1_start",
+            "Starting Pass 1 Orchestration",
+            0.1,
+        );
 
         let pass_one_result = self.pass_one.execute(narrative).await?;
 
+        let omissions_count = pass_one_result.omission_catalog.omissions.len();
+        self.emit_progress(
+            narrative.session_id,
+            "pass_1_complete",
+            &format!(
+                "Pass 1: Analysis complete, {} omissions identified",
+                omissions_count
+            ),
+            0.4,
+        );
+
         info!("Pass 1 complete, generating Pass 1 debate");
+        self.emit_progress(
+            narrative.session_id,
+            "pass_1_debate",
+            "Generating Pass 1 debate",
+            0.45,
+        );
+
         let pass_one_debate = if self.llm_client.is_some() {
             self.generate_pass_one_debate(narrative, &pass_one_result)
                 .await?
@@ -764,15 +830,29 @@ impl TwoPassDebateWorkflow {
         };
 
         info!("Pass 1 debate complete, starting Pass 2 exploitation");
+        self.emit_progress(
+            narrative.session_id,
+            "pass_2_start",
+            "Pass 1 debate complete, starting Pass 2 exploitation",
+            0.5,
+        );
+
         let pass_two_result = self
             .pass_two
             .execute(narrative, &pass_one_result, &pass_one_debate)
             .await?;
 
         info!("Pass 2 complete, generating cumulative analysis");
-
-        let omissions_count = pass_one_result.omission_catalog.omissions.len();
         let exploited_count = pass_two_result.exploited_vulnerabilities.len();
+        self.emit_progress(
+            narrative.session_id,
+            "pass_2_complete",
+            &format!(
+                "Pass 2 complete, {} vulnerabilities identified",
+                exploited_count
+            ),
+            0.7,
+        );
 
         let cumulative_analysis = self
             .generate_cumulative_analysis_mock(
@@ -785,6 +865,13 @@ impl TwoPassDebateWorkflow {
         let risk_level = cumulative_analysis.strategic_risk_level.clone();
 
         info!("Cumulative analysis complete, generating response strategies");
+        self.emit_progress(
+            narrative.session_id,
+            "response_generation",
+            "Generating response strategies",
+            0.8,
+        );
+
         let response_strategies = self
             .response_generator
             .generate_strategies(
@@ -797,6 +884,15 @@ impl TwoPassDebateWorkflow {
         info!(
             "Response strategies generated: {} strategies",
             response_strategies.len()
+        );
+        self.emit_progress(
+            narrative.session_id,
+            "strategies_complete",
+            &format!(
+                "Response strategies generated: {} strategies",
+                response_strategies.len()
+            ),
+            0.9,
         );
 
         let result = TruthForgeAnalysisResult {
@@ -823,6 +919,15 @@ impl TwoPassDebateWorkflow {
         info!(
             "TwoPassDebateWorkflow complete for session {} in {}ms",
             narrative.session_id, result.processing_time_ms
+        );
+        self.emit_progress(
+            narrative.session_id,
+            "workflow_complete",
+            &format!(
+                "TwoPassDebateWorkflow complete in {}ms",
+                result.processing_time_ms
+            ),
+            1.0,
         );
 
         Ok(result)
