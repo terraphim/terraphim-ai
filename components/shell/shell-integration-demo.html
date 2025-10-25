@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim App Shell - Integration Demo</title>
+
+  <!-- Font Awesome for icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", sans-serif;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+
+    .demo-controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: white;
+      border: 2px solid #3273dc;
+      border-radius: 8px;
+      padding: 1rem;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+      max-width: 300px;
+      z-index: 10000;
+    }
+
+    .demo-controls h3 {
+      margin: 0 0 0.75rem 0;
+      color: #3273dc;
+      font-size: 1rem;
+    }
+
+    .demo-controls p {
+      margin: 0 0 0.5rem 0;
+      font-size: 0.875rem;
+      color: #666;
+    }
+
+    .demo-controls .control-group {
+      margin-top: 1rem;
+    }
+
+    .demo-controls label {
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.875rem;
+      font-weight: 500;
+      color: #363636;
+    }
+
+    .demo-controls select {
+      width: 100%;
+      padding: 0.5rem;
+      border: 1px solid #dbdbdb;
+      border-radius: 4px;
+      font-size: 0.875rem;
+    }
+
+    .demo-controls button {
+      width: 100%;
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #3273dc;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 0.875rem;
+      transition: background 0.2s;
+    }
+
+    .demo-controls button:hover {
+      background: #2366d1;
+    }
+
+    .demo-controls .toggle-button {
+      background: #f5f5f5;
+      color: #363636;
+      border: 1px solid #dbdbdb;
+    }
+
+    .demo-controls .toggle-button:hover {
+      background: #e8e8e8;
+    }
+
+    .demo-controls .info {
+      margin-top: 1rem;
+      padding: 0.75rem;
+      background: #f0f8ff;
+      border: 1px solid #3273dc;
+      border-radius: 4px;
+      font-size: 0.75rem;
+    }
+
+    .demo-controls .info strong {
+      color: #3273dc;
+    }
+
+    .demo-controls .close-button {
+      position: absolute;
+      top: 0.5rem;
+      right: 0.5rem;
+      background: none;
+      border: none;
+      font-size: 1.25rem;
+      cursor: pointer;
+      color: #999;
+      width: auto;
+      padding: 0;
+    }
+
+    .demo-controls .close-button:hover {
+      color: #363636;
+    }
+
+    .demo-controls.hidden {
+      display: none;
+    }
+
+    .show-controls {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #3273dc;
+      color: white;
+      border: none;
+      border-radius: 50%;
+      width: 50px;
+      height: 50px;
+      font-size: 1.25rem;
+      cursor: pointer;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+      z-index: 9999;
+      display: none;
+    }
+
+    .show-controls.visible {
+      display: block;
+    }
+
+    .show-controls:hover {
+      background: #2366d1;
+    }
+  </style>
+</head>
+<body>
+  <!-- Main application -->
+  <terraphim-app id="app"></terraphim-app>
+
+  <!-- Demo controls -->
+  <div class="demo-controls" id="demoControls">
+    <button class="close-button" id="closeControls">×</button>
+    <h3>🎮 Demo Controls</h3>
+    <p>Test routing and navigation features</p>
+
+    <div class="control-group">
+      <label for="routeSelect">Navigate to:</label>
+      <select id="routeSelect">
+        <option value="/">Search (Home)</option>
+        <option value="/chat">Chat</option>
+        <option value="/chat/123">Chat with ID</option>
+        <option value="/graph">Knowledge Graph</option>
+        <option value="/config/wizard">Config Wizard</option>
+        <option value="/config/json">JSON Editor</option>
+        <option value="/invalid">404 Page</option>
+      </select>
+      <button id="navigateButton">Navigate</button>
+    </div>
+
+    <div class="control-group">
+      <label for="modeSelect">Router Mode:</label>
+      <select id="modeSelect">
+        <option value="auto">Auto (detect)</option>
+        <option value="history">History API</option>
+        <option value="hash">Hash Mode</option>
+      </select>
+      <button id="changeModeButton">Change Mode</button>
+    </div>
+
+    <div class="control-group">
+      <button class="toggle-button" id="testBackButton">Test Back Button</button>
+      <button class="toggle-button" id="testForwardButton">Test Forward Button</button>
+    </div>
+
+    <div class="info">
+      <strong>Keyboard Shortcuts:</strong><br>
+      Ctrl+1: Search<br>
+      Ctrl+2: Chat<br>
+      Ctrl+3: Graph<br>
+      Ctrl+4: Wizard<br>
+      Ctrl+5: JSON Editor
+    </div>
+
+    <div class="info" id="currentRouteInfo">
+      <strong>Current Route:</strong><br>
+      <span id="routeInfo">-</span>
+    </div>
+  </div>
+
+  <button class="show-controls" id="showControls">⚙️</button>
+
+  <!-- Import components as modules -->
+  <script type="module">
+    // Import all necessary components
+    import TerraphimRouter from './terraphim-router.js';
+    import TerraphimApp from './terraphim-app.js';
+    import './terraphim-nav.js';
+    import './router-outlet.js';
+
+    // Import feature components (stubs)
+    import '../search/terraphim-search.js';
+    import '../features/terraphim-chat.js';
+    import '../features/terraphim-graph.js';
+    import '../features/terraphim-config-wizard.js';
+    import '../features/terraphim-config-json.js';
+    import '../features/terraphim-not-found.js';
+
+    // Define routes
+    const routes = [
+      {
+        name: 'search',
+        path: '/',
+        component: 'terraphim-search',
+        lazy: () => import('../search/terraphim-search.js'),
+        meta: { title: 'Search', icon: 'fas fa-search', exact: true }
+      },
+      {
+        name: 'chat',
+        path: '/chat/:id?',
+        component: 'terraphim-chat',
+        lazy: () => import('../features/terraphim-chat.js'),
+        meta: { title: 'Chat', icon: 'fas fa-comments' }
+      },
+      {
+        name: 'graph',
+        path: '/graph',
+        component: 'terraphim-graph',
+        lazy: () => import('../features/terraphim-graph.js'),
+        meta: { title: 'Graph', icon: 'fas fa-project-diagram' }
+      },
+      {
+        name: 'config-wizard',
+        path: '/config/wizard',
+        component: 'terraphim-config-wizard',
+        lazy: () => import('../features/terraphim-config-wizard.js'),
+        meta: { title: 'Config Wizard', icon: 'fas fa-magic' }
+      },
+      {
+        name: 'config-json',
+        path: '/config/json',
+        component: 'terraphim-config-json',
+        lazy: () => import('../features/terraphim-config-json.js'),
+        meta: { title: 'JSON Editor', icon: 'fas fa-code' }
+      },
+      {
+        name: '404',
+        path: '*',
+        component: 'terraphim-not-found',
+        lazy: () => import('../features/terraphim-not-found.js'),
+        meta: { title: 'Page Not Found' }
+      }
+    ];
+
+    // Initialize app
+    const app = document.getElementById('app');
+    app.setRoutes(routes);
+
+    // Demo controls functionality
+    const demoControls = document.getElementById('demoControls');
+    const showControls = document.getElementById('showControls');
+    const closeControls = document.getElementById('closeControls');
+    const routeSelect = document.getElementById('routeSelect');
+    const navigateButton = document.getElementById('navigateButton');
+    const modeSelect = document.getElementById('modeSelect');
+    const changeModeButton = document.getElementById('changeModeButton');
+    const testBackButton = document.getElementById('testBackButton');
+    const testForwardButton = document.getElementById('testForwardButton');
+    const routeInfo = document.getElementById('routeInfo');
+
+    // Navigate button
+    navigateButton.addEventListener('click', () => {
+      const path = routeSelect.value;
+      const router = window.terraphimRouter;
+      if (router) {
+        router.navigate(path);
+      }
+    });
+
+    // Change mode button
+    changeModeButton.addEventListener('click', () => {
+      const mode = modeSelect.value;
+      app.setAttribute('router-mode', mode);
+      // Need to reload to apply new mode
+      window.location.reload();
+    });
+
+    // Back/forward buttons
+    testBackButton.addEventListener('click', () => {
+      window.history.back();
+    });
+
+    testForwardButton.addEventListener('click', () => {
+      window.history.forward();
+    });
+
+    // Show/hide controls
+    closeControls.addEventListener('click', () => {
+      demoControls.classList.add('hidden');
+      showControls.classList.add('visible');
+    });
+
+    showControls.addEventListener('click', () => {
+      demoControls.classList.remove('hidden');
+      showControls.classList.remove('visible');
+    });
+
+    // Update route info
+    window.addEventListener('route-change', (event) => {
+      const { to } = event.detail;
+      routeInfo.textContent = `${to.name} (${to.path})`;
+    });
+
+    // Log routing events
+    window.addEventListener('route-change-start', (event) => {
+      console.log('🚀 Route change starting:', event.detail);
+    });
+
+    window.addEventListener('route-change', (event) => {
+      console.log('✅ Route changed:', event.detail);
+    });
+
+    window.addEventListener('route-change-error', (event) => {
+      console.error('❌ Route error:', event.detail);
+    });
+
+    // App ready event
+    app.addEventListener('app-ready', (event) => {
+      console.log('🎉 App ready!', event.detail);
+    });
+
+    // Log all navigation
+    console.log('📍 Routes configured:', routes);
+    console.log('🎮 Use the demo controls (bottom-right) to test navigation');
+    console.log('⌨️  Keyboard shortcuts: Ctrl+1 through Ctrl+5');
+  </script>
+</body>
+</html>
