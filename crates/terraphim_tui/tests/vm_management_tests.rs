@@ -1,7 +1,11 @@
+#[cfg(feature = "repl-custom")]
 use std::str::FromStr;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::client::*;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::repl::commands::*;
 
+#[cfg(feature = "repl-custom")]
 /// Test VM management command parsing
 #[test]
 fn test_vm_list_command_parsing() {

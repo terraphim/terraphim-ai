@@ -523,6 +523,7 @@ mod tests {
         let hybrid = HybridExecutor::new();
 
         let settings = RiskAssessmentSettings::default();
+        let command_str = "rm -rf /";
         assert!(settings
             .high_risk_keywords
             .iter()

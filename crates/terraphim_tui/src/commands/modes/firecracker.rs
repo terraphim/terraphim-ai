@@ -3,6 +3,7 @@
 //! This module provides command execution within Firecracker microVMs
 //! for complete isolation and security.
 
+use super::local::LocalExecutor;
 use super::{
     default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
     ExecutorCapabilities, ResourceUsage,

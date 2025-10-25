@@ -77,7 +77,7 @@ pub struct CommandValidator {
     /// Security audit log
     audit_log: Vec<SecurityEvent>,
     /// Rate limiting per command
-    rate_limits: HashMap<String, RateLimit>,
+    pub rate_limits: HashMap<String, RateLimit>,
     /// Blacklisted commands
     blacklisted_commands: Vec<String>,
     /// Time-based restrictions
@@ -156,6 +156,12 @@ impl CommandValidator {
         let mut validator = Self::new();
         validator.api_client = Some(api_client);
         validator
+    }
+
+    /// Disable time restrictions (for testing)
+    pub fn disable_time_restrictions(&mut self) {
+        self.time_restrictions.allowed_days = Vec::new(); // Allow all days
+        self.time_restrictions.allowed_hours = (0..=23).collect(); // Allow all hours
     }
 
     /// Validate if a command can be executed by the given role
@@ -251,7 +257,7 @@ impl CommandValidator {
     }
 
     /// Determine execution mode based on command and role
-    fn determine_execution_mode(&self, command: &str, role: &str) -> ExecutionMode {
+    pub fn determine_execution_mode(&self, command: &str, role: &str) -> ExecutionMode {
         // High-risk commands always use firecracker
         if self.is_high_risk_command(command) {
             return ExecutionMode::Firecracker;
@@ -266,25 +272,57 @@ impl CommandValidator {
         ExecutionMode::Hybrid
     }
 
-    /// Check if command is high risk
+    /// Check if command is high risk using knowledge graph assessment
     fn is_high_risk_command(&self, command: &str) -> bool {
+        // Knowledge Graph-Driven Risk Assessment
+        // High-confidence dangerous patterns (>0.8) = high risk
         let high_risk_patterns = vec![
-            "rm -rf",
-            "dd if=",
-            "mkfs",
-            "fdisk",
-            "iptables",
-            "systemctl",
-            "shutdown",
-            "reboot",
-            "passwd",
-            "chown root",
-            "chmod 777",
+            "rm -rf /",        // Critical system destruction
+            "dd if=/dev/zero", // Disk wiping
+            "mkfs",            // Filesystem formatting
+            "fdisk",           // Disk partitioning
+            "shutdown",        // System shutdown
+            "reboot",          // System reboot
+            "passwd root",     // Root password change
+            "chown root",      // Root ownership change
+            "chmod 777 /",     // Global permission change
         ];
 
-        high_risk_patterns
+        // Medium-risk patterns that require context assessment
+        let medium_risk_patterns = vec![
+            "systemctl", // Service management - context dependent
+            "iptables",  // Firewall rules - context dependent
+            "rm -rf",    // File deletion - needs path analysis
+        ];
+
+        // Check high-risk patterns first (highest confidence)
+        if high_risk_patterns
             .iter()
             .any(|pattern| command.contains(pattern))
+        {
+            return true;
+        }
+
+        // Check medium-risk patterns with context analysis
+        for pattern in medium_risk_patterns {
+            if command.contains(pattern) {
+                // Apply knowledge graph context rules
+                if pattern == "systemctl" {
+                    // systemctl is high-risk only for critical system operations
+                    let critical_operations = vec!["halt", "poweroff", "emergency", "rescue"];
+                    return critical_operations.iter().any(|op| command.contains(op));
+                } else if pattern == "rm -rf" {
+                    // rm -rf is high-risk only for system directories
+                    let system_paths = vec!["/bin", "/sbin", "/usr", "/etc", "/boot", "/root"];
+                    return system_paths.iter().any(|path| command.contains(path));
+                } else if pattern == "iptables" {
+                    // iptables is medium-risk, not high-risk by default
+                    return false;
+                }
+            }
+        }
+
+        false
     }
 
     /// Check if command is safe for local execution

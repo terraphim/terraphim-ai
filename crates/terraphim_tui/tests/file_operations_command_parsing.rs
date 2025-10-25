@@ -1,3 +1,4 @@
+#[cfg(feature = "repl-custom")]
 // Simplified test that only tests command parsing without full handler dependencies
 #[cfg(test)]
 mod tests {

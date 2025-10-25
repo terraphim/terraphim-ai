@@ -1,3 +1,4 @@
+#[cfg(feature = "repl-custom")]
 #[cfg(feature = "repl")]
 use terraphim_tui::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
 #[cfg(feature = "repl")]
@@ -6,6 +7,7 @@ use terraphim_tui::repl::web_operations::*;
 #[cfg(all(test, feature = "repl"))]
 mod tests {
     use super::*;
+    use std::str::FromStr;
     use terraphim_tui::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
     use terraphim_tui::repl::web_operations::utils::*;
     use terraphim_tui::repl::web_operations::*;

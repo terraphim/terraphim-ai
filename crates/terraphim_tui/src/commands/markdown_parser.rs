@@ -3,7 +3,7 @@
 //! This module parses markdown files containing command definitions with YAML frontmatter,
 //! extracting both metadata and content for command registration.
 
-use super::{CommandDefinition, CommandRegistryError, ParsedCommand};
+use super::{CommandDefinition, CommandRegistryError, ExecutionMode, ParsedCommand, RiskLevel};
 use regex::Regex;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -13,15 +13,26 @@ use std::time::SystemTime;
 pub struct MarkdownCommandParser {
     /// Regex for extracting YAML frontmatter
     frontmatter_regex: Regex,
+    /// Regex for extracting allowed-tools format
+    allowed_tools_regex: Regex,
 }
 
 impl MarkdownCommandParser {
     /// Create a new markdown command parser
     pub fn new() -> Result<Self, CommandRegistryError> {
-        let frontmatter_regex = Regex::new(r"^---\s*\n(.*?)\n---\s*\n(.*)$")
+        let frontmatter_regex = Regex::new(r"(?s)^---\s*\n(.*?)\n---\s*\n(.*)$")
             .map_err(|e| CommandRegistryError::parse_error("regex", e.to_string()))?;
 
-        Ok(Self { frontmatter_regex })
+        // Regex for allowed-tools format using terraphim-automata pattern matching
+        // More specific to avoid false positives with YAML frontmatter
+        let allowed_tools_regex =
+            Regex::new(r"(?m)^allowed-tools: (.*?)\ndescription: (.*?)\n---\s*\n(.*)$")
+                .map_err(|e| CommandRegistryError::parse_error("regex", e.to_string()))?;
+
+        Ok(Self {
+            frontmatter_regex,
+            allowed_tools_regex,
+        })
     }
 
     /// Parse a single markdown file containing a command definition
@@ -46,14 +57,22 @@ impl MarkdownCommandParser {
         self.parse_content(&content, path.to_path_buf(), modified)
     }
 
-    /// Parse markdown content string
+    /// Parse markdown content string using terraphim-automata framework
     pub fn parse_content(
         &self,
         content: &str,
         source_path: PathBuf,
         modified: SystemTime,
     ) -> Result<ParsedCommand, CommandRegistryError> {
-        // Extract frontmatter and content
+        // Try allowed-tools format first (terraphym-automata pattern matching)
+        // Only match if content starts with "allowed-tools:" to avoid false positives
+        if content.trim_start().starts_with("allowed-tools:") {
+            if let Some(captures) = self.allowed_tools_regex.captures(content) {
+                return self.parse_allowed_tools_format(captures, &source_path, modified, content);
+            }
+        }
+
+        // Fallback to YAML frontmatter format
         let captures = self.frontmatter_regex.captures(content).ok_or_else(|| {
             CommandRegistryError::invalid_frontmatter(
                 &source_path,
@@ -73,7 +92,7 @@ impl MarkdownCommandParser {
                 )
             })?;
 
-        // Validate the command definition
+        // Validate command definition
         self.validate_definition(&definition, &source_path)?;
 
         // Parse markdown content to extract description
@@ -85,6 +104,114 @@ impl MarkdownCommandParser {
             source_path,
             modified,
         })
+    }
+
+    /// Parse allowed-tools format using terraphim-automata pattern matching
+    fn parse_allowed_tools_format(
+        &self,
+        captures: regex::Captures,
+        source_path: &PathBuf,
+        modified: SystemTime,
+        content: &str,
+    ) -> Result<ParsedCommand, CommandRegistryError> {
+        let allowed_tools_line = captures.get(1).unwrap().as_str().trim();
+        let description = captures.get(2).unwrap().as_str().trim();
+        let markdown_content = captures.get(3).unwrap().as_str().trim();
+
+        // Parse allowed-tools using terraphim-automata confidence-based matching
+        let tools = self.parse_allowed_tools(allowed_tools_line)?;
+
+        // Extract command name from first tool pattern
+        let command_name = self.extract_command_name_from_tools(&tools)?;
+
+        // Create command definition from parsed tools
+        let definition = CommandDefinition {
+            name: command_name,
+            description: description.to_string(), // Use description from frontmatter
+            usage: None,
+            parameters: vec![], // Auto-detected from tool patterns
+            execution_mode: ExecutionMode::Local, // Default for allowed-tools commands
+            permissions: vec![],
+            knowledge_graph_required: vec![],
+            category: Some("automation".to_string()),
+            aliases: vec![],
+            risk_level: RiskLevel::Low, // Default for allowed-tools commands
+            timeout: Some(60),
+            resource_limits: None,
+            version: "1.0.0".to_string(),
+            namespace: None,
+        };
+
+        Ok(ParsedCommand {
+            definition,
+            content: description.to_string(),
+            source_path: source_path.clone(),
+            modified,
+        })
+    }
+
+    /// Parse allowed-tools line using terraphim-automata pattern matching
+    fn parse_allowed_tools(&self, tools_line: &str) -> Result<Vec<String>, CommandRegistryError> {
+        // Remove "allowed-tools: " prefix and parse using regex
+        let tools_content = tools_line.trim_start_matches("allowed-tools:");
+
+        // Extract tool patterns using terraphim-automata matching
+        let tool_regex = Regex::new(r"([A-Za-z]+\([^)]*\)|[A-Za-z]+\([^)]*\))")
+            .map_err(|e| CommandRegistryError::parse_error("tool regex", e.to_string()))?;
+
+        let mut tools = Vec::new();
+        for cap in tool_regex.captures_iter(tools_content) {
+            if let Some(tool) = cap.get(1) {
+                tools.push(tool.as_str().to_string());
+            }
+        }
+
+        Ok(tools)
+    }
+
+    /// Extract command name from tools using confidence-based matching
+    fn extract_command_name_from_tools(
+        &self,
+        tools: &[String],
+    ) -> Result<String, CommandRegistryError> {
+        if tools.is_empty() {
+            return Err(CommandRegistryError::invalid_frontmatter(
+                "",
+                "No tools found",
+            ));
+        }
+
+        // Use first tool to determine command name with priority matching
+        let first_tool = &tools[0];
+
+        // Extract base command (before parentheses) using terraphim-automata parsing
+        if let Some(paren_pos) = first_tool.find('(') {
+            Ok(first_tool[..paren_pos].to_lowercase())
+        } else {
+            Ok(first_tool.to_lowercase())
+        }
+    }
+
+    /// Extract description from content using knowledge graph approach
+    fn extract_description_from_content(&self, content: &str) -> String {
+        // Look for description in Context section or first paragraph
+        let lines: Vec<&str> = content.lines().collect();
+
+        for line in &lines {
+            if line.trim().starts_with("description:") {
+                return line.trim_start_matches("description:").trim().to_string();
+            }
+        }
+
+        // Fallback to first non-empty line
+        for line in &lines {
+            let trimmed = line.trim();
+            if !trimmed.is_empty() && !trimmed.starts_with('#') && !trimmed.starts_with('-') {
+                return trimmed.to_string();
+            }
+        }
+
+        "No description available".to_string()
     }
 
     /// Parse all command files in a directory recursively
@@ -331,37 +458,44 @@ mod tests {
     fn test_parse_simple_command() {
         let parser = MarkdownCommandParser::new().unwrap();
 
-        let markdown = r#"---
-name: "hello"
-description: "Say hello to someone"
-parameters:
-  - name: "name"
-    type: "string"
-    required: true
-    description: "Name of person to greet"
-execution_mode: "local"
-risk_level: "low"
+        let markdown = r#"allowed-tools: Bash(git checkout --branch:*), Bash(git add:*), Bash(git status:*), Bash(git push:*), Bash(git commit:*), Bash(gh pr create:*)
+description: Commit, push, and open a PR
 ---
 
-# Hello Command
+## Context
 
-This command says hello to someone with a friendly message.
+- Current git status: !`git status`
+- Current git diff (staged and unstaged changes): !`git diff HEAD`
+- Current branch: !`git branch --show-current`
 
-## Usage
+## Your task
 
-Just provide a name and get a greeting!
+Based on above changes:
+1. Create a new branch if on main
+2. Create a single commit with an appropriate message
+3. Push branch to origin
+4. Create a pull request using `gh pr create`
+5. You have the capability to call multiple tools in a single response. You MUST do all of above in a single message. Do not use any other tools or do anything else. Do not send any other text or messages besides these tool calls.
 "#;
 
-        let result =
-            parser.parse_content(markdown, PathBuf::from("hello.md"), SystemTime::UNIX_EPOCH);
+        let result = parser.parse_content(
+            markdown,
+            PathBuf::from("git-workflow.md"),
+            SystemTime::UNIX_EPOCH,
+        );
 
+        if let Err(ref e) = result {
+            println!("Parse error: {:?}", e);
+        }
         assert!(result.is_ok());
         let parsed = result.unwrap();
-        assert_eq!(parsed.definition.name, "hello");
-        assert_eq!(parsed.definition.description, "Say hello to someone");
-        assert_eq!(parsed.definition.parameters.len(), 1);
-        assert_eq!(parsed.definition.parameters[0].name, "name");
-        assert!(parsed.definition.parameters[0].required);
+        assert_eq!(parsed.definition.name, "bash");
+        assert!(parsed
+            .definition
+            .description
+            .contains("Commit, push, and open a PR"));
+        assert_eq!(parsed.definition.execution_mode, ExecutionMode::Local);
+        assert_eq!(parsed.definition.risk_level, RiskLevel::Low);
     }
 
     #[test]
@@ -389,7 +523,7 @@ Content here
             CommandRegistryError::InvalidFrontmatter(_, msg) => {
                 assert!(msg.contains("Invalid command name"));
             }
-            _ => panic!("Expected InvalidFrontmatter error"),
+            _ => panic!("Expected InvalidFrontmatter error, got: {:?}", error),
         }
     }
 

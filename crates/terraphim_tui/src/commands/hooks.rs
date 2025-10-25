@@ -6,7 +6,7 @@
 use super::{CommandExecutionError, CommandHook, HookContext, HookResult};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Hook that logs command execution details
@@ -93,11 +93,9 @@ impl PreflightCheckHook {
         }
     }
 
-    pub fn with_allowed_dirs<P: AsRef<Path>>(dirs: Vec<P>) -> Self {
-        Self {
-            allowed_working_dirs: dirs.into_iter().map(|p| p.as_ref().to_path_buf()).collect(),
-            blocked_commands: vec![],
-        }
+    pub fn with_allowed_dirs<P: AsRef<Path>>(mut self, dirs: Vec<P>) -> Self {
+        self.allowed_working_dirs = dirs.into_iter().map(|p| p.as_ref().to_path_buf()).collect();
+        self
     }
 
     pub fn with_blocked_commands(mut self, commands: Vec<String>) -> Self {

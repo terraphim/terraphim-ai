@@ -319,11 +319,11 @@ async fn test_backup_hook_with_destructive_commands() {
     assert!(backup_dir.exists(), "Backup directory should be created");
 
     // Verify backup file was created
-    let mut backup_files: Vec<_> = fs::read_dir(&backup_dir)
-        .await
-        .unwrap()
-        .map(|entry| entry.unwrap())
-        .collect();
+    let mut entries = fs::read_dir(&backup_dir).await.unwrap();
+    let mut backup_files = Vec::new();
+    while let Some(entry) = entries.next_entry().await.unwrap() {
+        backup_files.push(entry);
+    }
 
     assert_eq!(
         backup_files.len(),

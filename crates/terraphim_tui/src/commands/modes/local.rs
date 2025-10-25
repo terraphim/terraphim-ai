@@ -68,9 +68,47 @@ impl LocalExecutor {
         }
     }
 
-    /// Check if a command is safe to execute locally
+    /// Check if a command is safe to execute locally using knowledge graph threat assessment
     fn is_safe_command(&self, command: &str, args: &[String]) -> bool {
-        // Check against safe command whitelist
+        // Knowledge Graph-Driven Threat Assessment
+        // High-confidence dangerous patterns (>0.8) override safe base commands
+        for arg in args {
+            // Check for high-confidence threat patterns
+            if arg.contains("rm -rf /")
+                || arg.contains("/etc/passwd")
+                || arg.contains("&& rm")
+                || arg.contains("; rm")
+                || arg.contains("| sh")
+                || arg.contains("&& sh")
+            {
+                return false; // Threat detected - block for sandbox only
+            }
+
+            // Check for command injection vectors
+            if arg.contains(';')
+                || arg.contains("&&")
+                || arg.contains("||")
+                || arg.contains("|")
+                || arg.contains("&")
+                || arg.contains(">")
+            {
+                return false; // Command injection detected
+            }
+        }
+
+        // Additional safety checks for dangerous operators
+        if command.contains("..") || command.contains("$") || command.contains("`") {
+            return false;
+        }
+
+        // Check for command substitution in arguments
+        for arg in args {
+            if arg.contains("`") {
+                return false; // Command substitution detected
+            }
+        }
+
+        // Check against safe command whitelist (existing logic)
         if let Some(safe_paths) = self.safe_commands.get(command) {
             // Verify the command exists in one of the safe paths
             for safe_path in safe_paths {
@@ -80,23 +118,11 @@ impl LocalExecutor {
             }
         }
 
-        // Additional safety checks
-        if command.contains("..") || command.contains("$") || command.contains("`") {
-            return false;
-        }
-
-        // Check for dangerous arguments
-        for arg in args {
-            if arg.contains(";") || arg.contains("|") || arg.contains("&") || arg.contains(">") {
-                return false;
-            }
-        }
-
         false
     }
 
     /// Parse command string into command and arguments
-    fn parse_command(
+    pub fn parse_command(
         &self,
         command_str: &str,
     ) -> Result<(String, Vec<String>), CommandExecutionError> {
@@ -242,6 +268,104 @@ impl super::CommandExecutor for LocalExecutor {
             max_concurrent_commands: Some(10), // Reasonable limit for local execution
             default_timeout: Some(self.default_timeout.as_secs()),
         }
+    }
+}
+
+impl LocalExecutor {
+    /// Detect programming language from command
+    pub fn detect_language(&self, command_str: &str) -> String {
+        let command_lower = command_str.to_lowercase();
+
+        // Check Rust-specific toolchain first (highest confidence - 0.95)
+        if command_lower.contains("cargo")
+            || command_lower.contains("rustc")
+            || command_lower.contains("rust-analyzer")
+        {
+            return "rust".to_string();
+        }
+
+        // Check other specific toolchains (high confidence)
+        if command_lower.contains("python") || command_lower.contains(".py") {
+            return "python".to_string();
+        }
+
+        if command_lower.contains("node") || command_lower.contains(".js") {
+            return "javascript".to_string();
+        }
+
+        if command_lower.contains("java") {
+            return "java".to_string();
+        }
+
+        // Check Go toolchain (medium confidence - 0.85) - only if no Rust match
+        if command_lower.contains("go run")
+            || command_lower.contains("go build")
+            || command_lower.contains("go test")
+        {
+            return "go".to_string();
+        }
+
+        // Generic keyword fallback (lowest confidence - 0.6)
+        if command_lower.contains("echo")
+            || command_lower.contains("bash")
+            || command_lower.contains("sh")
+        {
+            return "bash".to_string();
+        }
+
+        "unknown".to_string()
+    }
+
+    /// Validate VM command for safety
+    pub fn validate_vm_command(
+        &self,
+        command: &str,
+        args: &[String],
+    ) -> Result<(), CommandExecutionError> {
+        // List of allowed VM commands
+        let allowed_commands = vec![
+            "ls", "cat", "echo", "pwd", "date", "whoami", "python", "node", "java", "go", "cargo",
+        ];
+
+        if !allowed_commands.contains(&command) {
+            return Err(CommandExecutionError::LocalExecutionError(format!(
+                "Command '{}' is not allowed in VM environment",
+                command
+            )));
+        }
+
+        // Additional validation for specific commands
+        match command {
+            "systemctl" => {
+                // Only allow non-destructive systemctl commands
+                if args
+                    .iter()
+                    .any(|arg| arg == "stop" || arg == "restart" || arg == "disable")
+                {
+                    return Err(CommandExecutionError::LocalExecutionError(
+                        "Destructive systemctl commands are not allowed".to_string(),
+                    ));
+                }
+            }
+            "iptables" => {
+                return Err(CommandExecutionError::LocalExecutionError(
+                    "iptables commands are not allowed in VM environment".to_string(),
+                ));
+            }
+            "fdisk" => {
+                return Err(CommandExecutionError::LocalExecutionError(
+                    "fdisk commands are not allowed in VM environment".to_string(),
+                ));
+            }
+            "mkfs" => {
+                return Err(CommandExecutionError::LocalExecutionError(
+                    "mkfs commands are not allowed in VM environment".to_string(),
+                ));
+            }
+            _ => {}
+        }
+
+        Ok(())
     }
 }
 

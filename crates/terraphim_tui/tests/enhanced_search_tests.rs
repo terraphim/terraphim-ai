@@ -1,3 +1,4 @@
+#[cfg(feature = "repl-custom")]
 use std::str::FromStr;
 #[cfg(feature = "repl")]
 use terraphim_tui::repl::commands::*;

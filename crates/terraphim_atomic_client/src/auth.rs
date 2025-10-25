@@ -5,7 +5,10 @@
 
 use crate::{error::AtomicError, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use ed25519_dalek::{Keypair, PublicKey, Signer};
+use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
+use rand::rngs::OsRng;
+pub type Keypair = SigningKey;
+pub type PublicKey = VerifyingKey;
 #[cfg(feature = "native")]
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 #[cfg(not(feature = "native"))]
@@ -105,11 +108,10 @@ impl Agent {
     ///
     /// A new agent with a random keypair
     pub fn new() -> Self {
-        // Create a keypair using the rand 0.5 compatible OsRng
-        use rand_core::OsRng as RngCore;
-        let mut csprng = RngCore;
-        let keypair = Keypair::generate(&mut csprng);
-        let public_key_b64 = STANDARD.encode(keypair.public.as_bytes());
+        // Create a keypair using getrandom for entropy
+        let mut rng = rand::rngs::OsRng;
+        let keypair = SigningKey::generate(&mut rng);
+        let public_key_b64 = STANDARD.encode(keypair.verifying_key().as_bytes());
 
         Self {
             subject: format!("http://localhost:9883/agents/{}", public_key_b64),
@@ -152,14 +154,20 @@ impl Agent {
             STANDARD.decode(&padded_key)?
         };
 
-        // Create the keypair from the private key bytes
-        // For Ed25519 version 1.0, we need to use from_bytes
-        let mut keypair_bytes = [0u8; 64];
-        // Copy the private key bytes to the first 32 bytes of the keypair
-        keypair_bytes[..32].copy_from_slice(&private_key_bytes);
+        // Create the signing key from the private key bytes
+        let mut key_bytes = [0u8; 32];
+        if private_key_bytes.len() >= 32 {
+            key_bytes.copy_from_slice(&private_key_bytes[..32]);
+        } else {
+            return Err(AtomicError::Authentication(
+                "Private key too short, must be at least 32 bytes".to_string(),
+            ));
+        }
+
+        let signing_key = SigningKey::from_bytes(&key_bytes);
 
         // Get the public key from the secret or derive it from the private key
-        let public_key_bytes = match secret["publicKey"].as_str() {
+        let _public_key_bytes = match secret["publicKey"].as_str() {
             Some(public_key_str) => {
                 let res = {
                     let mut padded_key = public_key_str.to_string();
@@ -172,35 +180,19 @@ impl Agent {
                     Ok(bytes) => bytes,
                     Err(_) => {
                         // If we can't decode the public key, derive it from the private key
-                        let secret_key = ed25519_dalek::SecretKey::from_bytes(&private_key_bytes)
-                            .map_err(|e| {
-                            AtomicError::Authentication(format!(
-                                "Failed to create secret key: {:?}",
-                                e
-                            ))
-                        })?;
-                        let public_key = PublicKey::from(&secret_key);
+                        let public_key = VerifyingKey::from(&signing_key);
                         public_key.as_bytes().to_vec()
                     }
                 }
             }
             None => {
                 // If there's no public key in the secret, derive it from the private key
-                let secret_key =
-                    ed25519_dalek::SecretKey::from_bytes(&private_key_bytes).map_err(|e| {
-                        AtomicError::Authentication(format!("Failed to create secret key: {:?}", e))
-                    })?;
-                let public_key = PublicKey::from(&secret_key);
+                let public_key = VerifyingKey::from(&signing_key);
                 public_key.as_bytes().to_vec()
             }
         };
 
-        // Copy the public key bytes to the last 32 bytes of the keypair
-        keypair_bytes[32..].copy_from_slice(&public_key_bytes);
-
-        let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|e| {
-            AtomicError::Authentication(format!("Failed to create keypair: {:?}", e))
-        })?;
+        let keypair = signing_key;
 
         Ok(Self {
             subject: subject.to_string(),
@@ -230,7 +222,7 @@ impl Agent {
     ///
     /// The public key as a base64-encoded string
     pub fn get_public_key_base64(&self) -> String {
-        STANDARD.encode(self.keypair.public.as_bytes())
+        STANDARD.encode(self.keypair.verifying_key().as_bytes())
     }
 
     /// Creates a new agent with the given name and randomly generated keypair.
@@ -244,10 +236,9 @@ impl Agent {
     ///
     /// A new agent with the given name and a random keypair
     pub fn new_with_name(name: String, server_url: String) -> Self {
-        use rand_core::OsRng as RngCore;
-        let mut csprng = RngCore;
-        let keypair = Keypair::generate(&mut csprng);
-        let public_key_b64 = STANDARD.encode(keypair.public.as_bytes());
+        let mut rng = OsRng;
+        let keypair = SigningKey::generate(&mut rng);
+        let public_key_b64 = STANDARD.encode(keypair.verifying_key().as_bytes());
 
         Self {
             subject: format!(
@@ -286,23 +277,21 @@ impl Agent {
             STANDARD.decode(&padded_key)?
         };
 
-        // Create the keypair from the private key bytes
-        let mut keypair_bytes = [0u8; 64];
-        keypair_bytes[..32].copy_from_slice(&private_key_bytes);
+        // Create the signing key from the private key bytes
+        let mut key_bytes = [0u8; 32];
+        if private_key_bytes.len() >= 32 {
+            key_bytes.copy_from_slice(&private_key_bytes[..32]);
+        } else {
+            return Err(AtomicError::Authentication(
+                "Private key too short, must be at least 32 bytes".to_string(),
+            ));
+        }
 
-        // Derive the public key from the private key
-        let secret_key = ed25519_dalek::SecretKey::from_bytes(&private_key_bytes).map_err(|e| {
-            AtomicError::Authentication(format!("Failed to create secret key: {:?}", e))
-        })?;
-        let public_key = PublicKey::from(&secret_key);
+        let signing_key = SigningKey::from_bytes(&key_bytes);
+        let public_key = VerifyingKey::from(&signing_key);
         let public_key_bytes = public_key.as_bytes();
 
-        // Copy the public key bytes to the last 32 bytes of the keypair
-        keypair_bytes[32..].copy_from_slice(public_key_bytes);
-
-        let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|e| {
-            AtomicError::Authentication(format!("Failed to create keypair: {:?}", e))
-        })?;
+        let keypair = signing_key;
 
         let public_key_b64 = STANDARD.encode(public_key_bytes);
 
@@ -343,14 +332,17 @@ impl Agent {
             ));
         }
 
-        // Create a dummy keypair with zeros for the private key (this agent won't be able to sign)
-        let mut keypair_bytes = [0u8; 64];
-        keypair_bytes[32..].copy_from_slice(&public_key_bytes);
+        // For read-only agents, we need to create a signing key from the public key bytes
+        // This is a hack since we can't create a SigningKey from just a public key
+        // We'll use zeros for the private key part - this won't work for signing but that's intended
+        let mut key_bytes = [0u8; 32];
+        // Use the public key bytes as private key bytes (this won't work for signing)
+        if public_key_bytes.len() >= 32 {
+            key_bytes.copy_from_slice(&public_key_bytes[..32]);
+        }
 
-        // This will fail if used for signing, but that's intended for read-only agents
-        let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|e| {
-            AtomicError::Authentication(format!("Failed to create keypair: {:?}", e))
-        })?;
+        let signing_key = SigningKey::from_bytes(&key_bytes);
+        let keypair = signing_key;
 
         Ok(Self {
             subject: format!(

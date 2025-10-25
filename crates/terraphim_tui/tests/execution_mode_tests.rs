@@ -205,7 +205,7 @@ mod hybrid_execution_tests {
         ];
 
         for (name, risk_level, expected_mode) in test_cases {
-            let command_def = create_test_command(name, risk_level, expected_mode);
+            let command_def = create_test_command(name.clone(), risk_level.clone(), expected_mode.clone());
 
             // Verify the command is configured with the expected execution mode
             assert_eq!(
@@ -316,7 +316,7 @@ mod execution_mode_security_tests {
         ];
 
         for (name, risk_level, mode) in test_cases {
-            let command_def = create_test_command(name, risk_level, mode);
+            let command_def = create_test_command(name.clone(), risk_level.clone(), mode.clone());
 
             // Verify command structure
             assert_eq!(command_def.name, name);

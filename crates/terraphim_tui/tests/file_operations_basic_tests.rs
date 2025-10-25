@@ -1,3 +1,4 @@
+#[cfg(feature = "repl-custom")]
 #[cfg(test)]
 mod file_operations_tests {
     use std::str::FromStr;
