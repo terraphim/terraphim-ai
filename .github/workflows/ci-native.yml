@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
@@ -55,23 +55,13 @@ jobs:
           fi
 
   lint-and-format:
-    runs-on: ubuntu-latest
-    needs: [setup, build-frontend]
+    runs-on: [self-hosted, linux, bigbox]
+    needs: [setup]
+    timeout-minutes: 15  # Reduced timeout with faster runner
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
-      - name: Download frontend dist
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: desktop/dist
-
-      - name: Copy dist to terraphim_server
-        run: |
-          mkdir -p terraphim_server/dist
-          cp -r desktop/dist/* terraphim_server/dist/
 
       - name: Install build dependencies
         run: |
@@ -82,26 +72,12 @@ jobs:
             libclang-dev \
             llvm-dev \
             pkg-config \
-            libssl-dev \
-            libglib2.0-dev \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libsoup2.4-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev
-          # Create symlinks for webkit2gtk-sys and javascriptcore-rs-sys crates looking for 4.0
-          # Symlink .pc files
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.0.pc
-          # Symlink library files
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so
+            libssl-dev
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.87.0
           components: rustfmt, clippy
 
       - name: Cache Cargo dependencies
@@ -115,22 +91,19 @@ jobs:
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-cargo-lint-
 
-      - name: Run cargo fmt check
-        run: cargo fmt --all -- --check
-
-      - name: Run cargo clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - name: Run format and linting checks
+        run: ./scripts/ci-check-format.sh
 
   build-frontend:
     needs: setup
     uses: ./.github/workflows/frontend-build.yml
     with:
-      node-version: '20'
+      node-version: '18'
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
-    needs: [setup, build-frontend, lint-and-format]
-    runs-on: ubuntu-latest
+    needs: [setup, build-frontend]
+    runs-on: [self-hosted, linux, bigbox]
     strategy:
       fail-fast: false
       matrix:
@@ -172,10 +145,10 @@ jobs:
             gpg-agent \
             libglib2.0-dev \
             libgtk-3-dev \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             libsoup2.4-dev \
-            libjavascriptcoregtk-4.0-dev \
-            libappindicator3-dev \
+            libjavascriptcoregtk-4.1-dev \
+            libayatana-appindicator3-dev \
             librsvg2-dev \
             clang \
             libclang-dev \
@@ -206,7 +179,7 @@ jobs:
 
       - name: Install Rust
         run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.87.0
           echo "$HOME/.cargo/bin" >> $GITHUB_PATH
           echo "CARGO_HOME=$HOME/.cargo" >> $GITHUB_ENV
 
@@ -243,16 +216,9 @@ jobs:
 
       - name: Build Rust project
         run: |
-          # Build all main binaries
-          cargo build --release --target ${{ matrix.target }} \
-            --package terraphim_server \
-            --package terraphim_mcp_server \
-            --package terraphim_tui
-
-          # Test binaries exist and can run version command
-          ./target/${{ matrix.target }}/release/terraphim_server --version
-          ./target/${{ matrix.target }}/release/terraphim_mcp_server --version
-          ./target/${{ matrix.target }}/release/terraphim-tui --version
+          # Set target for CI script
+          export TARGET="${{ matrix.target }}"
+          ./scripts/ci-check-rust.sh "$TARGET"
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
@@ -291,7 +257,7 @@ jobs:
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   test-suite:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-rust]
 
     steps:
@@ -322,7 +288,7 @@ jobs:
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.85.0
+          toolchain: 1.87.0
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
@@ -341,17 +307,11 @@ jobs:
           name: frontend-dist
           path: terraphim_server/dist
 
-      - name: Run unit tests
-        run: cargo test --workspace --lib
-
-      - name: Run integration tests
-        run: cargo test --workspace --test '*'
-
-      - name: Run doc tests
-        run: cargo test --workspace --doc
+      - name: Run test suite
+        run: ./scripts/ci-check-tests.sh
 
   test-desktop:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-frontend]
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'desktop')
 
@@ -362,7 +322,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
-          node-version: '20'
+          node-version: '18'
           cache: yarn
           cache-dependency-path: desktop/yarn.lock
 
@@ -392,17 +352,8 @@ jobs:
         working-directory: ./desktop
         run: npx playwright install --with-deps
 
-      - name: Run unit tests
-        working-directory: ./desktop
-        run: yarn test --reporter=verbose --run
-
-      - name: Run E2E tests
-        working-directory: ./desktop
-        run: CI=true yarn e2e --reporter=line --bail=1
-
-      - name: Run config wizard tests
-        working-directory: ./desktop
-        run: CI=true npx playwright test tests/e2e/config-wizard.spec.ts --reporter=line
+      - name: Run desktop tests
+        run: ./scripts/ci-check-desktop.sh
 
   build-docker:
     needs: [setup, build-rust]
@@ -418,7 +369,7 @@ jobs:
     secrets: inherit  # pragma: allowlist secret
 
   package-repository:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-rust]
     if: github.event_name != 'pull_request'
     strategy:
@@ -453,7 +404,7 @@ jobs:
           retention-days: 90
 
   security-scan:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: build-docker
     if: github.event_name != 'pull_request'
 
@@ -472,7 +423,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   release:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [build-rust, build-docker, build-tauri, test-suite, security-scan]
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -510,7 +461,7 @@ jobs:
           find . -type f -name "terraphim*" -exec sha256sum {} \; > SHA256SUMS
 
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           files: |
             release/binaries/**/*
@@ -546,7 +497,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [build-rust, build-docker, build-tauri, test-suite]
     if: always() && github.event_name == 'pull_request'
 
@@ -562,7 +513,7 @@ jobs:
         continue-on-error: true
 
   summary:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, bigbox]
     needs: [setup, build-frontend, build-rust, build-docker, build-tauri, test-suite]
     if: always()
 

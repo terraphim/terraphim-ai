@@ -1,7 +1,7 @@
 # Simple Dockerfile for Terraphim Server
 FROM ubuntu:22.04
 
-ARG RUST_VERSION=1.85.0
+ARG RUST_VERSION=1.87.0
 
 # Install system dependencies
 ENV DEBIAN_FRONTEND=noninteractive

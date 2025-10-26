@@ -1,26 +1,21 @@
 <script lang="ts">
-import { router } from 'tinro';
-import { theme } from './lib/stores';
-import { Route, active } from 'tinro';
-import Search from './lib/Search/Search.svelte';
+import { active, Route, router } from 'tinro';
+import '@fortawesome/fontawesome-free/css/all.css';
+import logo from '/assets/terraphim_gray.png';
 import Chat from './lib/Chat/Chat.svelte';
-import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
-import FetchTabs from './lib/Fetchers/FetchTabs.svelte';
-import ConfigWizard from './lib/ConfigWizard.svelte';
 import ConfigJsonEditor from './lib/ConfigJsonEditor.svelte';
+import ConfigWizard from './lib/ConfigWizard.svelte';
+import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
+import Search from './lib/Search/Search.svelte';
+import { theme } from './lib/stores';
 import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
-import logo from '/assets/terraphim.png';
 
 let _visible = 'is-hidden';
 function _toggleVissible() {
 	_visible = '';
 }
 
-function _navigateTo(path: string) {
-	router.goto(path);
-}
-
-function _goBack() {
+function goBack() {
 	// Try to go back in browser history, fallback to home
 	if (window.history.length > 1) {
 		window.history.back();
@@ -42,11 +37,11 @@ function _goBack() {
         <div class="navigation-row">
   <button
     class="logo-back-button"
-    on:click={_goBack}
+    on:click={goBack}
     on:keydown={(e) => {
       if (e.key === 'Enter' || e.key === ' ') {
         e.preventDefault();
-        _goBack();
+        goBack();
       }
     }}
     title="Go back"
@@ -89,7 +84,6 @@ function _goBack() {
     </div>
     <br />
 
-    <Route path="/fetch/*"><FetchTabs /></Route>
     <Route path="/config/wizard"><ConfigWizard /></Route>
     <Route path="/config/json"><ConfigJsonEditor /></Route>
   </main>
@@ -99,7 +93,7 @@ function _goBack() {
       <Route path="/">
         <nav class="navbar">
           <div class="navbar-brand">
-            <a class="navbar-item" href="/">
+            <a class="navbar-item" href="/" aria-label="Go to home search">
               <span class="icon" style="color: #333;">
                 <i class="fas fa-home"> </i>
               </span>
@@ -116,7 +110,6 @@ function _goBack() {
 </div>
 
 <style>
-  @import "@fortawesome/fontawesome-free/css/all.css";
   :global(body) {
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen,
       Ubuntu, Cantarell, "Open Sans", "Helvetica Neue", sans-serif;
@@ -201,17 +194,17 @@ function _goBack() {
   }
 
   /* Active navigation tab styles */
-  .tabs li:has(a.active) {
+  :global(.tabs li:has(a.active)) {
     border-bottom-color: #3273dc;
   }
-  .tabs a.active {
+  :global(.tabs a.active) {
     color: #3273dc !important;
     border-bottom-color: #3273dc !important;
   }
 
   /* Fallback for browsers that don't support :has() selector */
   @supports not (selector(:has(*))) {
-    .tabs a.active {
+    :global(.tabs a.active) {
       background-color: #f5f5f5;
       border-bottom: 3px solid #3273dc;
     }

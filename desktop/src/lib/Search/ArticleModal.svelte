@@ -1,6 +1,11 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Modal } from 'svelma';
+// @ts-expect-error
+import SvelteMarkdown from 'svelte-markdown';
+import { is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
+import NovelWrapper from '../Editor/NovelWrapper.svelte';
 import type { DocumentListResponse } from '../generated/types';
 import type { Document } from './SearchResult';
 
@@ -12,7 +17,7 @@ export const kgTerm: string | null = null;
 export const kgRank: number | null = null;
 
 let editing = false;
-let _contentElement: HTMLElement;
+let contentElement: HTMLElement;
 
 // KG modal state (similar to ResultItem.svelte)
 let _showKgModal = false;
@@ -104,9 +109,9 @@ async function handleKgClick(term: string) {
 				kgDocument = response.results[0];
 				kgRankForModal = kgDocument.rank || 0;
 				console.log('  ✅ Found KG document:');
-				console.log('    Title:', kgDocument.title);
+				console.log('    Title:', kgDocument?.title);
 				console.log('    Rank:', kgRankForModal);
-				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+				console.log('    Body length:', kgDocument?.body?.length || 0, 'characters');
 				_showKgModal = true;
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
@@ -151,11 +156,11 @@ async function handleKgClick(term: string) {
 			if (data.status === 'success' && data.results && data.results.length > 0) {
 				// Get the first (highest-ranked) document
 				kgDocument = data.results[0];
-				kgRankForModal = kgDocument.rank || 0;
+				kgRankForModal = kgDocument?.rank || 0;
 				console.log('  ✅ Found KG document:');
-				console.log('    Title:', kgDocument.title);
+				console.log('    Title:', kgDocument?.title);
 				console.log('    Rank:', kgRankForModal);
-				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+				console.log('    Body length:', kgDocument?.body?.length || 0, 'characters');
 				_showKgModal = true;
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${term}" in role: "${$role}"`);
@@ -169,8 +174,8 @@ async function handleKgClick(term: string) {
 		}
 	} catch (error) {
 		console.error('❌ Error fetching KG document:');
-		console.error('  Error type:', error.constructor.name);
-		console.error('  Error message:', error.message || error);
+		console.error('  Error type:', (error as Error).constructor.name);
+		console.error('  Error message:', (error as Error).message || error);
 		console.error('  Request details:', {
 			term,
 			role: $role,
@@ -178,7 +183,7 @@ async function handleKgClick(term: string) {
 			timestamp: new Date().toISOString(),
 		});
 
-		if (!$is_tauri && error.message?.includes('Failed to fetch')) {
+		if (!$is_tauri && (error as Error).message?.includes('Failed to fetch')) {
 			console.error('  💡 Network error suggestions:');
 			console.error('    1. Check if server is running on expected port');
 			console.error('    2. Check CORS configuration');
@@ -260,7 +265,7 @@ function _handleKeyDown(event: KeyboardEvent) {
 
     {#if editing}
       <!-- Pass the article body as default content and bind back for updates -->
-      <NovelWrapper bind:html={item.body} outputFormat={originalFormat}/>
+      <NovelWrapper bind:html={item.body} outputFormat={isHtml ? 'html' : 'markdown'} />
       <div class="edit-controls">
         <button class="button is-primary" on:click={saveDocument}>
           Save
@@ -273,9 +278,9 @@ function _handleKeyDown(event: KeyboardEvent) {
       <div
         class="content-viewer"
         bind:this={contentElement}
-        on:dblclick={handleDoubleClick}
-        on:keydown={handleKeyDown}
-        on:click={handleContentClick}
+        on:dblclick={_handleDoubleClick}
+        on:keydown={_handleKeyDown}
+        on:click={_handleContentClick}
         tabindex="0"
         role="button"
         aria-label="Double-click to edit article content"
@@ -297,37 +302,36 @@ function _handleKeyDown(event: KeyboardEvent) {
 
 <!-- KG document modal -->
 {#if kgDocument}
-  <Modal bind:active={showKgModal}>
+  <Modal bind:active={_showKgModal}>
     <div class="box wrapper">
       <!-- Close button following Bulma styling -->
-      <button class="delete is-large modal-close-btn" on:click={() => showKgModal = false} aria-label="close"></button>
+      <button class="delete is-large modal-close-btn" on:click={() => _showKgModal = false} aria-label="close"></button>
 
       <!-- KG Context Header -->
-      {#if kgTermForModal && kgRankForModal !== null}
+      {#if _kgTermForModal && kgRankForModal !== null}
         <div class="kg-context">
           <h3 class="subtitle is-6">
             <span class="tag is-info">Knowledge Graph</span>
-            Term: <strong>{kgTermForModal}</strong> | Rank: <strong>{kgRankForModal}</strong>
+            Term: <strong>{_kgTermForModal}</strong> | Rank: <strong>{kgRankForModal}</strong>
           </h3>
           <hr />
         </div>
       {/if}
 
-      <h2>{kgDocument.title}</h2>
+      <h2>{kgDocument?.title}</h2>
 
       <div
         class="content-viewer"
-        on:click={handleContentClick}
-        on:keydown={(e) => (e.key === 'Enter' || e.key === ' ') && handleContentClick(e)}
+        on:click={_handleContentClick}
         tabindex="0"
         role="button"
         aria-label="KG document content - click KG links to explore further"
       >
-        {#if kgDocument.body && (/<html/i.test(kgDocument.body) || /<body/i.test(kgDocument.body) || /<head/i.test(kgDocument.body))}
+        {#if kgDocument?.body && (/<html/i.test(kgDocument.body) || /<body/i.test(kgDocument.body) || /<head/i.test(kgDocument.body))}
           <div class="prose">{@html kgDocument.body}</div>
         {:else}
           <div class="markdown-content">
-            <SvelteMarkdown source={kgDocument.body} />
+            <SvelteMarkdown source={kgDocument?.body || ''} />
           </div>
         {/if}
         <div class="edit-hint">

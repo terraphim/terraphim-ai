@@ -1,10 +1,64 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
+import { Tag, Taglist } from 'svelma';
+import { fade } from 'svelte/transition';
+// @ts-expect-error
+import SvelteMarkdown from 'svelte-markdown';
 import { router } from 'tinro';
+import { is_tauri, role, configStore as roleConfigStore } from '$lib/stores';
 import { CONFIG } from '../../config';
 import type { DocumentListResponse, Role } from '../generated/types';
 import configStore from '../ThemeSwitcher.svelte';
+import ArticleModal from './ArticleModal.svelte';
+import AtomicSaveModal from './AtomicSaveModal.svelte';
 import type { Document } from './SearchResult';
+
+// API Response interfaces
+interface ConversationsResponse {
+	conversations: Array<{
+		id: string;
+		title?: string;
+		created_at: string;
+	}>;
+}
+
+interface CreateConversationResponse {
+	status: string;
+	conversation_id?: string;
+	error?: string;
+}
+
+interface ConversationResponse {
+	status: string;
+	conversation?: {
+		id: string;
+		title?: string;
+	};
+	error?: string;
+}
+
+interface EnhancedDocument {
+	source_type: string;
+	document_id: string;
+	url?: string;
+	tags?: string[];
+	rank?: number;
+	[key: string]: any;
+}
+
+interface MenuItem {
+	id: string;
+	label: string;
+	icon: string;
+	action?: () => void;
+	visible: boolean;
+	title: string;
+	className: string;
+	disabled?: boolean;
+	testId?: string;
+	isLink?: boolean;
+	href?: string;
+}
 
 export let item: Document;
 let _showModal = false;
@@ -37,8 +91,8 @@ $: hasAtomicServer = checkAtomicServerAvailable();
 // Data-driven menu configuration
 $: menuItems = generateMenuItems();
 
-function generateMenuItems() {
-	const items = [];
+function generateMenuItems(): MenuItem[] {
+	const items: MenuItem[] = [];
 
 	// Always show download to markdown - downloads file only
 	items.push({
@@ -48,6 +102,7 @@ function generateMenuItems() {
 		action: () => downloadToMarkdown(),
 		visible: true,
 		title: 'Download document as markdown file',
+		className: '',
 	});
 
 	// Show atomic save only if configured
@@ -72,6 +127,7 @@ function generateMenuItems() {
 			action: () => openUrlAndModal(),
 			visible: true,
 			title: 'Open original URL in new tab',
+			className: '',
 		});
 	}
 
@@ -258,12 +314,14 @@ async function _handleTagClick(tag: string) {
 			if (data.status === 'success' && data.results && data.results.length > 0) {
 				// Get the first (highest-ranked) document
 				kgDocument = data.results[0];
-				kgRank = kgDocument.rank || 0;
-				console.log('  ✅ Found KG document:');
-				console.log('    Title:', kgDocument.title);
-				console.log('    Rank:', kgRank);
-				console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
-				_showKgModal = true;
+				if (kgDocument) {
+					kgRank = kgDocument.rank || 0;
+					console.log('  ✅ Found KG document:');
+					console.log('    Title:', kgDocument.title);
+					console.log('    Rank:', kgRank);
+					console.log('    Body length:', kgDocument.body?.length || 0, 'characters');
+					_showKgModal = true;
+				}
 			} else {
 				console.warn(`  ⚠️  No KG documents found for term: "${tag}" in role: "${$role}"`);
 				console.warn('    This could indicate:');
@@ -276,8 +334,8 @@ async function _handleTagClick(tag: string) {
 		}
 	} catch (error) {
 		console.error('❌ Error fetching KG document:');
-		console.error('  Error type:', error.constructor.name);
-		console.error('  Error message:', error.message || error);
+		console.error('  Error type:', error instanceof Error ? error.constructor.name : 'Unknown');
+		console.error('  Error message:', error instanceof Error ? error.message : String(error));
 		console.error('  Request details:', {
 			tag,
 			role: $role,
@@ -285,7 +343,7 @@ async function _handleTagClick(tag: string) {
 			timestamp: new Date().toISOString(),
 		});
 
-		if (!$is_tauri && error.message?.includes('Failed to fetch')) {
+		if (!$is_tauri && error instanceof Error && error.message?.includes('Failed to fetch')) {
 			console.error('  💡 Network error suggestions:');
 			console.error('    1. Check if server is running on expected port');
 			console.error('    2. Check CORS configuration');
@@ -319,7 +377,7 @@ async function _generateSummary() {
 
 		console.log('  📤 Summarization request:', requestBody);
 
-		let response;
+		let response: unknown;
 
 		if ($is_tauri) {
 			// For Tauri mode, we'll make an HTTP request directly
@@ -364,7 +422,7 @@ async function _generateSummary() {
 			summaryFromCache = data.from_cache || false;
 			_showAiSummary = true;
 			console.log('  ✅ Summary generated successfully');
-			console.log('    Summary length:', aiSummary.length, 'characters');
+			console.log('    Summary length:', aiSummary?.length || 0, 'characters');
 			console.log('    From cache:', summaryFromCache);
 			console.log('    Model used:', data.model_used);
 		} else {
@@ -373,8 +431,8 @@ async function _generateSummary() {
 		}
 	} catch (error) {
 		console.error('❌ Error generating summary:');
-		console.error('  Error type:', error.constructor.name);
-		console.error('  Error message:', error.message || error);
+		console.error('  Error type:', error instanceof Error ? error.constructor.name : 'Unknown');
+		console.error('  Error message:', error instanceof Error ? error.message : String(error));
 		console.error('  Request details:', {
 			document_id: item.id,
 			role: $role,
@@ -382,9 +440,9 @@ async function _generateSummary() {
 			timestamp: new Date().toISOString(),
 		});
 
-		summaryError = error.message || 'Network error occurred';
+		summaryError = error instanceof Error ? error.message : 'Network error occurred';
 
-		if (error.message?.includes('Failed to fetch')) {
+		if (error instanceof Error && error.message?.includes('Failed to fetch')) {
 			console.error('  💡 Network error suggestions:');
 			console.error('    1. Check if server is running on expected port');
 			console.error('    2. Verify OpenRouter is enabled for this role');
@@ -473,9 +531,9 @@ async function downloadToMarkdown() {
 		const a = document.createElement('a');
 		a.href = url;
 		a.download = filename;
-		item.body.appendChild(a);
+		document.body.appendChild(a);
 		a.click();
-		item.body.removeChild(a);
+		document.body.removeChild(a);
 		URL.revokeObjectURL(url);
 		console.log('✅ Fallback download completed:', filename);
 	}
@@ -525,7 +583,7 @@ async function addToContext() {
 		if ($is_tauri) {
 			// First, try to get or create a conversation
 			try {
-				const conversations = await invoke('list_conversations');
+				const conversations = (await invoke('list_conversations')) as ConversationsResponse;
 				console.log('📋 Available conversations:', conversations);
 
 				// Find an existing conversation or use the first one
@@ -534,10 +592,10 @@ async function addToContext() {
 					console.log('🎯 Using existing conversation:', conversationId);
 				} else {
 					// Create a new conversation
-					const newConv = await invoke('create_conversation', {
+					const newConv = (await invoke('create_conversation', {
 						title: 'Search Context',
 						role: $role || 'default',
-					});
+					})) as CreateConversationResponse;
 					if (newConv.status === 'success' && newConv.conversation_id) {
 						conversationId = newConv.conversation_id;
 						console.log('🆕 Created new conversation:', conversationId);
@@ -547,18 +605,21 @@ async function addToContext() {
 				}
 			} catch (convError) {
 				console.error('❌ Failed to manage conversations:', convError);
-				throw new Error(`Could not create or find conversation: ${convError.message}`);
+				const errorMessage = convError instanceof Error ? convError.message : String(convError);
+				throw new Error(`Could not create or find conversation: ${errorMessage}`);
 			}
 
 			// Use Tauri command for desktop app
-			const metadata = {
+			const enhancedItem = item as unknown as EnhancedDocument;
+			const metadata: Record<string, any> = {
 				source_type: 'document',
 				document_id: item.id,
 			};
 
-			if (item.url) metadata.url = item.url;
-			if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
-			if (item.rank !== undefined) metadata.rank = item.rank.toString();
+			if (enhancedItem.url) metadata.url = enhancedItem.url;
+			if (enhancedItem.tags && enhancedItem.tags.length > 0)
+				metadata.tags = enhancedItem.tags.join(', ');
+			if (enhancedItem.rank !== undefined) metadata.rank = enhancedItem.rank.toString();
 
 			const contextResult = await invoke('add_context_to_conversation', {
 				conversationId: conversationId,
@@ -614,7 +675,8 @@ async function addToContext() {
 				}
 			} catch (convError) {
 				console.error('❌ Failed to manage conversations:', convError);
-				throw new Error(`Could not create or find conversation: ${convError.message}`);
+				const errorMessage = convError instanceof Error ? convError.message : String(convError);
+				throw new Error(`Could not create or find conversation: ${errorMessage}`);
 			}
 
 			// Add document context to conversation
@@ -674,7 +736,7 @@ async function addToContext() {
 		console.error('❌ Error adding document to context:', error);
 
 		// Show error state
-		contextError = error.message || 'Failed to add document to context';
+		contextError = error instanceof Error ? error.message : 'Failed to add document to context';
 
 		// Show error notification
 		const notification = window.document.createElement('div');
@@ -716,7 +778,7 @@ async function addToContextAndChat() {
 		if ($is_tauri) {
 			// First, try to get or create a conversation
 			try {
-				const conversations = await invoke('list_conversations');
+				const conversations = (await invoke('list_conversations')) as ConversationsResponse;
 				console.log('📋 Available conversations:', conversations);
 
 				// Find an existing conversation or use the first one
@@ -725,10 +787,10 @@ async function addToContextAndChat() {
 					console.log('🎯 Using existing conversation:', conversationId);
 				} else {
 					// Create a new conversation
-					const newConv = await invoke('create_conversation', {
+					const newConv = (await invoke('create_conversation', {
 						title: 'Chat with Documents',
 						role: $role || 'default',
-					});
+					})) as CreateConversationResponse;
 					if (newConv.status === 'success' && newConv.conversation_id) {
 						conversationId = newConv.conversation_id;
 						console.log('🆕 Created new conversation:', conversationId);
@@ -738,18 +800,21 @@ async function addToContextAndChat() {
 				}
 			} catch (convError) {
 				console.error('❌ Failed to manage conversations:', convError);
-				throw new Error(`Could not create or find conversation: ${convError.message}`);
+				const errorMessage = convError instanceof Error ? convError.message : String(convError);
+				throw new Error(`Could not create or find conversation: ${errorMessage}`);
 			}
 
 			// Use Tauri command for desktop app
-			const metadata = {
+			const enhancedItem = item as unknown as EnhancedDocument;
+			const metadata: Record<string, any> = {
 				source_type: 'document',
 				document_id: item.id,
 			};
 
-			if (item.url) metadata.url = item.url;
-			if (item.tags && item.tags.length > 0) metadata.tags = item.tags.join(', ');
-			if (item.rank !== undefined) metadata.rank = item.rank.toString();
+			if (enhancedItem.url) metadata.url = enhancedItem.url;
+			if (enhancedItem.tags && enhancedItem.tags.length > 0)
+				metadata.tags = enhancedItem.tags.join(', ');
+			if (enhancedItem.rank !== undefined) metadata.rank = enhancedItem.rank.toString();
 
 			const contextResult = await invoke('add_context_to_conversation', {
 				conversationId: conversationId,
@@ -805,7 +870,8 @@ async function addToContextAndChat() {
 				}
 			} catch (convError) {
 				console.error('❌ Failed to manage conversations:', convError);
-				throw new Error(`Could not create or find conversation: ${convError.message}`);
+				const errorMessage = convError instanceof Error ? convError.message : String(convError);
+				throw new Error(`Could not create or find conversation: ${errorMessage}`);
 			}
 
 			// Add document context to conversation
@@ -865,7 +931,7 @@ async function addToContextAndChat() {
 		console.error('❌ Error adding document to context and opening chat:', error);
 
 		// Show error state
-		contextError = error.message || 'Failed to add document to context';
+		contextError = error instanceof Error ? error.message : 'Failed to add document to context';
 
 		// Show error notification
 		const notification = window.document.createElement('div');
@@ -893,9 +959,9 @@ async function addToContextAndChat() {
 	}
 }
 
-if (configStore[$role] !== undefined) {
-	console.log('Have attribute', configStore[$role]);
-	if (Object.hasOwn(configStore[$role], 'enableLogseq')) {
+if (configStore[$role as keyof typeof configStore] !== undefined) {
+	console.log('Have attribute', configStore[$role as keyof typeof configStore]);
+	if (Object.hasOwn(configStore[$role as keyof typeof configStore], 'enableLogseq')) {
 		console.log('enable logseq True');
 	} else {
 		console.log("Didn't make it");
@@ -913,8 +979,8 @@ if (configStore[$role] !== undefined) {
               {#each item.tags as tag}
                 <button
                   class="tag-button"
-                  on:click={() => handleTagClick(tag)}
-                  disabled={loadingKg}
+                  on:click={() => _handleTagClick(tag)}
+                  disabled={_loadingKg}
                   title="Click to view knowledge graph document"
                 >
                   <Tag rounded>{tag}</Tag>
@@ -947,10 +1013,10 @@ if (configStore[$role] !== undefined) {
 
           <!-- AI Summary Section -->
           <div class="ai-summary-section">
-            {#if !showAiSummary && !summaryLoading && !summaryError}
+            {#if !_showAiSummary && !summaryLoading && !summaryError}
               <button
                 class="button is-small is-info is-outlined ai-summary-button"
-                on:click={generateSummary}
+                on:click={_generateSummary}
                 disabled={summaryLoading}
                 title="Generate AI-powered summary using OpenRouter"
               >
@@ -978,7 +1044,7 @@ if (configStore[$role] !== undefined) {
                 <small class="has-text-danger">Summary error: {summaryError}</small>
                 <button
                   class="button is-small is-text"
-                  on:click={() => { summaryError = null; generateSummary(); }}
+                  on:click={() => { summaryError = null; _generateSummary(); }}
                   title="Retry generating summary"
                 >
                   Retry
@@ -986,7 +1052,7 @@ if (configStore[$role] !== undefined) {
               </div>
             {/if}
 
-            {#if showAiSummary && aiSummary}
+            {#if _showAiSummary && aiSummary}
               <div class="ai-summary" transition:fade>
                 <div class="ai-summary-header">
                   <small class="ai-summary-label">
@@ -1002,7 +1068,7 @@ if (configStore[$role] !== undefined) {
                   </small>
                   <button
                     class="button is-small is-text"
-                    on:click={() => showAiSummary = false}
+                    on:click={() => _showAiSummary = false}
                     title="Hide AI summary"
                   >
                     <span class="icon is-small">
@@ -1016,7 +1082,7 @@ if (configStore[$role] !== undefined) {
                 <div class="ai-summary-actions">
                   <button
                     class="button is-small is-text"
-                    on:click={() => { generateSummary(); }}
+                    on:click={() => { _generateSummary(); }}
                     disabled={summaryLoading}
                     title="Regenerate summary"
                   >
@@ -1094,14 +1160,14 @@ if (configStore[$role] !== undefined) {
 </div>
 
 <!-- Original document modal -->
-<ArticleModal bind:active={showModal} item={item} />
+<ArticleModal bind:active={_showModal} item={item} />
 
 <!-- KG document modal -->
 {#if kgDocument}
   <ArticleModal
-    bind:active={showKgModal}
+    bind:active={_showKgModal}
     item={kgDocument}
-    kgTerm={kgTerm}
+    kgTerm={_kgTerm}
     kgRank={kgRank}
   />
 {/if}
@@ -1109,7 +1175,7 @@ if (configStore[$role] !== undefined) {
 <!-- Atomic Save Modal -->
 {#if hasAtomicServer}
   <AtomicSaveModal
-    bind:active={showAtomicSaveModal}
+    bind:active={_showAtomicSaveModal}
     document={item}
   />
 {/if}
@@ -1166,7 +1232,7 @@ if (configStore[$role] !== undefined) {
   .description-content {
     display: inline;
 
-    // Style markdown content within description
+    /* Style markdown content within description */
     :global(p) {
       display: inline;
       margin: 0;
@@ -1253,7 +1319,7 @@ if (configStore[$role] !== undefined) {
   .ai-summary-content {
     margin-bottom: 0.5rem;
 
-    // Style markdown content within AI summary
+    /* Style markdown content within AI summary */
     :global(p) {
       margin: 0 0 0.5rem 0;
       line-height: 1.4;

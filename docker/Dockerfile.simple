@@ -1,5 +1,5 @@
 # Simple Dockerfile for building Terraphim binaries
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ARG RUST_VERSION=1.85.0
 

@@ -2,10 +2,10 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { onMount } from 'svelte';
 import { get } from 'svelte/store';
+import { JSONEditor } from 'svelte-jsoneditor';
 // @ts-expect-error local store defined elsewhere
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../config';
-import { JSONEditor } from 'svelte-jsoneditor';
 
 let _content = {
 	json: $configStore,

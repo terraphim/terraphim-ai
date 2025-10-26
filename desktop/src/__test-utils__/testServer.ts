@@ -3,9 +3,9 @@ import { URL } from 'node:url';
 
 // Simple test server that mimics the Terraphim API
 export async function startTestServer(_config: Record<string, unknown>): Promise<{
-  server: Server,
-  address: () => string,
-  port: number
+	server: Server;
+	address: () => string;
+	port: number;
 }> {
 	const conversations = new Map();
 	const _contexts = new Map();
@@ -124,7 +124,8 @@ export async function startTestServer(_config: Record<string, unknown>): Promise
 							content: (requestData as { content?: string }).content || '',
 							created_at: new Date().toISOString(),
 							metadata: (requestData as { metadata?: Record<string, unknown> }).metadata || {},
-							relevance_score: (requestData as { relevance_score?: number | null }).relevance_score || null,
+							relevance_score:
+								(requestData as { relevance_score?: number | null }).relevance_score || null,
 						};
 
 						// Add to conversation's context
@@ -203,7 +204,9 @@ export async function startTestServer(_config: Record<string, unknown>): Promise
 							const existingContext = conversation.global_context[contextIndex];
 							const updatedContext = {
 								...existingContext,
-								context_type: (requestData as { context_type?: string }).context_type || existingContext.context_type,
+								context_type:
+									(requestData as { context_type?: string }).context_type ||
+									existingContext.context_type,
 								title:
 									(requestData as { title?: string }).title !== undefined
 										? (requestData as { title?: string }).title
@@ -296,9 +299,9 @@ export async function startTestServer(_config: Record<string, unknown>): Promise
 }
 
 export async function stopTestServer(testServer: {
-  server: Server,
-  address: () => string,
-  port: number
+	server: Server;
+	address: () => string;
+	port: number;
 }): Promise<void> {
 	return new Promise((resolve, reject) => {
 		if (!testServer || !testServer.server) {

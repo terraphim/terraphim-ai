@@ -100,7 +100,7 @@ jobs:
             ubuntu.version=${{ matrix.ubuntu-version }}
 
       - name: Build and push Docker image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: docker/Dockerfile.multiarch

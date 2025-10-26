@@ -3,8 +3,7 @@ import { open } from '@tauri-apps/api/dialog';
 import { invoke } from '@tauri-apps/api/tauri';
 import { onMount } from 'svelte';
 import { get, writable } from 'svelte/store';
-// @ts-expect-error
-// @ts-expect-error
+
 import { configStore, is_tauri } from '$lib/stores';
 // Import generated types
 import type {
@@ -142,7 +141,7 @@ const _availableThemes = [
 
 onMount(async () => {
 	try {
-		let schemaJson;
+		let schemaJson: unknown;
 		if (get(is_tauri)) {
 			schemaJson = await invoke('get_config_schema');
 		} else {
@@ -461,19 +460,19 @@ function _closeWizard() {
 <div class="box" data-testid="config-wizard">
   <div class="is-flex is-justify-content-space-between is-align-items-center" style="gap: .5rem;">
     <h3 class="title is-4" style="margin-bottom: 0;">Configuration Wizard</h3>
-    <button class="button is-small is-light" on:click={closeWizard} aria-label="Close configuration wizard">Close</button>
+    <button class="button is-small is-light" on:click={_closeWizard} aria-label="Close configuration wizard">Close</button>
   </div>
 
-  {#if _saveStatus === 'success'}
+  {#if __saveStatus === 'success'}
     <div class="notification is-success" data-testid="wizard-success">
-      <button class="delete" on:click={() => _saveStatus = ''}></button>
+      <button class="delete" on:click={() => __saveStatus = ''}></button>
       Configuration _saved successfully!
     </div>
   {/if}
 
-  {#if _saveStatus === 'error'}
+  {#if __saveStatus === 'error'}
     <div class="notification is-danger" data-testid="wizard-error">
-      <button class="delete" on:click={() => _saveStatus = ''}></button>
+      <button class="delete" on:click={() => __saveStatus = ''}></button>
       Failed to _save configuration. Please try again.
     </div>
   {/if}
@@ -504,7 +503,7 @@ function _closeWizard() {
       <div class="control">
         <div class="select is-fullwidth">
           <select id="default-theme" bind:value={$draft.default_theme}>
-            {#each availableThemes as theme}
+            {#each _availableThemes as theme}
               <option value={theme}>{theme}</option>
             {/each}
           </select>
@@ -545,7 +544,7 @@ function _closeWizard() {
           <div class="control">
             <div class="select is-fullwidth">
               <select id={`role-theme-${idx}`} bind:value={$draft.roles[idx].theme}>
-                {#each availableThemes as theme}
+                {#each _availableThemes as theme}
                   <option value={theme}>{theme}</option>
                 {/each}
               </select>
@@ -612,7 +611,7 @@ function _closeWizard() {
                   placeholder={$draft.roles[idx].haystacks[hIdx].service === "Atomic" ? "https://localhost:9883" : "/path/to/documents"}
                   bind:value={$draft.roles[idx].haystacks[hIdx].path}
                   readonly={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic"}
-                  on:click={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic" ? () => selectHaystackPath(idx, hIdx) : undefined}
+                  on:click={$is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic" ? () => _selectHaystackPath(idx, hIdx) : undefined}
                 />
                 {#if $is_tauri && $draft.roles[idx].haystacks[hIdx].service !== "Atomic"}
                   <p class="help">Click to select directory</p>
@@ -681,7 +680,7 @@ function _closeWizard() {
                         type="text"
                         placeholder="Parameter name"
                         value={paramKey}
-                        on:blur={(e) => handleParameterKeyChange(idx, hIdx, paramKey, e)}
+                        on:blur={(e) => _handleParameterKeyChange(idx, hIdx, paramKey, e)}
                       />
                     </div>
                     <div class="control is-expanded">
@@ -695,7 +694,7 @@ function _closeWizard() {
                     <div class="control">
                       <button
                         class="button is-small is-danger"
-                        on:click={() => removeExtraParameter(idx, hIdx, paramKey)}
+                        on:click={() => _removeExtraParameter(idx, hIdx, paramKey)}
                       >
                         ×
                       </button>
@@ -708,7 +707,7 @@ function _closeWizard() {
                   <div class="control">
                     <button
                       class="button is-small is-link is-light"
-                      on:click={() => addExtraParameter(idx, hIdx, "tag", "#rust")}
+                      on:click={() => _addExtraParameter(idx, hIdx, "tag", "#rust")}
                     >
                       + Tag Filter
                     </button>
@@ -716,7 +715,7 @@ function _closeWizard() {
                   <div class="control">
                     <button
                       class="button is-small is-link is-light"
-                      on:click={() => addExtraParameter(idx, hIdx, "max_count", "10")}
+                      on:click={() => _addExtraParameter(idx, hIdx, "max_count", "10")}
                     >
                       + Max Results
                     </button>
@@ -724,7 +723,7 @@ function _closeWizard() {
                   <div class="control">
                     <button
                       class="button is-small is-link is-light"
-                      on:click={() => addExtraParameter(idx, hIdx, "", "")}
+                      on:click={() => _addExtraParameter(idx, hIdx, "", "")}
                     >
                       + Custom Parameter
                     </button>
@@ -766,13 +765,13 @@ function _closeWizard() {
 
             <!-- Remove haystack button -->
             <div class="field">
-              <button class="button is-small is-danger" data-testid="remove-haystack-{idx}-{hIdx}" on:click={() => removeHaystack(idx, hIdx)}>
+              <button class="button is-small is-danger" data-testid="remove-haystack-{idx}-{hIdx}" on:click={() => _removeHaystack(idx, hIdx)}>
                 Remove Haystack
               </button>
             </div>
           </div>
         {/each}
-        <button class="button is-small" data-testid="add-haystack-{idx}" on:click={() => addHaystack(idx)}>Add Haystack</button>
+        <button class="button is-small" data-testid="add-haystack-{idx}" on:click={() => _addHaystack(idx)}>Add Haystack</button>
 
         <!-- LLM Provider (Generic) -->
         <h5 class="title is-6">AI-Enhanced Summaries (LLM Provider)</h5>
@@ -797,7 +796,7 @@ function _closeWizard() {
             <div class="control">
               <input class="input" id={`llm-model-${idx}`} type="text" placeholder="llama3.1" bind:value={$draft.roles[idx].llm_model} />
             </div>
-            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            <button class="button is-small" on:click={() => _fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
                                         <select on:change={(e)=>{$draft.roles[idx].llm_model=e.currentTarget.value}}>
@@ -852,7 +851,7 @@ function _closeWizard() {
             <div class="control">
               <input class="input" id={`openrouter-model-${idx}`} type="text" placeholder="openai/gpt-4-turbo" bind:value={$draft.roles[idx].openrouter_model} />
             </div>
-            <button class="button is-small" on:click={() => fetchLlmModels(idx)}>Fetch models</button>
+            <button class="button is-small" on:click={() => _fetchLlmModels(idx)}>Fetch models</button>
             {#if roleModels[idx]?.length}
               <div class="select is-fullwidth" style="margin-top:0.5rem;">
                                         <select on:change={(e)=>{$draft.roles[idx].openrouter_model=e.currentTarget.value}}>
@@ -922,7 +921,7 @@ function _closeWizard() {
               placeholder="/path/to/markdown"
               bind:value={$draft.roles[idx].kg.local_path}
               readonly={$is_tauri}
-              on:click={$is_tauri ? () => _selectKnowledgeGraphPath(idx) : undefined}
+              on:click={$is_tauri ? () => __selectKnowledgeGraphPath(idx) : undefined}
             />
             {#if $is_tauri}
               <p class="help">Click to select directory</p>
@@ -951,10 +950,10 @@ function _closeWizard() {
           </label>
         </div>
         <hr />
-        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => _removeRole(idx)}>Remove Role</button>
+        <button class="button is-small is-danger" data-testid="remove-role-{idx}" on:click={() => __removeRole(idx)}>Remove Role</button>
       </div>
     {/each}
-    <button class="button is-link is-light" data-testid="add-role" on:click={_addRole}>Add Role</button>
+    <button class="button is-link is-light" data-testid="add-role" on:click={__addRole}>Add Role</button>
   {:else}
     <h4 class="title is-5">Review</h4>
     <div class="content">
@@ -983,14 +982,14 @@ function _closeWizard() {
   <nav class="level">
     <div class="level-left">
       {#if currentStep > 1}
-        <button class="button" data-testid="wizard-back" on:click={_prev}>Back</button>
+        <button class="button" data-testid="wizard-back" on:click={__prev}>Back</button>
       {/if}
     </div>
     <div class="level-right">
       {#if currentStep < totalSteps}
-        <button class="button is-primary" data-testid="wizard-_next" on:click={_next}>Next</button>
+        <button class="button is-primary" data-testid="wizard-_next" on:click={__next}>Next</button>
       {:else}
-        <button class="button is-success" data-testid="wizard-_save" on:click={_save}>Save</button>
+        <button class="button is-success" data-testid="wizard-_save" on:click={__save}>Save</button>
       {/if}
     </div>
   </nav>

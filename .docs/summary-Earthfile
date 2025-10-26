@@ -1,0 +1,20 @@
+# Summary: Earthfile
+
+## Purpose
+This Earthfile defines the build pipeline for Terraphim AI using Earthly, providing multi-platform builds, cross-compilation, and deployment automation.
+
+## Key Functionality
+- Defines comprehensive build pipeline with targets for different platforms and use cases
+- Supports cross-compilation for multiple architectures (x86_64, ARM64, ARMv7)
+- Includes Rust toolchain setup, dependency management, and binary building
+- Provides Docker image creation for various deployment scenarios
+- Integrates frontend build process and documentation generation
+- Features caching and optimization for faster builds
+
+## Important Details
+- Uses Ubuntu 20.04 as base image with Rust 1.85.0 toolchain
+- Supports musl and glibc targets for static and dynamic linking
+- Includes Node.js and Yarn setup for frontend dependencies
+- Provides separate targets for native builds, cross-compilation, and containerization
+- Integrates with mdbook for documentation and Netlify for deployment
+- Handles multi-stage builds with artifact saving and loading

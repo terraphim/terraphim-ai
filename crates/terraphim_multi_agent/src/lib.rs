@@ -122,8 +122,8 @@ pub mod test_utils {
     }
 
     /// Create test rolegraph for testing
-    pub async fn create_test_rolegraph()
-    -> Result<Arc<terraphim_rolegraph::RoleGraph>, MultiAgentError> {
+    pub async fn create_test_rolegraph(
+    ) -> Result<Arc<terraphim_rolegraph::RoleGraph>, MultiAgentError> {
         // Create a simple test rolegraph with empty thesaurus
         use terraphim_types::Thesaurus;
         let empty_thesaurus = Thesaurus::new("test_thesaurus".to_string());
@@ -139,8 +139,8 @@ pub mod test_utils {
     }
 
     /// Create test automata for testing
-    pub fn create_test_automata()
-    -> Result<Arc<terraphim_automata::AutocompleteIndex>, MultiAgentError> {
+    pub fn create_test_automata(
+    ) -> Result<Arc<terraphim_automata::AutocompleteIndex>, MultiAgentError> {
         // Create a simple test automata index with empty thesaurus
         use terraphim_types::Thesaurus;
         let empty_thesaurus = Thesaurus::new("test_thesaurus".to_string());
