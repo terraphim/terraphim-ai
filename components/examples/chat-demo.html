@@ -1,0 +1,542 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="spacelab">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Chat Components - Week 1 Demo</title>
+
+  <!-- Import CSS Variables -->
+  <link rel="stylesheet" href="../styles/variables.css">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .header {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .header h1 {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--text-primary);
+    }
+
+    .header .controls {
+      display: flex;
+      gap: var(--spacing-sm);
+    }
+
+    .header button {
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
+      border: none;
+      border-radius: var(--border-radius-md);
+      cursor: pointer;
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+      transition: var(--transition-base);
+    }
+
+    .header button:hover {
+      background: var(--color-primary-dark);
+    }
+
+    .header button.secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-primary);
+    }
+
+    .header button.secondary:hover {
+      background: var(--bg-hover);
+    }
+
+    .theme-selector {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+
+    .theme-selector label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .theme-selector select {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 300px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      overflow-y: auto;
+    }
+
+    .sidebar h2 {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--spacing-md);
+      color: var(--text-primary);
+    }
+
+    .sidebar .section {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .sidebar .section h3 {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-medium);
+      margin-bottom: var(--spacing-sm);
+      color: var(--text-secondary);
+    }
+
+    .sidebar button {
+      width: 100%;
+      padding: var(--spacing-sm);
+      margin-bottom: var(--spacing-xs);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      cursor: pointer;
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+      transition: var(--transition-base);
+      text-align: left;
+    }
+
+    .sidebar button:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-hover);
+    }
+
+    .sidebar button.active {
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
+      border-color: var(--color-primary);
+    }
+
+    .info-panel {
+      padding: var(--spacing-sm);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+    }
+
+    .info-panel strong {
+      color: var(--text-primary);
+    }
+
+    .chat-area {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      background: var(--bg-page);
+    }
+
+    .chat-header {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+    }
+
+    .chat-header h2 {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      color: var(--text-primary);
+    }
+
+    .chat-header p {
+      font-size: var(--font-size-sm);
+      color: var(--text-tertiary);
+      margin-top: var(--spacing-xs);
+    }
+
+    .footer {
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border-primary);
+      padding: var(--spacing-sm) var(--spacing-md);
+      text-align: center;
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        display: none;
+      }
+
+      .container {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Terraphim Chat Components Demo</h1>
+    <div class="controls">
+      <div class="theme-selector">
+        <label for="themeSelect">Theme:</label>
+        <select id="themeSelect">
+          <option value="default">Default</option>
+          <option value="cerulean">Cerulean</option>
+          <option value="cosmo">Cosmo</option>
+          <option value="cyborg">Cyborg (Dark)</option>
+          <option value="darkly">Darkly (Dark)</option>
+          <option value="flatly">Flatly</option>
+          <option value="journal">Journal</option>
+          <option value="litera">Litera</option>
+          <option value="lumen">Lumen</option>
+          <option value="lux">Lux</option>
+          <option value="materia">Materia</option>
+          <option value="minty">Minty</option>
+          <option value="nuclear">Nuclear (Dark)</option>
+          <option value="pulse">Pulse</option>
+          <option value="sandstone">Sandstone</option>
+          <option value="simplex">Simplex</option>
+          <option value="slate">Slate (Dark)</option>
+          <option value="solar">Solar (Dark)</option>
+          <option value="spacelab" selected>Spacelab</option>
+          <option value="superhero">Superhero (Dark)</option>
+          <option value="united">United</option>
+          <option value="yeti">Yeti</option>
+        </select>
+      </div>
+      <button onclick="clearMessages()">Clear Messages</button>
+      <button class="secondary" onclick="toggleMarkdown()">Toggle Markdown</button>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <h2>Demo Controls</h2>
+
+      <div class="section">
+        <h3>Quick Actions</h3>
+        <button onclick="addUserMessage()">Add User Message</button>
+        <button onclick="addAssistantMessage()">Add Assistant Message</button>
+        <button onclick="addSystemMessage()">Add System Message</button>
+        <button onclick="addMarkdownMessage()">Add Markdown Message</button>
+        <button onclick="simulateConversation()">Simulate Conversation</button>
+        <button onclick="loadLargeDataset()">Load 100+ Messages</button>
+      </div>
+
+      <div class="section">
+        <h3>Test Scenarios</h3>
+        <button onclick="testSending()">Test Sending State</button>
+        <button onclick="testLoading()">Test Loading State</button>
+        <button onclick="testStreaming()">Test Streaming</button>
+        <button onclick="testAutoScroll()">Test Auto-Scroll</button>
+      </div>
+
+      <div class="section">
+        <h3>Info</h3>
+        <div class="info-panel">
+          <p><strong>Message Count:</strong> <span id="messageCount">0</span></p>
+          <p><strong>Markdown:</strong> <span id="markdownStatus">ON</span></p>
+          <p><strong>Virtual Scroll:</strong> <span id="virtualScrollStatus">ON</span></p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="chat-area">
+      <div class="chat-header">
+        <h2>Week 1: Chat Component Foundation</h2>
+        <p>Demonstrating ChatAPIClient, terraphim-chat-message, terraphim-chat-input, and terraphim-chat-messages</p>
+      </div>
+
+      <terraphim-chat-messages
+        id="chatMessages"
+        render-markdown
+        virtual-scrolling>
+      </terraphim-chat-messages>
+
+      <terraphim-chat-input
+        id="chatInput"
+        placeholder="Type your message and press Enter...">
+      </terraphim-chat-input>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p>Terraphim AI - Week 1 Demo | Pure Vanilla JavaScript Web Components | No Build Tools Required</p>
+  </footer>
+
+  <!-- Import Web Components -->
+  <script type="module">
+    import { ChatAPIClient } from '../chat/chat-api-client.js';
+    import '../chat/terraphim-chat-messages.js';
+    import '../chat/terraphim-chat-input.js';
+
+    // Initialize demo state
+    let messages = [];
+    let renderMarkdown = true;
+    let isSending = false;
+
+    // Get component references
+    const chatMessages = document.getElementById('chatMessages');
+    const chatInput = document.getElementById('chatInput');
+    const messageCountEl = document.getElementById('messageCount');
+    const markdownStatusEl = document.getElementById('markdownStatus');
+
+    // Initialize ChatAPIClient (demo mode, no real backend)
+    const apiClient = new ChatAPIClient(false, 'http://localhost:8000');
+
+    // Listen to API events
+    apiClient.addEventListener('api-success', (e) => {
+      console.log('API Success:', e.detail);
+    });
+
+    apiClient.addEventListener('api-error', (e) => {
+      console.error('API Error:', e.detail);
+    });
+
+    // Handle message submission
+    chatInput.addEventListener('message-submit', async (e) => {
+      const text = e.detail.text;
+
+      // Add user message
+      addMessage({
+        role: 'user',
+        content: text,
+        timestamp: new Date().toISOString()
+      });
+
+      // Simulate sending state
+      setSending(true);
+
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+
+      // Add simulated response
+      addMessage({
+        role: 'assistant',
+        content: generateResponse(text),
+        timestamp: new Date().toISOString()
+      });
+
+      setSending(false);
+    });
+
+    // Update messages
+    function updateMessages() {
+      chatMessages.messages = [...messages];
+      messageCountEl.textContent = messages.length;
+    }
+
+    function addMessage(message) {
+      messages.push(message);
+      updateMessages();
+    }
+
+    function setSending(sending) {
+      isSending = sending;
+      chatMessages.sending = sending;
+      chatInput.disabled = sending;
+    }
+
+    // Generate simulated response
+    function generateResponse(userMessage) {
+      const responses = [
+        `I understand you said: "${userMessage}". How can I help you with that?`,
+        `That's an interesting point about "${userMessage}". Let me explain...`,
+        `Here's what I know about **${userMessage}**:\n\n- Point 1\n- Point 2\n- Point 3`,
+        `\`\`\`javascript\n// Example code related to: ${userMessage}\nconst result = processInput('${userMessage}');\nconsole.log(result);\n\`\`\``,
+        `Great question! Regarding "${userMessage}", I can provide the following insights...`
+      ];
+      return responses[Math.floor(Math.random() * responses.length)];
+    }
+
+    // Theme switching
+    document.getElementById('themeSelect').addEventListener('change', (e) => {
+      document.documentElement.setAttribute('data-theme', e.target.value);
+    });
+
+    // Global functions for demo controls
+    window.clearMessages = () => {
+      messages = [];
+      updateMessages();
+    };
+
+    window.toggleMarkdown = () => {
+      renderMarkdown = !renderMarkdown;
+      chatMessages.renderMarkdown = renderMarkdown;
+      markdownStatusEl.textContent = renderMarkdown ? 'ON' : 'OFF';
+    };
+
+    window.addUserMessage = () => {
+      addMessage({
+        role: 'user',
+        content: 'This is a sample user message',
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    window.addAssistantMessage = () => {
+      addMessage({
+        role: 'assistant',
+        content: 'This is a sample assistant message with helpful information.',
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    window.addSystemMessage = () => {
+      addMessage({
+        role: 'system',
+        content: 'System notification: Connection established',
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    window.addMarkdownMessage = () => {
+      addMessage({
+        role: 'assistant',
+        content: `# Markdown Example
+
+Here's some **bold text** and *italic text*.
+
+\`\`\`javascript
+function example() {
+  console.log('Hello, World!');
+}
+\`\`\`
+
+And here's an [example link](https://terraphim.ai).
+
+- List item 1
+- List item 2
+- List item 3`,
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    window.simulateConversation = async () => {
+      const conversation = [
+        { role: 'user', content: 'Hello! Can you help me?' },
+        { role: 'assistant', content: 'Of course! I\'d be happy to help. What do you need?' },
+        { role: 'user', content: 'I need to understand how these components work' },
+        { role: 'assistant', content: 'Great question! Let me explain the **Week 1 components**:\n\n1. **ChatAPIClient** - Handles API communication\n2. **terraphim-chat-message** - Individual message bubbles\n3. **terraphim-chat-input** - Message input with keyboard shortcuts\n4. **terraphim-chat-messages** - Message list with virtual scrolling' },
+      ];
+
+      for (const msg of conversation) {
+        addMessage({
+          ...msg,
+          timestamp: new Date().toISOString()
+        });
+        await new Promise(resolve => setTimeout(resolve, 800));
+      }
+    };
+
+    window.loadLargeDataset = () => {
+      const count = 150;
+      for (let i = 0; i < count; i++) {
+        addMessage({
+          role: i % 3 === 0 ? 'user' : 'assistant',
+          content: `Message ${i + 1}: This is a test message to demonstrate virtual scrolling performance with large datasets.`,
+          timestamp: new Date(Date.now() - (count - i) * 60000).toISOString()
+        });
+      }
+    };
+
+    window.testSending = async () => {
+      setSending(true);
+      await new Promise(resolve => setTimeout(resolve, 3000));
+      setSending(false);
+    };
+
+    window.testLoading = async () => {
+      chatMessages.loading = true;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      chatMessages.loading = false;
+      window.simulateConversation();
+    };
+
+    window.testStreaming = () => {
+      const streamingMsg = {
+        role: 'assistant',
+        content: 'This message is being streamed...',
+        timestamp: new Date().toISOString(),
+        streaming: true
+      };
+
+      messages.push(streamingMsg);
+      updateMessages();
+
+      // Simulate streaming completion
+      setTimeout(() => {
+        messages[messages.length - 1].streaming = false;
+        messages[messages.length - 1].content = 'Streaming complete! This is the full message that was being typed.';
+        updateMessages();
+      }, 3000);
+    };
+
+    window.testAutoScroll = async () => {
+      for (let i = 0; i < 5; i++) {
+        addMessage({
+          role: 'assistant',
+          content: `Auto-scroll test message ${i + 1}`,
+          timestamp: new Date().toISOString()
+        });
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+    };
+
+    // Initialize with welcome message
+    addMessage({
+      role: 'assistant',
+      content: `# Welcome to Terraphim Chat Demo!
+
+This demo showcases **Week 1** deliverables:
+
+✅ **ChatAPIClient** - Dual-mode API communication layer
+✅ **terraphim-chat-message** - Individual message component
+✅ **terraphim-chat-input** - Input with auto-resize
+✅ **terraphim-chat-messages** - Container with virtual scrolling
+
+Try the controls on the left to test different scenarios!`,
+      timestamp: new Date().toISOString()
+    });
+  </script>
+</body>
+</html>
