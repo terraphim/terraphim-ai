@@ -34,3 +34,4 @@ rust-sdk
 .aider*
 scratchpad/firecracker-rust
 terraphim_server/dist/
+scratchpad/
