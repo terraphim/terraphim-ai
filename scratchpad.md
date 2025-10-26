@@ -69,8 +69,7 @@
    - Verified @ files were NOT duplicates (different line counts and content)
    - `@lessons-learned.md` (1494 lines) vs `lessons-learned.md` (1174 lines)
    - Merged content to preserve all historical lessons
-2. ✅ **TruthForge Documentation Organized**: Created `docs/src/truthforge/`
-   - Copied 9 specification documents from `~/projects/zestic-at/trueforge/truthforge-ai/docs`
+   - Copied 9 specification documents from `[PRIVATE_DOCS_REMOVED]`
    - Created comprehensive README.md index
 3. ✅ **Git Operations**:
    - Committed 27 files with 13,405 insertions
@@ -79,9 +78,7 @@
    - Committed cargo fmt formatting changes
 
 **Files Modified in Previous Session**:
-- `docs/src/truthforge/README.md` (NEW)
 - `docs/src/history/` directory with historical @ files
-- `crates/terraphim_truthforge/src/agents/omission_detector.rs` (formatting only)
 
 ---
 
@@ -92,10 +89,6 @@
 ### Phase 4 Complete Summary
 
 **All Features Implemented** ✅:
-1. ✅ **REST API Endpoints Created** (`terraphim_server/src/truthforge_api.rs` - 154 lines)
-   - `POST /api/v1/truthforge` - Submit narrative for analysis
-   - `GET /api/v1/truthforge/{session_id}` - Retrieve analysis result
-   - `GET /api/v1/truthforge/analyses` - List all session IDs
    - Request/response models with proper serialization
 
 2. ✅ **Session Storage Infrastructure**
@@ -105,8 +98,6 @@
    - Currently in-memory (production will use Redis)
 
 3. ✅ **Server Integration**
-   - Extended `AppState` with `truthforge_sessions` field
-   - Added `terraphim-truthforge` dependency to `terraphim_server/Cargo.toml`
    - Initialized SessionStore in both main and test server functions
    - Routes registered in router (6 routes with trailing slash variants)
 
@@ -117,13 +108,11 @@
    - Result stored asynchronously after completion
    - Logging for analysis start, completion, and errors
 
-5. ✅ **WebSocket Progress Streaming** (`terraphim_server/src/truthforge_api.rs:20-38`)
    - `emit_progress()` helper function
    - Integration with existing `websocket_broadcaster`
    - Three event stages: started, completed, failed
    - Rich progress data (omission counts, risk scores, timing)
 
-6. ✅ **Integration Tests** (`terraphim_server/tests/truthforge_api_test.rs` - 137 lines)
    - 5 comprehensive test cases
    - All endpoints validated (POST, GET, list)
    - WebSocket progress event verification
@@ -146,7 +135,6 @@
 
 ### API Design
 
-**POST /api/v1/truthforge**:
 ```json
 {
   "text": "We achieved a 40% cost reduction this quarter...",
@@ -160,11 +148,9 @@ Response:
 {
   "status": "Success",
   "session_id": "550e8400-e29b-41d4-a716-446655440000",
-  "analysis_url": "/api/v1/truthforge/550e8400-e29b-41d4-a716-446655440000"
 }
 ```
 
-**GET /api/v1/truthforge/{session_id}**:
 ```json
 {
   "status": "Success",
@@ -188,13 +174,8 @@ Response:
 4. **SessionStore Clone Pattern**: Each handler gets cloned Arc for thread-safe access
 
 ### Files Created/Modified
-- `terraphim_server/src/truthforge_api.rs` (NEW - 189 lines with WebSocket)
-- `terraphim_server/tests/truthforge_api_test.rs` (NEW - 137 lines, 5 tests)
 - `terraphim_server/src/lib.rs` (+20 lines: module, AppState, routes × 2 routers)
 - `terraphim_server/Cargo.toml` (+1 dependency)
-- `crates/terraphim_truthforge/examples/api_usage.md` (NEW - 400+ lines API docs)
-- `crates/terraphim_truthforge/README.md` (UPDATED - Phase 4 complete status)
-- `crates/terraphim_truthforge/STATUS.md` (Phase 4 complete documentation)
 - `scratchpad.md` (Phase 4 summary)
 - `memories.md` (Phase 4 implementation details)
 
@@ -212,7 +193,6 @@ Response:
 
 **All Features Implemented** ✅:
 
-### 1. ✅ **Vanilla JavaScript UI** (`examples/truthforge-ui/`)
    - **index.html** (430 lines): Complete narrative input form + results dashboard
      - Narrative textarea with 10,000 character limit
      - Context controls (urgency: Low/High, stakes checkboxes, audience)
@@ -238,19 +218,15 @@ Response:
    - **websocket-client.js**: Copied from agent-workflows/shared/
 
 ### 2. ✅ **Deployment Infrastructure**
-   - **deploy-truthforge-ui.sh** (200+ lines): Automated 5-phase deployment
      - Phase 1: Rsync files to bigbox
-     - Phase 2: Add Caddy configuration for alpha.truthforge.terraphim.cloud
      - Phase 3: Update API endpoints (localhost → production URLs)
      - Phase 4: Start backend with `op run` for OPENROUTER_API_KEY
      - Phase 5: Verify deployment (UI access + API health checks)
 
    - **Caddy Configuration**:
      ```caddy
-     alpha.truthforge.terraphim.cloud {
          import tls_config
          authorize with mypolicy
-         root * /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui
          file_server
          handle /api/* { reverse_proxy 127.0.0.1:8090 }
          handle @ws { reverse_proxy 127.0.0.1:8090 }
@@ -274,17 +250,10 @@ Response:
    - **Deployment Topology**:
      ```
      bigbox.terraphim.cloud (Caddy reverse proxy)
-     ├── private.terraphim.cloud:8090 → TruthForge API Backend
-     └── alpha.truthforge.terraphim.cloud → Alpha UI (K-Partners pilot)
+     ├── [PRIVATE_API_REMOVED] → TruthForge API Backend
      ```
 
 ### Files Created/Modified (Phase 5)
-- `examples/truthforge-ui/index.html` (NEW - 430 lines)
-- `examples/truthforge-ui/app.js` (NEW - 600+ lines)
-- `examples/truthforge-ui/styles.css` (NEW - 800+ lines)
-- `examples/truthforge-ui/websocket-client.js` (COPIED from agent-workflows/shared/)
-- `examples/truthforge-ui/README.md` (UPDATED - deployment sections replaced)
-- `scripts/deploy-truthforge-ui.sh` (NEW - 200+ lines, executable)
 - `scratchpad.md` (Phase 5 summary)
 - `memories.md` (Phase 5 implementation details - pending)
 - `lessons-learned.md` (Deployment patterns - pending)
@@ -307,21 +276,17 @@ Response:
 
 **Production Deployment Summary**:
 1. ✅ **Bigbox Deployment**: UI and backend deployed to production
-   - UI Files: `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/`
-   - Backend: `/home/alex/infrastructure/terraphim-private-cloud-new/terraphim-ai/target/release/terraphim_server`
-   - Backend Source: `/home/alex/infrastructure/terraphim-private-cloud-new/terraphim-ai/`
-   - Service: `truthforge-backend.service` (active and running)
+   - Backend: `[PRIVATE_INFRASTRUCTURE_REMOVED]terraphim-ai/target/release/terraphim_server`
+   - Backend Source: `[PRIVATE_INFRASTRUCTURE_REMOVED]terraphim-ai/`
 
 2. ✅ **Backend Configuration**:
    - Port: 8090 (avoiding conflict with vm.terraphim.cloud on 8080)
    - Service Status: Active and running
    - Environment: `TERRAPHIM_SERVER_HOSTNAME=127.0.0.1:8090`
-   - Logs: `/home/alex/caddy_terraphim/log/truthforge-backend.log`
    - TruthForge API Module: Verified present and functional
    - Health Endpoint: Returns JSON (verified working)
 
 3. ✅ **Caddy Configuration**:
-   - Domain: `alpha.truthforge.terraphim.cloud`
    - Authentication: OAuth2 via auth.terraphim.cloud (GitHub)
    - GitHub Client ID: 6182d53553cf86b0faf2 (loaded from caddy_complete.env)
    - Reverse Proxy: /api/* and /ws to 127.0.0.1:8090
@@ -337,9 +302,6 @@ Response:
    - OAuth flow: Verified working (GitHub redirect functioning)
 
 **Production URLs**:
-- UI: https://alpha.truthforge.terraphim.cloud (requires auth)
-- API: https://alpha.truthforge.terraphim.cloud/api/* (proxied to backend)
-- WebSocket: wss://alpha.truthforge.terraphim.cloud/ws (proxied to backend)
 
 **API Testing Results** (2025-10-08):
 - Test Narrative: Charlie Kirk political violence commentary (High urgency, PublicMedia)
@@ -362,7 +324,6 @@ Response:
 
 **Public URL Deployment with Three Authentication Methods**:
 1. ✅ **Backend Running**: TruthForge backend on 127.0.0.1:8090 with OpenRouter API integration
-2. ✅ **Public Access**: https://alpha.truthforge.terraphim.cloud with three authentication methods
 3. ✅ **Caddy Systemd Service**: Running with EnvironmentFile properly loading GitHub secrets
    - Service: `caddy-terraphim.service` (active and running)
    - EnvironmentFile: `/home/alex/caddy_terraphim/caddy_complete.env`
@@ -374,7 +335,6 @@ Response:
    - **JWT Bearer Tokens**: Infrastructure complete with token generation script
 
 **Authentication Flow**:
-- User visits https://alpha.truthforge.terraphim.cloud
 - Caddy redirects to https://auth.terraphim.cloud/oauth2/github for OAuth
 - GitHub authentication → JWT token issued by Caddy
 - JWT token stored in browser cookie (domain: .terraphim.cloud)
@@ -385,13 +345,8 @@ Response:
 - `/home/alex/caddy_terraphim/conf/Caddyfile_auth` - Caddy OAuth + JWT + Basic Auth configuration
 - `/home/alex/caddy_terraphim/caddy_complete.env` - GitHub secrets (loaded via systemd EnvironmentFile)
 - `/etc/systemd/system/caddy-terraphim.service` - Caddy systemd service with EnvironmentFile
-- `/home/alex/.config/systemd/user/truthforge-backend.service` - Backend systemd service
-- `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/AUTH_GUIDE.md` - Authentication guide
-- `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/DEPLOYMENT_SUMMARY.md` - Complete deployment docs
 
 **Logs**:
-- Backend: `/home/alex/truthforge-backend.log`
-- Caddy: `/home/alex/caddy_terraphim/log/truthforge-alpha.log`
 - Systemd: `sudo journalctl -u caddy-terraphim.service -f`
 
 ### Next Steps (Phase 7)
@@ -421,7 +376,6 @@ Response:
 - [x] Scratchpad.md updated with Phase 6 complete
 - [x] OPENROUTER_API_KEY configured in systemd service
 - [x] JWT bearer token infrastructure complete
-- [x] Public hostname exposed (alpha.truthforge.terraphim.cloud)
 - [ ] End-to-end workflow tested with real LLM via public URL (pending)
 - [ ] Documentation updated (memories.md, lessons-learned.md with Phase 6)
 # Current Work: Terraphim Multi-Role Agent System Testing & Production 🚀

@@ -2,7 +2,7 @@
 
 **Date**: 2025-10-09
 **Status**: ✅ **DEPLOYED TO PRODUCTION**
-**URL**: https://alpha.truthforge.terraphim.cloud/
+**URL**: [Private Deployment - Removed]
 
 ---
 
@@ -149,14 +149,14 @@ All changes reviewed by overseer agent:
 ## Deployment Details
 
 ### Production Environment
-- **Frontend**: `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/`
+- **Frontend**: `[PRIVATE_PATH_REMOVED]`
 - **URL**: https://alpha.truthforge.terraphim.cloud/
 - **Backend**: Port 8090 (proxied by Caddy)
 - **Authentication**: GitHub OAuth via auth.terraphim.cloud
 
 ### Deployed Files (verified)
 ```bash
-/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/
+[PRIVATE_PATH_REMOVED]
 ├── app.js (updated with debug integration)
 ├── index.html (updated with debug panel)
 ├── shared/
@@ -176,14 +176,14 @@ All changes reviewed by overseer agent:
 ```bash
 # 1. Deploy 6-truthforge-debate app
 rsync -avz examples/agent-workflows/6-truthforge-debate/ \
-  /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/
+  [PRIVATE_PATH_REMOVED]
 
 # 2. Deploy shared components
 rsync -avz examples/agent-workflows/shared/ \
-  /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/shared/
+  [PRIVATE_PATH_REMOVED]shared/
 
 # 3. Verify deployment
-ls -la /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/shared/debug-panel.*
+ls -la [PRIVATE_PATH_REMOVED]shared/debug-panel.*
 curl -s https://alpha.truthforge.terraphim.cloud/api/health
 ```
 
@@ -329,7 +329,7 @@ npm test
 ## Production Validation Checklist
 
 - [x] Backend running (localhost:8000 locally, port 8090 in production)
-- [x] Frontend deployed to `/home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/`
+- [x] Frontend deployed to `[PRIVATE_PATH_REMOVED]`
 - [x] Shared components deployed to `truthforge-ui/shared/`
 - [x] Debug panel files present (debug-panel.js, debug-panel.css)
 - [x] Settings modal updated with debug checkbox
@@ -516,7 +516,7 @@ cargo test --package terraphim-truthforge
 # Output: 37 passed
 
 # Files deployed
-ls /home/alex/infrastructure/terraphim-private-cloud-new/truthforge-ui/shared/debug-panel.*
+ls [PRIVATE_PATH_REMOVED]shared/debug-panel.*
 # Output: debug-panel.css, debug-panel.js
 
 # Production API
