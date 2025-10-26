@@ -1,0 +1,119 @@
+   Compiling ring v0.17.14
+warning: terraphim_server@0.2.3: No changes in JS source files, skipping JS build.
+warning: terraphim_server@0.2.3: Found ./dist, skipping copy
+   Compiling rustls v0.23.34
+   Compiling rustls-webpki v0.103.7
+   Compiling sqlx-core v0.8.6
+   Compiling tokio-rustls v0.26.4
+   Compiling hyper-rustls v0.27.7
+   Compiling reqwest v0.12.24
+   Compiling sqlx-sqlite v0.8.6
+   Compiling reqsign v0.16.5
+   Compiling sqlx-macros-core v0.8.6
+   Compiling redis v0.32.7
+   Compiling terraphim_automata v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_automata)
+   Compiling terraphim_rolegraph v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_rolegraph)
+   Compiling sqlx-macros v0.8.6
+   Compiling terraphim_atomic_client v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_atomic_client)
+   Compiling reqwest-eventsource v0.6.0
+   Compiling genai v0.4.3-wip (https://github.com/terraphim/rust-genai.git?branch=main#a61208e2)
+   Compiling sqlx v0.8.6
+   Compiling opendal v0.54.1
+   Compiling terraphim_persistence v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence)
+   Compiling terraphim_config v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_config)
+   Compiling terraphim_agent_evolution v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_agent_evolution)
+   Compiling terraphim_middleware v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware)
+   Compiling terraphim_service v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service)
+   Compiling terraphim_multi_agent v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_multi_agent)
+   Compiling terraphim-truthforge v0.2.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_truthforge)
+   Compiling terraphim_server v0.2.3 (/home/alex/projects/terraphim/terraphim-ai/terraphim_server)
+warning: struct `TaskStatusRequest` is never constructed
+   --> terraphim_server/src/api.rs:401:12
+    |
+401 | pub struct TaskStatusRequest {
+    |            ^^^^^^^^^^^^^^^^^
+    |
+    = note: `#[warn(dead_code)]` on by default
+
+warning: `terraphim_server` (lib) generated 1 warning
+    Finished `dev` profile [unoptimized + debuginfo] target(s) in 16.77s
+     Running `target/debug/terraphim_server --config terraphim_server/default/terraphim_engineer_config.json`
+[2025-10-26T10:39:09Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T10:39:09Z INFO  terraphim_server] Device settings hostname: "127.0.0.1:8000"
+[2025-10-26T10:39:09Z INFO  terraphim_server] 🔧 Pre-creating storage directories...
+[2025-10-26T10:39:09Z INFO  terraphim_server] Found 3 profiles: ["sqlite", "memory", "dashmap"]
+[2025-10-26T10:39:09Z INFO  terraphim_server] Processing profile 'sqlite' of type 'sqlite'
+[2025-10-26T10:39:09Z INFO  terraphim_server] 🔧 Creating SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T10:39:09Z INFO  terraphim_server] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T10:39:09Z INFO  terraphim_server] Processing profile 'memory' of type 'memory'
+[2025-10-26T10:39:09Z INFO  terraphim_server] Processing profile 'dashmap' of type 'dashmap'
+[2025-10-26T10:39:09Z INFO  terraphim_server] 🔧 Creating DashMap directory: /tmp/terraphim_dashmap
+[2025-10-26T10:39:09Z INFO  terraphim_server] ✅ Created DashMap directory: /tmp/terraphim_dashmap
+[2025-10-26T10:39:09Z INFO  terraphim_server] ✅ Storage directory pre-creation completed
+[2025-10-26T10:39:09Z INFO  terraphim_server] Using TERRAPHIM_SERVER_PORT: 22482
+[2025-10-26T10:39:09Z INFO  terraphim_server] Loading configuration from terraphim_server/default/terraphim_engineer_config.json (role: TerraphimEngineer)
+[2025-10-26T10:39:09Z INFO  terraphim_server] Loading TerraphimEngineer role configuration from terraphim_server/default/terraphim_engineer_config.json
+[2025-10-26T10:39:09Z WARN  terraphim_server] Failed to parse TerraphimEngineer role config: Error("missing field `terraphim_it`", line: 57, column: 5)
+[2025-10-26T10:39:09Z INFO  terraphim_server] Falling back to default server configuration
+[2025-10-26T10:39:09Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T10:39:09Z INFO  terraphim_config] Current working directory: /home/alex/projects/terraphim/terraphim-ai
+[2025-10-26T10:39:09Z INFO  terraphim_config] Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2025-10-26T10:39:09Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T10:39:09Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: false, default_data_path: "${HOME/.terraphim}", profiles: {"rocksdb": {"type": "rocksdb", "datadir": "/tmp/terraphim_rocksdb"}, "dashmap": {"type": "dashmap", "root": "/tmp/dashmaptest"}, "rock": {"type": "rocksdb", "datadir": "/tmp/opendal/rocksdb"}, "memory": {"type": "memory"}, "sqlite": {"datadir": "/tmp/terraphim_sqlite", "table": "terraphim_kv", "type": "sqlite", "connection_string": "/tmp/terraphim_sqlite/terraphim.db"}} }
+[2025-10-26T10:39:09Z INFO  terraphim_persistence] 🔧 Pre-creating DashMap directory: /tmp/dashmaptest
+[2025-10-26T10:39:09Z INFO  terraphim_persistence] ✅ Created DashMap directory: /tmp/dashmaptest
+[2025-10-26T10:39:09Z INFO  terraphim_persistence] 🔧 Pre-creating SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T10:39:09Z INFO  terraphim_persistence] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rocksdb
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'rocksdb' using scheme: Rocksdb
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: dashmap
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'dashmap' using scheme: Dashmap
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] Got request for dashmap operator; initializing in-memory operator.
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rock
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'rock' using scheme: Rocksdb
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: memory
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'memory' using scheme: Memory
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] Got request for memory operator; initializing in-memory operator.
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: sqlite
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'sqlite' using scheme: Sqlite
+[2025-10-26T10:39:09Z INFO  terraphim_persistence::settings] Got request for sqlite operator; initializing in-memory operator.
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c3d8c80 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c4b4040 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c3d8c80 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c3dd6b0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c4a6130 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c2ed0b0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z WARN  opendal::services] service=memory name=0x55c49c3d8c80 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T10:39:09Z INFO  terraphim_server] Failed to load saved config, using default: OpenDal(NotFound (permanent) at read => memory doesn't have this path
+
+    Context:
+       service: memory
+       path: server_config.json
+       range: 0-
+    )
+[2025-10-26T10:39:09Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T10:39:09Z INFO  terraphim_config] Current working directory: /home/alex/projects/terraphim/terraphim-ai
+[2025-10-26T10:39:09Z INFO  terraphim_config] Automata remote URL: Remote URL: "https://staging-storage.terraphim.io/thesaurus_Default.json"
+[2025-10-26T10:39:09Z INFO  terraphim_config] Creating role System Operator
+[2025-10-26T10:39:09Z INFO  terraphim_config] Role System Operator is configured correctly with automata_path
+[2025-10-26T10:39:09Z INFO  terraphim_config] Loading Role `System Operator` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2025-10-26T10:39:09Z INFO  terraphim_config] Successfully loaded thesaurus from automata path
+[2025-10-26T10:39:09Z INFO  terraphim_config] Creating role Engineer
+[2025-10-26T10:39:09Z INFO  terraphim_config] Role Engineer is configured correctly with automata_path
+[2025-10-26T10:39:09Z INFO  terraphim_config] Loading Role `Engineer` - URL: Remote("https://staging-storage.terraphim.io/thesaurus_Default.json")
+[2025-10-26T10:39:09Z INFO  terraphim_config] Successfully loaded thesaurus from automata path
+[2025-10-26T10:39:09Z INFO  terraphim_config] Creating role Default
+[2025-10-26T10:39:09Z INFO  terraphim_server] Server started with 3 roles:
+[2025-10-26T10:39:09Z INFO  terraphim_server]   - Role: System Operator (relevance: TerraphimGraph, kg: true)
+[2025-10-26T10:39:09Z INFO  terraphim_server]   - Role: Engineer (relevance: TerraphimGraph, kg: true)
+[2025-10-26T10:39:09Z INFO  terraphim_server]   - Role: Default (relevance: TitleScorer, kg: false)
+[2025-10-26T10:39:09Z INFO  terraphim_server] Starting axum server
+[2025-10-26T10:39:09Z INFO  terraphim_server] Initialized summarization manager with default configuration
+[2025-10-26T10:39:09Z INFO  terraphim_server] Initialized workflow management system with WebSocket support
+[2025-10-26T10:39:09Z INFO  terraphim_service::summarization_worker] Starting summarization worker with 3 max concurrent workers
+[2025-10-26T10:39:09Z INFO  terraphim_service::summarization_worker] Worker 2 started
+[2025-10-26T10:39:09Z INFO  terraphim_service::summarization_worker] Worker 1 started
+[2025-10-26T10:39:09Z INFO  terraphim_service::summarization_worker] Worker 0 started
+listening on http://127.0.0.1:22482

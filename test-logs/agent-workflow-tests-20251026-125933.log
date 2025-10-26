@@ -1,0 +1,19 @@
+[0;34m[INFO][0m Agent Workflow Test Suite Started
+[0;34m[INFO][0m Workflow pattern: prompt-chaining
+[0;34m[INFO][0m Backend URL: http://localhost:8000
+[0;34m[INFO][0m Test timeout: 60s
+[0;34m[INFO][0m Log file: /home/alex/projects/terraphim/terraphim-ai/test-logs/agent-workflow-tests-20251026-125933.log
+[0;34m[INFO][0m Skipping backend startup
+[0;35m[WORKFLOW][0m Testing prompt-chaining workflow pattern
+[0;34m[INFO][0m Testing prompt chaining workflow (6-stage development pipeline)
+[0;31m[ERROR][0m Failed to call prompt chaining endpoint
+[0;31m[ERROR][0m prompt-chaining workflow failed (0s)
+[0;34m[INFO][0m ============================================
+[0;34m[INFO][0m Agent Workflow Test Results Summary
+[0;34m[INFO][0m ============================================
+[0;34m[INFO][0m Total duration: 0s
+[0;34m[INFO][0m Workflows tested: 1
+[0;34m[INFO][0m Failed workflows: 1
+[0;31m[ERROR][0m ❌ 1 workflow(s) failed: prompt-chaining
+[0;31m[ERROR][0m Check the log file for details: /home/alex/projects/terraphim/terraphim-ai/test-logs/agent-workflow-tests-20251026-125933.log
+[0;34m[INFO][0m Cleaning up test environment...

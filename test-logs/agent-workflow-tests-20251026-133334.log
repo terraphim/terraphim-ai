@@ -1,0 +1,19 @@
+[0;34m[INFO][0m Agent Workflow Test Suite Started
+[0;34m[INFO][0m Workflow pattern: optimization
+[0;34m[INFO][0m Backend URL: http://localhost:8000
+[0;34m[INFO][0m Test timeout: 60s
+[0;34m[INFO][0m Log file: /home/alex/projects/terraphim/terraphim-ai/test-logs/agent-workflow-tests-20251026-133334.log
+[0;34m[INFO][0m Skipping backend startup
+[0;35m[WORKFLOW][0m Testing optimization workflow pattern
+[0;34m[INFO][0m Testing optimization workflow (iterative quality improvement)
+[0;31m[ERROR][0m Optimization API endpoint failed: {"workflow_id":"workflow_1e0d5198-2964-40a8-ab78-8340c8d195ae","success":false,"result":null,"error":"Invalid role configuration: Role 'GeneratorAgent' not found in configuration","metadata":{"execution_time_ms":0,"pattern":"Optimization","steps":0,"role":"GeneratorAgent","overall_role":"Quality Optimizer"}}
+[0;31m[ERROR][0m optimization workflow failed (0s)
+[0;34m[INFO][0m ============================================
+[0;34m[INFO][0m Agent Workflow Test Results Summary
+[0;34m[INFO][0m ============================================
+[0;34m[INFO][0m Total duration: 0s
+[0;34m[INFO][0m Workflows tested: 1
+[0;34m[INFO][0m Failed workflows: 1
+[0;31m[ERROR][0m ❌ 1 workflow(s) failed: optimization
+[0;31m[ERROR][0m Check the log file for details: /home/alex/projects/terraphim/terraphim-ai/test-logs/agent-workflow-tests-20251026-133334.log
+[0;34m[INFO][0m Cleaning up test environment...

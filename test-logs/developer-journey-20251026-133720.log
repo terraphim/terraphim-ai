@@ -1,0 +1,10 @@
+[0;34m[INFO][0m Developer Journey Test Started
+[0;34m[INFO][0m Project: dev-journey-test-1761482240
+[0;34m[INFO][0m Backend URL: http://localhost:8000
+[0;34m[INFO][0m Test timeout: 60s
+[0;34m[INFO][0m Log file: /home/alex/projects/terraphim/terraphim-ai/test-logs/developer-journey-20251026-133720.log
+[0;34m[INFO][0m Skipping backend startup
+[0;35m[STAGE][0m Stage 1: Setting up Development Environment
+[0;36m[STEP][0m Building TUI...
+[0;36m[STEP][0m Testing TUI basic functionality
+[0;34m[INFO][0m Cleaning up test environment...

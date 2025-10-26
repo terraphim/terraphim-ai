@@ -1,0 +1,258 @@
+[2025-10-26T12:33:56Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T12:33:56Z INFO  terraphim_server] Device settings hostname: "127.0.0.1:8000"
+[2025-10-26T12:33:56Z INFO  terraphim_server] 🔧 Pre-creating storage directories...
+[2025-10-26T12:33:56Z INFO  terraphim_server] Found 3 profiles: ["sqlite", "memory", "dashmap"]
+[2025-10-26T12:33:56Z INFO  terraphim_server] Processing profile 'sqlite' of type 'sqlite'
+[2025-10-26T12:33:56Z INFO  terraphim_server] 🔧 Creating SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:56Z INFO  terraphim_server] Processing profile 'memory' of type 'memory'
+[2025-10-26T12:33:56Z INFO  terraphim_server] Processing profile 'dashmap' of type 'dashmap'
+[2025-10-26T12:33:56Z INFO  terraphim_server] 🔧 Creating DashMap directory: /tmp/terraphim_dashmap
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Created DashMap directory: /tmp/terraphim_dashmap
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Storage directory pre-creation completed
+[2025-10-26T12:33:56Z INFO  terraphim_server] Loading configuration from terraphim_server/default/terraphim_engineer_config.json (role: TerraphimEngineer)
+[2025-10-26T12:33:56Z INFO  terraphim_server] Loading TerraphimEngineer role configuration from terraphim_server/default/terraphim_engineer_config.json
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Successfully loaded TerraphimEngineer role configuration
+[2025-10-26T12:33:56Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T12:33:56Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: false, default_data_path: "${HOME/.terraphim}", profiles: {"dashmap": {"root": "/tmp/dashmaptest", "type": "dashmap"}, "rocksdb": {"datadir": "/tmp/terraphim_rocksdb", "type": "rocksdb"}, "rock": {"type": "rocksdb", "datadir": "/tmp/opendal/rocksdb"}, "sqlite": {"connection_string": "/tmp/terraphim_sqlite/terraphim.db", "datadir": "/tmp/terraphim_sqlite", "type": "sqlite", "table": "terraphim_kv"}, "memory": {"type": "memory"}} }
+[2025-10-26T12:33:56Z INFO  terraphim_persistence] 🔧 Pre-creating DashMap directory: /tmp/dashmaptest
+[2025-10-26T12:33:56Z INFO  terraphim_persistence] ✅ Created DashMap directory: /tmp/dashmaptest
+[2025-10-26T12:33:56Z INFO  terraphim_persistence] 🔧 Pre-creating SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:56Z INFO  terraphim_persistence] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 📁 Parsing profile: dashmap
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 🔧 Profile 'dashmap' using scheme: Dashmap
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] Got request for dashmap operator; initializing in-memory operator.
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rocksdb
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 🔧 Profile 'rocksdb' using scheme: Rocksdb
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rock
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 🔧 Profile 'rock' using scheme: Rocksdb
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 📁 Parsing profile: sqlite
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 🔧 Profile 'sqlite' using scheme: Sqlite
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] Got request for sqlite operator; initializing in-memory operator.
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 📁 Parsing profile: memory
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] 🔧 Profile 'memory' using scheme: Memory
+[2025-10-26T12:33:56Z INFO  terraphim_persistence::settings] Got request for memory operator; initializing in-memory operator.
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516b083450 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516b083450 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516b06b1b0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516b0830f0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516b083330 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516af94bb0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z WARN  opendal::services] service=memory name=0x56516b083450 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:56Z INFO  terraphim_server] No saved config found, using TerraphimEngineer role config: OpenDal(NotFound (permanent) at read => memory doesn't have this path
+
+    Context:
+       service: memory
+       path: server_config.json
+       range: 0-
+    )
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role Default
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role QAEngineer
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role EvaluatorAgent
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role GeneratorAgent
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role DevOpsEngineer
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role Terraphim Engineer
+[2025-10-26T12:33:56Z INFO  terraphim_config] Role Terraphim Engineer has no automata_path, building thesaurus from local KG files at "docs/src/kg"
+[2025-10-26T12:33:56Z INFO  terraphim_config] Successfully built thesaurus from local KG for role Terraphim Engineer
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role BusinessAnalyst
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role DevelopmentAgent
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role BackendArchitect
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role OrchestratorAgent
+[2025-10-26T12:33:56Z INFO  terraphim_config] Creating role ProductManager
+[2025-10-26T12:33:56Z INFO  terraphim_server] Server started with 11 roles:
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: Default (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: QAEngineer (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: EvaluatorAgent (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: GeneratorAgent (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: DevOpsEngineer (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: Terraphim Engineer (relevance: TerraphimGraph, kg: true)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: BusinessAnalyst (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: DevelopmentAgent (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: BackendArchitect (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: OrchestratorAgent (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - Role: ProductManager (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:56Z INFO  terraphim_server] Starting axum server
+[2025-10-26T12:33:56Z INFO  terraphim_server] Building rolegraph for role 'Terraphim Engineer' from local files
+[2025-10-26T12:33:56Z INFO  terraphim_server] Knowledge graph path: "docs/src/kg"
+[2025-10-26T12:33:56Z INFO  terraphim_server] Found 18 markdown files in "docs/src/kg"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/system.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/issue-tracking.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/PACKAGE_MANAGER_REPLACEMENT.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/api.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/bug-reporting.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/service.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/graph.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/bun_install.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/knowledge-graph.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/terraphim-graph.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/search.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/database.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/haystack.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/bun.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/configuration.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/knowledge-graph-system.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/thesaurus.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server]   - "docs/src/kg/middleware.md"
+[2025-10-26T12:33:56Z INFO  terraphim_server] Created Logseq builder for path: "docs/src/kg"
+[2025-10-26T12:33:56Z INFO  terraphim_server] Successfully built and indexed rolegraph for role 'Terraphim Engineer' with 190 terms and 18 documents
+[2025-10-26T12:33:56Z INFO  terraphim_server] Successfully created rolegraph for role 'Terraphim Engineer'
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'systemmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'system.md' into rolegraph (body: 115 chars, nodes: 2, edges: 4, docs: 1)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'issuetrackingmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'issue-tracking.md' into rolegraph (body: 2463 chars, nodes: 5, edges: 11, docs: 2)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'packagemanagerreplacementmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'PACKAGE_MANAGER_REPLACEMENT.md' into rolegraph (body: 6269 chars, nodes: 14, edges: 33, docs: 3)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'apimd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'api.md' into rolegraph (body: 109 chars, nodes: 14, edges: 33, docs: 4)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'bugreportingmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'bug-reporting.md' into rolegraph (body: 2349 chars, nodes: 14, edges: 33, docs: 5)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'servicemd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'service.md' into rolegraph (body: 129 chars, nodes: 14, edges: 34, docs: 6)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'graphmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'graph.md' into rolegraph (body: 104 chars, nodes: 14, edges: 34, docs: 7)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'buninstallmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'bun_install.md' into rolegraph (body: 103 chars, nodes: 14, edges: 34, docs: 8)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'knowledgegraphmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'knowledge-graph.md' into rolegraph (body: 8984 chars, nodes: 15, edges: 42, docs: 9)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'terraphimgraphmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'terraphim-graph.md' into rolegraph (body: 348 chars, nodes: 15, edges: 42, docs: 10)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'searchmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'search.md' into rolegraph (body: 98 chars, nodes: 15, edges: 42, docs: 11)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'databasemd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'database.md' into rolegraph (body: 95 chars, nodes: 15, edges: 43, docs: 12)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'haystackmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'haystack.md' into rolegraph (body: 141 chars, nodes: 16, edges: 45, docs: 13)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'bunmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'bun.md' into rolegraph (body: 332 chars, nodes: 16, edges: 45, docs: 14)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'configurationmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'configuration.md' into rolegraph (body: 121 chars, nodes: 16, edges: 45, docs: 15)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'knowledgegraphsystemmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'knowledge-graph-system.md' into rolegraph (body: 14403 chars, nodes: 16, edges: 54, docs: 16)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'thesaurusmd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'thesaurus.md' into rolegraph (body: 107 chars, nodes: 16, edges: 54, docs: 17)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Saved document 'middlewaremd' to persistence layer
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Indexed document 'middleware.md' into rolegraph (body: 120 chars, nodes: 16, edges: 55, docs: 18)
+[2025-10-26T12:33:56Z INFO  terraphim_server] Processing haystack documents from: docs/src (recursive)
+[2025-10-26T12:33:56Z INFO  terraphim_server] ✅ Processed 55 documents from haystack: docs/src (recursive)
+[2025-10-26T12:33:56Z INFO  terraphim_server] Stored rolegraph in local map for role 'Terraphim Engineer'
+[2025-10-26T12:33:56Z INFO  terraphim_server] Initialized summarization manager with default configuration
+[2025-10-26T12:33:56Z INFO  terraphim_server] Initialized workflow management system with WebSocket support
+[2025-10-26T12:33:56Z INFO  terraphim_service::summarization_worker] Starting summarization worker with 3 max concurrent workers
+[2025-10-26T12:33:56Z INFO  terraphim_service::summarization_worker] Worker 2 started
+[2025-10-26T12:33:56Z INFO  terraphim_service::summarization_worker] Worker 0 started
+[2025-10-26T12:33:56Z INFO  terraphim_service::summarization_worker] Worker 1 started
+listening on http://127.0.0.1:8000
+[2025-10-26T12:34:03Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::agent] Agent dff3df5c-9dd0-4120-92da-d727c64a4de5 (OrchestratorAgent) initialized successfully
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::agent] Agent 5d1276ff-6484-43f7-8e24-2e831434036f (data_collectorWorker) initialized successfully
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::agent] Agent fddf4f4f-942f-400b-a6d9-b3eddc133472 (content_analyzerWorker) initialized successfully
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:34:03Z INFO  terraphim_multi_agent::agent] Agent a3deecd8-ab82-4ff7-bc2a-a182a9360603 (knowledge_mapperWorker) initialized successfully
+[2025-10-26T12:35:07Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::agent] Agent 8508ac21-b752-47a4-b803-0c3474c42414 (OrchestratorAgent) initialized successfully
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::agent] Agent afeae26e-58db-4853-8c1d-5cd026dc6f95 (data_collectorWorker) initialized successfully
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::agent] Agent c475d173-72e3-471f-9ce6-cf0b1272c21e (content_analyzerWorker) initialized successfully
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:35:07Z INFO  terraphim_multi_agent::agent] Agent 13c6ad1e-dcf2-4c39-bed4-6493fa38a80a (knowledge_mapperWorker) initialized successfully
+[2025-10-26T12:36:09Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing optimization workflow with iterative agents
+[2025-10-26T12:36:09Z INFO  terraphim_multi_agent::agent] Agent dcd2ffb0-7499-42ef-bdc4-b3ff38f37d94 (GeneratorAgent_Generator) initialized successfully
+[2025-10-26T12:36:09Z INFO  terraphim_multi_agent::agent] Agent ba91cf9d-9b76-4dcc-b092-db4b0f6dfc3c (QA Engineer) initialized successfully
+[2025-10-26T12:36:17Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing prompt chain workflow with per-step specialized agents
+[2025-10-26T12:36:17Z INFO  terraphim_server::workflows::multi_agent_handlers] Using default step configurations
+[2025-10-26T12:36:17Z INFO  terraphim_multi_agent::agent] Agent 98791d57-16cc-490c-a087-7355f26a08ad (Business Analyst) initialized successfully
+[2025-10-26T12:36:18Z INFO  terraphim_multi_agent::agent] Agent 688969a4-5ee4-4fc7-a729-56ef81a0e591 (Backend Architect) initialized successfully
+[2025-10-26T12:36:20Z INFO  terraphim_multi_agent::agent] Agent c0de07fa-bd63-4bb2-9fc7-ba2f44924479 (Product Manager) initialized successfully
+[2025-10-26T12:36:22Z INFO  terraphim_multi_agent::agent] Agent db0c6f1e-03ad-45c8-be63-f730e314f0a5 (Development Agent) initialized successfully
+[2025-10-26T12:36:23Z INFO  terraphim_multi_agent::agent] Agent da6f7730-4479-4c7f-8713-7adf868d14be (QA Engineer) initialized successfully
+[2025-10-26T12:36:25Z INFO  terraphim_multi_agent::agent] Agent d9a2d869-8b59-4d90-b342-ca76d4ef5294 (DevOps Engineer) initialized successfully
+[2025-10-26T12:36:28Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing routing workflow with multi-agent intelligence
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::agent] Agent 1795a7db-73b4-4305-ac6c-ba904acc84d9 (Development Agent) initialized successfully
+[2025-10-26T12:36:28Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing parallelization workflow with multiple agents
+[2025-10-26T12:36:28Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::agent] Agent aa584d10-475d-46b3-872b-26ac7c46a050 (OrchestratorAgent) initialized successfully
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::agent] Agent 30bb03ab-899a-463f-aa30-5cb11b6c3e9a (data_collectorWorker) initialized successfully
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::agent] Agent fb5fc46d-6fca-4cd2-82f6-b2158d3c57ef (content_analyzerWorker) initialized successfully
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:36:28Z INFO  terraphim_multi_agent::agent] Agent a2a13e6b-1fa0-4078-841d-2e1656032c8a (knowledge_mapperWorker) initialized successfully
+[2025-10-26T12:37:31Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing parallelization workflow with multiple agents
+[2025-10-26T12:37:31Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::agent] Agent 05684cbe-147a-4eae-b1fd-34c191bf1852 (OrchestratorAgent) initialized successfully
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::agent] Agent 34045750-a29c-42ba-9130-cb0c65f90d51 (data_collectorWorker) initialized successfully
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::agent] Agent 879a6e11-be3f-4a1a-94e7-7e50fb1a4d92 (content_analyzerWorker) initialized successfully
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:37:31Z INFO  terraphim_multi_agent::agent] Agent 650b82a3-c7f9-4066-87ef-d4a7d8d06035 (knowledge_mapperWorker) initialized successfully
+[2025-10-26T12:47:17Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing prompt chain workflow with per-step specialized agents
+[2025-10-26T12:47:17Z INFO  terraphim_server::workflows::multi_agent_handlers] Using default step configurations
+[2025-10-26T12:47:17Z INFO  terraphim_multi_agent::agent] Agent 5a0fd984-d375-42e8-8b47-d9797051d411 (Business Analyst) initialized successfully
+[2025-10-26T12:47:25Z INFO  terraphim_multi_agent::agent] Agent f68bd4c5-b49a-4053-b856-d856600ece59 (Backend Architect) initialized successfully
+[2025-10-26T12:47:27Z INFO  terraphim_multi_agent::agent] Agent a1174887-63fa-462a-ab11-d244fa03b1e7 (Product Manager) initialized successfully
+[2025-10-26T12:47:30Z INFO  terraphim_multi_agent::agent] Agent 3687e31b-1dab-4574-aa4a-0b111555c0b9 (Development Agent) initialized successfully
+[2025-10-26T12:47:32Z INFO  terraphim_multi_agent::agent] Agent 2e486a41-59b7-4a0c-901c-54d0d6fc2a98 (QA Engineer) initialized successfully
+[2025-10-26T12:47:35Z INFO  terraphim_multi_agent::agent] Agent f082b9a4-7570-48dd-bcb1-0e29e5e1c03f (DevOps Engineer) initialized successfully
+[2025-10-26T12:47:39Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing parallelization workflow with multiple agents
+[2025-10-26T12:47:39Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "docs/src",
+        service: Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-10-26T12:47:39Z INFO  terraphim_middleware::command::ripgrep] 🚀 Executing: rg --json --trim -C3 --ignore-case -tmarkdown testing best practices api rest docs/src
+🧠 TerraphimGraph search initiated for role: Terraphim Engineer
+[2025-10-26T12:47:39Z INFO  terraphim_middleware::thesaurus] Thesaurus for role `Terraphim Engineer` saved to persistence
+[2025-10-26T12:47:39Z INFO  terraphim_middleware::thesaurus] Successfully updated rolegraph for role: Terraphim Engineer
+[2025-10-26T12:47:39Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-10-26T12:47:39Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::agent] Agent 97a33c57-63ab-4c91-81bb-ccbcd228d0fa (OrchestratorAgent) initialized successfully
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::agent] Agent d01ac5b6-782e-4a54-8674-da04cba0ce3f (data_collectorWorker) initialized successfully
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::agent] Agent d590ede2-a9af-4c33-9b3e-14129b217444 (content_analyzerWorker) initialized successfully
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:47:39Z INFO  terraphim_multi_agent::agent] Agent 962d57d1-b301-4d93-94e3-a52d358ff78a (knowledge_mapperWorker) initialized successfully
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "docs/src",
+        service: Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::command::ripgrep] 🚀 Executing: rg --json --trim -C3 --ignore-case -tmarkdown artificial intelligence ethics in autonomous systems docs/src
+🧠 TerraphimGraph search initiated for role: Terraphim Engineer
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::thesaurus] Thesaurus for role `Terraphim Engineer` saved to persistence
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::thesaurus] Successfully updated rolegraph for role: Terraphim Engineer
+[2025-10-26T12:47:57Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "docs/src",
+        service: Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::command::ripgrep] 🚀 Executing: rg --json --trim -C3 --ignore-case -tmarkdown machine learning ethics autonomous vehicles bias docs/src
+🧠 TerraphimGraph search initiated for role: Terraphim Engineer
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::thesaurus] Thesaurus for role `Terraphim Engineer` saved to persistence
+[2025-10-26T12:47:57Z INFO  terraphim_middleware::thesaurus] Successfully updated rolegraph for role: Terraphim Engineer
+[2025-10-26T12:47:57Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-10-26T12:47:57Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing parallelization workflow with multiple agents
+[2025-10-26T12:47:57Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::agent] Agent d9dc3ae2-b735-4ea3-8628-5e89648376fe (OrchestratorAgent) initialized successfully
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::agent] Agent 6e22f04d-5165-4b16-a44e-417f7920f550 (data_collectorWorker) initialized successfully
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::agent] Agent 9ac1c464-ced8-40f3-8ead-19ef6c5a3ea8 (content_analyzerWorker) initialized successfully
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::genai_llm_client] 🔗 Configured Ollama client with custom URL: http://127.0.0.1:11434
+[2025-10-26T12:47:57Z INFO  terraphim_multi_agent::agent] Agent a708d26b-0275-43ec-9220-13e169de51be (knowledge_mapperWorker) initialized successfully

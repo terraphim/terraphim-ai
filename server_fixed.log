@@ -1,0 +1,153 @@
+[2025-10-26T12:33:02Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T12:33:02Z INFO  terraphim_server] Device settings hostname: "127.0.0.1:8000"
+[2025-10-26T12:33:02Z INFO  terraphim_server] 🔧 Pre-creating storage directories...
+[2025-10-26T12:33:02Z INFO  terraphim_server] Found 3 profiles: ["sqlite", "dashmap", "memory"]
+[2025-10-26T12:33:02Z INFO  terraphim_server] Processing profile 'sqlite' of type 'sqlite'
+[2025-10-26T12:33:02Z INFO  terraphim_server] 🔧 Creating SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:02Z INFO  terraphim_server] Processing profile 'dashmap' of type 'dashmap'
+[2025-10-26T12:33:02Z INFO  terraphim_server] 🔧 Creating DashMap directory: /tmp/terraphim_dashmap
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Created DashMap directory: /tmp/terraphim_dashmap
+[2025-10-26T12:33:02Z INFO  terraphim_server] Processing profile 'memory' of type 'memory'
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Storage directory pre-creation completed
+[2025-10-26T12:33:02Z INFO  terraphim_server] Loading configuration from terraphim_server/default/terraphim_engineer_config.json (role: TerraphimEngineer)
+[2025-10-26T12:33:02Z INFO  terraphim_server] Loading TerraphimEngineer role configuration from terraphim_server/default/terraphim_engineer_config.json
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Successfully loaded TerraphimEngineer role configuration
+[2025-10-26T12:33:02Z INFO  terraphim_settings] Loading device settings...
+[2025-10-26T12:33:02Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: false, default_data_path: "${HOME/.terraphim}", profiles: {"rock": {"datadir": "/tmp/opendal/rocksdb", "type": "rocksdb"}, "memory": {"type": "memory"}, "rocksdb": {"datadir": "/tmp/terraphim_rocksdb", "type": "rocksdb"}, "sqlite": {"table": "terraphim_kv", "type": "sqlite", "datadir": "/tmp/terraphim_sqlite", "connection_string": "/tmp/terraphim_sqlite/terraphim.db"}, "dashmap": {"root": "/tmp/dashmaptest", "type": "dashmap"}} }
+[2025-10-26T12:33:02Z INFO  terraphim_persistence] 🔧 Pre-creating SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:02Z INFO  terraphim_persistence] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-10-26T12:33:02Z INFO  terraphim_persistence] 🔧 Pre-creating DashMap directory: /tmp/dashmaptest
+[2025-10-26T12:33:02Z INFO  terraphim_persistence] ✅ Created DashMap directory: /tmp/dashmaptest
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rock
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 🔧 Profile 'rock' using scheme: Rocksdb
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 📁 Parsing profile: memory
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 🔧 Profile 'memory' using scheme: Memory
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] Got request for memory operator; initializing in-memory operator.
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rocksdb
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 🔧 Profile 'rocksdb' using scheme: Rocksdb
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 📁 Parsing profile: sqlite
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 🔧 Profile 'sqlite' using scheme: Sqlite
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] Got request for sqlite operator; initializing in-memory operator.
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 📁 Parsing profile: dashmap
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] 🔧 Profile 'dashmap' using scheme: Dashmap
+[2025-10-26T12:33:02Z INFO  terraphim_persistence::settings] Got request for dashmap operator; initializing in-memory operator.
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb512d20 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb512d20 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb5129c0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb4fa9c0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb512c00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb4244a0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z WARN  opendal::services] service=memory name=0x55e5fb512d20 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-10-26T12:33:02Z INFO  terraphim_server] No saved config found, using TerraphimEngineer role config: OpenDal(NotFound (permanent) at read => memory doesn't have this path
+
+    Context:
+       service: memory
+       path: server_config.json
+       range: 0-
+    )
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role DevOpsEngineer
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role Default
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role BusinessAnalyst
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role Terraphim Engineer
+[2025-10-26T12:33:02Z INFO  terraphim_config] Role Terraphim Engineer has no automata_path, building thesaurus from local KG files at "docs/src/kg"
+[2025-10-26T12:33:02Z INFO  terraphim_config] Successfully built thesaurus from local KG for role Terraphim Engineer
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role ProductManager
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role QAEngineer
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role DevelopmentAgent
+[2025-10-26T12:33:02Z INFO  terraphim_config] Creating role BackendArchitect
+[2025-10-26T12:33:02Z INFO  terraphim_server] Server started with 8 roles:
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: DevOpsEngineer (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: Default (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: BusinessAnalyst (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: Terraphim Engineer (relevance: TerraphimGraph, kg: true)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: ProductManager (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: QAEngineer (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: DevelopmentAgent (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - Role: BackendArchitect (relevance: TitleScorer, kg: false)
+[2025-10-26T12:33:02Z INFO  terraphim_server] Starting axum server
+[2025-10-26T12:33:02Z INFO  terraphim_server] Building rolegraph for role 'Terraphim Engineer' from local files
+[2025-10-26T12:33:02Z INFO  terraphim_server] Knowledge graph path: "docs/src/kg"
+[2025-10-26T12:33:02Z INFO  terraphim_server] Found 18 markdown files in "docs/src/kg"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/system.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/issue-tracking.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/PACKAGE_MANAGER_REPLACEMENT.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/api.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/bug-reporting.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/service.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/graph.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/bun_install.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/knowledge-graph.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/terraphim-graph.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/search.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/database.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/haystack.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/bun.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/configuration.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/knowledge-graph-system.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/thesaurus.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server]   - "docs/src/kg/middleware.md"
+[2025-10-26T12:33:02Z INFO  terraphim_server] Created Logseq builder for path: "docs/src/kg"
+[2025-10-26T12:33:02Z INFO  terraphim_server] Successfully built and indexed rolegraph for role 'Terraphim Engineer' with 190 terms and 18 documents
+[2025-10-26T12:33:02Z INFO  terraphim_server] Successfully created rolegraph for role 'Terraphim Engineer'
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'systemmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'system.md' into rolegraph (body: 115 chars, nodes: 2, edges: 4, docs: 1)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'issuetrackingmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'issue-tracking.md' into rolegraph (body: 2463 chars, nodes: 5, edges: 11, docs: 2)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'packagemanagerreplacementmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'PACKAGE_MANAGER_REPLACEMENT.md' into rolegraph (body: 6269 chars, nodes: 14, edges: 33, docs: 3)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'apimd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'api.md' into rolegraph (body: 109 chars, nodes: 14, edges: 33, docs: 4)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'bugreportingmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'bug-reporting.md' into rolegraph (body: 2349 chars, nodes: 14, edges: 33, docs: 5)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'servicemd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'service.md' into rolegraph (body: 129 chars, nodes: 14, edges: 34, docs: 6)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'graphmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'graph.md' into rolegraph (body: 104 chars, nodes: 14, edges: 34, docs: 7)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'buninstallmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'bun_install.md' into rolegraph (body: 103 chars, nodes: 14, edges: 34, docs: 8)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'knowledgegraphmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'knowledge-graph.md' into rolegraph (body: 8984 chars, nodes: 15, edges: 42, docs: 9)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'terraphimgraphmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'terraphim-graph.md' into rolegraph (body: 348 chars, nodes: 15, edges: 42, docs: 10)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'searchmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'search.md' into rolegraph (body: 98 chars, nodes: 15, edges: 42, docs: 11)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'databasemd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'database.md' into rolegraph (body: 95 chars, nodes: 15, edges: 43, docs: 12)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'haystackmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'haystack.md' into rolegraph (body: 141 chars, nodes: 16, edges: 45, docs: 13)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'bunmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'bun.md' into rolegraph (body: 332 chars, nodes: 16, edges: 45, docs: 14)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'configurationmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'configuration.md' into rolegraph (body: 121 chars, nodes: 16, edges: 45, docs: 15)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'knowledgegraphsystemmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'knowledge-graph-system.md' into rolegraph (body: 14403 chars, nodes: 16, edges: 54, docs: 16)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'thesaurusmd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'thesaurus.md' into rolegraph (body: 107 chars, nodes: 16, edges: 54, docs: 17)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Saved document 'middlewaremd' to persistence layer
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Indexed document 'middleware.md' into rolegraph (body: 120 chars, nodes: 16, edges: 55, docs: 18)
+[2025-10-26T12:33:02Z INFO  terraphim_server] Processing haystack documents from: docs/src (recursive)
+[2025-10-26T12:33:02Z INFO  terraphim_server] ✅ Processed 55 documents from haystack: docs/src (recursive)
+[2025-10-26T12:33:02Z INFO  terraphim_server] Stored rolegraph in local map for role 'Terraphim Engineer'
+[2025-10-26T12:33:02Z INFO  terraphim_server] Initialized summarization manager with default configuration
+[2025-10-26T12:33:02Z INFO  terraphim_server] Initialized workflow management system with WebSocket support
+[2025-10-26T12:33:02Z INFO  terraphim_service::summarization_worker] Starting summarization worker with 3 max concurrent workers
+[2025-10-26T12:33:02Z INFO  terraphim_service::summarization_worker] Worker 2 started
+[2025-10-26T12:33:02Z INFO  terraphim_service::summarization_worker] Worker 0 started
+[2025-10-26T12:33:02Z INFO  terraphim_service::summarization_worker] Worker 1 started
+listening on http://127.0.0.1:8000
+[2025-10-26T12:33:11Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing prompt chain workflow with per-step specialized agents
+[2025-10-26T12:33:11Z INFO  terraphim_server::workflows::multi_agent_handlers] Using default step configurations
+[2025-10-26T12:33:11Z INFO  terraphim_multi_agent::agent] Agent ef890094-b77b-41f4-bc97-920e6b6e1743 (Business Analyst) initialized successfully
+[2025-10-26T12:33:12Z INFO  terraphim_multi_agent::agent] Agent 616cd1c2-2b5e-401a-897e-fbf105009e48 (Backend Architect) initialized successfully
+[2025-10-26T12:33:14Z INFO  terraphim_multi_agent::agent] Agent 4f34717a-4575-4906-b7c7-e7d7f86afc62 (Product Manager) initialized successfully
+[2025-10-26T12:33:15Z INFO  terraphim_multi_agent::agent] Agent bbd2d216-4615-48e9-9536-e1a701e08de0 (Development Agent) initialized successfully
+[2025-10-26T12:33:17Z INFO  terraphim_multi_agent::agent] Agent 1afd2fd3-8616-4505-8209-b0cc5aa8f1b8 (QA Engineer) initialized successfully
+[2025-10-26T12:33:19Z INFO  terraphim_multi_agent::agent] Agent 1af6f0f4-62b8-44a0-affd-1475e0a12f03 (DevOps Engineer) initialized successfully
+[2025-10-26T12:33:24Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing routing workflow with multi-agent intelligence
+[2025-10-26T12:33:24Z INFO  terraphim_multi_agent::agent] Agent beacbc19-86e7-464a-8dc5-eee3af37efe6 (Development Agent) initialized successfully
+[2025-10-26T12:33:26Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing parallelization workflow with multiple agents
+[2025-10-26T12:33:29Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing orchestration workflow with hierarchical agents
+[2025-10-26T12:33:34Z INFO  terraphim_server::workflows::multi_agent_handlers] Executing optimization workflow with iterative agents
