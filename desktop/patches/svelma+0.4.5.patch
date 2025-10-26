@@ -135,3 +135,18 @@ index 248fa3d..6d3667a 100644
 -    };
 -  };
 -}
+diff --git a/node_modules/svelma/src/components/Tooltip.svelte b/node_modules/svelma/src/components/Tooltip.svelte
+index 1234567..89abcdef 100644
+--- a/node_modules/svelma/src/components/Tooltip.svelte
++++ b/node_modules/svelma/src/components/Tooltip.svelte
+@@ -92,8 +92,8 @@
+ </script>
+
+ <style lang="scss">
+-  $tooltip-arrow-size: 8px;
+-  $tooltip-arrow-margin: 2px;
++  $tooltip-arrow-size: 8px;
++  $tooltip-arrow-margin: 2px;
+
+   @mixin tooltip($direction) {
+     &.#{$direction} {

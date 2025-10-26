@@ -15,6 +15,7 @@ export default defineConfig({
         // Ignore svelma warnings
         if (warning.code === 'css_nesting_selector_invalid_placement') return;
         if (warning.code === 'css_invalid_global') return;
+        if (warning.code === 'css_expected_identifier' && warning.filename?.includes('svelma')) return;
         handler(warning);
       },
       preprocess: {
@@ -53,7 +54,7 @@ export default defineConfig({
       output: {
         manualChunks: {
           // Vendor libraries
-          'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
+          'vendor-ui': ['bulma', '@fortawesome/fontawesome-free'],
           'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
           'vendor-charts': ['d3'],
           'vendor-atomic': ['@tomic/lib'],
