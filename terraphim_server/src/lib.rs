@@ -147,7 +147,6 @@ pub struct AppState {
     pub config_state: ConfigState,
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
-    
 }
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
