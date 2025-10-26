@@ -44,7 +44,7 @@ log_warning() {
 }
 
 log_error() {
-    log "${ERROR}[ERROR]${NC} $1"
+    log "${RED}[ERROR]${NC} $1"
 }
 
 log_stage() {
@@ -191,7 +191,22 @@ stage_1_setup_environment() {
     if [ ! -f "${PROJECT_ROOT}/target/release/terraphim_tui" ]; then
         log_step "Building TUI..."
         cd "$PROJECT_ROOT"
-        cargo build --release -p terraphim_tui
+        # Try to build with proper PATH setup
+        if command -v "$HOME/tools/rust/cargo/bin/cargo" >/dev/null 2>&1; then
+            export PATH="$HOME/tools/rust/cargo/bin:$PATH"
+            timeout 120 cargo build --release -p terraphim_tui || {
+                log_warning "TUI build failed, trying existing debug binary"
+                if [ -f "${PROJECT_ROOT}/target/debug/terraphim-tui" ]; then
+                    cp "${PROJECT_ROOT}/target/debug/terraphim-tui" "${PROJECT_ROOT}/target/release/terraphim_tui"
+                else
+                    log_error "No TUI binary available"
+                    return 1
+                fi
+            }
+        else
+            log_error "Cargo not found in PATH"
+            return 1
+        fi
     fi
 
     log_step "Testing TUI basic functionality"
