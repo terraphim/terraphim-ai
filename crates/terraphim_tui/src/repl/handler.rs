@@ -7,8 +7,6 @@ use super::commands::{
 };
 use crate::client::ApiClient;
 
-#[cfg(feature = "repl-custom")]
-use super::commands as cmd;
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -3318,7 +3316,7 @@ impl ReplHandler {
                             let ad_hoc_def = crate::commands::CommandDefinition {
                                 name: name.clone(),
                                 description: "Ad-hoc command".to_string(),
-                                risk_level: crate::RiskLevel::Medium,
+                                risk_level: crate::commands::RiskLevel::Medium,
                                 execution_mode: validated_mode.clone(),
                                 ..Default::default()
                             };

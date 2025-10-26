@@ -23,6 +23,9 @@ mod service;
 #[cfg(feature = "repl")]
 mod repl;
 
+#[cfg(feature = "repl-custom")]
+mod commands;
+
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
