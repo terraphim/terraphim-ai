@@ -1,0 +1,5 @@
+533003ffc6270601bedee34487259a1e30e54b7aa2a2f830ab8c8d53450ebcb4  ./linux/terraphim_server-x86_64-unknown-linux-gnu
+01f0ab4b50b94f459232dae11172e532f1f3cb791d7290f6f54999ebd7cb8de9  ./linux/terraphim-tui-x86_64-unknown-linux-gnu
+533003ffc6270601bedee34487259a1e30e54b7aa2a2f830ab8c8d53450ebcb4  ./binaries/terraphim_server-x86_64-unknown-linux-gnu
+01f0ab4b50b94f459232dae11172e532f1f3cb791d7290f6f54999ebd7cb8de9  ./binaries/terraphim-tui-x86_64-unknown-linux-gnu
+1e770e62f3f39c7ab85fae57c3c802bf2724198b425f434b896fb478ef3d19d0  ./checksums.txt

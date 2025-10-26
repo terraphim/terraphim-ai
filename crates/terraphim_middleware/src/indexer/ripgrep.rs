@@ -5,6 +5,118 @@ use terraphim_persistence::Persistable;
 use terraphim_types::{Document, Index};
 
 use super::IndexMiddleware;
+
+/// Simple HTML to Markdown converter
+fn simple_html_to_markdown(html: &str) -> String {
+    let mut result = html.to_string();
+
+    // Remove script and style tags with their content
+    result = regex::Regex::new(r"(?s)<script[^>]*>.*?</script>")
+        .unwrap()
+        .replace_all(&result, "")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<style[^>]*>.*?</style>")
+        .unwrap()
+        .replace_all(&result, "")
+        .to_string();
+
+    // Convert basic HTML tags to Markdown
+    result = regex::Regex::new(r"(?s)<h[1-6][^>]*>(.*?)</h[1-6]>")
+        .unwrap()
+        .replace_all(&result, |caps: &regex::Captures| {
+            let text = &caps[1];
+            let level = caps[0].chars().nth(2).unwrap_or('1') as usize - '0' as usize + 1;
+            "#".repeat(level) + " " + text.trim() + "\n"
+        })
+        .to_string();
+
+    result = regex::Regex::new(r"(?s)<p[^>]*>(.*?)</p>")
+        .unwrap()
+        .replace_all(&result, "$1\n\n")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<strong[^>]*>(.*?)</strong>")
+        .unwrap()
+        .replace_all(&result, "**$1**")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<b[^>]*>(.*?)</b>")
+        .unwrap()
+        .replace_all(&result, "**$1**")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<em[^>]*>(.*?)</em>")
+        .unwrap()
+        .replace_all(&result, "*$1*")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<i[^>]*>(.*?)</i>")
+        .unwrap()
+        .replace_all(&result, "*$1*")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<code[^>]*>(.*?)</code>")
+        .unwrap()
+        .replace_all(&result, "`$1`")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<pre[^>]*>(.*?)</pre>")
+        .unwrap()
+        .replace_all(&result, "```\n$1\n```\n")
+        .to_string();
+
+    // Skip complex link/image conversion for now - just remove tags
+    result = regex::Regex::new(r"(?s)<a[^>]*>(.*?)</a>")
+        .unwrap()
+        .replace_all(&result, "$1")
+        .to_string();
+    result = regex::Regex::new(r"(?s)<img[^>]*>")
+        .unwrap()
+        .replace_all(&result, "")
+        .to_string();
+
+    // Convert list items
+    result = regex::Regex::new(r"(?s)<ul[^>]*>(.*?)</ul>")
+        .unwrap()
+        .replace_all(&result, |caps: &regex::Captures| {
+            let content = &caps[1];
+            let items = regex::Regex::new(r"(?s)<li[^>]*>(.*?)</li>")
+                .unwrap()
+                .replace_all(content, "- $1\n")
+                .to_string();
+            items.trim().to_string() + "\n"
+        })
+        .to_string();
+
+    result = regex::Regex::new(r"(?s)<ol[^>]*>(.*?)</ol>")
+        .unwrap()
+        .replace_all(&result, |caps: &regex::Captures| {
+            let content = &caps[1];
+            let mut counter = 1;
+            regex::Regex::new(r"(?s)<li[^>]*>(.*?)</li>")
+                .unwrap()
+                .replace_all(content, |_: &regex::Captures| {
+                    let result = format!("{}. $1\n", counter);
+                    counter += 1;
+                    result
+                })
+                .to_string()
+        })
+        .to_string();
+
+    // Convert line breaks
+    result = regex::Regex::new(r"<br[^>]*>")
+        .unwrap()
+        .replace_all(&result, "\n")
+        .to_string();
+
+    // Remove all remaining HTML tags
+    result = regex::Regex::new(r"<[^>]*>")
+        .unwrap()
+        .replace_all(&result, "")
+        .to_string();
+
+    // Clean up extra whitespace
+    result = regex::Regex::new(r"\n\s*\n\s*\n")
+        .unwrap()
+        .replace_all(&result, "\n\n")
+        .to_string();
+    result.trim().to_string()
+}
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
 use terraphim_config::Haystack;
@@ -127,7 +239,7 @@ impl RipgrepIndexer {
         // Heuristically detect HTML (presence of tags). If HTML detected, convert to Markdown.
         if content.contains('<') && content.contains('>') {
             log::debug!("Converting HTML content to Markdown for file {:?}", path);
-            content = html2md::parse_html(&content);
+            content = simple_html_to_markdown(&content);
         }
 
         log::info!("Writing updated document back to markdown file: {:?}", path);

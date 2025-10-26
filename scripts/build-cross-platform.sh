@@ -29,10 +29,10 @@ build_target() {
 
     if [ "$use_cross" = "true" ]; then
         cross build --release --target $target --bin terraphim_server
-        cross build --release --target $target --bin terraphim-tui
+        cross build --release --target $target --package terraphim_tui
     else
         cargo build --release --target $target --bin terraphim_server
-        cargo build --release --target $target --bin terraphim-tui
+        cargo build --release --target $target --package terraphim_tui
     fi
 
     # Copy binaries to build directory
@@ -49,11 +49,11 @@ build_target() {
 # Build for all targets
 echo "🏗️  Starting cross-platform builds..."
 
-# Linux builds
+# Linux builds (skip problematic musl targets for now)
 build_target "x86_64-unknown-linux-gnu" "false"
-build_target "x86_64-unknown-linux-musl" "true"
-build_target "aarch64-unknown-linux-musl" "true"
-build_target "armv7-unknown-linux-musleabihf" "true"
+# build_target "x86_64-unknown-linux-musl" "true"  # Skip due to OpenSSL issues
+# build_target "aarch64-unknown-linux-musl" "true"  # Skip due to OpenSSL issues
+# build_target "armv7-unknown-linux-musleabihf" "true"  # Skip due to OpenSSL issues
 
 # macOS builds
 build_target "x86_64-apple-darwin" "false"

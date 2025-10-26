@@ -145,8 +145,8 @@ index 1234567..89abcdef 100644
  <style lang="scss">
 -  $tooltip-arrow-size: 8px;
 -  $tooltip-arrow-margin: 2px;
-+  $tooltip-arrow-size: 8px;
-+  $tooltip-arrow-margin: 2px;
++  $tooltip-arrow-size: 8px !default;
++  $tooltip-arrow-margin: 2px !default;
 
    @mixin tooltip($direction) {
      &.#{$direction} {
