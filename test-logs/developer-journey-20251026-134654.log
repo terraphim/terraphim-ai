@@ -1,0 +1,28 @@
+[0;34m[INFO][0m Developer Journey Test Started
+[0;34m[INFO][0m Project: dev-journey-test-1761482814
+[0;34m[INFO][0m Backend URL: http://localhost:8000
+[0;34m[INFO][0m Test timeout: 60s
+[0;34m[INFO][0m Log file: /home/alex/projects/terraphim/terraphim-ai/test-logs/developer-journey-20251026-134654.log
+[0;34m[INFO][0m Skipping backend startup
+[0;35m[STAGE][0m Stage 1: Setting up Development Environment
+[0;36m[STEP][0m Building TUI...
+[1;33m[WARNING][0m TUI build failed, trying existing debug binary
+[0;36m[STEP][0m Testing TUI basic functionality
+[0;36m[STEP][0m Testing TUI configuration
+[0;36m[STEP][0m Setting up developer role
+[1;33m[WARNING][0m Failed to set software_developer role, using default
+[0;32m[SUCCESS][0m Development environment setup completed
+[0;35m[STAGE][0m Stage 2: Creating Project Specification
+[0;36m[STEP][0m Calling prompt chaining workflow for specification
+[0;32m[SUCCESS][0m Project specification created successfully
+[0;36m[STEP][0m Specification saved to /home/alex/projects/terraphim/terraphim-ai/test-logs/specification.json
+[0;35m[STAGE][0m Stage 3: Implementation with VM Execution
+[1;33m[WARNING][0m Skipping VM execution as requested
+[0;35m[STAGE][0m Stage 4: Testing and Debugging
+[0;36m[STEP][0m Running parallel analysis for testing strategy
+[0;32m[SUCCESS][0m Testing strategy created successfully
+[0;36m[STEP][0m Running TUI search for testing best practices
+[0;32m[SUCCESS][0m Testing and debugging stage completed
+[0;35m[STAGE][0m Stage 5: Deployment and Monitoring
+[0;36m[STEP][0m Creating deployment orchestration plan
+[0;34m[INFO][0m Cleaning up test environment...

@@ -1,0 +1,21 @@
+[0;34m[INFO][0m Agent Workflow Test Suite Started
+[0;34m[INFO][0m Workflow pattern: optimization
+[0;34m[INFO][0m Backend URL: http://localhost:8000
+[0;34m[INFO][0m Test timeout: 60s
+[0;34m[INFO][0m Log file: /home/alex/projects/terraphim/terraphim-ai/test-logs/agent-workflow-tests-20251026-133609.log
+[0;34m[INFO][0m Skipping backend startup
+[0;35m[WORKFLOW][0m Testing optimization workflow pattern
+[0;34m[INFO][0m Testing optimization workflow (iterative quality improvement)
+[0;32m[SUCCESS][0m Optimization API endpoint working
+[0;32m[SUCCESS][0m optimization workflow completed successfully (5s)
+[0;34m[INFO][0m ============================================
+[0;34m[INFO][0m Agent Workflow Test Results Summary
+[0;34m[INFO][0m ============================================
+[0;34m[INFO][0m Total duration: 5s
+[0;34m[INFO][0m Workflows tested: 1
+[0;34m[INFO][0m Failed workflows: 0
+[0;32m[SUCCESS][0m 🎉 All agent workflow tests passed!
+[0;34m[INFO][0m ✅ All 5 workflow patterns are functional
+[0;34m[INFO][0m ✅ API endpoints responding correctly
+[0;34m[INFO][0m ✅ Integration with TUI/CLI working
+[0;34m[INFO][0m Cleaning up test environment...

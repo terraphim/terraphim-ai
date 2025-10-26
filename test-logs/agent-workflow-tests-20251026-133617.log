@@ -1,0 +1,21 @@
+[0;34m[INFO][0m Agent Workflow Test Suite Started
+[0;34m[INFO][0m Workflow pattern: all
+[0;34m[INFO][0m Backend URL: http://localhost:8000
+[0;34m[INFO][0m Test timeout: 30s
+[0;34m[INFO][0m Log file: /home/alex/projects/terraphim/terraphim-ai/test-logs/agent-workflow-tests-20251026-133617.log
+[0;34m[INFO][0m Skipping backend startup
+[0;35m[WORKFLOW][0m Testing prompt-chaining workflow pattern
+[0;34m[INFO][0m Testing prompt chaining workflow (6-stage development pipeline)
+[0;32m[SUCCESS][0m Prompt chaining API endpoint working
+[0;32m[SUCCESS][0m prompt-chaining workflow completed successfully (11s)
+[0;35m[WORKFLOW][0m Testing routing workflow pattern
+[0;34m[INFO][0m Testing routing workflow (intelligent task distribution)
+[0;32m[SUCCESS][0m Routing API endpoint working
+[0;32m[SUCCESS][0m routing workflow completed successfully (0s)
+[0;35m[WORKFLOW][0m Testing parallelization workflow pattern
+[0;34m[INFO][0m Testing parallelization workflow (multi-perspective analysis)
+[0;32m[SUCCESS][0m Parallelization API endpoint working
+[0;32m[SUCCESS][0m parallelization workflow completed successfully (0s)
+[0;35m[WORKFLOW][0m Testing orchestration workflow pattern
+[0;34m[INFO][0m Testing orchestration workflow (hierarchical coordination)
+[0;34m[INFO][0m Cleaning up test environment...
