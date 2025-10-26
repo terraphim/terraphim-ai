@@ -2,7 +2,7 @@
 //! without requiring actual LLM API calls
 
 use std::sync::Arc;
-use terraphim_multi_agent::{AgentRegistry, MultiAgentError, test_utils::create_test_role};
+use terraphim_multi_agent::{test_utils::create_test_role, AgentRegistry, MultiAgentError};
 use terraphim_persistence::DeviceStorage;
 
 #[tokio::test]

@@ -24,8 +24,8 @@ log = { workspace = true }
 # Direct HTTP client approach (like Goose) for LLM communication
 reqwest = { version = "0.12", features = ["json", "stream"] }
 
-# Multi-provider generative AI client (using stable version due to let_chains issue in git version)
-genai = "0.3.5"
+# Multi-provider generative AI client (using terraphim fork with OpenRouter support)
+genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "main" }
 
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
@@ -51,7 +51,7 @@ terraphim_service = { path = "../terraphim_service" }
 
 [dev-dependencies]
 tokio-test = "0.4"
-tempfile = "3.0"
+tempfile = "3.23"
 criterion = { version = "0.5", features = ["html_reports"] }
 
 [[bench]]

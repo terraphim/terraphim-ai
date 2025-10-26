@@ -81,6 +81,7 @@ impl fmt::Display for QueryScorer {
 /// For example, a 3-gram might contain up to 4 bytes, if it contains 3 Unicode
 /// codepoints that each require 4 UTF-8 code units.
 #[derive(Clone, Copy, Debug, Deserialize, Eq, Hash, PartialEq, Serialize)]
+#[allow(dead_code)]
 pub enum NgramType {
     /// A windowing ngram.
     ///

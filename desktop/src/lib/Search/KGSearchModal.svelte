@@ -1,11 +1,15 @@
 <script lang="ts">
+import { Modal, Field, Input, Button, Message } from 'svelma';
 import { invoke } from '@tauri-apps/api/tauri';
+import { Button, Field, Input, Message, Modal } from 'svelma';
 import { createEventDispatcher, onDestroy } from 'svelte';
+import { is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
+import { is_tauri as isTauriStore, role as roleStore } from '$lib/stores';
 
 export let active: boolean = false;
-export const initialQuery: string = '';
-export const conversationId: string | null = null;
+export let initialQuery: string = '';
+export let conversationId: string | null = null;
 
 const dispatch = createEventDispatcher();
 
@@ -85,10 +89,10 @@ async function getTermSuggestions(q: string): Promise<string[]> {
 	const trimmed = q.trim();
 	if (!trimmed || trimmed.length < 2) return [];
 	try {
-		if ($is_tauri) {
+		if ($isTauriStore) {
 			const resp: any = await invoke('get_autocomplete_suggestions', {
 				query: trimmed,
-				roleName: $role,
+				roleName: $roleStore,
 				limit: 8,
 			});
 			if (resp?.status === 'success' && Array.isArray(resp.suggestions)) {
@@ -96,7 +100,7 @@ async function getTermSuggestions(q: string): Promise<string[]> {
 			}
 		} else {
 			const resp = await fetch(
-				`${CONFIG.ServerURL}/autocomplete/${encodeURIComponent($role)}/${encodeURIComponent(trimmed)}`
+				`${CONFIG.ServerURL}/autocomplete/${encodeURIComponent($roleStore)}/${encodeURIComponent(trimmed)}`
 			);
 			if (resp.ok) {
 				const data = await resp.json();
@@ -189,11 +193,11 @@ async function searchKGTerms() {
 	_searchError = null;
 
 	try {
-		if ($is_tauri) {
+		if ($isTauriStore) {
 			const response: KGSearchResponse = await invoke('search_kg_terms', {
 				request: {
 					query: query.trim(),
-					role_name: $role,
+					role_name: $roleStore,
 					limit: 20,
 					min_similarity: 0.6,
 				},
@@ -218,7 +222,7 @@ async function searchKGTerms() {
 			}
 
 			const response = await fetch(
-				`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($role)}`
+				`${CONFIG.ServerURL}/conversations/${conversationId}/context/kg/search?query=${encodeURIComponent(query.trim())}&role=${encodeURIComponent($roleStore)}`
 			);
 
 			if (response.ok) {
@@ -262,12 +266,12 @@ async function addTermToContext() {
 	}
 
 	try {
-		if ($is_tauri) {
+		if ($isTauriStore) {
 			await invoke('add_kg_term_context', {
 				request: {
 					conversation_id: conversationId,
 					term: selectedSuggestion.term,
-					role_name: $role,
+					role_name: $roleStore,
 				},
 			});
 
@@ -287,7 +291,7 @@ async function addTermToContext() {
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
 						term: selectedSuggestion.term,
-						role: $role,
+						role: $roleStore,
 					}),
 				}
 			);
@@ -323,15 +327,15 @@ async function _addKGIndexToContext() {
 	}
 
 	try {
-		if ($is_tauri) {
+		if ($isTauriStore) {
 			await invoke('add_kg_index_context', {
 				request: {
 					conversation_id: conversationId,
-					role_name: $role,
+					role_name: $roleStore,
 				},
 			});
 
-			dispatch('kgIndexAdded', { role: $role });
+			dispatch('kgIndexAdded', { role: $roleStore });
 
 			// Close modal after successful addition
 			handleClose();
@@ -343,7 +347,7 @@ async function _addKGIndexToContext() {
 					method: 'POST',
 					headers: { 'Content-Type': 'application/json' },
 					body: JSON.stringify({
-						role: $role,
+						role: $roleStore,
 					}),
 				}
 			);
@@ -351,7 +355,7 @@ async function _addKGIndexToContext() {
 			if (response.ok) {
 				const data = await response.json();
 				if (data.status === 'success') {
-					dispatch('kgIndexAdded', { role: $role });
+					dispatch('kgIndexAdded', { role: $roleStore });
 
 					// Close modal after successful addition
 					handleClose();
@@ -391,6 +395,14 @@ onDestroy(() => {
 		clearTimeout(searchTimeout);
 	}
 });
+
+// Create aliases without underscores for template usage
+$: searchError = _searchError;
+$: isSearching = _isSearching;
+const handleInput = _handleInput;
+const handleKeydown = _handleKeydown;
+const selectSuggestion = _selectSuggestion;
+const addKGIndexToContext = _addKGIndexToContext;
 </script>
 
 <style lang="scss">
@@ -695,7 +707,7 @@ onDestroy(() => {
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-    <div class="kg-search-container" on:keydown={handleKeydown}>
+      <div class="kg-search-container" on:keydown={_handleKeydown}>
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 
@@ -712,11 +724,11 @@ onDestroy(() => {
             <Input
               bind:element={searchInput}
               bind:value={query}
-              on:input={handleInput}
-              on:keydown={handleKeydown}
+              on:input={_handleInput}
+              on:keydown={_handleKeydown}
               placeholder="Search knowledge graph terms..."
               type="search"
-              disabled={isSearching}
+              disabled={_isSearching}
               icon="search"
               expanded
               autofocus
@@ -749,13 +761,13 @@ onDestroy(() => {
         </Field>
       </div>
 
-      {#if searchError}
+      {#if _searchError}
         <Message type="is-danger" data-testid="kg-search-error">
-          {searchError}
+          {_searchError}
         </Message>
       {/if}
 
-      {#if isSearching}
+      {#if _isSearching}
         <div class="empty-state" data-testid="kg-search-loading">
           <div class="progress-container">
             <div class="progress-bar">
@@ -769,8 +781,8 @@ onDestroy(() => {
           {#each suggestions as suggestion}
             <button
               class="suggestion-item {selectedSuggestion?.term === suggestion.term ? 'is-active' : ''}"
-              on:click={() => selectSuggestion(suggestion)}
-              on:keydown={(e) => e.key === 'Enter' && selectSuggestion(suggestion)}
+              on:click={() => _selectSuggestion(suggestion)}
+              on:keydown={(e) => e.key === 'Enter' && _selectSuggestion(suggestion)}
               type="button"
               data-testid="kg-suggestion-item"
             >
@@ -799,12 +811,16 @@ onDestroy(() => {
       {:else if query.trim().length >= 2}
         <div class="notification is-light" data-testid="kg-search-empty">
           <p class="has-text-centered">No knowledge graph terms found for "<strong>{query}</strong>"</p>
-          <p class="has-text-centered is-size-7 has-text-grey mt-2">Try different keywords or check if the role "{$role}" has a knowledge graph enabled.</p>
+          <p class="has-text-centered is-size-7 has-text-grey mt-2">
+            Try different keywords or check if the role "<strong>{$roleStore}</strong>" has a knowledge graph enabled.
+          </p>
         </div>
       {:else}
         <div class="notification is-info is-light">
           <p class="has-text-centered">Enter at least 2 characters to search the knowledge graph</p>
-          <p class="has-text-centered is-size-7 mt-2">This will search terms from the knowledge graph for role "{$role}"</p>
+          <p class="has-text-centered is-size-7 mt-2">
+            This will search terms from the knowledge graph for role "<strong>{$roleStore}</strong>"
+          </p>
         </div>
       {/if}
 
@@ -829,13 +845,16 @@ onDestroy(() => {
 
       <div class="alternative-section">
         <div class="alternative-content">
-          <p><strong>Alternative:</strong> Add the complete thesaurus for role "{$role}". This includes all domain-specific terms and their normalized mappings in JSON format for comprehensive vocabulary context.</p>
+          <p>
+            <strong>Alternative:</strong> Add the complete thesaurus for role "<strong>{$roleStore}</strong>".
+            This includes all domain-specific terms and their normalized mappings in JSON format for comprehensive vocabulary context.
+          </p>
         </div>
         <Button
           type="is-link"
           size="is-small"
           style="width: 100%;"
-          on:click={addKGIndexToContext}
+          on:click={_addKGIndexToContext}
           data-testid="kg-add-index-button"
         >
           Add Complete Thesaurus to Context

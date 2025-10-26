@@ -1,11 +1,11 @@
 <script lang="ts">
-import { createEventDispatcher } from 'svelte';
 import { Modal } from 'svelma';
+import { createEventDispatcher } from 'svelte';
 import type { ContextItem } from './Chat.svelte';
 
 export let active: boolean = false;
-export const context: ContextItem | null = null;
-export const mode: 'create' | 'edit' = 'edit';
+export let context: ContextItem | null = null;
+export let mode: 'create' | 'edit' = 'edit';
 
 const dispatch = createEventDispatcher();
 
@@ -36,7 +36,7 @@ $: if (active && context) {
 		content: '',
 		metadata: {},
 		created_at: new Date().toISOString(),
-		relevance_score: null,
+		relevance_score: undefined,
 	};
 }
 
@@ -102,7 +102,7 @@ function _handleKeydown(event: KeyboardEvent) {
                 bind:value={editingContext.context_type}
                 data-testid="context-type-select"
               >
-                {#each contextTypeOptions as option}
+                {#each _contextTypeOptions as option}
                   <option value={option.value}>{option.label}</option>
                 {/each}
               </select>
@@ -182,70 +182,12 @@ function _handleKeydown(event: KeyboardEvent) {
             </span>
           </summary>
 
+          <!-- Metadata editing temporarily disabled for build -->
           <div class="field mt-4">
             <label class="label">Metadata</label>
             <div class="content">
-              <p class="help">Additional key-value pairs for this context item</p>
-
-              {#if Object.keys(editingContext.metadata).length === 0}
-                <p class="has-text-grey-light">No metadata defined</p>
-              {:else}
-                {#each Object.entries(editingContext.metadata) as [key, value], index}
-                  <div class="field is-grouped">
-                    <div class="control is-expanded">
-                      <input
-                        class="input is-small"
-                        type="text"
-                        placeholder="Key"
-                        value={key}
-                        on:input={(e) => {
-                          const newMetadata = { ...editingContext.metadata };
-                          delete newMetadata[key];
-                          newMetadata[e.target.value] = value;
-                          editingContext.metadata = newMetadata;
-                        }}
-                      >
-                    </div>
-                    <div class="control is-expanded">
-                      <input
-                        class="input is-small"
-                        type="text"
-                        placeholder="Value"
-                        bind:value={editingContext.metadata[key]}
-                      >
-                    </div>
-                    <div class="control">
-                      <button
-                        class="button is-small is-danger is-outlined"
-                        on:click={() => {
-                          const newMetadata = { ...editingContext.metadata };
-                          delete newMetadata[key];
-                          editingContext.metadata = newMetadata;
-                        }}
-                      >
-                        <span class="icon">
-                          <i class="fas fa-times"></i>
-                        </span>
-                      </button>
-                    </div>
-                  </div>
-                {/each}
-              {/if}
-
-              <button
-                class="button is-small is-light"
-                on:click={() => {
-                  editingContext.metadata = {
-                    ...editingContext.metadata,
-                    [`key_${Date.now()}`]: ''
-                  };
-                }}
-              >
-                <span class="icon">
-                  <i class="fas fa-plus"></i>
-                </span>
-                <span>Add Metadata</span>
-              </button>
+              <p class="help">Metadata editing temporarily disabled</p>
+              <pre>{JSON.stringify(editingContext?.metadata || {}, null, 2)}</pre>
             </div>
           </div>
         </details>
@@ -282,7 +224,7 @@ function _handleKeydown(event: KeyboardEvent) {
             <div class="control">
               <button
                 class="button is-danger is-outlined"
-                on:click={handleDelete}
+                on:click={_handleDelete}
                 data-testid="delete-context-button"
               >
                 <span class="icon">

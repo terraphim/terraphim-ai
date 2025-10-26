@@ -1,25 +1,5 @@
-<script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
-import { onMount } from 'svelte';
-import { get } from 'svelte/store';
-import { CONFIG } from '../../config';
-import {
-	configStore,
-	currentPersistentConversationId,
-	is_tauri,
-	role,
-	showSessionList,
-} from '../stores';
-import SessionList from './SessionList.svelte';
-import { Markdown } from 'svelte-markdown';
-
-// Tauri APIs for saving files (only used in desktop)
-let tauriDialog: any = null;
-let tauriFs: any = null;
-
-type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
-type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
-type ContextItem = {
+<script context="module" lang="ts">
+export type ContextItem = {
 	id: string;
 	title: string;
 	summary?: string;
@@ -41,6 +21,51 @@ type ContextItem = {
 		metadata: Record<string, string>;
 		relevance_score?: number;
 	};
+};
+</script>
+
+<script lang="ts">
+import { invoke } from '@tauri-apps/api/tauri';
+import { onMount } from 'svelte';
+import { get } from 'svelte/store';
+import { CONFIG } from '../../config';
+import {
+	configStore,
+	currentPersistentConversationId,
+	is_tauri,
+	role,
+	showSessionList,
+} from '../stores';
+import SessionList from './SessionList.svelte';
+import ContextEditModal from './ContextEditModal.svelte';
+import KGContextItem from '../Search/KGContextItem.svelte';
+import KGSearchModal from '../Search/KGSearchModal.svelte';
+import ArticleModal from '../Search/ArticleModal.svelte';
+// @ts-ignore
+import Markdown from 'svelte-markdown';
+
+// Tauri APIs for saving files (only used in desktop)
+let tauriDialog: any = null;
+let tauriFs: any = null;
+
+type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
+type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
+
+// API response types
+type ConversationsResponse = {
+	conversations: Array<{ id: string; created_at: string; title?: string }>;
+};
+type CreateConversationResponse = {
+	status: string;
+	conversation_id?: string;
+	error?: string;
+};
+type ConversationResponse = {
+	status: string;
+	conversation?: {
+		global_context: ContextItem[];
+	};
+	error?: string;
 };
 type Conversation = {
 	id: string;
@@ -64,8 +89,8 @@ let renderMarkdown: boolean = false;
 let _debugMode: boolean = false;
 let _lastRequest: any = null;
 let _lastResponse: any = null;
-let __showDebugRequest: boolean = false;
-let __showDebugResponse: boolean = false;
+let _showDebugRequest: boolean = false;
+let _showDebugResponse: boolean = false;
 
 // Conversation and context management
 let conversationId: string | null = null;
@@ -118,6 +143,14 @@ function loadChatState() {
 	}
 }
 
+function getRoleDisplay() {
+	const currentRole = get(role);
+	if (typeof currentRole === 'object' && currentRole && 'original' in currentRole) {
+		return (currentRole as any).original;
+	}
+	return String(currentRole);
+}
+
 function saveChatState() {
 	try {
 		if (typeof window === 'undefined') return;
@@ -154,7 +187,7 @@ async function initializeConversation() {
 	try {
 		if ($is_tauri) {
 			// Try to get existing conversations
-			const result = await invoke('list_conversations');
+			const result = await invoke('list_conversations') as ConversationsResponse;
 			if (result?.conversations && result.conversations.length > 0) {
 				// Use the most recent conversation
 				conversationId = result.conversations[0].id;
@@ -194,7 +227,7 @@ async function createNewConversation() {
 			const result = await invoke('create_conversation', {
 				title: 'Chat Conversation',
 				role: currentRole,
-			});
+			}) as CreateConversationResponse;
 			if (result.status === 'success' && result.conversation_id) {
 				conversationId = result.conversation_id;
 				console.log('🆕 Created new conversation:', conversationId);
@@ -245,7 +278,7 @@ async function loadConversationContext() {
 
 			const result = await invoke(command, {
 				conversationId: isPersistent ? conversationId : conversationId,
-			});
+			}) as ConversationResponse;
 
 			console.log('📥 Tauri response:', result);
 
@@ -287,7 +320,7 @@ async function loadConversationContext() {
 		}
 	} catch (error) {
 		console.error('❌ Error loading conversation context:', {
-			error: error.message || error,
+			error: error instanceof Error ? error.message : String(error),
 			conversationId,
 			isTauri: $is_tauri,
 			timestamp: new Date().toISOString(),
@@ -327,7 +360,7 @@ async function _addManualContext() {
 			const result = await invoke('add_context_to_conversation', {
 				conversationId,
 				contextData,
-			});
+			}) as { status: string; error?: string };
 			if (result.status === 'success') {
 				await loadConversationContext();
 				toggleAddContextForm();
@@ -487,7 +520,7 @@ async function deleteContext(contextId: string) {
 			const result = await invoke('delete_context', {
 				conversationId,
 				contextId,
-			});
+			}) as { status?: string; error?: string };
 			if (result?.status === 'success') {
 				console.log('✅ Context deleted successfully via Tauri');
 				await loadConversationContext();
@@ -541,7 +574,7 @@ async function _updateContext(updatedContext: ContextItem) {
 				conversationId,
 				contextId: updatedContext.id,
 				request: updatePayload,
-			});
+			}) as { status?: string; error?: string };
 			if (result?.status === 'success') {
 				console.log('✅ Context updated successfully via Tauri');
 				await loadConversationContext();
@@ -835,7 +868,7 @@ async function loadPersistentConversation(conversationIdToLoad: string) {
 		if ($is_tauri) {
 			const result = await invoke('get_persistent_conversation', {
 				conversationId: conversationIdToLoad,
-			});
+			}) as { status: string; conversation?: any; error?: string };
 
 			if (result.status === 'success' && result.conversation) {
 				const conv = result.conversation;
@@ -876,7 +909,7 @@ async function _savePersistentConversation() {
 	try {
 		if ($is_tauri) {
 			// Get the current conversation
-			const result = await invoke('get_conversation', { conversationId });
+			const result = await invoke('get_conversation', { conversationId }) as { status: string; conversation?: any; error?: string };
 
 			if (result.status === 'success' && result.conversation) {
 				const conv = result.conversation;
@@ -885,7 +918,7 @@ async function _savePersistentConversation() {
 				const saveResult = await invoke('create_persistent_conversation', {
 					title: conv.title || 'Chat Conversation',
 					role: conv.role,
-				});
+				}) as { status: string; conversation?: any; error?: string };
 
 				if (saveResult.status === 'success' && saveResult.conversation) {
 					const persistentConv = saveResult.conversation;
@@ -897,7 +930,7 @@ async function _savePersistentConversation() {
 							messages: conv.messages,
 							global_context: conv.global_context,
 						},
-					});
+					}) as { status: string; error?: string };
 
 					if (updateResult.status === 'success') {
 						currentPersistentConversationId.set(persistentConv.id);
@@ -956,7 +989,7 @@ function _toggleSessionList() {
         <div class="chat-header">
           <div>
             <h2 class="title is-4">Chat</h2>
-            <p class="subtitle is-6">Role: {typeof get(role) === 'object' ? get(role).original : get(role)}</p>
+            <p class="subtitle is-6">Role: {getRoleDisplay()}</p>
             {#if conversationId}
               <p class="is-size-7 has-text-grey">Conversation ID: {conversationId}</p>
             {/if}
@@ -1027,8 +1060,8 @@ function _toggleSessionList() {
                   <button
                     class="button is-small is-warning"
                     title="Show debug request (sent to LLM)"
-                    on:click={() => __showDebugRequest = true}
-                    disabled={!lastRequest}
+                    on:click={() => _showDebugRequest = true}
+                    disabled={!_lastRequest}
                   >
                     <span class="icon is-small"><i class="fas fa-bug"></i></span>
                     <span class="is-size-7">REQ</span>
@@ -1036,8 +1069,8 @@ function _toggleSessionList() {
                   <button
                     class="button is-small is-info"
                     title="Show debug response (from LLM)"
-                    on:click={() => __showDebugResponse = true}
-                    disabled={!lastResponse}
+                    on:click={() => _showDebugResponse = true}
+                    disabled={!_lastResponse}
                   >
                     <span class="icon is-small"><i class="fas fa-code"></i></span>
                     <span class="is-size-7">RES</span>
@@ -1070,7 +1103,7 @@ function _toggleSessionList() {
 
         <div class="field has-addons chat-input">
           <div class="control is-expanded">
-            <textarea class="textarea" rows="3" bind:value={input} on:keydown={handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
+            <textarea class="textarea" rows="3" bind:value={input} on:keydown={_handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
           </div>
           <div class="control">
             <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button">
@@ -1088,7 +1121,7 @@ function _toggleSessionList() {
             <div class="level-left">
               <div class="level-item">
                 <div class="buttons has-addons">
-                  <button class="button is-small is-info" data-testid="kg-search-button" on:click={openKGSearch}>
+                  <button class="button is-small is-info" data-testid="kg-search-button" on:click={_openKGSearch}>
                     <span class="icon is-small">
                       <i class="fas fa-sitemap"></i>
                     </span>
@@ -1102,10 +1135,10 @@ function _toggleSessionList() {
                 <button
                   class="button is-small is-light"
                   on:click={loadConversationContext}
-                  disabled={loadingContext}
+                  disabled={_loadingContext}
                   data-testid="refresh-context-button"
                 >
-                  {#if loadingContext}
+                  {#if _loadingContext}
                     <span class="icon is-small">
                       <i class="fas fa-spinner fa-spin"></i>
                     </span>
@@ -1152,17 +1185,16 @@ function _toggleSessionList() {
 
               <div class="field is-grouped">
                 <div class="control">
-                  <button class="button is-primary is-small" on:click={addManualContext} disabled={savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
-                    {#if savingContext}
+                  <button class="button is-primary is-small" on:click={_addManualContext} disabled={_savingContext || !newContextTitle.trim() || !newContextContent.trim()} data-testid="add-context-submit-button">
+                    {#if _savingContext}
                       <span class="icon is-small"><i class="fas fa-spinner fa-spin"></i></span>
                     {:else}
-                      <span class="icon is-small"><i class="fas fa-save"></i></span>
+                      <span class="icon is-small"><i class="fas fa-plus"></i></span>
                     {/if}
-                    <span>Save Context</span>
                   </button>
                 </div>
                 <div class="control">
-                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={savingContext}>
+                  <button class="button is-light is-small" on:click={toggleAddContextForm} disabled={_savingContext}>
                     <span class="icon is-small"><i class="fas fa-times"></i></span>
                     <span>Cancel</span>
                   </button>
@@ -1188,7 +1220,7 @@ function _toggleSessionList() {
                     contextItem={item}
                     compact={true}
                     on:remove={e => deleteContext(e.detail.contextId)}
-                    on:viewDetails={e => editContext(e.detail.contextItem, e.detail.term)}
+                    on:viewDetails={e => _editContext(e.detail.contextItem, e.detail.term)}
                   />
                 {:else}
                   <!-- Use default context item rendering for non-KG items -->
@@ -1218,7 +1250,7 @@ function _toggleSessionList() {
                             <div class="control">
                               <button
                                 class="button is-small is-light"
-                                on:click={() => editContext(item)}
+                                on:click={() => _editContext(item)}
                                 data-testid={`edit-context-${index}`}
                                 title="Edit context"
                               >
@@ -1230,7 +1262,7 @@ function _toggleSessionList() {
                             <div class="control">
                               <button
                                 class="button is-small is-light is-danger"
-                                on:click={() => confirmDeleteContext(item)}
+                                on:click={() => _confirmDeleteContext(item)}
                                 data-testid={`delete-context-${index}`}
                                 title="Delete context"
                               >
@@ -1308,16 +1340,16 @@ function _toggleSessionList() {
         <button class="delete" aria-label="close" on:click={() => _showDebugRequest = false}></button>
       </header>
       <section class="modal-card-body">
-        {#if lastRequest}
+        {#if _lastRequest}
           <div class="content">
             <p class="has-text-weight-semibold">Request Details:</p>
             <div class="tags are-medium">
-              <span class="tag is-info">Method: {lastRequest.method}</span>
-              <span class="tag is-primary">Time: {new Date(lastRequest.timestamp).toLocaleTimeString()}</span>
-              <span class="tag is-success">Context Items: {lastRequest.context_items_count}</span>
+              <span class="tag is-info">Method: {_lastRequest.method}</span>
+              <span class="tag is-primary">Time: {new Date(_lastRequest.timestamp).toLocaleTimeString()}</span>
+              <span class="tag is-success">Context Items: {_lastRequest.context_items_count}</span>
             </div>
             <p class="has-text-weight-semibold mt-4">Full Request JSON:</p>
-            <pre class="debug-json"><code>{JSON.stringify(lastRequest, null, 2)}</code></pre>
+            <pre class="debug-json"><code>{JSON.stringify(_lastRequest, null, 2)}</code></pre>
           </div>
         {:else}
           <p class="has-text-grey">No request data available</p>
@@ -1325,8 +1357,8 @@ function _toggleSessionList() {
       </section>
       <footer class="modal-card-foot">
         <button class="button" on:click={() => _showDebugRequest = false}>Close</button>
-        {#if lastRequest}
-          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(lastRequest, null, 2))}>
+        {#if _lastRequest}
+          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(_lastRequest, null, 2))}>
             <span class="icon"><i class="fas fa-copy"></i></span>
             <span>Copy JSON</span>
           </button>
@@ -1349,21 +1381,21 @@ function _toggleSessionList() {
         <button class="delete" aria-label="close" on:click={() => _showDebugResponse = false}></button>
       </header>
       <section class="modal-card-body">
-        {#if lastResponse}
+        {#if _lastResponse}
           <div class="content">
             <p class="has-text-weight-semibold">Response Details:</p>
             <div class="tags are-medium">
-              <span class="tag is-info">Status: {lastResponse.status}</span>
-              <span class="tag is-primary">Time: {new Date(lastResponse.timestamp).toLocaleTimeString()}</span>
-              {#if lastResponse.model_used}
-                <span class="tag is-success">Model: {lastResponse.model_used}</span>
+              <span class="tag is-info">Status: {_lastResponse.status}</span>
+              <span class="tag is-primary">Time: {new Date(_lastResponse.timestamp).toLocaleTimeString()}</span>
+              {#if _lastResponse.model_used}
+                <span class="tag is-success">Model: {_lastResponse.model_used}</span>
               {/if}
-              {#if lastResponse.message_length}
-                <span class="tag is-warning">Length: {lastResponse.message_length} chars</span>
+              {#if _lastResponse.message_length}
+                <span class="tag is-warning">Length: {_lastResponse.message_length} chars</span>
               {/if}
             </div>
             <p class="has-text-weight-semibold mt-4">Full Response JSON:</p>
-            <pre class="debug-json"><code>{JSON.stringify(lastResponse, null, 2)}</code></pre>
+            <pre class="debug-json"><code>{JSON.stringify(_lastResponse, null, 2)}</code></pre>
           </div>
         {:else}
           <p class="has-text-grey">No response data available</p>
@@ -1371,8 +1403,8 @@ function _toggleSessionList() {
       </section>
       <footer class="modal-card-foot">
         <button class="button" on:click={() => _showDebugResponse = false}>Close</button>
-        {#if lastResponse}
-          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(lastResponse, null, 2))}>
+        {#if _lastResponse}
+          <button class="button is-primary" on:click={() => _copyAsMarkdown(JSON.stringify(_lastResponse, null, 2))}>
             <span class="icon"><i class="fas fa-copy"></i></span>
             <span>Copy JSON</span>
           </button>
@@ -1385,13 +1417,13 @@ function _toggleSessionList() {
 <!-- Context Edit Modal -->
 <ContextEditModal
   bind:active={_showContextEditModal}
-  context={editingContext}
-  mode={contextEditMode}
-  on:update={e => updateContext(e.detail)}
+  context={_editingContext}
+  mode={_contextEditMode}
+  on:update={e => _updateContext(e.detail)}
   on:delete={e => deleteContext(e.detail)}
   on:close={() => {
     _showContextEditModal = false;
-    editingContext = null;
+    _editingContext = null;
   }}
 />
 
@@ -1399,8 +1431,8 @@ function _toggleSessionList() {
 <KGSearchModal
   bind:active={_showKGSearchModal}
   conversationId={conversationId}
-  on:termAdded={handleKGTermAdded}
-  on:kgIndexAdded={handleKGIndexAdded}
+  on:termAdded={_handleKGTermAdded}
+  on:kgIndexAdded={_handleKGIndexAdded}
 />
 
 <!-- KG Document Modal -->
@@ -1408,8 +1440,8 @@ function _toggleSessionList() {
   <ArticleModal
     bind:active={_showKgModal}
     item={kgDocument}
-    kgTerm={kgTerm}
-    kgRank={kgRank}
+    kgTerm={_kgTerm}
+    kgRank={_kgRank}
   />
 {/if}
 

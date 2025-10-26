@@ -20,6 +20,13 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
     // Initialize logging for debugging
     env_logger::try_init().ok();
 
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("workspace root")
+        .to_path_buf();
+    let docs_src_dir = workspace_root.join("docs/src");
+    let kg_dir = docs_src_dir.join("kg");
+
     // Initialize memory-only persistence for testing
     DeviceStorage::init_memory_only().await?;
     log::info!("🔧 Initialized memory-only persistence for testing");
@@ -30,7 +37,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             id: "haystack_doc".to_string(),
             title: "haystack.md".to_string(),
             body: "This is a haystack document that provides service functionality. It contains information about terraphim-graph and knowledge graph systems.".to_string(),
-            url: "docs/src/kg/haystack.md".to_string(),
+            url: kg_dir.join("haystack.md").to_string_lossy().into_owned(),
             description: Some("A haystack is a service that provides data indexing".to_string()),
             summarization: None,
             stub: None,
@@ -42,7 +49,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             id: "service_doc".to_string(),
             title: "service.md".to_string(),
             body: "Service architecture documentation. This service provides haystack functionality and integrates with the knowledge graph system.".to_string(),
-            url: "docs/src/kg/service.md".to_string(),
+            url: kg_dir.join("service.md").to_string_lossy().into_owned(),
             description: Some("Service layer documentation".to_string()),
             summarization: None,
             stub: None,
@@ -54,7 +61,10 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             id: "terraphim_graph_doc".to_string(),
             title: "terraphim-graph.md".to_string(),
             body: "Terraphim-graph is the knowledge graph system that provides semantic search. It uses haystacks as data sources and services for processing.".to_string(),
-            url: "docs/src/kg/terraphim-graph.md".to_string(),
+            url: kg_dir
+                .join("terraphim-graph.md")
+                .to_string_lossy()
+                .into_owned(),
             description: Some("Terraphim graph documentation".to_string()),
             summarization: None,
             stub: None,
@@ -99,7 +109,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
         shortname: Some("test-terraphim".to_string()),
         name: role_name.clone(),
         haystacks: vec![Haystack {
-            location: "docs/src".to_string(),
+            location: docs_src_dir.to_string_lossy().into_owned(),
             service: ServiceType::Ripgrep,
             read_only: true,
             atomic_server_secret: None,
@@ -110,7 +120,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: terraphim_types::KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/src/kg"),
+                path: kg_dir.clone(),
             }),
             public: true,
             publish: true,

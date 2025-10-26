@@ -3,13 +3,12 @@ import { get } from 'svelte/store';
 import { is_tauri } from '../stores';
 
 // Helper function to check if we're in Tauri mode
-function isTauriMode(): boolean {
+function _isTauriMode(): boolean {
 	// Check both the store value and the global window object for reliability
 	return (
 		get(is_tauri) || (typeof window !== 'undefined' && (window as any).__TAURI__ !== undefined)
 	);
 }
-
 export interface NovelAutocompleteSuggestion {
 	text: string;
 	snippet?: string;
@@ -41,25 +40,19 @@ export class NovelAutocompleteService {
 	private sessionId: string;
 	private currentRole: string = 'Default';
 	private connectionRetries: number = 0;
-	private maxRetries: number = 3;
-	private retryDelay: number = 1000;
 	private isConnecting: boolean = false;
 
 	constructor() {
-		// Use the MCP server URL - check environment or default to port 8001
+		// Use the Terraphim API server URL - check environment or default to port 8000
 		this.baseUrl =
 			typeof window !== 'undefined'
 				? (window.location.protocol === 'https:' ? 'https://' : 'http://') +
 					window.location.hostname +
-					':8001'
-				: 'http://localhost:8001';
+					':8000'
+				: 'http://localhost:8000';
 		this.sessionId = `novel-${Date.now()}`;
 
-		// Only try to detect server port if not in Tauri mode and health checks are needed
-		if (typeof window !== 'undefined' && !isTauriMode() && this.shouldPerformHealthCheck()) {
-			this.detectServerPort();
-		} else if (typeof window !== 'undefined' && !isTauriMode()) {
-		}
+		// Port detection will be done when needed during connection tests
 	}
 
 	/**
@@ -75,19 +68,12 @@ export class NovelAutocompleteService {
 	 * Detect the correct server port by checking common ports
 	 */
 	private async detectServerPort(): Promise<void> {
-		if (isTauriMode()) {
-			// In Tauri mode, no need for MCP server detection
+		if (get(is_tauri)) {
+			// In Tauri mode, no need for API server detection
 			return;
 		}
 
-		// Skip health checks entirely if we're not using autocomplete features
-		// This prevents unnecessary connection attempts
-		const shouldSkipHealthCheck = !this.shouldPerformHealthCheck();
-		if (shouldSkipHealthCheck) {
-			return;
-		}
-
-		const commonPorts = [8001, 3000]; // Reduced from 4 to 2 most likely ports
+		const commonPorts = [8000, 3000, 8080, 8001];
 
 		for (const port of commonPorts) {
 			try {
@@ -99,57 +85,28 @@ export class NovelAutocompleteService {
 							port
 						: `http://localhost:${port}`;
 
-				const response = await fetch(`${testUrl}/message?sessionId=health-check`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						jsonrpc: '2.0',
-						id: 0,
-						method: 'ping',
-						params: {},
-					}),
-					signal: AbortSignal.timeout(1000), // Reduced from 2s to 1s timeout
+				const response = await fetch(`${testUrl}/health`, {
+					method: 'GET',
+					signal: AbortSignal.timeout(2000), // 2 second timeout
 				});
 
-				if (response.ok || response.status === 404) {
-					// Server is responding, even if endpoint doesn't exist
+				if (response.ok && response.status === 200) {
+					// Server is responding to health check
 					this.baseUrl = testUrl;
+					console.log(`NovelAutocompleteService: Detected server at ${testUrl}`);
 					return;
 				}
 			} catch (_error) {}
 		}
+
+		console.warn(
+			'NovelAutocompleteService: Could not detect running server, using default:',
+			this.baseUrl
+		);
 	}
 
 	/**
-	 * Determine if health checks should be performed based on current context
-	 */
-	private shouldPerformHealthCheck(): boolean {
-		// Skip health checks if we're on specific pages that don't need autocomplete
-		if (typeof window !== 'undefined') {
-			const path = window.location.pathname;
-
-			// Only perform health checks on the chat page where autocomplete is actually needed
-			if (!path.startsWith('/chat')) {
-				return false;
-			}
-
-			// Additionally check if there's actually a text editor on the page
-			const hasEditor =
-				document.querySelector('[contenteditable="true"]') ||
-				document.querySelector('textarea') ||
-				document.querySelector('input[type="text"]');
-
-			if (!hasEditor) {
-				return false;
-			}
-		}
-
-		// Only perform health check if we're specifically on the chat page with an editor
-		return true;
-	}
-
-	/**
-	 * Build the autocomplete index for the current role with retry logic
+	 * Test the autocomplete endpoint to verify connectivity
 	 */
 	async buildAutocompleteIndex(): Promise<boolean> {
 		if (this.isConnecting) {
@@ -161,65 +118,62 @@ export class NovelAutocompleteService {
 		this.isConnecting = true;
 
 		try {
-			if (isTauriMode()) {
-				this.autocompleteIndexBuilt = true;
-				this.connectionRetries = 0;
-				return true;
+			if (get(is_tauri)) {
+				// In Tauri mode, test the autocomplete command directly
+				console.log('Using Tauri autocomplete - testing connection');
+				const testResponse = (await invoke('get_autocomplete_suggestions', {
+					query: 'test',
+					roleName: this.currentRole,
+					limit: 1,
+				})) as any;
+
+				if (testResponse && testResponse.status === 'success') {
+					this.autocompleteIndexBuilt = true;
+					this.connectionRetries = 0;
+					console.log('Tauri autocomplete connection verified');
+					return true;
+				}
+
+				console.warn('Tauri autocomplete test failed:', testResponse);
+				return false;
 			} else {
-				return await this.buildMCPIndex();
+				// Ensure server port is detected before testing REST API
+				await this.detectServerPort();
+
+				// Test the REST API autocomplete endpoint
+				const testQuery = 'test';
+				const encodedRole = encodeURIComponent(this.currentRole);
+				const encodedQuery = encodeURIComponent(testQuery);
+
+				const response = await fetch(
+					`${this.baseUrl}/autocomplete/${encodedRole}/${encodedQuery}`,
+					{
+						method: 'GET',
+						signal: AbortSignal.timeout(5000), // 5 second timeout
+					}
+				);
+
+				if (response.ok) {
+					const result = await response.json();
+					console.log('REST API autocomplete test response:', result);
+
+					if (result.status === 'success') {
+						this.autocompleteIndexBuilt = true;
+						this.connectionRetries = 0;
+						console.log('REST API autocomplete connection verified');
+						return true;
+					}
+				}
+
+				console.warn('REST API autocomplete test failed:', response.status, response.statusText);
+				return false;
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.error('Error testing Novel autocomplete endpoint:', error);
 			return false;
 		} finally {
 			this.isConnecting = false;
 		}
-	}
-
-	/**
-	 * Build MCP index with retry logic
-	 */
-	private async buildMCPIndex(): Promise<boolean> {
-		for (let attempt = 0; attempt <= this.maxRetries; attempt++) {
-			try {
-				const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-					method: 'POST',
-					headers: {
-						'Content-Type': 'application/json',
-					},
-					body: JSON.stringify({
-						jsonrpc: '2.0',
-						id: Date.now(),
-						method: 'tools/call',
-						params: {
-							name: 'build_autocomplete_index',
-							arguments: {},
-						},
-					}),
-					signal: AbortSignal.timeout(10000), // 10 second timeout
-				});
-
-				if (response.ok) {
-					const result = await response.json();
-
-					if (result.result && !result.result.is_error) {
-						this.autocompleteIndexBuilt = true;
-						this.connectionRetries = 0;
-						return true;
-					}
-				} else if (response.status >= 500 && attempt < this.maxRetries) {
-					await new Promise((resolve) => setTimeout(resolve, this.retryDelay * (attempt + 1)));
-				}
-			} catch (error) {
-				if (error instanceof Error && error.name === 'AbortError') {
-				} else {
-				}
-
-				if (attempt < this.maxRetries) {
-					await new Promise((resolve) => setTimeout(resolve, this.retryDelay * (attempt + 1)));
-				}
-			}
-		}
-		return false;
 	}
 
 	/**
@@ -271,7 +225,8 @@ export class NovelAutocompleteService {
 					totalTokens: Math.round(promptTokens + completionTokens),
 				},
 			};
-		} catch (_error) {
+		} catch (error) {
+			console.error('Error getting Novel autocomplete completion:', error);
 			return { text: '' };
 		}
 	}
@@ -288,17 +243,20 @@ export class NovelAutocompleteService {
 		if (!this.autocompleteIndexBuilt) {
 			const built = await this.buildAutocompleteIndex();
 			if (!built) {
+				// Return empty array instead of mock suggestions
+				console.warn('Autocomplete endpoint not ready, returning empty suggestions');
 				return [];
 			}
 		}
 
 		try {
-			if (isTauriMode()) {
+			if (get(is_tauri)) {
 				return await this.getTauriSuggestions(query, limit);
 			} else {
-				return await this.getMCPSuggestions(query, limit, 'autocomplete_terms');
+				return await this.getRestApiSuggestions(query, limit);
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.error('Error getting autocomplete suggestions:', error);
 			return [];
 		}
 	}
@@ -312,9 +270,11 @@ export class NovelAutocompleteService {
 	): Promise<NovelAutocompleteSuggestion[]> {
 		const response = (await invoke('get_autocomplete_suggestions', {
 			query: query.trim(),
-			role_name: this.currentRole,
+			roleName: this.currentRole,
 			limit: limit,
 		})) as any;
+
+		console.log('Tauri autocomplete response:', response);
 
 		if (response && response.status === 'success' && response.suggestions) {
 			return response.suggestions
@@ -327,57 +287,52 @@ export class NovelAutocompleteService {
 		}
 
 		if (response?.error) {
+			console.error('Tauri autocomplete error:', response.error);
 		}
 
 		return [];
 	}
 
 	/**
-	 * Get suggestions from MCP server
+	 * Get suggestions from REST API
 	 */
-	private async getMCPSuggestions(
+	private async getRestApiSuggestions(
 		query: string,
-		limit: number,
-		method: string
+		limit: number
 	): Promise<NovelAutocompleteSuggestion[]> {
-		const requestId = Date.now();
+		// Ensure server port is detected before making REST API requests
+		await this.detectServerPort();
 
-		const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-			method: 'POST',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: JSON.stringify({
-				jsonrpc: '2.0',
-				id: requestId,
-				method: 'tools/call',
-				params: {
-					name: method,
-					arguments: {
-						query: query.trim(),
-						limit,
-						role: this.currentRole,
-					},
-				},
-			}),
+		const encodedRole = encodeURIComponent(this.currentRole);
+		const encodedQuery = encodeURIComponent(query.trim());
+
+		const response = await fetch(`${this.baseUrl}/autocomplete/${encodedRole}/${encodedQuery}`, {
+			method: 'GET',
 			signal: AbortSignal.timeout(5000), // 5 second timeout
 		});
 
 		if (!response.ok) {
+			console.error(`REST API autocomplete request failed:`, response.status, response.statusText);
 			return [];
 		}
 
 		const result = await response.json();
+		console.log(`REST API autocomplete response for "${query}":`, result);
 
-		if (result.result && !result.result.is_error && result.result.content) {
-			if (method === 'autocomplete_with_snippets') {
-				return this.parseAutocompleteWithSnippetsContent(result.result.content);
-			} else {
-				return this.parseAutocompleteContent(result.result.content);
-			}
+		if (result.status === 'success' && result.suggestions) {
+			// Convert API response format to NovelAutocompleteSuggestion format
+			return result.suggestions
+				.slice(0, limit) // Limit results to requested amount
+				.map((suggestion: any) => ({
+					text: suggestion.text || suggestion.term || '',
+					snippet: suggestion.snippet || suggestion.url || '',
+					score: suggestion.score || 1.0,
+				}))
+				.filter((s: NovelAutocompleteSuggestion) => s.text.length > 0);
 		}
 
 		if (result.error) {
+			console.error(`REST API autocomplete error:`, result.error);
 		}
 
 		return [];
@@ -398,18 +353,21 @@ export class NovelAutocompleteService {
 		if (!this.autocompleteIndexBuilt) {
 			const built = await this.buildAutocompleteIndex();
 			if (!built) {
+				console.warn('Autocomplete endpoint not ready, returning empty suggestions with snippets');
 				return [];
 			}
 		}
 
 		try {
-			if (isTauriMode()) {
+			if (get(is_tauri)) {
 				// Tauri doesn't have separate snippets endpoint, use regular suggestions
 				return await this.getTauriSuggestions(query, limit);
 			} else {
-				return await this.getMCPSuggestions(query, limit, 'autocomplete_with_snippets');
+				// REST API already returns snippets if available
+				return await this.getRestApiSuggestions(query, limit);
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.error('Error getting autocomplete suggestions with snippets:', error);
 			return [];
 		}
 	}
@@ -420,63 +378,6 @@ export class NovelAutocompleteService {
 	private extractLastWord(prompt: string): string {
 		const words = prompt.trim().split(/\s+/);
 		return words[words.length - 1] || '';
-	}
-
-	/**
-	 * Parse autocomplete content from MCP response
-	 */
-	private parseAutocompleteContent(content: any[]): NovelAutocompleteSuggestion[] {
-		const suggestions: NovelAutocompleteSuggestion[] = [];
-
-		for (const item of content) {
-			if (item.type === 'text' && item.text) {
-				// Skip the summary line (e.g., "Found X suggestions")
-				if (!item.text.startsWith('Found') && !item.text.startsWith('•')) {
-					suggestions.push({ text: item.text.trim() });
-				} else if (item.text.startsWith('•')) {
-					// Extract term from bullet point format
-					const term = item.text.replace('•', '').trim();
-					if (term) {
-						suggestions.push({ text: term });
-					}
-				}
-			}
-		}
-
-		return suggestions;
-	}
-
-	/**
-	 * Parse autocomplete with snippets content from MCP response
-	 */
-	private parseAutocompleteWithSnippetsContent(content: any[]): NovelAutocompleteSuggestion[] {
-		const suggestions: NovelAutocompleteSuggestion[] = [];
-
-		for (const item of content) {
-			if (item.type === 'text' && item.text) {
-				// Skip the summary line
-				if (!item.text.startsWith('Found') && !item.text.startsWith('•')) {
-					// Check if it's in the format "term — snippet"
-					const parts = item.text.split(' — ');
-					if (parts.length === 2) {
-						suggestions.push({
-							text: parts[0].trim(),
-							snippet: parts[1].trim(),
-						});
-					} else {
-						suggestions.push({ text: item.text.trim() });
-					}
-				} else if (item.text.startsWith('•')) {
-					// Extract term from bullet point format
-					const term = item.text.replace('•', '').trim();
-					if (term) {
-						suggestions.push({ text: term });
-					}
-				}
-			}
-		}
-
-		return suggestions;
 	}
 
 	/**
@@ -502,7 +403,7 @@ export class NovelAutocompleteService {
 			ready: this.autocompleteIndexBuilt,
 			baseUrl: this.baseUrl,
 			sessionId: this.sessionId,
-			usingTauri: isTauriMode(),
+			usingTauri: get(is_tauri),
 			currentRole: this.currentRole,
 			connectionRetries: this.connectionRetries,
 			isConnecting: this.isConnecting,
@@ -523,31 +424,21 @@ export class NovelAutocompleteService {
 	 */
 	async testConnection(): Promise<boolean> {
 		try {
-			if (isTauriMode()) {
-				// In Tauri mode, test the autocomplete command directly
-				const response = (await invoke('get_autocomplete_suggestions', {
-					query: 'test',
-					role_name: this.currentRole,
-					limit: 1,
-				})) as any;
-
-				// Check if we got a valid response structure (success or error)
-				return response && (response.status === 'success' || response.status === 'error');
+			if (get(is_tauri)) {
+				const response = (await invoke('get_config')) as any;
+				return response && response.status === 'success';
 			} else {
-				const response = await fetch(`${this.baseUrl}/message?sessionId=${this.sessionId}`, {
-					method: 'POST',
-					headers: { 'Content-Type': 'application/json' },
-					body: JSON.stringify({
-						jsonrpc: '2.0',
-						id: Date.now(),
-						method: 'tools/list',
-						params: {},
-					}),
+				// Ensure server port is detected before testing connection
+				await this.detectServerPort();
+
+				const response = await fetch(`${this.baseUrl}/health`, {
+					method: 'GET',
 					signal: AbortSignal.timeout(3000),
 				});
-				return response.ok;
+				return response.ok && response.status === 200;
 			}
-		} catch (_error) {
+		} catch (error) {
+			console.warn('Connection test failed:', error);
 			return false;
 		}
 	}
