@@ -119,8 +119,7 @@ fn create_document_description(content: &str) -> Option<String> {
 
 mod api;
 mod error;
-mod truthforge_api;
-mod truthforge_context;
+
 pub mod workflows;
 
 use api::{
@@ -148,7 +147,7 @@ pub struct AppState {
     pub config_state: ConfigState,
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
-    pub truthforge_sessions: truthforge_api::SessionStore,
+    
 }
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
@@ -407,7 +406,6 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     // Initialize workflow management components
     let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
     let (websocket_broadcaster, _) = broadcast::channel(1000);
-    let truthforge_sessions = truthforge_api::SessionStore::new();
     log::info!("Initialized workflow management system with WebSocket support");
 
     // Create extended application state
@@ -415,7 +413,6 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         config_state,
         workflow_sessions,
         websocket_broadcaster,
-        truthforge_sessions,
     };
 
     let app = Router::new()
@@ -517,31 +514,6 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
-        // TruthForge API routes
-        .route(
-            "/api/v1/truthforge",
-            post(truthforge_api::analyze_narrative),
-        )
-        .route(
-            "/api/v1/truthforge/",
-            post(truthforge_api::analyze_narrative),
-        )
-        .route(
-            "/api/v1/truthforge/analyses",
-            get(truthforge_api::list_analyses),
-        )
-        .route(
-            "/api/v1/truthforge/analyses/",
-            get(truthforge_api::list_analyses),
-        )
-        .route(
-            "/api/v1/truthforge/{session_id}",
-            get(truthforge_api::get_analysis),
-        )
-        .route(
-            "/api/v1/truthforge/{session_id}/",
-            get(truthforge_api::get_analysis),
-        )
         // Add workflow management routes
         .merge(workflows::create_router())
         .fallback(static_handler)
@@ -625,14 +597,12 @@ pub async fn build_router_for_tests() -> Router {
     // Initialize workflow management components for tests
     let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
     let (websocket_broadcaster, _) = broadcast::channel(100);
-    let truthforge_sessions = truthforge_api::SessionStore::new();
 
     // Create extended application state for tests
     let app_state = AppState {
         config_state,
         workflow_sessions,
         websocket_broadcaster,
-        truthforge_sessions,
     };
 
     Router::new()
@@ -731,31 +701,6 @@ pub async fn build_router_for_tests() -> Router {
         .route(
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
-        )
-        // TruthForge API routes for tests
-        .route(
-            "/api/v1/truthforge",
-            post(truthforge_api::analyze_narrative),
-        )
-        .route(
-            "/api/v1/truthforge/",
-            post(truthforge_api::analyze_narrative),
-        )
-        .route(
-            "/api/v1/truthforge/analyses",
-            get(truthforge_api::list_analyses),
-        )
-        .route(
-            "/api/v1/truthforge/analyses/",
-            get(truthforge_api::list_analyses),
-        )
-        .route(
-            "/api/v1/truthforge/{session_id}",
-            get(truthforge_api::get_analysis),
-        )
-        .route(
-            "/api/v1/truthforge/{session_id}/",
-            get(truthforge_api::get_analysis),
         )
         // Add workflow management routes for tests
         .merge(workflows::create_router())
