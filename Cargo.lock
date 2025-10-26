@@ -4234,21 +4234,6 @@ dependencies = [
 
 [[package]]
 name = "mockall"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "43766c2b5203b10de348ffe19f7e54564b64f3d6018ff7648d1e2d6d3a0f0a48"
-dependencies = [
- "cfg-if",
- "downcast",
- "fragile",
- "lazy_static",
- "mockall_derive 0.12.1",
- "predicates",
- "predicates-tree",
-]
-
-[[package]]
-name = "mockall"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39a6bfcc6c8c7eed5ee98b9c3e33adc726054389233e201c95dab2d41a3839d2"
@@ -4256,21 +4241,9 @@ dependencies = [
  "cfg-if",
  "downcast",
  "fragile",
- "mockall_derive 0.13.1",
+ "mockall_derive",
  "predicates",
  "predicates-tree",
-]
-
-[[package]]
-name = "mockall_derive"
-version = "0.12.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "af7cbce79ec385a1d4f54baa90a76401eb15d9cab93685f62e7e9f942aa00ae2"
-dependencies = [
- "cfg-if",
- "proc-macro2",
- "quote",
- "syn 2.0.108",
 ]
 
 [[package]]
@@ -4615,7 +4588,7 @@ dependencies = [
  "prost",
  "quick-xml 0.38.3",
  "redb",
- "redis 0.32.7",
+ "redis",
  "reqsign",
  "reqwest 0.12.24",
  "rocksdb",
@@ -4676,15 +4649,6 @@ name = "option-ext"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "04744f49eae99ab78e0d5c0b603ab218f515ea8cfe5a456d7629ad883a3b6e7d"
-
-[[package]]
-name = "ordered-float"
-version = "4.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bb71e1b3fa6ca1c61f383464aaf2bb0e2f8e772a1f01d486832464de363b951"
-dependencies = [
- "num-traits",
-]
 
 [[package]]
 name = "ordered-multimap"
@@ -5666,30 +5630,6 @@ dependencies = [
 
 [[package]]
 name = "redis"
-version = "0.29.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1bc42f3a12fd4408ce64d8efef67048a924e543bd35c6591c0447fda9054695f"
-dependencies = [
- "arc-swap",
- "backon",
- "bytes",
- "combine",
- "futures-channel",
- "futures-util",
- "itoa 1.0.15",
- "num-bigint",
- "percent-encoding",
- "pin-project-lite",
- "ryu",
- "sha1_smol",
- "socket2 0.5.10",
- "tokio",
- "tokio-util",
- "url",
-]
-
-[[package]]
-name = "redis"
 version = "0.32.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "014cc767fefab6a3e798ca45112bccad9c6e0e218fbd49720042716c73cfef44"
@@ -6001,22 +5941,6 @@ dependencies = [
  "wasm-bindgen-futures",
  "web-sys",
  "windows 0.37.0",
-]
-
-[[package]]
-name = "rig-core"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcef2ad6a69dfbd94e0e35cc46ac4b7e91d15846820b1285660f8040e9377c3c"
-dependencies = [
- "futures",
- "ordered-float",
- "reqwest 0.11.27",
- "schemars 0.8.22",
- "serde",
- "serde_json",
- "thiserror 1.0.69",
- "tracing",
 ]
 
 [[package]]
@@ -7854,7 +7778,7 @@ dependencies = [
  "env_logger 0.11.8",
  "log",
  "lru 0.16.2",
- "mockall 0.13.1",
+ "mockall",
  "portpicker",
  "rmcp",
  "schemars 0.8.22",
@@ -7919,33 +7843,6 @@ name = "terraphim-markdown-parser"
 version = "0.2.0"
 dependencies = [
  "pulldown-cmark 0.13.0",
-]
-
-[[package]]
-name = "terraphim-truthforge"
-version = "0.2.0"
-dependencies = [
- "anyhow",
- "chrono",
- "futures",
- "mockall 0.12.1",
- "redis 0.29.5",
- "rig-core",
- "serde",
- "serde_json",
- "tempfile",
- "terraphim_agent_evolution",
- "terraphim_automata",
- "terraphim_config",
- "terraphim_multi_agent",
- "terraphim_persistence",
- "terraphim_rolegraph",
- "terraphim_types",
- "thiserror 1.0.69",
- "tokio",
- "tokio-test",
- "tracing",
- "uuid",
 ]
 
 [[package]]
@@ -8102,7 +7999,7 @@ dependencies = [
  "env_logger 0.11.8",
  "indexmap 2.12.0",
  "log",
- "mockall 0.13.1",
+ "mockall",
  "once_cell",
  "regex",
  "serde",
@@ -8419,7 +8316,6 @@ dependencies = [
  "serial_test",
  "static-files",
  "tempfile",
- "terraphim-truthforge",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
