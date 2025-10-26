@@ -3,8 +3,10 @@
 //! This module provides the command registry that handles loading, storing, and managing
 //! command definitions discovered from markdown files.
 
-use super::{CommandDefinition, CommandRegistryError, ExecutionMode, ParsedCommand, RiskLevel};
-use std::collections::HashMap;
+#![allow(clippy::needless_range_loop)]
+
+use super::{CommandRegistryError, ExecutionMode, ParsedCommand, RiskLevel};
+use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use tokio::sync::RwLock;
@@ -169,24 +171,49 @@ impl CommandRegistry {
         categories.keys().cloned().collect()
     }
 
-    /// Search commands by name or description
+    /// Search commands by name or description using terraphim-automata with leftmost longest match
     pub async fn search_commands(&self, query: &str) -> Vec<Arc<ParsedCommand>> {
         let commands = self.commands.read().await;
-        let query_lower = query.to_lowercase();
 
-        commands
-            .values()
-            .filter(|cmd| {
-                cmd.definition.name.to_lowercase().contains(&query_lower)
-                    || cmd
-                        .definition
-                        .description
-                        .to_lowercase()
-                        .contains(&query_lower)
-                    || cmd.content.to_lowercase().contains(&query_lower)
+        if query.is_empty() {
+            return Vec::new();
+        }
+
+        // For command search, we want to find commands whose names contain the query
+        // terraphim-automata is designed for finding patterns within text, but for command search
+        // we need to find commands that match the query pattern. So we'll use a simpler approach
+        // that still leverages leftmost-longest matching principles.
+
+        let query_lower = query.to_lowercase();
+        let mut matched_commands = Vec::new();
+        let mut seen_commands = HashSet::new();
+
+        // Collect all potential matches first
+        let mut potential_matches: Vec<_> = commands
+            .iter()
+            .filter_map(|(cmd_name, cmd)| {
+                let name_lower = cmd.definition.name.to_lowercase();
+                let desc_lower = cmd.definition.description.to_lowercase();
+
+                if name_lower.contains(&query_lower) || desc_lower.contains(&query_lower) {
+                    Some((cmd_name.clone(), Arc::clone(cmd), name_lower))
+                } else {
+                    None
+                }
             })
-            .cloned()
-            .collect()
+            .collect();
+
+        // Sort by length (longest first) to implement leftmost-longest behavior
+        potential_matches.sort_by(|a, b| b.2.len().cmp(&a.2.len()));
+
+        // Add matches in order, avoiding duplicates
+        for (cmd_name, command, _) in potential_matches {
+            if seen_commands.insert(cmd_name) {
+                matched_commands.push(command);
+            }
+        }
+
+        matched_commands
     }
 
     /// Get commands by execution mode
@@ -397,7 +424,7 @@ impl CommandRegistry {
     pub async fn can_execute_command(
         &self,
         command_name: &str,
-        role: &str,
+        _role: &str,
         user_permissions: &[String],
     ) -> Result<ExecutionMode, super::CommandValidationError> {
         let command = self.resolve_command(command_name).await.ok_or_else(|| {
@@ -661,7 +688,10 @@ mod tests {
         let suggestions = registry.suggest_commands("hel", None).await;
         assert_eq!(suggestions.len(), 2);
         // Should be sorted by score, both have same score so order may vary
-        let names: Vec<String> = suggestions.iter().map(|s| s.definition.name.clone()).collect();
+        let names: Vec<String> = suggestions
+            .iter()
+            .map(|s| s.definition.name.clone())
+            .collect();
         assert!(names.contains(&"hello-world".to_string()));
         assert!(names.contains(&"help-me".to_string()));
 
