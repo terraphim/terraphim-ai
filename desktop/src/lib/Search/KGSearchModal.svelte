@@ -1,9 +1,16 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
 import { Button, Field, Input, Message, Modal } from 'svelma';
 import { createEventDispatcher, onDestroy } from 'svelte';
 import { CONFIG } from '../../config';
 import { is_tauri, is_tauri as isTauriStore, role, role as roleStore } from '$lib/stores';
+
+// Dynamic Tauri imports - handle both web and Tauri environments
+let invoke: any = null;
+// Use type assertion to avoid TypeScript errors
+if (typeof window !== 'undefined' && (window as any).__TAURI__) {
+  // Tauri environment
+  invoke = (window as any).__TAURI__.invoke;
+}
 
 export let active: boolean = false;
 export let initialQuery: string = '';

@@ -277,7 +277,7 @@ test_prompt_chaining() {
     local response
     if response=$(curl -s -X POST "$BACKEND_URL/workflows/prompt-chain" \
         -H "Content-Type: application/json" \
-        -d '{"prompt":"Create a simple web server","role":"content_creator"}' 2>/dev/null); then
+        -d '{"prompt":"Create a simple web server","role":"Terraphim Engineer"}' 2>/dev/null); then
 
         if echo "$response" | jq -e '.success == true' >/dev/null 2>&1; then
             log_success "Prompt chaining API endpoint working"
