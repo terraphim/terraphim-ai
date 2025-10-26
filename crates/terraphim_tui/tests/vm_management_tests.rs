@@ -19,6 +19,7 @@ fn test_vm_list_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_pool_command_parsing() {
     let command = ReplCommand::from_str("/vm pool").unwrap();
@@ -31,6 +32,7 @@ fn test_vm_pool_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_status_command_parsing() {
     let command = ReplCommand::from_str("/vm status vm-123").unwrap();
@@ -47,6 +49,7 @@ fn test_vm_status_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_status_without_id_command_parsing() {
     let command = ReplCommand::from_str("/vm status").unwrap();
@@ -63,6 +66,7 @@ fn test_vm_status_without_id_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_metrics_command_parsing() {
     let command = ReplCommand::from_str("/vm metrics vm-456").unwrap();
@@ -79,6 +83,7 @@ fn test_vm_metrics_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_metrics_all_command_parsing() {
     let command = ReplCommand::from_str("/vm metrics").unwrap();
@@ -95,6 +100,7 @@ fn test_vm_metrics_all_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_execute_command_parsing() {
     let command =
@@ -119,6 +125,7 @@ fn test_vm_execute_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_execute_without_vm_id_command_parsing() {
     let command = ReplCommand::from_str("/vm execute javascript console.log('test')").unwrap();
@@ -142,6 +149,7 @@ fn test_vm_execute_without_vm_id_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_agent_command_parsing() {
     let command = ReplCommand::from_str("/vm agent dev-agent run-tests --vm-id vm-101").unwrap();
@@ -165,6 +173,7 @@ fn test_vm_agent_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_agent_without_vm_id_command_parsing() {
     let command = ReplCommand::from_str("/vm agent test-agent deploy").unwrap();
@@ -188,6 +197,7 @@ fn test_vm_agent_without_vm_id_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_tasks_command_parsing() {
     let command = ReplCommand::from_str("/vm tasks vm-202").unwrap();
@@ -204,6 +214,7 @@ fn test_vm_tasks_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_allocate_command_parsing() {
     let command = ReplCommand::from_str("/vm allocate vm-303").unwrap();
@@ -220,6 +231,7 @@ fn test_vm_allocate_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_release_command_parsing() {
     let command = ReplCommand::from_str("/vm release vm-404").unwrap();
@@ -236,6 +248,7 @@ fn test_vm_release_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_monitor_command_parsing() {
     let command = ReplCommand::from_str("/vm monitor vm-505 --refresh 10").unwrap();
@@ -253,6 +266,7 @@ fn test_vm_monitor_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_monitor_default_refresh_command_parsing() {
     let command = ReplCommand::from_str("/vm monitor vm-606").unwrap();
@@ -270,60 +284,70 @@ fn test_vm_monitor_default_refresh_command_parsing() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_invalid_command_parsing() {
     let result = ReplCommand::from_str("/vm");
     assert!(result.is_err(), "Should fail when no subcommand provided");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_unknown_subcommand_parsing() {
     let result = ReplCommand::from_str("/vm unknown");
     assert!(result.is_err(), "Should fail with unknown subcommand");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_monitor_missing_vm_id() {
     let result = ReplCommand::from_str("/vm monitor");
     assert!(result.is_err(), "Should fail when VM ID is missing");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_execute_missing_language() {
     let result = ReplCommand::from_str("/vm execute");
     assert!(result.is_err(), "Should fail when language is missing");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_agent_missing_agent_id() {
     let result = ReplCommand::from_str("/vm agent");
     assert!(result.is_err(), "Should fail when agent ID is missing");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_tasks_missing_vm_id() {
     let result = ReplCommand::from_str("/vm tasks");
     assert!(result.is_err(), "Should fail when VM ID is missing");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_execute_empty_code() {
     let result = ReplCommand::from_str("/vm execute python");
     assert!(result.is_err(), "Should fail when code is empty");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_agent_empty_task() {
     let result = ReplCommand::from_str("/vm agent test-agent");
     assert!(result.is_err(), "Should fail when task is empty");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_monitor_invalid_refresh() {
     let result = ReplCommand::from_str("/vm monitor vm-123 --refresh invalid");
     assert!(result.is_err(), "Should fail with invalid refresh rate");
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_execute_with_quotes() {
     let command = ReplCommand::from_str("/vm execute python print(\"hello world\")").unwrap();
@@ -347,6 +371,7 @@ fn test_vm_execute_with_quotes() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_agent_with_complex_task() {
     let command =
@@ -371,6 +396,7 @@ fn test_vm_agent_with_complex_task() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_vm_available_commands_includes_vm() {
     let commands = ReplCommand::available_commands();

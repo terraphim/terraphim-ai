@@ -3,7 +3,9 @@
 //! These tests verify that the OpenRouter service correctly uses the z.ai proxy
 //! when ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN environment variables are set.
 
+#[cfg(feature = "openrouter")]
 use std::env;
+#[cfg(feature = "openrouter")]
 use terraphim_service::openrouter::OpenRouterService;
 
 /// Test environment variable cleanup utility
@@ -48,7 +50,8 @@ impl Drop for TestEnv {
 mod tests {
     use super::*;
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_anthropic_model_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -63,10 +66,11 @@ mod tests {
         let service = service.unwrap();
 
         // Verify the service uses the z.ai proxy URL
-        assert_eq!(service.base_url, "https://api.z.ai/api/anthropic");
+        assert_eq!(service.base_url(), "https://api.z.ai/api/anthropic");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_claude_model_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -81,10 +85,11 @@ mod tests {
         let service = service.unwrap();
 
         // Verify the service uses the z.ai proxy URL
-        assert_eq!(service.base_url, "https://api.z.ai/api/anthropic");
+        assert_eq!(service.base_url(), "https://api.z.ai/api/anthropic");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_non_anthropic_model_ignores_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -99,10 +104,11 @@ mod tests {
         let service = service.unwrap();
 
         // Should use default OpenRouter URL, not z.ai proxy
-        assert_eq!(service.base_url, "https://openrouter.ai/api/v1");
+        assert_eq!(service.base_url(), "https://openrouter.ai/api/v1");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_openrouter_base_url_override() {
         let mut test_env = TestEnv::new();
 
@@ -119,12 +125,13 @@ mod tests {
 
         // Should use the custom OpenRouter URL
         assert_eq!(
-            service.base_url,
+            service.base_url(),
             "https://custom-openrouter.example.com/api/v1"
         );
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_z_ai_proxy_priority_over_openrouter() {
         let mut test_env = TestEnv::new();
 
@@ -139,7 +146,7 @@ mod tests {
         let service = service.unwrap();
 
         // Should use z.ai proxy for Anthropic models
-        assert_eq!(service.base_url, "https://api.z.ai/api/anthropic");
+        assert_eq!(service.base_url(), "https://api.z.ai/api/anthropic");
 
         // Test non-Anthropic model - should use OpenRouter
         let service2 = OpenRouterService::new("test-key", "openai/gpt-4");
@@ -148,10 +155,11 @@ mod tests {
         let service2 = service2.unwrap();
 
         // Should use OpenRouter for non-Anthropic models
-        assert_eq!(service2.base_url, "https://openrouter.ai/api/v1");
+        assert_eq!(service2.base_url(), "https://openrouter.ai/api/v1");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_api_key_selection_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -166,10 +174,11 @@ mod tests {
 
         // Test that the service would use ANTHROPIC_AUTH_TOKEN for z.ai proxy
         // We can't directly test the private method, but we can verify the URL detection
-        assert!(service.base_url.contains("z.ai"));
+        assert!(service.base_url().contains("z.ai"));
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_no_environment_variables() {
         let mut test_env = TestEnv::new();
 
@@ -185,10 +194,11 @@ mod tests {
         let service = service.unwrap();
 
         // Should use default OpenRouter URL when no proxy is configured
-        assert_eq!(service.base_url, "https://openrouter.ai/api/v1");
+        assert_eq!(service.base_url(), "https://openrouter.ai/api/v1");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_environment_variable_validation() {
         let mut test_env = TestEnv::new();
 
@@ -202,10 +212,11 @@ mod tests {
         let service = service.unwrap();
 
         // Should fall back to default when ANTHROPIC_BASE_URL is empty
-        assert_eq!(service.base_url, "https://openrouter.ai/api/v1");
+        assert_eq!(service.base_url(), "https://openrouter.ai/api/v1");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_model_name_patterns() {
         let mut test_env = TestEnv::new();
 
@@ -233,14 +244,15 @@ mod tests {
 
             let service = service.unwrap();
             assert_eq!(
-                service.base_url, "https://api.z.ai/api/anthropic",
+                service.base_url(), "https://api.z.ai/api/anthropic",
                 "Model {} should use z.ai proxy",
                 model
             );
         }
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_non_anthropic_model_patterns() {
         let mut test_env = TestEnv::new();
 
@@ -267,14 +279,15 @@ mod tests {
 
             let service = service.unwrap();
             assert_eq!(
-                service.base_url, "https://openrouter.ai/api/v1",
+                service.base_url(), "https://openrouter.ai/api/v1",
                 "Model {} should use OpenRouter, not z.ai proxy",
                 model
             );
         }
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_service_configuration_methods() {
         let mut test_env = TestEnv::new();
 
@@ -291,7 +304,8 @@ mod tests {
         assert_eq!(service.get_model(), "anthropic/claude-3-sonnet-20240229");
     }
 
-    #[test]
+    #[cfg(feature = "openrouter")]
+#[test]
     fn test_error_cases() {
         // Test empty API key
         let service = OpenRouterService::new("", "anthropic/claude-3-sonnet-20240229");
@@ -314,10 +328,10 @@ mod tests {
             OpenRouterService::new("test-key", "anthropic/claude-3-sonnet-20240229").unwrap();
 
         // We can't directly test private methods, but we can verify the URL
-        assert!(service.base_url.contains("z.ai"));
+        assert!(service.base_url().contains("z.ai"));
 
         // Verify the URL format is correct for z.ai proxy
-        assert!(!service.base_url.ends_with("/"));
-        assert!(service.base_url.starts_with("https://"));
+        assert!(!service.base_url().ends_with("/"));
+        assert!(service.base_url().starts_with("https://"));
     }
 }

@@ -230,18 +230,49 @@ fn test_thesaurus_response_deserialization() {
 
     let thesaurus_response = response.unwrap();
     assert_eq!(thesaurus_response.status, "Success");
-    assert_eq!(thesaurus_response.total, 2);
-    assert_eq!(thesaurus_response.terms.len(), 2);
 
-    let term1 = &thesaurus_response.terms[0];
-    assert_eq!(term1.id, "term1");
-    assert_eq!(term1.nterm, "machine learning");
-    assert_eq!(term1.url.as_ref().unwrap(), "http://example.com/ml");
+    // Check if we have thesaurus data
+    if let Some(thesaurus_map) = &thesaurus_response.thesaurus {
+        assert_eq!(thesaurus_map.len(), 2);
 
-    let term2 = &thesaurus_response.terms[1];
-    assert_eq!(term2.id, "term2");
-    assert_eq!(term2.nterm, "artificial intelligence");
-    assert!(term2.url.is_none());
+        // Get the first two terms (HashMap doesn't guarantee order, so we need to find specific terms)
+        let mut found_terms = 0;
+        let mut term1_id = None;
+        let mut term2_id = None;
+
+        for (term, _definition) in thesaurus_map {
+            if term.contains("machine learning") {
+                term1_id = Some(term.clone());
+                found_terms += 1;
+            } else if term.contains("data science") {
+                term2_id = Some(term.clone());
+                found_terms += 1;
+            }
+        }
+
+        assert!(found_terms == 2, "Should find both expected terms");
+        assert!(term1_id.is_some(), "Should find machine learning term");
+        assert!(term2_id.is_some(), "Should find data science term");
+
+        if let (Some(term1), Some(term2)) = (term1_id, term2_id) {
+            let term1_def = thesaurus_map.get(&term1).unwrap();
+            let term2_def = thesaurus_map.get(&term2).unwrap();
+
+            assert_eq!(term1_def, "machine learning");
+            assert_eq!(term2_def, "data science");
+        }
+    }
+
+    // Check thesaurus HashMap format
+    if let Some(thesaurus_map) = &thesaurus_response.thesaurus {
+        assert_eq!(thesaurus_map.len(), 2);
+        assert!(thesaurus_map.contains_key("term1"));
+        assert!(thesaurus_map.contains_key("term2"));
+        assert_eq!(thesaurus_map.get("term1").unwrap(), "machine learning");
+        assert_eq!(thesaurus_map.get("term2").unwrap(), "data science");
+    } else {
+        panic!("Thesaurus HashMap should not be None");
+    }
 }
 
 /// Test AutocompleteResponse deserialization

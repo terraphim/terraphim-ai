@@ -3,20 +3,26 @@
 //! These tests verify the end-to-end functionality of the markdown-based
 //! command system including parsing, validation, execution, and security.
 
+#[cfg(feature = "repl-custom")]
 use std::collections::HashMap;
+#[cfg(feature = "repl-custom")]
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+#[cfg(feature = "repl-custom")]
 use tempfile::TempDir;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::commands::{
-    hooks, CommandDefinition, CommandHook, CommandParameter, ExecutionMode, HookContext,
-    HookManager, ParsedCommand, RiskLevel,
+    hooks, CommandHook, ExecutionMode, HookContext,
+    HookManager,
 };
-use terraphim_tui::executor::CommandExecutor;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::registry::CommandRegistry;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::validator::CommandValidator;
+#[cfg(feature = "repl-custom")]
 use tokio::fs;
 
 /// Creates a temporary directory with test command files
+#[cfg(feature = "repl-custom")]
 async fn setup_test_commands_directory() -> (TempDir, PathBuf) {
     let temp_dir = tempfile::tempdir().unwrap();
     let commands_dir = temp_dir.path().join("commands");
@@ -32,8 +38,8 @@ description: Search files and content using ripgrep
 usage: "search <query> [--type] [--case-sensitive]"
 category: File Operations
 version: "1.0.0"
-risk_level: Low
-execution_mode: Local
+risk_level: low
+execution_mode: local
 permissions:
   - read
 aliases:
@@ -69,11 +75,11 @@ search "function.*test" --case-sensitive
             r#"---
 name: deploy
 description: Deploy applications with safety checks
-usage: "deploy <environment> [--dry-run]"
+usage: "deploy <environment> [--dry_run]"
 category: Deployment
 version: "1.0.0"
-risk_level: High
-execution_mode: Firecracker
+risk_level: high
+execution_mode: firecracker
 permissions:
   - read
   - write
@@ -89,7 +95,7 @@ parameters:
     required: true
     allowed_values: ["staging", "production"]
     description: Target environment
-  - name: dry-run
+  - name: dry_run
     type: boolean
     required: false
     default_value: false
@@ -121,8 +127,8 @@ description: Perform comprehensive security audit and vulnerability scanning
 usage: "security-audit [target] [--deep] [--report]"
 category: Security
 version: "1.0.0"
-risk_level: Critical
-execution_mode: Firecracker
+risk_level: critical
+execution_mode: firecracker
 permissions:
   - read
   - execute
@@ -173,8 +179,8 @@ description: Simple hello world command for testing
 usage: "hello-world [name] [--greeting]"
 category: Testing
 version: "1.0.0"
-risk_level: Low
-execution_mode: Local
+risk_level: low
+execution_mode: local
 permissions:
   - read
 aliases:
@@ -210,6 +216,8 @@ A simple greeting command used for testing the command system.
     (temp_dir, commands_dir)
 }
 
+#[cfg(feature = "repl-custom")]
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_full_command_lifecycle() {
     // Setup test environment
@@ -257,6 +265,7 @@ async fn test_full_command_lifecycle() {
     assert_eq!(stats.total_categories, 4, "Should have 4 categories");
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_security_validation_integration() {
     let (_temp_dir, commands_dir) = setup_test_commands_directory().await;
@@ -292,7 +301,11 @@ async fn test_security_validation_integration() {
 
     // Test high-risk command with engineer role
     let result = validator
-        .validate_command_execution(&deploy_cmd.definition.name, "Terraphim Engineer", &HashMap::new())
+        .validate_command_execution(
+            &deploy_cmd.definition.name,
+            "Terraphim Engineer",
+            &HashMap::new(),
+        )
         .await;
 
     assert!(
@@ -303,7 +316,11 @@ async fn test_security_validation_integration() {
     // Test critical risk command
     let audit_cmd = registry.get_command("security-audit").await.unwrap();
     let result = validator
-        .validate_command_execution(&audit_cmd.definition.name, "Terraphim Engineer", &HashMap::new())
+        .validate_command_execution(
+            &audit_cmd.definition.name,
+            "Terraphim Engineer",
+            &HashMap::new(),
+        )
         .await;
 
     assert!(
@@ -313,6 +330,7 @@ async fn test_security_validation_integration() {
     assert_eq!(result.unwrap(), ExecutionMode::Firecracker);
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_system_integration() {
     let (_temp_dir, commands_dir) = setup_test_commands_directory().await;
@@ -369,6 +387,7 @@ async fn test_hook_system_integration() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_rate_limiting_integration() {
     let mut validator = CommandValidator::new();
@@ -405,6 +424,7 @@ async fn test_rate_limiting_integration() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_security_event_logging() {
     let mut validator = CommandValidator::new();
@@ -449,6 +469,7 @@ async fn test_security_event_logging() {
     assert_eq!(recent_events[1].command, "deploy");
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_backup_hook_integration() {
     let temp_dir = tempfile::tempdir().unwrap();
@@ -505,6 +526,7 @@ async fn test_backup_hook_integration() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_environment_hook_integration() {
     let hook = hooks::EnvironmentHook::new()
@@ -547,6 +569,7 @@ async fn test_environment_hook_integration() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_command_suggestion_system() {
     let (_temp_dir, commands_dir) = setup_test_commands_directory().await;
@@ -567,10 +590,13 @@ async fn test_command_suggestion_system() {
     // Test description-based search
     let deploy_commands = registry.search_commands("application").await;
     assert_eq!(deploy_commands.len(), 1, "Should find deploy command");
-    assert!(deploy_commands[0]
-        .definition
-        .description
-        .contains("application"), "Should match description content");
+    assert!(
+        deploy_commands[0]
+            .definition
+            .description
+            .contains("application"),
+        "Should match description content"
+    );
 
     // Test case-insensitive search
     let hello_commands = registry.search_commands("HeLLo").await;
@@ -578,6 +604,7 @@ async fn test_command_suggestion_system() {
     assert_eq!(hello_commands[0].definition.name, "hello-world");
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_parameter_validation_integration() {
     let (_temp_dir, commands_dir) = setup_test_commands_directory().await;
@@ -592,7 +619,7 @@ async fn test_parameter_validation_integration() {
     // Valid parameters
     let mut valid_params = HashMap::new();
     valid_params.insert("environment".to_string(), "staging".to_string());
-    valid_params.insert("dry-run".to_string(), "true".to_string());
+    valid_params.insert("dry_run".to_string(), "true".to_string());
 
     // This would require implementing parameter validation logic
     // For now, we just verify the parameter structure
@@ -614,7 +641,7 @@ async fn test_parameter_validation_integration() {
         .is_some());
 
     let dry_run_param = &deploy_cmd.definition.parameters[1];
-    assert_eq!(dry_run_param.name, "dry-run");
+    assert_eq!(dry_run_param.name, "dry_run");
     assert_eq!(dry_run_param.param_type, "boolean");
     assert!(!dry_run_param.required);
     assert!(dry_run_param.default_value.is_some());
@@ -637,6 +664,7 @@ async fn test_parameter_validation_integration() {
     assert!(type_param.default_value.is_some());
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_role_based_command_access() {
     let mut validator = CommandValidator::new();

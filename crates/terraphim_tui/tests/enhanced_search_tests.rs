@@ -1,10 +1,10 @@
 #[cfg(feature = "repl-custom")]
 use std::str::FromStr;
-#[cfg(feature = "repl")]
-use terraphim_tui::repl::commands::*;
+#[cfg(feature = "repl-custom")]
+use terraphim_tui::repl::commands::ReplCommand;
 
 /// Test basic search command parsing
-#[cfg(feature = "repl")]
+#[cfg(feature = "repl-custom")]
 #[test]
 fn test_basic_search_command_parsing() {
     let command = ReplCommand::from_str("/search rust programming").unwrap();

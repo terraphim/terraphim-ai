@@ -61,6 +61,21 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 tokio = { version = "1", features = ["full"] }
 tempfile = "3.0"
 
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
+required-features = ["repl-custom"]
+
+[[test]]
+name = "enhanced_search_tests"
+path = "tests/enhanced_search_tests.rs"
+required-features = ["repl-custom"]
+
+[[test]]
+name = "command_system_integration_tests"
+path = "tests/command_system_integration_tests.rs"
+required-features = ["repl-custom"]
+
 [[bin]]
 name = "terraphim-tui"
 path = "src/main.rs"

@@ -3,14 +3,18 @@
 //! This module tests the Local, Firecracker, and Hybrid execution modes
 //! with proper isolation and security validation.
 
+#[cfg(feature = "repl-custom")]
 use std::collections::HashMap;
+#[cfg(feature = "repl-custom")]
 use std::path::PathBuf;
+#[cfg(feature = "repl-custom")]
 use std::time::Duration;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::commands::{
-    CommandDefinition, CommandExecutionError, CommandExecutionResult, CommandParameter,
-    ExecutionMode, ResourceUsage, RiskLevel,
+    CommandDefinition, CommandParameter, ExecutionMode, RiskLevel,
 };
 
+#[cfg(feature = "repl-custom")]
 /// Creates a test command definition
 fn create_test_command(
     name: &str,
@@ -48,6 +52,7 @@ fn create_test_command(
 }
 
 #[cfg(test)]
+#[cfg(feature = "repl-custom")]
 mod local_execution_tests {
     use super::*;
 
@@ -105,6 +110,7 @@ mod local_execution_tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "repl-custom")]
 mod firecracker_execution_tests {
     use super::*;
 
@@ -187,6 +193,7 @@ mod firecracker_execution_tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "repl-custom")]
 mod hybrid_execution_tests {
     use super::*;
 
@@ -205,7 +212,8 @@ mod hybrid_execution_tests {
         ];
 
         for (name, risk_level, expected_mode) in test_cases {
-            let command_def = create_test_command(name.clone(), risk_level.clone(), expected_mode.clone());
+            let command_def =
+                create_test_command(name.clone(), risk_level.clone(), expected_mode.clone());
 
             // Verify the command is configured with the expected execution mode
             assert_eq!(
@@ -253,6 +261,7 @@ mod hybrid_execution_tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "repl-custom")]
 mod execution_mode_security_tests {
     use super::*;
 
@@ -330,6 +339,7 @@ mod execution_mode_security_tests {
 }
 
 #[cfg(test)]
+#[cfg(feature = "repl-custom")]
 mod performance_tests {
     use super::*;
     use std::time::Instant;

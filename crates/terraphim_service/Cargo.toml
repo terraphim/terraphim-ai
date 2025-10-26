@@ -58,3 +58,8 @@ serial_test = "3.0"
 tempfile = "3"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing = "0.1"
+
+[[test]]
+name = "openrouter_proxy_test"
+path = "tests/openrouter_proxy_test.rs"
+required-features = ["openrouter"]

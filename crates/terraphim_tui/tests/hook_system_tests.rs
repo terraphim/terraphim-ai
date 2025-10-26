@@ -2,15 +2,21 @@
 //!
 //! Tests all built-in hooks, hook manager, and integration with command execution.
 
+#[cfg(feature = "repl-custom")]
 use std::collections::HashMap;
+#[cfg(feature = "repl-custom")]
 use std::path::PathBuf;
+#[cfg(feature = "repl-custom")]
 use tempfile::TempDir;
+#[cfg(feature = "repl-custom")]
 use terraphim_tui::commands::{
     hooks, CommandExecutionResult, CommandHook, ExecutionMode, HookContext, HookManager, HookResult,
 };
+#[cfg(feature = "repl-custom")]
 use tokio::fs;
 
 /// Creates a test hook context
+#[cfg(feature = "repl-custom")]
 fn create_test_hook_context(command: &str) -> HookContext {
     let mut parameters = HashMap::new();
     parameters.insert("input".to_string(), "test_value".to_string());
@@ -27,6 +33,7 @@ fn create_test_hook_context(command: &str) -> HookContext {
 }
 
 /// Creates a test command execution result
+#[cfg(feature = "repl-custom")]
 fn create_test_execution_result(command: &str, success: bool) -> CommandExecutionResult {
     CommandExecutionResult {
         command: command.to_string(),
@@ -47,6 +54,7 @@ fn create_test_execution_result(command: &str, success: bool) -> CommandExecutio
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_logging_hook_functionality() {
     let hook = hooks::LoggingHook::new();
@@ -71,6 +79,7 @@ async fn test_logging_hook_functionality() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_logging_hook_with_file() {
     let temp_dir = TempDir::new().unwrap();
@@ -102,6 +111,7 @@ async fn test_logging_hook_with_file() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_preflight_check_hook_safe_commands() {
     let hook = hooks::PreflightCheckHook::new()
@@ -136,6 +146,7 @@ async fn test_preflight_check_hook_safe_commands() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_preflight_check_hook_blocked_commands() {
     let hook = hooks::PreflightCheckHook::new().with_blocked_commands(vec![
@@ -168,6 +179,7 @@ async fn test_preflight_check_hook_blocked_commands() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_preflight_check_hook_directory_restriction() {
     let hook = hooks::PreflightCheckHook::new()
@@ -214,6 +226,7 @@ async fn test_preflight_check_hook_directory_restriction() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_notification_hook_important_commands() {
     let hook = hooks::NotificationHook::new().with_important_commands(vec![
@@ -252,6 +265,7 @@ async fn test_notification_hook_important_commands() {
     // The notification should still succeed, just not send notifications
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_environment_hook_variables() {
     let hook = hooks::EnvironmentHook::new()
@@ -287,6 +301,7 @@ async fn test_environment_hook_variables() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_backup_hook_with_destructive_commands() {
     let temp_dir = TempDir::new().unwrap();
@@ -344,6 +359,7 @@ async fn test_backup_hook_with_destructive_commands() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_backup_hook_with_safe_commands() {
     let temp_dir = TempDir::new().unwrap();
@@ -372,6 +388,7 @@ async fn test_backup_hook_with_safe_commands() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_resource_monitoring_hook() {
     let hook = hooks::ResourceMonitoringHook::new()
@@ -403,6 +420,7 @@ async fn test_resource_monitoring_hook() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_git_hook_with_repository() {
     let temp_dir = TempDir::new().unwrap();
@@ -471,6 +489,7 @@ async fn test_git_hook_with_repository() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_git_hook_with_dirty_repository() {
     let temp_dir = TempDir::new().unwrap();
@@ -522,6 +541,7 @@ async fn test_git_hook_with_dirty_repository() {
     }
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_manager_pre_hooks() {
     let mut hook_manager = HookManager::new();
@@ -540,6 +560,7 @@ async fn test_hook_manager_pre_hooks() {
     // In a real scenario, individual hook failures would be tested
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_manager_post_hooks() {
     let mut hook_manager = HookManager::new();
@@ -560,6 +581,7 @@ async fn test_hook_manager_post_hooks() {
     // They are for logging, cleanup, and monitoring
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_manager_blocking_pre_hook() {
     let mut hook_manager = HookManager::new();
@@ -585,6 +607,7 @@ async fn test_hook_manager_blocking_pre_hook() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_priority_ordering() {
     let mut hook_manager = HookManager::new();
@@ -607,6 +630,7 @@ async fn test_hook_priority_ordering() {
     // This is verified by the hooks executing without conflicts
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_default_hook_sets() {
     let default_hooks = hooks::create_default_hooks();
@@ -634,6 +658,7 @@ async fn test_default_hook_sets() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_error_handling() {
     let mut hook_manager = HookManager::new();
@@ -662,6 +687,7 @@ async fn test_hook_error_handling() {
     );
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_hook_data_accumulation() {
     let mut hook_manager = HookManager::new();
@@ -682,6 +708,7 @@ async fn test_hook_data_accumulation() {
     // For now, just verify that hooks with data don't interfere with each other
 }
 
+#[cfg(feature = "repl-custom")]
 #[tokio::test]
 async fn test_concurrent_hook_execution() {
     // This test would verify that hooks can be executed concurrently when appropriate

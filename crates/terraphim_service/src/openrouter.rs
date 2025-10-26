@@ -50,6 +50,11 @@ pub struct OpenRouterService {
 
 #[cfg(feature = "openrouter")]
 impl OpenRouterService {
+    /// Get the base URL being used by the service
+    pub fn base_url(&self) -> &str {
+        &self.base_url
+    }
+
     /// Create a new OpenRouter service instance
     ///
     /// # Arguments
