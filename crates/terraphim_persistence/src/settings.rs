@@ -69,67 +69,6 @@ pub fn resolve_relative_path(path: &Path) -> Cow<'_, Path> {
     result.into()
 }
 
-/// Ensure SQLite table exists for OpenDAL
-#[cfg(feature = "services-sqlite")]
-fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Result<()> {
-    // Extract database path from connection string (remove query parameters)
-    let db_path = if let Some(path_part) = connection_string.split('?').next() {
-        path_part
-    } else {
-        connection_string
-    };
-
-    log::info!(
-        "🔧 Ensuring SQLite table '{}' exists in database: {}",
-        table_name,
-        db_path
-    );
-
-    // Create the database file and table if they don't exist
-    let connection = rusqlite::Connection::open(db_path).map_err(|e| {
-        Error::OpenDal(Box::new(opendal::Error::new(
-            opendal::ErrorKind::Unexpected,
-            format!("Failed to open SQLite database '{}': {}", db_path, e),
-        )))
-    })?;
-
-    // Enable WAL mode for concurrent access
-    connection
-        .pragma_update(None, "journal_mode", "WAL")
-        .map_err(|e| {
-            Error::OpenDal(Box::new(opendal::Error::new(
-                opendal::ErrorKind::Unexpected,
-                format!("Failed to enable WAL mode: {}", e),
-            )))
-        })?;
-
-    // Set synchronous mode to NORMAL for better performance
-    connection
-        .pragma_update(None, "synchronous", "NORMAL")
-        .map_err(|e| {
-            Error::OpenDal(Box::new(opendal::Error::new(
-                opendal::ErrorKind::Unexpected,
-                format!("Failed to set synchronous mode: {}", e),
-            )))
-        })?;
-
-    // Create table with key-value schema expected by OpenDAL
-    let create_table_sql = format!(
-        "CREATE TABLE IF NOT EXISTS {} (key TEXT PRIMARY KEY, value BLOB)",
-        table_name
-    );
-
-    connection.execute(&create_table_sql, []).map_err(|e| {
-        Error::OpenDal(Box::new(opendal::Error::new(
-            opendal::ErrorKind::Unexpected,
-            format!("Failed to create SQLite table '{}': {}", table_name, e),
-        )))
-    })?;
-
-    log::info!("✅ SQLite table '{}' ready", table_name);
-    Ok(())
-}
-
 /// Create a memory operator as fallback
 #[allow(clippy::result_large_err)]
 fn create_memory_operator() -> OpendalResult<Operator> {
@@ -251,41 +190,6 @@ pub async fn parse_profile(
                 }
             }
             Operator::from_iter::<services::Redb>(profile.clone())?.finish()
-        }
-        #[cfg(feature = "services-sqlite")]
-        Scheme::Sqlite => {
-            // Ensure directory exists for SQLite
-            if let Some(datadir) = profile.get("datadir") {
-                std::fs::create_dir_all(datadir).map_err(|e| {
-                    Error::OpenDal(Box::new(opendal::Error::new(
-                        opendal::ErrorKind::Unexpected,
-                        format!("Failed to create directory '{}': {}", datadir, e),
-                    )))
-                })?;
-            }
-
-            // Ensure SQLite table exists before OpenDAL tries to use it
-            if let (Some(connection_string), Some(table_name)) =
-                (profile.get("connection_string"), profile.get("table"))
-            {
-                ensure_sqlite_table_exists(connection_string, table_name)?;
-            }
-
-            // SQLite configuration with proper field names
-            let mut sqlite_profile = profile.clone();
-
-            // Ensure required fields are set with proper defaults
-            if !sqlite_profile.contains_key("root") {
-                sqlite_profile.insert("root".to_string(), "/".to_string());
-            }
-            if !sqlite_profile.contains_key("key_field") {
-                sqlite_profile.insert("key_field".to_string(), "key".to_string());
-            }
-            if !sqlite_profile.contains_key("value_field") {
-                sqlite_profile.insert("value_field".to_string(), "value".to_string());
-            }
-
-            Operator::from_iter::<services::Sqlite>(sqlite_profile)?.finish()
         }
         #[cfg(feature = "s3")]
         Scheme::S3 => match Operator::from_iter::<services::S3>(profile.clone()) {
