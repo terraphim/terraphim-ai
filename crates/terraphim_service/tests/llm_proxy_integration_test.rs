@@ -26,6 +26,7 @@ impl TestEnv {
         env::set_var(key, value);
     }
 
+    #[allow(dead_code)]
     fn remove_var(&mut self, key: &str) {
         self.original_vars
             .push((key.to_string(), env::var(key).ok()));
@@ -79,7 +80,7 @@ async fn test_llm_proxy_auto_configuration() {
 
 #[tokio::test]
 async fn test_llm_proxy_fallback_mechanism() {
-    let mut test_env = TestEnv::new();
+    let _test_env = TestEnv::new();
 
     // Test without proxy configuration (fallback to direct)
     let _test_env = TestEnv::new();

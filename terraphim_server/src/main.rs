@@ -147,7 +147,7 @@ async fn run_server(args: Args) -> Result<()> {
     // Check for TERRAPHIM_SERVER_PORT environment variable first
     let server_hostname = if let Ok(port_str) = std::env::var("TERRAPHIM_SERVER_PORT") {
         if let Ok(port) = port_str.parse::<u16>() {
-            log::info!("Using TERRAPHIM_SERVER_PORT: {}", port);
+            log::info!("Using TERRAPHIM_SERVER_PORT: {port}");
             SocketAddr::from(([127, 0, 0, 1], port))
         } else {
             log::warn!("Invalid TERRAPHIM_SERVER_PORT value, using settings");

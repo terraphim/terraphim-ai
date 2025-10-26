@@ -240,7 +240,7 @@ fn test_thesaurus_response_deserialization() {
         let mut term1_id = None;
         let mut term2_id = None;
 
-        for (term, _definition) in thesaurus_map {
+        for term in thesaurus_map.keys() {
             if term.contains("machine learning") {
                 term1_id = Some(term.clone());
                 found_terms += 1;
