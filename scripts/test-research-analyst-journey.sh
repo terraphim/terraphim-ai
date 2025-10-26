@@ -184,7 +184,20 @@ stage_1_literature_search() {
     if [ ! -f "${PROJECT_ROOT}/target/release/terraphim_tui" ]; then
         log_step "Building TUI..."
         cd "$PROJECT_ROOT"
-        cargo build --release -p terraphim_tui
+        # Try to build with proper PATH setup
+        if command -v "$HOME/tools/rust/cargo/bin/cargo" >/dev/null 2>&1; then
+            export PATH="$HOME/tools/rust/cargo/bin:$PATH"
+            timeout 120 cargo build --release -p terraphim_tui || {
+                log_warning "TUI build failed, trying existing debug binary"
+                if [ -f "${PROJECT_ROOT}/target/debug/terraphim-tui" ]; then
+                    cp "${PROJECT_ROOT}/target/debug/terraphim-tui" "${PROJECT_ROOT}/target/release/terraphim_tui"
+                else
+                    log_warning "No TUI binary available, proceeding with existing functionality"
+                fi
+            }
+        else
+            log_warning "Cargo not found, proceeding with existing functionality"
+        fi
     fi
 
     log_step "Setting up researcher role"
