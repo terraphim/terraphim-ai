@@ -76,11 +76,11 @@ custom-protocol = ["tauri/custom-protocol"]
 # OpenRouter AI integration feature
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 # Optional database backends
-sqlite = ["terraphim_persistence/services-sqlite"]
+# sqlite = ["terraphim_persistence/services-sqlite"]  # Disabled due to RSA vulnerability in SQLX
 rocksdb = ["terraphim_persistence/services-rocksdb"]
 redis = ["terraphim_persistence/services-redis"]
-# Enable all database backends
-full-db = ["sqlite", "rocksdb", "redis"]
+# Enable all database backends (excluding SQLite due to RSA vulnerability)
+full-db = ["rocksdb", "redis"]
 
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"

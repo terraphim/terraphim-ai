@@ -45,12 +45,12 @@ tokio = { version = "1", features = ["full"] }
 test-env-log = "0.2"
 
 [features]
-# Default features for TUI and Desktop (NO S3/cloud services)
-default = ["sqlite", "dashmap", "memory"]
+# Default features for TUI and Desktop (NO S3/cloud services, NO SQLite due to RSA vulnerability)
+default = ["dashmap", "memory"]
 
 # Core backends (always available for TUI/Desktop)
 memory = []  # Built into OpenDAL core
-sqlite = ["opendal/services-sqlite", "rusqlite"]
+# sqlite = ["opendal/services-sqlite", "rusqlite"]  # Disabled due to RSA vulnerability in SQLX
 dashmap = ["opendal/services-dashmap"]
 
 # Optional cloud backends (NOT in default - server only)
@@ -69,7 +69,7 @@ all-backends = ["server", "redis", "rocksdb", "redb", "ipfs"]
 
 # Legacy feature names for backwards compatibility
 services-dashmap = ["dashmap"]
-services-sqlite = ["sqlite"]
+# services-sqlite = ["sqlite"]  # Disabled due to RSA vulnerability in SQLX
 # services-atomicserver = ["atomicserver"]  # Removed - atomicserver not available in opendal 0.54
 services-s3 = ["s3"]
 services-redis = ["redis"]

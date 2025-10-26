@@ -4,7 +4,7 @@
 //! that leverage the generic LLM interface instead of OpenRouter-specific code.
 
 use terraphim_multi_agent::{
-    test_utils, ChatAgent, ChatConfig, SummarizationAgent, SummarizationConfig, SummaryStyle,
+    ChatAgent, ChatConfig, SummarizationAgent, SummarizationConfig, SummaryStyle, test_utils,
 };
 
 #[tokio::main]

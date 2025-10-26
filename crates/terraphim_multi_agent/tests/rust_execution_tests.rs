@@ -74,10 +74,12 @@ fn main() {
 
         let validation_result = extractor.validate_code(&unsafe_code);
         assert!(validation_result.is_err());
-        assert!(validation_result
-            .unwrap_err()
-            .to_string()
-            .contains("unsafe"));
+        assert!(
+            validation_result
+                .unwrap_err()
+                .to_string()
+                .contains("unsafe")
+        );
     }
 
     #[test]
@@ -102,10 +104,12 @@ fn main() {
 
         let validation_result = extractor.validate_code(&process_code);
         assert!(validation_result.is_err());
-        assert!(validation_result
-            .unwrap_err()
-            .to_string()
-            .contains("std::process"));
+        assert!(
+            validation_result
+                .unwrap_err()
+                .to_string()
+                .contains("std::process")
+        );
     }
 
     #[test]
