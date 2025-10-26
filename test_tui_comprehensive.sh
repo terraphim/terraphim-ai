@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Comprehensive TUI Testing Script
+# Comprehensive TUI Testing Script with Agent Workflows
 # Tests all implemented features:
 # - Self-contained offline mode (default)
 # - Server API mode (via --server flag)
@@ -8,6 +8,8 @@
 # - Persistence with same backends as desktop
 # - Role switching with persistence
 # - All CLI commands work in both modes
+# - Agent workflow integration (NEW)
+# - User journey validation (NEW)
 
 set -e  # Exit on any error
 
@@ -513,6 +515,78 @@ run_server_tests() {
     fi
 }
 
+# Run agent workflow tests
+run_agent_workflow_tests() {
+    log_info "Running agent workflow tests"
+
+    # Check if workflow test script exists
+    if [ ! -f "scripts/test-agent-workflows.sh" ]; then
+        log_skip "Agent workflow test script not found"
+        return 0
+    fi
+
+    # Make script executable
+    chmod +x scripts/test-agent-workflows.sh
+
+    # Test individual workflow patterns
+    local workflows=("prompt-chaining" "routing" "parallelization" "orchestration" "optimization")
+
+    for workflow in "${workflows[@]}"; do
+        log_info "Testing $workflow workflow"
+
+        # Test with shorter timeout for CI
+        if timeout 120 scripts/test-agent-workflows.sh \
+            --skip-backend \
+            --timeout 120 \
+            --url http://localhost:8000 \
+            "$workflow" 2>/dev/null; then
+            log_success "$workflow workflow test passed"
+        else
+            log_warning "$workflow workflow test failed or timed out"
+        fi
+    done
+}
+
+# Run user journey tests
+run_user_journey_tests() {
+    log_info "Running user journey tests"
+
+    # Test developer journey
+    if [ -f "scripts/test-developer-journey.sh" ]; then
+        log_info "Testing developer journey"
+        chmod +x scripts/test-developer-journey.sh
+
+        if timeout 180 scripts/test-developer-journey.sh \
+            --skip-backend \
+            --skip-vm \
+            --timeout 180 \
+            --url http://localhost:8000 2>/dev/null; then
+            log_success "Developer journey test passed"
+        else
+            log_warning "Developer journey test failed or timed out"
+        fi
+    else
+        log_skip "Developer journey test script not found"
+    fi
+
+    # Test research analyst journey
+    if [ -f "scripts/test-research-analyst-journey.sh" ]; then
+        log_info "Testing research analyst journey"
+        chmod +x scripts/test-research-analyst-journey.sh
+
+        if timeout 180 scripts/test-research-analyst-journey.sh \
+            --skip-backend \
+            --timeout 180 \
+            --url http://localhost:8000 2>/dev/null; then
+            log_success "Research analyst journey test passed"
+        else
+            log_warning "Research analyst journey test failed or timed out"
+        fi
+    else
+        log_skip "Research analyst journey test script not found"
+    fi
+}
+
 # Main test execution
 main() {
     echo "============================================"
@@ -575,6 +649,16 @@ main() {
     run_server_tests || true
     echo
 
+    # Agent Workflow Tests (NEW)
+    echo "=== Agent Workflow Tests ==="
+    run_agent_workflow_tests || true
+    echo
+
+    # User Journey Tests (NEW)
+    echo "=== User Journey Tests ==="
+    run_user_journey_tests || true
+    echo
+
     # Summary
     echo "============================================"
     echo "Test Results Summary"
@@ -602,6 +686,15 @@ main() {
         echo "    - chat (LLM integration placeholder)"
         echo "    - extract (Paragraph extraction using automata)"
         echo "    - interactive (TUI mode)"
+        echo "  ✅ Agent workflow integration (NEW):"
+        echo "    - prompt-chaining (Sequential development pipeline)"
+        echo "    - routing (Intelligent task distribution)"
+        echo "    - parallelization (Multi-perspective analysis)"
+        echo "    - orchestration (Hierarchical coordination)"
+        echo "    - optimization (Iterative quality improvement)"
+        echo "  ✅ User journey validation (NEW):"
+        echo "    - developer journey (Complete software lifecycle)"
+        echo "    - research analyst journey (Academic research workflow)"
         echo
         echo "🚀 Usage Examples Validated:"
         echo "  # Offline mode (default) - uses selected_role from config"

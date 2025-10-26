@@ -43,7 +43,7 @@ export default defineConfig({
       'svelte/easing': resolve(__dirname, 'node_modules/svelte/src/easing/index.js'),
       'svelte/motion': resolve(__dirname, 'node_modules/svelte/src/motion/index.js'),
       'svelte/reactivity': resolve(__dirname, 'node_modules/svelte/src/reactivity/index-client.js'),
-      
+
       // Real runtime entry alias so that shim can import without causing an alias loop.
       'svelte-original': resolve(__dirname, 'node_modules/svelte/src/index-client.js'),
     },
