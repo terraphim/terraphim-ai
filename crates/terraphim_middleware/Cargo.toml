@@ -18,7 +18,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.2.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", features = ["tokio-runtime"] }
 terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
-terraphim_atomic_client = { path = "../terraphim_atomic_client", features = ["native"] }
+terraphim_atomic_client = { path = "../terraphim_atomic_client", features = ["native"], optional = true }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 cached = { version = "0.56.0", features = ["async", "serde", "ahash"] }
@@ -54,6 +54,8 @@ tempfile = "3.23"
 
 [features]
 default = []
+# Enable atomic server client integration
+atomic = ["terraphim_atomic_client"]
 # Enable openrouter integration
 openrouter = ["terraphim_config/openrouter"]
 # Enable SSE-based MCP client probing

@@ -21,7 +21,7 @@ tauri-build = { version = "1.5.5", features = [] }
 
 [dependencies]
 terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
-terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "0.2.0", features = ["native"] }
+terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "0.2.0", features = ["native"], optional = true }
 terraphim_config = { path = "../../crates/terraphim_config", version = "0.2.0", features = ["typescript"] }
 terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.2.0" }
 terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.2.0" }
@@ -73,6 +73,8 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
+# Enable atomic server client integration
+atomic = ["terraphim_atomic_client", "terraphim_middleware/atomic"]
 # OpenRouter AI integration feature
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 # Optional database backends
