@@ -1,8 +1,10 @@
+#[cfg(feature = "atomic")]
 pub mod atomic;
 pub mod clickup;
 pub mod mcp;
 pub mod perplexity;
 pub mod query_rs;
+#[cfg(feature = "atomic")]
 pub use atomic::AtomicHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
 pub use mcp::McpHaystackIndexer;

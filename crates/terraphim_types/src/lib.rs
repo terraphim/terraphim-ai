@@ -6,7 +6,6 @@ use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
 
-use chrono;
 use schemars::JsonSchema;
 use std::str::FromStr;
 #[cfg(feature = "typescript")]

@@ -5,9 +5,10 @@ use crate::{Error, Result};
 
 mod ripgrep;
 
+#[cfg(feature = "atomic")]
+use crate::haystack::AtomicHaystackIndexer;
 use crate::haystack::{
-    AtomicHaystackIndexer, ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
-    QueryRsHaystackIndexer,
+    ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -40,6 +41,7 @@ pub async fn search_haystacks(
     let needle = search_query.search_term.as_str();
 
     let ripgrep = RipgrepIndexer::default();
+    #[cfg(feature = "atomic")]
     let atomic = AtomicHaystackIndexer::default();
     let query_rs = QueryRsHaystackIndexer::default();
     let clickup = ClickUpHaystackIndexer::default();
@@ -60,8 +62,19 @@ pub async fn search_haystacks(
                 ripgrep.index(needle, haystack).await?
             }
             ServiceType::Atomic => {
-                // Search through documents using atomic-server
-                atomic.index(needle, haystack).await?
+                #[cfg(feature = "atomic")]
+                {
+                    // Search through documents using atomic-server
+                    atomic.index(needle, haystack).await?
+                }
+                #[cfg(not(feature = "atomic"))]
+                {
+                    log::warn!(
+                        "Atomic haystack support not enabled. Skipping haystack: {}",
+                        haystack.location
+                    );
+                    Index::new()
+                }
             }
             ServiceType::QueryRs => {
                 // Search through documents using query.rs
