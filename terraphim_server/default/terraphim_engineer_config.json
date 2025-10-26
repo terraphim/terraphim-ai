@@ -37,6 +37,7 @@
       "shortname": "Default",
       "name": "Default",
       "relevance_function": "title-scorer",
+      "terraphim_it": false,
       "theme": "spacelab",
       "kg": null,
       "haystacks": [
@@ -53,6 +54,189 @@
       "ollama_model": "llama3.2:3b",
       "llm_auto_summarize": true,
       "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
+    },
+    "BusinessAnalyst": {
+      "shortname": "BA",
+      "name": "Business Analyst",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "business",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Business Analyst specializing in requirements gathering, stakeholder analysis, and technical specification creation. Focus on creating detailed user stories, acceptance criteria, and comprehensive technical specifications.",
+      "extra": {}
+    },
+    "BackendArchitect": {
+      "shortname": "Arch",
+      "name": "Backend Architect",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "architect",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Backend Architect specializing in system design, database architecture, API design, and technology stack selection. Focus on creating scalable, maintainable, and secure backend systems.",
+      "extra": {}
+    },
+    "ProductManager": {
+      "shortname": "PM",
+      "name": "Product Manager",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "product",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Product Manager specializing in project planning, roadmap development, and cross-functional team coordination. Focus on creating detailed development plans, timelines, and milestone tracking.",
+      "extra": {}
+    },
+    "DevelopmentAgent": {
+      "shortname": "Dev",
+      "name": "Development Agent",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "developer",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Development Agent specializing in code generation, implementation, and technical problem-solving. Focus on writing clean, efficient, and well-documented code following best practices.",
+      "extra": {}
+    },
+    "QAEngineer": {
+      "shortname": "QA",
+      "name": "QA Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "testing",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a QA Engineer specializing in test planning, test case creation, and quality assurance. Focus on creating comprehensive test suites, integration tests, and quality checklists.",
+      "extra": {}
+    },
+    "DevOpsEngineer": {
+      "shortname": "DevOps",
+      "name": "DevOps Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "operations",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a DevOps Engineer specializing in deployment automation, infrastructure management, and operational excellence. Focus on creating deployment instructions, environment setup, and operational documentation.",
+      "extra": {}
+    },
+    "OrchestratorAgent": {
+      "shortname": "Orchestrator",
+      "name": "OrchestratorAgent",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are an Orchestrator Agent specializing in coordinating complex workflows, managing task distribution, and synthesizing results from multiple specialized agents.",
+      "extra": {}
+    },
+    "GeneratorAgent": {
+      "shortname": "Generator",
+      "name": "GeneratorAgent",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are a Generator Agent specializing in creating high-quality content, code, and solutions through iterative improvement and refinement.",
+      "extra": {}
+    },
+    "EvaluatorAgent": {
+      "shortname": "Evaluator",
+      "name": "EvaluatorAgent",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "default",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are an Evaluator Agent specializing in assessing quality, providing feedback, and identifying areas for improvement in generated content and solutions.",
       "extra": {}
     }
   },
