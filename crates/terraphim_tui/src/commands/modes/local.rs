@@ -3,12 +3,14 @@
 //! This module provides local execution for commands that are considered safe
 //! and don't require sandboxing.
 
+#![allow(clippy::trim_split_whitespace, clippy::useless_vec)]
+
 use super::{
     default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
-    ExecutorCapabilities, ResourceUsage,
+    ExecutorCapabilities,
 };
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
 
@@ -145,7 +147,7 @@ impl LocalExecutor {
         definition: &CommandDefinition,
         args: &[String],
     ) -> Result<(), CommandExecutionError> {
-        if let Some(ref limits) = definition.resource_limits {
+        if let Some(ref _limits) = definition.resource_limits {
             // Simple argument count limit as a basic safety measure
             if args.len() > 50 {
                 return Err(CommandExecutionError::ResourceLimitExceeded(

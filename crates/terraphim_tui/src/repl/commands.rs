@@ -4,21 +4,17 @@ use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 use std::str::FromStr;
 
+#[allow(dead_code)]
 // Define ExecutionMode locally to avoid conditional compilation issues
 #[cfg(feature = "repl-custom")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[serde(rename_all = "lowercase")]
+#[derive(Default)]
 pub enum ExecutionMode {
+    #[default]
     Local,
     Firecracker,
     Hybrid,
-}
-
-#[cfg(feature = "repl-custom")]
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        ExecutionMode::Local
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -99,6 +95,7 @@ pub enum ReplCommand {
 
     // Custom markdown-defined commands
     #[cfg(feature = "repl-custom")]
+    #[allow(dead_code)]
     Custom {
         name: String,
         parameters: HashMap<String, String>,
@@ -1588,8 +1585,10 @@ impl FromStr for ReplCommand {
     }
 }
 
+#[allow(dead_code)]
 impl ReplCommand {
     /// Get available commands based on compiled features
+    #[allow(dead_code)]
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
             "search", "config", "role", "graph", "vm", "web", "help", "quit", "exit", "clear",
@@ -1625,6 +1624,7 @@ impl ReplCommand {
     }
 
     /// Get command description for help system
+    #[allow(dead_code)]
     pub fn get_command_help(command: &str) -> Option<&'static str> {
         match command {
             "search" => Some("/search <query> [--role <role>] [--limit <n>] [--semantic] [--concepts] - Search documents with semantic options"),

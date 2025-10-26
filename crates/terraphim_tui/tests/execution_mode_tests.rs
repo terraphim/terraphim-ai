@@ -10,9 +10,7 @@ use std::path::PathBuf;
 #[cfg(feature = "repl-custom")]
 use std::time::Duration;
 #[cfg(feature = "repl-custom")]
-use terraphim_tui::commands::{
-    CommandDefinition, CommandParameter, ExecutionMode, RiskLevel,
-};
+use terraphim_tui::commands::{CommandDefinition, CommandParameter, ExecutionMode, RiskLevel};
 
 #[cfg(feature = "repl-custom")]
 /// Creates a test command definition

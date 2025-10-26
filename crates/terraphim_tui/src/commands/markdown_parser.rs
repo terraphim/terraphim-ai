@@ -3,6 +3,8 @@
 //! This module parses markdown files containing command definitions with YAML frontmatter,
 //! extracting both metadata and content for command registration.
 
+#![allow(clippy::ptr_arg, clippy::regex_creation_in_loops)]
+
 use super::{CommandDefinition, CommandRegistryError, ExecutionMode, ParsedCommand, RiskLevel};
 use regex::Regex;
 use std::path::{Path, PathBuf};
@@ -45,7 +47,7 @@ impl MarkdownCommandParser {
         // Read the file content
         let content = tokio::fs::read_to_string(path)
             .await
-            .map_err(|e| CommandRegistryError::FileNotFound(path.to_string_lossy().to_string()))?;
+            .map_err(|_e| CommandRegistryError::FileNotFound(path.to_string_lossy().to_string()))?;
 
         // Get file metadata
         let metadata = tokio::fs::metadata(path)
@@ -110,13 +112,13 @@ impl MarkdownCommandParser {
     fn parse_allowed_tools_format(
         &self,
         captures: regex::Captures,
-        source_path: &PathBuf,
+        #[allow(clippy::ptr_arg)] source_path: &PathBuf,
         modified: SystemTime,
-        content: &str,
+        _content: &str,
     ) -> Result<ParsedCommand, CommandRegistryError> {
         let allowed_tools_line = captures.get(1).unwrap().as_str().trim();
         let description = captures.get(2).unwrap().as_str().trim();
-        let markdown_content = captures.get(3).unwrap().as_str().trim();
+        let _markdown_content = captures.get(3).unwrap().as_str().trim();
 
         // Parse allowed-tools using terraphim-automata confidence-based matching
         let tools = self.parse_allowed_tools(allowed_tools_line)?;
@@ -193,6 +195,7 @@ impl MarkdownCommandParser {
     }
 
     /// Extract description from content using knowledge graph approach
+    #[allow(dead_code)]
     fn extract_description_from_content(&self, content: &str) -> String {
         // Look for description in Context section or first paragraph
         let lines: Vec<&str> = content.lines().collect();

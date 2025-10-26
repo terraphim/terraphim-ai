@@ -2,7 +2,7 @@
 #[cfg(all(test, feature = "repl-custom"))]
 mod tests {
     use std::str::FromStr;
-    
+
     // Test basic command parsing - this is the core functionality we need
     #[test]
     fn test_web_get_command_parsing() {

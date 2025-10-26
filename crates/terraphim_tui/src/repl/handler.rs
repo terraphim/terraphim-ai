@@ -3,8 +3,7 @@
 #[cfg(feature = "repl-file")]
 use super::commands::FileSubcommand;
 use super::commands::{
-    ConfigSubcommand, ExecutionMode, ReplCommand, RoleSubcommand, WebConfigSubcommand,
-    WebSubcommand,
+    ConfigSubcommand, ReplCommand, RoleSubcommand, WebConfigSubcommand, WebSubcommand,
 };
 
 use crate::client::ApiClient;
@@ -40,6 +39,7 @@ impl ReplHandler {
 
     #[cfg(feature = "repl-custom")]
     /// Initialize command registry and validator with API client integration
+    #[allow(dead_code)]
     pub async fn initialize_commands(&mut self) -> Result<()> {
         println!("{} Command system initialization disabled", "⚠️".yellow());
         Ok(())
@@ -57,6 +57,7 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-custom")]
+    #[allow(dead_code)]
     async fn execute_custom_command(
         &mut self,
         _command_def: &CommandDefinition,
@@ -68,6 +69,7 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-custom")]
+    #[allow(dead_code)]
     async fn display_command_result(
         &self,
         _result: &Result<CommandExecutionResult, CommandExecutionError>,
@@ -86,6 +88,7 @@ impl ReplHandler {
     }
 
     /// Create a visual usage bar (e.g., [████████░░░░] 80%)
+    #[allow(dead_code)]
     fn create_usage_bar(&self, usage: f64, max_usage: f64) -> String {
         let percentage = (usage / max_usage * 100.0).min(100.0);
         let filled = (percentage / 10.0) as usize;
@@ -120,7 +123,7 @@ impl ReplHandler {
                         continue;
                     }
 
-                    editor.add_history_entry(line);
+                    let _ = editor.add_history_entry(line);
 
                     if line == "exit" || line == "quit" {
                         println!("{} Goodbye!", "👋".yellow());

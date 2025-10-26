@@ -10,10 +10,7 @@ use std::path::PathBuf;
 #[cfg(feature = "repl-custom")]
 use tempfile::TempDir;
 #[cfg(feature = "repl-custom")]
-use terraphim_tui::commands::{
-    hooks, CommandHook, ExecutionMode, HookContext,
-    HookManager,
-};
+use terraphim_tui::commands::{hooks, CommandHook, ExecutionMode, HookContext, HookManager};
 #[cfg(feature = "repl-custom")]
 use terraphim_tui::registry::CommandRegistry;
 #[cfg(feature = "repl-custom")]

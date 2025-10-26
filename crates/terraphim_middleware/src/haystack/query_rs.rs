@@ -45,6 +45,7 @@ impl QueryRsHaystackIndexer {
     /// Check if URL should be fetched. Returns true if URL hasn't been fetched yet.
     /// If URL is new, adds it to the cache and returns true.
     /// Thread-safe for concurrent access.
+    #[allow(dead_code)]
     pub(crate) fn should_fetch_url(&self, url: &str) -> bool {
         let mut cache = self.fetched_urls.lock().unwrap();
         if cache.contains(url) {
@@ -68,6 +69,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Get the number of unique URLs that have been fetched
+    #[allow(dead_code)]
     pub(crate) fn get_fetched_count(&self) -> usize {
         self.fetched_urls.lock().unwrap().len()
     }
@@ -194,6 +196,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
     }
 }
 
+#[allow(dead_code)]
 impl QueryRsHaystackIndexer {
     /// Normalize document ID to match persistence layer expectations
     pub fn normalize_document_id(&self, original_id: &str) -> String {
@@ -330,6 +333,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Fetch and scrape content from a document's URL with retry logic for critical URLs
+    #[allow(dead_code)]
     async fn fetch_and_scrape_content(&self, doc: &Document) -> Result<Document> {
         let mut enhanced_doc = doc.clone();
 
@@ -411,6 +415,7 @@ impl QueryRsHaystackIndexer {
     }
 
     /// Scrape relevant content from HTML based on the URL type
+    #[allow(dead_code)]
     fn scrape_content(&self, html_content: &str, url: &str) -> String {
         let document = Html::parse_document(html_content);
 

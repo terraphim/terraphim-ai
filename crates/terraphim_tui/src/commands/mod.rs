@@ -3,6 +3,8 @@
 //! This module provides support for defining commands in markdown files with YAML frontmatter,
 //! supporting multiple execution modes (local, firecracker, hybrid) and knowledge graph-based validation.
 
+#![allow(clippy::unnecessary_sort_by)]
+
 pub mod executor;
 pub mod hooks;
 pub mod markdown_parser;
@@ -16,24 +18,18 @@ mod tests;
 pub mod modes;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Execution mode for commands
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionMode {
     /// Execute locally on the host machine (safe commands only)
+    #[default]
     Local,
     /// Execute in isolated Firecracker microVM
     Firecracker,
     /// Smart hybrid mode based on risk assessment
     Hybrid,
-}
-
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        ExecutionMode::Local
-    }
 }
 
 /// Command parameter definition
@@ -366,7 +362,7 @@ impl HookManager {
     pub async fn execute_post_hooks(
         &self,
         context: &HookContext,
-        result: &CommandExecutionResult,
+        _result: &CommandExecutionResult,
     ) -> Result<(), CommandExecutionError> {
         for hook in &self.post_hooks {
             match hook.execute(context).await {

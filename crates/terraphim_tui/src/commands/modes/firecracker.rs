@@ -3,7 +3,13 @@
 //! This module provides command execution within Firecracker microVMs
 //! for complete isolation and security.
 
-use super::local::LocalExecutor;
+#![allow(
+    clippy::collapsible_str_replace,
+    clippy::if_same_then_else,
+    clippy::trim_split_whitespace,
+    clippy::useless_vec
+)]
+
 use super::{
     default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
     ExecutorCapabilities, ResourceUsage,
@@ -105,7 +111,7 @@ impl FirecrackerExecutor {
         vm_id: &str,
         command: &str,
         args: &[String],
-        timeout: Duration,
+        _timeout: Duration,
     ) -> Result<CommandExecutionResult, CommandExecutionError> {
         let api_client = self.api_client.as_ref().ok_or_else(|| {
             CommandExecutionError::VmExecutionError("No API client available".to_string())
@@ -163,7 +169,7 @@ impl FirecrackerExecutor {
     /// Calculate resource usage from VM response
     fn calculate_resource_usage(
         &self,
-        response: &crate::client::VmExecuteResponse,
+        _response: &crate::client::VmExecuteResponse,
     ) -> ResourceUsage {
         // This would be enhanced in a real implementation
         // For now, return default values
@@ -306,6 +312,7 @@ impl Default for FirecrackerExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::modes::LocalExecutor;
 
     #[test]
     fn test_language_detection() {

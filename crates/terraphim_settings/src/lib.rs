@@ -221,8 +221,8 @@ impl DeviceSettings {
 
     /// Save settings to a specified file
     fn save_to_file(&self, path: &PathBuf) -> Result<(), Error> {
-        let serialized_settings = toml::to_string_pretty(self)
-            .map_err(|e| Error::IoError(std::io::Error::new(std::io::ErrorKind::Other, e)))?;
+        let serialized_settings =
+            toml::to_string_pretty(self).map_err(|e| Error::IoError(std::io::Error::other(e)))?;
 
         std::fs::write(path, serialized_settings).map_err(Error::IoError)?;
 

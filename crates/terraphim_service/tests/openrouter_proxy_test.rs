@@ -51,7 +51,7 @@ mod tests {
     use super::*;
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_anthropic_model_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -70,7 +70,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_claude_model_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -89,7 +89,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_non_anthropic_model_ignores_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -108,7 +108,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_openrouter_base_url_override() {
         let mut test_env = TestEnv::new();
 
@@ -131,7 +131,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_z_ai_proxy_priority_over_openrouter() {
         let mut test_env = TestEnv::new();
 
@@ -159,7 +159,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_api_key_selection_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
 
@@ -178,7 +178,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_no_environment_variables() {
         let mut test_env = TestEnv::new();
 
@@ -198,7 +198,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_environment_variable_validation() {
         let mut test_env = TestEnv::new();
 
@@ -216,7 +216,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_model_name_patterns() {
         let mut test_env = TestEnv::new();
 
@@ -244,7 +244,8 @@ mod tests {
 
             let service = service.unwrap();
             assert_eq!(
-                service.base_url(), "https://api.z.ai/api/anthropic",
+                service.base_url(),
+                "https://api.z.ai/api/anthropic",
                 "Model {} should use z.ai proxy",
                 model
             );
@@ -252,7 +253,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_non_anthropic_model_patterns() {
         let mut test_env = TestEnv::new();
 
@@ -279,7 +280,8 @@ mod tests {
 
             let service = service.unwrap();
             assert_eq!(
-                service.base_url(), "https://openrouter.ai/api/v1",
+                service.base_url(),
+                "https://openrouter.ai/api/v1",
                 "Model {} should use OpenRouter, not z.ai proxy",
                 model
             );
@@ -287,7 +289,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_service_configuration_methods() {
         let mut test_env = TestEnv::new();
 
@@ -305,7 +307,7 @@ mod tests {
     }
 
     #[cfg(feature = "openrouter")]
-#[test]
+    #[test]
     fn test_error_cases() {
         // Test empty API key
         let service = OpenRouterService::new("", "anthropic/claude-3-sonnet-20240229");

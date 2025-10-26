@@ -8,6 +8,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use ed25519_dalek::{Signer, SigningKey, VerifyingKey};
 use rand::rngs::OsRng;
 pub type Keypair = SigningKey;
+#[allow(dead_code)]
 pub type PublicKey = VerifyingKey;
 #[cfg(feature = "native")]
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
