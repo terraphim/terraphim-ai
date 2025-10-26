@@ -1,0 +1,433 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="spacelab">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terraphim Chat - Week 2 Demo</title>
+
+  <!-- Import CSS Variables -->
+  <link rel="stylesheet" href="../styles/variables.css">
+
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: var(--font-family-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .page-header {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .page-header h1 {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-bold);
+      color: var(--text-primary);
+    }
+
+    .theme-selector {
+      display: flex;
+      align-items: center;
+      gap: var(--spacing-xs);
+    }
+
+    .theme-selector label {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+
+    .theme-selector select {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+      cursor: pointer;
+    }
+
+    .container {
+      flex: 1;
+      display: flex;
+      max-width: 1400px;
+      width: 100%;
+      margin: 0 auto;
+      min-height: 0;
+    }
+
+    .sidebar {
+      width: 280px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      overflow-y: auto;
+    }
+
+    .sidebar h2 {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--spacing-md);
+      color: var(--text-primary);
+    }
+
+    .sidebar .section {
+      margin-bottom: var(--spacing-lg);
+    }
+
+    .sidebar .section h3 {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-medium);
+      margin-bottom: var(--spacing-sm);
+      color: var(--text-secondary);
+    }
+
+    .sidebar button {
+      width: 100%;
+      padding: var(--spacing-sm);
+      margin-bottom: var(--spacing-xs);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      cursor: pointer;
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+      transition: var(--transition-base);
+      text-align: left;
+    }
+
+    .sidebar button:hover {
+      background: var(--bg-hover);
+      border-color: var(--border-hover);
+    }
+
+    .info-panel {
+      padding: var(--spacing-sm);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+    }
+
+    .info-panel p {
+      margin-bottom: var(--spacing-xs);
+    }
+
+    .info-panel strong {
+      color: var(--text-primary);
+    }
+
+    .info-panel code {
+      background: var(--bg-secondary);
+      padding: 2px 4px;
+      border-radius: var(--border-radius-sm);
+      font-family: var(--font-family-mono);
+      font-size: 0.9em;
+    }
+
+    .chat-container {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+
+    terraphim-chat {
+      flex: 1;
+      min-height: 0;
+    }
+
+    .footer {
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border-primary);
+      padding: var(--spacing-sm) var(--spacing-md);
+      text-align: center;
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+    }
+
+    @media (max-width: 768px) {
+      .sidebar {
+        display: none;
+      }
+
+      .container {
+        max-width: 100%;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="page-header">
+    <h1>Week 2: Unified Chat Component</h1>
+    <div class="theme-selector">
+      <label for="themeSelect">Theme:</label>
+      <select id="themeSelect">
+        <option value="default">Default</option>
+        <option value="cerulean">Cerulean</option>
+        <option value="cosmo">Cosmo</option>
+        <option value="cyborg">Cyborg (Dark)</option>
+        <option value="darkly">Darkly (Dark)</option>
+        <option value="flatly">Flatly</option>
+        <option value="journal">Journal</option>
+        <option value="litera">Litera</option>
+        <option value="lumen">Lumen</option>
+        <option value="lux">Lux</option>
+        <option value="materia">Materia</option>
+        <option value="minty">Minty</option>
+        <option value="nuclear">Nuclear (Dark)</option>
+        <option value="pulse">Pulse</option>
+        <option value="sandstone">Sandstone</option>
+        <option value="simplex">Simplex</option>
+        <option value="slate">Slate (Dark)</option>
+        <option value="solar">Solar (Dark)</option>
+        <option value="spacelab" selected>Spacelab</option>
+        <option value="superhero">Superhero (Dark)</option>
+        <option value="united">United</option>
+        <option value="yeti">Yeti</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="container">
+    <aside class="sidebar">
+      <h2>Component Controls</h2>
+
+      <div class="section">
+        <h3>Public API Methods</h3>
+        <button onclick="testAddMessage()">Add Message</button>
+        <button onclick="testSendMessage()">Send Message</button>
+        <button onclick="testLoadMessages()">Load Messages</button>
+        <button onclick="testGetMessages()">Get Messages</button>
+        <button onclick="testClearMessages()">Clear Messages</button>
+      </div>
+
+      <div class="section">
+        <h3>Property Tests</h3>
+        <button onclick="toggleMarkdown()">Toggle Markdown</button>
+        <button onclick="toggleVirtualScroll()">Toggle Virtual Scroll</button>
+        <button onclick="changeHeader()">Change Header Text</button>
+        <button onclick="simulateLoading()">Simulate Loading</button>
+      </div>
+
+      <div class="section">
+        <h3>Event Tests</h3>
+        <button onclick="testEvents()">Test All Events</button>
+        <button onclick="simulateError()">Simulate Error</button>
+      </div>
+
+      <div class="section">
+        <h3>Info</h3>
+        <div class="info-panel">
+          <p><strong>Component:</strong> <code>&lt;terraphim-chat&gt;</code></p>
+          <p><strong>Week:</strong> 2</p>
+          <p><strong>Status:</strong> Complete</p>
+          <p style="margin-top: var(--spacing-sm); margin-bottom: 0;">
+            This demo showcases the unified chat component that integrates header, messages, and input.
+          </p>
+        </div>
+      </div>
+    </aside>
+
+    <main class="chat-container">
+      <terraphim-chat
+        id="mainChat"
+        api-endpoint="http://localhost:8000"
+        header-title="Terraphim AI Assistant"
+        header-subtitle="Your intelligent knowledge companion"
+        input-placeholder="Ask me anything..."
+        render-markdown
+        virtual-scrolling
+        show-header-controls
+        show-clear-button
+        show-settings-button>
+      </terraphim-chat>
+    </main>
+  </div>
+
+  <footer class="footer">
+    <p>Terraphim AI - Week 2 Complete | Unified Chat Component | Pure Vanilla JavaScript Web Components</p>
+  </footer>
+
+  <!-- Import Web Components -->
+  <script type="module">
+    import '../chat/terraphim-chat.js';
+
+    // Get component reference
+    const chat = document.getElementById('mainChat');
+
+    // Listen to chat events
+    chat.addEventListener('message-sent', (e) => {
+      console.log('Message sent:', e.detail);
+    });
+
+    chat.addEventListener('message-received', (e) => {
+      console.log('Message received:', e.detail);
+    });
+
+    chat.addEventListener('error', (e) => {
+      console.error('Chat error:', e.detail);
+    });
+
+    chat.addEventListener('settings-clicked', (e) => {
+      console.log('Settings clicked');
+      alert('Settings dialog would open here');
+    });
+
+    // Theme switching
+    document.getElementById('themeSelect').addEventListener('change', (e) => {
+      document.documentElement.setAttribute('data-theme', e.target.value);
+    });
+
+    // Public API Tests
+    window.testAddMessage = () => {
+      chat.addMessage({
+        role: 'assistant',
+        content: 'This message was added using `addMessage()` method.',
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    window.testSendMessage = async () => {
+      await chat.sendMessage('This is a programmatic message sent via sendMessage()');
+    };
+
+    window.testLoadMessages = () => {
+      const messages = [
+        { role: 'user', content: 'Hello!', timestamp: new Date().toISOString() },
+        { role: 'assistant', content: 'Hi there! How can I help?', timestamp: new Date().toISOString() },
+        { role: 'user', content: 'Can you explain how this works?', timestamp: new Date().toISOString() },
+        {
+          role: 'assistant',
+          content: `# How It Works
+
+The \`<terraphim-chat>\` component orchestrates:
+
+- **Header** with title and controls
+- **Messages** container with virtual scrolling
+- **Input** field with auto-resize
+- **API Client** for backend communication
+
+All managed in a single, reusable component!`,
+          timestamp: new Date().toISOString()
+        }
+      ];
+      chat.loadMessages(messages);
+    };
+
+    window.testGetMessages = () => {
+      const messages = chat.getMessages();
+      console.log('Current messages:', messages);
+      alert(`Current message count: ${messages.length}\n\nCheck console for details.`);
+    };
+
+    window.testClearMessages = () => {
+      chat.clearMessages();
+    };
+
+    // Property Tests
+    window.toggleMarkdown = () => {
+      chat.renderMarkdown = !chat.renderMarkdown;
+      console.log('Markdown rendering:', chat.renderMarkdown ? 'ON' : 'OFF');
+    };
+
+    window.toggleVirtualScroll = () => {
+      chat.virtualScrolling = !chat.virtualScrolling;
+      console.log('Virtual scrolling:', chat.virtualScrolling ? 'ON' : 'OFF');
+    };
+
+    window.changeHeader = () => {
+      const titles = [
+        'Terraphim AI Assistant',
+        'Knowledge Explorer',
+        'Smart Chat Interface',
+        'AI Companion'
+      ];
+      const subtitles = [
+        'Your intelligent knowledge companion',
+        'Navigate your digital knowledge',
+        'Powered by semantic search',
+        'Always ready to help'
+      ];
+      const randomTitle = titles[Math.floor(Math.random() * titles.length)];
+      const randomSubtitle = subtitles[Math.floor(Math.random() * subtitles.length)];
+
+      chat.headerTitle = randomTitle;
+      chat.headerSubtitle = randomSubtitle;
+    };
+
+    window.simulateLoading = async () => {
+      chat.loading = true;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      chat.loading = false;
+      chat.addMessage({
+        role: 'assistant',
+        content: 'Loading complete! This simulated a 2-second loading state.',
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    // Event Tests
+    window.testEvents = async () => {
+      console.log('Testing all events...');
+
+      // Send message (triggers message-sent)
+      await chat.sendMessage('Testing event system');
+
+      // Trigger error (triggers error event)
+      setTimeout(() => {
+        chat.dispatchEvent(new CustomEvent('error', {
+          detail: { error: new Error('Test error'), message: 'This is a test error' }
+        }));
+      }, 1000);
+    };
+
+    window.simulateError = () => {
+      chat.addMessage({
+        role: 'system',
+        content: 'Error: This is a simulated error message.',
+        timestamp: new Date().toISOString()
+      });
+    };
+
+    // Initialize with welcome message
+    chat.addMessage({
+      role: 'assistant',
+      content: `# Welcome to Week 2 Demo! 🎉
+
+This demonstrates the **unified \`<terraphim-chat>\` component** which includes:
+
+✅ **Integrated Header** with customizable title and controls
+✅ **Message Management** with all Week 1 features
+✅ **Input Field** with submission handling
+✅ **API Integration** ready for backend communication
+
+## Try These Features:
+
+- Use the controls on the left to test the public API
+- Send messages using the input field below
+- Click the Clear and Settings buttons in the header
+- Check the browser console for event logs
+
+**Much simpler than Week 1!** All the logic is now encapsulated in a single component.`,
+      timestamp: new Date().toISOString()
+    });
+  </script>
+</body>
+</html>
