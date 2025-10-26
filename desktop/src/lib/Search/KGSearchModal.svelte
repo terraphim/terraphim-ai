@@ -1,11 +1,9 @@
 <script lang="ts">
-import { Modal, Field, Input, Button, Message } from 'svelma';
 import { invoke } from '@tauri-apps/api/tauri';
 import { Button, Field, Input, Message, Modal } from 'svelma';
 import { createEventDispatcher, onDestroy } from 'svelte';
-import { is_tauri, role } from '$lib/stores';
+import { is_tauri, is_tauri as isTauriStore, role, role as roleStore } from '$lib/stores';
 import { CONFIG } from '../../config';
-import { is_tauri as isTauriStore, role as roleStore } from '$lib/stores';
 
 export let active: boolean = false;
 export let initialQuery: string = '';

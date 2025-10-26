@@ -911,7 +911,7 @@ impl TerraphimAgent {
         // TODO: Load from role configuration
         // TODO: Load actual automata from role config
         // TODO: Load actual automata from role config
-        use terraphim_automata::{build_autocomplete_index, AutocompleteConfig};
+        use terraphim_automata::{AutocompleteConfig, build_autocomplete_index};
         use terraphim_types::Thesaurus;
 
         let thesaurus = Thesaurus::new("default".to_string());

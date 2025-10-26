@@ -2,7 +2,7 @@
 //! with Rig integration and queue-based architecture
 
 use std::sync::Arc;
-use terraphim_multi_agent::{test_utils::create_test_role, AgentRegistry, TerraphimAgent};
+use terraphim_multi_agent::{AgentRegistry, TerraphimAgent, test_utils::create_test_role};
 use terraphim_persistence::DeviceStorage;
 
 #[tokio::test]

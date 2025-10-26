@@ -5,7 +5,7 @@
 
 use std::sync::Arc;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, TerraphimAgent,
+    CommandInput, CommandType, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 
