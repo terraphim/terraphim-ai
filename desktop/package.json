@@ -115,7 +115,6 @@
 		"d3": "^7.9.0",
 		"rollup-plugin-css-only": "^4.5.2",
 		"rollup-plugin-terser": "^7.0.2",
-		"svelma": "^0.4.5",
 		"svelte-jsoneditor": "^0.21.6",
 		"svelte-markdown": "^0.4.1",
 		"svelte-routing": "^2.13.0",
@@ -136,7 +135,6 @@
 		"d3": "^7.9.0",
 		"rollup-plugin-css-only": "^4.5.2",
 		"rollup-plugin-terser": "^7.0.2",
-		"svelma": "^0.4.5",
 		"svelte-jsoneditor": "^0.21.6",
 		"svelte-markdown": "^0.4.1"
 	},
@@ -175,9 +173,6 @@
 			"optional": true
 		},
 		"rollup-plugin-terser": {
-			"optional": true
-		},
-		"svelma": {
 			"optional": true
 		},
 		"svelte-jsoneditor": {

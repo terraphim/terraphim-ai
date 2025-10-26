@@ -2,7 +2,6 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
 import { store } from '@tomic/svelte';
-import { Button, Field, Input, Select, Switch } from 'svelma';
 import { JSONEditor } from 'svelte-jsoneditor';
 import { Route } from 'tinro';
 import { configStore, is_tauri } from '$lib/stores';
@@ -109,55 +108,84 @@ $: console.log('Print roles', $_roles);
 <div class="box">
   <!-- <Tab label="Atomic"> -->
   <Route path="/atomic">
-    <Field>
-      <Input bind:value={atomicServerUrl} />
-    </Field>
-    <Field grouped>
-      <Input
-        type="password"
-        placeholder="secret"
-        icon="fas fa-lock"
-        expanded
-        bind:value={agentSecret}
-      />
-    </Field>
-    <Field grouped>
-      <Button
-        type="is-success"
-        class="is-right"
-        iconPack="fa"
-        iconLeft="check"
-        on:click={_setAtomicServer}
-        on:submit={_setAtomicServer}>Save</Button
-      >
-    </Field>
+    <div class="field">
+      <div class="control">
+        <input class="input" type="text" bind:value={atomicServerUrl} />
+      </div>
+    </div>
+    <div class="field is-grouped">
+      <div class="control has-icons-left is-expanded">
+        <input
+          class="input"
+          type="password"
+          placeholder="secret"
+          bind:value={agentSecret}
+        />
+        <span class="icon is-left">
+          <i class="fas fa-lock"></i>
+        </span>
+      </div>
+    </div>
+    <div class="field is-grouped">
+      <div class="control">
+        <button
+          class="button is-success is-right"
+          on:click={_setAtomicServer}
+          on:submit={_setAtomicServer}
+        >
+          <span class="icon">
+            <i class="fa fa-check"></i>
+          </span>
+          <span>Save</span>
+        </button>
+      </div>
+    </div>
   </Route>
   <!-- <Tab label="JSON"> -->
   <Route path="/json">
-    <Field grouped>
-      <Input
-        type="search"
-        placeholder="Fetch JSON"
-        icon="search"
-        bind:value={fetchUrl}
-      />
-    </Field>
-    <Field grouped>
-      <Input
-        type="search"
-        placeholder="Post JSON"
-        icon="search"
-        bind:value={postUrl}
-      />
-      <Switch bind:checked={isWiki}>WikiPage</Switch>
-    </Field>
-    <Field grouped>
-      <Button
-        type="is-primary"
-        on:click={_handleClickUrl}
-        on:submit={_handleClickUrl}>Fetch</Button
-      >
-    </Field>
+    <div class="field is-grouped">
+      <div class="control has-icons-left is-expanded">
+        <input
+          class="input"
+          type="search"
+          placeholder="Fetch JSON"
+          bind:value={fetchUrl}
+        />
+        <span class="icon is-left">
+          <i class="fas fa-search"></i>
+        </span>
+      </div>
+    </div>
+    <div class="field is-grouped">
+      <div class="control has-icons-left is-expanded">
+        <input
+          class="input"
+          type="search"
+          placeholder="Post JSON"
+          bind:value={postUrl}
+        />
+        <span class="icon is-left">
+          <i class="fas fa-search"></i>
+        </span>
+      </div>
+      <div class="control">
+        <label class="checkbox">
+          <input type="checkbox" bind:checked={isWiki} />
+          WikiPage
+        </label>
+      </div>
+    </div>
+    <div class="field is-grouped">
+      <div class="control">
+        <button
+          class="button is-primary"
+          on:click={_handleClickUrl}
+          on:submit={_handleClickUrl}
+        >
+          Fetch
+        </button>
+      </div>
+    </div>
   </Route>
   <Route path="/editor">
     <p>
@@ -173,13 +201,17 @@ $: console.log('Print roles', $_roles);
   </Route>
 </div>
 <hr />
-<Field grouped position="is-right">
-  <Select>
-    {#each $_roles ?? [] as role_value}
-      <FetchRole subject={role_value} />
-    {/each}
-  </Select>
-</Field>
+<div class="field is-grouped is-grouped-right">
+  <div class="control">
+    <div class="select">
+      <select>
+        {#each $_roles ?? [] as role_value}
+          <FetchRole subject={role_value} />
+        {/each}
+      </select>
+    </div>
+  </div>
+</div>
 <nav class="navbar">
   <div class="navbar-brand">
     <a class="navbar-item" href="/">
