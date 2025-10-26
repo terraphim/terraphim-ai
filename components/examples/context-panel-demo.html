@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="spacelab">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Context Panel Demo</title>
+  <link rel="stylesheet" href="../styles/variables.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-family-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+    }
+    .container {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .sidebar {
+      width: 250px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      overflow-y: auto;
+    }
+    .sidebar button {
+      width: 100%;
+      padding: var(--spacing-sm);
+      margin-bottom: var(--spacing-xs);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      cursor: pointer;
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+    }
+    .sidebar button:hover {
+      background: var(--bg-hover);
+    }
+    terraphim-chat-context-panel {
+      width: 300px;
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Context Panel Demo - Week 3</h1>
+  </header>
+  <div class="container">
+    <aside class="sidebar">
+      <h2>Controls</h2>
+      <button onclick="addFileContext()">Add File</button>
+      <button onclick="addURLContext()">Add URL</button>
+      <button onclick="addDocContext()">Add Document</button>
+      <button onclick="clearAll()">Clear All</button>
+    </aside>
+    <terraphim-chat-context-panel
+      id="contextPanel"
+      title="Context Items"
+      show-add-button>
+    </terraphim-chat-context-panel>
+  </div>
+
+  <script type="module">
+    import '../chat/terraphim-chat-context-panel.js';
+
+    const panel = document.getElementById('contextPanel');
+
+    panel.addEventListener('context-item-add', () => {
+      console.log('Add context clicked');
+      alert('Add context dialog would open here');
+    });
+
+    panel.addEventListener('context-item-click', (e) => {
+      console.log('Context item clicked:', e.detail);
+      alert(`Clicked: ${e.detail.item.title}`);
+    });
+
+    panel.addEventListener('context-item-remove', (e) => {
+      console.log('Context item removed:', e.detail);
+      panel.removeContextItem(e.detail.id);
+    });
+
+    window.addFileContext = () => {
+      panel.addContextItem({
+        type: 'file',
+        title: `Document ${Date.now()}.pdf`,
+        path: '/Users/alex/Documents/file.pdf',
+        id: Date.now()
+      });
+    };
+
+    window.addURLContext = () => {
+      panel.addContextItem({
+        type: 'url',
+        title: 'Terraphim Documentation',
+        path: 'https://terraphim.ai/docs',
+        id: Date.now()
+      });
+    };
+
+    window.addDocContext = () => {
+      panel.addContextItem({
+        type: 'document',
+        title: 'Meeting Notes',
+        path: 'notes/meeting-2025-10-26.md',
+        id: Date.now()
+      });
+    };
+
+    window.clearAll = () => {
+      panel.clearContextItems();
+    };
+
+    // Add some initial items
+    window.addFileContext();
+    window.addURLContext();
+  </script>
+</body>
+</html>
