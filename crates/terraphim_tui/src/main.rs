@@ -583,15 +583,19 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
 
             // Build thesaurus from response
             let mut thesaurus = terraphim_types::Thesaurus::new(format!("role-{}", role_name));
-            for entry in thesaurus_res.terms {
-                let normalized_term = terraphim_types::NormalizedTerm::new(
-                    1, // Simple ID for CLI usage
-                    terraphim_types::NormalizedTermValue::from(entry.nterm.clone()),
-                );
-                thesaurus.insert(
-                    terraphim_types::NormalizedTermValue::from(entry.nterm),
-                    normalized_term,
-                );
+
+            // Handle thesaurus map format from server
+            if let Some(thesaurus_map) = thesaurus_res.thesaurus {
+                for (term, _definition) in thesaurus_map {
+                    let normalized_term = terraphim_types::NormalizedTerm::new(
+                        1, // Simple ID for CLI usage
+                        terraphim_types::NormalizedTermValue::from(term.clone()),
+                    );
+                    thesaurus.insert(
+                        terraphim_types::NormalizedTermValue::from(term),
+                        normalized_term,
+                    );
+                }
             }
 
             // Extract paragraphs using automata

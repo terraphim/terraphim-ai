@@ -144,13 +144,31 @@ async fn run_server(args: Args) -> Result<()> {
     }
     log::info!("✅ Storage directory pre-creation completed");
 
-    let server_hostname = server_settings
-        .server_hostname
-        .parse::<SocketAddr>()
-        .unwrap_or_else(|_| {
-            let port = portpicker::pick_unused_port().expect("Failed to find unused port");
+    // Check for TERRAPHIM_SERVER_PORT environment variable first
+    let server_hostname = if let Ok(port_str) = std::env::var("TERRAPHIM_SERVER_PORT") {
+        if let Ok(port) = port_str.parse::<u16>() {
+            log::info!("Using TERRAPHIM_SERVER_PORT: {}", port);
             SocketAddr::from(([127, 0, 0, 1], port))
-        });
+        } else {
+            log::warn!("Invalid TERRAPHIM_SERVER_PORT value, using settings");
+            server_settings
+                .server_hostname
+                .parse::<SocketAddr>()
+                .unwrap_or_else(|_| {
+                    let port = portpicker::pick_unused_port().expect("Failed to find unused port");
+                    SocketAddr::from(([127, 0, 0, 1], port))
+                })
+        }
+    } else {
+        // Use settings file value or fallback
+        server_settings
+            .server_hostname
+            .parse::<SocketAddr>()
+            .unwrap_or_else(|_| {
+                let port = portpicker::pick_unused_port().expect("Failed to find unused port");
+                SocketAddr::from(([127, 0, 0, 1], port))
+            })
+    };
 
     let mut config = {
         // Use custom config file if provided, otherwise determine from role

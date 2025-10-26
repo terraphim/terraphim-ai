@@ -3,6 +3,7 @@ use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use terraphim_types::{Document, SearchQuery};
 
+#[allow(dead_code)]
 #[derive(Clone, Debug)]
 pub struct ApiClient {
     http: Client,
@@ -163,17 +164,10 @@ pub struct SummarizeResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
-pub struct ThesaurusEntry {
-    pub id: String,
-    pub nterm: String,
-    pub url: Option<String>,
-}
-
-#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct ThesaurusResponse {
     pub status: String,
-    pub terms: Vec<ThesaurusEntry>,
-    pub total: usize,
+    pub thesaurus: Option<std::collections::HashMap<String, String>>,
+    pub error: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -235,18 +229,21 @@ pub struct BatchSummarizeResponse {
 // VM Management Types
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmWithIp {
     pub vm_id: String,
     pub ip_address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmPoolListResponse {
     pub vms: Vec<VmWithIp>,
     pub stats: VmPoolStatsResponse,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmPoolStatsResponse {
     pub total_ips: usize,
     pub allocated_ips: usize,
@@ -255,6 +252,7 @@ pub struct VmPoolStatsResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmStatusResponse {
     pub vm_id: String,
     pub status: String,
@@ -264,6 +262,7 @@ pub struct VmStatusResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmExecuteRequest {
     pub code: String,
     pub language: String,
@@ -273,6 +272,7 @@ pub struct VmExecuteRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmExecuteResponse {
     pub execution_id: String,
     pub vm_id: String,
@@ -286,6 +286,7 @@ pub struct VmExecuteResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmTask {
     pub id: String,
     pub vm_id: String,
@@ -295,6 +296,7 @@ pub struct VmTask {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmTasksResponse {
     pub tasks: Vec<VmTask>,
     pub vm_id: String,
@@ -302,17 +304,20 @@ pub struct VmTasksResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmAllocateRequest {
     pub vm_id: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmAllocateResponse {
     pub vm_id: String,
     pub ip_address: String,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmMetricsResponse {
     pub vm_id: String,
     pub status: String,
@@ -326,6 +331,7 @@ pub struct VmMetricsResponse {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmAgentRequest {
     pub agent_id: String,
     pub task: String,
@@ -334,6 +340,7 @@ pub struct VmAgentRequest {
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
+#[allow(dead_code)]
 pub struct VmAgentResponse {
     pub task_id: String,
     pub agent_id: String,
@@ -347,6 +354,7 @@ pub struct VmAgentResponse {
     pub error: Option<String>,
 }
 
+#[allow(dead_code)]
 impl ApiClient {
     pub async fn chat(
         &self,
