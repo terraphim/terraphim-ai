@@ -214,8 +214,9 @@ export class TerraphimElement extends HTMLElement {
 
     if (type === Boolean) {
       // Handle attribute-style boolean (presence = true, absence = false)
+      // Empty string means attribute is present without value, which is true
       if (typeof value === 'string') {
-        return value !== 'false' && value !== '';
+        return value !== 'false';
       }
       return Boolean(value);
     }
