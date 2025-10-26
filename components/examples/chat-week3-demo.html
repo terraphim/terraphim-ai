@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="spacelab">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week 3: Complete Chat with Context & Sessions</title>
+  <link rel="stylesheet" href="../styles/variables.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-family-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-bold);
+    }
+    .theme-selector select {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+    }
+    .container {
+      flex: 1;
+      display: flex;
+      min-height: 0;
+    }
+    .left-sidebar {
+      width: 280px;
+      display: flex;
+      flex-direction: column;
+      border-right: 1px solid var(--border-primary);
+    }
+    terraphim-conversation-list {
+      flex: 1;
+      min-height: 0;
+    }
+    terraphim-session-manager {
+      border-top: 1px solid var(--border-primary);
+    }
+    .chat-main {
+      flex: 1;
+      min-width: 0;
+    }
+    terraphim-chat {
+      height: 100%;
+    }
+    terraphim-chat-context-panel {
+      width: 300px;
+    }
+    .footer {
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border-primary);
+      padding: var(--spacing-sm);
+      text-align: center;
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Week 3: Complete Chat Interface</h1>
+    <div class="theme-selector">
+      <select id="themeSelect">
+        <option value="spacelab" selected>Spacelab</option>
+        <option value="darkly">Darkly (Dark)</option>
+        <option value="flatly">Flatly</option>
+        <option value="cyborg">Cyborg (Dark)</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="container">
+    <!-- Left Sidebar: Conversations + Sessions -->
+    <aside class="left-sidebar">
+      <terraphim-conversation-list
+        id="conversationList"
+        show-search
+        current-conversation-id="conv-1">
+      </terraphim-conversation-list>
+
+      <terraphim-session-manager
+        id="sessionManager"
+        show-create-button
+        current-session-id="session-1">
+      </terraphim-session-manager>
+    </aside>
+
+    <!-- Main Chat Area -->
+    <main class="chat-main">
+      <terraphim-chat
+        id="mainChat"
+        header-title="General Discussion"
+        header-subtitle="Active conversation"
+        show-header-controls
+        show-clear-button
+        show-settings-button
+        render-markdown
+        virtual-scrolling>
+      </terraphim-chat>
+    </main>
+
+    <!-- Right Sidebar: Context Panel -->
+    <terraphim-chat-context-panel
+      id="contextPanel"
+      title="Context"
+      show-add-button>
+    </terraphim-chat-context-panel>
+  </div>
+
+  <footer class="footer">
+    Week 3 Complete: Conversation List • Session Manager • Context Panel • Unified Chat | Pure Vanilla JavaScript
+  </footer>
+
+  <script type="module">
+    import '../chat/terraphim-chat.js';
+    import '../chat/terraphim-chat-context-panel.js';
+    import '../chat/terraphim-session-manager.js';
+    import '../chat/terraphim-conversation-list.js';
+
+    const chat = document.getElementById('mainChat');
+    const contextPanel = document.getElementById('contextPanel');
+    const sessionManager = document.getElementById('sessionManager');
+    const conversationList = document.getElementById('conversationList');
+
+    // Initialize conversations
+    const sampleConversations = [
+      {
+        id: 'conv-1',
+        title: 'General Discussion',
+        lastMessage: 'How can I help you today?',
+        lastMessageAt: new Date(Date.now() - 5 * 60000).toISOString(),
+        createdAt: new Date(Date.now() - 2 * 24 * 60 * 60000).toISOString()
+      },
+      {
+        id: 'conv-2',
+        title: 'Project Planning',
+        lastMessage: 'Let me create a timeline for the project',
+        lastMessageAt: new Date(Date.now() - 2 * 60 * 60000).toISOString(),
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60000).toISOString()
+      },
+      {
+        id: 'conv-3',
+        title: 'Code Review',
+        lastMessage: 'The implementation looks good overall',
+        lastMessageAt: new Date(Date.now() - 24 * 60 * 60000).toISOString(),
+        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60000).toISOString()
+      }
+    ];
+    conversationList.conversations = sampleConversations;
+
+    // Initialize sessions
+    const sampleSessions = [
+      {
+        id: 'session-1',
+        name: 'Work Session',
+        messageCount: 45,
+        lastUpdated: new Date().toISOString(),
+        createdAt: new Date(Date.now() - 3 * 24 * 60 * 60000).toISOString()
+      },
+      {
+        id: 'session-2',
+        name: 'Research',
+        messageCount: 23,
+        lastUpdated: new Date(Date.now() - 24 * 60 * 60000).toISOString(),
+        createdAt: new Date(Date.now() - 5 * 24 * 60 * 60000).toISOString()
+      }
+    ];
+    sessionManager.sessions = sampleSessions;
+
+    // Initialize context items
+    contextPanel.addContextItem({
+      type: 'file',
+      title: 'project-plan.pdf',
+      path: '/Documents/project-plan.pdf',
+      id: 'ctx-1'
+    });
+    contextPanel.addContextItem({
+      type: 'url',
+      title: 'Documentation',
+      path: 'https://docs.terraphim.ai',
+      id: 'ctx-2'
+    });
+
+    // Add initial welcome message
+    chat.addMessage({
+      role: 'assistant',
+      content: `# Welcome to Week 3 Demo! 🎉
+
+This demonstrates the **complete chat interface** with:
+
+✅ **Conversation List** - Browse and switch between conversations
+✅ **Session Manager** - Manage chat sessions
+✅ **Context Panel** - Add documents and URLs for context
+✅ **Unified Chat** - Full-featured chat interface
+
+## Try These Features:
+
+- **Left Sidebar**: Click conversations to switch, create new sessions
+- **Main Chat**: Send messages, toggle markdown rendering
+- **Right Panel**: Add/remove context items, collapse panel
+- **Search**: Filter conversations in the left sidebar
+
+All components work together seamlessly!`,
+      timestamp: new Date().toISOString()
+    });
+
+    // Event Listeners
+    conversationList.addEventListener('conversation-select', (e) => {
+      console.log('Conversation selected:', e.detail);
+      const conv = e.detail.conversation;
+      chat.headerTitle = conv.title;
+      chat.headerSubtitle = `Last active ${formatTime(conv.lastMessageAt)}`;
+      conversationList.currentConversationId = conv.id;
+    });
+
+    conversationList.addEventListener('conversation-delete', (e) => {
+      console.log('Conversation deleted:', e.detail);
+      conversationList.deleteConversation(e.detail.id);
+    });
+
+    conversationList.addEventListener('conversation-archive', (e) => {
+      console.log('Conversation archived:', e.detail);
+      alert(`Archived: ${e.detail.conversation.title}`);
+    });
+
+    sessionManager.addEventListener('session-create', () => {
+      const name = prompt('Enter session name:', 'New Session');
+      if (name) {
+        const session = sessionManager.createSession(name);
+        sessionManager.currentSessionId = session.id;
+      }
+    });
+
+    sessionManager.addEventListener('session-select', (e) => {
+      console.log('Session selected:', e.detail);
+      sessionManager.currentSessionId = e.detail.id;
+      alert(`Switched to session: ${e.detail.session.name}`);
+    });
+
+    sessionManager.addEventListener('session-delete', (e) => {
+      console.log('Session deleted:', e.detail);
+      sessionManager.deleteSession(e.detail.id);
+    });
+
+    sessionManager.addEventListener('session-rename', (e) => {
+      console.log('Session renamed:', e.detail);
+      sessionManager.renameSession(e.detail.id, e.detail.newName);
+    });
+
+    contextPanel.addEventListener('context-item-add', () => {
+      const type = prompt('Type (file/url/document):', 'file');
+      const title = prompt('Title:', 'New Item');
+      if (type && title) {
+        contextPanel.addContextItem({
+          type,
+          title,
+          path: `/path/to/${title}`,
+          id: Date.now()
+        });
+      }
+    });
+
+    contextPanel.addEventListener('context-item-click', (e) => {
+      console.log('Context item clicked:', e.detail);
+      alert(`Viewing: ${e.detail.item.title}`);
+    });
+
+    contextPanel.addEventListener('context-item-remove', (e) => {
+      console.log('Context item removed:', e.detail);
+      contextPanel.removeContextItem(e.detail.id);
+    });
+
+    chat.addEventListener('settings-clicked', () => {
+      alert('Settings dialog would open here');
+    });
+
+    // Theme switching
+    document.getElementById('themeSelect').addEventListener('change', (e) => {
+      document.documentElement.setAttribute('data-theme', e.target.value);
+    });
+
+    // Helper function
+    function formatTime(dateStr) {
+      const date = new Date(dateStr);
+      const now = new Date();
+      const diff = now - date;
+      const minutes = Math.floor(diff / (1000 * 60));
+      const hours = Math.floor(diff / (1000 * 60 * 60));
+
+      if (minutes < 60) return `${minutes} minutes ago`;
+      if (hours < 24) return `${hours} hours ago`;
+      return date.toLocaleDateString();
+    }
+  </script>
+</body>
+</html>

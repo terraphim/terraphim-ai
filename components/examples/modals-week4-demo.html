@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="spacelab">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Week 4: Modal Components Demo</title>
+  <link rel="stylesheet" href="../styles/variables.css">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: var(--font-family-sans);
+      background: var(--bg-page);
+      color: var(--text-primary);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+    .header {
+      background: var(--bg-elevated);
+      border-bottom: 1px solid var(--border-primary);
+      padding: var(--spacing-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .header h1 {
+      font-size: var(--font-size-xl);
+      font-weight: var(--font-weight-bold);
+    }
+    .theme-selector select {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-sm);
+      background: var(--bg-elevated);
+      color: var(--text-primary);
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+    }
+    .container {
+      flex: 1;
+      max-width: 1200px;
+      width: 100%;
+      margin: 0 auto;
+      padding: var(--spacing-xl);
+    }
+    .intro {
+      background: var(--bg-elevated);
+      padding: var(--spacing-lg);
+      border-radius: var(--border-radius-lg);
+      margin-bottom: var(--spacing-xl);
+      border: 1px solid var(--border-primary);
+    }
+    .intro h2 {
+      font-size: var(--font-size-lg);
+      margin-bottom: var(--spacing-md);
+    }
+    .intro-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: var(--spacing-md);
+      margin-top: var(--spacing-md);
+    }
+    .intro-feature {
+      padding: var(--spacing-md);
+      background: var(--bg-secondary);
+      border-radius: var(--border-radius-md);
+      border-left: 3px solid var(--color-primary);
+    }
+    .intro-feature h3 {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--spacing-xs);
+    }
+    .intro-feature p {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+    }
+    .modal-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: var(--spacing-lg);
+    }
+    .modal-card {
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-lg);
+      padding: var(--spacing-lg);
+      transition: var(--transition-base);
+    }
+    .modal-card:hover {
+      border-color: var(--color-primary);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+    .modal-card-icon {
+      width: 48px;
+      height: 48px;
+      background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+      border-radius: var(--border-radius-md);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: var(--spacing-md);
+    }
+    .modal-card-icon svg {
+      width: 28px;
+      height: 28px;
+      fill: var(--color-primary-contrast);
+    }
+    .modal-card h3 {
+      font-size: var(--font-size-lg);
+      font-weight: var(--font-weight-bold);
+      margin-bottom: var(--spacing-sm);
+    }
+    .modal-card p {
+      font-size: var(--font-size-sm);
+      color: var(--text-secondary);
+      margin-bottom: var(--spacing-md);
+      line-height: 1.6;
+    }
+    .modal-card-actions {
+      display: flex;
+      gap: var(--spacing-xs);
+      flex-wrap: wrap;
+    }
+    .modal-btn {
+      padding: var(--spacing-sm) var(--spacing-md);
+      background: var(--color-primary);
+      color: var(--color-primary-contrast);
+      border: none;
+      border-radius: var(--border-radius-md);
+      cursor: pointer;
+      font-family: var(--font-family-sans);
+      font-size: var(--font-size-sm);
+      font-weight: var(--font-weight-medium);
+      transition: var(--transition-base);
+    }
+    .modal-btn:hover {
+      background: var(--color-primary-dark);
+    }
+    .modal-btn.secondary {
+      background: var(--bg-secondary);
+      color: var(--text-primary);
+      border: 1px solid var(--border-primary);
+    }
+    .modal-btn.secondary:hover {
+      background: var(--bg-hover);
+    }
+    .event-log {
+      margin-top: var(--spacing-xl);
+      background: var(--bg-elevated);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-lg);
+      padding: var(--spacing-lg);
+    }
+    .event-log h3 {
+      font-size: var(--font-size-base);
+      font-weight: var(--font-weight-semibold);
+      margin-bottom: var(--spacing-md);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .event-log-clear {
+      padding: var(--spacing-xs) var(--spacing-sm);
+      background: transparent;
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-sm);
+      cursor: pointer;
+      font-size: var(--font-size-xs);
+      color: var(--text-secondary);
+    }
+    .event-log-clear:hover {
+      background: var(--bg-hover);
+    }
+    .event-log-content {
+      background: var(--bg-secondary);
+      border: 1px solid var(--border-primary);
+      border-radius: var(--border-radius-md);
+      padding: var(--spacing-md);
+      max-height: 200px;
+      overflow-y: auto;
+      font-family: var(--font-family-mono);
+      font-size: var(--font-size-xs);
+    }
+    .event-item {
+      padding: var(--spacing-xs) 0;
+      border-bottom: 1px solid var(--border-primary);
+      color: var(--text-secondary);
+    }
+    .event-item:last-child {
+      border-bottom: none;
+    }
+    .event-time {
+      color: var(--color-primary);
+      margin-right: var(--spacing-sm);
+    }
+    .footer {
+      background: var(--bg-elevated);
+      border-top: 1px solid var(--border-primary);
+      padding: var(--spacing-sm);
+      text-align: center;
+      font-size: var(--font-size-xs);
+      color: var(--text-tertiary);
+    }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <h1>Week 4: Modal Components</h1>
+    <div class="theme-selector">
+      <select id="themeSelect">
+        <option value="spacelab" selected>Spacelab</option>
+        <option value="darkly">Darkly (Dark)</option>
+        <option value="flatly">Flatly</option>
+        <option value="cyborg">Cyborg (Dark)</option>
+      </select>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="intro">
+      <h2>Modal Component Library</h2>
+      <p>Week 4 delivers a complete set of modal dialogs for various interactions. All modals feature smooth animations, accessibility support, keyboard navigation, and responsive design.</p>
+
+      <div class="intro-grid">
+        <div class="intro-feature">
+          <h3>Context Management</h3>
+          <p>Add and edit context items with validation</p>
+        </div>
+        <div class="intro-feature">
+          <h3>Article Viewer</h3>
+          <p>Display full articles with metadata and actions</p>
+        </div>
+        <div class="intro-feature">
+          <h3>Atomic Server</h3>
+          <p>Save resources to Atomic Data protocol</p>
+        </div>
+        <div class="intro-feature">
+          <h3>Knowledge Graph</h3>
+          <p>Search and explore the knowledge graph</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="modal-grid">
+      <!-- Context Edit Modal Card -->
+      <div class="modal-card">
+        <div class="modal-card-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M20.71,7.04C21.1,6.65 21.1,6 20.71,5.63L18.37,3.29C18,2.9 17.35,2.9 16.96,3.29L15.12,5.12L18.87,8.87M3,17.25V21H6.75L17.81,9.93L14.06,6.18L3,17.25Z"/>
+          </svg>
+        </div>
+        <h3>Context Edit Modal</h3>
+        <p>Add or edit context items (files, URLs, documents) with validation and type selection.</p>
+        <div class="modal-card-actions">
+          <button class="modal-btn" onclick="openContextEditModal('add')">Open Add Mode</button>
+          <button class="modal-btn secondary" onclick="openContextEditModal('edit')">Open Edit Mode</button>
+        </div>
+      </div>
+
+      <!-- Article Modal Card -->
+      <div class="modal-card">
+        <div class="modal-card-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M19,5V19H5V5H19M19,3H5A2,2 0 0,0 3,5V19A2,2 0 0,0 5,21H19A2,2 0 0,0 21,19V5A2,2 0 0,0 19,3M13,7H7V9H13V7M17,11H7V13H17V11M17,15H7V17H17V15Z"/>
+          </svg>
+        </div>
+        <h3>Article Modal</h3>
+        <p>Display full article content with metadata, markdown rendering, and copy/save actions.</p>
+        <div class="modal-card-actions">
+          <button class="modal-btn" onclick="openArticleModal('plain')">Open Plain Text</button>
+          <button class="modal-btn secondary" onclick="openArticleModal('markdown')">Open Markdown</button>
+        </div>
+      </div>
+
+      <!-- Atomic Save Modal Card -->
+      <div class="modal-card">
+        <div class="modal-card-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12,2A10,10 0 0,1 22,12A10,10 0 0,1 12,22A10,10 0 0,1 2,12A10,10 0 0,1 12,2M12,4A8,8 0 0,0 4,12A8,8 0 0,0 12,20A8,8 0 0,0 20,12A8,8 0 0,0 12,4M12,6A6,6 0 0,1 18,12A6,6 0 0,1 12,18A6,6 0 0,1 6,12A6,6 0 0,1 12,6M12,8A4,4 0 0,0 8,12A4,4 0 0,0 12,16A4,4 0 0,0 16,12A4,4 0 0,0 12,8Z"/>
+          </svg>
+        </div>
+        <h3>Atomic Save Modal</h3>
+        <p>Save documents and resources to your Atomic Server with custom properties and tags.</p>
+        <div class="modal-card-actions">
+          <button class="modal-btn" onclick="openAtomicSaveModal('document')">Open Document</button>
+          <button class="modal-btn secondary" onclick="openAtomicSaveModal('article')">Open Article</button>
+        </div>
+      </div>
+
+      <!-- KG Search Modal Card -->
+      <div class="modal-card">
+        <div class="modal-card-icon">
+          <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9.5,3A6.5,6.5 0 0,1 16,9.5C16,11.11 15.41,12.59 14.44,13.73L14.71,14H15.5L20.5,19L19,20.5L14,15.5V14.71L13.73,14.44C12.59,15.41 11.11,16 9.5,16A6.5,6.5 0 0,1 3,9.5A6.5,6.5 0 0,1 9.5,3M9.5,5C7,5 5,7 5,9.5C5,12 7,14 9.5,14C12,14 14,12 14,9.5C14,7 12,5 9.5,5Z"/>
+          </svg>
+        </div>
+        <h3>Knowledge Graph Search</h3>
+        <p>Search and explore the knowledge graph with filtering, sorting, and result actions.</p>
+        <div class="modal-card-actions">
+          <button class="modal-btn" onclick="openKgSearchModal('empty')">Open Empty</button>
+          <button class="modal-btn secondary" onclick="openKgSearchModal('results')">Open with Results</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="event-log">
+      <h3>
+        Event Log
+        <button class="event-log-clear" onclick="clearEventLog()">Clear</button>
+      </h3>
+      <div class="event-log-content" id="eventLog">
+        <div class="event-item">
+          <span class="event-time">Ready</span>
+          <span>Click buttons above to test modal interactions</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    Week 4 Complete: All Modal Components | Vanilla JavaScript | No Build Required
+  </footer>
+
+  <!-- Modal Components -->
+  <terraphim-context-edit-modal id="contextEditModal"></terraphim-context-edit-modal>
+  <terraphim-article-modal id="articleModal"></terraphim-article-modal>
+  <terraphim-atomic-save-modal id="atomicSaveModal"></terraphim-atomic-save-modal>
+  <terraphim-kg-search-modal id="kgSearchModal"></terraphim-kg-search-modal>
+
+  <script type="module">
+    import '../modals/terraphim-context-edit-modal.js';
+    import '../modals/terraphim-article-modal.js';
+    import '../modals/terraphim-atomic-save-modal.js';
+    import '../modals/terraphim-kg-search-modal.js';
+
+    // Get modal references
+    const contextEditModal = document.getElementById('contextEditModal');
+    const articleModal = document.getElementById('articleModal');
+    const atomicSaveModal = document.getElementById('atomicSaveModal');
+    const kgSearchModal = document.getElementById('kgSearchModal');
+
+    // Event logging
+    function logEvent(eventType, detail) {
+      const eventLog = document.getElementById('eventLog');
+      const time = new Date().toLocaleTimeString();
+      const item = document.createElement('div');
+      item.className = 'event-item';
+      item.innerHTML = `
+        <span class="event-time">${time}</span>
+        <span>${eventType}: ${JSON.stringify(detail)}</span>
+      `;
+      eventLog.insertBefore(item, eventLog.firstChild);
+    }
+
+    // Context Edit Modal handlers
+    contextEditModal.addEventListener('context-save', (e) => {
+      logEvent('context-save', e.detail);
+    });
+    contextEditModal.addEventListener('modal-close', () => {
+      logEvent('modal-close', 'Context Edit Modal closed');
+    });
+
+    window.openContextEditModal = (mode) => {
+      if (mode === 'add') {
+        contextEditModal.open({ mode: 'add' });
+      } else {
+        contextEditModal.open({
+          mode: 'edit',
+          item: {
+            type: 'file',
+            title: 'Sample Document.pdf',
+            path: '/Users/alex/Documents/sample.pdf',
+            id: '123'
+          }
+        });
+      }
+      logEvent('modal-open', `Context Edit Modal (${mode} mode)`);
+    };
+
+    // Article Modal handlers
+    articleModal.addEventListener('article-save', (e) => {
+      logEvent('article-save', e.detail);
+    });
+    articleModal.addEventListener('article-copy', (e) => {
+      logEvent('article-copy', 'Content copied to clipboard');
+    });
+    articleModal.addEventListener('modal-close', () => {
+      logEvent('modal-close', 'Article Modal closed');
+    });
+
+    window.openArticleModal = (type) => {
+      if (type === 'markdown') {
+        articleModal.open({
+          title: 'Building Web Components with Vanilla JavaScript',
+          author: 'Terraphim AI',
+          date: '2025-10-26',
+          url: 'https://terraphim.ai/blog/web-components',
+          tags: ['web-components', 'javascript', 'tutorial'],
+          content: `# Introduction\n\nWeb Components are a suite of different technologies allowing you to create reusable custom elements.\n\n## Key Features\n\n- **Custom Elements**: Define new HTML elements\n- **Shadow DOM**: Encapsulated styles and markup\n- **HTML Templates**: Reusable markup structures\n\n## Example\n\nHere's how to create a simple web component:\n\n\`\`\`javascript\nclass MyElement extends HTMLElement {\n  connectedCallback() {\n    this.innerHTML = '<p>Hello World!</p>';\n  }\n}\ncustomElements.define('my-element', MyElement);\n\`\`\`\n\nThis creates a **powerful** foundation for building reusable UI components.`,
+          renderMarkdown: true,
+          showActions: true
+        });
+      } else {
+        articleModal.open({
+          title: 'Getting Started with Terraphim AI',
+          author: 'Documentation Team',
+          date: '2025-10-25',
+          tags: ['guide', 'getting-started'],
+          content: 'Terraphim AI is a privacy-first knowledge management system that helps you organize and search your personal and team knowledge. This guide will walk you through the basic concepts and features to get you started quickly.',
+          renderMarkdown: false,
+          showActions: true
+        });
+      }
+      logEvent('modal-open', `Article Modal (${type})`);
+    };
+
+    // Atomic Save Modal handlers
+    atomicSaveModal.addEventListener('atomic-save', (e) => {
+      logEvent('atomic-save', e.detail);
+    });
+    atomicSaveModal.addEventListener('modal-close', () => {
+      logEvent('modal-close', 'Atomic Save Modal closed');
+    });
+
+    window.openAtomicSaveModal = (type) => {
+      atomicSaveModal.open({
+        resourceType: type === 'document' ? 'Document' : 'Article',
+        title: type === 'document' ? 'Meeting Notes' : 'Research Article',
+        description: type === 'document' ? 'Notes from team meeting on 2025-10-26' : 'Comprehensive research on knowledge graphs',
+        content: type === 'document' ? '## Meeting Notes\n\n### Attendees\n- Alice\n- Bob\n- Charlie\n\n### Action Items\n- Implement new features\n- Update documentation' : 'Knowledge graphs are structured representations of information...',
+        tags: type === 'document' ? ['meeting', 'team', 'notes'] : ['research', 'knowledge-graph', 'ai'],
+        properties: type === 'document' ? { 'date': '2025-10-26', 'location': 'Conference Room A' } : { 'author': 'Research Team', 'status': 'published' }
+      });
+      logEvent('modal-open', `Atomic Save Modal (${type})`);
+    };
+
+    // KG Search Modal handlers
+    kgSearchModal.addEventListener('kg-search', (e) => {
+      logEvent('kg-search', e.detail);
+      // Simulate search results
+      setTimeout(() => {
+        const results = [
+          {
+            id: '1',
+            title: 'Knowledge Graphs in AI Systems',
+            description: 'Comprehensive guide to implementing knowledge graphs for AI applications',
+            type: 'article',
+            score: 0.95,
+            date: '2025-10-20',
+            tags: ['ai', 'knowledge-graph', 'systems']
+          },
+          {
+            id: '2',
+            title: 'Semantic Search Implementation',
+            description: 'How to build semantic search using embeddings and vector databases',
+            type: 'document',
+            score: 0.87,
+            date: '2025-10-22',
+            tags: ['search', 'embeddings', 'database']
+          },
+          {
+            id: '3',
+            title: 'Privacy-First AI Architecture',
+            description: 'Design principles for building privacy-preserving AI systems',
+            type: 'reference',
+            score: 0.82,
+            date: '2025-10-24',
+            tags: ['privacy', 'architecture', 'ai']
+          }
+        ];
+        kgSearchModal.setResults(results);
+      }, 1000);
+    });
+    kgSearchModal.addEventListener('result-select', (e) => {
+      logEvent('result-select', e.detail);
+    });
+    kgSearchModal.addEventListener('result-add-context', (e) => {
+      logEvent('result-add-context', e.detail);
+    });
+    kgSearchModal.addEventListener('modal-close', () => {
+      logEvent('modal-close', 'KG Search Modal closed');
+    });
+
+    window.openKgSearchModal = (mode) => {
+      if (mode === 'results') {
+        kgSearchModal.open({
+          query: 'knowledge graph',
+          results: [
+            {
+              id: '1',
+              title: 'Introduction to Knowledge Graphs',
+              description: 'Learn the fundamentals of knowledge graph systems and their applications',
+              type: 'article',
+              score: 0.92,
+              date: '2025-10-15',
+              tags: ['tutorial', 'basics', 'knowledge-graph']
+            },
+            {
+              id: '2',
+              title: 'Advanced Graph Algorithms',
+              description: 'Explore complex algorithms for traversing and analyzing knowledge graphs',
+              type: 'document',
+              score: 0.88,
+              date: '2025-10-18',
+              tags: ['algorithms', 'advanced', 'graph-theory']
+            }
+          ]
+        });
+      } else {
+        kgSearchModal.open({});
+      }
+      logEvent('modal-open', `KG Search Modal (${mode})`);
+    };
+
+    // Clear event log
+    window.clearEventLog = () => {
+      const eventLog = document.getElementById('eventLog');
+      eventLog.innerHTML = '<div class="event-item"><span class="event-time">Cleared</span><span>Event log cleared</span></div>';
+    };
+
+    // Theme switching
+    document.getElementById('themeSelect').addEventListener('change', (e) => {
+      document.documentElement.setAttribute('data-theme', e.target.value);
+    });
+  </script>
+</body>
+</html>
