@@ -1394,57 +1394,69 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
+            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+            use comfy_table::presets::UTF8_FULL;
+            use comfy_table::{Cell, Table};
 
             println!("{} Loading thesaurus...", "📚".bold());
 
-            if false {
-                // TODO: Reimplement service integration
-                let _role_name = if let Some(role_str) = role {
-                    terraphim_types::RoleName::new(&role_str)
-                } else {
-                    terraphim_types::RoleName::new(&self.current_role) // Use current role from handler
-                };
-
-            // match api_client.get_thesaurus(role_name).await {
-            //     Ok(thesaurus) => {
-            //         let mut table = Table::new();
-            //         table
-            //             .load_preset(UTF8_FULL)
-            //             .apply_modifier(UTF8_ROUND_CORNERS)
-            //             .set_header(vec![
-            //                 Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-            //                 Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
-            //                 Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
-            //                 Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-            //             ]);
-
-            //         let mut count = 0;
-            //         for (term, normalized) in (&thesaurus as &[(String, String)]).into_iter().take(20) {
-            //             // Show first 20 entries
-            //             table.add_row(vec![
-            //                 Cell::new(term.as_str()),
-            //                 Cell::new(normalized.id.to_string()),
-            //                 Cell::new(normalized.value.as_str()),
-            //                 Cell::new(normalized.url.as_deref().unwrap_or("N/A")),
-            //             ]);
-            //             count += 1;
-            //         }
-
-            //         println!("{}", table);
-            //         println!(
-            //             "{} Showing {} of {} thesaurus entries for role '{}'",
-            //             "✅".bold(),
-            //             count.to_string().green(),
-            //             thesaurus.len().to_string().cyan(),
-            //             role_name.to_string().yellow()
-            //         );
-            //     }
-            //     Err(e) => {
-            //         println!("{} Thesaurus failed: {}", "❌".bold(), e.to_string().red());
-            //     }
-            // }
+            let role_name = if let Some(role_str) = role {
+                terraphim_types::RoleName::new(&role_str)
             } else {
-                println!("{} Thesaurus requires offline mode", "ℹ".blue().bold());
+                terraphim_types::RoleName::new(&self.current_role)
+            };
+
+            if let Some(service) = &self.tui_service {
+                // Offline mode - use TuiService
+                match service.get_thesaurus(&role_name).await {
+                    Ok(thesaurus) => {
+                        let entries: Vec<_> = (&thesaurus).into_iter().take(20).collect();
+
+                        if entries.is_empty() {
+                            println!("{} No thesaurus entries found for role '{}'",
+                                "ℹ".blue().bold(),
+                                role_name.to_string().yellow());
+                            return Ok(());
+                        }
+
+                        let mut table = Table::new();
+                        table
+                            .load_preset(UTF8_FULL)
+                            .apply_modifier(UTF8_ROUND_CORNERS)
+                            .set_header(vec![
+                                Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                                Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                                Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
+                            ]);
+
+                        let count = entries.len();
+
+                        for (key, normalized_term) in &entries {
+                            table.add_row(vec![
+                                Cell::new(key.as_str()),
+                                Cell::new(normalized_term.id.to_string()),
+                                Cell::new(normalized_term.url.as_deref().unwrap_or("N/A")),
+                            ]);
+                        }
+
+                        println!("{}", table);
+                        println!(
+                            "{} Showing {} of {} thesaurus entries for role '{}'",
+                            "✅".bold(),
+                            count.to_string().green(),
+                            thesaurus.len().to_string().cyan(),
+                            role_name.to_string().yellow()
+                        );
+                    }
+                    Err(e) => {
+                        println!("{} Thesaurus failed: {}", "❌".bold(), e.to_string().red());
+                    }
+                }
+            } else if let Some(_api_client) = &self.api_client {
+                // Server mode - would use API client
+                println!("{} Thesaurus via server not yet implemented", "ℹ".blue().bold());
+            } else {
+                println!("{} No service available", "⚠️".yellow().bold());
             }
         }
 
