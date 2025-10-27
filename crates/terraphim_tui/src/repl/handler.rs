@@ -378,11 +378,11 @@ impl ReplHandler {
             self.current_role.green().bold()
         );
 
-        self.show_available_commands();
+        self.show_available_commands().await;
     }
 
     #[cfg(feature = "repl")]
-    fn show_available_commands(&self) {
+    async fn show_available_commands(&self) {
         println!("\n{}", "Built-in commands:".bold());
         println!("  {} - Search documents", "/search <query>".yellow());
         println!("  {} - Manage roles", "/role [list|select]".yellow());
@@ -417,22 +417,18 @@ impl ReplHandler {
         // Show markdown-defined custom commands if registry is loaded
         #[cfg(feature = "repl-custom")]
         if let Some(registry) = &self.command_registry {
-            // Use a blocking context to call async method
-            let rt = tokio::runtime::Handle::try_current();
-            if let Ok(handle) = rt {
-                let commands = handle.block_on(registry.list_all_commands());
-                if !commands.is_empty() {
-                    println!("\n{}", "Custom commands (from markdown):".bold());
-                    for cmd in commands {
-                        println!(
-                            "  {} - {} {}",
-                            format!("/{}", cmd.name).yellow(),
-                            cmd.description,
-                            format!("[{:?}]", cmd.execution_mode).dimmed()
-                        );
-                    }
-                    println!("\nUse {} to manage custom commands", "/commands list".yellow());
+            let commands = registry.list_all_commands().await;
+            if !commands.is_empty() {
+                println!("\n{}", "Custom commands (from markdown):".bold());
+                for cmd in commands {
+                    println!(
+                        "  {} - {} {}",
+                        format!("/{}", cmd.name).yellow(),
+                        cmd.description,
+                        format!("[{:?}]", cmd.execution_mode).dimmed()
+                    );
                 }
+                println!("\nUse {} to manage custom commands", "/commands list".yellow());
             }
         }
     }
@@ -970,7 +966,7 @@ impl ReplHandler {
                 );
             }
         } else {
-            self.show_available_commands();
+            self.show_available_commands().await;
         }
         Ok(())
     }
