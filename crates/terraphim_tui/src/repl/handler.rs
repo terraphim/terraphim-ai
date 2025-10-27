@@ -6,6 +6,7 @@ use super::commands::{
     ConfigSubcommand, ReplCommand, RoleSubcommand, WebConfigSubcommand, WebSubcommand,
 };
 use crate::client::ApiClient;
+use crate::service::TuiService;
 
 use anyhow::Result;
 use std::io::{self, Write};
@@ -19,6 +20,7 @@ use colored::Colorize;
 
 pub struct ReplHandler {
     api_client: Option<ApiClient>,
+    tui_service: Option<TuiService>,
     current_role: String,
     #[cfg(feature = "repl-custom")]
     command_registry: Option<crate::commands::registry::CommandRegistry>,
@@ -28,7 +30,8 @@ impl ReplHandler {
     pub fn new_offline() -> Self {
         Self {
             api_client: None,
-            current_role: "Default".to_string(),
+            tui_service: None,
+            current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
         }
@@ -37,10 +40,25 @@ impl ReplHandler {
     pub fn new_server(api_client: ApiClient) -> Self {
         Self {
             api_client: Some(api_client),
+            tui_service: None,
             current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
         }
+    }
+
+    /// Initialize TuiService for offline mode
+    pub async fn initialize_offline_service(&mut self) -> Result<()> {
+        log::info!("Initializing TuiService for offline mode");
+        self.tui_service = Some(TuiService::new().await?);
+
+        // Get actual selected role from service
+        if let Some(service) = &self.tui_service {
+            self.current_role = service.get_selected_role().await.to_string();
+            log::info!("Offline mode initialized with role: {}", self.current_role);
+        }
+
+        Ok(())
     }
 
     #[cfg(feature = "repl-custom")]
@@ -524,96 +542,82 @@ impl ReplHandler {
             );
 
             if self.api_client.is_none() {
-                // Offline mode - mock results
-                println!("{} Offline mode - showing mock results", "📱".blue());
+                // Offline mode - use TuiService
+                if let Some(service) = &self.tui_service {
+                    println!("{} Offline mode - searching local haystacks", "📱".blue());
 
-                // Mock search results for demonstration
-                let results = vec![
-                    (
-                        "Introduction to Terraphim",
-                        "https://docs.example.com/intro",
-                        0.95,
-                    ),
-                    (
-                        "Advanced Search Techniques",
-                        "https://docs.example.com/search",
-                        0.87,
-                    ),
-                    (
-                        "Knowledge Graph Theory",
-                        "https://docs.example.com/graph",
-                        0.82,
-                    ),
-                ];
+                    let role_name = role.as_ref()
+                        .map(|r| terraphim_types::RoleName::new(r))
+                        .unwrap_or_else(|| terraphim_types::RoleName::new(&self.current_role));
 
-                if results.is_empty() {
-                    println!("{} No results found", "ℹ".blue().bold());
-                } else {
-                    // Enhanced results display with semantic information
-                    let mut table = Table::new();
-                    table
-                        .load_preset(UTF8_FULL)
-                        .apply_modifier(UTF8_ROUND_CORNERS)
-                        .set_header(vec![
-                            Cell::new("Rank").add_attribute(comfy_table::Attribute::Bold),
-                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
-                            Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                            if semantic || concepts {
-                                Cell::new("Relevance").add_attribute(comfy_table::Attribute::Bold)
+                    match service.search_with_role(&query, &role_name, limit).await {
+                        Ok(documents) => {
+                            if documents.is_empty() {
+                                println!("{} No results found", "ℹ".blue().bold());
                             } else {
-                                Cell::new("Score").add_attribute(comfy_table::Attribute::Bold)
-                            },
-                        ]);
+                                // Enhanced results display with semantic information
+                                let mut table = Table::new();
+                                table
+                                    .load_preset(UTF8_FULL)
+                                    .apply_modifier(UTF8_ROUND_CORNERS)
+                                    .set_header(vec![
+                                        Cell::new("Rank").add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
+                                        if semantic || concepts {
+                                            Cell::new("Relevance").add_attribute(comfy_table::Attribute::Bold)
+                                        } else {
+                                            Cell::new("Score").add_attribute(comfy_table::Attribute::Bold)
+                                        },
+                                    ]);
 
-                    for doc in &results {
-                        let relevance_score = if semantic || concepts {
-                            // Show semantic relevance indicator
-                            let score = doc.2;
-                            if score >= 0.8 {
-                                "🟢 High".to_string()
-                            } else if score >= 0.5 {
-                                "🟡 Medium".to_string()
-                            } else {
-                                "🔴 Low".to_string()
-                            }
-                        } else {
-                            doc.2.to_string()
-                        };
+                                for doc in &documents {
+                                    let rank = doc.rank.unwrap_or(0);
+                                    let relevance_score = if semantic || concepts {
+                                        // Show semantic relevance indicator based on rank
+                                        // Higher rank = more relevant
+                                        if rank >= 80 {
+                                            "🟢 High".to_string()
+                                        } else if rank >= 50 {
+                                            "🟡 Medium".to_string()
+                                        } else {
+                                            "🔴 Low".to_string()
+                                        }
+                                    } else {
+                                        rank.to_string()
+                                    };
 
-                        table.add_row(vec![
-                            Cell::new(doc.2.to_string()),
-                            Cell::new(doc.0),
-                            Cell::new(doc.1),
-                            Cell::new(relevance_score),
-                        ]);
-                    }
+                                    table.add_row(vec![
+                                        Cell::new(rank.to_string()),
+                                        Cell::new(&doc.title),
+                                        Cell::new(&doc.url),
+                                        Cell::new(relevance_score),
+                                    ]);
+                                }
 
-                    println!("{}", table);
-                    println!(
-                        "{} Found {} result(s) using {}",
-                        "✅".bold(),
-                        results.len().to_string().green(),
-                        search_mode.blue()
-                    );
+                                println!("{}", table);
+                                println!(
+                                    "{} Found {} result(s) using {}",
+                                    "✅".bold(),
+                                    documents.len().to_string().green(),
+                                    search_mode.blue()
+                                );
 
-                    // Show concept expansion if enabled
-                    if concepts {
-                        println!("\n{} Expanding concepts for query...", "🧠".bold());
-                        // Mock concepts for demonstration
-                        let concepts_list = vec![
-                            "search",
-                            "query",
-                            "information retrieval",
-                            "semantic",
-                            "relevance",
-                        ];
-                        if !concepts_list.is_empty() {
-                            println!("{} Related concepts:", "🔗".bold());
-                            for (i, concept) in concepts_list.iter().enumerate() {
-                                println!("  {}. {}", (i + 1).to_string().yellow(), concept.cyan());
+                            // Show concept expansion if enabled
+                            if concepts {
+                                println!("\n{} Concept expansion in offline mode", "🧠".bold());
+                                // In offline mode, concepts are included in search results
+                                println!("{} Use semantic search features with knowledge graph roles", "ℹ".blue());
                             }
                         }
+                        }
+                        Err(e) => {
+                            println!("{} Search failed: {}", "❌".red().bold(), e);
+                        }
                     }
+                } else {
+                    println!("{} Offline service not initialized", "⚠️".yellow().bold());
+                    println!("This is a bug - please report it.");
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode
@@ -999,53 +1003,97 @@ impl ReplHandler {
 
             println!("{} Autocompleting: '{}'", "🔍".bold(), query.cyan());
 
-            if false { // TODO: Reimplement service integration
-                 // Autocomplete moved to server - use api_client.autocomplete() instead
-                 // let role_name = &self.current_role;
+            if let Some(service) = &self.tui_service {
+                // Offline mode - use TuiService
+                let role_name = terraphim_types::RoleName::new(&self.current_role);
+                match service.autocomplete(&role_name, &query, _limit).await {
+                    Ok(results) => {
+                        if results.is_empty() {
+                            println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
+                        } else {
+                            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+                            use comfy_table::presets::UTF8_FULL;
+                            use comfy_table::{Cell, Table};
 
-                // match api_client.autocomplete(role_name, &query, limit).await {
-                //     Ok(results) => {
-                //         if results.is_empty() {
-                //             println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
-                //         } else {
-                //             let mut table = Table::new();
-                //             table
-                //                 .load_preset(UTF8_FULL)
-                //                 .apply_modifier(UTF8_ROUND_CORNERS)
-                //                 .set_header(vec![
-                //                     Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                //                     Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
-                //                     Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                //                 ]);
+                            let mut table = Table::new();
+                            table
+                                .load_preset(UTF8_FULL)
+                                .apply_modifier(UTF8_ROUND_CORNERS)
+                                .set_header(vec![
+                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                                    Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
+                                ]);
 
-                //             for result in &results {
-                //                 table.add_row(vec![
-                //                     Cell::new(&result.term),
-                //                     Cell::new(format!("{:.2}", result.score)),
-                //                     Cell::new(result.url.as_deref().unwrap_or("N/A")),
-                //                 ]);
-                //             }
+                            for result in &results {
+                                table.add_row(vec![
+                                    Cell::new(&result.term),
+                                    Cell::new(format!("{:.2}", result.score)),
+                                ]);
+                            }
 
-                //             println!("{}", table);
-                //             println!(
-                //                 "{} Found {} suggestion(s)",
-                //                 "✅".bold(),
-                //                 results.len().to_string().green()
-                //             );
-                //         }
-                //     }
-                //     Err(e) => {
-                //         println!(
-                //             "{} Autocomplete failed: {}",
-                //             "❌".bold(),
-                //             e.to_string().red()
-                //         );
-                //     }
-                // }
+                            println!("{}", table);
+                            println!(
+                                "{} Found {} suggestion(s)",
+                                "✅".bold(),
+                                results.len().to_string().green()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        println!(
+                            "{} Autocomplete failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
+                    }
+                }
+            } else if let Some(api_client) = &self.api_client {
+                // Server mode
+                match api_client.get_autocomplete(&self.current_role, &query).await {
+                    Ok(response) => {
+                        if response.suggestions.is_empty() {
+                            println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
+                        } else {
+                            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+                            use comfy_table::presets::UTF8_FULL;
+                            use comfy_table::{Cell, Table};
+
+                            let mut table = Table::new();
+                            table
+                                .load_preset(UTF8_FULL)
+                                .apply_modifier(UTF8_ROUND_CORNERS)
+                                .set_header(vec![
+                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                                    Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
+                                ]);
+
+                            for suggestion in &response.suggestions {
+                                table.add_row(vec![
+                                    Cell::new(&suggestion.text),
+                                    Cell::new(format!("{:.2}", suggestion.score)),
+                                ]);
+                            }
+
+                            println!("{}", table);
+                            println!(
+                                "{} Found {} suggestion(s)",
+                                "✅".bold(),
+                                response.suggestions.len().to_string().green()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        println!(
+                            "{} Autocomplete failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
+                    }
+                }
             } else {
                 println!(
-                    "{} Autocomplete requires offline mode with thesaurus",
-                    "ℹ".blue().bold()
+                    "{} No service available - run in offline or server mode",
+                    "⚠️".yellow().bold()
                 );
             }
         }
@@ -3241,6 +3289,7 @@ impl ReplHandler {
 /// Run REPL in offline mode
 pub async fn run_repl_offline_mode() -> Result<()> {
     let mut handler = ReplHandler::new_offline();
+    handler.initialize_offline_service().await?;
     handler.run().await
 }
 
