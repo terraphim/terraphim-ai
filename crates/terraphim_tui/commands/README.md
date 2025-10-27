@@ -65,6 +65,18 @@ The Interactive TUI mode now uses **Ctrl modifiers** to avoid conflicts with tex
 - **Backspace** - Delete character
 - **Any letter/number** - Type freely into search box (no more conflicts!)
 
+## Detailed Documentation
+
+For complete documentation on the command execution system, including:
+- **Local, Hybrid, and Firecracker execution modes**
+- **Intelligent risk assessment algorithms**
+- **Complete execution flow examples**
+- **Security model and safety features**
+- **REPL integration guide**
+- **Hook system details**
+
+See **[docs/command-execution-system.md](../../../docs/command-execution-system.md)**
+
 ## Command Structure
 
 Each command is defined in a `.md` file with the following structure:
