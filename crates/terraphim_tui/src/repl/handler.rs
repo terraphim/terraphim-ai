@@ -729,13 +729,18 @@ impl ReplHandler {
     }
 
     async fn handle_config(&self, subcommand: ConfigSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
         match subcommand {
             ConfigSubcommand::Show => {
-                if false { // TODO: Reimplement service integration
-                     // Config moved to server - available via API client
-                     // let config_json = serde_json::to_string_pretty(&config)?;
-                     // println!("{}", config_json);
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - use TuiService
+                    let config = service.get_config().await;
+                    let config_json = serde_json::to_string_pretty(&config)?;
+                    println!("{}", config_json);
                 } else if let Some(api_client) = &self.api_client {
+                    // Server mode
                     match api_client.get_config().await {
                         Ok(response) => {
                             let config_json = serde_json::to_string_pretty(&response.config)?;
@@ -749,34 +754,72 @@ impl ReplHandler {
                             );
                         }
                     }
+                } else {
+                    println!("{} No service available", "⚠️".yellow().bold());
                 }
             }
             ConfigSubcommand::Set { key, value } => {
-                println!(
-                    "{} Config modification not yet implemented",
-                    "ℹ".blue().bold()
-                );
-                println!("Would set {} = {}", key.yellow(), value.cyan());
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - implement config updates
+                    match key.as_str() {
+                        "selected_role" => {
+                            let role_name = terraphim_types::RoleName::new(&value);
+                            match service.update_selected_role(role_name).await {
+                                Ok(_) => {
+                                    if let Err(e) = service.save_config().await {
+                                        println!("{} Warning: Failed to save: {}", "⚠️".yellow(), e);
+                                    }
+                                    println!("{} Set {} = {}", "✅".bold(), key.yellow(), value.green());
+                                }
+                                Err(e) => {
+                                    println!("{} Failed to set config: {}", "❌".red().bold(), e);
+                                }
+                            }
+                        }
+                        _ => {
+                            println!(
+                                "{} Config key '{}' not supported in offline mode",
+                                "ℹ".blue().bold(),
+                                key.yellow()
+                            );
+                            println!("Supported keys: selected_role");
+                        }
+                    }
+                } else if let Some(_api_client) = &self.api_client {
+                    // Server mode
+                    println!(
+                        "{} Config modification via server not yet implemented",
+                        "ℹ".blue().bold()
+                    );
+                    println!("Would set {} = {}", key.yellow(), value.cyan());
+                } else {
+                    println!("{} No service available", "⚠️".yellow().bold());
+                }
             }
         }
         Ok(())
     }
 
     async fn handle_role(&mut self, subcommand: RoleSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
         match subcommand {
             RoleSubcommand::List => {
-                if false { // TODO: Reimplement service integration
-                     // Roles moved to server - available via API client
-                     //     println!("{}", "Available roles:".bold());
-                     //     for role in roles {
-                     //         let marker = if role == self.current_role {
-                     //             "▶"
-                     //         } else {
-                     //             " "
-                     //         };
-                     //         println!("  {} {}", marker.green(), role);
-                     //     }
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - use TuiService
+                    let roles = service.list_roles().await;
+                    println!("{}", "Available roles:".bold());
+                    for role in roles {
+                        let marker = if role == self.current_role {
+                            "▶"
+                        } else {
+                            " "
+                        };
+                        println!("  {} {}", marker.green(), role);
+                    }
                 } else if let Some(api_client) = &self.api_client {
+                    // Server mode
                     match api_client.get_config().await {
                         Ok(response) => {
                             println!("{}", "Available roles:".bold());
@@ -803,9 +846,30 @@ impl ReplHandler {
                             );
                         }
                     }
+                } else {
+                    println!("{} No service available", "⚠️".yellow().bold());
                 }
             }
             RoleSubcommand::Select { name } => {
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - update via TuiService
+                    let role_name = terraphim_types::RoleName::new(&name);
+                    match service.update_selected_role(role_name).await {
+                        Ok(_) => {
+                            if let Err(e) = service.save_config().await {
+                                println!("{} Warning: Failed to save config: {}", "⚠️".yellow(), e);
+                            }
+                        }
+                        Err(e) => {
+                            println!("{} Failed to update role: {}", "❌".red().bold(), e);
+                            return Ok(());
+                        }
+                    }
+                } else if let Some(_api_client) = &self.api_client {
+                    // Server mode - role selection handled by server
+                    // Just update local state
+                }
+
                 self.current_role = name.clone();
                 println!("{} Switched to role: {}", "✅".bold(), name.green());
             }
@@ -814,15 +878,34 @@ impl ReplHandler {
     }
 
     async fn handle_graph(&self, top_k: Option<usize>) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
         let k = top_k.unwrap_or(10);
 
-        if false { // TODO: Reimplement service integration
-             // Role graph concepts moved to server - available via API client
-             //     println!("{} Top {} concepts:", "📊".bold(), k.to_string().cyan());
-             //     for (i, concept) in concepts.iter().enumerate() {
-             //         println!("  {}. {}", (i + 1).to_string().yellow(), concept);
-             //     }
+        if let Some(service) = &self.tui_service {
+            // Offline mode - use TuiService
+            let role_name = terraphim_types::RoleName::new(&self.current_role);
+            match service.get_role_graph_top_k(&role_name, k).await {
+                Ok(concepts) => {
+                    println!("{} Top {} concepts for role '{}':",
+                             "📊".bold(),
+                             k.to_string().cyan(),
+                             self.current_role.green());
+                    for (i, concept) in concepts.iter().enumerate() {
+                        println!("  {}. {}", (i + 1).to_string().yellow(), concept);
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "{} Failed to get graph: {}",
+                        "❌".bold(),
+                        e.to_string().red()
+                    );
+                }
+            }
         } else if let Some(api_client) = &self.api_client {
+            // Server mode
             match api_client.rolegraph(Some(&self.current_role)).await {
                 Ok(response) => {
                     let mut nodes = response.nodes;
@@ -846,6 +929,8 @@ impl ReplHandler {
                     );
                 }
             }
+        } else {
+            println!("{} No service available", "⚠️".yellow().bold());
         }
 
         Ok(())
