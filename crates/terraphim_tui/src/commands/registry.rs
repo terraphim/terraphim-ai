@@ -127,6 +127,21 @@ impl CommandRegistry {
             total_categories: categories.len(),
         }
     }
+
+    /// List all registered commands
+    pub async fn list_all_commands(&self) -> Vec<super::CommandDefinition> {
+        let commands = self.commands.read().await;
+        commands
+            .values()
+            .map(|cmd| cmd.definition.clone())
+            .collect()
+    }
+
+    /// Get a specific command by name
+    pub async fn get_command(&self, name: &str) -> Option<super::CommandDefinition> {
+        let commands = self.commands.read().await;
+        commands.get(name).map(|cmd| cmd.definition.clone())
+    }
 }
 
 /// Registry statistics

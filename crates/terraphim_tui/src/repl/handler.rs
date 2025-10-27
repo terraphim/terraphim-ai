@@ -383,15 +383,11 @@ impl ReplHandler {
 
     #[cfg(feature = "repl")]
     fn show_available_commands(&self) {
-        println!("\n{}", "Available commands:".bold());
+        println!("\n{}", "Built-in commands:".bold());
         println!("  {} - Search documents", "/search <query>".yellow());
-        println!("  {} - Manage configuration", "/config [show|set]".yellow());
         println!("  {} - Manage roles", "/role [list|select]".yellow());
+        println!("  {} - Manage configuration", "/config [show|set]".yellow());
         println!("  {} - Show knowledge graph", "/graph".yellow());
-        println!(
-            "  {} - Manage VMs",
-            "/vm [list|pool|status|execute|tasks|allocate|release]".yellow()
-        );
 
         #[cfg(feature = "repl-chat")]
         {
@@ -401,18 +397,44 @@ impl ReplHandler {
 
         #[cfg(feature = "repl-mcp")]
         {
-            println!(
-                "  {} - Autocomplete terms",
-                "/autocomplete <query>".yellow()
-            );
+            println!("  {} - Autocomplete terms", "/autocomplete <query>".yellow());
             println!("  {} - Extract paragraphs", "/extract <text>".yellow());
             println!("  {} - Find matches", "/find <text>".yellow());
             println!("  {} - Replace matches", "/replace <text>".yellow());
             println!("  {} - Show thesaurus", "/thesaurus".yellow());
         }
 
+        println!("  {} - Web operations", "/web [get|post|scrape|screenshot|pdf]".yellow());
+
+        #[cfg(feature = "repl-file")]
+        {
+            println!("  {} - File operations", "/file [search|classify|analyze|...]".yellow());
+        }
+
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
+
+        // Show markdown-defined custom commands if registry is loaded
+        #[cfg(feature = "repl-custom")]
+        if let Some(registry) = &self.command_registry {
+            // Use a blocking context to call async method
+            let rt = tokio::runtime::Handle::try_current();
+            if let Ok(handle) = rt {
+                let commands = handle.block_on(registry.list_all_commands());
+                if !commands.is_empty() {
+                    println!("\n{}", "Custom commands (from markdown):".bold());
+                    for cmd in commands {
+                        println!(
+                            "  {} - {} {}",
+                            format!("/{}", cmd.name).yellow(),
+                            cmd.description,
+                            format!("[{:?}]", cmd.execution_mode).dimmed()
+                        );
+                    }
+                    println!("\nUse {} to manage custom commands", "/commands list".yellow());
+                }
+            }
+        }
     }
 
     #[cfg(not(feature = "repl"))]
@@ -3375,6 +3397,15 @@ impl ReplHandler {
 pub async fn run_repl_offline_mode() -> Result<()> {
     let mut handler = ReplHandler::new_offline();
     handler.initialize_offline_service().await?;
+
+    #[cfg(feature = "repl-custom")]
+    {
+        // Initialize markdown command registry
+        if let Err(e) = handler.initialize_commands().await {
+            eprintln!("Warning: Failed to load custom commands: {}", e);
+        }
+    }
+
     handler.run().await
 }
 
