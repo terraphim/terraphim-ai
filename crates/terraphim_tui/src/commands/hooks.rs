@@ -5,7 +5,7 @@
 
 use super::{CommandExecutionError, CommandHook, HookContext, HookResult};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
@@ -430,7 +430,7 @@ impl CommandHook for ResourceMonitoringHook {
         60
     }
 
-    async fn execute(&self, context: &HookContext) -> Result<HookResult, CommandExecutionError> {
+    async fn execute(&self, _context: &HookContext) -> Result<HookResult, CommandExecutionError> {
         let mut warnings = vec![];
 
         // Check memory limits

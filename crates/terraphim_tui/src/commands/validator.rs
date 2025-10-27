@@ -3,13 +3,13 @@
 //! This module provides validation for commands against knowledge graphs,
 //! role permissions, and security policies.
 
-use super::{CommandDefinition, CommandValidationError, ExecutionMode};
+use super::{CommandValidationError, ExecutionMode};
 use crate::client::ApiClient;
 use chrono::{Datelike, Timelike};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 
 /// Security event for auditing
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -22,10 +22,6 @@ pub struct ReplHandler {
     current_role: String,
     #[cfg(feature = "repl-custom")]
     command_registry: Option<crate::commands::registry::CommandRegistry>,
-    #[cfg(feature = "repl-custom")]
-    command_validator: Option<crate::commands::validator::CommandValidator>,
-    #[cfg(feature = "repl-custom")]
-    command_executor: Option<crate::commands::executor::CommandExecutor>,
 }
 
 impl ReplHandler {
@@ -35,10 +31,6 @@ impl ReplHandler {
             current_role: "Default".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
-            #[cfg(feature = "repl-custom")]
-            command_validator: None,
-            #[cfg(feature = "repl-custom")]
-            command_executor: None,
         }
     }
 
@@ -48,18 +40,12 @@ impl ReplHandler {
             current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
-            #[cfg(feature = "repl-custom")]
-            command_validator: None,
-            #[cfg(feature = "repl-custom")]
-            command_executor: None,
         }
     }
 
     #[cfg(feature = "repl-custom")]
-    /// Initialize command registry and validator with API client integration
+    /// Initialize command registry
     pub async fn initialize_commands(&mut self) -> Result<()> {
-        use std::sync::Arc;
-
         // Initialize command registry
         let mut registry = crate::commands::registry::CommandRegistry::new()?;
 
@@ -88,33 +74,6 @@ impl ReplHandler {
         }
 
         self.command_registry = Some(registry);
-
-        // Initialize command validator with API client if available
-        if let Some(ref api_client) = self.api_client {
-            let validator = crate::commands::validator::CommandValidator::with_api_client(
-                Arc::new(api_client.clone()),
-            );
-            self.command_validator = Some(validator);
-        } else {
-            self.command_validator = Some(crate::commands::validator::CommandValidator::new());
-        }
-
-        // Initialize command executor with hooks
-        let executor = if let Some(ref api_client) = self.api_client {
-            crate::commands::executor::CommandExecutor::with_api_client(api_client.clone())
-        } else {
-            crate::commands::executor::CommandExecutor::new()
-        };
-
-        // Add appropriate hooks based on role
-        let hooks = match self.current_role.as_str() {
-            "Terraphim Engineer" => crate::commands::hooks::create_development_hooks(),
-            "System Operator" => crate::commands::hooks::create_production_hooks(),
-            _ => crate::commands::hooks::create_default_hooks(),
-        };
-
-        let executor_with_hooks = executor.with_hooks(hooks);
-        self.command_executor = Some(executor_with_hooks);
 
         Ok(())
     }
@@ -466,9 +425,10 @@ impl ReplHandler {
             ReplCommand::Graph { top_k } => {
                 self.handle_graph(top_k).await?;
             }
-            ReplCommand::Vm { subcommand } => {
-                self.handle_vm(subcommand).await?;
-            }
+            // VM command temporarily disabled - methods removed from ApiClient
+            // ReplCommand::Vm { subcommand } => {
+            //     self.handle_vm(subcommand).await?;
+            // }
             ReplCommand::Web { subcommand } => {
                 self.handle_web(subcommand).await?;
             }
@@ -519,16 +479,6 @@ impl ReplHandler {
             #[cfg(feature = "repl-mcp")]
             ReplCommand::Thesaurus { role } => {
                 self.handle_thesaurus(role).await?;
-            }
-
-            #[cfg(feature = "repl-custom")]
-            ReplCommand::Custom {
-                name,
-                parameters,
-                execution_mode,
-            } => {
-                self.handle_custom_command(name, parameters, execution_mode)
-                    .await?;
             }
 
             #[cfg(feature = "repl-custom")]
@@ -1042,13 +992,10 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_autocomplete(&self, query: String, limit: Option<usize>) -> Result<()> {
+    async fn handle_autocomplete(&self, query: String, _limit: Option<usize>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Autocompleting: '{}'", "🔍".bold(), query.cyan());
 
@@ -1112,13 +1059,10 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_extract(&self, text: String, exclude_term: bool) -> Result<()> {
+    async fn handle_extract(&self, _text: String, _exclude_term: bool) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Extracting paragraphs from text...", "📄".bold());
 
@@ -1186,13 +1130,10 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_find(&self, text: String) -> Result<()> {
+    async fn handle_find(&self, _text: String) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Finding matches in text...", "🔍".bold());
 
@@ -1253,14 +1194,14 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_replace(&self, text: String, format: Option<String>) -> Result<()> {
+    async fn handle_replace(&self, _text: String, format: Option<String>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
 
             println!("{} Replacing matches in text...", "🔄".bold());
 
-            let link_type = match format.as_deref() {
+            let _link_type = match format.as_deref() {
                 Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
                 Some("html") => terraphim_automata::LinkType::HTMLLinks,
                 Some("wiki") => terraphim_automata::LinkType::WikiLinks,
@@ -1302,15 +1243,12 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Loading thesaurus...", "📚".bold());
 
             if false {
                 // TODO: Reimplement service integration
-                let role_name = if let Some(role_str) = role {
+                let _role_name = if let Some(role_str) = role {
                     terraphim_types::RoleName::new(&role_str)
                 } else {
                     terraphim_types::RoleName::new(&self.current_role) // Use current role from handler
@@ -1367,6 +1305,8 @@ impl ReplHandler {
         Ok(())
     }
 
+    // VM handling disabled - methods removed from ApiClient
+    /*
     async fn handle_vm(&self, subcommand: super::commands::VmSubcommand) -> Result<()> {
         use super::commands::VmSubcommand;
 
@@ -2063,6 +2003,7 @@ impl ReplHandler {
 
         Ok(())
     }
+    */
 
     #[cfg(feature = "repl")]
     async fn handle_web(&self, subcommand: super::commands::WebSubcommand) -> Result<()> {
@@ -2411,48 +2352,8 @@ impl ReplHandler {
                 WebConfigSubcommand::Show => {
                     println!("{} Web Operations Configuration", "⚙️".bold());
                     println!("{}", "-".repeat(50));
-
-                    let config = WebOperationConfig::default();
-                    println!(
-                        "{} Default timeout: {}ms",
-                        "⏱️",
-                        config.default_timeout_ms.to_string().cyan()
-                    );
-                    println!(
-                        "{} Max concurrent operations: {}",
-                        "🔢",
-                        config.max_concurrent_operations.to_string().cyan()
-                    );
-                    println!(
-                        "{} Sandbox enabled: {}",
-                        "🛡️",
-                        config.security.sandbox_enabled.to_string().green()
-                    );
-                    println!(
-                        "{} JavaScript enabled: {}",
-                        "📜",
-                        config.security.allow_javascript.to_string().green()
-                    );
-                    println!(
-                        "{} Cookies enabled: {}",
-                        "🍪",
-                        config.security.allow_cookies.to_string().red()
-                    );
-                    println!(
-                        "{} Max response size: {}MB",
-                        "📏",
-                        config.security.max_response_size_mb.to_string().cyan()
-                    );
-
-                    println!("\n{} Allowed domains:", "✅".green());
-                    for domain in &config.security.allowed_domains {
-                        println!("  {}", domain.green());
-                    }
-
-                    println!("\n{} Blocked domains:", "🚫".red());
-                    for domain in &config.security.blocked_domains {
-                        println!("  {}", domain.red());
-                    }
+                    println!("Configuration display not implemented (WebOperationConfig was removed)");
+                    // TODO: Reimplement configuration display with new types
                 }
 
                 WebConfigSubcommand::Set { key, value } => {
@@ -3194,266 +3095,6 @@ impl ReplHandler {
         Ok(())
     }
 
-    #[cfg(feature = "repl-custom")]
-    async fn handle_custom_command(
-        &mut self,
-        name: String,
-        parameters: std::collections::HashMap<String, String>,
-        execution_mode: super::commands::ExecutionMode,
-    ) -> Result<()> {
-        use super::commands as cmd;
-        use colored::Colorize;
-
-        // Check if command registry is initialized
-        if self.command_registry.is_none() || self.command_validator.is_none() {
-            println!(
-                "{}",
-                "⚠️  Command system not initialized. Run /commands init first.".yellow()
-            );
-            return Ok(());
-        }
-
-        let registry = self.command_registry.as_mut().unwrap();
-        let validator = self.command_validator.as_mut().unwrap();
-
-        // Try to find the command in registry
-        match registry.get_command(&name).await {
-            Some(command_def) => {
-                println!("{} Executing registered command:", "🔧".bold());
-                println!("  Name: {}", command_def.definition.name.green());
-                println!("  Description: {}", command_def.definition.description);
-                println!("  Risk Level: {:?}", command_def.definition.risk_level);
-
-                // Validate parameters
-                let json_parameters: std::collections::HashMap<String, serde_json::Value> =
-                    parameters
-                        .iter()
-                        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                        .collect();
-
-                if let Err(e) = registry
-                    .validate_parameters(&command_def.definition.name, &json_parameters)
-                    .await
-                {
-                    println!("{} Parameter validation failed: {}", "❌".red(), e);
-                    return Ok(());
-                }
-
-                // Validate command execution
-                let command_str = parameters.get("command").unwrap_or(&name);
-                match validator
-                    .validate_command_execution(command_str, &self.current_role, &parameters)
-                    .await
-                {
-                    Ok(validated_mode) => {
-                        println!(
-                            "  {} Validated for execution in {:?} mode",
-                            "✅".green(),
-                            validated_mode
-                        );
-
-                        // Convert ExecutionMode from commands to repl::commands
-                        let repl_mode = match validated_mode {
-                            crate::commands::ExecutionMode::Local => {
-                                super::commands::ExecutionMode::Local
-                            }
-                            crate::commands::ExecutionMode::Firecracker => {
-                                super::commands::ExecutionMode::Firecracker
-                            }
-                            crate::commands::ExecutionMode::Hybrid => {
-                                super::commands::ExecutionMode::Hybrid
-                            }
-                        };
-
-                        // Execute the command using the appropriate executor
-                        if let Err(e) = self
-                            .execute_custom_command(&command_def.definition, &parameters, repl_mode)
-                            .await
-                        {
-                            println!("{} Command execution failed: {}", "❌".red(), e);
-                        } else {
-                            println!("{} Command executed successfully", "✅".green());
-                        }
-                    }
-                    Err(e) => {
-                        println!("{} Command validation failed: {}", "❌".red(), e);
-                    }
-                }
-            }
-            None => {
-                // Command not found in registry, treat as ad-hoc command
-                println!("{} Executing ad-hoc command:", "⚡".bold());
-                println!("  Name: {}", name.yellow());
-                println!("  Mode: {:?}", execution_mode);
-
-                // Basic validation for ad-hoc commands
-                if let Some(validator) = &mut self.command_validator {
-                    match validator
-                        .validate_command_execution(&name, &self.current_role, &parameters)
-                        .await
-                    {
-                        Ok(validated_mode) => {
-                            println!(
-                                "  {} Validated for execution in {:?} mode",
-                                "✅".green(),
-                                validated_mode
-                            );
-
-                            // Convert ExecutionMode from commands to repl::commands
-                            let repl_mode = match validated_mode {
-                                crate::commands::ExecutionMode::Local => {
-                                    super::commands::ExecutionMode::Local
-                                }
-                                crate::commands::ExecutionMode::Firecracker => {
-                                    super::commands::ExecutionMode::Firecracker
-                                }
-                                crate::commands::ExecutionMode::Hybrid => {
-                                    super::commands::ExecutionMode::Hybrid
-                                }
-                            };
-
-                            // Create a basic command definition for ad-hoc execution
-                            let ad_hoc_def = crate::commands::CommandDefinition {
-                                name: name.clone(),
-                                description: "Ad-hoc command".to_string(),
-                                risk_level: crate::commands::RiskLevel::Medium,
-                                execution_mode: validated_mode.clone(),
-                                ..Default::default()
-                            };
-
-                            if let Err(e) = self
-                                .execute_custom_command(&ad_hoc_def, &parameters, repl_mode)
-                                .await
-                            {
-                                println!("{} Command execution failed: {}", "❌".red(), e);
-                            } else {
-                                println!("{} Command executed successfully", "✅".green());
-                            }
-                        }
-                        Err(e) => {
-                            println!("{} Command validation failed: {}", "❌".red(), e);
-                        }
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    #[cfg(feature = "repl-custom")]
-    async fn execute_custom_command(
-        &mut self,
-        command_def: &crate::commands::CommandDefinition,
-        parameters: &std::collections::HashMap<String, String>,
-        execution_mode: super::commands::ExecutionMode,
-    ) -> Result<()> {
-        #[cfg(feature = "repl-custom")]
-        use crate::commands::modes::CommandExecutor;
-        #[cfg(feature = "repl-custom")]
-        use crate::commands::modes::{FirecrackerExecutor, HybridExecutor, LocalExecutor};
-
-        // Execute based on execution mode
-        // Use the hook-enabled command executor if available
-        if let Some(ref executor) = self.command_executor {
-            let result = executor
-                .execute_with_context(
-                    command_def,
-                    parameters,
-                    &command_def.name,
-                    &self.current_role,
-                    &self.current_role,
-                    ".",
-                )
-                .await;
-            self.display_command_result(&result).await?;
-        } else {
-            // Fallback to manual execution mode handling
-            match execution_mode {
-                super::commands::ExecutionMode::Local => {
-                    let executor = LocalExecutor::new();
-                    let result = executor.execute_command(command_def, parameters).await;
-                    self.display_command_result(&result).await?;
-                }
-                super::commands::ExecutionMode::Firecracker => {
-                    let executor = if let Some(ref api_client) = self.api_client {
-                        FirecrackerExecutor::with_api_client(api_client.clone())
-                    } else {
-                        FirecrackerExecutor::new()
-                    };
-                    let result = executor.execute_command(command_def, parameters).await;
-                    self.display_command_result(&result).await?;
-                }
-                super::commands::ExecutionMode::Hybrid => {
-                    let executor = if let Some(ref api_client) = self.api_client {
-                        HybridExecutor::with_api_client(api_client.clone())
-                    } else {
-                        HybridExecutor::new()
-                    };
-                    let result = executor.execute_command(command_def, parameters).await;
-                    self.display_command_result(&result).await?;
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    #[cfg(feature = "repl-custom")]
-    async fn display_command_result(
-        &self,
-        result: &Result<
-            crate::commands::CommandExecutionResult,
-            crate::commands::CommandExecutionError,
-        >,
-    ) -> Result<()> {
-        use colored::Colorize;
-
-        match result {
-            Ok(execution_result) => {
-                println!("{} Command execution completed", "✅".green());
-                println!("  Duration: {}ms", execution_result.duration_ms);
-                println!("  Exit code: {}", execution_result.exit_code);
-
-                if !execution_result.stdout.is_empty() {
-                    println!("{} Output:", "📄".bold());
-                    for line in execution_result.stdout.lines().take(10) {
-                        println!("  {}", line);
-                    }
-                    if execution_result.stdout.lines().count() > 10 {
-                        println!(
-                            "  ... ({} more lines)",
-                            execution_result.stdout.lines().count() - 10
-                        );
-                    }
-                }
-
-                if !execution_result.stderr.is_empty() {
-                    println!("{} Errors:", "⚠️".yellow().bold());
-                    for line in execution_result.stderr.lines().take(5) {
-                        println!("  {}", line.red());
-                    }
-                    if execution_result.stderr.lines().count() > 5 {
-                        println!(
-                            "  ... ({} more lines)",
-                            execution_result.stderr.lines().count() - 5
-                        );
-                    }
-                }
-
-                if let Some(usage) = &execution_result.resource_usage {
-                    println!("{} Resource usage:", "📊".blue().bold());
-                    println!("  Memory: {:.2} MB", usage.memory_mb);
-                    println!("  CPU time: {:.2}s", usage.cpu_time_seconds);
-                }
-            }
-            Err(e) => {
-                println!("{} Command execution failed: {}", "❌".red(), e);
-            }
-        }
-
-        Ok(())
-    }
 
     #[cfg(feature = "repl-custom")]
     async fn handle_commands_command(
@@ -3594,15 +3235,6 @@ impl ReplHandler {
         }
 
         Ok(())
-    }
-
-    /// Create a visual usage bar (e.g., [████████░░░░] 80%)
-    fn create_usage_bar(&self, usage: f64, max_usage: f64) -> String {
-        let percentage = (usage / max_usage * 100.0).min(100.0);
-        let filled = (percentage / 10.0) as usize;
-        let empty = 10 - filled;
-
-        format!("[{}{}]", "█".repeat(filled), "░".repeat(empty))
     }
 }
 

@@ -30,7 +30,7 @@ pub struct RiskAssessmentSettings {
     /// Keywords that indicate high risk
     high_risk_keywords: Vec<String>,
     /// Always use VM for commands from unknown sources
-    vm_for_unknown: bool,
+    _vm_for_unknown: bool,
     /// Maximum risk level for local execution
     max_local_risk_level: RiskLevel,
 }
@@ -137,7 +137,7 @@ impl Default for RiskAssessmentSettings {
             high_risk_commands,
             safe_commands,
             high_risk_keywords,
-            vm_for_unknown: true,
+            _vm_for_unknown: true,
             max_local_risk_level: RiskLevel::Medium,
         }
     }
@@ -153,14 +153,6 @@ impl HybridExecutor {
         }
     }
 
-    /// Create a hybrid executor with custom settings
-    pub fn with_settings(risk_settings: RiskAssessmentSettings) -> Self {
-        Self {
-            local_executor: LocalExecutor::new(),
-            firecracker_executor: FirecrackerExecutor::new(),
-            risk_settings,
-        }
-    }
 
     /// Create a hybrid executor with API client for VM operations
     pub fn with_api_client(api_client: crate::client::ApiClient) -> Self {
@@ -373,17 +365,6 @@ impl HybridExecutor {
             .to_string()
     }
 
-    /// Get execution statistics
-    pub async fn get_execution_stats(&self) -> ExecutionStats {
-        // This would be implemented with actual statistics tracking
-        ExecutionStats {
-            total_executions: 0,
-            local_executions: 0,
-            vm_executions: 0,
-            blocked_executions: 0,
-            average_execution_time_ms: 0.0,
-        }
-    }
 }
 
 #[async_trait::async_trait]
@@ -452,16 +433,6 @@ impl super::CommandExecutor for HybridExecutor {
     }
 }
 
-/// Execution statistics
-#[derive(Debug, Clone)]
-pub struct ExecutionStats {
-    pub total_executions: u64,
-    pub local_executions: u64,
-    pub vm_executions: u64,
-    pub blocked_executions: u64,
-    pub average_execution_time_ms: f64,
-}
-
 impl Default for HybridExecutor {
     fn default() -> Self {
         Self::new()
@@ -520,9 +491,10 @@ mod tests {
 
     #[test]
     fn test_high_risk_keywords() {
-        let hybrid = HybridExecutor::new();
+        let _hybrid = HybridExecutor::new();
 
         let settings = RiskAssessmentSettings::default();
+        let command_str = "rm -rf /";
         assert!(settings
             .high_risk_keywords
             .iter()

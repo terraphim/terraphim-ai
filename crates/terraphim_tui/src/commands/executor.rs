@@ -4,7 +4,7 @@
 //! between different executors and handles command lifecycle.
 
 use super::{
-    CommandDefinition, CommandExecutionError, CommandExecutionResult, ExecutionMode, HookContext,
+    CommandDefinition, CommandExecutionError, CommandExecutionResult, HookContext,
     HookManager,
 };
 use std::collections::HashMap;
@@ -12,7 +12,6 @@ use std::sync::Arc;
 
 /// Main command executor
 pub struct CommandExecutor {
-    api_client: Option<crate::client::ApiClient>,
     hook_manager: Arc<HookManager>,
 }
 
@@ -20,15 +19,13 @@ impl CommandExecutor {
     /// Create a new command executor
     pub fn new() -> Self {
         Self {
-            api_client: None,
             hook_manager: Arc::new(HookManager::new()),
         }
     }
 
-    /// Create a command executor with API client
-    pub fn with_api_client(api_client: crate::client::ApiClient) -> Self {
+    /// Create a command executor with API client (kept for backwards compatibility)
+    pub fn with_api_client(_api_client: crate::client::ApiClient) -> Self {
         Self {
-            api_client: Some(api_client),
             hook_manager: Arc::new(HookManager::new()),
         }
     }
@@ -78,7 +75,7 @@ impl CommandExecutor {
 
         // Execute the actual command
         let result = match self.execute_command_internal(definition, parameters).await {
-            Ok(mut result) => {
+            Ok(result) => {
                 // Execute post-command hooks
                 if let Err(hook_error) = self
                     .hook_manager

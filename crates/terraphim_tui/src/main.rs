@@ -177,7 +177,7 @@ fn main() -> Result<()> {
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
-                rt.block_on(run_tui_offline_mode(cli.transparent))
+                run_tui_offline_mode(cli.transparent)
             }
         }
 
@@ -199,19 +199,14 @@ fn main() -> Result<()> {
         }
     }
 }
-async fn run_tui_offline_mode(transparent: bool) -> Result<()> {
-    let service = TuiService::new().await?;
-    run_tui_with_service(service, transparent).await
+fn run_tui_offline_mode(transparent: bool) -> Result<()> {
+    // TODO: Implement offline mode with TuiService
+    // For now, fall back to server mode (API client)
+    run_tui(transparent)
 }
 
 fn run_tui_server_mode(_server_url: &str, transparent: bool) -> Result<()> {
     // TODO: Pass server_url to TUI for API client initialization
-    run_tui(transparent)
-}
-
-async fn run_tui_with_service(_service: TuiService, transparent: bool) -> Result<()> {
-    // TODO: Update interactive TUI to use local service instead of API client
-    // For now, fall back to the existing TUI implementation
     run_tui(transparent)
 }
 
@@ -693,6 +688,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
     let api = ApiClient::new(
         std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
     );
+
+    // Create a new tokio runtime for async operations in the UI loop
     let rt = Runtime::new()?;
 
     // Initialize terms from rolegraph (selected role)
