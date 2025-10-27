@@ -3,7 +3,7 @@ use std::io;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyModifiers},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -716,7 +716,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                         ])
                         .split(f.area());
 
-                    let input_title = format!("Search [Role: {}] • Enter: search/select, Tab: autocomplete, ↑↓: navigate, r: switch role, q: quit", current_role);
+                    let input_title = format!("Search [Role: {}] • Enter: search, Tab: autocomplete, ↑↓: navigate, Ctrl+R: role, Ctrl+S: summarize, Ctrl+Q: quit", current_role);
                     let input_widget = Paragraph::new(Line::from(input.as_str())).block(
                         create_block(&input_title, transparent)
                     );
@@ -749,7 +749,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                         }
                     }).collect();
                     let list = List::new(items)
-                        .block(create_block("Results • ↑↓: select, Enter: view details, s: summarize", transparent));
+                        .block(create_block("Results • ↑↓: select, Enter: view, Ctrl+S: summarize", transparent));
                     f.render_widget(list, chunks[2]);
 
                     let status_text = if let Some(ref error) = last_error {
@@ -787,7 +787,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
 
                         let content_text = if doc.body.is_empty() { "No content available" } else { &doc.body };
                         let content_widget = Paragraph::new(content_text)
-                            .block(create_block("Content • s: summarize, Esc: back to search", transparent))
+                            .block(create_block("Content • Ctrl+S: summarize, Esc: back, Ctrl+Q: quit", transparent))
                             .wrap(ratatui::widgets::Wrap { trim: true });
                         f.render_widget(content_widget, chunks[1]);
 
@@ -806,9 +806,11 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
             if let Event::Key(key) = event::read()? {
                 match view_mode {
                     ViewMode::Search => {
-                        match key.code {
-                            KeyCode::Char('q') => break,
-                            KeyCode::Enter => {
+                        match (key.code, key.modifiers) {
+                            // Ctrl+Q: Quit
+                            (KeyCode::Char('q'), KeyModifiers::CONTROL) | (KeyCode::Char('Q'), KeyModifiers::CONTROL) => break,
+                            // Enter: Search or select suggestion
+                            (KeyCode::Enter, _) => {
                                 // If suggestion is selected, insert it into input
                                 if let Some(idx) = suggestion_index {
                                     if idx < suggestions.len() {
@@ -864,7 +866,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Up => {
+                            // Up Arrow: Navigate suggestions/results
+                            (KeyCode::Up, _) => {
                                 if !suggestions.is_empty() {
                                     // Navigate suggestions
                                     suggestion_index = match suggestion_index {
@@ -877,7 +880,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     selected_result_index = selected_result_index.saturating_sub(1);
                                 }
                             }
-                            KeyCode::Down => {
+                            // Down Arrow: Navigate suggestions/results
+                            (KeyCode::Down, _) => {
                                 if !suggestions.is_empty() {
                                     // Navigate suggestions
                                     suggestion_index = match suggestion_index {
@@ -890,7 +894,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     selected_result_index += 1;
                                 }
                             }
-                            KeyCode::Tab => {
+                            // Tab: Autocomplete
+                            (KeyCode::Tab, _) => {
                                 // Real autocomplete from API
                                 let query = input.trim();
                                 if !query.is_empty() {
@@ -915,7 +920,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('r') => {
+                            // Ctrl+R: Switch role
+                            (KeyCode::Char('r'), KeyModifiers::CONTROL) | (KeyCode::Char('R'), KeyModifiers::CONTROL) => {
                                 // Switch role
                                 let api = api.clone();
                                 if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
@@ -938,7 +944,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('s') => {
+                            // Ctrl+S: Summarize current selection
+                            (KeyCode::Char('s'), KeyModifiers::CONTROL) | (KeyCode::Char('S'), KeyModifiers::CONTROL) => {
                                 // Summarize current selection
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
@@ -957,25 +964,30 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Backspace => {
+                            // Backspace: Delete character
+                            (KeyCode::Backspace, _) => {
                                 input.pop();
                                 suggestion_index = None;
                                 update_local_suggestions(&input, &terms, &mut suggestions);
                             }
-                            KeyCode::Char(c) => {
+                            // Regular character input (not Ctrl modified)
+                            (KeyCode::Char(c), m) if !m.contains(KeyModifiers::CONTROL) => {
                                 input.push(c);
                                 suggestion_index = None;
                                 update_local_suggestions(&input, &terms, &mut suggestions);
                             }
+                            // Ignore all other keys
                             _ => {}
                         }
                     }
                     ViewMode::ResultDetail => {
-                        match key.code {
-                            KeyCode::Esc => {
+                        match (key.code, key.modifiers) {
+                            // Esc: Back to search view
+                            (KeyCode::Esc, _) => {
                                 view_mode = ViewMode::Search;
                             }
-                            KeyCode::Char('s') => {
+                            // Ctrl+S: Summarize document in detail view
+                            (KeyCode::Char('s'), KeyModifiers::CONTROL) | (KeyCode::Char('S'), KeyModifiers::CONTROL) => {
                                 // Summarize current document in detail view
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
@@ -1003,7 +1015,9 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('q') => break,
+                            // Ctrl+Q: Quit from detail view
+                            (KeyCode::Char('q'), KeyModifiers::CONTROL) | (KeyCode::Char('Q'), KeyModifiers::CONTROL) => break,
+                            // Ignore all other keys
                             _ => {}
                         }
                     }

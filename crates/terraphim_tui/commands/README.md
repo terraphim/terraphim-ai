@@ -2,6 +2,45 @@
 
 This directory contains custom command definitions for the Terraphim TUI enhanced slash command system.
 
+## ✅ PROOF: All Commands Can Be Defined via Markdown Files
+
+**YES - The entire command system is markdown-based and fully functional.**
+
+### Evidence from Codebase
+
+1. **Complete Command Infrastructure** (`src/commands/`):
+   - `registry.rs` - Full async command registry with loading system
+   - `markdown_parser.rs` - Parses YAML frontmatter + markdown content
+   - `mod.rs` - Complete type system (ExecutionMode, RiskLevel, Parameters, Validation)
+
+2. **Working Examples** (this directory):
+   - ✅ `search.md` - File/content search with ripgrep
+   - ✅ `backup.md` - System backup with compression
+   - ✅ `deploy.md` - Application deployment
+   - ✅ `test.md` - Test suite runner
+   - ✅ `security-audit.md` - Security scanning
+   - ✅ `hello-world.md` - Example/testing command
+
+3. **REPL Integration** (`src/repl/handler.rs:46-79`):
+   - `initialize_commands()` loads from `./commands` and `./terraphim_commands`
+   - `/commands list|help|search|reload|validate|stats|suggest` subcommands
+   - Fully integrated with REPL via `/commands` prefix
+
+### What IS Markdown-Definable
+
+✅ Domain-specific operations (search, deploy, backup, audit)
+✅ Custom workflows and automation
+✅ Tool integrations
+✅ User-defined commands with parameters
+✅ Security policies and risk levels
+✅ Execution modes (Local, Firecracker, Hybrid)
+
+### What is NOT Markdown (By Design)
+
+❌ Core REPL commands (`/help`, `/quit`, `/config`, `/role`) - built-in system commands
+❌ Interactive TUI keyboard shortcuts - UI navigation, not domain commands
+❌ Low-level system operations - implemented in Rust for performance
+
 ## Command System Overview
 
 The Terraphim TUI supports custom commands defined in markdown files with YAML frontmatter. This provides a flexible, extensible command system with:
@@ -11,6 +50,20 @@ The Terraphim TUI supports custom commands defined in markdown files with YAML f
 - **Security validation**: Knowledge graph integration, rate limiting, blacklisting
 - **Multiple execution modes**: Local, Firecracker VM, Hybrid intelligent selection
 - **Parameter validation**: Type checking, required fields, allowed values
+
+## Interactive TUI Keyboard Shortcuts (Updated)
+
+The Interactive TUI mode now uses **Ctrl modifiers** to avoid conflicts with text input:
+
+- **Ctrl+R** - Switch role (cycle through available roles)
+- **Ctrl+S** - Summarize current selection/document
+- **Ctrl+Q** - Quit application
+- **Enter** - Perform search (default) or select suggestion
+- **Tab** - Autocomplete
+- **↑↓** - Navigate suggestions/results
+- **Esc** - Back to search view (from detail view)
+- **Backspace** - Delete character
+- **Any letter/number** - Type freely into search box (no more conflicts!)
 
 ## Command Structure
 
