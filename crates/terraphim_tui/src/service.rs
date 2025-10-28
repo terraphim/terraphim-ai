@@ -184,30 +184,42 @@ impl TuiService {
         prompt: &str,
         model: Option<String>,
     ) -> Result<String> {
-        // Check if role has LLM configuration
-        let config = self.config_state.config.lock().await;
-        if let Some(role) = config.roles.get(role_name) {
-            // Check for various LLM providers in the role's extra config
-            if let Some(llm_provider) = role.extra.get("llm_provider") {
-                if let Some(provider_str) = llm_provider.as_str() {
-                    log::info!("Using LLM provider: {}", provider_str);
-                    // Use the service's LLM capabilities
-                    let _service = self.service.lock().await;
-                    // For now, return a placeholder response
-                    // TODO: Implement actual LLM integration when service supports it
-                    return Ok(format!(
-                        "Chat response from {} with model {:?}: {}",
-                        provider_str, model, prompt
-                    ));
-                }
-            }
-        }
+        // Get role configuration
+        let role = {
+            let config = self.config_state.config.lock().await;
+            config.roles.get(role_name)
+                .ok_or_else(|| anyhow::anyhow!("Role not found"))?
+                .clone()
+        };
 
-        // Fallback response
-        Ok(format!(
-            "No LLM configured for role {}. Prompt was: {}",
-            role_name, prompt
-        ))
+        // Build LLM client from role configuration
+        if let Some(llm_client) = terraphim_service::llm::build_llm_from_role(&role) {
+            log::info!("Using LLM provider: {} for role: {}",
+                llm_client.name(), role_name);
+
+            // Prepare messages for chat completion
+            let messages = vec![serde_json::json!({
+                "role": "user",
+                "content": prompt
+            })];
+
+            // Configure chat options
+            let opts = terraphim_service::llm::ChatOptions {
+                max_tokens: Some(2048),
+                temperature: Some(0.7),
+            };
+
+            // Call LLM
+            let response = llm_client.chat_completion(messages, opts).await
+                .map_err(|e| anyhow::anyhow!("LLM error: {}", e))?;
+
+            Ok(response)
+        } else {
+            Err(anyhow::anyhow!(
+                "No LLM configured for role {}. Add llm_provider to role.extra",
+                role_name
+            ))
+        }
     }
 
     /// Extract paragraphs from text using thesaurus
