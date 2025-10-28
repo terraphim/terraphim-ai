@@ -1,6 +1,6 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { Button, Field, Input, Message, Modal } from 'svelma';
+import Modal from '$lib/components/Modal.svelte';
 import { configStore, is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
 import type { Haystack, Role } from '../generated/types';
@@ -257,17 +257,21 @@ function _handleClose() {
 
     <!-- Success Message -->
     {#if _success}
-      <Message type="is-success">
-        <p><strong>Success!</strong> Article saved to atomic server successfully.</p>
-        <p>The modal will close automatically...</p>
-      </Message>
+      <div class="message is-success">
+        <div class="message-body">
+          <p><strong>Success!</strong> Article saved to atomic server successfully.</p>
+          <p>The modal will close automatically...</p>
+        </div>
+      </div>
     {/if}
 
     <!-- Error Message -->
     {#if _error}
-      <Message type="is-danger">
-        <p><strong>Error:</strong> {_error}</p>
-      </Message>
+      <div class="message is-danger">
+        <div class="message-body">
+          <p><strong>Error:</strong> {_error}</p>
+        </div>
+      </div>
     {/if}
 
     <!-- Main Content -->
@@ -333,7 +337,9 @@ function _handleClose() {
         <div class="field">
           <label class="label" for="article-title">Article Title</label>
           <div class="control">
-            <Input
+            <input
+              class="input"
+              type="text"
               id="article-title"
               bind:value={articleTitle}
               placeholder="Enter article title"
@@ -397,7 +403,9 @@ function _handleClose() {
         {:else}
           <div class="field">
             <div class="control">
-              <Input
+              <input
+                class="input"
+                type="text"
                 bind:value={customParent}
                 placeholder="e.g., my-collection or http://server/custom-parent"
                 disabled={saving}
@@ -413,9 +421,8 @@ function _handleClose() {
         <!-- Action Buttons -->
         <div class="field is-grouped">
           <div class="control">
-            <Button
-              type="is-primary"
-              loading={saving}
+            <button
+              class="button is-primary {saving ? 'is-loading' : ''}"
               disabled={saving || !articleTitle.trim() || !selectedAtomicServer}
               on:click={_saveToAtomic}
             >
@@ -423,16 +430,16 @@ function _handleClose() {
                 <i class="fas fa-cloud-upload-alt"></i>
               </span>
               <span>Save to Atomic Server</span>
-            </Button>
+            </button>
           </div>
           <div class="control">
-            <Button
-              type="is-light"
+            <button
+              class="button is-light"
               disabled={saving}
-            on:click={_handleClose}
+              on:click={_handleClose}
             >
               Cancel
-            </Button>
+            </button>
           </div>
         </div>
 

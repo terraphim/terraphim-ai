@@ -34,7 +34,7 @@ impl MarkdownCommandParser {
         // Read the file content
         let content = tokio::fs::read_to_string(path)
             .await
-            .map_err(|e| CommandRegistryError::FileNotFound(path.to_string_lossy().to_string()))?;
+            .map_err(|_e| CommandRegistryError::FileNotFound(path.to_string_lossy().to_string()))?;
 
         // Get file metadata
         let metadata = tokio::fs::metadata(path)
@@ -51,7 +51,7 @@ impl MarkdownCommandParser {
         &self,
         content: &str,
         source_path: PathBuf,
-        modified: SystemTime,
+        _modified: SystemTime,
     ) -> Result<ParsedCommand, CommandRegistryError> {
         // Extract frontmatter and content
         let captures = self.frontmatter_regex.captures(content).ok_or_else(|| {
@@ -62,7 +62,7 @@ impl MarkdownCommandParser {
         })?;
 
         let frontmatter_yaml = captures.get(1).unwrap().as_str().trim();
-        let markdown_content = captures.get(2).unwrap().as_str().trim();
+        let _markdown_content = captures.get(2).unwrap().as_str().trim();
 
         // Parse YAML frontmatter
         let definition: CommandDefinition =
@@ -76,15 +76,7 @@ impl MarkdownCommandParser {
         // Validate the command definition
         self.validate_definition(&definition, &source_path)?;
 
-        // Parse markdown content to extract description
-        let description = self.extract_description(markdown_content);
-
-        Ok(ParsedCommand {
-            definition,
-            content: description,
-            source_path,
-            modified,
-        })
+        Ok(ParsedCommand { definition })
     }
 
     /// Parse all command files in a directory recursively
@@ -148,63 +140,6 @@ impl MarkdownCommandParser {
         }
 
         Ok(commands)
-    }
-
-    /// Extract a clean description from markdown content
-    fn extract_description(&self, markdown_content: &str) -> String {
-        // Remove markdown formatting and extract plain text description
-        let mut description_lines = Vec::new();
-
-        for line in markdown_content.lines() {
-            let line = line.trim();
-
-            // Skip empty lines and code blocks
-            if line.is_empty() || line.starts_with("```") {
-                continue;
-            }
-
-            // Remove markdown formatting
-            let clean_line = self.remove_markdown_formatting(line);
-
-            // Skip if line becomes empty after cleaning
-            if clean_line.is_empty() {
-                continue;
-            }
-
-            description_lines.push(clean_line);
-
-            // Limit description length
-            if description_lines.len() >= 5 {
-                break;
-            }
-        }
-
-        description_lines.join(" ").trim().to_string()
-    }
-
-    /// Remove markdown formatting from text
-    fn remove_markdown_formatting(&self, text: &str) -> String {
-        // Remove headers (# Header)
-        let text = regex::Regex::new(r"^#+\s*").unwrap().replace(text, "");
-
-        // Remove bold/italic formatting
-        let text = regex::Regex::new(r"\*\*(.*?)\*\*")
-            .unwrap()
-            .replace(&text, "$1");
-        let text = regex::Regex::new(r"\*(.*?)\*")
-            .unwrap()
-            .replace(&text, "$1");
-
-        // Remove inline code formatting
-        let text = regex::Regex::new(r"`(.*?)`").unwrap().replace(&text, "$1");
-
-        // Remove links [text](url)
-        let text = regex::Regex::new(r"\[(.*?)\]\(.*?\)")
-            .unwrap()
-            .replace(&text, "$1");
-
-        // Clean up extra whitespace
-        text.trim().to_string()
     }
 
     /// Validate command definition
@@ -417,44 +352,4 @@ without any frontmatter.
         }
     }
 
-    #[test]
-    fn test_description_extraction() {
-        let parser = MarkdownCommandParser::new().unwrap();
-
-        let markdown = r#"---
-name: "test"
-description: "Test command"
-execution_mode: "local"
----
-
-# Test Command
-
-This is a **bold** description with *italic* text and `code` blocks.
-
-Here's a [link](https://example.com) that should be removed.
-
-## Subheading
-
-Some additional content that might be included.
-"#;
-
-        let result =
-            parser.parse_content(markdown, PathBuf::from("test.md"), SystemTime::UNIX_EPOCH);
-
-        assert!(result.is_ok());
-        let parsed = result.unwrap();
-        assert!(parsed.content.contains("Test Command"));
-        assert!(parsed
-            .content
-            .contains("bold description with italic text and code blocks"));
-        assert!(!parsed.content.contains("https://example.com"));
-    }
-}
-
-/// Convenience function to parse a markdown command file
-pub async fn parse_markdown_command(
-    file_path: impl AsRef<Path>,
-) -> Result<ParsedCommand, CommandRegistryError> {
-    let parser = MarkdownCommandParser::new()?;
-    parser.parse_file(file_path).await
 }

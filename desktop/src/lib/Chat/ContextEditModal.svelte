@@ -1,5 +1,5 @@
 <script lang="ts">
-import { Modal } from 'svelma';
+import Modal from '$lib/components/Modal.svelte';
 import { createEventDispatcher } from 'svelte';
 import type { ContextItem } from './Chat.svelte';
 

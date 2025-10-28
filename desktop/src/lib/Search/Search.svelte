@@ -1,6 +1,5 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { Field, Input, Tag, Taglist } from 'svelma';
 import { onDestroy, onMount } from 'svelte';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
 import logo from '/assets/terraphim.png';
@@ -612,21 +611,25 @@ async function handleSearchInputEvent() {
 </script>
 
 <form on:submit|preventDefault={handleSearchInputEvent}>
-  <Field>
+  <div class="field">
     <div class="search-row">
       <div class="input-wrapper">
-        <Input
-          type="search"
-          bind:value={$input}
-          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-          icon="search"
-          expanded
-          autofocus
-          on:click={handleSearchInputEvent}
-          on:submit={handleSearchInputEvent}
-          on:keydown={_handleKeydown}
-          on:input={() => {}}
-        />
+        <div class="control has-icons-left is-expanded">
+          <input
+            class="input"
+            type="search"
+            bind:value={$input}
+            placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
+            autofocus
+            on:click={handleSearchInputEvent}
+            on:submit={handleSearchInputEvent}
+            on:keydown={_handleKeydown}
+            on:input={() => {}}
+          />
+          <span class="icon is-left">
+            <i class="fas fa-search"></i>
+          </span>
+        </div>
       {#if suggestions.length > 0}
         <ul class="suggestions">
           {#each suggestions as suggestion, index}
@@ -654,13 +657,16 @@ async function handleSearchInputEvent() {
       <!-- Selected terms display -->
       {#if selectedTerms.length > 0}
         <div class="selected-terms-section">
-          <Taglist>
+          <div class="tags">
             {#each selectedTerms as term, index}
               <div class="term-tag-wrapper" class:from-kg={term.isFromKG}>
-                <Tag
-                  rounded
+                <span
+                  class="tag is-rounded"
                   on:click={() => _removeSelectedTerm(term.value)}
+                  on:keydown={(e) => e.key === 'Enter' && _removeSelectedTerm(term.value)}
                   title="Click to remove term"
+                  role="button"
+                  tabindex="0"
                 >
                   {term.value}
                   <button
@@ -670,17 +676,17 @@ async function handleSearchInputEvent() {
                   >
                     ×
                   </button>
-                </Tag>
+                </span>
               </div>
               {#if index < selectedTerms.length - 1}
                 <div class="operator-tag-wrapper">
-                  <Tag class="operator-tag" rounded>
+                  <span class="tag is-rounded operator-tag">
                     {currentLogicalOperator || 'AND'}
-                  </Tag>
+                  </span>
                 </div>
               {/if}
             {/each}
-          </Taglist>
+          </div>
           <button type="button" class="clear-terms-btn" on:click={_clearSelectedTerms}>
             Clear all
           </button>
@@ -696,7 +702,7 @@ async function handleSearchInputEvent() {
         </div>
       {/if}
     </div>
-  </Field>
+  </div>
 </form>
 
 {#if _error}

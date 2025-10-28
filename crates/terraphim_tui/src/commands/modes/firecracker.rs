@@ -17,35 +17,6 @@ pub struct FirecrackerExecutor {
     api_client: Option<ApiClient>,
     /// Default timeout
     default_timeout: Duration,
-    /// VM pool settings
-    vm_settings: VmSettings,
-}
-
-/// VM settings for firecracker execution
-#[derive(Debug, Clone)]
-pub struct VmSettings {
-    /// Memory limit in MB
-    pub memory_mb: u64,
-    /// CPU limit
-    pub vcpu_count: u8,
-    /// Disk limit in MB
-    pub disk_mb: u64,
-    /// Network enabled
-    pub network_enabled: bool,
-    /// Root filesystem
-    pub root_fs: String,
-}
-
-impl Default for VmSettings {
-    fn default() -> Self {
-        Self {
-            memory_mb: 512,
-            vcpu_count: 1,
-            disk_mb: 1024,
-            network_enabled: false,
-            root_fs: "ubuntu:22.04".to_string(), // Default to Ubuntu
-        }
-    }
 }
 
 impl FirecrackerExecutor {
@@ -54,7 +25,6 @@ impl FirecrackerExecutor {
         Self {
             api_client: None,
             default_timeout: Duration::from_secs(300), // 5 minutes for VM operations
-            vm_settings: VmSettings::default(),
         }
     }
 
@@ -63,14 +33,7 @@ impl FirecrackerExecutor {
         Self {
             api_client: Some(api_client),
             default_timeout: Duration::from_secs(300),
-            vm_settings: VmSettings::default(),
         }
-    }
-
-    /// Set VM settings
-    pub fn with_vm_settings(mut self, settings: VmSettings) -> Self {
-        self.vm_settings = settings;
-        self
     }
 
     /// Prepare VM for command execution
@@ -104,7 +67,7 @@ impl FirecrackerExecutor {
         vm_id: &str,
         command: &str,
         args: &[String],
-        timeout: Duration,
+        _timeout: Duration,
     ) -> Result<CommandExecutionResult, CommandExecutionError> {
         let api_client = self.api_client.as_ref().ok_or_else(|| {
             CommandExecutionError::VmExecutionError("No API client available".to_string())
@@ -162,7 +125,7 @@ impl FirecrackerExecutor {
     /// Calculate resource usage from VM response
     fn calculate_resource_usage(
         &self,
-        response: &crate::client::VmExecuteResponse,
+        _response: &crate::client::VmExecuteResponse,
     ) -> ResourceUsage {
         // This would be enhanced in a real implementation
         // For now, return default values
@@ -288,7 +251,7 @@ impl super::CommandExecutor for FirecrackerExecutor {
     fn capabilities(&self) -> ExecutorCapabilities {
         ExecutorCapabilities {
             supports_resource_limits: true,
-            supports_network_access: self.vm_settings.network_enabled,
+            supports_network_access: false, // Configure as needed
             supports_file_system: true,
             max_concurrent_commands: Some(5), // VMs are resource intensive
             default_timeout: Some(self.default_timeout.as_secs()),
@@ -308,7 +271,7 @@ mod tests {
 
     #[test]
     fn test_language_detection() {
-        let executor = LocalExecutor::new();
+        let executor = FirecrackerExecutor::new();
 
         assert_eq!(executor.detect_language("python script.py"), "python");
         assert_eq!(executor.detect_language("node app.js"), "javascript");
@@ -320,7 +283,7 @@ mod tests {
 
     #[test]
     fn test_vm_command_validation() {
-        let executor = LocalExecutor::new();
+        let executor = FirecrackerExecutor::new();
 
         // Valid commands
         assert!(executor.validate_vm_command("ls", &[]).is_ok());
@@ -342,7 +305,7 @@ mod tests {
 
     #[test]
     fn test_command_parsing() {
-        let executor = LocalExecutor::new();
+        let executor = FirecrackerExecutor::new();
 
         let (cmd, args) = executor
             .parse_command("python script.py --verbose")
@@ -353,13 +316,4 @@ mod tests {
         assert!(executor.parse_command("").is_err());
     }
 
-    #[test]
-    fn test_vm_settings_default() {
-        let settings = VmSettings::default();
-        assert_eq!(settings.memory_mb, 512);
-        assert_eq!(settings.vcpu_count, 1);
-        assert_eq!(settings.disk_mb, 1024);
-        assert!(!settings.network_enabled);
-        assert_eq!(settings.root_fs, "ubuntu:22.04");
-    }
 }

@@ -1,6 +1,5 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { Tag, Taglist } from 'svelma';
 import { fade } from 'svelte/transition';
 // @ts-expect-error
 import SvelteMarkdown from 'svelte-markdown';
@@ -975,7 +974,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
       <div class="content">
         <div class="level-right">
           {#if item.tags}
-          <Taglist>
+          <div class="tags">
               {#each item.tags as tag}
                 <button
                   class="tag-button"
@@ -983,16 +982,16 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                   disabled={_loadingKg}
                   title="Click to view knowledge graph document"
                 >
-                  <Tag rounded>{tag}</Tag>
+                  <span class="tag is-rounded">{tag}</span>
                 </button>
               {/each}
-          </Taglist>
+          </div>
           {/if}
         </div>
           <div class="level-right">
-          <Taglist>
-            <Tag rounded>Rank {item.rank || 0}</Tag>
-          </Taglist>
+          <div class="tags">
+            <span class="tag is-rounded">Rank {item.rank || 0}</span>
+          </div>
         </div>
         <div transition:fade>
           <button on:click={onTitleClick}>

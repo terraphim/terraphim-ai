@@ -1,5 +1,4 @@
 <script lang="ts">
-import { Button, Tag } from 'svelma';
 import { createEventDispatcher } from 'svelte';
 
 export let contextItem: KGContextItem;
@@ -259,28 +258,28 @@ $: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 
       <span class="context-title-text {compact ? 'compact' : ''}">
         {contextItem.title}
       </span>
-      <Tag type={displayColor} rounded>
+      <span class="tag {displayColor} is-rounded">
         {contextItem.context_type === "KGTermDefinition" ? "KG Term" : "KG Index"}
-      </Tag>
+      </span>
     </div>
 
     <div class="context-actions">
-      <Button
-        type="is-ghost"
+      <button
+        class="button is-ghost"
         on:click={_handleViewDetails}
         title="View details"
       >
         👁️
-      </Button>
+      </button>
 
       {#if removable}
-        <Button
-          type="is-ghost"
+        <button
+          class="button is-ghost"
           on:click={_handleRemove}
           title="Remove from context"
         >
           ❌
-        </Button>
+        </button>
       {/if}
     </div>
   </div>
@@ -298,27 +297,27 @@ $: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 
 
         <div class="term-metadata {compact ? 'compact' : ''}">
           {#if term.synonyms && term.synonyms.length > 0}
-            <Tag type="is-light" rounded title="Synonyms">
+            <span class="tag is-light is-rounded" title="Synonyms">
               ≈ {term.synonyms.length} synonym{term.synonyms.length !== 1 ? 's' : ''}
-            </Tag>
+            </span>
           {/if}
 
           {#if term.related_terms && term.related_terms.length > 0}
-            <Tag type="is-light" rounded title="Related Terms">
+            <span class="tag is-light is-rounded" title="Related Terms">
               🔗 {term.related_terms.length} related
-            </Tag>
+            </span>
           {/if}
 
           {#if term.usage_examples && term.usage_examples.length > 0}
-            <Tag type="is-light" rounded title="Usage Examples">
+            <span class="tag is-light is-rounded" title="Usage Examples">
               💬 {term.usage_examples.length} example{term.usage_examples.length !== 1 ? 's' : ''}
-            </Tag>
+            </span>
           {/if}
 
           {#if term.url}
-            <Tag type="is-link" rounded>
+            <span class="tag is-link is-rounded">
               🔗 Source
-            </Tag>
+            </span>
           {/if}
         </div>
       </div>
