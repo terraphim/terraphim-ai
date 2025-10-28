@@ -521,6 +521,16 @@ impl ReplHandler {
             ReplCommand::Commands { subcommand } => {
                 self.handle_commands_command(subcommand).await?;
             }
+
+            #[cfg(feature = "repl-chat")]
+            ReplCommand::Context { subcommand } => {
+                self.handle_context(subcommand).await?;
+            }
+
+            #[cfg(feature = "repl-chat")]
+            ReplCommand::Conversation { subcommand } => {
+                self.handle_conversation(subcommand).await?;
+            }
         }
 
         Ok(false)

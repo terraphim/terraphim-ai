@@ -80,6 +80,18 @@ pub enum ReplCommand {
         subcommand: CommandsSubcommand,
     },
 
+    // RAG workflow - Context management
+    #[cfg(feature = "repl-chat")]
+    Context {
+        subcommand: ContextSubcommand,
+    },
+
+    // RAG workflow - Conversation management
+    #[cfg(feature = "repl-chat")]
+    Conversation {
+        subcommand: ConversationSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -258,6 +270,36 @@ pub enum FileSubcommand {
     Status {
         operation: Option<String>, // "indexing", "classification", "analysis"
     },
+}
+
+/// Context management subcommands for RAG workflow
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-chat")]
+pub enum ContextSubcommand {
+    /// Add documents from last search results by indices (e.g., "1,2,3" or "1-5")
+    Add { indices: String },
+    /// List all context items in current conversation
+    List,
+    /// Clear all context from current conversation
+    Clear,
+    /// Remove a specific context item by index
+    Remove { index: usize },
+}
+
+/// Conversation management subcommands for RAG workflow
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-chat")]
+pub enum ConversationSubcommand {
+    /// Create a new conversation
+    New { title: Option<String> },
+    /// Load an existing conversation by ID
+    Load { id: String },
+    /// List all conversations
+    List { limit: Option<usize> },
+    /// Show current conversation details
+    Show,
+    /// Delete a conversation by ID
+    Delete { id: String },
 }
 
 impl FromStr for ReplCommand {
@@ -1329,6 +1371,99 @@ impl FromStr for ReplCommand {
                 }
             }
 
+            #[cfg(feature = "repl-chat")]
+            "context" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Context command requires a subcommand. Use: /context <add|list|clear|remove>"));
+                }
+
+                match parts[1] {
+                    "add" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Context add requires indices. Use: /context add <indices>"));
+                        }
+                        Ok(ReplCommand::Context {
+                            subcommand: ContextSubcommand::Add {
+                                indices: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    "list" => Ok(ReplCommand::Context {
+                        subcommand: ContextSubcommand::List,
+                    }),
+                    "clear" => Ok(ReplCommand::Context {
+                        subcommand: ContextSubcommand::Clear,
+                    }),
+                    "remove" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Context remove requires an index. Use: /context remove <index>"));
+                        }
+                        let index = parts[2].parse::<usize>()
+                            .map_err(|_| anyhow!("Invalid index value"))?;
+                        Ok(ReplCommand::Context {
+                            subcommand: ContextSubcommand::Remove { index },
+                        })
+                    }
+                    _ => Err(anyhow!("Unknown context subcommand: {}. Use: add, list, clear, remove", parts[1])),
+                }
+            }
+
+            #[cfg(feature = "repl-chat")]
+            "conversation" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Conversation command requires a subcommand. Use: /conversation <new|load|list|show|delete>"));
+                }
+
+                match parts[1] {
+                    "new" => {
+                        let title = if parts.len() > 2 {
+                            Some(parts[2..].join(" "))
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::New { title },
+                        })
+                    }
+                    "load" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Conversation load requires an ID. Use: /conversation load <id>"));
+                        }
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::Load {
+                                id: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    "list" => {
+                        let mut limit = None;
+                        if parts.len() > 2 && parts[2] == "--limit" {
+                            if parts.len() > 3 {
+                                limit = Some(parts[3].parse::<usize>()
+                                    .map_err(|_| anyhow!("Invalid limit value"))?);
+                            }
+                        }
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::List { limit },
+                        })
+                    }
+                    "show" => Ok(ReplCommand::Conversation {
+                        subcommand: ConversationSubcommand::Show,
+                    }),
+                    "delete" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Conversation delete requires an ID. Use: /conversation delete <id>"));
+                        }
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::Delete {
+                                id: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    _ => Err(anyhow!("Unknown conversation subcommand: {}. Use: new, load, list, show, delete", parts[1])),
+                }
+            }
+
             _ => Err(anyhow!("Unknown command: {}", parts[0])),
         }
     }
@@ -1343,7 +1478,7 @@ impl ReplCommand {
 
         #[cfg(feature = "repl-chat")]
         {
-            commands.extend_from_slice(&["chat", "summarize"]);
+            commands.extend_from_slice(&["chat", "summarize", "context", "conversation"]);
         }
 
         #[cfg(feature = "repl-mcp")]
@@ -1388,6 +1523,10 @@ impl ReplCommand {
             "chat" => Some("/chat [message] - Interactive chat with AI"),
             #[cfg(feature = "repl-chat")]
             "summarize" => Some("/summarize <doc-id|text> - Summarize content"),
+            #[cfg(feature = "repl-chat")]
+            "context" => Some("/context add <indices> | list | clear | remove <index> - Manage conversation context for RAG"),
+            #[cfg(feature = "repl-chat")]
+            "conversation" => Some("/conversation new [title] | load <id> | list [--limit <n>] | show | delete <id> - Manage chat conversations"),
 
             #[cfg(feature = "repl-mcp")]
             "autocomplete" => Some("/autocomplete <query> [--limit <n>] - Autocomplete terms"),
