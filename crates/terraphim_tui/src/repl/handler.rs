@@ -5,12 +5,15 @@ use super::commands::FileSubcommand;
 use super::commands::{
     ConfigSubcommand, ReplCommand, RoleSubcommand, WebConfigSubcommand, WebSubcommand,
 };
+#[cfg(feature = "repl-chat")]
+use super::commands::{ContextSubcommand, ConversationSubcommand};
 use crate::client::ApiClient;
 use crate::service::TuiService;
 
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
+use terraphim_types::{ConversationId, Document};
 
 #[cfg(feature = "repl")]
 use rustyline::Editor;
@@ -24,6 +27,11 @@ pub struct ReplHandler {
     current_role: String,
     #[cfg(feature = "repl-custom")]
     command_registry: Option<crate::commands::registry::CommandRegistry>,
+    // RAG workflow session state
+    #[cfg(feature = "repl-chat")]
+    current_conversation_id: Option<ConversationId>,
+    #[cfg(feature = "repl-chat")]
+    last_search_results: Vec<Document>,
 }
 
 impl ReplHandler {
@@ -34,6 +42,10 @@ impl ReplHandler {
             current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
+            #[cfg(feature = "repl-chat")]
+            current_conversation_id: None,
+            #[cfg(feature = "repl-chat")]
+            last_search_results: Vec::new(),
         }
     }
 
@@ -44,6 +56,10 @@ impl ReplHandler {
             current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
+            #[cfg(feature = "repl-chat")]
+            current_conversation_id: None,
+            #[cfg(feature = "repl-chat")]
+            last_search_results: Vec::new(),
         }
     }
 
