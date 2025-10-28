@@ -553,7 +553,7 @@ impl ReplHandler {
     }
 
     async fn handle_search(
-        &self,
+        &mut self,
         query: String,
         role: Option<String>,
         limit: Option<usize>,
@@ -596,6 +596,12 @@ impl ReplHandler {
 
                     match service.search_with_role(&query, &role_name, limit).await {
                         Ok(documents) => {
+                            // Store results for context selection
+                            #[cfg(feature = "repl-chat")]
+                            {
+                                self.last_search_results = documents.clone();
+                            }
+
                             if documents.is_empty() {
                                 println!("{} No results found", "ℹ".blue().bold());
                             } else {
@@ -605,6 +611,8 @@ impl ReplHandler {
                                     .load_preset(UTF8_FULL)
                                     .apply_modifier(UTF8_ROUND_CORNERS)
                                     .set_header(vec![
+                                        #[cfg(feature = "repl-chat")]
+                                        Cell::new("#").add_attribute(comfy_table::Attribute::Bold),
                                         Cell::new("Rank").add_attribute(comfy_table::Attribute::Bold),
                                         Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
                                         Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
@@ -615,7 +623,7 @@ impl ReplHandler {
                                         },
                                     ]);
 
-                                for doc in &documents {
+                                for (i, doc) in documents.iter().enumerate() {
                                     let rank = doc.rank.unwrap_or(0);
                                     let relevance_score = if semantic || concepts {
                                         // Show semantic relevance indicator based on rank
@@ -631,12 +639,14 @@ impl ReplHandler {
                                         rank.to_string()
                                     };
 
-                                    table.add_row(vec![
-                                        Cell::new(rank.to_string()),
-                                        Cell::new(&doc.title),
-                                        Cell::new(&doc.url),
-                                        Cell::new(relevance_score),
-                                    ]);
+                                    let mut row = vec![];
+                                    #[cfg(feature = "repl-chat")]
+                                    row.push(Cell::new(format!("{:2}", i)));
+                                    row.push(Cell::new(rank.to_string()));
+                                    row.push(Cell::new(&doc.title));
+                                    row.push(Cell::new(&doc.url));
+                                    row.push(Cell::new(relevance_score));
+                                    table.add_row(row);
                                 }
 
                                 println!("{}", table);
@@ -646,6 +656,13 @@ impl ReplHandler {
                                     documents.len().to_string().green(),
                                     search_mode.blue()
                                 );
+
+                                // Show context hint
+                                #[cfg(feature = "repl-chat")]
+                                {
+                                    println!("\n💡 Use {} to add documents to context",
+                                        "/context add <indices>".yellow());
+                                }
 
                             // Show concept expansion if enabled
                             if concepts {
@@ -1004,42 +1021,65 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-chat")]
-    async fn handle_chat(&self, message: Option<String>) -> Result<()> {
+    async fn handle_chat(&mut self, message: Option<String>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
 
-            if let Some(msg) = message {
-                println!("{} Sending message: '{}'", "💬".bold(), msg.cyan());
+            let msg = message.unwrap_or_else(|| {
+                print!("💬 Message: ");
+                io::stdout().flush().unwrap();
+                let mut input = String::new();
+                io::stdin().read_line(&mut input).unwrap();
+                input.trim().to_string()
+            });
 
-                if false { // TODO: Reimplement service integration
-                     // Role-based chat moved to server - use api_client.chat() instead
-                     // let role_name = &self.current_role;
+            if msg.is_empty() {
+                println!("{} Message cannot be empty", "⚠️".yellow().bold());
+                return Ok(());
+            }
 
-                    // match api_client.chat(role_name, &msg, None).await {
-                    //     Ok(response) => {
-                    //         println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
-                    //         println!("{}", response);
-                    //     }
-                    //     Err(e) => {
-                    //         println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
-                    //     }
-                    // }
-                } else if let Some(api_client) = &self.api_client {
-                    // Server mode chat
-                    match api_client.chat(&self.current_role, &msg, None).await {
+            println!("{} Sending message: '{}'", "💬".bold(), msg.cyan());
+
+            if let Some(service) = &self.tui_service {
+                // Check if we have a conversation with context
+                if let Some(conv_id) = &self.current_conversation_id {
+                    // Use RAG chat with context
+                    match service.chat_with_context(conv_id, msg, None).await {
+                        Ok(response) => {
+                            println!("\n{} {}\n", "🤖".bold(), "Response (with context):".bold());
+                            println!("{}", response);
+                        }
+                        Err(e) => {
+                            println!("{} Chat with context failed: {}", "❌".bold(), e.to_string().red());
+                        }
+                    }
+                } else {
+                    // Direct chat without context
+                    let role_name = terraphim_types::RoleName::new(&self.current_role);
+                    match service.chat(&role_name, &msg, None).await {
                         Ok(response) => {
                             println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
-                            println!("{}", response.message.unwrap_or(response.status));
+                            println!("{}", response);
                         }
                         Err(e) => {
                             println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
                         }
                     }
                 }
+            } else if let Some(api_client) = &self.api_client {
+                // Server mode chat
+                match api_client.chat(&self.current_role, &msg, None).await {
+                    Ok(response) => {
+                        println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
+                        println!("{}", response.message.unwrap_or(response.status));
+                    }
+                    Err(e) => {
+                        println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
+                    }
+                }
             } else {
-                println!("{} Please provide a message to chat", "ℹ".blue().bold());
-                println!("Usage: {} <message>", "/chat".yellow());
+                println!("{} No service available", "⚠️".yellow().bold());
             }
         }
 
@@ -3424,6 +3464,190 @@ impl ReplHandler {
         }
 
         Ok(())
+    }
+
+    // ==================== RAG Workflow Handlers ====================
+
+    #[cfg(feature = "repl-chat")]
+    async fn handle_context(&mut self, subcommand: ContextSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
+        let service = self.tui_service.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No service available"))?;
+
+        // Ensure conversation exists
+        if self.current_conversation_id.is_none() {
+            let title = format!("Session {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"));
+            let conv_id = service.create_conversation(title.clone()).await?;
+            self.current_conversation_id = Some(conv_id);
+            println!("📝 Created conversation: {}", title.green());
+        }
+
+        let conv_id = self.current_conversation_id.as_ref().unwrap();
+
+        match subcommand {
+            ContextSubcommand::Add { indices } => {
+                // Parse indices: "1,2,3" or "1-5"
+                let index_list = Self::parse_indices(&indices)?;
+
+                for idx in index_list {
+                    if let Some(doc) = self.last_search_results.get(idx) {
+                        service.add_document_to_context(conv_id, doc).await?;
+                        println!("✅ Added [{}]: {}", idx, doc.title.green());
+                    } else {
+                        println!("⚠️  Index {} out of range (have {} results)",
+                            idx, self.last_search_results.len());
+                    }
+                }
+            }
+
+            ContextSubcommand::List => {
+                let items = service.list_context(conv_id).await?;
+                if items.is_empty() {
+                    println!("No context items");
+                } else {
+                    println!("Context items ({}):", items.len());
+                    for (i, item) in items.iter().enumerate() {
+                        println!("  [{}] {} (score: {:?})",
+                            format!("{:2}", i).yellow(),
+                            item.title,
+                            item.relevance_score
+                        );
+                    }
+                }
+            }
+
+            ContextSubcommand::Clear => {
+                service.clear_context(conv_id).await?;
+                println!("✅ Context cleared");
+            }
+
+            ContextSubcommand::Remove { index } => {
+                let items = service.list_context(conv_id).await?;
+                if let Some(item) = items.get(index) {
+                    service.remove_context_item(conv_id, &item.id).await?;
+                    println!("✅ Removed: {}", item.title);
+                } else {
+                    println!("⚠️  Index {} out of range (have {} items)", index, items.len());
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-chat")]
+    async fn handle_conversation(&mut self, subcommand: ConversationSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
+        let service = self.tui_service.as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No service available"))?;
+
+        match subcommand {
+            ConversationSubcommand::New { title } => {
+                let title = title.unwrap_or_else(||
+                    format!("Session {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"))
+                );
+                let conv_id = service.create_conversation(title.clone()).await?;
+                self.current_conversation_id = Some(conv_id.clone());
+                println!("✅ Created conversation: {} (ID: {})",
+                    title.green(), conv_id.as_str().yellow());
+            }
+
+            ConversationSubcommand::Load { id } => {
+                let conv_id = terraphim_types::ConversationId::from_string(id.clone());
+                let conv = service.load_conversation(&conv_id).await?;
+                self.current_conversation_id = Some(conv_id);
+                println!("✅ Loaded: {} ({} messages, {} context items)",
+                    conv.title.green(),
+                    conv.messages.len(),
+                    conv.global_context.len()
+                );
+            }
+
+            ConversationSubcommand::List { limit } => {
+                let summaries = service.list_conversations().await?;
+                let display = if let Some(limit) = limit {
+                    &summaries[..limit.min(summaries.len())]
+                } else {
+                    &summaries
+                };
+
+                if display.is_empty() {
+                    println!("No conversations");
+                } else {
+                    println!("Conversations ({}):", summaries.len());
+                    for summary in display {
+                        let marker = if Some(&summary.id) == self.current_conversation_id.as_ref() {
+                            "▶".green()
+                        } else {
+                            " ".normal()
+                        };
+                        println!("  {} {} - {} ({} msg, {} ctx)",
+                            marker,
+                            summary.id.as_str().yellow(),
+                            summary.title,
+                            summary.message_count,
+                            summary.context_count
+                        );
+                    }
+                }
+            }
+
+            ConversationSubcommand::Show => {
+                if let Some(conv_id) = &self.current_conversation_id {
+                    if let Some(conv) = service.get_conversation(conv_id).await? {
+                        println!("Conversation: {}", conv.title.green());
+                        println!("ID: {}", conv.id.as_str().yellow());
+                        println!("Role: {}", conv.role);
+                        println!("Messages: {}", conv.messages.len());
+                        println!("Context Items: {}", conv.global_context.len());
+                    } else {
+                        println!("⚠️  Conversation not found in memory");
+                    }
+                } else {
+                    println!("No active conversation. Use {} to create one",
+                        "/conversation new".yellow());
+                }
+            }
+
+            ConversationSubcommand::Delete { id } => {
+                let conv_id = terraphim_types::ConversationId::from_string(id.clone());
+                service.delete_conversation(&conv_id).await?;
+                if Some(&conv_id) == self.current_conversation_id.as_ref() {
+                    self.current_conversation_id = None;
+                }
+                println!("✅ Deleted conversation: {}", id.yellow());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Parse index string like "1,2,3" or "1-5" into Vec<usize>
+    #[cfg(feature = "repl-chat")]
+    fn parse_indices(indices_str: &str) -> Result<Vec<usize>> {
+        let mut result = Vec::new();
+        for part in indices_str.split(',') {
+            let part = part.trim();
+            if part.contains('-') {
+                // Range: "1-5"
+                let range: Vec<&str> = part.split('-').collect();
+                if range.len() == 2 {
+                    let start: usize = range[0].trim().parse()?;
+                    let end: usize = range[1].trim().parse()?;
+                    for i in start..=end {
+                        result.push(i);
+                    }
+                }
+            } else {
+                // Single index: "3"
+                result.push(part.parse()?);
+            }
+        }
+        Ok(result)
     }
 }
 
