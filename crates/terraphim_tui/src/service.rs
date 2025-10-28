@@ -2,15 +2,22 @@ use anyhow::Result;
 use std::sync::Arc;
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
-use terraphim_service::TerraphimService;
+use terraphim_persistence::conversation::OpenDALConversationPersistence;
+use terraphim_service::{TerraphimService, context::ContextManager};
 use terraphim_settings::DeviceSettings;
-use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
+use terraphim_types::{
+    ChatMessage, ContextItem, Conversation, ConversationId, ConversationSummary,
+    Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus,
+};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
 pub struct TuiService {
     config_state: ConfigState,
     service: Arc<Mutex<TerraphimService>>,
+    context_manager: Arc<Mutex<ContextManager>>,
+    // Note: OpenDALConversationPersistence doesn't implement Clone, so we wrap in Arc
+    conversation_persistence: Arc<OpenDALConversationPersistence>,
 }
 
 impl TuiService {
@@ -55,9 +62,19 @@ impl TuiService {
         // Create service
         let service = TerraphimService::new(config_state.clone());
 
+        // Create context manager
+        let context_manager = Arc::new(Mutex::new(
+            ContextManager::new(terraphim_service::context::ContextConfig::default())
+        ));
+
+        // Create conversation persistence
+        let conversation_persistence = Arc::new(OpenDALConversationPersistence::new());
+
         Ok(Self {
             config_state,
             service: Arc::new(Mutex::new(service)),
+            context_manager,
+            conversation_persistence,
         })
     }
 
@@ -270,5 +287,224 @@ impl TuiService {
         let config = self.config_state.config.lock().await;
         config.save().await?;
         Ok(())
+    }
+
+    // ==================== Conversation Management (RAG Workflow) ====================
+
+    /// Create a new conversation for chat with context
+    pub async fn create_conversation(&self, title: String) -> Result<ConversationId> {
+        let role = self.get_selected_role().await;
+        let mut context_manager = self.context_manager.lock().await;
+
+        let conv_id = context_manager.create_conversation(title, role).await?;
+
+        // Get the conversation and persist it
+        if let Some(conversation) = context_manager.get_conversation(&conv_id) {
+            use terraphim_persistence::conversation::ConversationPersistence;
+            self.conversation_persistence
+                .save(&conversation)
+                .await?;
+        }
+
+        Ok(conv_id)
+    }
+
+    /// Load an existing conversation from persistence
+    pub async fn load_conversation(&self, id: &ConversationId) -> Result<Conversation> {
+        use terraphim_persistence::conversation::ConversationPersistence;
+        Ok(self.conversation_persistence.load(id).await?)
+    }
+
+    /// List all persisted conversations
+    pub async fn list_conversations(&self) -> Result<Vec<ConversationSummary>> {
+        use terraphim_persistence::conversation::ConversationPersistence;
+        Ok(self.conversation_persistence.list_summaries().await?)
+    }
+
+    /// Delete a conversation from persistence
+    pub async fn delete_conversation(&self, id: &ConversationId) -> Result<()> {
+        use terraphim_persistence::conversation::ConversationPersistence;
+        Ok(self.conversation_persistence.delete(id).await?)
+    }
+
+    /// Get current conversation from context manager (in-memory)
+    pub async fn get_conversation(&self, conversation_id: &ConversationId) -> Result<Option<Conversation>> {
+        let context_manager = self.context_manager.lock().await;
+        Ok(context_manager.get_conversation(conversation_id).map(|c| (&*c).clone()))
+    }
+
+    // ==================== Context Management ====================
+
+    /// Add a single document to conversation context
+    pub async fn add_document_to_context(
+        &self,
+        conversation_id: &ConversationId,
+        document: &Document,
+    ) -> Result<()> {
+        let mut context_manager = self.context_manager.lock().await;
+
+        // Create context item from document
+        let context_item = context_manager.create_document_context(document);
+
+        // Add to conversation
+        context_manager.add_context(conversation_id, context_item)?;
+
+        // Persist the updated conversation
+        if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+            use terraphim_persistence::conversation::ConversationPersistence;
+            self.conversation_persistence
+                .save(&conversation)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// Add multiple documents from search results as a single context item
+    pub async fn add_search_results_to_context(
+        &self,
+        conversation_id: &ConversationId,
+        query: &str,
+        documents: &[Document],
+        limit: Option<usize>,
+    ) -> Result<()> {
+        let mut context_manager = self.context_manager.lock().await;
+
+        // Create context item from search results
+        let context_item = context_manager.create_search_context(query, documents, limit);
+
+        // Add to conversation
+        context_manager.add_context(conversation_id, context_item)?;
+
+        // Persist the updated conversation
+        if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+            use terraphim_persistence::conversation::ConversationPersistence;
+            self.conversation_persistence
+                .save(&conversation)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    /// List all context items for a conversation
+    pub async fn list_context(&self, conversation_id: &ConversationId) -> Result<Vec<ContextItem>> {
+        let context_manager = self.context_manager.lock().await;
+
+        if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+            Ok(conversation.global_context.clone())
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    /// Clear all context from a conversation
+    pub async fn clear_context(&self, conversation_id: &ConversationId) -> Result<()> {
+        let context_manager = self.context_manager.lock().await;
+
+        if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+            // Create updated conversation with cleared context
+            let mut updated_conv = (&*conversation).clone();
+            updated_conv.global_context.clear();
+            updated_conv.updated_at = chrono::Utc::now();
+
+            // Save to persistence
+            use terraphim_persistence::conversation::ConversationPersistence;
+            self.conversation_persistence.save(&updated_conv).await?;
+        }
+
+        Ok(())
+    }
+
+    /// Remove a specific context item by ID
+    pub async fn remove_context_item(
+        &self,
+        conversation_id: &ConversationId,
+        context_id: &str,
+    ) -> Result<()> {
+        let mut context_manager = self.context_manager.lock().await;
+
+        context_manager.delete_context(conversation_id, context_id)?;
+
+        // Persist changes
+        if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+            use terraphim_persistence::conversation::ConversationPersistence;
+            self.conversation_persistence
+                .save(&conversation)
+                .await?;
+        }
+
+        Ok(())
+    }
+
+    // ==================== Chat with Context (RAG) ====================
+
+    /// Chat with LLM using conversation context (RAG workflow)
+    pub async fn chat_with_context(
+        &self,
+        conversation_id: &ConversationId,
+        user_message: String,
+        model: Option<String>,
+    ) -> Result<String> {
+        let role = self.get_selected_role().await;
+
+        // Build prompt with context
+        let prompt = {
+            let context_manager = self.context_manager.lock().await;
+
+            if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+                // Build messages with context for LLM
+                let messages = terraphim_service::context::build_llm_messages_with_context(
+                    &conversation,
+                    true, // include global context
+                );
+
+                // Format messages into prompt
+                let context_text = messages
+                    .iter()
+                    .map(|msg| {
+                        format!(
+                            "{}: {}",
+                            msg.get("role").and_then(|v| v.as_str()).unwrap_or("unknown"),
+                            msg.get("content").and_then(|v| v.as_str()).unwrap_or("")
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n\n");
+
+                format!("{}\n\nUser: {}", context_text, user_message)
+            } else {
+                user_message.clone()
+            }
+        };
+
+        // Call LLM (clone model for later use)
+        let model_for_message = model.clone();
+        let response = self.chat(&role, &prompt, model).await?;
+
+        // Add messages to conversation
+        {
+            let mut context_manager = self.context_manager.lock().await;
+
+            context_manager.add_message(
+                conversation_id,
+                ChatMessage::user(user_message),
+            )?;
+
+            context_manager.add_message(
+                conversation_id,
+                ChatMessage::assistant(response.clone(), model_for_message),
+            )?;
+
+            // Persist conversation with new messages
+            if let Some(conversation) = context_manager.get_conversation(conversation_id) {
+                use terraphim_persistence::conversation::ConversationPersistence;
+                self.conversation_persistence
+                    .save(&conversation)
+                    .await?;
+            }
+        }
+
+        Ok(response)
     }
 }
