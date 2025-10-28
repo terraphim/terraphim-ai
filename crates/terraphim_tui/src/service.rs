@@ -61,6 +61,24 @@ impl TuiService {
 
         // Create service
         let service = TerraphimService::new(config_state.clone());
+        let service_arc = Arc::new(Mutex::new(service));
+
+        // Pre-build thesauri for roles with knowledge graphs to avoid warnings on first use
+        {
+            let roles_with_kg: Vec<_> = config.roles.iter()
+                .filter(|(_, role)| role.kg.is_some())
+                .map(|(name, _)| name.clone())
+                .collect();
+
+            for role_name in roles_with_kg {
+                log::info!("Pre-building thesaurus for role: {}", role_name);
+                let mut svc = service_arc.lock().await;
+                match svc.ensure_thesaurus_loaded(&role_name).await {
+                    Ok(_) => log::info!("✅ Thesaurus ready for {}", role_name),
+                    Err(e) => log::warn!("Failed to build thesaurus for {}: {}", role_name, e),
+                }
+            }
+        }
 
         // Create context manager
         let context_manager = Arc::new(Mutex::new(
@@ -72,7 +90,7 @@ impl TuiService {
 
         Ok(Self {
             config_state,
-            service: Arc::new(Mutex::new(service)),
+            service: service_arc,
             context_manager,
             conversation_persistence,
         })
