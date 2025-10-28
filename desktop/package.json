@@ -121,7 +121,7 @@
 		"svelte-routing": "^2.13.0",
 		"tinro": "^0.6.12",
 		"tippy.js": "^6.3.7",
-		"tiptap-markdown": "^0.8.10"
+		"tiptap-markdown": "^0.9.0"
 	},
 	"peerDependencies": {
 		"@fortawesome/fontawesome-free": "^7.0.1",
