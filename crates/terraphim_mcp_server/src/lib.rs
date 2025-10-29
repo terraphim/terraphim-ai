@@ -20,11 +20,14 @@ use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 pub mod resource_mapper;
+pub mod security;
+pub mod validation;
 
 use crate::resource_mapper::TerraphimResourceMapper;
+use crate::validation::{ValidationContext, ValidationPipeline};
 
 #[derive(Error, Debug)]
 pub enum TerraphimMcpError {
@@ -52,6 +55,7 @@ pub struct McpService {
     config_state: Arc<ConfigState>,
     resource_mapper: Arc<TerraphimResourceMapper>,
     autocomplete_index: Arc<tokio::sync::RwLock<Option<AutocompleteIndex>>>,
+    validation_pipeline: Arc<ValidationPipeline>,
 }
 
 impl McpService {
@@ -61,6 +65,7 @@ impl McpService {
             config_state,
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
             autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
+            validation_pipeline: Arc::new(ValidationPipeline::new()),
         }
     }
 
@@ -1309,6 +1314,68 @@ impl McpService {
         ));
         Ok(CallToolResult::success(vec![content]))
     }
+
+    /// Execute tool with validation pipeline (pre-tool and post-tool hooks)
+    async fn execute_with_validation<F, Fut>(
+        &self,
+        request: &CallToolRequestParam,
+        tool_fn: F,
+    ) -> Result<CallToolResult, ErrorData>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<CallToolResult, ErrorData>>,
+    {
+        // Build validation context
+        let context = ValidationContext::from_tool_request(request);
+
+        // PRE-TOOL VALIDATION
+        match self.validation_pipeline.validate_pre_tool(&context).await {
+            Ok(result) => {
+                if !result.passed {
+                    let error_content =
+                        Content::text(format!("Pre-tool validation failed: {}", result.message));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                // Log warnings
+                for warning in &result.warnings {
+                    warn!("Pre-tool warning: {}", warning);
+                }
+            }
+            Err(e) => {
+                let error_content = Content::text(format!("Pre-tool validation error: {}", e));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+        }
+
+        // EXECUTE TOOL
+        let tool_result = tool_fn().await?;
+
+        // POST-TOOL VALIDATION
+        match self
+            .validation_pipeline
+            .validate_post_tool(&context, &tool_result)
+            .await
+        {
+            Ok(result) => {
+                if !result.passed {
+                    let error_content =
+                        Content::text(format!("Post-tool validation failed: {}", result.message));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                // Log warnings
+                for warning in &result.warnings {
+                    warn!("Post-tool warning: {}", warning);
+                }
+            }
+            Err(e) => {
+                warn!("Post-tool validation error (non-fatal): {}", e);
+            }
+        }
+
+        Ok(tool_result)
+    }
 }
 
 impl ServerHandler for McpService {
@@ -2155,33 +2222,41 @@ impl ServerHandler for McpService {
                     .map_err(ErrorData::from)
             }
             "edit_file_search_replace" => {
-                let arguments = request.arguments.unwrap_or_default();
+                let arguments = request.arguments.as_ref();
                 let file_path = arguments
-                    .get("file_path")
+                    .and_then(|args| args.get("file_path"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
                         ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
                     })?
                     .to_string();
                 let search = arguments
-                    .get("search")
+                    .and_then(|args| args.get("search"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
                         ErrorData::invalid_params("Missing 'search' parameter".to_string(), None)
                     })?
                     .to_string();
                 let replace = arguments
-                    .get("replace")
+                    .and_then(|args| args.get("replace"))
                     .and_then(|v| v.as_str())
                     .ok_or_else(|| {
                         ErrorData::invalid_params("Missing 'replace' parameter".to_string(), None)
                     })?
                     .to_string();
 
-                self.edit_file_search_replace(file_path, search, replace)
-                    .await
-                    .map_err(TerraphimMcpError::Mcp)
-                    .map_err(ErrorData::from)
+                // Execute with validation pipeline (pre-tool and post-tool hooks)
+                let file_path_clone = file_path.clone();
+                let search_clone = search.clone();
+                let replace_clone = replace.clone();
+
+                self.execute_with_validation(&request, || async move {
+                    self.edit_file_search_replace(file_path_clone, search_clone, replace_clone)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                })
+                .await
             }
             "edit_file_fuzzy" => {
                 let arguments = request.arguments.unwrap_or_default();
