@@ -808,7 +808,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                     ViewMode::Search => {
                         match (key.code, key.modifiers) {
                             // Ctrl+Q: Quit
-                            (KeyCode::Char('q'), KeyModifiers::CONTROL) | (KeyCode::Char('Q'), KeyModifiers::CONTROL) => break,
+                            (KeyCode::Char('q'), KeyModifiers::CONTROL)
+                            | (KeyCode::Char('Q'), KeyModifiers::CONTROL) => break,
                             // Enter: Search or select suggestion
                             (KeyCode::Enter, _) => {
                                 // If suggestion is selected, insert it into input
@@ -827,7 +828,9 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     if !query.is_empty() {
                                         match rt.block_on(async move {
                                             let q = SearchQuery {
-                                                search_term: NormalizedTermValue::from(query.as_str()),
+                                                search_term: NormalizedTermValue::from(
+                                                    query.as_str(),
+                                                ),
                                                 search_terms: None,
                                                 operator: None,
                                                 skip: Some(0),
@@ -911,17 +914,23 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                                 .take(5)
                                                 .map(|s| s.text)
                                                 .collect();
-                                            suggestion_index = if !suggestions.is_empty() { Some(0) } else { None };
+                                            suggestion_index = if !suggestions.is_empty() {
+                                                Some(0)
+                                            } else {
+                                                None
+                                            };
                                             last_error = None;
                                         }
                                         Err(e) => {
-                                            last_error = Some(format!("Autocomplete failed: {}", e));
+                                            last_error =
+                                                Some(format!("Autocomplete failed: {}", e));
                                         }
                                     }
                                 }
                             }
                             // Ctrl+R: Switch role
-                            (KeyCode::Char('r'), KeyModifiers::CONTROL) | (KeyCode::Char('R'), KeyModifiers::CONTROL) => {
+                            (KeyCode::Char('r'), KeyModifiers::CONTROL)
+                            | (KeyCode::Char('R'), KeyModifiers::CONTROL) => {
                                 // Switch role
                                 let api = api.clone();
                                 if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
@@ -945,7 +954,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 }
                             }
                             // Ctrl+S: Summarize current selection
-                            (KeyCode::Char('s'), KeyModifiers::CONTROL) | (KeyCode::Char('S'), KeyModifiers::CONTROL) => {
+                            (KeyCode::Char('s'), KeyModifiers::CONTROL)
+                            | (KeyCode::Char('S'), KeyModifiers::CONTROL) => {
                                 // Summarize current selection
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
@@ -987,7 +997,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 view_mode = ViewMode::Search;
                             }
                             // Ctrl+S: Summarize document in detail view
-                            (KeyCode::Char('s'), KeyModifiers::CONTROL) | (KeyCode::Char('S'), KeyModifiers::CONTROL) => {
+                            (KeyCode::Char('s'), KeyModifiers::CONTROL)
+                            | (KeyCode::Char('S'), KeyModifiers::CONTROL) => {
                                 // Summarize current document in detail view
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
@@ -1016,7 +1027,8 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 }
                             }
                             // Ctrl+Q: Quit from detail view
-                            (KeyCode::Char('q'), KeyModifiers::CONTROL) | (KeyCode::Char('Q'), KeyModifiers::CONTROL) => break,
+                            (KeyCode::Char('q'), KeyModifiers::CONTROL)
+                            | (KeyCode::Char('Q'), KeyModifiers::CONTROL) => break,
                             // Ignore all other keys
                             _ => {}
                         }

@@ -2,7 +2,7 @@
 
 ## Current Status: Phase 1 Complete ✅
 
-**Branch:** feature/rag-workflow-context-chat  
+**Branch:** feature/rag-workflow-context-chat
 **GitHub Issue:** #269
 
 ### Completed (2 commits)
@@ -34,7 +34,7 @@ Add after line 89 (after existing ReplCommand variants):
 #[cfg(feature = "repl-chat")]
 Context { subcommand: ContextSubcommand },
 
-#[cfg(feature = "repl-chat")]  
+#[cfg(feature = "repl-chat")]
 Conversation { subcommand: ConversationSubcommand },
 ```
 

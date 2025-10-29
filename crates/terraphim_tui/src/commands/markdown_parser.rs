@@ -351,5 +351,4 @@ without any frontmatter.
             _ => panic!("Expected InvalidFrontmatter error"),
         }
     }
-
 }

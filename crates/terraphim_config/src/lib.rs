@@ -424,20 +424,25 @@ impl ConfigBuilder {
             terraphim_role.llm_model = Some("openai/gpt-4o-mini".to_string());
             terraphim_role.extra.insert(
                 "llm_provider".to_string(),
-                Value::String("openrouter".to_string())
+                Value::String("openrouter".to_string()),
             );
-        } else if std::env::var("OLLAMA_BASE_URL").is_ok() || std::path::Path::new("/usr/local/bin/ollama").exists() {
+        } else if std::env::var("OLLAMA_BASE_URL").is_ok()
+            || std::path::Path::new("/usr/local/bin/ollama").exists()
+        {
             terraphim_role.extra.insert(
                 "llm_provider".to_string(),
-                Value::String("ollama".to_string())
+                Value::String("ollama".to_string()),
             );
             terraphim_role.extra.insert(
                 "ollama_base_url".to_string(),
-                Value::String(std::env::var("OLLAMA_BASE_URL").unwrap_or_else(|_| "http://127.0.0.1:11434".to_string()))
+                Value::String(
+                    std::env::var("OLLAMA_BASE_URL")
+                        .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string()),
+                ),
             );
             terraphim_role.extra.insert(
                 "llm_model".to_string(),
-                Value::String("llama3.2:3b".to_string())
+                Value::String("llama3.2:3b".to_string()),
             );
         }
         terraphim_role.llm_chat_system_prompt = Some(

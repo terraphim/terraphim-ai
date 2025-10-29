@@ -413,18 +413,27 @@ impl ReplHandler {
 
         #[cfg(feature = "repl-mcp")]
         {
-            println!("  {} - Autocomplete terms", "/autocomplete <query>".yellow());
+            println!(
+                "  {} - Autocomplete terms",
+                "/autocomplete <query>".yellow()
+            );
             println!("  {} - Extract paragraphs", "/extract <text>".yellow());
             println!("  {} - Find matches", "/find <text>".yellow());
             println!("  {} - Replace matches", "/replace <text>".yellow());
             println!("  {} - Show thesaurus", "/thesaurus".yellow());
         }
 
-        println!("  {} - Web operations", "/web [get|post|scrape|screenshot|pdf]".yellow());
+        println!(
+            "  {} - Web operations",
+            "/web [get|post|scrape|screenshot|pdf]".yellow()
+        );
 
         #[cfg(feature = "repl-file")]
         {
-            println!("  {} - File operations", "/file [search|classify|analyze|...]".yellow());
+            println!(
+                "  {} - File operations",
+                "/file [search|classify|analyze|...]".yellow()
+            );
         }
 
         println!("  {} - Show help", "/help [command]".yellow());
@@ -444,7 +453,10 @@ impl ReplHandler {
                         format!("[{:?}]", cmd.execution_mode).dimmed()
                     );
                 }
-                println!("\nUse {} to manage custom commands", "/commands list".yellow());
+                println!(
+                    "\nUse {} to manage custom commands",
+                    "/commands list".yellow()
+                );
             }
         }
     }
@@ -590,7 +602,8 @@ impl ReplHandler {
                 if let Some(service) = &self.tui_service {
                     println!("{} Offline mode - searching local haystacks", "📱".blue());
 
-                    let role_name = role.as_ref()
+                    let role_name = role
+                        .as_ref()
                         .map(|r| terraphim_types::RoleName::new(r))
                         .unwrap_or_else(|| terraphim_types::RoleName::new(&self.current_role));
 
@@ -613,13 +626,18 @@ impl ReplHandler {
                                     .set_header(vec![
                                         #[cfg(feature = "repl-chat")]
                                         Cell::new("#").add_attribute(comfy_table::Attribute::Bold),
-                                        Cell::new("Rank").add_attribute(comfy_table::Attribute::Bold),
-                                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
-                                        Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("Rank")
+                                            .add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("Title")
+                                            .add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("URL")
+                                            .add_attribute(comfy_table::Attribute::Bold),
                                         if semantic || concepts {
-                                            Cell::new("Relevance").add_attribute(comfy_table::Attribute::Bold)
+                                            Cell::new("Relevance")
+                                                .add_attribute(comfy_table::Attribute::Bold)
                                         } else {
-                                            Cell::new("Score").add_attribute(comfy_table::Attribute::Bold)
+                                            Cell::new("Score")
+                                                .add_attribute(comfy_table::Attribute::Bold)
                                         },
                                     ]);
 
@@ -660,17 +678,19 @@ impl ReplHandler {
                                 // Show context hint
                                 #[cfg(feature = "repl-chat")]
                                 {
-                                    println!("\n💡 Use {} to add documents to context",
-                                        "/context add <indices>".yellow());
+                                    println!(
+                                        "\n💡 Use {} to add documents to context",
+                                        "/context add <indices>".yellow()
+                                    );
                                 }
 
-                            // Show concept expansion if enabled
-                            if concepts {
-                                println!("\n{} Concept expansion in offline mode", "🧠".bold());
-                                // In offline mode, concepts are included in search results
-                                println!("{} Use semantic search features with knowledge graph roles", "ℹ".blue());
+                                // Show concept expansion if enabled
+                                if concepts {
+                                    println!("\n{} Concept expansion in offline mode", "🧠".bold());
+                                    // In offline mode, concepts are included in search results
+                                    println!("{} Use semantic search features with knowledge graph roles", "ℹ".blue());
+                                }
                             }
-                        }
                         }
                         Err(e) => {
                             println!("{} Search failed: {}", "❌".red().bold(), e);
@@ -828,9 +848,18 @@ impl ReplHandler {
                             match service.update_selected_role(role_name).await {
                                 Ok(_) => {
                                     if let Err(e) = service.save_config().await {
-                                        println!("{} Warning: Failed to save: {}", "⚠️".yellow(), e);
+                                        println!(
+                                            "{} Warning: Failed to save: {}",
+                                            "⚠️".yellow(),
+                                            e
+                                        );
                                     }
-                                    println!("{} Set {} = {}", "✅".bold(), key.yellow(), value.green());
+                                    println!(
+                                        "{} Set {} = {}",
+                                        "✅".bold(),
+                                        key.yellow(),
+                                        value.green()
+                                    );
                                 }
                                 Err(e) => {
                                     println!("{} Failed to set config: {}", "❌".red().bold(), e);
@@ -949,10 +978,12 @@ impl ReplHandler {
             let role_name = terraphim_types::RoleName::new(&self.current_role);
             match service.get_role_graph_top_k(&role_name, k).await {
                 Ok(concepts) => {
-                    println!("{} Top {} concepts for role '{}':",
-                             "📊".bold(),
-                             k.to_string().cyan(),
-                             self.current_role.green());
+                    println!(
+                        "{} Top {} concepts for role '{}':",
+                        "📊".bold(),
+                        k.to_string().cyan(),
+                        self.current_role.green()
+                    );
                     for (i, concept) in concepts.iter().enumerate() {
                         println!("  {}. {}", (i + 1).to_string().yellow(), concept);
                     }
@@ -1051,7 +1082,11 @@ impl ReplHandler {
                             println!("{}", response);
                         }
                         Err(e) => {
-                            println!("{} Chat with context failed: {}", "❌".bold(), e.to_string().red());
+                            println!(
+                                "{} Chat with context failed: {}",
+                                "❌".bold(),
+                                e.to_string().red()
+                            );
                         }
                     }
                 } else {
@@ -1218,7 +1253,10 @@ impl ReplHandler {
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode
-                match api_client.get_autocomplete(&self.current_role, &query).await {
+                match api_client
+                    .get_autocomplete(&self.current_role, &query)
+                    .await
+                {
                     Ok(response) => {
                         if response.suggestions.is_empty() {
                             println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
@@ -1479,9 +1517,11 @@ impl ReplHandler {
                         let entries: Vec<_> = (&thesaurus).into_iter().take(20).collect();
 
                         if entries.is_empty() {
-                            println!("{} No thesaurus entries found for role '{}'",
+                            println!(
+                                "{} No thesaurus entries found for role '{}'",
                                 "ℹ".blue().bold(),
-                                role_name.to_string().yellow());
+                                role_name.to_string().yellow()
+                            );
                             return Ok(());
                         }
 
@@ -1520,7 +1560,10 @@ impl ReplHandler {
                 }
             } else if let Some(_api_client) = &self.api_client {
                 // Server mode - would use API client
-                println!("{} Thesaurus via server not yet implemented", "ℹ".blue().bold());
+                println!(
+                    "{} Thesaurus via server not yet implemented",
+                    "ℹ".blue().bold()
+                );
             } else {
                 println!("{} No service available", "⚠️".yellow().bold());
             }
@@ -2577,37 +2620,39 @@ impl ReplHandler {
                 }
             }
 
-            WebSubcommand::Config { subcommand } => match subcommand {
-                WebConfigSubcommand::Show => {
-                    println!("{} Web Operations Configuration", "⚙️".bold());
-                    println!("{}", "-".repeat(50));
-                    println!("Configuration display not implemented (WebOperationConfig was removed)");
-                    // TODO: Reimplement configuration display with new types
-                }
+            WebSubcommand::Config { subcommand } => {
+                match subcommand {
+                    WebConfigSubcommand::Show => {
+                        println!("{} Web Operations Configuration", "⚙️".bold());
+                        println!("{}", "-".repeat(50));
+                        println!("Configuration display not implemented (WebOperationConfig was removed)");
+                        // TODO: Reimplement configuration display with new types
+                    }
 
-                WebConfigSubcommand::Set { key, value } => {
-                    println!("{} Updating web operations configuration", "⚙️".bold());
-                    println!("{} Setting: {} = {}", "🔧", key.cyan(), value.yellow());
-                    println!("{} Configuration updated successfully", "✅".green());
-                    println!(
-                        "{} This would persist the configuration to the config store",
-                        "ℹ️".blue()
-                    );
-                }
+                    WebConfigSubcommand::Set { key, value } => {
+                        println!("{} Updating web operations configuration", "⚙️".bold());
+                        println!("{} Setting: {} = {}", "🔧", key.cyan(), value.yellow());
+                        println!("{} Configuration updated successfully", "✅".green());
+                        println!(
+                            "{} This would persist the configuration to the config store",
+                            "ℹ️".blue()
+                        );
+                    }
 
-                WebConfigSubcommand::Reset => {
-                    println!("{} Resetting web operations configuration", "🔄".bold());
-                    println!(
-                        "{} All settings will be restored to defaults",
-                        "⚠️".yellow()
-                    );
-                    println!("{} Configuration reset successfully", "✅".green());
-                    println!(
-                        "{} This would reset the configuration to defaults",
-                        "ℹ️".blue()
-                    );
+                    WebConfigSubcommand::Reset => {
+                        println!("{} Resetting web operations configuration", "🔄".bold());
+                        println!(
+                            "{} All settings will be restored to defaults",
+                            "⚠️".yellow()
+                        );
+                        println!("{} Configuration reset successfully", "✅".green());
+                        println!(
+                            "{} This would reset the configuration to defaults",
+                            "ℹ️".blue()
+                        );
+                    }
                 }
-            },
+            }
         }
 
         Ok(())
@@ -3324,7 +3369,6 @@ impl ReplHandler {
         Ok(())
     }
 
-
     #[cfg(feature = "repl-custom")]
     async fn handle_commands_command(
         &mut self,
@@ -3473,7 +3517,9 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         use colored::Colorize;
 
-        let service = self.tui_service.as_ref()
+        let service = self
+            .tui_service
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No service available"))?;
 
         // Ensure conversation exists
@@ -3496,8 +3542,11 @@ impl ReplHandler {
                         service.add_document_to_context(conv_id, doc).await?;
                         println!("✅ Added [{}]: {}", idx, doc.title.green());
                     } else {
-                        println!("⚠️  Index {} out of range (have {} results)",
-                            idx, self.last_search_results.len());
+                        println!(
+                            "⚠️  Index {} out of range (have {} results)",
+                            idx,
+                            self.last_search_results.len()
+                        );
                     }
                 }
             }
@@ -3509,7 +3558,8 @@ impl ReplHandler {
                 } else {
                     println!("Context items ({}):", items.len());
                     for (i, item) in items.iter().enumerate() {
-                        println!("  [{}] {} (score: {:?})",
+                        println!(
+                            "  [{}] {} (score: {:?})",
                             format!("{:2}", i).yellow(),
                             item.title,
                             item.relevance_score
@@ -3529,7 +3579,11 @@ impl ReplHandler {
                     service.remove_context_item(conv_id, &item.id).await?;
                     println!("✅ Removed: {}", item.title);
                 } else {
-                    println!("⚠️  Index {} out of range (have {} items)", index, items.len());
+                    println!(
+                        "⚠️  Index {} out of range (have {} items)",
+                        index,
+                        items.len()
+                    );
                 }
             }
         }
@@ -3542,25 +3596,31 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         use colored::Colorize;
 
-        let service = self.tui_service.as_ref()
+        let service = self
+            .tui_service
+            .as_ref()
             .ok_or_else(|| anyhow::anyhow!("No service available"))?;
 
         match subcommand {
             ConversationSubcommand::New { title } => {
-                let title = title.unwrap_or_else(||
+                let title = title.unwrap_or_else(|| {
                     format!("Session {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"))
-                );
+                });
                 let conv_id = service.create_conversation(title.clone()).await?;
                 self.current_conversation_id = Some(conv_id.clone());
-                println!("✅ Created conversation: {} (ID: {})",
-                    title.green(), conv_id.as_str().yellow());
+                println!(
+                    "✅ Created conversation: {} (ID: {})",
+                    title.green(),
+                    conv_id.as_str().yellow()
+                );
             }
 
             ConversationSubcommand::Load { id } => {
                 let conv_id = terraphim_types::ConversationId::from_string(id.clone());
                 let conv = service.load_conversation(&conv_id).await?;
                 self.current_conversation_id = Some(conv_id);
-                println!("✅ Loaded: {} ({} messages, {} context items)",
+                println!(
+                    "✅ Loaded: {} ({} messages, {} context items)",
                     conv.title.green(),
                     conv.messages.len(),
                     conv.global_context.len()
@@ -3585,7 +3645,8 @@ impl ReplHandler {
                         } else {
                             " ".normal()
                         };
-                        println!("  {} {} - {} ({} msg, {} ctx)",
+                        println!(
+                            "  {} {} - {} ({} msg, {} ctx)",
                             marker,
                             summary.id.as_str().yellow(),
                             summary.title,
@@ -3608,8 +3669,10 @@ impl ReplHandler {
                         println!("⚠️  Conversation not found in memory");
                     }
                 } else {
-                    println!("No active conversation. Use {} to create one",
-                        "/conversation new".yellow());
+                    println!(
+                        "No active conversation. Use {} to create one",
+                        "/conversation new".yellow()
+                    );
                 }
             }
 

@@ -142,7 +142,6 @@ pub struct ParsedCommand {
     pub definition: CommandDefinition,
 }
 
-
 /// Command registry error
 #[derive(Debug, thiserror::Error)]
 pub enum CommandRegistryError {
@@ -164,7 +163,6 @@ pub enum CommandRegistryError {
     #[error("YAML parsing error: {0}")]
     YamlError(#[from] serde_yaml::Error),
 }
-
 
 impl CommandRegistryError {
     pub fn parse_error(path: impl AsRef<std::path::Path>, error: impl Into<String>) -> Self {

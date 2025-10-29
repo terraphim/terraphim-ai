@@ -232,7 +232,6 @@ pub struct BatchSummarizeResponse {
     pub error: Option<String>,
 }
 
-
 impl ApiClient {
     pub async fn chat(
         &self,

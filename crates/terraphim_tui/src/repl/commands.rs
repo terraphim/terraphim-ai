@@ -1380,7 +1380,9 @@ impl FromStr for ReplCommand {
                 match parts[1] {
                     "add" => {
                         if parts.len() < 3 {
-                            return Err(anyhow!("Context add requires indices. Use: /context add <indices>"));
+                            return Err(anyhow!(
+                                "Context add requires indices. Use: /context add <indices>"
+                            ));
                         }
                         Ok(ReplCommand::Context {
                             subcommand: ContextSubcommand::Add {
@@ -1396,15 +1398,21 @@ impl FromStr for ReplCommand {
                     }),
                     "remove" => {
                         if parts.len() < 3 {
-                            return Err(anyhow!("Context remove requires an index. Use: /context remove <index>"));
+                            return Err(anyhow!(
+                                "Context remove requires an index. Use: /context remove <index>"
+                            ));
                         }
-                        let index = parts[2].parse::<usize>()
+                        let index = parts[2]
+                            .parse::<usize>()
                             .map_err(|_| anyhow!("Invalid index value"))?;
                         Ok(ReplCommand::Context {
                             subcommand: ContextSubcommand::Remove { index },
                         })
                     }
-                    _ => Err(anyhow!("Unknown context subcommand: {}. Use: add, list, clear, remove", parts[1])),
+                    _ => Err(anyhow!(
+                        "Unknown context subcommand: {}. Use: add, list, clear, remove",
+                        parts[1]
+                    )),
                 }
             }
 
@@ -1427,7 +1435,9 @@ impl FromStr for ReplCommand {
                     }
                     "load" => {
                         if parts.len() < 3 {
-                            return Err(anyhow!("Conversation load requires an ID. Use: /conversation load <id>"));
+                            return Err(anyhow!(
+                                "Conversation load requires an ID. Use: /conversation load <id>"
+                            ));
                         }
                         Ok(ReplCommand::Conversation {
                             subcommand: ConversationSubcommand::Load {
@@ -1439,8 +1449,11 @@ impl FromStr for ReplCommand {
                         let mut limit = None;
                         if parts.len() > 2 && parts[2] == "--limit" {
                             if parts.len() > 3 {
-                                limit = Some(parts[3].parse::<usize>()
-                                    .map_err(|_| anyhow!("Invalid limit value"))?);
+                                limit = Some(
+                                    parts[3]
+                                        .parse::<usize>()
+                                        .map_err(|_| anyhow!("Invalid limit value"))?,
+                                );
                             }
                         }
                         Ok(ReplCommand::Conversation {
@@ -1460,7 +1473,10 @@ impl FromStr for ReplCommand {
                             },
                         })
                     }
-                    _ => Err(anyhow!("Unknown conversation subcommand: {}. Use: new, load, list, show, delete", parts[1])),
+                    _ => Err(anyhow!(
+                        "Unknown conversation subcommand: {}. Use: new, load, list, show, delete",
+                        parts[1]
+                    )),
                 }
             }
 

@@ -156,9 +156,7 @@ async fn test_tui_service_extract_paragraphs() -> Result<()> {
     let text = "This is a test paragraph with some content for extraction.";
 
     // Extract paragraphs
-    let result = service
-        .extract_paragraphs(&role_name, text, false)
-        .await;
+    let result = service.extract_paragraphs(&role_name, text, false).await;
 
     match result {
         Ok(paragraphs) => {
@@ -339,7 +337,9 @@ async fn test_offline_mode_no_server_required() -> Result<()> {
     service.update_selected_role(role_name.clone()).await?;
 
     // 4. Perform search
-    let _results = service.search_with_role("async", &role_name, Some(10)).await?;
+    let _results = service
+        .search_with_role("async", &role_name, Some(10))
+        .await?;
 
     // 5. Get config
     let config = service.get_config().await;

@@ -1,13 +1,13 @@
 use anyhow::Result;
 use std::sync::Arc;
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
-use terraphim_persistence::Persistable;
 use terraphim_persistence::conversation::OpenDALConversationPersistence;
-use terraphim_service::{TerraphimService, context::ContextManager};
+use terraphim_persistence::Persistable;
+use terraphim_service::{context::ContextManager, TerraphimService};
 use terraphim_settings::DeviceSettings;
 use terraphim_types::{
-    ChatMessage, ContextItem, Conversation, ConversationId, ConversationSummary,
-    Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus,
+    ChatMessage, ContextItem, Conversation, ConversationId, ConversationSummary, Document,
+    NormalizedTermValue, RoleName, SearchQuery, Thesaurus,
 };
 use tokio::sync::Mutex;
 
@@ -65,7 +65,9 @@ impl TuiService {
 
         // Pre-build thesauri for roles with knowledge graphs to avoid warnings on first use
         {
-            let roles_with_kg: Vec<_> = config.roles.iter()
+            let roles_with_kg: Vec<_> = config
+                .roles
+                .iter()
                 .filter(|(_, role)| role.kg.is_some())
                 .map(|(name, _)| name.clone())
                 .collect();
@@ -81,9 +83,9 @@ impl TuiService {
         }
 
         // Create context manager
-        let context_manager = Arc::new(Mutex::new(
-            ContextManager::new(terraphim_service::context::ContextConfig::default())
-        ));
+        let context_manager = Arc::new(Mutex::new(ContextManager::new(
+            terraphim_service::context::ContextConfig::default(),
+        )));
 
         // Create conversation persistence
         let conversation_persistence = Arc::new(OpenDALConversationPersistence::new());
@@ -187,15 +189,20 @@ impl TuiService {
         // Get role configuration
         let role = {
             let config = self.config_state.config.lock().await;
-            config.roles.get(role_name)
+            config
+                .roles
+                .get(role_name)
                 .ok_or_else(|| anyhow::anyhow!("Role not found"))?
                 .clone()
         };
 
         // Build LLM client from role configuration
         if let Some(llm_client) = terraphim_service::llm::build_llm_from_role(&role) {
-            log::info!("Using LLM provider: {} for role: {}",
-                llm_client.name(), role_name);
+            log::info!(
+                "Using LLM provider: {} for role: {}",
+                llm_client.name(),
+                role_name
+            );
 
             // Prepare messages for chat completion
             let messages = vec![serde_json::json!({
@@ -210,7 +217,9 @@ impl TuiService {
             };
 
             // Call LLM
-            let response = llm_client.chat_completion(messages, opts).await
+            let response = llm_client
+                .chat_completion(messages, opts)
+                .await
                 .map_err(|e| anyhow::anyhow!("LLM error: {}", e))?;
 
             Ok(response)
@@ -331,9 +340,7 @@ impl TuiService {
         // Get the conversation and persist it
         if let Some(conversation) = context_manager.get_conversation(&conv_id) {
             use terraphim_persistence::conversation::ConversationPersistence;
-            self.conversation_persistence
-                .save(&conversation)
-                .await?;
+            self.conversation_persistence.save(&conversation).await?;
         }
 
         Ok(conv_id)
@@ -358,9 +365,14 @@ impl TuiService {
     }
 
     /// Get current conversation from context manager (in-memory)
-    pub async fn get_conversation(&self, conversation_id: &ConversationId) -> Result<Option<Conversation>> {
+    pub async fn get_conversation(
+        &self,
+        conversation_id: &ConversationId,
+    ) -> Result<Option<Conversation>> {
         let context_manager = self.context_manager.lock().await;
-        Ok(context_manager.get_conversation(conversation_id).map(|c| (&*c).clone()))
+        Ok(context_manager
+            .get_conversation(conversation_id)
+            .map(|c| (&*c).clone()))
     }
 
     // ==================== Context Management ====================
@@ -382,9 +394,7 @@ impl TuiService {
         // Persist the updated conversation
         if let Some(conversation) = context_manager.get_conversation(conversation_id) {
             use terraphim_persistence::conversation::ConversationPersistence;
-            self.conversation_persistence
-                .save(&conversation)
-                .await?;
+            self.conversation_persistence.save(&conversation).await?;
         }
 
         Ok(())
@@ -409,9 +419,7 @@ impl TuiService {
         // Persist the updated conversation
         if let Some(conversation) = context_manager.get_conversation(conversation_id) {
             use terraphim_persistence::conversation::ConversationPersistence;
-            self.conversation_persistence
-                .save(&conversation)
-                .await?;
+            self.conversation_persistence.save(&conversation).await?;
         }
 
         Ok(())
@@ -459,9 +467,7 @@ impl TuiService {
         // Persist changes
         if let Some(conversation) = context_manager.get_conversation(conversation_id) {
             use terraphim_persistence::conversation::ConversationPersistence;
-            self.conversation_persistence
-                .save(&conversation)
-                .await?;
+            self.conversation_persistence.save(&conversation).await?;
         }
 
         Ok(())
@@ -495,7 +501,9 @@ impl TuiService {
                     .map(|msg| {
                         format!(
                             "{}: {}",
-                            msg.get("role").and_then(|v| v.as_str()).unwrap_or("unknown"),
+                            msg.get("role")
+                                .and_then(|v| v.as_str())
+                                .unwrap_or("unknown"),
                             msg.get("content").and_then(|v| v.as_str()).unwrap_or("")
                         )
                     })
@@ -516,10 +524,7 @@ impl TuiService {
         {
             let mut context_manager = self.context_manager.lock().await;
 
-            context_manager.add_message(
-                conversation_id,
-                ChatMessage::user(user_message),
-            )?;
+            context_manager.add_message(conversation_id, ChatMessage::user(user_message))?;
 
             context_manager.add_message(
                 conversation_id,
@@ -529,9 +534,7 @@ impl TuiService {
             // Persist conversation with new messages
             if let Some(conversation) = context_manager.get_conversation(conversation_id) {
                 use terraphim_persistence::conversation::ConversationPersistence;
-                self.conversation_persistence
-                    .save(&conversation)
-                    .await?;
+                self.conversation_persistence.save(&conversation).await?;
             }
         }
 
