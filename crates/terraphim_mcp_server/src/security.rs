@@ -356,6 +356,127 @@ impl SecurityAuditLog {
     }
 }
 
+/// User decision on a command
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserDecision {
+    pub command: String,
+    pub allowed: bool,
+    pub timestamp: String,
+    pub context: HashMap<String, String>,
+}
+
+/// Learning system that adapts permissions based on user decisions
+pub struct SecurityLearner {
+    decisions: Vec<UserDecision>,
+    learning_threshold: usize,
+}
+
+impl SecurityLearner {
+    pub fn new(learning_threshold: usize) -> Self {
+        Self {
+            decisions: Vec::new(),
+            learning_threshold,
+        }
+    }
+
+    /// Record a user's decision on a command
+    pub async fn record_decision(
+        &mut self,
+        command: &str,
+        allowed: bool,
+    ) -> Option<LearningAction> {
+        let decision = UserDecision {
+            command: command.to_string(),
+            allowed,
+            timestamp: chrono::Utc::now().to_rfc3339(),
+            context: HashMap::new(),
+        };
+
+        self.decisions.push(decision);
+
+        // Check if we have enough data to learn
+        if self.decisions.len() >= self.learning_threshold {
+            return self.analyze_patterns(command).await;
+        }
+
+        None
+    }
+
+    /// Analyze patterns to determine if command should be auto-allowed or auto-blocked
+    async fn analyze_patterns(&self, command: &str) -> Option<LearningAction> {
+        // Find all similar decisions for this command
+        let similar_decisions: Vec<&UserDecision> = self
+            .decisions
+            .iter()
+            .filter(|d| self.is_similar_command(&d.command, command))
+            .collect();
+
+        if similar_decisions.len() < 3 {
+            return None; // Not enough data
+        }
+
+        let allowed_count = similar_decisions.iter().filter(|d| d.allowed).count();
+        let denied_count = similar_decisions.len() - allowed_count;
+
+        // Consistent approval pattern
+        if allowed_count >= 5 && denied_count == 0 {
+            info!(
+                "📝 Learning: Command '{}' consistently allowed ({} times)",
+                command, allowed_count
+            );
+            return Some(LearningAction::AddToAllowed(command.to_string()));
+        }
+
+        // Consistent denial pattern
+        if denied_count >= 3 && allowed_count == 0 {
+            warn!(
+                "🚫 Learning: Command '{}' consistently blocked ({} times)",
+                command, denied_count
+            );
+            return Some(LearningAction::AddToBlocked(command.to_string()));
+        }
+
+        None
+    }
+
+    /// Check if two commands are similar (simple string matching for now)
+    fn is_similar_command(&self, cmd1: &str, cmd2: &str) -> bool {
+        // Extract base command (first word)
+        let base1 = cmd1.split_whitespace().next().unwrap_or("");
+        let base2 = cmd2.split_whitespace().next().unwrap_or("");
+
+        base1 == base2 || cmd1.contains(cmd2) || cmd2.contains(cmd1)
+    }
+
+    /// Get learning statistics
+    pub fn stats(&self) -> LearningStats {
+        let total = self.decisions.len();
+        let allowed = self.decisions.iter().filter(|d| d.allowed).count();
+        let denied = total - allowed;
+
+        LearningStats {
+            total_decisions: total,
+            allowed_count: allowed,
+            denied_count: denied,
+        }
+    }
+}
+
+/// Action recommended by learning system
+#[derive(Debug, Clone, PartialEq)]
+pub enum LearningAction {
+    AddToAllowed(String),
+    AddToBlocked(String),
+}
+
+/// Learning statistics
+#[derive(Debug, Clone)]
+pub struct LearningStats {
+    pub total_decisions: usize,
+    pub allowed_count: usize,
+    pub denied_count: usize,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -419,5 +540,53 @@ mod tests {
 
         assert_eq!(config.repository, loaded.repository);
         assert_eq!(config.allowed_commands.len(), loaded.allowed_commands.len());
+    }
+
+    #[tokio::test]
+    async fn test_security_learner_consistent_allow() {
+        let mut learner = SecurityLearner::new(3);
+
+        // Record 5 consistent approvals
+        for _ in 0..5 {
+            learner.record_decision("git push", true).await;
+        }
+
+        // Should recommend adding to allowed list
+        let action = learner.record_decision("git push", true).await;
+        assert_eq!(
+            action,
+            Some(LearningAction::AddToAllowed("git push".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_security_learner_consistent_deny() {
+        let mut learner = SecurityLearner::new(3);
+
+        // Record 3 consistent denials
+        for _ in 0..3 {
+            learner.record_decision("rm -rf /", false).await;
+        }
+
+        // Should recommend adding to blocked list
+        let action = learner.record_decision("rm -rf /", false).await;
+        assert_eq!(
+            action,
+            Some(LearningAction::AddToBlocked("rm -rf /".to_string()))
+        );
+    }
+
+    #[tokio::test]
+    async fn test_security_learner_stats() {
+        let mut learner = SecurityLearner::new(10);
+
+        learner.record_decision("git status", true).await;
+        learner.record_decision("git diff", true).await;
+        learner.record_decision("rm file.txt", false).await;
+
+        let stats = learner.stats();
+        assert_eq!(stats.total_decisions, 3);
+        assert_eq!(stats.allowed_count, 2);
+        assert_eq!(stats.denied_count, 1);
     }
 }

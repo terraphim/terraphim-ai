@@ -35,6 +35,7 @@ pub mod genai_llm_client;
 pub mod history;
 pub mod llm_types;
 pub mod prompt_sanitizer;
+pub mod validated_llm_client;
 pub mod vm_execution;
 // pub mod llm_client;      // Disabled - uses rig-core
 // pub mod simple_llm_client; // Disabled - uses rig-core
@@ -52,6 +53,7 @@ pub use genai_llm_client::*;
 pub use history::*;
 pub use llm_types::*;
 pub use prompt_sanitizer::*;
+pub use validated_llm_client::*;
 // pub use llm_client::*;      // Disabled - uses rig-core
 // pub use simple_llm_client::*; // Disabled - uses rig-core
 pub use pool::*;
