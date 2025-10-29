@@ -6,9 +6,14 @@
 
 use crate::{Result, TerraphimAutomataError};
 use aho_corasick::{AhoCorasick, MatchKind};
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "typescript")]
+use tsify::Tsify;
 
 /// Result of an edit operation
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct EditResult {
     pub success: bool,
     pub strategy_used: String,
@@ -18,7 +23,9 @@ pub struct EditResult {
 }
 
 /// Strategies for applying edits
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum EditStrategy {
     /// Exact string matching using Aho-Corasick (fastest, most precise)
     Exact,
