@@ -200,7 +200,7 @@ Result:
 **Reason:** Needs API key in environment
 **Solution:**
 ```bash
-export OPENROUTER_API_KEY="sk-or-v1-..."
+export OPENROUTER_API_KEY="sk-or-v1-..."  # pragma: allowlist secret
 ```
 
 ## Demonstration with Smaller Documents
