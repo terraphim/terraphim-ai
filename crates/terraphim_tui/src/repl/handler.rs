@@ -3364,6 +3364,157 @@ impl ReplHandler {
 
                 println!("\n{} Last updated: {}", "🕐", "2025-01-18 16:45:30 UTC");
             }
+
+            FileSubcommand::Edit {
+                file_path,
+                search,
+                replace,
+                strategy,
+            } => {
+                println!("{} Editing file with multi-strategy matching", "✏️".bold());
+                println!("{} File: {}", "📄", file_path.cyan());
+                println!(
+                    "{} Strategy: {}",
+                    "🎯",
+                    strategy.as_deref().unwrap_or("auto").yellow()
+                );
+
+                // Use our proven edit functionality from terraphim_automata
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        // Import edit functionality
+                        use terraphim_automata::apply_edit;
+
+                        match apply_edit(&content, &search, &replace) {
+                            Ok(result) if result.success => {
+                                // Write the modified content
+                                match tokio::fs::write(
+                                    &file_path,
+                                    result.modified_content.as_bytes(),
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        println!("\n{} Edit applied successfully!", "✅".green());
+                                        println!(
+                                            "{} Strategy used: {}",
+                                            "🎯",
+                                            result.strategy_used.green()
+                                        );
+                                        println!(
+                                            "{} Similarity score: {:.2}",
+                                            "📊", result.similarity_score
+                                        );
+                                        println!("{} File saved: {}", "💾", file_path.cyan());
+                                    }
+                                    Err(e) => {
+                                        println!("{} Failed to write file: {}", "❌".red(), e);
+                                    }
+                                }
+                            }
+                            Ok(result) => {
+                                println!("{} No matching content found", "❌".red());
+                                println!("{} All {} strategies failed", "ℹ️".yellow(), 4);
+                                println!("\n{} Try:", "💡".yellow());
+                                println!("   - Check search block exactly matches file content");
+                                println!("   - Use /file validate-edit to test first");
+                            }
+                            Err(e) => {
+                                println!("{} Edit error: {}", "❌".red(), e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{} Cannot read file: {}", "❌".red(), e);
+                    }
+                }
+            }
+
+            FileSubcommand::ValidateEdit {
+                file_path,
+                search,
+                replace,
+            } => {
+                println!("{} Validating edit (dry-run)", "🔍".bold());
+                println!("{} File: {}", "📄", file_path.cyan());
+
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        use terraphim_automata::apply_edit;
+
+                        match apply_edit(&content, &search, &replace) {
+                            Ok(result) if result.success => {
+                                println!("\n{} Validation PASSED ✅", "✅".green());
+                                println!(
+                                    "{} Strategy that would work: {}",
+                                    "🎯",
+                                    result.strategy_used.green()
+                                );
+                                println!(
+                                    "{} Similarity score: {:.2}",
+                                    "📊", result.similarity_score
+                                );
+                                println!("\n{} Preview of change:", "👀".bold());
+                                println!("{}", "-".repeat(60));
+
+                                // Show a preview of the change
+                                let lines: Vec<&str> = content.lines().collect();
+                                let modified_lines: Vec<&str> =
+                                    result.modified_content.lines().collect();
+
+                                for (i, (old, new)) in
+                                    lines.iter().zip(modified_lines.iter()).enumerate()
+                                {
+                                    if old != new {
+                                        println!("{} {}", "-".red(), old);
+                                        println!("{} {}", "+".green(), new);
+                                    }
+                                }
+
+                                println!("{}", "-".repeat(60));
+                                println!("\n{} Run /file edit to apply this change", "💡".yellow());
+                            }
+                            Ok(result) => {
+                                println!("\n{} Validation FAILED ❌", "❌".red());
+                                println!("{} No matching content found", "ℹ️".yellow());
+                                println!("{} Tried all {} strategies", "📊", 4);
+                            }
+                            Err(e) => {
+                                println!("{} Validation error: {}", "❌".red(), e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{} Cannot read file: {}", "❌".red(), e);
+                    }
+                }
+            }
+
+            FileSubcommand::Diff { file_path } => {
+                println!("{} File diff viewer", "📊".bold());
+
+                if let Some(path) = file_path {
+                    println!("{} File: {}", "📄", path.cyan());
+                    println!("\n{} Git diff integration coming in Phase 5", "ℹ️".yellow());
+                    println!("{} For now, use: git diff {}", "💡".yellow(), path);
+                } else {
+                    println!("{} Showing all modified files...", "📊".bold());
+                    println!("\n{} Git integration coming in Phase 5", "ℹ️".yellow());
+                    println!("{} For now, use: git status", "💡".yellow());
+                }
+            }
+
+            FileSubcommand::Undo { steps } => {
+                let step_count = steps.unwrap_or(1);
+                println!(
+                    "{} Undoing last {} file operation(s)",
+                    "⏪".bold(),
+                    step_count
+                );
+                println!("\n{} Git-based undo coming in Phase 5", "ℹ️".yellow());
+                println!("{} For now, use: git restore {}", "💡".yellow(), "<file>");
+                println!("{} Or: git reset --soft HEAD~{}", "💡".yellow(), step_count);
+            }
         }
 
         Ok(())

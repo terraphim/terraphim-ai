@@ -7,7 +7,7 @@ edition = "2021"
 default = []
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
 repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom"]
-repl-chat = ["repl"]  # Chat functionality
+repl-chat = ["repl", "dep:terraphim_multi_agent"]  # Chat functionality with ValidatedGenAiClient
 repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
@@ -54,6 +54,7 @@ terraphim_automata = { path = "../terraphim_automata" }
 terraphim_service = { path = "../terraphim_service" }
 terraphim_middleware = { path = "../terraphim_middleware" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_multi_agent = { path = "../terraphim_multi_agent", optional = true }
 
 [dev-dependencies]
 serial_test = "3.0"

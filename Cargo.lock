@@ -8525,6 +8525,7 @@ dependencies = [
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
+ "terraphim_multi_agent",
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_service",

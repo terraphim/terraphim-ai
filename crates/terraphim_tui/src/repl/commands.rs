@@ -270,6 +270,23 @@ pub enum FileSubcommand {
     Status {
         operation: Option<String>, // "indexing", "classification", "analysis"
     },
+    /// Edit file using multi-strategy matching (Phase 1 integration)
+    Edit {
+        file_path: String,
+        search: String,
+        replace: String,
+        strategy: Option<String>, // "exact", "fuzzy", "block-anchor", "auto"
+    },
+    /// Validate edit without applying (dry-run)
+    ValidateEdit {
+        file_path: String,
+        search: String,
+        replace: String,
+    },
+    /// Show diff for last/proposed edit
+    Diff { file_path: Option<String> },
+    /// Undo last file operation
+    Undo { steps: Option<usize> },
 }
 
 /// Context management subcommands for RAG workflow
