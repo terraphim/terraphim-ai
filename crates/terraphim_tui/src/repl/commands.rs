@@ -926,7 +926,7 @@ impl FromStr for ReplCommand {
             #[cfg(feature = "repl-file")]
             "file" => {
                 if parts.len() < 2 {
-                    return Err(anyhow!("File command requires a subcommand. Use: /file <search|classify|suggest|analyze|summarize|metadata|index|find|list|tag|status>"));
+                    return Err(anyhow!("File command requires a subcommand. Use: /file <search|classify|suggest|analyze|summarize|metadata|index|find|list|tag|status|edit|validate-edit|diff|undo>"));
                 }
 
                 match parts[1] {
@@ -1285,7 +1285,57 @@ impl FromStr for ReplCommand {
                         }
                         Ok(ReplCommand::File { subcommand: FileSubcommand::Status { operation } })
                     }
-                    _ => Err(anyhow!("Unknown file subcommand: {}. Use: search, classify, suggest, analyze, summarize, metadata, index, find, list, tag, status", parts[1])),
+                    "edit" => {
+                        if parts.len() < 5 {
+                            return Err(anyhow!("File edit requires file path, search, and replace. Use: /file edit <path> \"<search>\" \"<replace>\" [--strategy <auto|exact|fuzzy|block-anchor>]"));
+                        }
+                        let file_path = parts[2].to_string();
+                        let search = parts[3].to_string();
+                        let replace = parts[4].to_string();
+                        let mut strategy = None;
+                        let mut i = 5;
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--strategy" => {
+                                    if i + 1 < parts.len() {
+                                        strategy = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--strategy requires value: auto, exact, fuzzy, or block-anchor"));
+                                    }
+                                }
+                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
+                            }
+                            i += 1;
+                        }
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::Edit { file_path, search, replace, strategy } })
+                    }
+                    "validate-edit" => {
+                        if parts.len() < 5 {
+                            return Err(anyhow!("File validate-edit requires file path, search, and replace. Use: /file validate-edit <path> \"<search>\" \"<replace>\""));
+                        }
+                        let file_path = parts[2].to_string();
+                        let search = parts[3].to_string();
+                        let replace = parts[4].to_string();
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::ValidateEdit { file_path, search, replace } })
+                    }
+                    "diff" => {
+                        let file_path = if parts.len() >= 3 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::Diff { file_path } })
+                    }
+                    "undo" => {
+                        let steps = if parts.len() >= 3 {
+                            Some(parts[2].parse()?)
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::Undo { steps } })
+                    }
+                    _ => Err(anyhow!("Unknown file subcommand: {}. Use: search, classify, suggest, analyze, summarize, metadata, index, find, list, tag, status, edit, validate-edit, diff, undo", parts[1])),
                 }
             }
 
@@ -1650,5 +1700,135 @@ mod tests {
                 command: Some("search".to_string())
             }
         );
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_edit_command_parsing() {
+        let cmd = "/file edit test.rs old_code new_code"
+            .parse::<ReplCommand>()
+            .unwrap();
+
+        if let ReplCommand::File {
+            subcommand:
+                FileSubcommand::Edit {
+                    file_path,
+                    search,
+                    replace,
+                    strategy,
+                },
+        } = cmd
+        {
+            assert_eq!(file_path, "test.rs");
+            assert_eq!(search, "old_code");
+            assert_eq!(replace, "new_code");
+            assert_eq!(strategy, None);
+        } else {
+            panic!("Failed to parse edit command");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_edit_with_strategy() {
+        let cmd = "/file edit test.rs old new --strategy fuzzy"
+            .parse::<ReplCommand>()
+            .unwrap();
+
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Edit { strategy, .. },
+        } = cmd
+        {
+            assert_eq!(strategy, Some("fuzzy".to_string()));
+        } else {
+            panic!("Failed to parse edit command with strategy");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_validate_edit_command() {
+        let cmd = "/file validate-edit test.rs search replace"
+            .parse::<ReplCommand>()
+            .unwrap();
+
+        if let ReplCommand::File {
+            subcommand:
+                FileSubcommand::ValidateEdit {
+                    file_path,
+                    search,
+                    replace,
+                },
+        } = cmd
+        {
+            assert_eq!(file_path, "test.rs");
+            assert_eq!(search, "search");
+            assert_eq!(replace, "replace");
+        } else {
+            panic!("Failed to parse validate-edit command");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_diff_command() {
+        // With file path
+        let cmd = "/file diff test.rs".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Diff { file_path },
+        } = cmd
+        {
+            assert_eq!(file_path, Some("test.rs".to_string()));
+        } else {
+            panic!("Failed to parse diff command with file");
+        }
+
+        // Without file path
+        let cmd = "/file diff".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Diff { file_path },
+        } = cmd
+        {
+            assert_eq!(file_path, None);
+        } else {
+            panic!("Failed to parse diff command without file");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_undo_command() {
+        // With steps
+        let cmd = "/file undo 2".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Undo { steps },
+        } = cmd
+        {
+            assert_eq!(steps, Some(2));
+        } else {
+            panic!("Failed to parse undo command with steps");
+        }
+
+        // Without steps (default to 1)
+        let cmd = "/file undo".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Undo { steps },
+        } = cmd
+        {
+            assert_eq!(steps, None);
+        } else {
+            panic!("Failed to parse undo command without steps");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_edit_missing_args_error() {
+        let result = "/file edit test.rs".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires file path, search, and replace"));
     }
 }
