@@ -3,6 +3,8 @@
 //! This module tests the Local, Firecracker, and Hybrid execution modes
 //! with proper isolation and security validation.
 
+#![cfg(feature = "repl-custom")]
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Duration;

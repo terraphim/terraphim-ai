@@ -106,7 +106,10 @@ async fn main() -> Result<()> {
         #[cfg(feature = "test-utils")]
         let role = create_test_role();
         #[cfg(not(feature = "test-utils"))]
-        let role = terraphim_types::RoleName::from("default");
+        let role = {
+            use terraphim_config::Role;
+            Role::new("default")
+        };
 
         let agent = TerraphimAgent::new(role, persistence, None)
             .await
