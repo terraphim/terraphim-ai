@@ -22,10 +22,12 @@ use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
 use tracing::{error, info, warn};
 
+pub mod recovery;
 pub mod resource_mapper;
 pub mod security;
 pub mod validation;
 
+use crate::recovery::{GitRecovery, SnapshotManager};
 use crate::resource_mapper::TerraphimResourceMapper;
 use crate::validation::{ValidationContext, ValidationPipeline};
 
