@@ -6,11 +6,12 @@ edition = "2021"
 [features]
 default = []
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
-repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom"]
+repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-editor"]
 repl-chat = ["repl", "dep:terraphim_multi_agent"]  # Chat functionality with ValidatedGenAiClient
 repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
+repl-editor = ["repl", "dep:tempfile"]  # External editor integration (Ctrl-G)
 openrouter = ["terraphim_service/openrouter"]  # OpenRouter LLM integration
 ollama = ["terraphim_service/ollama"]  # Ollama LLM integration
 
@@ -40,11 +41,12 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 
 # REPL dependencies - only compiled with features
-rustyline = { version = "14.0", optional = true }
+rustyline = { version = "14.0", optional = true, features = ["custom-bindings"] }
 colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
 indicatif = { version = "0.18", optional = true }
 dirs = { version = "5.0", optional = true }
+tempfile = { version = "3.0", optional = true }
 
 terraphim_types = { path = "../terraphim_types" }
 terraphim_settings = { path = "../terraphim_settings" }

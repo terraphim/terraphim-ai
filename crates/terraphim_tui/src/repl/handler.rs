@@ -133,6 +133,82 @@ impl ReplHandler {
         }
 
         impl Helper for CommandCompleter {}
+
+        // External editor handler for Ctrl-G
+        #[cfg(feature = "repl-editor")]
+        #[derive(Clone)]
+        struct ExternalEditorHandler;
+
+        #[cfg(feature = "repl-editor")]
+        impl rustyline::ConditionalEventHandler for ExternalEditorHandler {
+            fn handle(
+                &self,
+                _evt: &rustyline::Event,
+                _n: rustyline::RepeatCount,
+                _: bool,
+                ctx: &rustyline::EventContext,
+            ) -> Option<rustyline::Cmd> {
+                use rustyline::{Cmd, Movement};
+
+                let current_line = ctx.line().to_string();
+
+                match Self::launch_editor(&current_line) {
+                    Ok(edited) if !edited.is_empty() && edited != current_line => {
+                        // Replace current line with edited content
+                        Some(Cmd::Replace(Movement::WholeLine, Some(edited)))
+                    }
+                    Ok(_) => None, // No changes or empty, keep current line
+                    Err(e) => {
+                        eprintln!("\n❌ Editor error: {}", e);
+                        None
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "repl-editor")]
+        impl ExternalEditorHandler {
+            fn launch_editor(content: &str) -> Result<String> {
+                use std::io::Write;
+                use std::process::Command;
+                use tempfile::NamedTempFile;
+
+                // Try VISUAL, then EDITOR, then platform-specific defaults
+                let editor = std::env::var("VISUAL")
+                    .or_else(|_| std::env::var("EDITOR"))
+                    .unwrap_or_else(|_| {
+                        if cfg!(windows) {
+                            "notepad.exe".to_string()
+                        } else {
+                            "vi".to_string()
+                        }
+                    });
+
+                // Create temp file with content
+                let mut temp_file = NamedTempFile::with_suffix(".txt")?;
+                temp_file.write_all(content.as_bytes())?;
+                temp_file.flush()?;
+
+                let temp_path = temp_file.path().to_path_buf();
+
+                // Launch editor and wait for it to close
+                let status = Command::new(&editor)
+                    .arg(&temp_path)
+                    .status()
+                    .map_err(|e| anyhow::anyhow!("Failed to launch editor '{}': {}", editor, e))?;
+
+                if !status.success() {
+                    return Err(anyhow::anyhow!("Editor exited with status: {}", status));
+                }
+
+                // Read edited content
+                let edited_content = std::fs::read_to_string(&temp_path)?;
+
+                // Return trimmed content (preserve intentional whitespace within, trim ends)
+                Ok(edited_content.trim_end().to_string())
+            }
+        }
+
         impl Hinter for CommandCompleter {
             type Hint = String;
 
@@ -310,6 +386,21 @@ impl ReplHandler {
 
         let mut rl = Editor::<CommandCompleter, rustyline::history::DefaultHistory>::new()?;
         rl.set_helper(Some(CommandCompleter::new(self.current_role.clone())));
+
+        // Bind Ctrl-G to open external editor
+        #[cfg(feature = "repl-editor")]
+        {
+            use rustyline::{EventHandler, KeyEvent};
+
+            rl.bind_sequence(
+                KeyEvent::ctrl('G'),
+                EventHandler::Conditional(Box::new(ExternalEditorHandler)),
+            );
+            println!(
+                "{}",
+                "💡 Tip: Press Ctrl-G to edit in external editor ($EDITOR)".dimmed()
+            );
+        }
 
         // Load command history if it exists
         let history_file = dirs::home_dir()
