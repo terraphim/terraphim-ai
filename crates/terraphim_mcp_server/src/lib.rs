@@ -11,6 +11,7 @@ use rmcp::{
     RoleServer, ServerHandler,
 };
 use terraphim_automata::builder::json_decode;
+use terraphim_automata::editor::{apply_edit, apply_edit_with_strategy, EditStrategy};
 use terraphim_automata::matcher::{
     extract_paragraphs_from_automata, find_matches, replace_matches,
 };
@@ -19,11 +20,16 @@ use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
+pub mod recovery;
 pub mod resource_mapper;
+pub mod security;
+pub mod validation;
 
+use crate::recovery::{GitRecovery, SnapshotManager};
 use crate::resource_mapper::TerraphimResourceMapper;
+use crate::validation::{ValidationContext, ValidationPipeline};
 
 #[derive(Error, Debug)]
 pub enum TerraphimMcpError {
@@ -51,6 +57,7 @@ pub struct McpService {
     config_state: Arc<ConfigState>,
     resource_mapper: Arc<TerraphimResourceMapper>,
     autocomplete_index: Arc<tokio::sync::RwLock<Option<AutocompleteIndex>>>,
+    validation_pipeline: Arc<ValidationPipeline>,
 }
 
 impl McpService {
@@ -60,6 +67,7 @@ impl McpService {
             config_state,
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
             autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
+            validation_pipeline: Arc::new(ValidationPipeline::new()),
         }
     }
 
@@ -1142,6 +1150,234 @@ impl McpService {
             }
         }
     }
+
+    /// Apply code edit using multi-strategy approach (exact → whitespace-flexible → block-anchor → fuzzy)
+    pub async fn edit_file_search_replace(
+        &self,
+        file_path: String,
+        search: String,
+        replace: String,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Read file
+        let content = tokio::fs::read_to_string(&file_path)
+            .await
+            .map_err(|e| ErrorData::internal_error(format!("Failed to read file: {}", e), None))?;
+
+        // Apply edit with automatic strategy fallback
+        match apply_edit(&content, &search, &replace) {
+            Ok(result) => {
+                if result.success {
+                    // Write modified content back to file
+                    tokio::fs::write(&file_path, result.modified_content.as_bytes())
+                        .await
+                        .map_err(|e| {
+                            ErrorData::internal_error(format!("Failed to write file: {}", e), None)
+                        })?;
+
+                    let content = Content::text(format!(
+                        "✓ Edit applied successfully using {} strategy (similarity: {:.2})",
+                        result.strategy_used, result.similarity_score
+                    ));
+                    Ok(CallToolResult::success(vec![content]))
+                } else {
+                    let error_content = Content::text(
+                        "Failed to apply edit: no matching content found".to_string(),
+                    );
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+            Err(e) => {
+                let error_content = Content::text(format!("Edit failed: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Apply code edit using fuzzy matching with specified threshold
+    pub async fn edit_file_fuzzy(
+        &self,
+        file_path: String,
+        search: String,
+        replace: String,
+        threshold: Option<f64>,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Read file
+        let content = tokio::fs::read_to_string(&file_path)
+            .await
+            .map_err(|e| ErrorData::internal_error(format!("Failed to read file: {}", e), None))?;
+
+        let threshold = threshold.unwrap_or(0.8);
+
+        // Apply fuzzy edit
+        match apply_edit_with_strategy(&content, &search, &replace, EditStrategy::Fuzzy) {
+            Ok(result) => {
+                if result.success && result.similarity_score >= threshold {
+                    // Write modified content
+                    tokio::fs::write(&file_path, result.modified_content.as_bytes())
+                        .await
+                        .map_err(|e| {
+                            ErrorData::internal_error(format!("Failed to write file: {}", e), None)
+                        })?;
+
+                    let content = Content::text(format!(
+                        "✓ Fuzzy edit applied (similarity: {:.2}, threshold: {:.2})",
+                        result.similarity_score, threshold
+                    ));
+                    Ok(CallToolResult::success(vec![content]))
+                } else {
+                    let error_content = Content::text(format!(
+                        "Fuzzy match failed: similarity {:.2} below threshold {:.2}",
+                        result.similarity_score, threshold
+                    ));
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+            Err(e) => {
+                let error_content = Content::text(format!("Fuzzy edit failed: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Apply unified diff/patch to file
+    pub async fn edit_file_patch(
+        &self,
+        file_path: String,
+        patch: String,
+    ) -> Result<CallToolResult, ErrorData> {
+        // For now, return a placeholder response
+        // Full unified diff parsing would be implemented here
+        let content = Content::text(format!(
+            "⚠ Patch application not yet implemented. File: {}, Patch length: {} bytes",
+            file_path,
+            patch.len()
+        ));
+        Ok(CallToolResult::success(vec![content]))
+    }
+
+    /// Replace entire file content (use with caution)
+    pub async fn edit_file_whole(
+        &self,
+        file_path: String,
+        new_content: String,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Write new content to file
+        tokio::fs::write(&file_path, new_content.as_bytes())
+            .await
+            .map_err(|e| ErrorData::internal_error(format!("Failed to write file: {}", e), None))?;
+
+        let content = Content::text(format!(
+            "✓ File replaced entirely: {} ({} bytes)",
+            file_path,
+            new_content.len()
+        ));
+        Ok(CallToolResult::success(vec![content]))
+    }
+
+    /// Validate an edit without applying it (dry-run)
+    pub async fn validate_edit(
+        &self,
+        file_path: String,
+        search: String,
+        replace: String,
+    ) -> Result<CallToolResult, ErrorData> {
+        // Read file
+        let content = tokio::fs::read_to_string(&file_path)
+            .await
+            .map_err(|e| ErrorData::internal_error(format!("Failed to read file: {}", e), None))?;
+
+        // Try edit (without writing)
+        match apply_edit(&content, &search, &replace) {
+            Ok(result) => {
+                if result.success {
+                    let content = Content::text(format!(
+                        "✓ Validation passed: {} strategy would work (similarity: {:.2})",
+                        result.strategy_used, result.similarity_score
+                    ));
+                    Ok(CallToolResult::success(vec![content]))
+                } else {
+                    let error_content =
+                        Content::text("⚠ Validation failed: no matching content found".to_string());
+                    Ok(CallToolResult::error(vec![error_content]))
+                }
+            }
+            Err(e) => {
+                let error_content = Content::text(format!("Validation error: {}", e));
+                Ok(CallToolResult::error(vec![error_content]))
+            }
+        }
+    }
+
+    /// Get LSP diagnostics for a file (placeholder for Phase 5)
+    pub async fn lsp_diagnostics(&self, file_path: String) -> Result<CallToolResult, ErrorData> {
+        let content = Content::text(format!(
+            "⚠ LSP diagnostics not yet implemented (Phase 5). File: {}",
+            file_path
+        ));
+        Ok(CallToolResult::success(vec![content]))
+    }
+
+    /// Execute tool with validation pipeline (pre-tool and post-tool hooks)
+    async fn execute_with_validation<F, Fut>(
+        &self,
+        request: &CallToolRequestParam,
+        tool_fn: F,
+    ) -> Result<CallToolResult, ErrorData>
+    where
+        F: FnOnce() -> Fut,
+        Fut: std::future::Future<Output = Result<CallToolResult, ErrorData>>,
+    {
+        // Build validation context
+        let context = ValidationContext::from_tool_request(request);
+
+        // PRE-TOOL VALIDATION
+        match self.validation_pipeline.validate_pre_tool(&context).await {
+            Ok(result) => {
+                if !result.passed {
+                    let error_content =
+                        Content::text(format!("Pre-tool validation failed: {}", result.message));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                // Log warnings
+                for warning in &result.warnings {
+                    warn!("Pre-tool warning: {}", warning);
+                }
+            }
+            Err(e) => {
+                let error_content = Content::text(format!("Pre-tool validation error: {}", e));
+                return Ok(CallToolResult::error(vec![error_content]));
+            }
+        }
+
+        // EXECUTE TOOL
+        let tool_result = tool_fn().await?;
+
+        // POST-TOOL VALIDATION
+        match self
+            .validation_pipeline
+            .validate_post_tool(&context, &tool_result)
+            .await
+        {
+            Ok(result) => {
+                if !result.passed {
+                    let error_content =
+                        Content::text(format!("Post-tool validation failed: {}", result.message));
+                    return Ok(CallToolResult::error(vec![error_content]));
+                }
+
+                // Log warnings
+                for warning in &result.warnings {
+                    warn!("Post-tool warning: {}", warning);
+                }
+            }
+            Err(e) => {
+                warn!("Post-tool validation error (non-fatal): {}", e);
+            }
+        }
+
+        Ok(tool_result)
+    }
 }
 
 impl ServerHandler for McpService {
@@ -1345,6 +1581,71 @@ impl ServerHandler for McpService {
         });
         let is_all_terms_connected_map = is_all_terms_connected_schema.as_object().unwrap().clone();
 
+        // File editing tools schemas
+        let edit_file_search_replace_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": { "type": "string", "description": "Path to the file to edit" },
+                "search": { "type": "string", "description": "Text to search for (will try multiple strategies: exact, whitespace-flexible, block-anchor, fuzzy)" },
+                "replace": { "type": "string", "description": "Text to replace with" }
+            },
+            "required": ["file_path", "search", "replace"]
+        });
+        let edit_file_search_replace_map =
+            edit_file_search_replace_schema.as_object().unwrap().clone();
+
+        let edit_file_fuzzy_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": { "type": "string", "description": "Path to the file to edit" },
+                "search": { "type": "string", "description": "Text to search for using fuzzy matching" },
+                "replace": { "type": "string", "description": "Text to replace with" },
+                "threshold": { "type": "number", "description": "Minimum similarity threshold (0.0-1.0, default: 0.8)" }
+            },
+            "required": ["file_path", "search", "replace"]
+        });
+        let edit_file_fuzzy_map = edit_file_fuzzy_schema.as_object().unwrap().clone();
+
+        let edit_file_patch_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": { "type": "string", "description": "Path to the file to patch" },
+                "patch": { "type": "string", "description": "Unified diff patch to apply" }
+            },
+            "required": ["file_path", "patch"]
+        });
+        let edit_file_patch_map = edit_file_patch_schema.as_object().unwrap().clone();
+
+        let edit_file_whole_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": { "type": "string", "description": "Path to the file to replace" },
+                "new_content": { "type": "string", "description": "New content for the entire file" }
+            },
+            "required": ["file_path", "new_content"]
+        });
+        let edit_file_whole_map = edit_file_whole_schema.as_object().unwrap().clone();
+
+        let validate_edit_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": { "type": "string", "description": "Path to the file to validate edit for" },
+                "search": { "type": "string", "description": "Text to search for" },
+                "replace": { "type": "string", "description": "Text to replace with" }
+            },
+            "required": ["file_path", "search", "replace"]
+        });
+        let validate_edit_map = validate_edit_schema.as_object().unwrap().clone();
+
+        let lsp_diagnostics_schema = serde_json::json!({
+            "type": "object",
+            "properties": {
+                "file_path": { "type": "string", "description": "Path to the file to get diagnostics for" }
+            },
+            "required": ["file_path"]
+        });
+        let lsp_diagnostics_map = lsp_diagnostics_schema.as_object().unwrap().clone();
+
         let tools = vec![
             Tool {
                 name: "search".into(),
@@ -1505,6 +1806,60 @@ impl ServerHandler for McpService {
                 title: Some("Check Terms Connectivity".into()),
                 description: Some("Check if all matched terms in text can be connected by a single path in the knowledge graph".into()),
                 input_schema: Arc::new(is_all_terms_connected_map),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+            },
+            Tool {
+                name: "edit_file_search_replace".into(),
+                title: Some("Edit File (Multi-Strategy)".into()),
+                description: Some("Apply code edit using multiple fallback strategies (exact, whitespace-flexible, block-anchor, fuzzy). Works with any LLM output.".into()),
+                input_schema: Arc::new(edit_file_search_replace_map),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+            },
+            Tool {
+                name: "edit_file_fuzzy".into(),
+                title: Some("Edit File (Fuzzy Match)".into()),
+                description: Some("Apply code edit using fuzzy Levenshtein matching with configurable threshold.".into()),
+                input_schema: Arc::new(edit_file_fuzzy_map),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+            },
+            Tool {
+                name: "edit_file_patch".into(),
+                title: Some("Edit File (Unified Diff)".into()),
+                description: Some("Apply unified diff/patch to file (placeholder for Phase 1)".into()),
+                input_schema: Arc::new(edit_file_patch_map),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+            },
+            Tool {
+                name: "edit_file_whole".into(),
+                title: Some("Replace Entire File".into()),
+                description: Some("Replace entire file content (use with caution - last resort strategy)".into()),
+                input_schema: Arc::new(edit_file_whole_map),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+            },
+            Tool {
+                name: "validate_edit".into(),
+                title: Some("Validate Edit (Dry Run)".into()),
+                description: Some("Validate an edit without applying it - check which strategy would work".into()),
+                input_schema: Arc::new(validate_edit_map),
+                output_schema: None,
+                annotations: None,
+                icons: None,
+            },
+            Tool {
+                name: "lsp_diagnostics".into(),
+                title: Some("LSP Diagnostics".into()),
+                description: Some("Get LSP diagnostics for a file (placeholder for Phase 5)".into()),
+                input_schema: Arc::new(lsp_diagnostics_map),
                 output_schema: None,
                 annotations: None,
                 icons: None,
@@ -1864,6 +2219,164 @@ impl ServerHandler for McpService {
                     .map(|s| s.to_string());
 
                 self.is_all_terms_connected_by_path(text, role)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "edit_file_search_replace" => {
+                let arguments = request.arguments.as_ref();
+                let file_path = arguments
+                    .and_then(|args| args.get("file_path"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let search = arguments
+                    .and_then(|args| args.get("search"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'search' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let replace = arguments
+                    .and_then(|args| args.get("replace"))
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'replace' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                // Execute with validation pipeline (pre-tool and post-tool hooks)
+                let file_path_clone = file_path.clone();
+                let search_clone = search.clone();
+                let replace_clone = replace.clone();
+
+                self.execute_with_validation(&request, || async move {
+                    self.edit_file_search_replace(file_path_clone, search_clone, replace_clone)
+                        .await
+                        .map_err(TerraphimMcpError::Mcp)
+                        .map_err(ErrorData::from)
+                })
+                .await
+            }
+            "edit_file_fuzzy" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let file_path = arguments
+                    .get("file_path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let search = arguments
+                    .get("search")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'search' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let replace = arguments
+                    .get("replace")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'replace' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let threshold = arguments.get("threshold").and_then(|v| v.as_f64());
+
+                self.edit_file_fuzzy(file_path, search, replace, threshold)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "edit_file_patch" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let file_path = arguments
+                    .get("file_path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let patch = arguments
+                    .get("patch")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'patch' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                self.edit_file_patch(file_path, patch)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "edit_file_whole" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let file_path = arguments
+                    .get("file_path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let new_content = arguments
+                    .get("new_content")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params(
+                            "Missing 'new_content' parameter".to_string(),
+                            None,
+                        )
+                    })?
+                    .to_string();
+
+                self.edit_file_whole(file_path, new_content)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "validate_edit" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let file_path = arguments
+                    .get("file_path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let search = arguments
+                    .get("search")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'search' parameter".to_string(), None)
+                    })?
+                    .to_string();
+                let replace = arguments
+                    .get("replace")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'replace' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                self.validate_edit(file_path, search, replace)
+                    .await
+                    .map_err(TerraphimMcpError::Mcp)
+                    .map_err(ErrorData::from)
+            }
+            "lsp_diagnostics" => {
+                let arguments = request.arguments.unwrap_or_default();
+                let file_path = arguments
+                    .get("file_path")
+                    .and_then(|v| v.as_str())
+                    .ok_or_else(|| {
+                        ErrorData::invalid_params("Missing 'file_path' parameter".to_string(), None)
+                    })?
+                    .to_string();
+
+                self.lsp_diagnostics(file_path)
                     .await
                     .map_err(TerraphimMcpError::Mcp)
                     .map_err(ErrorData::from)
