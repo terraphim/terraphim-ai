@@ -107,7 +107,7 @@ jobs:
           docker save "${IMAGE_TAG}" | gzip > terraphim-builder-image.tar.gz
 
       - name: Upload Docker image artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: terraphim-builder-image
           path: terraphim-builder-image.tar.gz
@@ -220,7 +220,7 @@ jobs:
             cargo deb --target ${{ matrix.target }} --package terraphim_server --no-build
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: rust-binaries-${{ matrix.target }}-${{ matrix.ubuntu-version }}
           path: target/${{ matrix.target }}/release/terraphim*
@@ -228,7 +228,7 @@ jobs:
 
       - name: Upload .deb packages
         if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: deb-packages-${{ matrix.target }}-${{ matrix.ubuntu-version }}
           path: target/${{ matrix.target }}/debian/*.deb
