@@ -6,12 +6,11 @@ use axum::{
 };
 use chrono::Utc;
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 
 use crate::{AppState, Result, Status};
 use terraphim_persistence::mcp::{
     McpApiKeyRecord, McpAuditRecord, McpEndpointRecord, McpNamespaceRecord, McpPersistence,
-    McpPersistenceImpl, NamespaceVisibility,
+    NamespaceVisibility,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -78,9 +77,9 @@ pub struct CreateApiKeyRequest {
 }
 
 pub async fn list_namespaces(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
 ) -> Result<Json<McpNamespaceListResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.list_namespaces(None).await {
         Ok(namespaces) => Ok(Json(McpNamespaceListResponse {
@@ -97,10 +96,10 @@ pub async fn list_namespaces(
 }
 
 pub async fn get_namespace(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Path(uuid): Path<String>,
 ) -> Result<Json<McpNamespaceResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.get_namespace(&uuid).await {
         Ok(Some(namespace)) => Ok(Json(McpNamespaceResponse {
@@ -122,10 +121,10 @@ pub async fn get_namespace(
 }
 
 pub async fn create_namespace(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Json(request): Json<CreateNamespaceRequest>,
 ) -> Result<Json<McpNamespaceResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     let record = McpNamespaceRecord {
         uuid: uuid::Uuid::new_v4().to_string(),
@@ -153,10 +152,10 @@ pub async fn create_namespace(
 }
 
 pub async fn delete_namespace(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Path(uuid): Path<String>,
 ) -> Result<impl IntoResponse> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.delete_namespace(&uuid).await {
         Ok(()) => Ok((StatusCode::NO_CONTENT, "")),
@@ -171,9 +170,9 @@ pub async fn delete_namespace(
 }
 
 pub async fn list_endpoints(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
 ) -> Result<Json<McpEndpointListResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.list_endpoints(None).await {
         Ok(endpoints) => Ok(Json(McpEndpointListResponse {
@@ -190,10 +189,10 @@ pub async fn list_endpoints(
 }
 
 pub async fn get_endpoint(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Path(uuid): Path<String>,
 ) -> Result<Json<McpEndpointResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.get_endpoint(&uuid).await {
         Ok(Some(endpoint)) => Ok(Json(McpEndpointResponse {
@@ -215,10 +214,10 @@ pub async fn get_endpoint(
 }
 
 pub async fn create_endpoint(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Json(request): Json<CreateEndpointRequest>,
 ) -> Result<Json<McpEndpointResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     let record = McpEndpointRecord {
         uuid: uuid::Uuid::new_v4().to_string(),
@@ -245,10 +244,10 @@ pub async fn create_endpoint(
 }
 
 pub async fn delete_endpoint(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Path(uuid): Path<String>,
 ) -> Result<impl IntoResponse> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.delete_endpoint(&uuid).await {
         Ok(()) => Ok((StatusCode::NO_CONTENT, "")),
@@ -263,10 +262,10 @@ pub async fn delete_endpoint(
 }
 
 pub async fn create_api_key(
-    State(_app_state): State<AppState>,
+    State(app_state): State<AppState>,
     Json(request): Json<CreateApiKeyRequest>,
 ) -> Result<Json<McpApiKeyResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     let key_value = format!("tpai_{}", uuid::Uuid::new_v4().to_string().replace('-', ""));
     let key_hash = hash_api_key(&key_value);
@@ -297,23 +296,6 @@ pub async fn create_api_key(
     }
 }
 
-fn get_mcp_persistence() -> Result<Arc<McpPersistenceImpl>> {
-    use opendal::services::Memory;
-    use opendal::Operator;
-
-    let builder = Memory::default();
-    let op = Operator::new(builder)
-        .map_err(|e| {
-            crate::error::ApiError(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                anyhow::anyhow!("Failed to create operator: {}", e),
-            )
-        })?
-        .finish();
-
-    Ok(Arc::new(McpPersistenceImpl::new(op)))
-}
-
 fn hash_api_key(key: &str) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
@@ -339,8 +321,8 @@ pub struct McpAuditListResponse {
     pub error: Option<String>,
 }
 
-pub async fn get_mcp_health(State(_app_state): State<AppState>) -> Result<Json<McpHealthResponse>> {
-    let persistence = get_mcp_persistence()?;
+pub async fn get_mcp_health(State(app_state): State<AppState>) -> Result<Json<McpHealthResponse>> {
+    let persistence = app_state.mcp_persistence.clone();
 
     let namespaces = persistence.list_namespaces(None).await.map_err(|e| {
         crate::error::ApiError(
@@ -366,8 +348,8 @@ pub async fn get_mcp_health(State(_app_state): State<AppState>) -> Result<Json<M
     }))
 }
 
-pub async fn list_audits(State(_app_state): State<AppState>) -> Result<Json<McpAuditListResponse>> {
-    let persistence = get_mcp_persistence()?;
+pub async fn list_audits(State(app_state): State<AppState>) -> Result<Json<McpAuditListResponse>> {
+    let persistence = app_state.mcp_persistence.clone();
 
     match persistence.list_audits(None, None, Some(100)).await {
         Ok(audits) => {

@@ -4,9 +4,8 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
-use std::sync::Arc;
 use terraphim_mcp_proxy::{ContentItem, McpProxy, Tool, ToolCallRequest};
-use terraphim_persistence::mcp::{McpPersistence, McpPersistenceImpl};
+use terraphim_persistence::mcp::McpPersistence;
 use utoipa::ToSchema;
 
 use crate::{AppState, Result};
@@ -111,7 +110,7 @@ pub async fn list_tools_for_endpoint(
     State(app_state): State<AppState>,
     Path(endpoint_uuid): Path<String>,
 ) -> Result<Json<ToolListResponse>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     let endpoint = persistence
         .get_endpoint(&endpoint_uuid)
@@ -186,7 +185,7 @@ pub async fn execute_tool(
     Path((endpoint_uuid, tool_name)): Path<(String, String)>,
     Json(payload): Json<ToolCallRequestPayload>,
 ) -> Result<Json<ToolCallResponsePayload>> {
-    let persistence = get_mcp_persistence()?;
+    let persistence = app_state.mcp_persistence.clone();
 
     let endpoint = persistence
         .get_endpoint(&endpoint_uuid)
@@ -277,27 +276,13 @@ async fn create_proxy_from_namespace(
     Ok(proxy)
 }
 
-fn get_mcp_persistence() -> Result<Arc<McpPersistenceImpl>> {
-    use opendal::services::Memory;
-    use opendal::Operator;
-
-    let builder = Memory::default();
-    let op = Operator::new(builder)
-        .map_err(|e| {
-            crate::error::ApiError(
-                StatusCode::INTERNAL_SERVER_ERROR,
-                anyhow::anyhow!("Failed to create operator: {}", e),
-            )
-        })?
-        .finish();
-
-    Ok(Arc::new(McpPersistenceImpl::new(op)))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_persistence::mcp::{McpEndpointRecord, McpNamespaceRecord, NamespaceVisibility};
+    use std::sync::Arc;
+    use terraphim_persistence::mcp::{
+        McpEndpointRecord, McpNamespaceRecord, McpPersistenceImpl, NamespaceVisibility,
+    };
 
     #[tokio::test]
     async fn test_tool_list_response_serialization() {

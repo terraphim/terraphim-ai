@@ -152,6 +152,7 @@ pub struct AppState {
     pub config_state: ConfigState,
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
+    pub mcp_persistence: Arc<terraphim_persistence::mcp::McpPersistenceImpl>,
 }
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
@@ -412,11 +413,24 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     let (websocket_broadcaster, _) = broadcast::channel(1000);
     log::info!("Initialized workflow management system with WebSocket support");
 
+    // Initialize MCP persistence with Memory backend for now
+    let mcp_persistence = {
+        use opendal::services::Memory;
+        use opendal::Operator;
+        let builder = Memory::default();
+        let op = Operator::new(builder)
+            .map_err(|e| anyhow::anyhow!("Failed to create MCP persistence operator: {}", e))?
+            .finish();
+        Arc::new(terraphim_persistence::mcp::McpPersistenceImpl::new(op))
+    };
+    log::info!("Initialized MCP persistence layer");
+
     // Create extended application state
     let app_state = AppState {
         config_state,
         workflow_sessions,
         websocket_broadcaster,
+        mcp_persistence,
     };
 
     let app = Router::new()
@@ -633,11 +647,21 @@ pub async fn build_router_for_tests() -> Router {
     let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
     let (websocket_broadcaster, _) = broadcast::channel(100);
 
+    // Initialize MCP persistence for tests
+    let mcp_persistence = {
+        use opendal::services::Memory;
+        use opendal::Operator;
+        let builder = Memory::default();
+        let op = Operator::new(builder).unwrap().finish();
+        Arc::new(terraphim_persistence::mcp::McpPersistenceImpl::new(op))
+    };
+
     // Create extended application state for tests
     let app_state = AppState {
         config_state,
         workflow_sessions,
         websocket_broadcaster,
+        mcp_persistence,
     };
 
     Router::new()
