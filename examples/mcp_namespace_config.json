@@ -1,0 +1,65 @@
+{
+  "name": "System Engineer with MCP",
+  "relevance_function": "TerraphimGraph",
+  "terraphim_it": true,
+  "theme": "default",
+  "haystacks": [
+    {
+      "location": "/workspace/docs",
+      "service": "Ripgrep",
+      "read_only": false
+    }
+  ],
+  "mcp_namespaces": [
+    {
+      "name": "dev-tools",
+      "enabled": true,
+      "servers": [
+        {
+          "name": "filesystem",
+          "transport": "STDIO",
+          "command": "npx",
+          "args": ["-y", "@modelcontextprotocol/server-filesystem", "/workspace"]
+        },
+        {
+          "name": "github",
+          "transport": "SSE",
+          "url": "http://localhost:3001/mcp",
+          "bearer_token": "${GITHUB_MCP_TOKEN}"
+        }
+      ],
+      "tool_overrides": {
+        "filesystem__read_file": {
+          "name": "read_code",
+          "description": "Read source code file",
+          "status": "ACTIVE"
+        },
+        "filesystem__write_file": {
+          "status": "INACTIVE"
+        },
+        "github__create_pr": {
+          "name": "create_pull_request",
+          "description": "Create a new pull request on GitHub"
+        }
+      }
+    },
+    {
+      "name": "ai-tools",
+      "enabled": true,
+      "servers": [
+        {
+          "name": "perplexity",
+          "transport": "HTTP",
+          "url": "https://api.perplexity.ai/mcp",
+          "bearer_token": "${PERPLEXITY_API_KEY}"
+        }
+      ],
+      "tool_overrides": {}
+    }
+  ],
+  "llm_enabled": true,
+  "llm_api_key": "${OPENROUTER_API_KEY}",
+  "llm_model": "anthropic/claude-3.5-sonnet",
+  "llm_auto_summarize": false,
+  "llm_chat_enabled": true
+}
