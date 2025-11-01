@@ -1,6 +1,14 @@
-use ahash::AHashMap;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+
+#[cfg(feature = "json-schema")]
+use schemars::JsonSchema;
+
+#[cfg(not(feature = "json-schema"))]
+use ahash::AHashMap as HashMap;
+
+#[cfg(feature = "json-schema")]
+use std::collections::HashMap;
 
 pub mod namespace;
 pub mod pool;
@@ -42,6 +50,7 @@ pub enum McpProxyError {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TransportType {
     Stdio,
@@ -57,6 +66,7 @@ impl Default for TransportType {
 }
 
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ToolStatus {
     Active,
@@ -70,6 +80,7 @@ impl Default for ToolStatus {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 pub struct ToolOverride {
     pub name: Option<String>,
     pub description: Option<String>,
@@ -88,6 +99,7 @@ impl Default for ToolOverride {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 pub struct McpServerConfig {
     pub name: String,
     #[serde(default)]
@@ -96,7 +108,7 @@ pub struct McpServerConfig {
     pub args: Option<Vec<String>>,
     pub url: Option<String>,
     pub bearer_token: Option<String>,
-    pub env: Option<AHashMap<String, String>>,
+    pub env: Option<HashMap<String, String>>,
 }
 
 impl McpServerConfig {
@@ -141,14 +153,14 @@ impl McpServerConfig {
         self
     }
 
-    pub fn with_env(mut self, env: AHashMap<String, String>) -> Self {
+    pub fn with_env(mut self, env: HashMap<String, String>) -> Self {
         self.env = Some(env);
         self
     }
 
     pub fn resolve_env_vars(&mut self) -> Result<()> {
         if let Some(env) = &mut self.env {
-            let mut resolved = AHashMap::new();
+            let mut resolved = HashMap::default();
             for (key, value) in env.iter() {
                 let resolved_value = resolve_env_string(value)?;
                 resolved.insert(key.clone(), resolved_value);
@@ -186,11 +198,12 @@ fn resolve_env_string(input: &str) -> Result<String> {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 pub struct McpNamespace {
     pub name: String,
     pub servers: Vec<McpServerConfig>,
     #[serde(default)]
-    pub tool_overrides: AHashMap<String, ToolOverride>,
+    pub tool_overrides: HashMap<String, ToolOverride>,
     #[serde(default = "default_true")]
     pub enabled: bool,
 }
@@ -204,7 +217,7 @@ impl McpNamespace {
         Self {
             name: name.into(),
             servers: Vec::new(),
-            tool_overrides: AHashMap::new(),
+            tool_overrides: HashMap::default(),
             enabled: true,
         }
     }

@@ -1,7 +1,12 @@
 use crate::{McpProxyError, McpServerConfig, Result};
-use ahash::AHashMap;
 use std::sync::Arc;
 use tokio::sync::RwLock;
+
+#[cfg(not(feature = "json-schema"))]
+use ahash::HashMap as HashMap;
+
+#[cfg(feature = "json-schema")]
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ServerHealth {
@@ -96,7 +101,7 @@ impl McpServerConnection {
 #[derive(Debug, Clone)]
 pub struct McpServerPool {
     /// Map of server name to connection
-    connections: Arc<RwLock<AHashMap<String, McpServerConnection>>>,
+    connections: Arc<RwLock<HashMap<String, McpServerConnection>>>,
     /// Health check interval in seconds
     health_check_interval: u64,
     /// Maximum number of idle connections per server
@@ -114,7 +119,7 @@ impl McpServerPool {
     /// Create a new server pool with default settings
     pub fn new() -> Self {
         Self {
-            connections: Arc::new(RwLock::new(AHashMap::new())),
+            connections: Arc::new(RwLock::new(HashMap::default())),
             health_check_interval: 60, // 60 seconds
             max_idle_connections: 5,
         }
@@ -123,7 +128,7 @@ impl McpServerPool {
     /// Create a server pool with custom settings
     pub fn with_config(health_check_interval: u64, max_idle_connections: usize) -> Self {
         Self {
-            connections: Arc::new(RwLock::new(AHashMap::new())),
+            connections: Arc::new(RwLock::new(HashMap::default())),
             health_check_interval,
             max_idle_connections,
         }

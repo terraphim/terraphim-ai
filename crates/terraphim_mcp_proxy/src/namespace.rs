@@ -1,17 +1,22 @@
 use crate::{McpNamespace, McpServerConfig};
-use ahash::AHashMap;
+
+#[cfg(not(feature = "json-schema"))]
+use ahash::HashMap as HashMap;
+
+#[cfg(feature = "json-schema")]
+use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default)]
 pub struct NamespaceManager {
     /// Map of namespace name to namespace configuration
-    namespaces: AHashMap<String, McpNamespace>,
+    namespaces: HashMap<String, McpNamespace>,
 }
 
 impl NamespaceManager {
     /// Create a new namespace manager
     pub fn new() -> Self {
         Self {
-            namespaces: AHashMap::new(),
+            namespaces: HashMap::default(),
         }
     }
 
@@ -83,14 +88,14 @@ mod tests {
                 "npx",
                 vec!["-y".to_string()],
             )],
-            tool_overrides: AHashMap::new(),
+            tool_overrides: HashMap::default(),
             enabled: true,
         };
 
         let ns2 = McpNamespace {
             name: "data-tools".to_string(),
             servers: vec![],
-            tool_overrides: AHashMap::new(),
+            tool_overrides: HashMap::default(),
             enabled: false,
         };
 
@@ -119,14 +124,14 @@ mod tests {
                 McpServerConfig::stdio("server1", "cmd1", vec![]),
                 McpServerConfig::stdio("server2", "cmd2", vec![]),
             ],
-            tool_overrides: AHashMap::new(),
+            tool_overrides: HashMap::default(),
             enabled: true,
         };
 
         let ns2 = McpNamespace {
             name: "ns2".to_string(),
             servers: vec![McpServerConfig::stdio("server3", "cmd3", vec![])],
-            tool_overrides: AHashMap::new(),
+            tool_overrides: HashMap::default(),
             enabled: true,
         };
 

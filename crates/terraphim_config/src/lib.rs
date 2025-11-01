@@ -91,6 +91,10 @@ pub struct Role {
     pub theme: String,
     pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
+    #[serde(default)]
+    #[cfg_attr(feature = "mcp-proxy", serde(skip_serializing_if = "Vec::is_empty"))]
+    #[cfg(feature = "mcp-proxy")]
+    pub mcp_namespaces: Vec<terraphim_mcp_proxy::McpNamespace>,
     /// Enable AI-powered article summaries using LLM providers
     #[serde(default)]
     pub llm_enabled: bool,
@@ -132,6 +136,8 @@ impl Role {
             theme: "default".to_string(),
             kg: None,
             haystacks: vec![],
+            #[cfg(feature = "mcp-proxy")]
+            mcp_namespaces: vec![],
             llm_enabled: false,
             llm_api_key: None,
             llm_model: None,

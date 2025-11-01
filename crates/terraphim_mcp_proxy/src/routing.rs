@@ -33,7 +33,7 @@ impl ToolRouter {
     /// Create a new tool router
     pub fn new() -> Self {
         Self {
-            tool_to_server: std::collections::HashMap::new(),
+            tool_to_server: std::collections::HashMap::default(),
         }
     }
 

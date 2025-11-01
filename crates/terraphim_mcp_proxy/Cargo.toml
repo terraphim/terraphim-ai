@@ -12,7 +12,6 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_config = { path = "../terraphim_config", version = "0.2.0" }
 terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
 
 # Async runtime and traits
@@ -26,6 +25,7 @@ anyhow = "1.0"
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+schemars = { version = "0.8.22", features = ["derive"], optional = true }
 
 # Logging
 log = "0.4"
@@ -48,3 +48,5 @@ test-log = { version = "0.2.11", features = ["trace"] }
 default = []
 # Enable MCP protocol support with rust SDK
 mcp-rust-sdk = ["rmcp", "reqwest"]
+# Enable JSON schema generation for config integration
+json-schema = ["schemars"]
