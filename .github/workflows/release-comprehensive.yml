@@ -88,7 +88,7 @@ jobs:
           copy target\${{ matrix.target }}\release\terraphim-tui.exe artifacts\terraphim-tui-${{ matrix.target }}.exe
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.target }}
           path: artifacts/*
@@ -124,7 +124,7 @@ jobs:
           cargo deb -p terraphim-ai-desktop --output target/debian/
 
       - name: Upload Debian packages
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: debian-packages
           path: target/debian/*.deb
@@ -185,7 +185,7 @@ jobs:
 
       - name: Upload desktop artifacts (macOS)
         if: matrix.platform == 'macos-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: desktop-macos
           path: |
@@ -194,7 +194,7 @@ jobs:
 
       - name: Upload desktop artifacts (Linux)
         if: startsWith(matrix.platform, 'ubuntu-')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: desktop-linux-${{ matrix.platform }}
           path: |
@@ -203,7 +203,7 @@ jobs:
 
       - name: Upload desktop artifacts (Windows)
         if: matrix.platform == 'windows-latest'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: desktop-windows
           path: |

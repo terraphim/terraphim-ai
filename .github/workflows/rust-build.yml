@@ -181,7 +181,7 @@ jobs:
           echo "deb-package=target/$NEW_NAME" >> $GITHUB_OUTPUT
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.target }}-ubuntu${{ matrix.ubuntu-version }}
           path: |
@@ -192,7 +192,7 @@ jobs:
 
       - name: Upload .deb package
         if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: deb-package-${{ matrix.target }}-ubuntu${{ matrix.ubuntu-version }}
           path: target/*.deb
