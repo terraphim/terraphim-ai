@@ -119,6 +119,7 @@ fn create_document_description(content: &str) -> Option<String> {
 
 mod api;
 mod api_mcp;
+mod api_mcp_tools;
 mod error;
 mod mcp_auth;
 
@@ -533,6 +534,14 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         .route("/metamcp/api_keys", post(api_mcp::create_api_key))
         .route("/metamcp/health", get(api_mcp::get_mcp_health))
         .route("/metamcp/audits", get(api_mcp::list_audits))
+        .route(
+            "/metamcp/endpoints/{endpoint_uuid}/tools",
+            get(api_mcp_tools::list_tools_for_endpoint),
+        )
+        .route(
+            "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
+            post(api_mcp_tools::execute_tool),
+        )
         // Add workflow management routes
         .merge(workflows::create_router())
         .fallback(static_handler)
@@ -737,6 +746,14 @@ pub async fn build_router_for_tests() -> Router {
             delete(api_mcp::delete_endpoint),
         )
         .route("/metamcp/api_keys", post(api_mcp::create_api_key))
+        .route(
+            "/metamcp/endpoints/{endpoint_uuid}/tools",
+            get(api_mcp_tools::list_tools_for_endpoint),
+        )
+        .route(
+            "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
+            post(api_mcp_tools::execute_tool),
+        )
         // Add workflow management routes for tests
         .merge(workflows::create_router())
         .with_state(app_state)

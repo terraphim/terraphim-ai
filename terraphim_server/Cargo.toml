@@ -21,6 +21,7 @@ terraphim_types = { path = "../crates/terraphim_types", version = "0.2.0" }
 terraphim_automata = { path = "../crates/terraphim_automata", version = "0.2.0", features = ["tokio-runtime"] }
 terraphim_service = { path = "../crates/terraphim_service", version = "0.2.0" }
 terraphim_multi_agent = { path = "../crates/terraphim_multi_agent", version = "0.2.0" }
+terraphim_mcp_proxy = { path = "../crates/terraphim_mcp_proxy", version = "0.1.0" }
 
 
 anyhow = "1.0.40"

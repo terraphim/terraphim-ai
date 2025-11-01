@@ -8428,6 +8428,7 @@ dependencies = [
  "tempfile",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_mcp_proxy",
  "terraphim_middleware",
  "terraphim_multi_agent",
  "terraphim_persistence",
