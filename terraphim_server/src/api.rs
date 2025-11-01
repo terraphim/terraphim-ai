@@ -24,7 +24,7 @@ use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
 /// Health check endpoint
-pub(crate) async fn health() -> impl IntoResponse {
+pub async fn health() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 

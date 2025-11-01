@@ -17,7 +17,7 @@ static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(||
     Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create normalize regex")
 });
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
-use terraphim_config::ConfigState;
+pub use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_service::summarization_manager::SummarizationManager;
@@ -119,20 +119,20 @@ fn create_document_description(content: &str) -> Option<String> {
 }
 
 mod api;
-mod api_mcp;
-mod api_mcp_openapi;
-mod api_mcp_tools;
+pub mod api_mcp;
+pub mod api_mcp_openapi;
+pub mod api_mcp_tools;
 mod error;
-mod mcp_auth;
+pub mod mcp_auth;
 
 pub mod workflows;
 
 use api::{
-    create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
+    create_document, find_documents_by_kg_term, get_rolegraph, search_documents,
     search_documents_post,
 };
 pub use api::{
-    AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
+    health, AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
     CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
     ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
