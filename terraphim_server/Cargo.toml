@@ -49,6 +49,8 @@ chrono = { version = "0.4", features = ["serde"] }
 uuid = { version = "1.0", features = ["v4", "serde"] }
 futures-util = "0.3"
 rand = "0.8"
+sha2 = "0.10"
+opendal = "0.54"
 
 [features]
 default = []

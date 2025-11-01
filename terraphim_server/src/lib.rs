@@ -118,7 +118,9 @@ fn create_document_description(content: &str) -> Option<String> {
 }
 
 mod api;
+mod api_mcp;
 mod error;
+mod mcp_auth;
 
 pub mod workflows;
 
@@ -513,6 +515,22 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
+        // MCP namespace and endpoint management routes
+        .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
+        .route("/metamcp/namespaces", post(api_mcp::create_namespace))
+        .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
+        .route(
+            "/metamcp/namespaces/{uuid}",
+            delete(api_mcp::delete_namespace),
+        )
+        .route("/metamcp/endpoints", get(api_mcp::list_endpoints))
+        .route("/metamcp/endpoints", post(api_mcp::create_endpoint))
+        .route("/metamcp/endpoints/{uuid}", get(api_mcp::get_endpoint))
+        .route(
+            "/metamcp/endpoints/{uuid}",
+            delete(api_mcp::delete_endpoint),
+        )
+        .route("/metamcp/api_keys", post(api_mcp::create_api_key))
         // Add workflow management routes
         .merge(workflows::create_router())
         .fallback(static_handler)
@@ -701,6 +719,22 @@ pub async fn build_router_for_tests() -> Router {
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
+        // MCP namespace and endpoint management routes
+        .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
+        .route("/metamcp/namespaces", post(api_mcp::create_namespace))
+        .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
+        .route(
+            "/metamcp/namespaces/{uuid}",
+            delete(api_mcp::delete_namespace),
+        )
+        .route("/metamcp/endpoints", get(api_mcp::list_endpoints))
+        .route("/metamcp/endpoints", post(api_mcp::create_endpoint))
+        .route("/metamcp/endpoints/{uuid}", get(api_mcp::get_endpoint))
+        .route(
+            "/metamcp/endpoints/{uuid}",
+            delete(api_mcp::delete_endpoint),
+        )
+        .route("/metamcp/api_keys", post(api_mcp::create_api_key))
         // Add workflow management routes for tests
         .merge(workflows::create_router())
         .with_state(app_state)
