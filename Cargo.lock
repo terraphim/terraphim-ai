@@ -8200,6 +8200,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_mcp_proxy"
+version = "0.1.0"
+dependencies = [
+ "ahash 0.8.12",
+ "anyhow",
+ "async-trait",
+ "log",
+ "regex",
+ "reqwest 0.12.24",
+ "rmcp",
+ "serde",
+ "serde_json",
+ "terraphim_config",
+ "terraphim_types",
+ "test-log",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "terraphim_mcp_server"
 version = "0.2.0"
 dependencies = [

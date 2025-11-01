@@ -1,0 +1,50 @@
+[package]
+name = "terraphim_mcp_proxy"
+version = "0.1.0"
+edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "MCP proxy for aggregating multiple MCP servers"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["mcp", "proxy", "aggregation", "ai"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+terraphim_config = { path = "../terraphim_config", version = "0.2.0" }
+terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+
+# Async runtime and traits
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1.73"
+
+# Error handling
+thiserror = "1.0.56"
+anyhow = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Logging
+log = "0.4"
+
+# Collections
+ahash = { version = "0.8.8", features = ["serde"] }
+
+# Utilities
+regex = "1.10"
+
+# MCP dependencies - feature-gated
+rmcp = { version = "0.6", features = ["client", "transport-child-process"], optional = true }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false, optional = true }
+
+[dev-dependencies]
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+test-log = { version = "0.2.11", features = ["trace"] }
+
+[features]
+default = []
+# Enable MCP protocol support with rust SDK
+mcp-rust-sdk = ["rmcp", "reqwest"]
