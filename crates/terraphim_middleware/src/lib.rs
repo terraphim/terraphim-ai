@@ -5,6 +5,7 @@ use terraphim_config::TerraphimConfigError;
 pub mod command;
 pub mod haystack;
 pub mod indexer;
+pub mod mcp_namespace;
 pub mod thesaurus;
 
 #[cfg(feature = "atomic")]

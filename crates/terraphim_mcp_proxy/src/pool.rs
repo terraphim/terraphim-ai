@@ -3,7 +3,7 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 #[cfg(not(feature = "json-schema"))]
-use ahash::HashMap as HashMap;
+use ahash::HashMap;
 
 #[cfg(feature = "json-schema")]
 use std::collections::HashMap;

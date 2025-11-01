@@ -1,7 +1,7 @@
 use crate::{McpNamespace, McpServerConfig};
 
 #[cfg(not(feature = "json-schema"))]
-use ahash::HashMap as HashMap;
+use ahash::HashMap;
 
 #[cfg(feature = "json-schema")]
 use std::collections::HashMap;

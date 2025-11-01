@@ -19,6 +19,7 @@ terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", featur
 terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
 terraphim_atomic_client = { path = "../terraphim_atomic_client", features = ["native"], optional = true }
+terraphim_mcp_proxy = { path = "../terraphim_mcp_proxy", version = "0.1.0", optional = true }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 cached = { version = "0.56.0", features = ["async", "serde", "ahash"] }
@@ -64,3 +65,5 @@ mcp-sse = ["reqwest-eventsource"]
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
 mcp-rust-sdk = ["mcp-sse", "mcp-client", "mcp-spec", "rmcp"]
+# Enable MCP proxy for namespace aggregation
+mcp-proxy = ["terraphim_mcp_proxy", "terraphim_config/mcp-proxy"]

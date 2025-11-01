@@ -8279,6 +8279,7 @@ dependencies = [
  "terraphim_atomic_client",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_mcp_proxy",
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_settings",
