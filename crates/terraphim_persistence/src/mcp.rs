@@ -16,6 +16,12 @@ pub struct McpNamespaceRecord {
     pub config_json: String,
     pub created_at: DateTime<Utc>,
     pub enabled: bool,
+    #[serde(default = "default_visibility")]
+    pub visibility: NamespaceVisibility,
+}
+
+fn default_visibility() -> NamespaceVisibility {
+    NamespaceVisibility::Private
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -68,11 +74,36 @@ pub struct ToolDiscoveryCache {
     pub expires_at: DateTime<Utc>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct McpAuditRecord {
+    pub uuid: String,
+    pub user_id: Option<String>,
+    pub endpoint_uuid: String,
+    pub namespace_uuid: String,
+    pub tool_name: String,
+    pub arguments: Option<String>,
+    pub response: Option<String>,
+    pub is_error: bool,
+    pub latency_ms: u64,
+    pub created_at: DateTime<Utc>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum NamespaceVisibility {
+    Public,
+    Private,
+}
+
 #[async_trait]
 pub trait McpPersistence: Send + Sync {
     async fn save_namespace(&self, record: &McpNamespaceRecord) -> Result<()>;
     async fn get_namespace(&self, uuid: &str) -> Result<Option<McpNamespaceRecord>>;
     async fn list_namespaces(&self, user_id: Option<&str>) -> Result<Vec<McpNamespaceRecord>>;
+    async fn list_namespaces_with_visibility(
+        &self,
+        user_id: Option<&str>,
+        include_public: bool,
+    ) -> Result<Vec<McpNamespaceRecord>>;
     async fn delete_namespace(&self, uuid: &str) -> Result<()>;
 
     async fn save_endpoint(&self, record: &McpEndpointRecord) -> Result<()>;
@@ -95,6 +126,16 @@ pub trait McpPersistence: Send + Sync {
     async fn save_tool_cache(&self, cache: &ToolDiscoveryCache) -> Result<()>;
     async fn get_tool_cache(&self, namespace_uuid: &str) -> Result<Option<ToolDiscoveryCache>>;
     async fn delete_tool_cache(&self, namespace_uuid: &str) -> Result<()>;
+
+    async fn save_audit(&self, record: &McpAuditRecord) -> Result<()>;
+    async fn get_audit(&self, uuid: &str) -> Result<Option<McpAuditRecord>>;
+    async fn list_audits(
+        &self,
+        user_id: Option<&str>,
+        endpoint_uuid: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<McpAuditRecord>>;
+    async fn delete_audit(&self, uuid: &str) -> Result<()>;
 }
 
 pub struct McpPersistenceImpl {
@@ -126,6 +167,10 @@ impl McpPersistenceImpl {
 
     fn tool_cache_path(namespace_uuid: &str) -> String {
         format!("mcp/tool_cache/{}.json", namespace_uuid)
+    }
+
+    fn audit_path(uuid: &str) -> String {
+        format!("mcp/audit/{}.json", uuid)
     }
 }
 
@@ -159,6 +204,35 @@ impl McpPersistence for McpPersistenceImpl {
             if let Ok(data) = op.read(entry.path()).await {
                 if let Ok(record) = serde_json::from_slice::<McpNamespaceRecord>(&data.to_vec()) {
                     if user_id.is_none() || record.user_id.as_deref() == user_id {
+                        namespaces.push(record);
+                    }
+                }
+            }
+        }
+
+        Ok(namespaces)
+    }
+
+    async fn list_namespaces_with_visibility(
+        &self,
+        user_id: Option<&str>,
+        include_public: bool,
+    ) -> Result<Vec<McpNamespaceRecord>> {
+        let mut namespaces = Vec::new();
+        let op = self.operator.read().await;
+
+        let mut lister = op.lister("mcp/namespaces/").await?;
+        while let Some(entry) = lister.try_next().await? {
+            if let Ok(data) = op.read(entry.path()).await {
+                if let Ok(record) = serde_json::from_slice::<McpNamespaceRecord>(&data.to_vec()) {
+                    let user_match = user_id.is_none() || record.user_id.as_deref() == user_id;
+                    let visibility_match = if include_public {
+                        user_match || record.visibility == NamespaceVisibility::Public
+                    } else {
+                        user_match
+                    };
+
+                    if visibility_match {
                         namespaces.push(record);
                     }
                 }
@@ -361,6 +435,65 @@ impl McpPersistence for McpPersistenceImpl {
         self.operator.write().await.delete(&path).await?;
         Ok(())
     }
+
+    async fn save_audit(&self, record: &McpAuditRecord) -> Result<()> {
+        let path = Self::audit_path(&record.uuid);
+        let data = serde_json::to_vec(record)?;
+        self.operator.write().await.write(&path, data).await?;
+        Ok(())
+    }
+
+    async fn get_audit(&self, uuid: &str) -> Result<Option<McpAuditRecord>> {
+        let path = Self::audit_path(uuid);
+        match self.operator.read().await.read(&path).await {
+            Ok(data) => {
+                let record = serde_json::from_slice(&data.to_vec())?;
+                Ok(Some(record))
+            }
+            Err(e) if e.kind() == opendal::ErrorKind::NotFound => Ok(None),
+            Err(e) => Err(Error::OpenDal(Box::new(e))),
+        }
+    }
+
+    async fn list_audits(
+        &self,
+        user_id: Option<&str>,
+        endpoint_uuid: Option<&str>,
+        limit: Option<usize>,
+    ) -> Result<Vec<McpAuditRecord>> {
+        let mut audits = Vec::new();
+        let op = self.operator.read().await;
+
+        let mut lister = op.lister("mcp/audit/").await?;
+        while let Some(entry) = lister.try_next().await? {
+            if let Ok(data) = op.read(entry.path()).await {
+                if let Ok(record) = serde_json::from_slice::<McpAuditRecord>(&data.to_vec()) {
+                    let user_match = user_id.is_none() || record.user_id.as_deref() == user_id;
+                    let endpoint_match = endpoint_uuid.is_none()
+                        || endpoint_uuid == Some(record.endpoint_uuid.as_str());
+
+                    if user_match && endpoint_match {
+                        audits.push(record);
+
+                        if let Some(limit) = limit {
+                            if audits.len() >= limit {
+                                break;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        audits.sort_by(|a, b| b.created_at.cmp(&a.created_at));
+        Ok(audits)
+    }
+
+    async fn delete_audit(&self, uuid: &str) -> Result<()> {
+        let path = Self::audit_path(uuid);
+        self.operator.write().await.delete(&path).await?;
+        Ok(())
+    }
 }
 
 #[cfg(test)]
@@ -380,6 +513,7 @@ mod tests {
             config_json: "{}".to_string(),
             created_at: Utc::now(),
             enabled: true,
+            visibility: NamespaceVisibility::Private,
         };
 
         persistence.save_namespace(&record).await.unwrap();
@@ -499,5 +633,111 @@ mod tests {
             .await
             .unwrap()
             .is_none());
+    }
+
+    #[tokio::test]
+    async fn test_audit_trail() {
+        let op = opendal::Operator::via_map(opendal::Scheme::Memory, Default::default()).unwrap();
+        let persistence = McpPersistenceImpl::new(op);
+
+        let audit1 = McpAuditRecord {
+            uuid: "audit-1".to_string(),
+            user_id: Some("user-123".to_string()),
+            endpoint_uuid: "endpoint-1".to_string(),
+            namespace_uuid: "ns-1".to_string(),
+            tool_name: "test_tool".to_string(),
+            arguments: Some(r#"{"key": "value"}"#.to_string()),
+            response: Some(r#"{"result": "success"}"#.to_string()),
+            is_error: false,
+            latency_ms: 150,
+            created_at: Utc::now(),
+        };
+
+        let audit2 = McpAuditRecord {
+            uuid: "audit-2".to_string(),
+            user_id: Some("user-456".to_string()),
+            endpoint_uuid: "endpoint-1".to_string(),
+            namespace_uuid: "ns-1".to_string(),
+            tool_name: "another_tool".to_string(),
+            arguments: None,
+            response: Some(r#"{"error": "failed"}"#.to_string()),
+            is_error: true,
+            latency_ms: 50,
+            created_at: Utc::now(),
+        };
+
+        persistence.save_audit(&audit1).await.unwrap();
+        persistence.save_audit(&audit2).await.unwrap();
+
+        let retrieved = persistence.get_audit("audit-1").await.unwrap().unwrap();
+        assert_eq!(retrieved.tool_name, "test_tool");
+        assert_eq!(retrieved.latency_ms, 150);
+
+        let user_audits = persistence
+            .list_audits(Some("user-123"), None, None)
+            .await
+            .unwrap();
+        assert_eq!(user_audits.len(), 1);
+        assert_eq!(user_audits[0].uuid, "audit-1");
+
+        let endpoint_audits = persistence
+            .list_audits(None, Some("endpoint-1"), Some(10))
+            .await
+            .unwrap();
+        assert_eq!(endpoint_audits.len(), 2);
+
+        persistence.delete_audit("audit-1").await.unwrap();
+        assert!(persistence.get_audit("audit-1").await.unwrap().is_none());
+    }
+
+    #[tokio::test]
+    async fn test_namespace_visibility() {
+        let op = opendal::Operator::via_map(opendal::Scheme::Memory, Default::default()).unwrap();
+        let persistence = McpPersistenceImpl::new(op);
+
+        let private_ns = McpNamespaceRecord {
+            uuid: "private-ns".to_string(),
+            name: "Private Namespace".to_string(),
+            description: None,
+            user_id: Some("user-123".to_string()),
+            config_json: "{}".to_string(),
+            created_at: Utc::now(),
+            enabled: true,
+            visibility: NamespaceVisibility::Private,
+        };
+
+        let public_ns = McpNamespaceRecord {
+            uuid: "public-ns".to_string(),
+            name: "Public Namespace".to_string(),
+            description: None,
+            user_id: Some("user-456".to_string()),
+            config_json: "{}".to_string(),
+            created_at: Utc::now(),
+            enabled: true,
+            visibility: NamespaceVisibility::Public,
+        };
+
+        persistence.save_namespace(&private_ns).await.unwrap();
+        persistence.save_namespace(&public_ns).await.unwrap();
+
+        let user_only = persistence
+            .list_namespaces_with_visibility(Some("user-123"), false)
+            .await
+            .unwrap();
+        assert_eq!(user_only.len(), 1);
+        assert_eq!(user_only[0].uuid, "private-ns");
+
+        let with_public = persistence
+            .list_namespaces_with_visibility(Some("user-123"), true)
+            .await
+            .unwrap();
+        assert_eq!(with_public.len(), 2);
+
+        let other_user = persistence
+            .list_namespaces_with_visibility(Some("user-789"), true)
+            .await
+            .unwrap();
+        assert_eq!(other_user.len(), 1);
+        assert_eq!(other_user[0].uuid, "public-ns");
     }
 }

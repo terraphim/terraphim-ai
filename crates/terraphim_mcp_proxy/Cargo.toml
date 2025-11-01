@@ -35,10 +35,13 @@ ahash = { version = "0.8.8", features = ["serde"] }
 
 # Utilities
 regex = "1.10"
+uuid = { version = "1.0", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
 
 # MCP dependencies - feature-gated
 rmcp = { version = "0.6", features = ["client", "transport-child-process"], optional = true }
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false, optional = true }
+terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0", optional = true }
 
 [dev-dependencies]
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
@@ -50,3 +53,5 @@ default = []
 mcp-rust-sdk = ["rmcp", "reqwest"]
 # Enable JSON schema generation for config integration
 json-schema = ["schemars"]
+# Enable audit trail functionality
+audit = ["terraphim_persistence"]

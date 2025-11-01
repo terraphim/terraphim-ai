@@ -4,6 +4,9 @@ use std::time::Instant;
 
 use crate::{ContentItem, Result, Tool, ToolCallRequest, ToolCallResponse};
 
+#[cfg(feature = "audit")]
+use terraphim_persistence::mcp::{McpAuditRecord, McpPersistence};
+
 #[async_trait]
 pub trait McpMiddleware: Send + Sync {
     async fn before_tool_call(&self, request: &ToolCallRequest) -> Result<Option<ToolCallRequest>> {
@@ -189,6 +192,58 @@ pub struct ToolFilterMiddleware {
 impl ToolFilterMiddleware {
     pub fn new(allowed_tools: Vec<String>) -> Self {
         Self { allowed_tools }
+    }
+}
+
+#[cfg(feature = "audit")]
+pub struct AuditMiddleware<P: McpPersistence> {
+    persistence: Arc<P>,
+    endpoint_uuid: String,
+    namespace_uuid: String,
+}
+
+#[cfg(feature = "audit")]
+impl<P: McpPersistence> AuditMiddleware<P> {
+    pub fn new(persistence: Arc<P>, endpoint_uuid: String, namespace_uuid: String) -> Self {
+        Self {
+            persistence,
+            endpoint_uuid,
+            namespace_uuid,
+        }
+    }
+}
+
+#[cfg(feature = "audit")]
+#[async_trait]
+impl<P: McpPersistence> McpMiddleware for AuditMiddleware<P> {
+    async fn after_tool_call(
+        &self,
+        request: &ToolCallRequest,
+        response: ToolCallResponse,
+    ) -> Result<ToolCallResponse> {
+        let start = Instant::now();
+
+        let audit_record = McpAuditRecord {
+            uuid: uuid::Uuid::new_v4().to_string(),
+            user_id: None,
+            endpoint_uuid: self.endpoint_uuid.clone(),
+            namespace_uuid: self.namespace_uuid.clone(),
+            tool_name: request.name.clone(),
+            arguments: request
+                .arguments
+                .as_ref()
+                .and_then(|a| serde_json::to_string(a).ok()),
+            response: serde_json::to_string(&response.content).ok(),
+            is_error: response.is_error,
+            latency_ms: start.elapsed().as_millis() as u64,
+            created_at: chrono::Utc::now(),
+        };
+
+        if let Err(e) = self.persistence.save_audit(&audit_record).await {
+            log::warn!("Failed to save audit record: {}", e);
+        }
+
+        Ok(response)
     }
 }
 

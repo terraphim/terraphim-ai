@@ -4,12 +4,14 @@ use axum::{
     response::IntoResponse,
     Json,
 };
+use chrono::Utc;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 
 use crate::{AppState, Result, Status};
 use terraphim_persistence::mcp::{
-    McpApiKeyRecord, McpEndpointRecord, McpNamespaceRecord, McpPersistence, McpPersistenceImpl,
+    McpApiKeyRecord, McpAuditRecord, McpEndpointRecord, McpNamespaceRecord, McpPersistence,
+    McpPersistenceImpl, NamespaceVisibility,
 };
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -55,6 +57,7 @@ pub struct CreateNamespaceRequest {
     pub user_id: Option<String>,
     pub config_json: String,
     pub enabled: bool,
+    pub visibility: NamespaceVisibility,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone)]
@@ -132,6 +135,7 @@ pub async fn create_namespace(
         config_json: request.config_json,
         created_at: chrono::Utc::now(),
         enabled: request.enabled,
+        visibility: request.visibility,
     };
 
     match persistence.save_namespace(&record).await {
@@ -315,4 +319,71 @@ fn hash_api_key(key: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(key.as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct McpHealthResponse {
+    pub status: Status,
+    pub version: String,
+    pub timestamp: chrono::DateTime<Utc>,
+    pub namespaces_count: usize,
+    pub endpoints_count: usize,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct McpAuditListResponse {
+    pub status: Status,
+    pub audits: Vec<McpAuditRecord>,
+    pub total: usize,
+    pub error: Option<String>,
+}
+
+pub async fn get_mcp_health(State(_app_state): State<AppState>) -> Result<Json<McpHealthResponse>> {
+    let persistence = get_mcp_persistence()?;
+
+    let namespaces = persistence.list_namespaces(None).await.map_err(|e| {
+        crate::error::ApiError(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            anyhow::anyhow!("Failed to list namespaces: {}", e),
+        )
+    })?;
+
+    let endpoints = persistence.list_endpoints(None).await.map_err(|e| {
+        crate::error::ApiError(
+            StatusCode::INTERNAL_SERVER_ERROR,
+            anyhow::anyhow!("Failed to list endpoints: {}", e),
+        )
+    })?;
+
+    Ok(Json(McpHealthResponse {
+        status: Status::Success,
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        timestamp: Utc::now(),
+        namespaces_count: namespaces.len(),
+        endpoints_count: endpoints.len(),
+        error: None,
+    }))
+}
+
+pub async fn list_audits(State(_app_state): State<AppState>) -> Result<Json<McpAuditListResponse>> {
+    let persistence = get_mcp_persistence()?;
+
+    match persistence.list_audits(None, None, Some(100)).await {
+        Ok(audits) => {
+            let total = audits.len();
+            Ok(Json(McpAuditListResponse {
+                status: Status::Success,
+                audits,
+                total,
+                error: None,
+            }))
+        }
+        Err(e) => Ok(Json(McpAuditListResponse {
+            status: Status::Error,
+            audits: vec![],
+            total: 0,
+            error: Some(format!("Failed to list audits: {}", e)),
+        })),
+    }
 }

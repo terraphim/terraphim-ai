@@ -8207,6 +8207,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "async-trait",
+ "chrono",
  "log",
  "regex",
  "reqwest 0.12.24",
@@ -8214,10 +8215,12 @@ dependencies = [
  "schemars 0.8.22",
  "serde",
  "serde_json",
+ "terraphim_persistence",
  "terraphim_types",
  "test-log",
  "thiserror 1.0.69",
  "tokio",
+ "uuid",
 ]
 
 [[package]]

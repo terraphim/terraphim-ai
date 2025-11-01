@@ -531,6 +531,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             delete(api_mcp::delete_endpoint),
         )
         .route("/metamcp/api_keys", post(api_mcp::create_api_key))
+        .route("/metamcp/health", get(api_mcp::get_mcp_health))
+        .route("/metamcp/audits", get(api_mcp::list_audits))
         // Add workflow management routes
         .merge(workflows::create_router())
         .fallback(static_handler)
