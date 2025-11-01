@@ -52,6 +52,7 @@ futures-util = "0.3"
 rand = "0.8"
 sha2 = "0.10"
 opendal = "0.54"
+utoipa = { version = "5.3", features = ["axum_extras", "chrono", "uuid"] }
 
 [features]
 default = []

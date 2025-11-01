@@ -7,30 +7,106 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use terraphim_mcp_proxy::{ContentItem, McpProxy, Tool, ToolCallRequest};
 use terraphim_persistence::mcp::{McpPersistence, McpPersistenceImpl};
+use utoipa::ToSchema;
 
 use crate::{AppState, Result};
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+pub struct McpTool {
+    /// Tool name (prefixed with server name)
+    pub name: String,
+    /// Tool description
+    pub description: String,
+    /// Tool input JSON schema
+    #[schema(value_type = Object)]
+    pub input_schema: Option<serde_json::Value>,
+}
+
+impl From<Tool> for McpTool {
+    fn from(tool: Tool) -> Self {
+        Self {
+            name: tool.name,
+            description: tool.description,
+            input_schema: tool.input_schema,
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ToolListResponse {
-    pub tools: Vec<Tool>,
+    /// List of available tools
+    pub tools: Vec<McpTool>,
+    /// Endpoint UUID
     pub endpoint_uuid: String,
+    /// Namespace UUID
     pub namespace_uuid: String,
+    /// Total number of tools
     pub count: usize,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ToolCallRequestPayload {
+    /// Optional JSON arguments for the tool
+    #[schema(value_type = Object)]
     pub arguments: Option<serde_json::Value>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone)]
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum McpContentItem {
+    Text {
+        text: String,
+    },
+    Image {
+        data: String,
+        mime_type: String,
+    },
+    Resource {
+        uri: String,
+        mime_type: Option<String>,
+    },
+}
+
+impl From<ContentItem> for McpContentItem {
+    fn from(item: ContentItem) -> Self {
+        match item {
+            ContentItem::Text { text } => McpContentItem::Text { text },
+            ContentItem::Image { data, mime_type } => McpContentItem::Image { data, mime_type },
+            ContentItem::Resource { uri, mime_type } => McpContentItem::Resource { uri, mime_type },
+        }
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct ToolCallResponsePayload {
-    pub content: Vec<ContentItem>,
+    /// Response content items (text, image, resource)
+    pub content: Vec<McpContentItem>,
+    /// Whether the tool execution resulted in an error
     pub is_error: bool,
+    /// Name of the executed tool
     pub tool_name: String,
+    /// Endpoint UUID
     pub endpoint_uuid: String,
 }
 
+/// List all tools available for an endpoint
+///
+/// Returns all MCP tools registered under the namespace associated with this endpoint.
+/// Tools are prefixed with their server name (ServerName__toolName) and filtered
+/// based on namespace tool_overrides configuration.
+#[utoipa::path(
+    get,
+    path = "/metamcp/endpoints/{endpoint_uuid}/tools",
+    params(
+        ("endpoint_uuid" = String, Path, description = "Endpoint UUID")
+    ),
+    responses(
+        (status = 200, description = "List of tools retrieved successfully", body = ToolListResponse),
+        (status = 404, description = "Endpoint or namespace not found"),
+        (status = 500, description = "Internal server error")
+    ),
+    tag = "MCP Tools"
+)]
 pub async fn list_tools_for_endpoint(
     State(app_state): State<AppState>,
     Path(endpoint_uuid): Path<String>,
@@ -80,12 +156,31 @@ pub async fn list_tools_for_endpoint(
 
     Ok(Json(ToolListResponse {
         count: tools.len(),
-        tools,
+        tools: tools.into_iter().map(McpTool::from).collect(),
         endpoint_uuid: endpoint_uuid.clone(),
         namespace_uuid: endpoint.namespace_uuid.clone(),
     }))
 }
 
+/// Execute a specific MCP tool
+///
+/// Executes the specified tool with the provided arguments and returns the response.
+/// The tool name should match one of the tools returned by the list endpoint.
+#[utoipa::path(
+    post,
+    path = "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
+    params(
+        ("endpoint_uuid" = String, Path, description = "Endpoint UUID"),
+        ("tool_name" = String, Path, description = "Tool name (may be prefixed with ServerName__)")
+    ),
+    request_body = ToolCallRequestPayload,
+    responses(
+        (status = 200, description = "Tool executed successfully", body = ToolCallResponsePayload),
+        (status = 404, description = "Endpoint, namespace, or tool not found"),
+        (status = 500, description = "Tool execution failed or internal server error")
+    ),
+    tag = "MCP Tools"
+)]
 pub async fn execute_tool(
     State(app_state): State<AppState>,
     Path((endpoint_uuid, tool_name)): Path<(String, String)>,
@@ -141,7 +236,11 @@ pub async fn execute_tool(
     })?;
 
     Ok(Json(ToolCallResponsePayload {
-        content: response.content,
+        content: response
+            .content
+            .into_iter()
+            .map(McpContentItem::from)
+            .collect(),
         is_error: response.is_error,
         tool_name,
         endpoint_uuid,
@@ -203,7 +302,7 @@ mod tests {
     #[tokio::test]
     async fn test_tool_list_response_serialization() {
         let response = ToolListResponse {
-            tools: vec![Tool {
+            tools: vec![McpTool {
                 name: "test__read_file".to_string(),
                 description: "Read a file".to_string(),
                 input_schema: Some(serde_json::json!({"type": "object"})),
@@ -235,7 +334,7 @@ mod tests {
     #[tokio::test]
     async fn test_tool_call_response_serialization() {
         let response = ToolCallResponsePayload {
-            content: vec![ContentItem::Text {
+            content: vec![McpContentItem::Text {
                 text: "File contents here".to_string(),
             }],
             is_error: false,
@@ -300,13 +399,13 @@ mod tests {
     async fn test_multiple_content_items() {
         let response = ToolCallResponsePayload {
             content: vec![
-                ContentItem::Text {
+                McpContentItem::Text {
                     text: "First message".to_string(),
                 },
-                ContentItem::Text {
+                McpContentItem::Text {
                     text: "Second message".to_string(),
                 },
-                ContentItem::Image {
+                McpContentItem::Image {
                     data: "base64data".to_string(),
                     mime_type: "image/png".to_string(),
                 },

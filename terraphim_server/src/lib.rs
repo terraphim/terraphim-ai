@@ -6,7 +6,7 @@ use axum::{
     http::{header, StatusCode, Uri},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
-    Extension, Router,
+    Extension, Json, Router,
 };
 use regex::Regex;
 use rust_embed::RustEmbed;
@@ -26,6 +26,7 @@ use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
+use utoipa::OpenApi;
 use walkdir::WalkDir;
 
 /// Create a proper description from document content
@@ -119,6 +120,7 @@ fn create_document_description(content: &str) -> Option<String> {
 
 mod api;
 mod api_mcp;
+mod api_mcp_openapi;
 mod api_mcp_tools;
 mod error;
 mod mcp_auth;
@@ -544,6 +546,11 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         )
         // Add workflow management routes
         .merge(workflows::create_router())
+        // OpenAPI documentation endpoint for MCP API
+        .route(
+            "/metamcp/openapi.json",
+            get(|| async { Json(api_mcp_openapi::McpApiDoc::openapi()) }),
+        )
         .fallback(static_handler)
         .with_state(app_state)
         .layer(Extension(tx))
@@ -756,6 +763,11 @@ pub async fn build_router_for_tests() -> Router {
         )
         // Add workflow management routes for tests
         .merge(workflows::create_router())
+        // OpenAPI documentation endpoint for MCP API (test router)
+        .route(
+            "/metamcp/openapi.json",
+            get(|| async { Json(api_mcp_openapi::McpApiDoc::openapi()) }),
+        )
         .with_state(app_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))
