@@ -10,11 +10,13 @@ use ahash::AHashMap as HashMap;
 #[cfg(feature = "json-schema")]
 use std::collections::HashMap;
 
+pub mod middleware;
 pub mod namespace;
 pub mod pool;
 pub mod proxy;
 pub mod routing;
 
+pub use middleware::*;
 pub use namespace::*;
 pub use pool::*;
 pub use proxy::*;

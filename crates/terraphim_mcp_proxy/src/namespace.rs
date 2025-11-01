@@ -88,14 +88,14 @@ mod tests {
                 "npx",
                 vec!["-y".to_string()],
             )],
-            tool_overrides: HashMap::default(),
+            tool_overrides: Default::default(),
             enabled: true,
         };
 
         let ns2 = McpNamespace {
             name: "data-tools".to_string(),
             servers: vec![],
-            tool_overrides: HashMap::default(),
+            tool_overrides: Default::default(),
             enabled: false,
         };
 
@@ -124,14 +124,14 @@ mod tests {
                 McpServerConfig::stdio("server1", "cmd1", vec![]),
                 McpServerConfig::stdio("server2", "cmd2", vec![]),
             ],
-            tool_overrides: HashMap::default(),
+            tool_overrides: Default::default(),
             enabled: true,
         };
 
         let ns2 = McpNamespace {
             name: "ns2".to_string(),
             servers: vec![McpServerConfig::stdio("server3", "cmd3", vec![])],
-            tool_overrides: HashMap::default(),
+            tool_overrides: Default::default(),
             enabled: true,
         };
 

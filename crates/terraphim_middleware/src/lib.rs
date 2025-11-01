@@ -7,6 +7,7 @@ pub mod haystack;
 pub mod indexer;
 pub mod mcp_namespace;
 pub mod thesaurus;
+pub mod tool_discovery;
 
 #[cfg(feature = "atomic")]
 pub use haystack::AtomicHaystackIndexer;
