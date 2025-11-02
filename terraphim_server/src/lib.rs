@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use axum::{
     http::{header, StatusCode, Uri},
+    middleware,
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
     Extension, Json, Router,
@@ -532,35 +533,43 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
-        // MCP namespace and endpoint management routes
-        .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
-        .route("/metamcp/namespaces", post(api_mcp::create_namespace))
-        .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
-        .route(
-            "/metamcp/namespaces/{uuid}",
-            delete(api_mcp::delete_namespace),
-        )
-        .route("/metamcp/endpoints", get(api_mcp::list_endpoints))
-        .route("/metamcp/endpoints", post(api_mcp::create_endpoint))
-        .route("/metamcp/endpoints/{uuid}", get(api_mcp::get_endpoint))
-        .route(
-            "/metamcp/endpoints/{uuid}",
-            delete(api_mcp::delete_endpoint),
-        )
-        .route("/metamcp/api_keys", post(api_mcp::create_api_key))
-        .route("/metamcp/health", get(api_mcp::get_mcp_health))
-        .route("/metamcp/audits", get(api_mcp::list_audits))
-        .route(
-            "/metamcp/endpoints/{endpoint_uuid}/tools",
-            get(api_mcp_tools::list_tools_for_endpoint),
-        )
-        .route(
-            "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
-            post(api_mcp_tools::execute_tool),
-        )
         // Add workflow management routes
         .merge(workflows::create_router())
-        // OpenAPI documentation endpoint for MCP API
+        // MCP namespace and endpoint management routes - PROTECTED WITH AUTHENTICATION
+        .merge({
+            let protected_mcp_routes = Router::new()
+                .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
+                .route("/metamcp/namespaces", post(api_mcp::create_namespace))
+                .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
+                .route(
+                    "/metamcp/namespaces/{uuid}",
+                    delete(api_mcp::delete_namespace),
+                )
+                .route("/metamcp/endpoints", get(api_mcp::list_endpoints))
+                .route("/metamcp/endpoints", post(api_mcp::create_endpoint))
+                .route("/metamcp/endpoints/{uuid}", get(api_mcp::get_endpoint))
+                .route(
+                    "/metamcp/endpoints/{uuid}",
+                    delete(api_mcp::delete_endpoint),
+                )
+                .route("/metamcp/api_keys", post(api_mcp::create_api_key))
+                .route("/metamcp/audits", get(api_mcp::list_audits))
+                .route(
+                    "/metamcp/endpoints/{endpoint_uuid}/tools",
+                    get(api_mcp_tools::list_tools_for_endpoint),
+                )
+                .route(
+                    "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
+                    post(api_mcp_tools::execute_tool),
+                )
+                .route_layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    mcp_auth::validate_api_key,
+                ));
+            protected_mcp_routes
+        })
+        // Public MCP endpoints (no authentication required)
+        .route("/metamcp/health", get(api_mcp::get_mcp_health))
         .route(
             "/metamcp/openapi.json",
             get(|| async { Json(api_mcp_openapi::McpApiDoc::openapi()) }),

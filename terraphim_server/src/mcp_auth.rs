@@ -4,6 +4,7 @@ use axum::{
     middleware::Next,
     response::Response,
 };
+use chrono::Utc;
 use sha2::{Digest, Sha256};
 
 use crate::AppState;
@@ -29,9 +30,35 @@ pub async fn validate_api_key(
 
     // Use the shared persistence from AppState
     match McpPersistence::verify_api_key(&*state.mcp_persistence, &key_hash).await {
-        Ok(Some(_record)) => Ok(next.run(request).await),
-        Ok(None) => Err(StatusCode::UNAUTHORIZED),
-        Err(_) => Err(StatusCode::INTERNAL_SERVER_ERROR),
+        Ok(Some(record)) => {
+            // Check if the API key is enabled
+            if !record.enabled {
+                log::warn!("Attempt to use disabled API key: {}", &key_hash[..8]);
+                return Err(StatusCode::UNAUTHORIZED);
+            }
+
+            // Check if the API key has expired
+            if let Some(expires_at) = record.expires_at {
+                if expires_at < Utc::now() {
+                    log::warn!(
+                        "Attempt to use expired API key: {} (expired at: {})",
+                        &key_hash[..8],
+                        expires_at
+                    );
+                    return Err(StatusCode::UNAUTHORIZED);
+                }
+            }
+
+            Ok(next.run(request).await)
+        }
+        Ok(None) => {
+            log::warn!("Invalid API key attempt: {}", &key_hash[..8]);
+            Err(StatusCode::UNAUTHORIZED)
+        }
+        Err(e) => {
+            log::error!("Database error during API key validation: {}", e);
+            Err(StatusCode::INTERNAL_SERVER_ERROR)
+        }
     }
 }
 

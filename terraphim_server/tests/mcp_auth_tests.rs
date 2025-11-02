@@ -188,6 +188,173 @@ async fn test_malformed_auth_header_returns_401() {
     );
 }
 
+/// Test that expired API keys are rejected
+#[tokio::test]
+async fn test_expired_api_key_returns_401() {
+    use chrono::{Duration, Utc};
+
+    let (app, persistence) = create_test_server_with_auth_and_persistence().await;
+    let client = axum_test::TestServer::new(app).unwrap();
+
+    // Create an API key that expired 1 day ago
+    let api_key = "expired-key-123";
+    let key_hash = terraphim_server::mcp_auth::hash_api_key(api_key);
+
+    let record = McpApiKeyRecord {
+        uuid: uuid::Uuid::new_v4().to_string(),
+        key_hash,
+        endpoint_uuid: "test-endpoint".to_string(),
+        user_id: Some("test-user".to_string()),
+        created_at: Utc::now() - Duration::days(2),
+        expires_at: Some(Utc::now() - Duration::days(1)), // Expired yesterday
+        enabled: true,
+    };
+
+    persistence
+        .save_api_key(&record)
+        .await
+        .expect("Failed to save expired API key");
+
+    // Try to use the expired key
+    let auth_value = format!("Bearer {}", api_key);
+    let response = client
+        .post("/metamcp/namespaces")
+        .add_header(
+            axum::http::HeaderName::from_static("authorization"),
+            axum::http::HeaderValue::from_str(&auth_value).unwrap(),
+        )
+        .json(&json!({
+            "name": "test-namespace",
+            "description": "Test",
+            "user_id": "test-user",
+            "config_json": r#"{"servers":[]}"#,
+            "enabled": true,
+            "visibility": "Private"
+        }))
+        .await;
+
+    assert_eq!(
+        response.status_code(),
+        StatusCode::UNAUTHORIZED,
+        "Expired API key should return 401"
+    );
+}
+
+/// Test that disabled API keys are rejected
+#[tokio::test]
+async fn test_disabled_api_key_returns_401() {
+    let (app, persistence) = create_test_server_with_auth_and_persistence().await;
+    let client = axum_test::TestServer::new(app).unwrap();
+
+    // Create a disabled API key
+    let api_key = "disabled-key-123";
+    let key_hash = terraphim_server::mcp_auth::hash_api_key(api_key);
+
+    let record = McpApiKeyRecord {
+        uuid: uuid::Uuid::new_v4().to_string(),
+        key_hash,
+        endpoint_uuid: "test-endpoint".to_string(),
+        user_id: Some("test-user".to_string()),
+        created_at: chrono::Utc::now(),
+        expires_at: None,
+        enabled: false, // Disabled!
+    };
+
+    persistence
+        .save_api_key(&record)
+        .await
+        .expect("Failed to save disabled API key");
+
+    // Try to use the disabled key
+    let auth_value = format!("Bearer {}", api_key);
+    let response = client
+        .post("/metamcp/namespaces")
+        .add_header(
+            axum::http::HeaderName::from_static("authorization"),
+            axum::http::HeaderValue::from_str(&auth_value).unwrap(),
+        )
+        .json(&json!({
+            "name": "test-namespace",
+            "description": "Test",
+            "user_id": "test-user",
+            "config_json": r#"{"servers":[]}"#,
+            "enabled": true,
+            "visibility": "Private"
+        }))
+        .await;
+
+    assert_eq!(
+        response.status_code(),
+        StatusCode::UNAUTHORIZED,
+        "Disabled API key should return 401"
+    );
+}
+
+/// Test that case-insensitive "bearer" is accepted
+#[tokio::test]
+async fn test_case_insensitive_bearer_scheme() {
+    let (app, persistence) = create_test_server_with_auth_and_persistence().await;
+    let client = axum_test::TestServer::new(app).unwrap();
+
+    let api_key = "case-test-key-123";
+    create_api_key_for_test(&persistence, api_key).await;
+
+    // Test lowercase "bearer"
+    let response = client
+        .post("/metamcp/namespaces")
+        .add_header(
+            axum::http::HeaderName::from_static("authorization"),
+            axum::http::HeaderValue::from_static("bearer case-test-key-123"),
+        )
+        .json(&json!({
+            "name": "test-namespace",
+            "description": "Test",
+            "user_id": "test-user",
+            "config_json": r#"{"servers":[]}"#,
+            "enabled": true,
+            "visibility": "Private"
+        }))
+        .await;
+
+    // Note: Current implementation is case-sensitive ("Bearer" only)
+    // This test documents the current behavior
+    assert_eq!(
+        response.status_code(),
+        StatusCode::UNAUTHORIZED,
+        "lowercase 'bearer' currently returns 401 (case-sensitive check)"
+    );
+}
+
+/// Test API key with extra whitespace in Bearer token
+#[tokio::test]
+async fn test_bearer_token_with_whitespace() {
+    let app = create_test_server_with_auth().await;
+    let client = axum_test::TestServer::new(app).unwrap();
+
+    // Test with extra spaces
+    let response = client
+        .post("/metamcp/namespaces")
+        .add_header(
+            axum::http::HeaderName::from_static("authorization"),
+            axum::http::HeaderValue::from_static("Bearer  extra-spaces-key"),
+        )
+        .json(&json!({
+            "name": "test-namespace",
+            "description": "Test",
+            "user_id": "test-user",
+            "config_json": r#"{"servers":[]}"#,
+            "enabled": true,
+            "visibility": "Private"
+        }))
+        .await;
+
+    assert_eq!(
+        response.status_code(),
+        StatusCode::UNAUTHORIZED,
+        "Extra whitespace in token should return 401"
+    );
+}
+
 // Helper functions - GREEN phase implementation
 
 use axum::{
