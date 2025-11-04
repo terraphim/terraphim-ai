@@ -1,6 +1,6 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { Button, Field, Input, Message, Modal } from 'svelma';
+import Modal from '$lib/components/Modal.svelte';
 import { createEventDispatcher, onDestroy } from 'svelte';
 import { is_tauri, is_tauri as isTauriStore, role, role as roleStore } from '$lib/stores';
 import { CONFIG } from '../../config';
@@ -717,21 +717,25 @@ const addKGIndexToContext = _addKGIndexToContext;
       </div>
 
       <div class="search-section">
-        <Field>
+        <div class="field">
           <div class="input-wrapper">
-            <Input
-              bind:element={searchInput}
-              bind:value={query}
-              on:input={_handleInput}
-              on:keydown={_handleKeydown}
-              placeholder="Search knowledge graph terms..."
-              type="search"
-              disabled={_isSearching}
-              icon="search"
-              expanded
-              autofocus
-              data-testid="kg-search-input"
-            />
+            <div class="control has-icons-left is-expanded">
+              <input
+                class="input"
+                type="search"
+                bind:this={searchInput}
+                bind:value={query}
+                on:input={_handleInput}
+                on:keydown={_handleKeydown}
+                placeholder="Search knowledge graph terms..."
+                disabled={_isSearching}
+                autofocus
+                data-testid="kg-search-input"
+              />
+              <span class="icon is-left">
+                <i class="fas fa-search"></i>
+              </span>
+            </div>
             {#if autocompleteSuggestions.length > 0}
               <ul class="suggestions" data-testid="kg-autocomplete-list">
                 {#each autocompleteSuggestions as suggestion, index}
@@ -756,13 +760,13 @@ const addKGIndexToContext = _addKGIndexToContext;
               </ul>
             {/if}
           </div>
-        </Field>
+        </div>
       </div>
 
       {#if _searchError}
-        <Message type="is-danger" data-testid="kg-search-error">
-          {_searchError}
-        </Message>
+        <div class="message is-danger" data-testid="kg-search-error">
+          <div class="message-body">{_searchError}</div>
+        </div>
       {/if}
 
       {#if _isSearching}
@@ -824,19 +828,19 @@ const addKGIndexToContext = _addKGIndexToContext;
 
       <div class="modal-actions">
         <div class="action-buttons">
-          <Button on:click={handleClose}>
+          <button class="button" on:click={handleClose}>
             Cancel
-          </Button>
+          </button>
 
           {#if selectedSuggestion}
-            <Button
-              type="is-primary"
+            <button
+              class="button is-primary"
               on:click={addTermToContext}
               disabled={!selectedSuggestion}
               data-testid="kg-add-term-button"
             >
               Add "{selectedSuggestion.term}" to Context
-            </Button>
+            </button>
           {/if}
         </div>
       </div>
@@ -848,15 +852,14 @@ const addKGIndexToContext = _addKGIndexToContext;
             This includes all domain-specific terms and their normalized mappings in JSON format for comprehensive vocabulary context.
           </p>
         </div>
-        <Button
-          type="is-link"
-          size="is-small"
+        <button
+          class="button is-link is-small"
           style="width: 100%;"
           on:click={_addKGIndexToContext}
           data-testid="kg-add-index-button"
         >
           Add Complete Thesaurus to Context
-        </Button>
+        </button>
       </div>
     </div>
   </div>
