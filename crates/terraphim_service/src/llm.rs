@@ -15,6 +15,7 @@ pub struct SummarizeOptions {
 pub struct ChatOptions {
     pub max_tokens: Option<u32>,
     pub temperature: Option<f32>,
+    pub model: Option<String>,
 }
 
 #[async_trait::async_trait]
@@ -197,7 +198,12 @@ impl LlmClient for OpenRouterClient {
     ) -> ServiceResult<String> {
         let response = self
             .inner
-            .chat_completion(messages, opts.max_tokens, opts.temperature)
+            .chat_completion(
+                messages,
+                opts.max_tokens,
+                opts.temperature,
+                opts.model.as_deref(),
+            )
             .await?;
         Ok(response)
     }
@@ -382,8 +388,9 @@ impl LlmClient for OllamaClient {
         let mut last_err: Option<crate::ServiceError> = None;
 
         for attempt in 1..=max_attempts {
+            let model_to_use = opts.model.as_deref().unwrap_or(&self.model);
             let body = serde_json::json!({
-                "model": self.model,
+                "model": model_to_use,
                 "messages": messages,
                 "stream": false,
                 "options": {

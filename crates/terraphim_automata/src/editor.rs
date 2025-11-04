@@ -59,9 +59,9 @@ pub fn apply_edit(content: &str, search: &str, replace: &str) -> Result<EditResu
         }
     }
 
-    Err(TerraphimAutomataError::Dict(format!(
-        "Failed to apply edit: all strategies failed to match search block"
-    )))
+    Err(TerraphimAutomataError::Dict(
+        "Failed to apply edit: all strategies failed to match search block".to_string(),
+    ))
 }
 
 /// Apply edit using a specific strategy
@@ -86,7 +86,7 @@ fn apply_edit_exact(content: &str, search: &str, replace: &str) -> Result<EditRe
     // Use Aho-Corasick for exact matching (fastest)
     let ac = AhoCorasick::builder()
         .match_kind(MatchKind::LeftmostLongest)
-        .build(&[search])?;
+        .build([search])?;
 
     if ac.is_match(content) {
         // Replace first occurrence
@@ -171,8 +171,8 @@ fn apply_edit_whitespace_flexible(
 ///
 /// # Arguments
 /// * `threshold` - Minimum similarity (0.0-1.0). Lower threshold = more lenient.
-///                 - Single candidate: 0.0 (very lenient)
-///                 - Multiple candidates: 0.3 (stricter)
+///   - Single candidate: 0.0 (very lenient)
+///   - Multiple candidates: 0.3 (stricter)
 pub fn apply_edit_block_anchor(
     content: &str,
     search: &str,
@@ -395,8 +395,8 @@ pub fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     let mut matrix: Vec<Vec<usize>> = vec![vec![0; len2 + 1]; len1 + 1];
 
     // Initialize first column and row
-    for i in 0..=len1 {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
     for j in 0..=len2 {
         matrix[0][j] = j;

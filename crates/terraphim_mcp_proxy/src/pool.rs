@@ -8,11 +8,12 @@ use ahash::HashMap;
 #[cfg(feature = "json-schema")]
 use std::collections::HashMap;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ServerHealth {
     /// Server is healthy and responding
     Healthy,
     /// Server connection is being established
+    #[default]
     Connecting,
     /// Server connection failed
     ConnectionFailed,
@@ -20,12 +21,6 @@ pub enum ServerHealth {
     Unresponsive,
     /// Server returned an error
     Error,
-}
-
-impl Default for ServerHealth {
-    fn default() -> Self {
-        ServerHealth::Connecting
-    }
 }
 
 #[derive(Debug, Clone, Default)]

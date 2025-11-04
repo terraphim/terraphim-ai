@@ -53,6 +53,7 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         }),
         haystacks: vec![],
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
         terraphim_it: false,
         ..Default::default()
     };

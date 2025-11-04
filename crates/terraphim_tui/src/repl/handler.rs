@@ -3162,7 +3162,7 @@ impl ReplHandler {
                     println!(
                         "{} Concepts: {}",
                         "🧠",
-                        vec!["async", "tokio", "server", "api"].join(", ").cyan()
+                        ["async", "tokio", "server", "api"].join(", ").cyan()
                     );
                 }
 
@@ -3170,7 +3170,7 @@ impl ReplHandler {
                     println!(
                         "{} Entities: {}",
                         "👥",
-                        vec!["tokio::runtime", "std::fs::File", "serde::Deserialize"]
+                        ["tokio::runtime", "std::fs::File", "serde::Deserialize"]
                             .join(", ")
                             .cyan()
                     );
@@ -3180,7 +3180,7 @@ impl ReplHandler {
                     println!(
                         "{} Keywords: {}",
                         "🔑",
-                        vec!["error_handling", "async_await", "Result", "HashMap"]
+                        ["error_handling", "async_await", "Result", "HashMap"]
                             .join(", ")
                             .cyan()
                     );
@@ -3267,24 +3267,24 @@ impl ReplHandler {
                 println!("\n{} Search Results:", "🔍".bold());
                 println!("{}", "-".repeat(80));
 
-                let matches = vec![
+                let matches = [
                     (
                         "src/main.rs",
                         42,
                         "async fn main() {",
-                        vec!["    // Main function"],
+                        ["    // Main function"],
                     ),
                     (
                         "src/config.rs",
                         15,
                         "let config = Config::new();",
-                        vec!["// Load configuration"],
+                        ["// Load configuration"],
                     ),
                     (
                         "tests/test.rs",
                         28,
                         "assert_eq!(result, expected)",
-                        vec!["// Test assertion"],
+                        ["// Test assertion"],
                     ),
                 ];
 
@@ -3410,7 +3410,7 @@ impl ReplHandler {
                     println!(
                         "{} Suggested tags: {}",
                         "💡",
-                        vec!["rust", "module", "core"].join(", ")
+                        ["rust", "module", "core"].join(", ")
                     );
                 }
 

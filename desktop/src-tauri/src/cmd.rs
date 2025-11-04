@@ -1765,6 +1765,7 @@ pub async fn chat(
     let chat_opts = llm::ChatOptions {
         max_tokens: Some(1024),
         temperature: Some(0.7),
+        model: None,
     };
 
     // Call the LLM client

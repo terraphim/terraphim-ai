@@ -161,6 +161,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -200,6 +201,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -228,6 +230,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -258,6 +261,7 @@ async fn test_dual_haystack_comprehensive_validation() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -751,6 +755,7 @@ async fn test_source_differentiation_validation() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()

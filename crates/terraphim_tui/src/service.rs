@@ -214,6 +214,7 @@ impl TuiService {
             let opts = terraphim_service::llm::ChatOptions {
                 max_tokens: Some(2048),
                 temperature: Some(0.7),
+                model,
             };
 
             // Call LLM

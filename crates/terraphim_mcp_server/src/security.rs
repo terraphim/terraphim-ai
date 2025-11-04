@@ -7,23 +7,17 @@
 // - Thesaurus for synonym resolution
 // - Learning system from user decisions
 
-use ahash::AHashMap;
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use terraphim_automata::autocomplete::{fuzzy_autocomplete_search, AutocompleteConfig};
-use terraphim_automata::{find_matches, AutocompleteIndex};
+use terraphim_automata::autocomplete::fuzzy_autocomplete_search;
+use terraphim_automata::AutocompleteIndex;
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 use tracing::{debug, info, warn};
 
-#[cfg(feature = "typescript")]
-use tsify::Tsify;
-
 /// Permission decision for a command
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum CommandPermission {
     /// Command is allowed to run without asking
     Allow,
@@ -133,8 +127,6 @@ impl SecurityConfig {
 
 /// Security level affects default permissions
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum SecurityLevel {
     Development,
     Staging,

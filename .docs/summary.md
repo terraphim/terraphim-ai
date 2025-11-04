@@ -162,3 +162,135 @@ Both steps are MANDATORY for every `/init` command execution.
 - `crates/terraphim_kg_agents/Cargo.toml`: Knowledge graph agent crate configuration
 
 This comprehensive overview represents the complete Terraphim AI system as of the current development state, providing a solid foundation for privacy-first AI assistance with production-ready capabilities and extensive testing validation.
+
+---
+
+## Recent Implementation: MCP Authentication System (2025-11-02)
+
+### Critical Security Discovery & Remediation
+
+The project completed a major security implementation using Test-Driven Development (TDD) for MCP (Model Context Protocol) authentication. A **CRITICAL vulnerability** was discovered and fixed: authentication middleware was fully tested but not applied to production routes.
+
+**Security Score Improvement**: 2/10 → 8/10
+
+### MCP Authentication Architecture
+
+```
+HTTP Request → validate_api_key Middleware → McpPersistenceImpl → MCP API Handlers
+                ├─ Extract Bearer token
+                ├─ SHA256 hash verification
+                ├─ Enabled status check
+                ├─ Expiration validation
+                └─ Security logging
+```
+
+### Key Components
+
+#### 1. Authentication Middleware (`terraphim_server/src/mcp_auth.rs`)
+- Bearer token validation with SHA256 hashing
+- Three-layer security: exists + enabled + not expired
+- Structured logging for attack detection
+- Uses shared `AppState.mcp_persistence` for data persistence
+
+#### 2. MCP API Handlers (`terraphim_server/src/api_mcp.rs`)
+- CRUD operations for namespaces, endpoints, API keys
+- Auto-generated UUIDs and timestamps
+- API key format: `tpai_{uuid}` (plaintext returned once, hash stored)
+- Comprehensive audit trail with latency tracking
+
+#### 3. Persistence Layer (`crates/terraphim_persistence/src/mcp.rs`)
+- Multi-backend storage via OpenDAL (Memory, Filesystem, S3, Azure)
+- Hierarchical JSON structure: `mcp/{resource}/{uuid}.json`
+- Thread-safe: `Arc<RwLock<Operator>>` for concurrent access
+- 7 unit tests validating CRUD operations
+
+#### 4. Test Suite (`terraphim_server/tests/mcp_auth_tests.rs`)
+- 11 comprehensive tests (100% passing in <0.01s)
+- Core authentication + security edge cases
+- No mocks (uses real Memory backend)
+- Validates production router configuration
+
+### The Critical Bug
+
+**What Was Broken:**
+```rust
+// tests/mcp_auth_tests.rs - ✅ HAD AUTHENTICATION
+protected_mcp_routes.route_layer(middleware::from_fn_with_state(..., validate_api_key))
+
+// src/lib.rs (PRODUCTION) - ❌ NO AUTHENTICATION
+.route("/metamcp/namespaces", post(api_mcp::create_namespace))
+// All MCP endpoints were completely unprotected!
+```
+
+**Impact:** Anyone could create namespaces, endpoints, API keys, execute tools, and access audit logs without authentication.
+
+**Fix (Commit 35c9cfc0):** Applied authentication middleware to all production MCP routes.
+
+### TDD Lessons Learned
+
+1. **TDD Validates Logic, Not Configuration** - Tests passed but production lacked middleware
+2. **Integration Tests Must Match Production** - Same router config in tests and production
+3. **Security Requires Layered Validation** - Check exists + enabled + not expired
+4. **Retrospectives Catch Critical Issues** - "What would you do better?" led to discovery
+5. **Shared State is Critical** - Must use `AppState.mcp_persistence`, not new instances
+
+### Security Improvements Implemented
+
+| Feature | Before | After |
+|---------|--------|-------|
+| Production Routes | ❌ No auth | ✅ Fully protected |
+| Expiration Check | ❌ Missing | ✅ Validated |
+| Enabled Status | ❌ Missing | ✅ Validated |
+| Test Coverage | 7 tests | 11 tests (+57%) |
+| Security Logging | None | Comprehensive |
+
+### Technical Details
+
+**API Key Security:**
+- SHA256 hashing (never stores plaintext)
+- Format: `tpai_{uuid_without_hyphens}`
+- Expiration support via `expires_at` timestamp
+- Revocation via `enabled` flag (no deletion needed)
+
+**Performance Characteristics:**
+- API key verification: O(n) linear search (acceptable for <1000 keys)
+- List operations: Unbounded (future: add pagination)
+- Audit logging: O(n log n) due to timestamp sorting
+
+**Known Limitations:**
+- No rate limiting (Phase 2 planned)
+- No in-memory cache for key verification
+- SQLite backend incompatible (hierarchical paths vs blob storage)
+
+### Documentation
+
+**Individual File Summaries Created:**
+- `.docs/summary-terraphim_server-src-mcp_auth.rs.md` - Middleware implementation
+- `.docs/summary-terraphim_server-tests-mcp_auth_tests.rs.md` - Test suite analysis
+- `.docs/summary-terraphim_server-src-api_mcp.rs.md` - API handlers
+- `.docs/summary-terraphim_persistence-src-mcp.rs.md` - Persistence layer
+- `.docs/summary-tmp-retrospective_improvements.md.md` - Security retrospective
+
+**External Documentation:**
+- `/tmp/retrospective_improvements.md` - Complete incident analysis
+- `/tmp/tdd_learnings.md` - TDD process documentation
+
+### Future Enhancements (Phase 2)
+
+- [ ] Rate limiting with `tower-governor`
+- [ ] Constant-time comparison (prevent timing attacks)
+- [ ] In-memory LRU cache for key verification
+- [ ] Structured logging with `tracing`
+- [ ] Prometheus metrics for monitoring
+
+### GitHub Integration
+
+- **Issue #285**: TDD Success Story
+- **Commits**:
+  - `b667597b` - Initial TDD implementation
+  - `35c9cfc0` - CRITICAL SECURITY FIX
+- **Comment**: https://github.com/terraphim/terraphim-ai/issues/285#issuecomment-3477816591
+
+---
+
+*Summary updated: 2025-11-02 - MCP Authentication implementation complete with critical security fixes*

@@ -5828,6 +5828,3 @@ tool.
 
 ● Bash(cargo run --example edit_demo -p terraphim_automata 2>&1) timeout: 1m 0s
   ⎿  Interrupted · What should Claude do instead?
-
-
-

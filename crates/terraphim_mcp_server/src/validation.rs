@@ -12,9 +12,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tracing::{debug, info, warn};
 
-#[cfg(feature = "typescript")]
-use tsify::Tsify;
-
 /// Validation layer trait
 pub trait ValidationLayer: Send + Sync {
     /// Name of the validation layer
@@ -67,8 +64,6 @@ impl ValidationContext {
 
 /// Result of validation
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct ValidationResult {
     pub passed: bool,
     pub layer: String,

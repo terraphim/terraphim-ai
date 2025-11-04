@@ -502,7 +502,7 @@ This should work fine.
         let blocks = extractor.extract_code_blocks(text);
         // Extractor finds both fenced blocks and inline executable code (e.g., "x = 5 + 3")
         assert!(
-            blocks.len() >= 1,
+            !blocks.is_empty(),
             "Expected at least 1 code block, got {}",
             blocks.len()
         );

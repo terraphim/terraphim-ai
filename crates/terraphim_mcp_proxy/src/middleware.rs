@@ -15,7 +15,7 @@ pub trait McpMiddleware: Send + Sync {
 
     async fn after_tool_call(
         &self,
-        request: &ToolCallRequest,
+        _request: &ToolCallRequest,
         response: ToolCallResponse,
     ) -> Result<ToolCallResponse> {
         Ok(response)
@@ -37,7 +37,7 @@ impl MiddlewareChain {
         }
     }
 
-    pub fn add<M: McpMiddleware + 'static>(mut self, middleware: M) -> Self {
+    pub fn with_middleware<M: McpMiddleware + 'static>(mut self, middleware: M) -> Self {
         self.middlewares.push(Arc::new(middleware));
         self
     }
@@ -280,8 +280,8 @@ mod tests {
     #[tokio::test]
     async fn test_middleware_chain() {
         let chain = MiddlewareChain::new()
-            .add(LoggingMiddleware::new("test"))
-            .add(MetricsMiddleware::new("test"));
+            .with_middleware(LoggingMiddleware::new("test"))
+            .with_middleware(MetricsMiddleware::new("test"));
 
         let request = ToolCallRequest {
             name: "test_tool".to_string(),

@@ -1,8 +1,8 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import Modal from '$lib/components/Modal.svelte';
 // @ts-expect-error
 import SvelteMarkdown from 'svelte-markdown';
+import Modal from '$lib/components/Modal.svelte';
 import { is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
 import NovelWrapper from '../Editor/NovelWrapper.svelte';

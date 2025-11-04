@@ -45,7 +45,7 @@ pub struct OpenRouterService {
     client: reqwest::Client,
     api_key: String,
     model: String,
-    base_url: String,
+    pub base_url: String,
 }
 
 #[cfg(feature = "openrouter")]
@@ -306,9 +306,11 @@ impl OpenRouterService {
         messages: Vec<serde_json::Value>,
         max_tokens: Option<u32>,
         temperature: Option<f32>,
+        model: Option<&str>,
     ) -> Result<String> {
+        let model_to_use = model.unwrap_or(&self.model);
         let request_body = serde_json::json!({
-            "model": self.model,
+            "model": model_to_use,
             "messages": messages,
             "max_tokens": max_tokens.unwrap_or(512),
             "temperature": temperature.unwrap_or(0.2),

@@ -100,9 +100,10 @@ pub fn extract_vm_config_from_role(role: &Role) -> Option<VmExecutionConfig> {
             }
             Value::Bool(true) => {
                 // Simple boolean true = enable with defaults
-                let mut config = VmExecutionConfig::default();
-                config.enabled = true; // Override default to actually enable VM execution
-                Some(config)
+                Some(VmExecutionConfig {
+                    enabled: true,
+                    ..Default::default()
+                })
             }
             _ => None,
         }

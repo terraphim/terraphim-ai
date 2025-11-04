@@ -4,11 +4,8 @@
 
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use tracing::{debug, info, warn};
-
-#[cfg(feature = "typescript")]
-use tsify::Tsify;
 
 /// Git recovery manager for auto-commit and undo
 pub struct GitRecovery {
@@ -58,7 +55,7 @@ impl GitRecovery {
         // Execute git add
         let add_output = tokio::process::Command::new("git")
             .current_dir(&self.repo_path)
-            .args(&["add", file_path])
+            .args(["add", file_path])
             .output()
             .await?;
 
@@ -73,7 +70,7 @@ impl GitRecovery {
         // Execute git commit
         let commit_output = tokio::process::Command::new("git")
             .current_dir(&self.repo_path)
-            .args(&["commit", "-m", &message])
+            .args(["commit", "-m", &message])
             .output()
             .await?;
 
@@ -91,7 +88,7 @@ impl GitRecovery {
         // Get the commit hash
         let hash_output = tokio::process::Command::new("git")
             .current_dir(&self.repo_path)
-            .args(&["rev-parse", "HEAD"])
+            .args(["rev-parse", "HEAD"])
             .output()
             .await?;
 
@@ -134,7 +131,7 @@ impl GitRecovery {
             // Git reset --soft HEAD~1
             let output = tokio::process::Command::new("git")
                 .current_dir(&self.repo_path)
-                .args(&["reset", "--soft", "HEAD~1"])
+                .args(["reset", "--soft", "HEAD~1"])
                 .output()
                 .await?;
 
@@ -180,7 +177,7 @@ impl GitRecovery {
     pub async fn is_clean(&self) -> Result<bool> {
         let output = tokio::process::Command::new("git")
             .current_dir(&self.repo_path)
-            .args(&["status", "--porcelain"])
+            .args(["status", "--porcelain"])
             .output()
             .await?;
 
@@ -190,8 +187,6 @@ impl GitRecovery {
 
 /// Snapshot system for state preservation
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct Snapshot {
     pub id: String,
     pub timestamp: String,
@@ -200,8 +195,6 @@ pub struct Snapshot {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[cfg_attr(feature = "typescript", derive(Tsify))]
-#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct FileSnapshot {
     pub path: String,
     pub content: String,

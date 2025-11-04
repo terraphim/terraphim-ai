@@ -723,6 +723,7 @@ pub(crate) async fn chat_completion(
     let chat_opts = llm::ChatOptions {
         max_tokens: request.max_tokens.or(Some(1024)),
         temperature: request.temperature.or(Some(0.7)),
+        model: request.model,
     };
 
     // Call the LLM client FIRST

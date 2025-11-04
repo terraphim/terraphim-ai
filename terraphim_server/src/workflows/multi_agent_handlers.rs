@@ -929,20 +929,9 @@ impl MultiAgentWorkflowExecutor {
         Role {
             shortname: Some("DevAgent".to_string()),
             name: "DevelopmentAgent".into(),
-            relevance_function: RelevanceFunction::BM25,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            llm_enabled: false,
-            llm_api_key: None,
-            llm_model: None,
-            llm_auto_summarize: false,
-            llm_chat_enabled: false,
-            llm_chat_system_prompt: None,
-            llm_chat_model: None,
             llm_context_window: Some(32768),
             extra,
+            ..Default::default()
         }
     }
 
@@ -1006,6 +995,8 @@ impl MultiAgentWorkflowExecutor {
             llm_chat_model: None,
             llm_context_window: Some(32768),
             extra,
+            #[cfg(feature = "mcp-proxy")]
+            mcp_namespaces: vec![],
         }
     }
 
@@ -1039,6 +1030,8 @@ impl MultiAgentWorkflowExecutor {
             llm_chat_model: None,
             llm_context_window: Some(32768),
             extra,
+            #[cfg(feature = "mcp-proxy")]
+            mcp_namespaces: vec![],
         }
     }
 
@@ -1077,6 +1070,8 @@ impl MultiAgentWorkflowExecutor {
             llm_chat_model: None,
             llm_context_window: Some(32768),
             extra,
+            #[cfg(feature = "mcp-proxy")]
+            mcp_namespaces: vec![],
         }
     }
 
@@ -1110,6 +1105,8 @@ impl MultiAgentWorkflowExecutor {
             llm_chat_model: None,
             llm_context_window: Some(32768),
             extra,
+            #[cfg(feature = "mcp-proxy")]
+            mcp_namespaces: vec![],
         }
     }
 
@@ -1143,6 +1140,8 @@ impl MultiAgentWorkflowExecutor {
             llm_chat_model: None,
             llm_context_window: Some(32768),
             extra,
+            #[cfg(feature = "mcp-proxy")]
+            mcp_namespaces: vec![],
         }
     }
 

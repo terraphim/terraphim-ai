@@ -1,7 +1,7 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import Modal from '$lib/components/Modal.svelte';
 import { createEventDispatcher, onDestroy } from 'svelte';
+import Modal from '$lib/components/Modal.svelte';
 import { is_tauri, is_tauri as isTauriStore, role, role as roleStore } from '$lib/stores';
 import { CONFIG } from '../../config';
 

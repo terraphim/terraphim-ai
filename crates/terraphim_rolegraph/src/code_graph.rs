@@ -4,7 +4,7 @@
 // Maintains backward compatibility by using separate storage.
 
 use ahash::{AHashMap, AHashSet};
-use terraphim_types::{CodeReference, CodeSymbol, ReferenceType, SymbolKind};
+use terraphim_types::{CodeReference, CodeSymbol, SymbolKind};
 
 /// Extension to RoleGraph for code symbol storage
 #[derive(Debug, Clone)]
@@ -44,22 +44,13 @@ impl CodeGraph {
         self.code_symbols.insert(id, symbol);
 
         // Update file index
-        self.symbols_by_file
-            .entry(file)
-            .or_insert_with(Vec::new)
-            .push(id);
+        self.symbols_by_file.entry(file).or_default().push(id);
 
         // Update name index
-        self.symbols_by_name
-            .entry(name)
-            .or_insert_with(Vec::new)
-            .push(id);
+        self.symbols_by_name.entry(name).or_default().push(id);
 
         // Update kind index
-        self.symbols_by_kind
-            .entry(kind)
-            .or_insert_with(Vec::new)
-            .push(id);
+        self.symbols_by_kind.entry(kind).or_default().push(id);
     }
 
     /// Add a reference between code symbols
@@ -253,6 +244,7 @@ pub struct CodeGraphStats {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use terraphim_types::ReferenceType;
 
     #[test]
     fn test_code_graph_creation() {

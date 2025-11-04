@@ -51,34 +51,24 @@ pub enum McpProxyError {
     Protocol(String),
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 #[serde(rename_all = "UPPERCASE")]
 pub enum TransportType {
+    #[default]
     Stdio,
     Sse,
     Http,
     OAuth,
 }
 
-impl Default for TransportType {
-    fn default() -> Self {
-        TransportType::Stdio
-    }
-}
-
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 #[serde(rename_all = "UPPERCASE")]
 pub enum ToolStatus {
+    #[default]
     Active,
     Inactive,
-}
-
-impl Default for ToolStatus {
-    fn default() -> Self {
-        ToolStatus::Active
-    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

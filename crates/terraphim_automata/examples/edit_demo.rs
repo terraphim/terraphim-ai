@@ -26,7 +26,7 @@ fn main() {
                 result.modified_content.contains("a * b")
             );
         }
-        Ok(result) => println!("❌ FAILED - No match found"),
+        Ok(_result) => println!("❌ FAILED - No match found"),
         Err(e) => println!("❌ ERROR: {}", e),
     }
 
@@ -44,7 +44,7 @@ fn main() {
                 result.modified_content.contains("    let")
             );
         }
-        Ok(result) => println!("❌ FAILED - No match found"),
+        Ok(_result) => println!("❌ FAILED - No match found"),
         Err(e) => println!("❌ ERROR: {}", e),
     }
 
@@ -68,7 +68,7 @@ fn main() {
                 !result.modified_content.contains("let result")
             );
         }
-        Ok(result) => println!("❌ FAILED - No match (expected, will try fuzzy)"),
+        Ok(_result) => println!("❌ FAILED - No match (expected, will try fuzzy)"),
         Err(e) => println!("❌ ERROR: {}", e),
     }
 
@@ -113,7 +113,7 @@ return result;
             println!("   Strategy used: {}", result.strategy_used);
             println!("   Similarity score: {:.2}", result.similarity_score);
         }
-        Ok(result) => println!("❌ FAILED - All strategies exhausted"),
+        Ok(_result) => println!("❌ FAILED - All strategies exhausted"),
         Err(e) => println!("❌ ERROR: {}", e),
     }
 

@@ -251,11 +251,11 @@ async fn test_levenshtein_similarity_ranges() {
 
     // Very similar (one character difference)
     let sim = levenshtein_similarity("hello", "helo");
-    assert!(sim >= 0.79 && sim < 1.0); // 4/5 = 0.8
+    assert!((0.79..1.0).contains(&sim)); // 4/5 = 0.8
 
     // Somewhat similar (one character substitution)
     let sim = levenshtein_similarity("hello", "hallo");
-    assert!(sim >= 0.79 && sim < 1.0); // 4/5 = 0.8
+    assert!((0.79..1.0).contains(&sim)); // 4/5 = 0.8
 
     // Very different
     let sim = levenshtein_similarity("hello", "world");

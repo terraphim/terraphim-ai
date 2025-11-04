@@ -5,7 +5,7 @@
 
 use tempfile::TempDir;
 use terraphim_automata::{apply_edit, EditStrategy};
-use terraphim_mcp_server::recovery::{GitRecovery, SnapshotManager};
+use terraphim_mcp_server::recovery::SnapshotManager;
 use terraphim_mcp_server::security::{CommandPermission, RepositorySecurityGraph, SecurityConfig};
 use terraphim_mcp_server::validation::{ValidationContext, ValidationPipeline};
 
@@ -99,19 +99,19 @@ async fn test_recovery_system_workflow() {
     // Initialize git repo (required for GitRecovery)
     std::process::Command::new("git")
         .current_dir(temp_dir.path())
-        .args(&["init"])
+        .args(["init"])
         .output()
         .unwrap();
 
     std::process::Command::new("git")
         .current_dir(temp_dir.path())
-        .args(&["config", "user.email", "test@terraphim.ai"])
+        .args(["config", "user.email", "test@terraphim.ai"])
         .output()
         .unwrap();
 
     std::process::Command::new("git")
         .current_dir(temp_dir.path())
-        .args(&["config", "user.name", "Test User"])
+        .args(["config", "user.name", "Test User"])
         .output()
         .unwrap();
 
@@ -123,13 +123,13 @@ async fn test_recovery_system_workflow() {
     // Initial commit
     std::process::Command::new("git")
         .current_dir(temp_dir.path())
-        .args(&["add", "."])
+        .args(["add", "."])
         .output()
         .unwrap();
 
     std::process::Command::new("git")
         .current_dir(temp_dir.path())
-        .args(&["commit", "-m", "Initial commit"])
+        .args(["commit", "-m", "Initial commit"])
         .output()
         .unwrap();
 
