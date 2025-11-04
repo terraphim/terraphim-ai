@@ -79,7 +79,7 @@ jobs:
         run: earthly --ci ./desktop+build
 
       - name: Upload frontend artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-dist
           path: desktop/dist
@@ -103,7 +103,7 @@ jobs:
           earthly --ci +build-debug-native
 
       - name: Upload native binaries
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: native-binaries
           path: artifact/bin/
@@ -149,7 +149,7 @@ jobs:
 
       - name: Upload cross-compiled binaries
         if: success()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: cross-binaries-${{ matrix.target }}
           path: artifact/bin/
