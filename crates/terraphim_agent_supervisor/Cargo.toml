@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent_supervisor"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "OTP-inspired supervision trees for fault-tolerant AI agent management"
@@ -12,8 +12,8 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
-terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 
 # Core async runtime and utilities
 tokio = { workspace = true }

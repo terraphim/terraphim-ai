@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_tui"
-version = "0.2.3"
+version = "1.0.0"
 edition = "2021"
 
 [features]
@@ -29,7 +29,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = "0.4"
 jiff = "0.1"
 urlencoding = "2.1"
-terraphim_update = { path = "../terraphim_update", version = "0.2.0" }
+terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
 handlebars = "6.0"
 regex = "1.0"

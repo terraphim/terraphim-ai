@@ -20,17 +20,17 @@ path = "src/bin/generate-bindings.rs"
 tauri-build = { version = "1.5.5", features = [] }
 
 [dependencies]
-terraphim_automata = { path = "../../crates/terraphim_automata", version = "0.2.0", features = ["typescript"] }
-terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "0.2.0", features = ["native"], optional = true }
-terraphim_config = { path = "../../crates/terraphim_config", version = "0.2.0", features = ["typescript"] }
-terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "0.2.0" }
-terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "0.2.0" }
-terraphim_settings = { path = "../../crates/terraphim_settings", version = "0.2.0", features = ["onepassword"] }
-terraphim_onepassword_cli = { path = "../../crates/terraphim_onepassword_cli", version = "0.2.0" }
-terraphim_types = { path = "../../crates/terraphim_types", version = "0.2.0", features = ["typescript"] }
-terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "0.2.0" }
-terraphim_service = { path = "../../crates/terraphim_service", version = "0.2.0" }
-terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "0.2.0" }
+terraphim_automata = { path = "../../crates/terraphim_automata", version = "1.0.0", features = ["typescript"] }
+terraphim_atomic_client = { path = "../../crates/terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
+terraphim_config = { path = "../../crates/terraphim_config", version = "1.0.0", features = ["typescript"] }
+terraphim_middleware = { path = "../../crates/terraphim_middleware", version = "1.0.0" }
+terraphim_rolegraph = { path = "../../crates/terraphim_rolegraph", version = "1.0.0" }
+terraphim_settings = { path = "../../crates/terraphim_settings", version = "1.0.0", features = ["onepassword"] }
+terraphim_onepassword_cli = { path = "../../crates/terraphim_onepassword_cli", version = "1.0.0" }
+terraphim_types = { path = "../../crates/terraphim_types", version = "1.0.0", features = ["typescript"] }
+terraphim_persistence = { path = "../../crates/terraphim_persistence", version = "1.0.0" }
+terraphim_service = { path = "../../crates/terraphim_service", version = "1.0.0" }
+terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "1.0.0" }
 rmcp = { version = "0.6.1", features = ["server"] }
 serde_json_any_key = "2.0.0"
 anyhow = "1.0.81"
