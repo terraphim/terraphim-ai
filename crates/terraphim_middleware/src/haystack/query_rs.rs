@@ -10,6 +10,36 @@ use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::{Document, Index};
 
+/// Statistics for tracking URL fetch success/failure rates
+#[derive(Default)]
+struct FetchStats {
+    successful: usize,
+    failed: usize,
+    skipped: usize,
+}
+
+impl FetchStats {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
+/// Statistics for tracking persistence cache hits/misses
+#[derive(Default)]
+struct PersistenceStats {
+    cache_hits: usize,
+    cache_misses: usize,
+    cache_saves: usize,
+    document_cache_hits: usize,
+    document_cache_misses: usize,
+}
+
+impl PersistenceStats {
+    fn new() -> Self {
+        Self::default()
+    }
+}
+
 /// Middleware that uses query.rs as a haystack.
 /// Supports comprehensive Rust documentation search including:
 /// - Standard library docs (stable/nightly) via /suggest API
@@ -83,7 +113,7 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
     ) -> impl std::future::Future<Output = Result<Index>> + Send {
         async move {
             let fetch_content = haystack.fetch_content;
-            log::info!(
+            log::warn!(
                 "QueryRs: Starting index for search term: '{}' (fetch_content: {})",
                 needle,
                 fetch_content
@@ -93,34 +123,60 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
             self.clear_url_cache();
 
             let mut documents = Vec::new();
+            let mut persistence_stats = PersistenceStats::new();
 
-            // Try to load cached results quickly without warnings
+            // First, try to load cached search results from persistence
             let cache_key = format!("queryrs_search_{}", self.normalize_search_query(needle));
             let mut cache_placeholder = Document {
                 id: cache_key.clone(),
                 ..Default::default()
             };
 
-            // Try cache lookup silently - suppress NotFound warnings by catching errors
-            let cached_docs = if let Ok(cached_doc) = cache_placeholder.load().await {
-                if self.is_cache_fresh(&cached_doc) {
-                    log::info!("QueryRs: Using cached results for '{}'", needle);
-                    serde_json::from_str::<Vec<Document>>(&cached_doc.body).ok()
-                } else {
-                    None
+            let use_cached_results = match cache_placeholder.load().await {
+                Ok(cached_doc) => {
+                    // Check if cache is fresh (less than 1 hour old)
+                    if self.is_cache_fresh(&cached_doc) {
+                        log::info!(
+                            "Using cached QueryRs search results for query: '{}'",
+                            needle
+                        );
+                        match serde_json::from_str::<Vec<Document>>(&cached_doc.body) {
+                            Ok(cached_documents) => {
+                                documents = cached_documents;
+                                persistence_stats.cache_hits += 1;
+                                true
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "Failed to deserialize cached results for '{}': {}",
+                                    needle,
+                                    e
+                                );
+                                persistence_stats.cache_misses += 1;
+                                false
+                            }
+                        }
+                    } else {
+                        log::debug!(
+                            "Cached results for '{}' are stale, fetching fresh results",
+                            needle
+                        );
+                        persistence_stats.cache_misses += 1;
+                        false
+                    }
                 }
-            } else {
-                // Cache miss - not found, this is expected and should not log warnings
-                None
+                Err(_) => {
+                    log::debug!("No cached results found for query: '{}'", needle);
+                    persistence_stats.cache_misses += 1;
+                    false
+                }
             };
 
-            // If we have cached results, return them immediately
-            if let Some(cached) = cached_docs {
-                documents = cached;
-            } else {
-                // No cache or stale cache - execute fresh search
-                log::info!("QueryRs: Executing fresh search for '{}'", needle);
-
+            if !use_cached_results {
+                log::warn!(
+                    "QueryRs: No cached results found, executing fresh search for '{}'",
+                    needle
+                );
                 // Search across all query.rs endpoints concurrently
                 let (reddit_results, suggest_results, crates_results, docs_results) = tokio::join!(
                     self.search_reddit_posts(needle),
@@ -143,22 +199,18 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                     documents.extend(docs);
                 }
 
-                // Update cache in background without blocking response
+                // Cache the search results for future queries
                 if !documents.is_empty() {
-                    let documents_clone = documents.clone();
-                    let cache_key_clone = cache_key.clone();
-                    let needle_clone = needle.to_string();
-
-                    tokio::spawn(async move {
-                        if let Ok(serialized) = serde_json::to_string(&documents_clone) {
+                    match serde_json::to_string(&documents) {
+                        Ok(serialized_docs) => {
                             let cache_doc = Document {
-                                id: cache_key_clone,
-                                title: format!("QueryRs search results for '{}'", needle_clone),
-                                body: serialized,
-                                url: format!("cache://queryrs/{}", needle_clone),
+                                id: cache_key,
+                                title: format!("QueryRs search results for '{}'", needle),
+                                body: serialized_docs,
+                                url: format!("cache://queryrs/{}", needle),
                                 description: Some(format!(
-                                    "Cached search results for query: {}",
-                                    needle_clone
+                                    "Cached search results from query.rs API for query: {}",
+                                    needle
                                 )),
                                 summarization: None,
                                 stub: None,
@@ -166,21 +218,196 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                                 rank: None,
                                 source_haystack: None,
                             };
-                            let _ = cache_doc.save().await; // Ignore errors - don't log warnings
+                            if let Err(e) = cache_doc.save().await {
+                                log::warn!(
+                                    "Failed to cache search results for '{}': {}",
+                                    needle,
+                                    e
+                                );
+                            } else {
+                                log::debug!(
+                                    "Cached {} search results for query: '{}'",
+                                    documents.len(),
+                                    needle
+                                );
+                                persistence_stats.cache_saves += 1;
+                            }
                         }
-                    });
+                        Err(e) => {
+                            log::warn!(
+                                "Failed to serialize search results for caching '{}': {}",
+                                needle,
+                                e
+                            );
+                        }
+                    }
                 }
             }
 
-            // Process documents: minimal processing for search performance
-            // Remove all persistence operations from the search path to eliminate UI freeze
-            let enhanced_documents = documents;
+            // Process documents: check persistence first, then fetch content if needed
+            let mut enhanced_documents = Vec::new();
+            let mut fetch_stats = FetchStats::new();
 
-            // Log simple summary
+            log::warn!(
+                "QueryRs: Processing {} documents from search results",
+                documents.len()
+            );
+
+            for doc in documents {
+                log::warn!(
+                    "QueryRs: Processing document '{}' - title: '{}'",
+                    doc.id,
+                    doc.title
+                );
+
+                // First, check if we have a cached version of this document with enhanced content
+                let mut doc_placeholder = Document {
+                    id: doc.id.clone(),
+                    ..Default::default()
+                };
+
+                let enhanced_doc = match doc_placeholder.load().await {
+                    Ok(cached_doc) => {
+                        log::debug!("Found cached document '{}' in persistence", doc.title);
+                        persistence_stats.document_cache_hits += 1;
+                        // Use cached version if it has more content than the API result
+                        if cached_doc.body.len() > doc.body.len() + 100 {
+                            log::debug!(
+                                "Using cached content for '{}' (cached: {} chars vs API: {} chars)",
+                                doc.title,
+                                cached_doc.body.len(),
+                                doc.body.len()
+                            );
+                            // Clear any existing summaries to ensure fresh AI summarization
+                            let mut fresh_doc = cached_doc;
+                            fresh_doc.summarization = None;
+                            fresh_doc.description = None;
+                            log::debug!("Cleared existing summaries from cached document '{}' for fresh AI summarization", fresh_doc.id);
+                            fresh_doc
+                        } else {
+                            doc
+                        }
+                    }
+                    Err(_) => {
+                        persistence_stats.document_cache_misses += 1;
+                        doc
+                    }
+                };
+
+                // Check if content enhancement is disabled via configuration
+                let disable_content_enhancement = haystack
+                    .extra_parameters
+                    .get("disable_content_enhancement")
+                    .map(|v| v == "true")
+                    .unwrap_or(true); // Default to disabled for performance
+
+                log::warn!(
+                    "QueryRs: disable_content_enhancement = {} for document '{}'",
+                    disable_content_enhancement,
+                    enhanced_doc.id
+                );
+
+                if disable_content_enhancement {
+                    // Skip aggressive content fetching to improve performance
+                    // The QueryRs API already provides good summaries and metadata
+                    fetch_stats.skipped += 1;
+
+                    log::warn!(
+                        "QueryRs: Processing document '{}' for persistence saving",
+                        enhanced_doc.id
+                    );
+
+                    // Still save documents to persistence for summarization to work
+                    log::warn!(
+                        "QueryRs: Attempting to save document '{}' to persistence",
+                        enhanced_doc.id
+                    );
+                    match enhanced_doc.save().await {
+                        Ok(_) => {
+                            log::warn!(
+                            "QueryRs: Successfully saved document '{}' to persistence for summarization",
+                            enhanced_doc.id
+                        );
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "QueryRs: Failed to save document '{}' to persistence: {}",
+                                enhanced_doc.id,
+                                e
+                            );
+                            // Continue processing even if save fails
+                        }
+                    }
+
+                    enhanced_documents.push(enhanced_doc);
+                } else {
+                    // Legacy content fetching (disabled by default)
+                    // Only fetch content if enabled and URL hasn't been fetched yet
+                    if fetch_content
+                        && !enhanced_doc.url.is_empty()
+                        && enhanced_doc.url.starts_with("http")
+                        && !enhanced_doc.url.contains("crates.io/crates/")
+                        && enhanced_doc.body.len() < 200
+                        && self.should_fetch_url(&enhanced_doc.url)
+                    {
+                        match self.fetch_and_scrape_content(&enhanced_doc).await {
+                            Ok(fetched_doc) => {
+                                fetch_stats.successful += 1;
+                                // Save the enhanced document to persistence for future use
+                                if let Err(e) = fetched_doc.save().await {
+                                    log::warn!(
+                                        "Failed to save enhanced document '{}': {}",
+                                        fetched_doc.title,
+                                        e
+                                    );
+                                } else {
+                                    log::debug!(
+                                        "Saved enhanced document '{}' to persistence",
+                                        fetched_doc.title
+                                    );
+                                }
+                                enhanced_documents.push(fetched_doc);
+                            }
+                            Err(e) => {
+                                fetch_stats.failed += 1;
+                                if self.is_critical_url(&enhanced_doc.url) {
+                                    log::warn!(
+                                        "Failed to fetch critical URL {}: {}",
+                                        enhanced_doc.url,
+                                        e
+                                    );
+                                } else {
+                                    log::debug!(
+                                        "Failed to fetch non-critical URL {}: {}",
+                                        enhanced_doc.url,
+                                        e
+                                    );
+                                }
+                                enhanced_documents.push(enhanced_doc);
+                            }
+                        }
+                    } else {
+                        fetch_stats.skipped += 1;
+                        if !fetch_content {
+                            log::trace!(
+                                "Skipping content fetch (fetch_content=false): {}",
+                                enhanced_doc.url
+                            );
+                        }
+                        enhanced_documents.push(enhanced_doc);
+                    }
+                }
+            }
+
+            // Log comprehensive summary statistics
+            let unique_urls_fetched = self.get_fetched_count();
             log::info!(
-                "QueryRs search complete: {} documents returned for query '{}'",
+                "QueryRs processing complete: {} documents, {} unique URLs fetched (fetch: {} successful, {} failed, {} skipped) | (cache: {} search hits, {} search misses, {} doc hits, {} doc misses)",
                 enhanced_documents.len(),
-                needle
+                unique_urls_fetched,
+                fetch_stats.successful, fetch_stats.failed, fetch_stats.skipped,
+                persistence_stats.cache_hits, persistence_stats.cache_misses,
+                persistence_stats.document_cache_hits, persistence_stats.document_cache_misses
             );
 
             // Convert to Index format
