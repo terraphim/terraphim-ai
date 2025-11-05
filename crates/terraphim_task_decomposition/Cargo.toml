@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_task_decomposition"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Knowledge graph-based task decomposition system for intelligent task analysis and execution planning"
@@ -13,11 +13,11 @@ readme = "../../README.md"
 
 [dependencies]
 # Core Terraphim dependencies
-terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "0.2.0" }
-terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.2.0" }
-# terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "0.2.0" }
-# terraphim_goal_alignment = { path = "../terraphim_goal_alignment", version = "0.2.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
+# terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "1.0.0" }
+# terraphim_goal_alignment = { path = "../terraphim_goal_alignment", version = "1.0.0" }
 
 # Core async runtime and utilities
 tokio = { workspace = true }

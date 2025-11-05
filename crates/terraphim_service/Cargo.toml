@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_service"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim service for handling user requests and responses."
@@ -12,12 +12,12 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_persistence = { path = "../terraphim_persistence", version = "0.2.0" }
-terraphim_config = { path = "../terraphim_config", version = "0.2.0" }
-terraphim_middleware = { path = "../terraphim_middleware", version = "0.2.0" }
-terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
-terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", features = ["remote-loading", "tokio-runtime"] }
-terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "0.2.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["remote-loading", "tokio-runtime"] }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 thiserror = "1.0.58"
@@ -52,7 +52,7 @@ tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [dev-dependencies]
 tokio = { version = "1.35.0", features = ["full"] }
-terraphim_settings = { path = "../terraphim_settings", version = "0.2.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 anyhow = "1.0.82"
 serial_test = "3.0"
 tempfile = "3"
