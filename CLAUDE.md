@@ -149,6 +149,19 @@ For comprehensive project knowledge, patterns, and best practices, refer to:
 
 Terraphim AI is a privacy-first AI assistant that operates locally, providing semantic search across multiple knowledge repositories (personal, team, and public sources). The system uses knowledge graphs, semantic embeddings, and various search algorithms to deliver relevant results.
 
+## Workspace Structure
+
+The project is organized as a Cargo workspace with multiple components:
+
+- **Core crates**: `crates/*` - 29 library crates providing specialized functionality
+- **Binaries**:
+  - `terraphim_server` - Main HTTP API server (default workspace member)
+  - `terraphim_firecracker` - Firecracker microVM integration for secure execution
+- **Frontend**: `desktop/src-tauri` - Tauri-based desktop application
+- **Excluded**: `crates/terraphim_agent_application` - Experimental crate with incomplete API implementations
+
+The workspace uses Rust edition 2024 and resolver version 2 for optimal dependency resolution.
+
 ## Key Architecture Components
 
 ### Core System Architecture
@@ -157,8 +170,11 @@ Terraphim AI is a privacy-first AI assistant that operates locally, providing se
 - **Knowledge Graph System**: Custom graph-based semantic search using automata
 - **Persistence Layer**: Multi-backend storage (local, Atomic Data, cloud)
 - **Search Infrastructure**: Multiple relevance functions (TitleScorer, BM25, TerraphimGraph)
+- **Firecracker Integration**: Secure VM-based command execution with sub-2 second boot times
 
 ### Critical Crates
+
+**Core Service Layer**:
 - `terraphim_service`: Main service layer with search, document management, and AI integration
 - `terraphim_middleware`: Haystack indexing, document processing, and search orchestration
 - `terraphim_rolegraph`: Knowledge graph implementation with node/edge relationships
@@ -166,6 +182,33 @@ Terraphim AI is a privacy-first AI assistant that operates locally, providing se
 - `terraphim_config`: Configuration management and role-based settings
 - `terraphim_persistence`: Document storage abstraction layer
 - `terraphim_server`: HTTP API server (main binary)
+
+**Agent System Crates**:
+- `terraphim_agent_supervisor`: Agent lifecycle management and supervision
+- `terraphim_agent_registry`: Agent discovery and registration
+- `terraphim_agent_messaging`: Inter-agent communication infrastructure
+- `terraphim_agent_evolution`: Agent learning and adaptation mechanisms
+- `terraphim_goal_alignment`: Goal-driven agent orchestration
+- `terraphim_task_decomposition`: Breaking complex tasks into subtasks
+- `terraphim_multi_agent`: Multi-agent coordination and collaboration
+- `terraphim_kg_agents`: Knowledge graph-specific agent implementations
+- `terraphim_kg_orchestration`: Knowledge graph workflow orchestration
+
+**Haystack Integration Crates**:
+- `haystack_core`: Core haystack abstraction and interfaces
+- `haystack_atlassian`: Confluence and Jira integration
+- `haystack_discourse`: Discourse forum integration
+- `haystack_jmap`: Email integration via JMAP protocol
+
+**Supporting Crates**:
+- `terraphim_settings`: Device and server settings
+- `terraphim_types`: Shared type definitions
+- `terraphim_mcp_server`: MCP server for AI tool integration
+- `terraphim_tui`: Terminal UI implementation with REPL
+- `terraphim_atomic_client`: Atomic Data integration
+- `terraphim_onepassword_cli`: 1Password CLI integration
+- `terraphim-markdown-parser`: Markdown parsing utilities
+- `terraphim_build_args`: Build-time argument handling
 
 ### Key Concepts
 - **Roles**: User profiles with specific knowledge domains and search preferences
@@ -181,6 +224,9 @@ Terraphim AI is a privacy-first AI assistant that operates locally, providing se
 # Build all components
 cargo build
 
+# Build with release optimizations
+cargo build --release
+
 # Run the backend server
 cargo run
 
@@ -195,6 +241,47 @@ yarn run dev
 # Run Tauri desktop app
 cd desktop
 yarn run tauri dev
+
+# Build Tauri release
+cd desktop
+yarn run tauri build
+
+# Build Tauri debug version
+cd desktop
+yarn run tauri build --debug
+```
+
+### TUI Build Options
+```bash
+# Build with all features (recommended)
+cargo build -p terraphim_tui --features repl-full --release
+
+# Run minimal version
+cargo run --bin terraphim-tui
+
+# Launch interactive REPL
+./target/release/terraphim-tui
+
+# Available REPL commands:
+# /help           - Show all commands
+# /search "query" - Semantic search
+# /chat "message" - AI conversation
+# /commands list  - List available markdown commands
+# /vm list        - VM management with sub-2s boot
+```
+
+### Feature Flags
+```bash
+# Build with OpenRouter support
+cargo build --features openrouter
+cargo test --features openrouter
+
+# Build with MCP SDK
+cargo build --features mcp-rust-sdk
+cargo test --features mcp-rust-sdk
+
+# Build TUI with full REPL
+cargo build -p terraphim_tui --features repl-full
 ```
 
 ### Testing
@@ -207,6 +294,18 @@ cargo test --workspace
 
 # Run specific crate tests
 cargo test -p terraphim_service
+
+# Run a specific test by name
+cargo test test_name
+
+# Run specific test with output visible
+cargo test test_name -- --nocapture
+
+# Run tests in a specific file
+cargo test --test integration_test_name
+
+# Run ignored/live tests
+cargo test test_name -- --ignored
 
 # Run frontend tests
 cd desktop
@@ -221,17 +320,92 @@ cd desktop
 yarn run test:atomic
 ```
 
+### Development Watch Commands
+```bash
+# Watch and auto-rebuild on changes
+cargo watch -x build
+
+# Watch and run tests
+cargo watch -x test
+
+# Watch specific package
+cargo watch -p terraphim_service -x test
+
+# Watch with clippy
+cargo watch -x clippy
+```
+
 ### Linting and Formatting
 ```bash
 # Format Rust code
 cargo fmt
 
+# Check formatting without modifying
+cargo fmt -- --check
+
 # Run Rust linter
 cargo clippy
+
+# Run clippy with all warnings
+cargo clippy -- -W clippy::all
 
 # Frontend linting/formatting
 cd desktop
 yarn run check
+```
+
+### Pre-commit Hooks
+
+Install code quality hooks for automatic formatting, linting, and validation:
+```bash
+./scripts/install-hooks.sh
+```
+
+This sets up:
+- Automatic `cargo fmt` on Rust files
+- Automatic Biome formatting on JavaScript/TypeScript
+- Conventional commit message validation
+- Secret detection
+- Large file blocking
+
+## Testing Scripts and Automation
+
+### Novel Autocomplete Testing
+
+The project includes comprehensive testing scripts for Novel editor autocomplete integration.
+See `TESTING_SCRIPTS_README.md` for full documentation.
+
+Quick start testing scripts:
+```bash
+# Interactive testing menu
+./quick-start-autocomplete.sh
+
+# Start full testing environment
+./start-autocomplete-test.sh
+
+# Start only MCP server
+./start-autocomplete-test.sh --mcp-only --port 8001
+
+# Stop all services
+./stop-autocomplete-test.sh
+
+# Check service status
+./stop-autocomplete-test.sh --status
+```
+
+Testing scenarios:
+```bash
+# Full testing environment
+./quick-start-autocomplete.sh full
+
+# Development environment (MCP + Desktop, no tests)
+./quick-start-autocomplete.sh dev
+
+# Run tests only
+./quick-start-autocomplete.sh test
+
+# MCP server only
+./quick-start-autocomplete.sh mcp
 ```
 
 ## Configuration System
@@ -252,6 +426,7 @@ The system uses role-based configuration with multiple backends:
 - `TERRAPHIM_CONFIG`: Override config file path
 - `TERRAPHIM_DATA_DIR`: Data directory location
 - `LOG_LEVEL`: Logging verbosity
+- `RUST_LOG`: Rust-specific logging configuration
 
 ## Search and Knowledge Graph System
 
@@ -274,6 +449,28 @@ The system uses role-based configuration with multiple backends:
 - **Logseq**: Personal knowledge management with markdown parsing
 - **QueryRs**: Rust documentation and Reddit community search
 - **MCP**: Model Context Protocol for AI tool integration
+- **Atlassian**: Confluence and Jira integration
+- **Discourse**: Forum integration
+- **JMAP**: Email integration
+
+## Firecracker Integration
+
+The project includes Firecracker microVM support for secure command execution:
+
+- **Location**: `terraphim_firecracker/` binary crate
+- **Use case**: Security-first execution with VM sandboxing
+- **Execution modes**:
+  - **Local**: Direct execution for trusted operations
+  - **Firecracker**: Full VM isolation for untrusted code
+  - **Hybrid**: Intelligent mode selection based on operation type
+- **Performance**:
+  - Sub-2 second VM boot times
+  - Sub-500ms VM allocation
+  - Optimized VM pooling and reuse
+- **Features**:
+  - Knowledge graph validation before execution
+  - Secure web request sandboxing
+  - Isolated file operations
 
 ## AI Integration
 
@@ -286,6 +483,7 @@ The system uses role-based configuration with multiple backends:
 - Document summarization
 - Intelligent descriptions for search results
 - Context-aware content processing
+- Chat completion with role-based context
 
 ## Common Development Patterns
 
@@ -310,12 +508,13 @@ The system uses role-based configuration with multiple backends:
 - Integration tests for cross-crate functionality
 - E2E tests for full user workflows
 - Atomic server tests for external integrations
+- Live tests gated by environment variables
 
 ## Project Structure
 
 ```
 terraphim-ai/
-├── crates/                          # Core library crates
+├── crates/                          # Core library crates (29 crates)
 │   ├── terraphim_automata/         # Text matching, autocomplete, thesaurus
 │   ├── terraphim_config/           # Configuration management
 │   ├── terraphim_middleware/       # Haystack indexing and search orchestration
@@ -328,10 +527,15 @@ terraphim-ai/
 │   ├── terraphim_tui/              # Terminal UI implementation
 │   ├── terraphim_atomic_client/    # Atomic Data integration
 │   ├── terraphim_onepassword_cli/  # 1Password CLI integration
-│   └── terraphim-markdown-parser/  # Markdown parsing utilities
+│   ├── terraphim-markdown-parser/  # Markdown parsing utilities
+│   ├── terraphim_agent_*/          # Agent system crates (6 crates)
+│   ├── terraphim_kg_*/             # Knowledge graph orchestration (2 crates)
+│   ├── haystack_*/                 # Haystack integrations (4 crates)
+│   └── terraphim_build_args/       # Build-time argument handling
 ├── terraphim_server/                # Main HTTP server binary
 │   ├── default/                    # Default configurations
 │   └── fixtures/                   # Test data and examples
+├── terraphim_firecracker/           # Firecracker microVM binary
 ├── desktop/                         # Svelte frontend application
 │   ├── src/                        # Frontend source code
 │   ├── src-tauri/                  # Tauri desktop integration
@@ -375,6 +579,31 @@ The system includes comprehensive MCP server functionality in `crates/terraphim_
 - Knowledge graph visualization
 - Configuration management UI
 - Role switching and management
+- Novel editor with MCP-based autocomplete
+
+### Desktop App Development
+```bash
+# Install dependencies
+cd desktop && yarn install
+
+# Run in development mode
+yarn run dev
+
+# Run Tauri desktop app
+yarn run tauri dev
+
+# Build release
+yarn run tauri build
+
+# Build debug version
+yarn run tauri build --debug
+
+# Run tests
+yarn test
+
+# Run linting/formatting
+yarn run check
+```
 
 ## Troubleshooting
 
@@ -383,9 +612,10 @@ The system includes comprehensive MCP server functionality in `crates/terraphim_
 - **Search returns no results**: Verify haystack configuration and indexing
 - **Knowledge graph empty**: Ensure thesaurus files exist and are valid
 - **Frontend connection issues**: Confirm backend is running on correct port
+- **Port already in use**: Use `lsof -i :PORT` to find conflicting process
 
 ### Debug Logging
-Set `LOG_LEVEL=debug` for detailed logging across all components.
+Set `LOG_LEVEL=debug` or `RUST_LOG=debug` for detailed logging across all components.
 
 ### Port Configuration
 Default server runs on dynamically assigned port. Check logs for actual port or configure in settings.
@@ -399,8 +629,11 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 - Use concurrent API calls with `tokio::join!` for parallel operations
 - Implement bounded channels for backpressure in async operations
 - Virtual scrolling for large datasets in UI components
+- Firecracker VM pooling reduces startup overhead
 
 ## Recent Implementations and Features
+
+> **Note**: This section captures recent significant features. For historical context, refer to `memories.md`, `lessons-learned.md`, and `agents_instructions.json`.
 
 ### CI/CD Infrastructure (2025-01-31)
 - **Hybrid GitHub Actions**: Complete migration from Earthly to GitHub Actions + Docker Buildx
@@ -415,6 +648,9 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 - **MCP**: Model Context Protocol with SSE/HTTP transports
 - **ClickUp**: Task management with list/team search
 - **Atomic Server**: Integration with Atomic Data protocol
+- **Atlassian**: Confluence and Jira integration
+- **Discourse**: Forum integration
+- **JMAP**: Email integration
 
 ### LLM Support
 - **OpenRouter**: Feature-gated integration with `--features openrouter`
@@ -426,6 +662,7 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 - **Graph Path Connectivity**: Verify if matched terms connect via single path
 - **TUI Interface**: Terminal UI with hierarchical commands and ASCII graphs
 - **Autocomplete Service**: MCP-based autocomplete for Novel editor
+- **Firecracker VMs**: Sub-2 second boot, secure execution sandboxing
 
 ## Testing and Validation
 
@@ -478,6 +715,14 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
 - QueryRs `/suggest/{query}` returns OpenSearch format
 - Reddit API ~500ms, Suggest API ~300ms response times
 - Implement graceful degradation for network failures
+
+### Dependency Constraints
+Some dependencies are pinned to specific versions to ensure compatibility:
+- `wiremock = "0.6.4"` - Version 0.6.5 uses unstable Rust features requiring nightly compiler
+- `schemars = "0.8.22"` - Version 1.0+ introduces breaking API changes
+- `thiserror = "1.0.x"` - Version 2.0+ requires code migration for breaking changes
+
+These constraints are enforced in `.github/dependabot.yml` to prevent automatic updates that would break CI.
 
 ## Critical Implementation Details
 
@@ -536,19 +781,24 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
    cargo build --release
    ```
 
-2. **Run Backend Server**
+2. **Install Pre-commit Hooks (Recommended)**
+   ```bash
+   ./scripts/install-hooks.sh
+   ```
+
+3. **Run Backend Server**
    ```bash
    cargo run --release -- --config terraphim_engineer_config.json
    ```
 
-3. **Run Frontend (separate terminal)**
+4. **Run Frontend (separate terminal)**
    ```bash
    cd desktop
    yarn install
    yarn dev
    ```
 
-4. **Run with Ollama Support**
+5. **Run with Ollama Support**
    ```bash
    # Start Ollama first
    ollama serve
@@ -557,10 +807,16 @@ act -W .github/workflows/ci-native.yml -j setup -n  # Local workflow testing
    cargo run --release -- --config ollama_llama_config.json
    ```
 
-5. **Run MCP Server**
+6. **Run MCP Server**
    ```bash
    cd crates/terraphim_mcp_server
    ./start_local_dev.sh
+   ```
+
+7. **Run TUI Interface**
+   ```bash
+   cargo build -p terraphim_tui --features repl-full --release
+   ./target/release/terraphim-tui
    ```
 
 ## Frontend Technology Guidelines
