@@ -1,0 +1,31 @@
+yarn run v1.22.22
+warning package.json: "optionalDependencies" has dependency "@tauri-apps/cli" with range "^1.6.3" that collides with a dependency in "devDependencies" of the same name with version "^1.5.11"
+warning package.json: "optionalDependencies" has dependency "@testing-library/jest-dom" with range "^6.8.0" that collides with a dependency in "devDependencies" of the same name with version "^6.9.1"
+warning package.json: "optionalDependencies" has dependency "@testing-library/svelte" with range "^5.2.8" that collides with a dependency in "devDependencies" of the same name with version "^4.0.0"
+warning package.json: "optionalDependencies" has dependency "dotenv" with range "^17.2.3" that collides with a dependency in "devDependencies" of the same name with version "^16.4.5"
+warning package.json: "optionalDependencies" has dependency "jsdom" with range "^24.1.0" that collides with a dependency in "devDependencies" of the same name with version "^25.0.1"
+warning package.json: "optionalDependencies" has dependency "sass" with range "1.92.1" that collides with a dependency in "devDependencies" of the same name with version "^1.83.0"
+warning package.json: "optionalDependencies" has dependency "selenium-webdriver" with range "^4.34.0" that collides with a dependency in "devDependencies" of the same name with version "^4.21.0"
+warning package.json: "optionalDependencies" has dependency "svelte-typeahead" with range "^5.0.1" that collides with a dependency in "devDependencies" of the same name with version "^4.4.1"
+$ tauri signer generate --ci
+        Warn Generating new private key without password. For security reasons, we recommend setting a password instead.
+
+Your secret key was generated successfully - Keep it secret!
+dW50cnVzdGVkIGNvbW1lbnQ6IHJzaWduIGVuY3J5cHRlZCBzZWNyZXQga2V5ClJXUlRZMEl5V1dRd2FJQWd1NldnaFRONW5EMGhTY0Q5UTlENjh3V0NrQmlOZzkzcFVwa0FBQkFBQUFBQUFBQUFBQUlBQUFBQWVMTXBKajNtU2hUcTJjczI3WVJZaFB3Q1JFVEdxbVJJaWhiMUY2OFVWeUpTNXRpTHg2NkowNHJtMUNFRUpudURtazJHREZadUpqOGUwOStDR3JyN1V6b0RNald4eWZiTkJoSSt0RkNlYVFYS3BGS2Rjd1F0cC9meitIMmFqZnVSMFJEQ2RUSUNYaXc9Cg==
+
+
+Your public key was generated successfully:
+dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5Qzc1Q0VGOTM5RDdFNDEKUldSQmZwMlQ3MXpIV1R2ampjWVo0Z2ZCanBXclVMZnB6R1pSMDFqTUhBOTUrNE9BSTg3cW13WlIK
+
+Add the public key in your tauri.conf.json
+---------------------------
+
+
+Environment variables used to sign:
+`TAURI_PRIVATE_KEY`  Path or String of your private key
+`TAURI_KEY_PASSWORD`  Your private key password (optional)
+
+ATTENTION: If you lose your private key OR password, you'll not be able to sign your update package and updates will not work.
+---------------------------
+
+Done in 0.25s.
