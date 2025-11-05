@@ -4,11 +4,8 @@ use serde::{Deserialize, Serialize};
 use terraphim_persistence::{Persistable, Result};
 
 // Import multi-agent system for enhanced persistence capabilities
-use std::sync::Arc;
-use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, TerraphimAgent,
-};
-use terraphim_persistence::DeviceStorage;
+// use std::sync::Arc;
+// use terraphim_persistence::DeviceStorage;
 
 /// Enhanced struct that can work with both traditional persistence and multi-agent system
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -86,6 +83,8 @@ async fn main() -> Result<()> {
     println!("loaded obj: {:?}", obj1);
 
     // Example 2: Multi-Agent Enhanced Persistence
+    // NOTE: Commented out as multi-agent dependencies are not available
+    /*
     {
         println!("\n🤖 Example 2: Multi-Agent Enhanced Persistence");
         println!("=============================================");
@@ -154,6 +153,7 @@ async fn main() -> Result<()> {
         );
         println!("   Cost: ${:.6}", cost_tracker.current_month_spending);
     }
+    */
 
     if false {
         println!("\n💡 Multi-Agent Enhanced Persistence Available");
