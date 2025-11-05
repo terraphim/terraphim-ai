@@ -68,9 +68,18 @@ function updateStoresFromConfig(config: ConfigResponse['config']) {
 		theme.set(config.global_shortcut);
 	}
 
-	// Update selected role
+	// Update selected role (handle both string and RoleName object)
 	if (config.selected_role) {
-		role.set(config.selected_role);
+		const roleName = typeof config.selected_role === 'string' 
+			? config.selected_role 
+			: config.selected_role.original;
+		role.set(roleName);
+		
+		// Update theme based on the selected role
+		const selectedRoleSettings = config.roles[roleName];
+		if (selectedRoleSettings && selectedRoleSettings.theme) {
+			theme.set(selectedRoleSettings.theme);
+		}
 	}
 }
 
@@ -114,8 +123,15 @@ export function switchTheme(newTheme: string) {
 // Listen for theme changes from Tauri backend
 onMount(() => {
 	if ($is_tauri) {
+		// Listen for theme changes
 		listen('theme-changed', (event: any) => {
 			theme.set(event.payload);
+		});
+		
+		// Listen for role changes from system tray
+		listen('role_changed', (event: any) => {
+			console.log('Role changed event received from system tray:', event.payload);
+			updateStoresFromConfig(event.payload);
 		});
 	}
 	// Load config on mount
