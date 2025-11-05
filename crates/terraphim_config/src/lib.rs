@@ -91,6 +91,10 @@ pub struct Role {
     pub theme: String,
     pub kg: Option<KnowledgeGraph>,
     pub haystacks: Vec<Haystack>,
+    #[serde(default)]
+    #[cfg_attr(feature = "mcp-proxy", serde(skip_serializing_if = "Vec::is_empty"))]
+    #[cfg(feature = "mcp-proxy")]
+    pub mcp_namespaces: Vec<terraphim_mcp_proxy::McpNamespace>,
     /// Enable AI-powered article summaries using LLM providers
     #[serde(default)]
     pub llm_enabled: bool,
@@ -124,23 +128,48 @@ pub struct Role {
 impl Role {
     /// Create a new Role with default values for all fields
     pub fn new(name: impl Into<RoleName>) -> Self {
-        Self {
-            shortname: None,
-            name: name.into(),
-            relevance_function: RelevanceFunction::TitleScorer,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            llm_enabled: false,
-            llm_api_key: None,
-            llm_model: None,
-            llm_auto_summarize: false,
-            llm_chat_enabled: false,
-            llm_chat_system_prompt: None,
-            llm_chat_model: None,
-            llm_context_window: default_context_window(),
-            extra: AHashMap::new(),
+        #[cfg(feature = "mcp-proxy")]
+        {
+            Self {
+                shortname: None,
+                name: name.into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "default".to_string(),
+                kg: None,
+                haystacks: vec![],
+                mcp_namespaces: vec![],
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: default_context_window(),
+                extra: AHashMap::new(),
+            }
+        }
+        #[cfg(not(feature = "mcp-proxy"))]
+        {
+            Self {
+                shortname: None,
+                name: name.into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "default".to_string(),
+                kg: None,
+                haystacks: vec![],
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: default_context_window(),
+                extra: AHashMap::new(),
+            }
         }
     }
 
@@ -391,7 +420,7 @@ impl ConfigBuilder {
 
         self = self.add_role("Default", default_role);
 
-        // Add Terraphim Engineer role with knowledge graph
+        // Add Terraphim Engineer role with knowledge graph and LLM
         let mut terraphim_role = Role::new("Terraphim Engineer");
         terraphim_role.shortname = Some("TerraEng".to_string());
         terraphim_role.relevance_function = RelevanceFunction::TerraphimGraph;
@@ -414,6 +443,40 @@ impl ConfigBuilder {
             atomic_server_secret: None,
             extra_parameters: std::collections::HashMap::new(),
         }];
+
+        // Configure LLM (OpenRouter or Ollama)
+        terraphim_role.llm_enabled = true;
+        terraphim_role.llm_chat_enabled = true;
+        // Try OpenRouter first, fall back to Ollama
+        if let Ok(api_key) = std::env::var("OPENROUTER_API_KEY") {
+            terraphim_role.llm_api_key = Some(api_key);
+            terraphim_role.llm_model = Some("openai/gpt-4o-mini".to_string());
+            terraphim_role.extra.insert(
+                "llm_provider".to_string(),
+                Value::String("openrouter".to_string()),
+            );
+        } else if std::env::var("OLLAMA_BASE_URL").is_ok()
+            || std::path::Path::new("/usr/local/bin/ollama").exists()
+        {
+            terraphim_role.extra.insert(
+                "llm_provider".to_string(),
+                Value::String("ollama".to_string()),
+            );
+            terraphim_role.extra.insert(
+                "ollama_base_url".to_string(),
+                Value::String(
+                    std::env::var("OLLAMA_BASE_URL")
+                        .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string()),
+                ),
+            );
+            terraphim_role.extra.insert(
+                "llm_model".to_string(),
+                Value::String("llama3.2:3b".to_string()),
+            );
+        }
+        terraphim_role.llm_chat_system_prompt = Some(
+            "You are an expert in Terraphim architecture and knowledge graphs. Use the provided context documents to answer questions accurately and concisely.".to_string()
+        );
 
         self = self.add_role("Terraphim Engineer", terraphim_role);
 

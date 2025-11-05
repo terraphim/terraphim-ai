@@ -99,6 +99,7 @@ async fn create_autocomplete_test_config() -> Result<String> {
         llm_chat_model: None,
         llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let mut config = ConfigBuilder::new()
@@ -575,6 +576,7 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         llm_chat_model: None,
         llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let invalid_config = ConfigBuilder::new()

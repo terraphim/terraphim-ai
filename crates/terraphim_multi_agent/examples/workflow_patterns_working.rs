@@ -385,6 +385,7 @@ fn create_simple_role() -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 
@@ -408,6 +409,7 @@ fn create_complex_role() -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 
@@ -431,6 +433,7 @@ fn create_perspective_role(perspective: &str) -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 
@@ -454,6 +457,7 @@ fn create_orchestrator_role() -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 
@@ -477,6 +481,7 @@ fn create_worker_role(worker_name: &str) -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 
@@ -500,6 +505,7 @@ fn create_generator_role() -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 
@@ -523,6 +529,7 @@ fn create_evaluator_role() -> Role {
         llm_context_window: Some(4096),
         haystacks: vec![],
         extra,
+        mcp_namespaces: vec![],
     }
 }
 

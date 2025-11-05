@@ -36,6 +36,7 @@ async fn mcp_live_haystack_smoke() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let mut config = ConfigBuilder::new()

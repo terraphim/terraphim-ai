@@ -255,9 +255,9 @@ impl AgentPool {
 
         // If no available agents and we haven't reached max pool size, create a new one
         let current_total_size = {
-            let available = self.available_agents.read().await;
-            let busy = self.busy_agents.read().await;
-            available.len() + busy.len()
+            // Use stats.current_pool_size which is properly maintained
+            let stats = self.stats.read().await;
+            stats.current_pool_size
         };
 
         if current_total_size < self.config.max_pool_size {
@@ -453,6 +453,7 @@ impl AgentPool {
 }
 
 /// Handle for a pooled agent that automatically returns the agent to the pool when dropped
+#[derive(Debug)]
 pub struct PooledAgentHandle {
     pooled_agent: Option<PooledAgent>,
     available_agents: Arc<RwLock<VecDeque<PooledAgent>>>,
@@ -588,12 +589,20 @@ mod tests {
 
         let pool = AgentPool::new(role, storage, Some(config)).await.unwrap();
 
-        // Acquire all available agents
-        let _handle1 = pool.get_agent().await.unwrap();
-        let _handle2 = pool.get_agent().await.unwrap();
+        // Acquire all available agents (keep handles in scope to prevent premature drop)
+        let handle1 = pool.get_agent().await.unwrap();
+        let handle2 = pool.get_agent().await.unwrap();
 
-        // Next acquisition should create a new agent (up to max)
+        // Next acquisition should fail - pool exhausted (max_pool_size=2, both acquired)
         let result = pool.get_agent().await;
-        assert!(result.is_err());
+        assert!(
+            result.is_err(),
+            "Expected pool exhaustion but got: {:?}",
+            result
+        );
+
+        // Explicitly drop handles to release agents back to pool
+        drop(handle1);
+        drop(handle2);
     }
 }

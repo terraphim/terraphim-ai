@@ -4,9 +4,10 @@ use std::sync::Arc;
 
 use axum::{
     http::{header, StatusCode, Uri},
+    middleware,
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
-    Extension, Router,
+    Extension, Json, Router,
 };
 use regex::Regex;
 use rust_embed::RustEmbed;
@@ -17,7 +18,7 @@ static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(||
     Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create normalize regex")
 });
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
-use terraphim_config::ConfigState;
+pub use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
 use terraphim_service::summarization_manager::SummarizationManager;
@@ -26,6 +27,7 @@ use terraphim_types::IndexedDocument;
 use terraphim_types::{Document, RelevanceFunction};
 use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
+use utoipa::OpenApi;
 use walkdir::WalkDir;
 
 /// Create a proper description from document content
@@ -118,16 +120,20 @@ fn create_document_description(content: &str) -> Option<String> {
 }
 
 mod api;
+pub mod api_mcp;
+pub mod api_mcp_openapi;
+pub mod api_mcp_tools;
 mod error;
+pub mod mcp_auth;
 
 pub mod workflows;
 
 use api::{
-    create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
+    create_document, find_documents_by_kg_term, get_rolegraph, search_documents,
     search_documents_post,
 };
 pub use api::{
-    AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
+    health, AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
     CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
     ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
@@ -147,6 +153,7 @@ pub struct AppState {
     pub config_state: ConfigState,
     pub workflow_sessions: Arc<workflows::WorkflowSessions>,
     pub websocket_broadcaster: workflows::WebSocketBroadcaster,
+    pub mcp_persistence: Arc<terraphim_persistence::mcp::McpPersistenceImpl>,
 }
 
 pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigState) -> Result<()> {
@@ -407,11 +414,24 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     let (websocket_broadcaster, _) = broadcast::channel(1000);
     log::info!("Initialized workflow management system with WebSocket support");
 
+    // Initialize MCP persistence with Memory backend for now
+    let mcp_persistence = {
+        use opendal::services::Memory;
+        use opendal::Operator;
+        let builder = Memory::default();
+        let op = Operator::new(builder)
+            .map_err(|e| anyhow::anyhow!("Failed to create MCP persistence operator: {}", e))?
+            .finish();
+        Arc::new(terraphim_persistence::mcp::McpPersistenceImpl::new(op))
+    };
+    log::info!("Initialized MCP persistence layer");
+
     // Create extended application state
     let app_state = AppState {
         config_state,
         workflow_sessions,
         websocket_broadcaster,
+        mcp_persistence,
     };
 
     let app = Router::new()
@@ -515,6 +535,44 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         )
         // Add workflow management routes
         .merge(workflows::create_router())
+        // MCP namespace and endpoint management routes - PROTECTED WITH AUTHENTICATION
+        .merge(
+            Router::new()
+                .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
+                .route("/metamcp/namespaces", post(api_mcp::create_namespace))
+                .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
+                .route(
+                    "/metamcp/namespaces/{uuid}",
+                    delete(api_mcp::delete_namespace),
+                )
+                .route("/metamcp/endpoints", get(api_mcp::list_endpoints))
+                .route("/metamcp/endpoints", post(api_mcp::create_endpoint))
+                .route("/metamcp/endpoints/{uuid}", get(api_mcp::get_endpoint))
+                .route(
+                    "/metamcp/endpoints/{uuid}",
+                    delete(api_mcp::delete_endpoint),
+                )
+                .route("/metamcp/api_keys", post(api_mcp::create_api_key))
+                .route("/metamcp/audits", get(api_mcp::list_audits))
+                .route(
+                    "/metamcp/endpoints/{endpoint_uuid}/tools",
+                    get(api_mcp_tools::list_tools_for_endpoint),
+                )
+                .route(
+                    "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
+                    post(api_mcp_tools::execute_tool),
+                )
+                .route_layer(middleware::from_fn_with_state(
+                    app_state.clone(),
+                    mcp_auth::validate_api_key,
+                )),
+        )
+        // Public MCP endpoints (no authentication required)
+        .route("/metamcp/health", get(api_mcp::get_mcp_health))
+        .route(
+            "/metamcp/openapi.json",
+            get(|| async { Json(api_mcp_openapi::McpApiDoc::openapi()) }),
+        )
         .fallback(static_handler)
         .with_state(app_state)
         .layer(Extension(tx))
@@ -597,11 +655,21 @@ pub async fn build_router_for_tests() -> Router {
     let workflow_sessions = Arc::new(RwLock::new(HashMap::new()));
     let (websocket_broadcaster, _) = broadcast::channel(100);
 
+    // Initialize MCP persistence for tests
+    let mcp_persistence = {
+        use opendal::services::Memory;
+        use opendal::Operator;
+        let builder = Memory::default();
+        let op = Operator::new(builder).unwrap().finish();
+        Arc::new(terraphim_persistence::mcp::McpPersistenceImpl::new(op))
+    };
+
     // Create extended application state for tests
     let app_state = AppState {
         config_state,
         workflow_sessions,
         websocket_broadcaster,
+        mcp_persistence,
     };
 
     Router::new()
@@ -701,8 +769,37 @@ pub async fn build_router_for_tests() -> Router {
             "/conversations/{id}/context/{context_id}",
             delete(api::delete_context_from_conversation).put(api::update_context_in_conversation),
         )
+        // MCP namespace and endpoint management routes
+        .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
+        .route("/metamcp/namespaces", post(api_mcp::create_namespace))
+        .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
+        .route(
+            "/metamcp/namespaces/{uuid}",
+            delete(api_mcp::delete_namespace),
+        )
+        .route("/metamcp/endpoints", get(api_mcp::list_endpoints))
+        .route("/metamcp/endpoints", post(api_mcp::create_endpoint))
+        .route("/metamcp/endpoints/{uuid}", get(api_mcp::get_endpoint))
+        .route(
+            "/metamcp/endpoints/{uuid}",
+            delete(api_mcp::delete_endpoint),
+        )
+        .route("/metamcp/api_keys", post(api_mcp::create_api_key))
+        .route(
+            "/metamcp/endpoints/{endpoint_uuid}/tools",
+            get(api_mcp_tools::list_tools_for_endpoint),
+        )
+        .route(
+            "/metamcp/endpoints/{endpoint_uuid}/tools/{tool_name}",
+            post(api_mcp_tools::execute_tool),
+        )
         // Add workflow management routes for tests
         .merge(workflows::create_router())
+        // OpenAPI documentation endpoint for MCP API (test router)
+        .route(
+            "/metamcp/openapi.json",
+            get(|| async { Json(api_mcp_openapi::McpApiDoc::openapi()) }),
+        )
         .with_state(app_state)
         .layer(Extension(tx))
         .layer(Extension(summarization_manager))

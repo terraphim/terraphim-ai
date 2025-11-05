@@ -43,6 +43,7 @@ async fn clickup_live_search_returns_documents() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
         ..Default::default()
     };
 
@@ -92,6 +93,7 @@ async fn clickup_live_search_work_term() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
         ..Default::default()
     };
 

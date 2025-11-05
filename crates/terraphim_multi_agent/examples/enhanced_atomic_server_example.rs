@@ -38,6 +38,7 @@ fn create_atomic_server_agent_role() -> Role {
             )
             .with_atomic_secret(Some("your-base64-secret-here".to_string())),
         ],
+        mcp_namespaces: Vec::new(),
         extra: {
             let mut extra = AHashMap::new();
             // Multi-agent specific configuration

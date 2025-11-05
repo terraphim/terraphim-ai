@@ -23,6 +23,7 @@ async fn live_chat_completion_smoke() {
             vec![serde_json::json!({"role":"user","content":"Say 'pong'"})],
             Some(64),
             Some(0.2),
+            None, // Use default model
         )
         .await
         .expect("live chat call should succeed");

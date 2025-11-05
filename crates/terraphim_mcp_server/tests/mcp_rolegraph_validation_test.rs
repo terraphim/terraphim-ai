@@ -108,6 +108,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
         llm_chat_model: None,
         llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let mut config = ConfigBuilder::new()

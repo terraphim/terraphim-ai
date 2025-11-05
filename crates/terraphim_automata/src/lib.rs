@@ -1,12 +1,17 @@
 pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
+pub mod editor;
 pub mod matcher;
 
 pub use autocomplete::{
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
     AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
+};
+pub use editor::{
+    apply_edit, apply_edit_block_anchor, apply_edit_with_strategy, levenshtein_distance,
+    levenshtein_similarity, EditResult, EditStrategy,
 };
 pub use matcher::{
     extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,

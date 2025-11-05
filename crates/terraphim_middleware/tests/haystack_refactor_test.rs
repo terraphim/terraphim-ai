@@ -271,6 +271,7 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let config = ConfigBuilder::new()

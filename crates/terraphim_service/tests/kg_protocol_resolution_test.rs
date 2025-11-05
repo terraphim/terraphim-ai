@@ -44,6 +44,7 @@ mod kg_protocol_resolution_test {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            mcp_namespaces: vec![],
         };
 
         let role_name = RoleName::new("Test Engineer");
@@ -183,6 +184,7 @@ mod kg_protocol_resolution_test {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            mcp_namespaces: vec![],
         };
 
         let role_name = RoleName::new("Synonym Test");

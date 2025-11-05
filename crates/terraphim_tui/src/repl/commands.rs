@@ -1,25 +1,7 @@
 //! Command definitions for REPL interface
 
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
 use std::str::FromStr;
-
-// Define ExecutionMode locally to avoid conditional compilation issues
-#[cfg(feature = "repl-custom")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExecutionMode {
-    Local,
-    Firecracker,
-    Hybrid,
-}
-
-#[cfg(feature = "repl-custom")]
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        ExecutionMode::Local
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReplCommand {
@@ -81,11 +63,6 @@ pub enum ReplCommand {
         role: Option<String>,
     },
 
-    // VM commands
-    Vm {
-        subcommand: VmSubcommand,
-    },
-
     // Web operations commands
     Web {
         subcommand: WebSubcommand,
@@ -97,18 +74,22 @@ pub enum ReplCommand {
         subcommand: FileSubcommand,
     },
 
-    // Custom markdown-defined commands
-    #[cfg(feature = "repl-custom")]
-    Custom {
-        name: String,
-        parameters: HashMap<String, String>,
-        execution_mode: ExecutionMode,
-    },
-
     // Command management
     #[cfg(feature = "repl-custom")]
     Commands {
         subcommand: CommandsSubcommand,
+    },
+
+    // RAG workflow - Context management
+    #[cfg(feature = "repl-chat")]
+    Context {
+        subcommand: ContextSubcommand,
+    },
+
+    // RAG workflow - Conversation management
+    #[cfg(feature = "repl-chat")]
+    Conversation {
+        subcommand: ConversationSubcommand,
     },
 
     // Utility commands
@@ -130,41 +111,6 @@ pub enum ConfigSubcommand {
 pub enum RoleSubcommand {
     List,
     Select { name: String },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum VmSubcommand {
-    List,
-    Pool,
-    Status {
-        vm_id: Option<String>,
-    },
-    Metrics {
-        vm_id: Option<String>,
-    },
-    Execute {
-        code: String,
-        language: String,
-        vm_id: Option<String>,
-    },
-    Agent {
-        agent_id: String,
-        task: String,
-        vm_id: Option<String>,
-    },
-    Tasks {
-        vm_id: String,
-    },
-    Allocate {
-        vm_id: String,
-    },
-    Release {
-        vm_id: String,
-    },
-    Monitor {
-        vm_id: String,
-        refresh: Option<u64>,
-    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -324,6 +270,53 @@ pub enum FileSubcommand {
     Status {
         operation: Option<String>, // "indexing", "classification", "analysis"
     },
+    /// Edit file using multi-strategy matching (Phase 1 integration)
+    Edit {
+        file_path: String,
+        search: String,
+        replace: String,
+        strategy: Option<String>, // "exact", "fuzzy", "block-anchor", "auto"
+    },
+    /// Validate edit without applying (dry-run)
+    ValidateEdit {
+        file_path: String,
+        search: String,
+        replace: String,
+    },
+    /// Show diff for last/proposed edit
+    Diff { file_path: Option<String> },
+    /// Undo last file operation
+    Undo { steps: Option<usize> },
+}
+
+/// Context management subcommands for RAG workflow
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-chat")]
+pub enum ContextSubcommand {
+    /// Add documents from last search results by indices (e.g., "1,2,3" or "1-5")
+    Add { indices: String },
+    /// List all context items in current conversation
+    List,
+    /// Clear all context from current conversation
+    Clear,
+    /// Remove a specific context item by index
+    Remove { index: usize },
+}
+
+/// Conversation management subcommands for RAG workflow
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-chat")]
+pub enum ConversationSubcommand {
+    /// Create a new conversation
+    New { title: Option<String> },
+    /// Load an existing conversation by ID
+    Load { id: String },
+    /// List all conversations
+    List { limit: Option<usize> },
+    /// Show current conversation details
+    Show,
+    /// Delete a conversation by ID
+    Delete { id: String },
 }
 
 impl FromStr for ReplCommand {
@@ -489,194 +482,6 @@ impl FromStr for ReplCommand {
                 }
 
                 Ok(ReplCommand::Graph { top_k })
-            }
-
-            "vm" => {
-                if parts.len() < 2 {
-                    return Err(anyhow!(
-                        "VM command requires a subcommand (list | pool | status | metrics | execute | agent | tasks | allocate | release | monitor)"
-                    ));
-                }
-
-                match parts[1] {
-                    "list" => Ok(ReplCommand::Vm {
-                        subcommand: VmSubcommand::List,
-                    }),
-                    "pool" => Ok(ReplCommand::Vm {
-                        subcommand: VmSubcommand::Pool,
-                    }),
-                    "status" => {
-                        let vm_id = if parts.len() > 2 {
-                            Some(parts[2].to_string())
-                        } else {
-                            None
-                        };
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Status { vm_id },
-                        })
-                    }
-                    "metrics" => {
-                        let vm_id = if parts.len() > 2 {
-                            Some(parts[2].to_string())
-                        } else {
-                            None
-                        };
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Metrics { vm_id },
-                        })
-                    }
-                    "execute" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!(
-                                "VM execute requires: <language> <code> [--vm-id <vm_id>]"
-                            ));
-                        }
-
-                        let language = parts[2].to_string();
-                        let mut code = String::new();
-                        let mut vm_id = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--vm-id" => {
-                                    if i + 1 < parts.len() {
-                                        vm_id = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--vm-id requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    if !code.is_empty() {
-                                        code.push(' ');
-                                    }
-                                    code.push_str(parts[i]);
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        if code.is_empty() {
-                            return Err(anyhow!("Code cannot be empty"));
-                        }
-
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Execute {
-                                code,
-                                language,
-                                vm_id,
-                            },
-                        })
-                    }
-                    "agent" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!(
-                                "VM agent requires: <agent_id> <task> [--vm-id <vm_id>]"
-                            ));
-                        }
-
-                        let agent_id = parts[2].to_string();
-                        let mut task = String::new();
-                        let mut vm_id = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--vm-id" => {
-                                    if i + 1 < parts.len() {
-                                        vm_id = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--vm-id requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    if !task.is_empty() {
-                                        task.push(' ');
-                                    }
-                                    task.push_str(parts[i]);
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        if task.is_empty() {
-                            return Err(anyhow!("Task cannot be empty"));
-                        }
-
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Agent {
-                                agent_id,
-                                task,
-                                vm_id,
-                            },
-                        })
-                    }
-                    "tasks" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM tasks requires a VM ID"));
-                        }
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Tasks {
-                                vm_id: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "allocate" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM allocate requires a VM ID"));
-                        }
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Allocate {
-                                vm_id: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "release" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM release requires a VM ID"));
-                        }
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Release {
-                                vm_id: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "monitor" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM monitor requires a VM ID"));
-                        }
-                        let vm_id = parts[2].to_string();
-                        let mut refresh = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--refresh" => {
-                                    if i + 1 < parts.len() {
-                                        refresh = Some(
-                                            parts[i + 1]
-                                                .parse::<u64>()
-                                                .map_err(|_| anyhow!("Invalid refresh rate"))?,
-                                        );
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--refresh requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    return Err(anyhow!("Unknown monitor option: {}", parts[i]));
-                                }
-                            }
-                        }
-
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Monitor { vm_id, refresh },
-                        })
-                    }
-                    _ => Err(anyhow!("Invalid VM subcommand: {}", parts[1])),
-                }
             }
 
             #[cfg(feature = "repl-chat")]
@@ -1121,7 +926,7 @@ impl FromStr for ReplCommand {
             #[cfg(feature = "repl-file")]
             "file" => {
                 if parts.len() < 2 {
-                    return Err(anyhow!("File command requires a subcommand. Use: /file <search|classify|suggest|analyze|summarize|metadata|index|find|list|tag|status>"));
+                    return Err(anyhow!("File command requires a subcommand. Use: /file <search|classify|suggest|analyze|summarize|metadata|index|find|list|tag|status|edit|validate-edit|diff|undo>"));
                 }
 
                 match parts[1] {
@@ -1480,7 +1285,57 @@ impl FromStr for ReplCommand {
                         }
                         Ok(ReplCommand::File { subcommand: FileSubcommand::Status { operation } })
                     }
-                    _ => Err(anyhow!("Unknown file subcommand: {}. Use: search, classify, suggest, analyze, summarize, metadata, index, find, list, tag, status", parts[1])),
+                    "edit" => {
+                        if parts.len() < 5 {
+                            return Err(anyhow!("File edit requires file path, search, and replace. Use: /file edit <path> \"<search>\" \"<replace>\" [--strategy <auto|exact|fuzzy|block-anchor>]"));
+                        }
+                        let file_path = parts[2].to_string();
+                        let search = parts[3].to_string();
+                        let replace = parts[4].to_string();
+                        let mut strategy = None;
+                        let mut i = 5;
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--strategy" => {
+                                    if i + 1 < parts.len() {
+                                        strategy = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--strategy requires value: auto, exact, fuzzy, or block-anchor"));
+                                    }
+                                }
+                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
+                            }
+                            i += 1;
+                        }
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::Edit { file_path, search, replace, strategy } })
+                    }
+                    "validate-edit" => {
+                        if parts.len() < 5 {
+                            return Err(anyhow!("File validate-edit requires file path, search, and replace. Use: /file validate-edit <path> \"<search>\" \"<replace>\""));
+                        }
+                        let file_path = parts[2].to_string();
+                        let search = parts[3].to_string();
+                        let replace = parts[4].to_string();
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::ValidateEdit { file_path, search, replace } })
+                    }
+                    "diff" => {
+                        let file_path = if parts.len() >= 3 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::Diff { file_path } })
+                    }
+                    "undo" => {
+                        let steps = if parts.len() >= 3 {
+                            Some(parts[2].parse()?)
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::File { subcommand: FileSubcommand::Undo { steps } })
+                    }
+                    _ => Err(anyhow!("Unknown file subcommand: {}. Use: search, classify, suggest, analyze, summarize, metadata, index, find, list, tag, status, edit, validate-edit, diff, undo", parts[1])),
                 }
             }
 
@@ -1583,6 +1438,113 @@ impl FromStr for ReplCommand {
                 }
             }
 
+            #[cfg(feature = "repl-chat")]
+            "context" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Context command requires a subcommand. Use: /context <add|list|clear|remove>"));
+                }
+
+                match parts[1] {
+                    "add" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!(
+                                "Context add requires indices. Use: /context add <indices>"
+                            ));
+                        }
+                        Ok(ReplCommand::Context {
+                            subcommand: ContextSubcommand::Add {
+                                indices: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    "list" => Ok(ReplCommand::Context {
+                        subcommand: ContextSubcommand::List,
+                    }),
+                    "clear" => Ok(ReplCommand::Context {
+                        subcommand: ContextSubcommand::Clear,
+                    }),
+                    "remove" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!(
+                                "Context remove requires an index. Use: /context remove <index>"
+                            ));
+                        }
+                        let index = parts[2]
+                            .parse::<usize>()
+                            .map_err(|_| anyhow!("Invalid index value"))?;
+                        Ok(ReplCommand::Context {
+                            subcommand: ContextSubcommand::Remove { index },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown context subcommand: {}. Use: add, list, clear, remove",
+                        parts[1]
+                    )),
+                }
+            }
+
+            #[cfg(feature = "repl-chat")]
+            "conversation" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Conversation command requires a subcommand. Use: /conversation <new|load|list|show|delete>"));
+                }
+
+                match parts[1] {
+                    "new" => {
+                        let title = if parts.len() > 2 {
+                            Some(parts[2..].join(" "))
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::New { title },
+                        })
+                    }
+                    "load" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!(
+                                "Conversation load requires an ID. Use: /conversation load <id>"
+                            ));
+                        }
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::Load {
+                                id: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    "list" => {
+                        let mut limit = None;
+                        if parts.len() > 2 && parts[2] == "--limit" && parts.len() > 3 {
+                            limit = Some(
+                                parts[3]
+                                    .parse::<usize>()
+                                    .map_err(|_| anyhow!("Invalid limit value"))?,
+                            );
+                        }
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::List { limit },
+                        })
+                    }
+                    "show" => Ok(ReplCommand::Conversation {
+                        subcommand: ConversationSubcommand::Show,
+                    }),
+                    "delete" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Conversation delete requires an ID. Use: /conversation delete <id>"));
+                        }
+                        Ok(ReplCommand::Conversation {
+                            subcommand: ConversationSubcommand::Delete {
+                                id: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown conversation subcommand: {}. Use: new, load, list, show, delete",
+                        parts[1]
+                    )),
+                }
+            }
+
             _ => Err(anyhow!("Unknown command: {}", parts[0])),
         }
     }
@@ -1592,12 +1554,12 @@ impl ReplCommand {
     /// Get available commands based on compiled features
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "vm", "web", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "web", "help", "quit", "exit", "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
         {
-            commands.extend_from_slice(&["chat", "summarize"]);
+            commands.extend_from_slice(&["chat", "summarize", "context", "conversation"]);
         }
 
         #[cfg(feature = "repl-mcp")]
@@ -1631,7 +1593,6 @@ impl ReplCommand {
             "config" => Some("/config show | set <key> <value> - Manage configuration"),
             "role" => Some("/role list | select <name> - Manage roles"),
             "graph" => Some("/graph [--top-k <n>] - Show knowledge graph"),
-            "vm" => Some("/vm list | pool | status [vm_id] | metrics [vm_id] | execute <lang> <code> [--vm-id <id>] | agent <agent_id> <task> [--vm-id <id>] | tasks <vm_id> | allocate <vm_id> | release <vm_id> | monitor <vm_id> [--refresh <secs>] - Manage VMs"),
             "web" => Some("/web get <url> | post <url> <body> | scrape <url> <selector> | screenshot <url> | pdf <url> | form <url> <json> | api <base_url> <endpoints> | status <id> | cancel <id> | history | config <show|set|reset> - Web operations through VM sandboxing"),
             "file" => Some("/file search <query> | classify <path> | suggest [--context <desc>] | analyze <file> | summarize <file> | metadata <file> | index <path> | find <pattern> | list <path> | tag <file> <tags> | status - Enhanced file operations with semantic awareness"),
             "help" => Some("/help [command] - Show help information"),
@@ -1643,6 +1604,10 @@ impl ReplCommand {
             "chat" => Some("/chat [message] - Interactive chat with AI"),
             #[cfg(feature = "repl-chat")]
             "summarize" => Some("/summarize <doc-id|text> - Summarize content"),
+            #[cfg(feature = "repl-chat")]
+            "context" => Some("/context add <indices> | list | clear | remove <index> - Manage conversation context for RAG"),
+            #[cfg(feature = "repl-chat")]
+            "conversation" => Some("/conversation new [title] | load <id> | list [--limit <n>] | show | delete <id> - Manage chat conversations"),
 
             #[cfg(feature = "repl-mcp")]
             "autocomplete" => Some("/autocomplete <query> [--limit <n>] - Autocomplete terms"),
@@ -1733,5 +1698,135 @@ mod tests {
                 command: Some("search".to_string())
             }
         );
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_edit_command_parsing() {
+        let cmd = "/file edit test.rs old_code new_code"
+            .parse::<ReplCommand>()
+            .unwrap();
+
+        if let ReplCommand::File {
+            subcommand:
+                FileSubcommand::Edit {
+                    file_path,
+                    search,
+                    replace,
+                    strategy,
+                },
+        } = cmd
+        {
+            assert_eq!(file_path, "test.rs");
+            assert_eq!(search, "old_code");
+            assert_eq!(replace, "new_code");
+            assert_eq!(strategy, None);
+        } else {
+            panic!("Failed to parse edit command");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_edit_with_strategy() {
+        let cmd = "/file edit test.rs old new --strategy fuzzy"
+            .parse::<ReplCommand>()
+            .unwrap();
+
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Edit { strategy, .. },
+        } = cmd
+        {
+            assert_eq!(strategy, Some("fuzzy".to_string()));
+        } else {
+            panic!("Failed to parse edit command with strategy");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_validate_edit_command() {
+        let cmd = "/file validate-edit test.rs search replace"
+            .parse::<ReplCommand>()
+            .unwrap();
+
+        if let ReplCommand::File {
+            subcommand:
+                FileSubcommand::ValidateEdit {
+                    file_path,
+                    search,
+                    replace,
+                },
+        } = cmd
+        {
+            assert_eq!(file_path, "test.rs");
+            assert_eq!(search, "search");
+            assert_eq!(replace, "replace");
+        } else {
+            panic!("Failed to parse validate-edit command");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_diff_command() {
+        // With file path
+        let cmd = "/file diff test.rs".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Diff { file_path },
+        } = cmd
+        {
+            assert_eq!(file_path, Some("test.rs".to_string()));
+        } else {
+            panic!("Failed to parse diff command with file");
+        }
+
+        // Without file path
+        let cmd = "/file diff".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Diff { file_path },
+        } = cmd
+        {
+            assert_eq!(file_path, None);
+        } else {
+            panic!("Failed to parse diff command without file");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_undo_command() {
+        // With steps
+        let cmd = "/file undo 2".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Undo { steps },
+        } = cmd
+        {
+            assert_eq!(steps, Some(2));
+        } else {
+            panic!("Failed to parse undo command with steps");
+        }
+
+        // Without steps (default to 1)
+        let cmd = "/file undo".parse::<ReplCommand>().unwrap();
+        if let ReplCommand::File {
+            subcommand: FileSubcommand::Undo { steps },
+        } = cmd
+        {
+            assert_eq!(steps, None);
+        } else {
+            panic!("Failed to parse undo command without steps");
+        }
+    }
+
+    #[cfg(feature = "repl-file")]
+    #[test]
+    fn test_file_edit_missing_args_error() {
+        let result = "/file edit test.rs".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires file path, search, and replace"));
     }
 }

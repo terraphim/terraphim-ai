@@ -313,6 +313,162 @@ impl Node {
     // }
 }
 
+/// Kind of code symbol for knowledge graph
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum SymbolKind {
+    Function,
+    Class,
+    Struct,
+    Enum,
+    Trait,
+    Method,
+    Import,
+    Variable,
+    Constant,
+    Type,
+    Interface,
+    Module,
+}
+
+impl fmt::Display for SymbolKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            SymbolKind::Function => write!(f, "function"),
+            SymbolKind::Class => write!(f, "class"),
+            SymbolKind::Struct => write!(f, "struct"),
+            SymbolKind::Enum => write!(f, "enum"),
+            SymbolKind::Trait => write!(f, "trait"),
+            SymbolKind::Method => write!(f, "method"),
+            SymbolKind::Import => write!(f, "import"),
+            SymbolKind::Variable => write!(f, "variable"),
+            SymbolKind::Constant => write!(f, "constant"),
+            SymbolKind::Type => write!(f, "type"),
+            SymbolKind::Interface => write!(f, "interface"),
+            SymbolKind::Module => write!(f, "module"),
+        }
+    }
+}
+
+/// A code symbol for knowledge graph integration
+///
+/// Represents a symbol in source code (function, class, etc.) that can be
+/// indexed in the knowledge graph alongside concepts and documents.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct CodeSymbol {
+    /// Unique identifier for the symbol
+    pub id: u64,
+    /// Symbol name (e.g., "calculate_sum", "UserClass")
+    pub name: String,
+    /// Kind of symbol (function, class, etc.)
+    pub kind: SymbolKind,
+    /// File path where symbol is defined
+    pub file_path: String,
+    /// Line number in file
+    pub line_number: usize,
+    /// Programming language
+    pub language: String,
+    /// Parent scope (e.g., class name for methods)
+    pub scope: Option<String>,
+    /// Visibility (public, private, etc.)
+    pub visibility: Option<String>,
+    /// Full signature (e.g., "fn calculate(a: i32, b: i32) -> i32")
+    pub signature: Option<String>,
+}
+
+impl CodeSymbol {
+    pub fn new(
+        id: u64,
+        name: String,
+        kind: SymbolKind,
+        file_path: String,
+        line_number: usize,
+        language: String,
+    ) -> Self {
+        Self {
+            id,
+            name,
+            kind,
+            file_path,
+            line_number,
+            language,
+            scope: None,
+            visibility: None,
+            signature: None,
+        }
+    }
+
+    /// Convert to NormalizedTerm for knowledge graph storage
+    pub fn to_normalized_term(&self) -> NormalizedTerm {
+        NormalizedTerm {
+            id: self.id,
+            value: NormalizedTermValue::from(self.name.clone()),
+            url: Some(format!(
+                "file://{}#L{}:{}",
+                self.file_path, self.line_number, self.kind
+            )),
+        }
+    }
+
+    /// Create a unique identifier for the symbol
+    pub fn unique_id(&self) -> String {
+        format!("{}:{}:{}", self.file_path, self.line_number, self.name)
+    }
+}
+
+/// Type of reference between code symbols
+#[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum ReferenceType {
+    /// Function/method calls another function
+    Calls,
+    /// File/module imports another module
+    Imports,
+    /// Class extends another class
+    Inherits,
+    /// Class/struct implements interface/trait
+    Implements,
+    /// Generic usage/reference
+    Uses,
+    /// Defines/declares
+    Defines,
+}
+
+/// Reference between code symbols for dependency tracking
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct CodeReference {
+    /// Symbol that makes the reference
+    pub from_symbol_id: u64,
+    /// Symbol being referenced
+    pub to_symbol_id: u64,
+    /// Type of reference
+    pub reference_type: ReferenceType,
+    /// Optional context (e.g., line number where reference occurs)
+    pub context: Option<String>,
+}
+
+impl CodeReference {
+    pub fn new(from_id: u64, to_id: u64, reference_type: ReferenceType) -> Self {
+        Self {
+            from_symbol_id: from_id,
+            to_symbol_id: to_id,
+            reference_type,
+            context: None,
+        }
+    }
+
+    pub fn with_context(mut self, context: String) -> Self {
+        self.context = Some(context);
+        self
+    }
+}
+
 /// A thesaurus is a dictionary with synonyms which map to upper-level concepts.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default)]
 pub struct Thesaurus {
@@ -2073,5 +2229,124 @@ mod tests {
         assert_eq!(rule.priority, deserialized.priority);
         assert_eq!(rule.provider, deserialized.provider);
         assert_eq!(rule.model, deserialized.model);
+    }
+
+    #[test]
+    fn test_code_symbol_creation() {
+        let symbol = CodeSymbol::new(
+            1,
+            "calculate_sum".to_string(),
+            SymbolKind::Function,
+            "src/math.rs".to_string(),
+            42,
+            "rust".to_string(),
+        );
+
+        assert_eq!(symbol.id, 1);
+        assert_eq!(symbol.name, "calculate_sum");
+        assert_eq!(symbol.kind, SymbolKind::Function);
+        assert_eq!(symbol.file_path, "src/math.rs");
+        assert_eq!(symbol.line_number, 42);
+        assert_eq!(symbol.language, "rust");
+        assert_eq!(symbol.scope, None);
+        assert_eq!(symbol.visibility, None);
+    }
+
+    #[test]
+    fn test_code_symbol_to_normalized_term() {
+        let symbol = CodeSymbol::new(
+            1,
+            "MyClass".to_string(),
+            SymbolKind::Class,
+            "src/types.rs".to_string(),
+            100,
+            "rust".to_string(),
+        );
+
+        let term = symbol.to_normalized_term();
+        assert_eq!(term.id, 1);
+        assert_eq!(term.value, NormalizedTermValue::from("MyClass"));
+        assert!(term.url.is_some());
+        assert!(term.url.unwrap().contains("file://src/types.rs#L100"));
+    }
+
+    #[test]
+    fn test_code_symbol_unique_id() {
+        let symbol = CodeSymbol::new(
+            1,
+            "test_function".to_string(),
+            SymbolKind::Function,
+            "tests/unit.rs".to_string(),
+            10,
+            "rust".to_string(),
+        );
+
+        let unique_id = symbol.unique_id();
+        assert_eq!(unique_id, "tests/unit.rs:10:test_function");
+    }
+
+    #[test]
+    fn test_symbol_kind_display() {
+        assert_eq!(format!("{}", SymbolKind::Function), "function");
+        assert_eq!(format!("{}", SymbolKind::Class), "class");
+        assert_eq!(format!("{}", SymbolKind::Method), "method");
+        assert_eq!(format!("{}", SymbolKind::Import), "import");
+    }
+
+    #[test]
+    fn test_code_reference_creation() {
+        let reference = CodeReference::new(1, 2, ReferenceType::Calls);
+
+        assert_eq!(reference.from_symbol_id, 1);
+        assert_eq!(reference.to_symbol_id, 2);
+        assert_eq!(reference.reference_type, ReferenceType::Calls);
+        assert_eq!(reference.context, None);
+    }
+
+    #[test]
+    fn test_code_reference_with_context() {
+        let reference =
+            CodeReference::new(1, 2, ReferenceType::Imports).with_context("line 5".to_string());
+
+        assert_eq!(reference.context, Some("line 5".to_string()));
+    }
+
+    #[test]
+    fn test_code_symbol_serialization() {
+        let symbol = CodeSymbol::new(
+            42,
+            "main".to_string(),
+            SymbolKind::Function,
+            "src/main.rs".to_string(),
+            1,
+            "rust".to_string(),
+        );
+
+        let json = serde_json::to_string(&symbol).unwrap();
+        let deserialized: CodeSymbol = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(symbol, deserialized);
+        assert_eq!(deserialized.name, "main");
+        assert_eq!(deserialized.kind, SymbolKind::Function);
+    }
+
+    #[test]
+    fn test_reference_type_variants() {
+        // Test all variants
+        let variants = vec![
+            ReferenceType::Calls,
+            ReferenceType::Imports,
+            ReferenceType::Inherits,
+            ReferenceType::Implements,
+            ReferenceType::Uses,
+            ReferenceType::Defines,
+        ];
+
+        // All should serialize/deserialize
+        for variant in variants {
+            let json = serde_json::to_string(&variant).unwrap();
+            let deserialized: ReferenceType = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, deserialized);
+        }
     }
 }

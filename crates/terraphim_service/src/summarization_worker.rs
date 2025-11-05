@@ -647,6 +647,7 @@ mod tests {
             name: "Test Role".to_string().into(),
             relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
             haystacks: vec![],
+            mcp_namespaces: vec![],
             terraphim_it: false,
             theme: "default".to_string(),
             kg: None,

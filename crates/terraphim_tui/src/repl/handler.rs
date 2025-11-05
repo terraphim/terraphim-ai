@@ -5,13 +5,15 @@ use super::commands::FileSubcommand;
 use super::commands::{
     ConfigSubcommand, ReplCommand, RoleSubcommand, WebConfigSubcommand, WebSubcommand,
 };
+#[cfg(feature = "repl-chat")]
+use super::commands::{ContextSubcommand, ConversationSubcommand};
 use crate::client::ApiClient;
+use crate::service::TuiService;
 
-#[cfg(feature = "repl-custom")]
-use super::commands as cmd;
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
+use terraphim_types::{ConversationId, Document};
 
 #[cfg(feature = "repl")]
 use rustyline::Editor;
@@ -21,47 +23,63 @@ use colored::Colorize;
 
 pub struct ReplHandler {
     api_client: Option<ApiClient>,
+    tui_service: Option<TuiService>,
     current_role: String,
     #[cfg(feature = "repl-custom")]
     command_registry: Option<crate::commands::registry::CommandRegistry>,
-    #[cfg(feature = "repl-custom")]
-    command_validator: Option<crate::commands::validator::CommandValidator>,
-    #[cfg(feature = "repl-custom")]
-    command_executor: Option<crate::commands::executor::CommandExecutor>,
+    // RAG workflow session state
+    #[cfg(feature = "repl-chat")]
+    current_conversation_id: Option<ConversationId>,
+    #[cfg(feature = "repl-chat")]
+    last_search_results: Vec<Document>,
 }
 
 impl ReplHandler {
     pub fn new_offline() -> Self {
         Self {
             api_client: None,
-            current_role: "Default".to_string(),
+            tui_service: None,
+            current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
-            #[cfg(feature = "repl-custom")]
-            command_validator: None,
-            #[cfg(feature = "repl-custom")]
-            command_executor: None,
+            #[cfg(feature = "repl-chat")]
+            current_conversation_id: None,
+            #[cfg(feature = "repl-chat")]
+            last_search_results: Vec::new(),
         }
     }
 
     pub fn new_server(api_client: ApiClient) -> Self {
         Self {
             api_client: Some(api_client),
+            tui_service: None,
             current_role: "Terraphim Engineer".to_string(),
             #[cfg(feature = "repl-custom")]
             command_registry: None,
-            #[cfg(feature = "repl-custom")]
-            command_validator: None,
-            #[cfg(feature = "repl-custom")]
-            command_executor: None,
+            #[cfg(feature = "repl-chat")]
+            current_conversation_id: None,
+            #[cfg(feature = "repl-chat")]
+            last_search_results: Vec::new(),
         }
     }
 
-    #[cfg(feature = "repl-custom")]
-    /// Initialize command registry and validator with API client integration
-    pub async fn initialize_commands(&mut self) -> Result<()> {
-        use std::sync::Arc;
+    /// Initialize TuiService for offline mode
+    pub async fn initialize_offline_service(&mut self) -> Result<()> {
+        log::info!("Initializing TuiService for offline mode");
+        self.tui_service = Some(TuiService::new().await?);
 
+        // Get actual selected role from service
+        if let Some(service) = &self.tui_service {
+            self.current_role = service.get_selected_role().await.to_string();
+            log::info!("Offline mode initialized with role: {}", self.current_role);
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-custom")]
+    /// Initialize command registry
+    pub async fn initialize_commands(&mut self) -> Result<()> {
         // Initialize command registry
         let mut registry = crate::commands::registry::CommandRegistry::new()?;
 
@@ -91,33 +109,6 @@ impl ReplHandler {
 
         self.command_registry = Some(registry);
 
-        // Initialize command validator with API client if available
-        if let Some(ref api_client) = self.api_client {
-            let validator = crate::commands::validator::CommandValidator::with_api_client(
-                Arc::new(api_client.clone()),
-            );
-            self.command_validator = Some(validator);
-        } else {
-            self.command_validator = Some(crate::commands::validator::CommandValidator::new());
-        }
-
-        // Initialize command executor with hooks
-        let executor = if let Some(ref api_client) = self.api_client {
-            crate::commands::executor::CommandExecutor::with_api_client(api_client.clone())
-        } else {
-            crate::commands::executor::CommandExecutor::new()
-        };
-
-        // Add appropriate hooks based on role
-        let hooks = match self.current_role.as_str() {
-            "Terraphim Engineer" => crate::commands::hooks::create_development_hooks(),
-            "System Operator" => crate::commands::hooks::create_production_hooks(),
-            _ => crate::commands::hooks::create_default_hooks(),
-        };
-
-        let executor_with_hooks = executor.with_hooks(hooks);
-        self.command_executor = Some(executor_with_hooks);
-
         Ok(())
     }
 
@@ -142,6 +133,82 @@ impl ReplHandler {
         }
 
         impl Helper for CommandCompleter {}
+
+        // External editor handler for Ctrl-G
+        #[cfg(feature = "repl-editor")]
+        #[derive(Clone)]
+        struct ExternalEditorHandler;
+
+        #[cfg(feature = "repl-editor")]
+        impl rustyline::ConditionalEventHandler for ExternalEditorHandler {
+            fn handle(
+                &self,
+                _evt: &rustyline::Event,
+                _n: rustyline::RepeatCount,
+                _: bool,
+                ctx: &rustyline::EventContext,
+            ) -> Option<rustyline::Cmd> {
+                use rustyline::{Cmd, Movement};
+
+                let current_line = ctx.line().to_string();
+
+                match Self::launch_editor(&current_line) {
+                    Ok(edited) if !edited.is_empty() && edited != current_line => {
+                        // Replace current line with edited content
+                        Some(Cmd::Replace(Movement::WholeLine, Some(edited)))
+                    }
+                    Ok(_) => None, // No changes or empty, keep current line
+                    Err(e) => {
+                        eprintln!("\n❌ Editor error: {}", e);
+                        None
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "repl-editor")]
+        impl ExternalEditorHandler {
+            fn launch_editor(content: &str) -> Result<String> {
+                use std::io::Write;
+                use std::process::Command;
+                use tempfile::NamedTempFile;
+
+                // Try VISUAL, then EDITOR, then platform-specific defaults
+                let editor = std::env::var("VISUAL")
+                    .or_else(|_| std::env::var("EDITOR"))
+                    .unwrap_or_else(|_| {
+                        if cfg!(windows) {
+                            "notepad.exe".to_string()
+                        } else {
+                            "vi".to_string()
+                        }
+                    });
+
+                // Create temp file with content
+                let mut temp_file = NamedTempFile::with_suffix(".txt")?;
+                temp_file.write_all(content.as_bytes())?;
+                temp_file.flush()?;
+
+                let temp_path = temp_file.path().to_path_buf();
+
+                // Launch editor and wait for it to close
+                let status = Command::new(&editor)
+                    .arg(&temp_path)
+                    .status()
+                    .map_err(|e| anyhow::anyhow!("Failed to launch editor '{}': {}", editor, e))?;
+
+                if !status.success() {
+                    return Err(anyhow::anyhow!("Editor exited with status: {}", status));
+                }
+
+                // Read edited content
+                let edited_content = std::fs::read_to_string(&temp_path)?;
+
+                // Return trimmed content (preserve intentional whitespace within, trim ends)
+                Ok(edited_content.trim_end().to_string())
+            }
+        }
+
         impl Hinter for CommandCompleter {
             type Hint = String;
 
@@ -251,8 +318,8 @@ impl ReplHandler {
                     }
 
                     // Search term suggestions based on role concepts
-                    if line.starts_with("/search ") {
-                        let search_term = line[8..].trim(); // Skip "/search "
+                    if let Some(search_term) = line.strip_prefix("/search ") {
+                        let search_term = search_term.trim();
                         if !search_term.is_empty() {
                             // Add role-based search suggestions
                             let role_suggestions = match self.current_role.as_str() {
@@ -319,6 +386,21 @@ impl ReplHandler {
 
         let mut rl = Editor::<CommandCompleter, rustyline::history::DefaultHistory>::new()?;
         rl.set_helper(Some(CommandCompleter::new(self.current_role.clone())));
+
+        // Bind Ctrl-G to open external editor
+        #[cfg(feature = "repl-editor")]
+        {
+            use rustyline::{EventHandler, KeyEvent};
+
+            rl.bind_sequence(
+                KeyEvent::ctrl('G'),
+                EventHandler::Conditional(Box::new(ExternalEditorHandler)),
+            );
+            println!(
+                "{}",
+                "💡 Tip: Press Ctrl-G to edit in external editor ($EDITOR)".dimmed()
+            );
+        }
 
         // Load command history if it exists
         let history_file = dirs::home_dir()
@@ -403,20 +485,16 @@ impl ReplHandler {
             self.current_role.green().bold()
         );
 
-        self.show_available_commands();
+        self.show_available_commands().await;
     }
 
     #[cfg(feature = "repl")]
-    fn show_available_commands(&self) {
-        println!("\n{}", "Available commands:".bold());
+    async fn show_available_commands(&self) {
+        println!("\n{}", "Built-in commands:".bold());
         println!("  {} - Search documents", "/search <query>".yellow());
-        println!("  {} - Manage configuration", "/config [show|set]".yellow());
         println!("  {} - Manage roles", "/role [list|select]".yellow());
+        println!("  {} - Manage configuration", "/config [show|set]".yellow());
         println!("  {} - Show knowledge graph", "/graph".yellow());
-        println!(
-            "  {} - Manage VMs",
-            "/vm [list|pool|status|execute|tasks|allocate|release]".yellow()
-        );
 
         #[cfg(feature = "repl-chat")]
         {
@@ -436,8 +514,42 @@ impl ReplHandler {
             println!("  {} - Show thesaurus", "/thesaurus".yellow());
         }
 
+        println!(
+            "  {} - Web operations",
+            "/web [get|post|scrape|screenshot|pdf]".yellow()
+        );
+
+        #[cfg(feature = "repl-file")]
+        {
+            println!(
+                "  {} - File operations",
+                "/file [search|classify|analyze|...]".yellow()
+            );
+        }
+
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
+
+        // Show markdown-defined custom commands if registry is loaded
+        #[cfg(feature = "repl-custom")]
+        if let Some(registry) = &self.command_registry {
+            let commands = registry.list_all_commands().await;
+            if !commands.is_empty() {
+                println!("\n{}", "Custom commands (from markdown):".bold());
+                for cmd in commands {
+                    println!(
+                        "  {} - {} {}",
+                        format!("/{}", cmd.name).yellow(),
+                        cmd.description,
+                        format!("[{:?}]", cmd.execution_mode).dimmed()
+                    );
+                }
+                println!(
+                    "\nUse {} to manage custom commands",
+                    "/commands list".yellow()
+                );
+            }
+        }
     }
 
     #[cfg(not(feature = "repl"))]
@@ -468,9 +580,10 @@ impl ReplHandler {
             ReplCommand::Graph { top_k } => {
                 self.handle_graph(top_k).await?;
             }
-            ReplCommand::Vm { subcommand } => {
-                self.handle_vm(subcommand).await?;
-            }
+            // VM command temporarily disabled - methods removed from ApiClient
+            // ReplCommand::Vm { subcommand } => {
+            //     self.handle_vm(subcommand).await?;
+            // }
             ReplCommand::Web { subcommand } => {
                 self.handle_web(subcommand).await?;
             }
@@ -524,18 +637,18 @@ impl ReplHandler {
             }
 
             #[cfg(feature = "repl-custom")]
-            ReplCommand::Custom {
-                name,
-                parameters,
-                execution_mode,
-            } => {
-                self.handle_custom_command(name, parameters, execution_mode)
-                    .await?;
-            }
-
-            #[cfg(feature = "repl-custom")]
             ReplCommand::Commands { subcommand } => {
                 self.handle_commands_command(subcommand).await?;
+            }
+
+            #[cfg(feature = "repl-chat")]
+            ReplCommand::Context { subcommand } => {
+                self.handle_context(subcommand).await?;
+            }
+
+            #[cfg(feature = "repl-chat")]
+            ReplCommand::Conversation { subcommand } => {
+                self.handle_conversation(subcommand).await?;
             }
         }
 
@@ -543,7 +656,7 @@ impl ReplHandler {
     }
 
     async fn handle_search(
-        &self,
+        &mut self,
         query: String,
         role: Option<String>,
         limit: Option<usize>,
@@ -576,96 +689,107 @@ impl ReplHandler {
             );
 
             if self.api_client.is_none() {
-                // Offline mode - mock results
-                println!("{} Offline mode - showing mock results", "📱".blue());
+                // Offline mode - use TuiService
+                if let Some(service) = &self.tui_service {
+                    println!("{} Offline mode - searching local haystacks", "📱".blue());
 
-                // Mock search results for demonstration
-                let results = vec![
-                    (
-                        "Introduction to Terraphim",
-                        "https://docs.example.com/intro",
-                        0.95,
-                    ),
-                    (
-                        "Advanced Search Techniques",
-                        "https://docs.example.com/search",
-                        0.87,
-                    ),
-                    (
-                        "Knowledge Graph Theory",
-                        "https://docs.example.com/graph",
-                        0.82,
-                    ),
-                ];
+                    let role_name = role
+                        .as_ref()
+                        .map(|r| terraphim_types::RoleName::new(r))
+                        .unwrap_or_else(|| terraphim_types::RoleName::new(&self.current_role));
 
-                if results.is_empty() {
-                    println!("{} No results found", "ℹ".blue().bold());
-                } else {
-                    // Enhanced results display with semantic information
-                    let mut table = Table::new();
-                    table
-                        .load_preset(UTF8_FULL)
-                        .apply_modifier(UTF8_ROUND_CORNERS)
-                        .set_header(vec![
-                            Cell::new("Rank").add_attribute(comfy_table::Attribute::Bold),
-                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
-                            Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                            if semantic || concepts {
-                                Cell::new("Relevance").add_attribute(comfy_table::Attribute::Bold)
-                            } else {
-                                Cell::new("Score").add_attribute(comfy_table::Attribute::Bold)
-                            },
-                        ]);
-
-                    for doc in &results {
-                        let relevance_score = if semantic || concepts {
-                            // Show semantic relevance indicator
-                            let score = doc.2;
-                            if score >= 0.8 {
-                                "🟢 High".to_string()
-                            } else if score >= 0.5 {
-                                "🟡 Medium".to_string()
-                            } else {
-                                "🔴 Low".to_string()
+                    match service.search_with_role(&query, &role_name, limit).await {
+                        Ok(documents) => {
+                            // Store results for context selection
+                            #[cfg(feature = "repl-chat")]
+                            {
+                                self.last_search_results = documents.clone();
                             }
-                        } else {
-                            doc.2.to_string()
-                        };
 
-                        table.add_row(vec![
-                            Cell::new(doc.2.to_string()),
-                            Cell::new(doc.0),
-                            Cell::new(doc.1),
-                            Cell::new(relevance_score),
-                        ]);
-                    }
+                            if documents.is_empty() {
+                                println!("{} No results found", "ℹ".blue().bold());
+                            } else {
+                                // Enhanced results display with semantic information
+                                let mut table = Table::new();
+                                table
+                                    .load_preset(UTF8_FULL)
+                                    .apply_modifier(UTF8_ROUND_CORNERS)
+                                    .set_header(vec![
+                                        #[cfg(feature = "repl-chat")]
+                                        Cell::new("#").add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("Rank")
+                                            .add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("Title")
+                                            .add_attribute(comfy_table::Attribute::Bold),
+                                        Cell::new("URL")
+                                            .add_attribute(comfy_table::Attribute::Bold),
+                                        if semantic || concepts {
+                                            Cell::new("Relevance")
+                                                .add_attribute(comfy_table::Attribute::Bold)
+                                        } else {
+                                            Cell::new("Score")
+                                                .add_attribute(comfy_table::Attribute::Bold)
+                                        },
+                                    ]);
 
-                    println!("{}", table);
-                    println!(
-                        "{} Found {} result(s) using {}",
-                        "✅".bold(),
-                        results.len().to_string().green(),
-                        search_mode.blue()
-                    );
+                                for (i, doc) in documents.iter().enumerate() {
+                                    let rank = doc.rank.unwrap_or(0);
+                                    let relevance_score = if semantic || concepts {
+                                        // Show semantic relevance indicator based on rank
+                                        // Higher rank = more relevant
+                                        if rank >= 80 {
+                                            "🟢 High".to_string()
+                                        } else if rank >= 50 {
+                                            "🟡 Medium".to_string()
+                                        } else {
+                                            "🔴 Low".to_string()
+                                        }
+                                    } else {
+                                        rank.to_string()
+                                    };
 
-                    // Show concept expansion if enabled
-                    if concepts {
-                        println!("\n{} Expanding concepts for query...", "🧠".bold());
-                        // Mock concepts for demonstration
-                        let concepts_list = vec![
-                            "search",
-                            "query",
-                            "information retrieval",
-                            "semantic",
-                            "relevance",
-                        ];
-                        if !concepts_list.is_empty() {
-                            println!("{} Related concepts:", "🔗".bold());
-                            for (i, concept) in concepts_list.iter().enumerate() {
-                                println!("  {}. {}", (i + 1).to_string().yellow(), concept.cyan());
+                                    let mut row = vec![];
+                                    #[cfg(feature = "repl-chat")]
+                                    row.push(Cell::new(format!("{:2}", i)));
+                                    row.push(Cell::new(rank.to_string()));
+                                    row.push(Cell::new(&doc.title));
+                                    row.push(Cell::new(&doc.url));
+                                    row.push(Cell::new(relevance_score));
+                                    table.add_row(row);
+                                }
+
+                                println!("{}", table);
+                                println!(
+                                    "{} Found {} result(s) using {}",
+                                    "✅".bold(),
+                                    documents.len().to_string().green(),
+                                    search_mode.blue()
+                                );
+
+                                // Show context hint
+                                #[cfg(feature = "repl-chat")]
+                                {
+                                    println!(
+                                        "\n💡 Use {} to add documents to context",
+                                        "/context add <indices>".yellow()
+                                    );
+                                }
+
+                                // Show concept expansion if enabled
+                                if concepts {
+                                    println!("\n{} Concept expansion in offline mode", "🧠".bold());
+                                    // In offline mode, concepts are included in search results
+                                    println!("{} Use semantic search features with knowledge graph roles", "ℹ".blue());
+                                }
                             }
                         }
+                        Err(e) => {
+                            println!("{} Search failed: {}", "❌".red().bold(), e);
+                        }
                     }
+                } else {
+                    println!("{} Offline service not initialized", "⚠️".yellow().bold());
+                    println!("This is a bug - please report it.");
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode
@@ -777,13 +901,18 @@ impl ReplHandler {
     }
 
     async fn handle_config(&self, subcommand: ConfigSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
         match subcommand {
             ConfigSubcommand::Show => {
-                if false { // TODO: Reimplement service integration
-                     // Config moved to server - available via API client
-                     // let config_json = serde_json::to_string_pretty(&config)?;
-                     // println!("{}", config_json);
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - use TuiService
+                    let config = service.get_config().await;
+                    let config_json = serde_json::to_string_pretty(&config)?;
+                    println!("{}", config_json);
                 } else if let Some(api_client) = &self.api_client {
+                    // Server mode
                     match api_client.get_config().await {
                         Ok(response) => {
                             let config_json = serde_json::to_string_pretty(&response.config)?;
@@ -797,34 +926,81 @@ impl ReplHandler {
                             );
                         }
                     }
+                } else {
+                    println!("{} No service available", "⚠️".yellow().bold());
                 }
             }
             ConfigSubcommand::Set { key, value } => {
-                println!(
-                    "{} Config modification not yet implemented",
-                    "ℹ".blue().bold()
-                );
-                println!("Would set {} = {}", key.yellow(), value.cyan());
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - implement config updates
+                    match key.as_str() {
+                        "selected_role" => {
+                            let role_name = terraphim_types::RoleName::new(&value);
+                            match service.update_selected_role(role_name).await {
+                                Ok(_) => {
+                                    if let Err(e) = service.save_config().await {
+                                        println!(
+                                            "{} Warning: Failed to save: {}",
+                                            "⚠️".yellow(),
+                                            e
+                                        );
+                                    }
+                                    println!(
+                                        "{} Set {} = {}",
+                                        "✅".bold(),
+                                        key.yellow(),
+                                        value.green()
+                                    );
+                                }
+                                Err(e) => {
+                                    println!("{} Failed to set config: {}", "❌".red().bold(), e);
+                                }
+                            }
+                        }
+                        _ => {
+                            println!(
+                                "{} Config key '{}' not supported in offline mode",
+                                "ℹ".blue().bold(),
+                                key.yellow()
+                            );
+                            println!("Supported keys: selected_role");
+                        }
+                    }
+                } else if let Some(_api_client) = &self.api_client {
+                    // Server mode
+                    println!(
+                        "{} Config modification via server not yet implemented",
+                        "ℹ".blue().bold()
+                    );
+                    println!("Would set {} = {}", key.yellow(), value.cyan());
+                } else {
+                    println!("{} No service available", "⚠️".yellow().bold());
+                }
             }
         }
         Ok(())
     }
 
     async fn handle_role(&mut self, subcommand: RoleSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
         match subcommand {
             RoleSubcommand::List => {
-                if false { // TODO: Reimplement service integration
-                     // Roles moved to server - available via API client
-                     //     println!("{}", "Available roles:".bold());
-                     //     for role in roles {
-                     //         let marker = if role == self.current_role {
-                     //             "▶"
-                     //         } else {
-                     //             " "
-                     //         };
-                     //         println!("  {} {}", marker.green(), role);
-                     //     }
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - use TuiService
+                    let roles = service.list_roles().await;
+                    println!("{}", "Available roles:".bold());
+                    for role in roles {
+                        let marker = if role == self.current_role {
+                            "▶"
+                        } else {
+                            " "
+                        };
+                        println!("  {} {}", marker.green(), role);
+                    }
                 } else if let Some(api_client) = &self.api_client {
+                    // Server mode
                     match api_client.get_config().await {
                         Ok(response) => {
                             println!("{}", "Available roles:".bold());
@@ -851,9 +1027,30 @@ impl ReplHandler {
                             );
                         }
                     }
+                } else {
+                    println!("{} No service available", "⚠️".yellow().bold());
                 }
             }
             RoleSubcommand::Select { name } => {
+                if let Some(service) = &self.tui_service {
+                    // Offline mode - update via TuiService
+                    let role_name = terraphim_types::RoleName::new(&name);
+                    match service.update_selected_role(role_name).await {
+                        Ok(_) => {
+                            if let Err(e) = service.save_config().await {
+                                println!("{} Warning: Failed to save config: {}", "⚠️".yellow(), e);
+                            }
+                        }
+                        Err(e) => {
+                            println!("{} Failed to update role: {}", "❌".red().bold(), e);
+                            return Ok(());
+                        }
+                    }
+                } else if let Some(_api_client) = &self.api_client {
+                    // Server mode - role selection handled by server
+                    // Just update local state
+                }
+
                 self.current_role = name.clone();
                 println!("{} Switched to role: {}", "✅".bold(), name.green());
             }
@@ -862,15 +1059,36 @@ impl ReplHandler {
     }
 
     async fn handle_graph(&self, top_k: Option<usize>) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
         let k = top_k.unwrap_or(10);
 
-        if false { // TODO: Reimplement service integration
-             // Role graph concepts moved to server - available via API client
-             //     println!("{} Top {} concepts:", "📊".bold(), k.to_string().cyan());
-             //     for (i, concept) in concepts.iter().enumerate() {
-             //         println!("  {}. {}", (i + 1).to_string().yellow(), concept);
-             //     }
+        if let Some(service) = &self.tui_service {
+            // Offline mode - use TuiService
+            let role_name = terraphim_types::RoleName::new(&self.current_role);
+            match service.get_role_graph_top_k(&role_name, k).await {
+                Ok(concepts) => {
+                    println!(
+                        "{} Top {} concepts for role '{}':",
+                        "📊".bold(),
+                        k.to_string().cyan(),
+                        self.current_role.green()
+                    );
+                    for (i, concept) in concepts.iter().enumerate() {
+                        println!("  {}. {}", (i + 1).to_string().yellow(), concept);
+                    }
+                }
+                Err(e) => {
+                    println!(
+                        "{} Failed to get graph: {}",
+                        "❌".bold(),
+                        e.to_string().red()
+                    );
+                }
+            }
         } else if let Some(api_client) = &self.api_client {
+            // Server mode
             match api_client.rolegraph(Some(&self.current_role)).await {
                 Ok(response) => {
                     let mut nodes = response.nodes;
@@ -894,6 +1112,8 @@ impl ReplHandler {
                     );
                 }
             }
+        } else {
+            println!("{} No service available", "⚠️".yellow().bold());
         }
 
         Ok(())
@@ -911,7 +1131,7 @@ impl ReplHandler {
                 );
             }
         } else {
-            self.show_available_commands();
+            self.show_available_commands().await;
         }
         Ok(())
     }
@@ -923,42 +1143,69 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-chat")]
-    async fn handle_chat(&self, message: Option<String>) -> Result<()> {
+    async fn handle_chat(&mut self, message: Option<String>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
 
-            if let Some(msg) = message {
-                println!("{} Sending message: '{}'", "💬".bold(), msg.cyan());
+            let msg = message.unwrap_or_else(|| {
+                print!("💬 Message: ");
+                io::stdout().flush().unwrap();
+                let mut input = String::new();
+                io::stdin().read_line(&mut input).unwrap();
+                input.trim().to_string()
+            });
 
-                if false { // TODO: Reimplement service integration
-                     // Role-based chat moved to server - use api_client.chat() instead
-                     // let role_name = &self.current_role;
+            if msg.is_empty() {
+                println!("{} Message cannot be empty", "⚠️".yellow().bold());
+                return Ok(());
+            }
 
-                    // match api_client.chat(role_name, &msg, None).await {
-                    //     Ok(response) => {
-                    //         println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
-                    //         println!("{}", response);
-                    //     }
-                    //     Err(e) => {
-                    //         println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
-                    //     }
-                    // }
-                } else if let Some(api_client) = &self.api_client {
-                    // Server mode chat
-                    match api_client.chat(&self.current_role, &msg, None).await {
+            println!("{} Sending message: '{}'", "💬".bold(), msg.cyan());
+
+            if let Some(service) = &self.tui_service {
+                // Check if we have a conversation with context
+                if let Some(conv_id) = &self.current_conversation_id {
+                    // Use RAG chat with context
+                    match service.chat_with_context(conv_id, msg, None).await {
+                        Ok(response) => {
+                            println!("\n{} {}\n", "🤖".bold(), "Response (with context):".bold());
+                            println!("{}", response);
+                        }
+                        Err(e) => {
+                            println!(
+                                "{} Chat with context failed: {}",
+                                "❌".bold(),
+                                e.to_string().red()
+                            );
+                        }
+                    }
+                } else {
+                    // Direct chat without context
+                    let role_name = terraphim_types::RoleName::new(&self.current_role);
+                    match service.chat(&role_name, &msg, None).await {
                         Ok(response) => {
                             println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
-                            println!("{}", response.message.unwrap_or(response.status));
+                            println!("{}", response);
                         }
                         Err(e) => {
                             println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
                         }
                     }
                 }
+            } else if let Some(api_client) = &self.api_client {
+                // Server mode chat
+                match api_client.chat(&self.current_role, &msg, None).await {
+                    Ok(response) => {
+                        println!("\n{} {}\n", "🤖".bold(), "Response:".bold());
+                        println!("{}", response.message.unwrap_or(response.status));
+                    }
+                    Err(e) => {
+                        println!("{} Chat failed: {}", "❌".bold(), e.to_string().red());
+                    }
+                }
             } else {
-                println!("{} Please provide a message to chat", "ℹ".blue().bold());
-                println!("Usage: {} <message>", "/chat".yellow());
+                println!("{} No service available", "⚠️".yellow().bold());
             }
         }
 
@@ -1044,63 +1291,107 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_autocomplete(&self, query: String, limit: Option<usize>) -> Result<()> {
+    async fn handle_autocomplete(&self, query: String, _limit: Option<usize>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Autocompleting: '{}'", "🔍".bold(), query.cyan());
 
-            if false { // TODO: Reimplement service integration
-                 // Autocomplete moved to server - use api_client.autocomplete() instead
-                 // let role_name = &self.current_role;
+            if let Some(service) = &self.tui_service {
+                // Offline mode - use TuiService
+                let role_name = terraphim_types::RoleName::new(&self.current_role);
+                match service.autocomplete(&role_name, &query, _limit).await {
+                    Ok(results) => {
+                        if results.is_empty() {
+                            println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
+                        } else {
+                            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+                            use comfy_table::presets::UTF8_FULL;
+                            use comfy_table::{Cell, Table};
 
-                // match api_client.autocomplete(role_name, &query, limit).await {
-                //     Ok(results) => {
-                //         if results.is_empty() {
-                //             println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
-                //         } else {
-                //             let mut table = Table::new();
-                //             table
-                //                 .load_preset(UTF8_FULL)
-                //                 .apply_modifier(UTF8_ROUND_CORNERS)
-                //                 .set_header(vec![
-                //                     Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                //                     Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
-                //                     Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                //                 ]);
+                            let mut table = Table::new();
+                            table
+                                .load_preset(UTF8_FULL)
+                                .apply_modifier(UTF8_ROUND_CORNERS)
+                                .set_header(vec![
+                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                                    Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
+                                ]);
 
-                //             for result in &results {
-                //                 table.add_row(vec![
-                //                     Cell::new(&result.term),
-                //                     Cell::new(format!("{:.2}", result.score)),
-                //                     Cell::new(result.url.as_deref().unwrap_or("N/A")),
-                //                 ]);
-                //             }
+                            for result in &results {
+                                table.add_row(vec![
+                                    Cell::new(&result.term),
+                                    Cell::new(format!("{:.2}", result.score)),
+                                ]);
+                            }
 
-                //             println!("{}", table);
-                //             println!(
-                //                 "{} Found {} suggestion(s)",
-                //                 "✅".bold(),
-                //                 results.len().to_string().green()
-                //             );
-                //         }
-                //     }
-                //     Err(e) => {
-                //         println!(
-                //             "{} Autocomplete failed: {}",
-                //             "❌".bold(),
-                //             e.to_string().red()
-                //         );
-                //     }
-                // }
+                            println!("{}", table);
+                            println!(
+                                "{} Found {} suggestion(s)",
+                                "✅".bold(),
+                                results.len().to_string().green()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        println!(
+                            "{} Autocomplete failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
+                    }
+                }
+            } else if let Some(api_client) = &self.api_client {
+                // Server mode
+                match api_client
+                    .get_autocomplete(&self.current_role, &query)
+                    .await
+                {
+                    Ok(response) => {
+                        if response.suggestions.is_empty() {
+                            println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
+                        } else {
+                            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+                            use comfy_table::presets::UTF8_FULL;
+                            use comfy_table::{Cell, Table};
+
+                            let mut table = Table::new();
+                            table
+                                .load_preset(UTF8_FULL)
+                                .apply_modifier(UTF8_ROUND_CORNERS)
+                                .set_header(vec![
+                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                                    Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
+                                ]);
+
+                            for suggestion in &response.suggestions {
+                                table.add_row(vec![
+                                    Cell::new(&suggestion.text),
+                                    Cell::new(format!("{:.2}", suggestion.score)),
+                                ]);
+                            }
+
+                            println!("{}", table);
+                            println!(
+                                "{} Found {} suggestion(s)",
+                                "✅".bold(),
+                                response.suggestions.len().to_string().green()
+                            );
+                        }
+                    }
+                    Err(e) => {
+                        println!(
+                            "{} Autocomplete failed: {}",
+                            "❌".bold(),
+                            e.to_string().red()
+                        );
+                    }
+                }
             } else {
                 println!(
-                    "{} Autocomplete requires offline mode with thesaurus",
-                    "ℹ".blue().bold()
+                    "{} No service available - run in offline or server mode",
+                    "⚠️".yellow().bold()
                 );
             }
         }
@@ -1114,13 +1405,10 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_extract(&self, text: String, exclude_term: bool) -> Result<()> {
+    async fn handle_extract(&self, _text: String, _exclude_term: bool) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Extracting paragraphs from text...", "📄".bold());
 
@@ -1188,13 +1476,10 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_find(&self, text: String) -> Result<()> {
+    async fn handle_find(&self, _text: String) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Finding matches in text...", "🔍".bold());
 
@@ -1255,14 +1540,14 @@ impl ReplHandler {
     }
 
     #[cfg(feature = "repl-mcp")]
-    async fn handle_replace(&self, text: String, format: Option<String>) -> Result<()> {
+    async fn handle_replace(&self, _text: String, format: Option<String>) -> Result<()> {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
 
             println!("{} Replacing matches in text...", "🔄".bold());
 
-            let link_type = match format.as_deref() {
+            let _link_type = match format.as_deref() {
                 Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
                 Some("html") => terraphim_automata::LinkType::HTMLLinks,
                 Some("wiki") => terraphim_automata::LinkType::WikiLinks,
@@ -1275,7 +1560,7 @@ impl ReplHandler {
                  // let role_name = &self.current_role;
 
                 // match api_client.replace_matches(role_name, &text, link_type).await {
-                //     Ok(result) => {
+                //     Ok(_result) => {
                 //         println!("\n{} {}\n", "📝".bold(), "Result:".bold());
                 //         println!("{}", result);
                 //     }
@@ -1310,54 +1595,68 @@ impl ReplHandler {
 
             println!("{} Loading thesaurus...", "📚".bold());
 
-            if false {
-                // TODO: Reimplement service integration
-                let role_name = if let Some(role_str) = role {
-                    terraphim_types::RoleName::new(&role_str)
-                } else {
-                    terraphim_types::RoleName::new(&self.current_role) // Use current role from handler
-                };
-
-            // match api_client.get_thesaurus(role_name).await {
-            //     Ok(thesaurus) => {
-            //         let mut table = Table::new();
-            //         table
-            //             .load_preset(UTF8_FULL)
-            //             .apply_modifier(UTF8_ROUND_CORNERS)
-            //             .set_header(vec![
-            //                 Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-            //                 Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
-            //                 Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
-            //                 Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-            //             ]);
-
-            //         let mut count = 0;
-            //         for (term, normalized) in (&thesaurus as &[(String, String)]).into_iter().take(20) {
-            //             // Show first 20 entries
-            //             table.add_row(vec![
-            //                 Cell::new(term.as_str()),
-            //                 Cell::new(normalized.id.to_string()),
-            //                 Cell::new(normalized.value.as_str()),
-            //                 Cell::new(normalized.url.as_deref().unwrap_or("N/A")),
-            //             ]);
-            //             count += 1;
-            //         }
-
-            //         println!("{}", table);
-            //         println!(
-            //             "{} Showing {} of {} thesaurus entries for role '{}'",
-            //             "✅".bold(),
-            //             count.to_string().green(),
-            //             thesaurus.len().to_string().cyan(),
-            //             role_name.to_string().yellow()
-            //         );
-            //     }
-            //     Err(e) => {
-            //         println!("{} Thesaurus failed: {}", "❌".bold(), e.to_string().red());
-            //     }
-            // }
+            let role_name = if let Some(role_str) = role {
+                terraphim_types::RoleName::new(&role_str)
             } else {
-                println!("{} Thesaurus requires offline mode", "ℹ".blue().bold());
+                terraphim_types::RoleName::new(&self.current_role)
+            };
+
+            if let Some(service) = &self.tui_service {
+                // Offline mode - use TuiService
+                match service.get_thesaurus(&role_name).await {
+                    Ok(thesaurus) => {
+                        let entries: Vec<_> = (&thesaurus).into_iter().take(20).collect();
+
+                        if entries.is_empty() {
+                            println!(
+                                "{} No thesaurus entries found for role '{}'",
+                                "ℹ".blue().bold(),
+                                role_name.to_string().yellow()
+                            );
+                            return Ok(());
+                        }
+
+                        let mut table = Table::new();
+                        table
+                            .load_preset(UTF8_FULL)
+                            .apply_modifier(UTF8_ROUND_CORNERS)
+                            .set_header(vec![
+                                Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                                Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                                Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
+                            ]);
+
+                        let count = entries.len();
+
+                        for (key, normalized_term) in &entries {
+                            table.add_row(vec![
+                                Cell::new(key.as_str()),
+                                Cell::new(normalized_term.id.to_string()),
+                                Cell::new(normalized_term.url.as_deref().unwrap_or("N/A")),
+                            ]);
+                        }
+
+                        println!("{}", table);
+                        println!(
+                            "{} Showing {} of {} thesaurus entries for role '{}'",
+                            "✅".bold(),
+                            count.to_string().green(),
+                            thesaurus.len().to_string().cyan(),
+                            role_name.to_string().yellow()
+                        );
+                    }
+                    Err(e) => {
+                        println!("{} Thesaurus failed: {}", "❌".bold(), e.to_string().red());
+                    }
+                }
+            } else if let Some(_api_client) = &self.api_client {
+                // Server mode - would use API client
+                println!(
+                    "{} Thesaurus via server not yet implemented",
+                    "ℹ".blue().bold()
+                );
+            } else {
+                println!("{} No service available", "⚠️".yellow().bold());
             }
         }
 
@@ -1369,6 +1668,8 @@ impl ReplHandler {
         Ok(())
     }
 
+    // VM handling disabled - methods removed from ApiClient
+    /*
     async fn handle_vm(&self, subcommand: super::commands::VmSubcommand) -> Result<()> {
         use super::commands::VmSubcommand;
 
@@ -1732,8 +2033,7 @@ impl ReplHandler {
                                     "Agent Execution Result:".bold()
                                 );
                                 println!(
-                                    "{} Task ID: {}",
-                                    "🆔".bold(),
+                                    "🆔 Task ID: {}",
                                     response.task_id.to_string()
                                 );
                                 println!("{} Agent: {}", "👤".bold(), response.agent_id);
@@ -2065,6 +2365,7 @@ impl ReplHandler {
 
         Ok(())
     }
+    */
 
     #[cfg(feature = "repl")]
     async fn handle_web(&self, subcommand: super::commands::WebSubcommand) -> Result<()> {
@@ -2073,10 +2374,10 @@ impl ReplHandler {
         match subcommand {
             WebSubcommand::Get { url, headers } => {
                 println!("{} Executing HTTP GET request", "🌐".bold());
-                println!("{} URL: {}", "📍", url.cyan());
+                println!("📍 URL: {}", url.cyan());
 
                 if let Some(headers) = &headers {
-                    println!("{} Headers:", "📋");
+                    println!("📋 Headers:");
                     for (key, value) in headers {
                         println!("  {}: {}", key.green(), value);
                     }
@@ -2093,11 +2394,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Web operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2106,11 +2403,11 @@ impl ReplHandler {
 
             WebSubcommand::Post { url, body, headers } => {
                 println!("{} Executing HTTP POST request", "🌐".bold());
-                println!("{} URL: {}", "📍", url.cyan());
-                println!("{} Body: {}", "📝", body.yellow());
+                println!("📍 URL: {}", url.cyan());
+                println!("📝 Body: {}", body.yellow());
 
                 if let Some(headers) = &headers {
-                    println!("{} Headers:", "📋");
+                    println!("📋 Headers:");
                     for (key, value) in headers {
                         println!("  {}: {}", key.green(), value);
                     }
@@ -2127,11 +2424,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Web operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2144,11 +2437,11 @@ impl ReplHandler {
                 wait: wait_for_element,
             } => {
                 println!("{} Executing web scraping operation", "🕷️".bold());
-                println!("{} URL: {}", "📍", url.cyan());
-                println!("{} CSS Selector: {}", "🎯", selector.yellow());
+                println!("📍 URL: {}", url.cyan());
+                println!("🎯 CSS Selector: {}", selector.yellow());
 
                 if let Some(wait_element) = &wait_for_element {
-                    println!("{} Wait for element: {}", "⏳", wait_element.green());
+                    println!("⏳ Wait for element: {}", wait_element.green());
                 }
 
                 let operation = if let Some(wait) = wait_for_element {
@@ -2162,11 +2455,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Web scraping operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2180,13 +2469,13 @@ impl ReplHandler {
                 full_page,
             } => {
                 println!("{} Capturing webpage screenshot", "📸".bold());
-                println!("{} URL: {}", "📍", url.cyan());
+                println!("📍 URL: {}", url.cyan());
 
                 if let Some(w) = width {
-                    println!("{} Width: {}px", "📐", w.to_string().yellow());
+                    println!("📐 Width: {}px", w.to_string().yellow());
                 }
                 if let Some(h) = height {
-                    println!("{} Height: {}px", "📏", h.to_string().yellow());
+                    println!("📏 Height: {}px", h.to_string().yellow());
                 }
                 if full_page.unwrap_or(false) {
                     println!("{} Full page screenshot", "📄".green());
@@ -2205,11 +2494,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Screenshot operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2218,10 +2503,10 @@ impl ReplHandler {
 
             WebSubcommand::Pdf { url, page_size } => {
                 println!("{} Generating PDF from webpage", "📄".bold());
-                println!("{} URL: {}", "📍", url.cyan());
+                println!("📍 URL: {}", url.cyan());
 
                 if let Some(size) = &page_size {
-                    println!("{} Page size: {}", "📋", size.yellow());
+                    println!("📋 Page size: {}", size.yellow());
                 }
 
                 let operation = if let Some(size) = page_size {
@@ -2235,11 +2520,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} PDF generation operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2248,8 +2529,8 @@ impl ReplHandler {
 
             WebSubcommand::Form { url, form_data } => {
                 println!("{} Submitting web form", "📝".bold());
-                println!("{} URL: {}", "📍", url.cyan());
-                println!("{} Form data:", "📋");
+                println!("📍 URL: {}", url.cyan());
+                println!("📋 Form data:");
                 for (key, value) in &form_data {
                     println!("  {}: {}", key.green(), value.yellow());
                 }
@@ -2260,11 +2541,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Form submission operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2277,14 +2554,14 @@ impl ReplHandler {
                 rate_limit: rate_limit_ms,
             } => {
                 println!("{} Executing API interaction", "🔌".bold());
-                println!("{} Base URL: {}", "📍", base_url.cyan());
-                println!("{} Endpoints:", "🎯");
+                println!("📍 Base URL: {}", base_url.cyan());
+                println!("🎯 Endpoints:");
                 for endpoint in &endpoints {
                     println!("  {}", endpoint.green());
                 }
 
                 if let Some(rate_limit) = rate_limit_ms {
-                    println!("{} Rate limit: {}ms", "⏱️", rate_limit.to_string().yellow());
+                    println!("⏱️ Rate limit: {}ms", rate_limit.to_string().yellow());
                 }
 
                 let operation = if let Some(rate) = rate_limit_ms {
@@ -2302,26 +2579,18 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} API interaction operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
                 );
             }
 
-            WebSubcommand::Status { operation_id } => {
+            WebSubcommand::Status { operation_id: _ } => {
                 println!("{} Checking web operation status", "📊".bold());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    operation_id.unwrap_or_default().cyan()
-                );
-                println!("{} Status: {}", "📋", "Running".yellow());
-                println!("{} Started: {}", "⏰", "2025-01-18 15:30:00 UTC".green());
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
+                println!("📋 Status: {}", "Running".yellow());
+                println!("⏰ Started: {}", "2025-01-18 15:30:00 UTC".green());
                 println!(
                     "{} This would query the actual operation status from the VM manager",
                     "ℹ️".blue()
@@ -2330,8 +2599,8 @@ impl ReplHandler {
 
             WebSubcommand::Cancel { operation_id } => {
                 println!("{} Canceling web operation", "❌".bold());
-                println!("{} Operation ID: {}", "🆔", operation_id.cyan());
-                println!("{} Status: {}", "📋", "Cancelled".red());
+                println!("🆔 Operation ID: {}", operation_id.cyan());
+                println!("📋 Status: {}", "Cancelled".red());
                 println!(
                     "{} This would send a cancel signal to the VM manager",
                     "ℹ️".blue()
@@ -2343,8 +2612,7 @@ impl ReplHandler {
 
                 let limit_count = limit.unwrap_or(10);
                 println!(
-                    "{} Showing last {} operations",
-                    "📊",
+                    "📊 Showing last {} operations",
                     limit_count.to_string().cyan()
                 );
                 println!("\n{} Web Operations:", "🌐".bold());
@@ -2409,77 +2677,39 @@ impl ReplHandler {
                 }
             }
 
-            WebSubcommand::Config { subcommand } => match subcommand {
-                WebConfigSubcommand::Show => {
-                    println!("{} Web Operations Configuration", "⚙️".bold());
-                    println!("{}", "-".repeat(50));
-
-                    let config = WebOperationConfig::default();
-                    println!(
-                        "{} Default timeout: {}ms",
-                        "⏱️",
-                        config.default_timeout_ms.to_string().cyan()
-                    );
-                    println!(
-                        "{} Max concurrent operations: {}",
-                        "🔢",
-                        config.max_concurrent_operations.to_string().cyan()
-                    );
-                    println!(
-                        "{} Sandbox enabled: {}",
-                        "🛡️",
-                        config.security.sandbox_enabled.to_string().green()
-                    );
-                    println!(
-                        "{} JavaScript enabled: {}",
-                        "📜",
-                        config.security.allow_javascript.to_string().green()
-                    );
-                    println!(
-                        "{} Cookies enabled: {}",
-                        "🍪",
-                        config.security.allow_cookies.to_string().red()
-                    );
-                    println!(
-                        "{} Max response size: {}MB",
-                        "📏",
-                        config.security.max_response_size_mb.to_string().cyan()
-                    );
-
-                    println!("\n{} Allowed domains:", "✅".green());
-                    for domain in &config.security.allowed_domains {
-                        println!("  {}", domain.green());
+            WebSubcommand::Config { subcommand } => {
+                match subcommand {
+                    WebConfigSubcommand::Show => {
+                        println!("{} Web Operations Configuration", "⚙️".bold());
+                        println!("{}", "-".repeat(50));
+                        println!("Configuration display not implemented (WebOperationConfig was removed)");
+                        // TODO: Reimplement configuration display with new types
                     }
 
-                    println!("\n{} Blocked domains:", "🚫".red());
-                    for domain in &config.security.blocked_domains {
-                        println!("  {}", domain.red());
+                    WebConfigSubcommand::Set { key, value } => {
+                        println!("{} Updating web operations configuration", "⚙️".bold());
+                        println!("🔧 Setting: {} = {}", key.cyan(), value.yellow());
+                        println!("{} Configuration updated successfully", "✅".green());
+                        println!(
+                            "{} This would persist the configuration to the config store",
+                            "ℹ️".blue()
+                        );
+                    }
+
+                    WebConfigSubcommand::Reset => {
+                        println!("{} Resetting web operations configuration", "🔄".bold());
+                        println!(
+                            "{} All settings will be restored to defaults",
+                            "⚠️".yellow()
+                        );
+                        println!("{} Configuration reset successfully", "✅".green());
+                        println!(
+                            "{} This would reset the configuration to defaults",
+                            "ℹ️".blue()
+                        );
                     }
                 }
-
-                WebConfigSubcommand::Set { key, value } => {
-                    println!("{} Updating web operations configuration", "⚙️".bold());
-                    println!("{} Setting: {} = {}", "🔧", key.cyan(), value.yellow());
-                    println!("{} Configuration updated successfully", "✅".green());
-                    println!(
-                        "{} This would persist the configuration to the config store",
-                        "ℹ️".blue()
-                    );
-                }
-
-                WebConfigSubcommand::Reset => {
-                    println!("{} Resetting web operations configuration", "🔄".bold());
-                    println!(
-                        "{} All settings will be restored to defaults",
-                        "⚠️".yellow()
-                    );
-                    println!("{} Configuration reset successfully", "✅".green());
-                    println!(
-                        "{} This would reset the configuration to defaults",
-                        "ℹ️".blue()
-                    );
-                }
-            },
+            }
         }
 
         Ok(())
@@ -2496,24 +2726,24 @@ impl ReplHandler {
                 limit,
             } => {
                 println!("{} Searching files with semantic awareness", "🔍".bold());
-                println!("{} Query: {}", "📋", query.cyan());
+                println!("📋 Query: {}", query.cyan());
 
                 if let Some(path) = &path {
-                    println!("{} Path: {}", "📁", path.yellow());
+                    println!("📁 Path: {}", path.yellow());
                 }
 
                 if let Some(types) = &file_types {
-                    println!("{} File types: {}", "📄", types.join(", ").green());
+                    println!("📄 File types: {}", types.join(", ").green());
                 }
 
                 if semantic {
-                    println!("{} Semantic search: {}", "🧠", "Enabled".green());
+                    println!("🧠 Semantic search: {}", "Enabled".green());
                 } else {
-                    println!("{} Semantic search: {}", "🧠", "Disabled".red());
+                    println!("🧠 Semantic search: {}", "Disabled".red());
                 }
 
                 if let Some(limit) = limit {
-                    println!("{} Max results: {}", "📊", limit.to_string().yellow());
+                    println!("📊 Max results: {}", limit.to_string().yellow());
                 }
 
                 println!(
@@ -2529,7 +2759,7 @@ impl ReplHandler {
                 println!("\n{} Found files:", "📄".bold());
                 println!("{}", "-".repeat(80));
 
-                let mock_results = vec![
+                let mock_results = [
                     ("/src/main.rs", "Rust application entry point", 0.95),
                     (
                         "/docs/architecture.md",
@@ -2540,10 +2770,8 @@ impl ReplHandler {
                     ("/tests/integration_test.rs", "Integration test suite", 0.76),
                 ];
 
-                for (i, (file_path, description, score)) in mock_results
-                    .iter()
-                    .take(limit.unwrap_or(10) as usize)
-                    .enumerate()
+                for (i, (file_path, description, score)) in
+                    mock_results.iter().take(limit.unwrap_or(10)).enumerate()
                 {
                     let score_color = if *score >= 0.9 {
                         "🟢"
@@ -2569,16 +2797,16 @@ impl ReplHandler {
                 update_metadata,
             } => {
                 println!("{} Classifying files by content type", "📁".bold());
-                println!("{} Path: {}", "📁", path.yellow());
+                println!("📁 Path: {}", path.yellow());
 
                 if recursive {
-                    println!("{} Recursive search: {}", "🔄", "Enabled".green());
+                    println!("🔄 Recursive search: {}", "Enabled".green());
                 }
 
                 if update_metadata {
-                    println!("{} Update metadata: {}", "💾", "Enabled".green());
+                    println!("💾 Update metadata: {}", "Enabled".green());
                 } else {
-                    println!("{} Update metadata: {}", "💾", "Disabled".red());
+                    println!("💾 Update metadata: {}", "Disabled".red());
                 }
 
                 println!("\n{} Analyzing file content...", "⚙️".bold());
@@ -2624,15 +2852,15 @@ impl ReplHandler {
                 println!("{} Generating intelligent file suggestions", "💡".bold());
 
                 if let Some(ctx) = &context {
-                    println!("{} Context: {}", "💭", ctx.yellow());
+                    println!("💭 Context: {}", ctx.yellow());
                 }
 
                 if let Some(limit) = limit {
-                    println!("{} Suggestions: {}", "📊", limit.to_string().yellow());
+                    println!("📊 Suggestions: {}", limit.to_string().yellow());
                 }
 
                 if let Some(p) = &path {
-                    println!("{} Path: {}", "📁", p.yellow());
+                    println!("📁 Path: {}", p.yellow());
                 }
 
                 println!("\n{} Analyzing workspace patterns...", "🧠".bold());
@@ -2641,7 +2869,7 @@ impl ReplHandler {
                 println!("\n{} Suggested Files:", "💡".bold());
                 println!("{}", "-".repeat(80));
 
-                let suggestions = vec![
+                let suggestions = [
                     (
                         "src/utils.rs",
                         "Utility functions matching current context",
@@ -2660,12 +2888,10 @@ impl ReplHandler {
                     ),
                 ];
 
-                for (i, (file_path, description, priority)) in suggestions
-                    .iter()
-                    .take(limit.unwrap_or(5) as usize)
-                    .enumerate()
+                for (i, (file_path, description, priority)) in
+                    suggestions.iter().take(limit.unwrap_or(5)).enumerate()
                 {
-                    let priority_color = match priority.as_ref() {
+                    let priority_color = match *priority {
                         "High" => "🔴",
                         "Medium" => "🟡",
                         _ => "🟢",
@@ -2693,20 +2919,19 @@ impl ReplHandler {
                 threshold,
             } => {
                 println!("{} Analyzing file relationships", "🔗".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 if find_similar {
-                    println!("{} Find similar files: {}", "🔍", "Enabled".green());
+                    println!("🔍 Find similar files: {}", "Enabled".green());
                 }
 
                 if find_related {
-                    println!("{} Find related files: {}", "🔗", "Enabled".green());
+                    println!("🔗 Find related files: {}", "Enabled".green());
                 }
 
                 if let Some(thresh) = threshold {
                     println!(
-                        "{} Similarity threshold: {}",
-                        "📏",
+                        "📏 Similarity threshold: {}",
                         format!("{:.2}", thresh).yellow()
                     );
                 }
@@ -2718,7 +2943,7 @@ impl ReplHandler {
                     println!("\n{} Similar Files:", "📄".bold());
                     println!("{}", "-".repeat(80));
 
-                    let similar_files = vec![
+                    let similar_files = [
                         (
                             "src/main.rs",
                             0.92,
@@ -2757,7 +2982,7 @@ impl ReplHandler {
                     println!("\n{} Related Files:", "🔗".bold());
                     println!("{}", "-".repeat(80));
 
-                    let related_files = vec![
+                    let related_files = [
                         (
                             "README.md",
                             "Project Documentation",
@@ -2781,7 +3006,7 @@ impl ReplHandler {
                     for (i, (path, relationship, confidence, explanation)) in
                         related_files.iter().enumerate()
                     {
-                        let conf_color = match confidence.as_ref() {
+                        let conf_color = match *confidence {
                             "High" => "🔴",
                             "Medium" => "🟡",
                             _ => "🟢",
@@ -2806,14 +3031,14 @@ impl ReplHandler {
                 include_key_points,
             } => {
                 println!("{} Summarizing file content", "📝".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 if let Some(level) = &detail_level {
-                    println!("{} Detail level: {}", "📋", level.green());
+                    println!("📋 Detail level: {}", level.green());
                 }
 
                 if include_key_points {
-                    println!("{} Include key points: {}", "🎯", "Enabled".green());
+                    println!("🎯 Include key points: {}", "Enabled".green());
                 }
 
                 println!("\n{} Extracting semantic summary...", "🧠".bold());
@@ -2832,7 +3057,7 @@ impl ReplHandler {
                 println!("\n{} File Summary:", "📝".bold());
                 println!("{}", "-".repeat(80));
 
-                let summary_lines = vec![
+                let summary_lines = [
                     "This file implements the main application logic using Rust",
                     "It integrates with tokio for asynchronous operations",
                     "The code follows Rust best practices for error handling",
@@ -2854,7 +3079,7 @@ impl ReplHandler {
                     println!("  • Integration with Terraphim AI backend services");
                 }
 
-                println!("\n{} Reading time estimate: {}", "⏱️".bold(), "15 minutes");
+                println!("\n{} Reading time estimate: 15 minutes", "⏱️".bold());
                 // Mock reading time
             }
 
@@ -2866,7 +3091,7 @@ impl ReplHandler {
                 update_index,
             } => {
                 println!("{} Extracting semantic metadata", "🏷️".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 let mut extractions = Vec::new();
                 if extract_concepts {
@@ -2879,10 +3104,10 @@ impl ReplHandler {
                     extractions.push("keywords");
                 }
 
-                println!("{} Extracting: {}", "🔧", extractions.join(", ").green());
+                println!("🔧 Extracting: {}", extractions.join(", ").green());
 
                 if update_index {
-                    println!("{} Update index: {}", "📝", "Enabled".green());
+                    println!("📝 Update index: {}", "Enabled".green());
                 }
 
                 println!(
@@ -2896,17 +3121,15 @@ impl ReplHandler {
 
                 if extract_concepts {
                     println!(
-                        "{} Concepts: {}",
-                        "🧠",
-                        vec!["async", "tokio", "server", "api"].join(", ").cyan()
+                        "🧠 Concepts: {}",
+                        ["async", "tokio", "server", "api"].join(", ").cyan()
                     );
                 }
 
                 if extract_entities {
                     println!(
-                        "{} Entities: {}",
-                        "👥",
-                        vec!["tokio::runtime", "std::fs::File", "serde::Deserialize"]
+                        "👥 Entities: {}",
+                        ["tokio::runtime", "std::fs::File", "serde::Deserialize"]
                             .join(", ")
                             .cyan()
                     );
@@ -2914,19 +3137,18 @@ impl ReplHandler {
 
                 if extract_keywords {
                     println!(
-                        "{} Keywords: {}",
-                        "🔑",
-                        vec!["error_handling", "async_await", "Result", "HashMap"]
+                        "🔑 Keywords: {}",
+                        ["error_handling", "async_await", "Result", "HashMap"]
                             .join(", ")
                             .cyan()
                     );
                 }
 
                 println!("\n{} Content Properties:", "📊".bold());
-                println!("  {} Complexity Score: {:.2}", "📊", 0.75);
-                println!("  {} Reading Time: {} minutes", "⏱️", 15);
-                println!("  {} Semantic Fingerprint: {}", "🔍", "abc123def456");
-                println!("  {} Content Type: {}", "📄", "Rust Source Code");
+                println!("  📊 Complexity Score: {:.2}", 0.75);
+                println!("  ⏱️ Reading Time: {} minutes", 15);
+                println!("  🔍 Semantic Fingerprint: abc123def456");
+                println!("  📄 Content Type: Rust Source Code");
             }
 
             FileSubcommand::Index {
@@ -2935,18 +3157,18 @@ impl ReplHandler {
                 force_reindex,
             } => {
                 println!("{} Indexing files for semantic search", "📚".bold());
-                println!("{} Path: {}", "📁", path.yellow());
+                println!("📁 Path: {}", path.yellow());
 
                 if recursive {
-                    println!("{} Recursive indexing: {}", "🔄", "Enabled".green());
+                    println!("🔄 Recursive indexing: {}", "Enabled".green());
                 } else {
-                    println!("{} Recursive indexing: {}", "🔄", "Disabled".red());
+                    println!("🔄 Recursive indexing: {}", "Disabled".red());
                 }
 
                 if force_reindex {
-                    println!("{} Force reindex: {}", "🔄", "Enabled".green());
+                    println!("🔄 Force reindex: {}", "Enabled".green());
                 } else {
-                    println!("{} Force reindex: {}", "🔄", "Disabled".yellow());
+                    println!("🔄 Force reindex: {}", "Disabled".yellow());
                 }
 
                 println!("\n{} Scanning directory structure...", "🔍".bold());
@@ -2955,16 +3177,16 @@ impl ReplHandler {
                 // Mock indexing progress
                 println!("\n{} Indexing Progress:", "📈".bold());
                 println!("{}", "-".repeat(60));
-                println!("{} Scanning {} files...", "🔍", 150);
+                println!("🔍 Scanning {} files...", 150);
                 println!("{} Processing semantic analysis...", "🧠".bold());
                 println!("{} Building search index...", "🏗️".bold());
                 println!("{} Optimizing for performance...", "⚡".bold());
                 println!("{} Finalizing index...", "✅".bold());
 
                 println!("\n{} Indexing completed successfully!", "✅".green());
-                println!("{} Files indexed: {}", "📊", 150);
-                println!("{} Index size: {} MB", "💾", "45");
-                println!("{} Processing time: {} seconds", "⏱️", 12);
+                println!("📊 Files indexed: {}", 150);
+                println!("💾 Index size: 45 MB");
+                println!("⏱️ Processing time: {} seconds", 12);
             }
 
             FileSubcommand::Find {
@@ -2975,26 +3197,26 @@ impl ReplHandler {
                 whole_word,
             } => {
                 println!("{} Finding pattern in files", "🔍".bold());
-                println!("{} Pattern: {}", "🎯", pattern.cyan());
+                println!("🎯 Pattern: {}", pattern.cyan());
 
                 if let Some(p) = &path {
-                    println!("{} Path: {}", "📁", p.yellow());
+                    println!("📁 Path: {}", p.yellow());
                 }
 
                 if let Some(ctx) = context_lines {
-                    println!("{} Context lines: {}", "📜", ctx.to_string().yellow());
+                    println!("📜 Context lines: {}", ctx.to_string().yellow());
                 }
 
                 if case_sensitive {
-                    println!("{} Case sensitive: {}", "🔤", "Enabled".green());
+                    println!("🔤 Case sensitive: {}", "Enabled".green());
                 } else {
-                    println!("{} Case sensitive: {}", "🔤", "Disabled".red());
+                    println!("🔤 Case sensitive: {}", "Disabled".red());
                 }
 
                 if whole_word {
-                    println!("{} Whole word: {}", "🎯", "Enabled".green());
+                    println!("🎯 Whole word: {}", "Enabled".green());
                 } else {
-                    println!("{} Whole word: {}", "🎯", "Disabled".yellow());
+                    println!("🎯 Whole word: {}", "Disabled".yellow());
                 }
 
                 println!("\n{} Searching through files...", "🔍".bold());
@@ -3003,24 +3225,24 @@ impl ReplHandler {
                 println!("\n{} Search Results:", "🔍".bold());
                 println!("{}", "-".repeat(80));
 
-                let matches = vec![
+                let matches = [
                     (
                         "src/main.rs",
                         42,
                         "async fn main() {",
-                        vec!["    // Main function"],
+                        ["    // Main function"],
                     ),
                     (
                         "src/config.rs",
                         15,
                         "let config = Config::new();",
-                        vec!["// Load configuration"],
+                        ["// Load configuration"],
                     ),
                     (
                         "tests/test.rs",
                         28,
                         "assert_eq!(result, expected)",
-                        vec!["// Test assertion"],
+                        ["// Test assertion"],
                     ),
                 ];
 
@@ -3035,16 +3257,8 @@ impl ReplHandler {
                         matched_line.green()
                     );
 
-                    for (j, context_line) in context
-                        .iter()
-                        .take(context_lines.unwrap_or(2) as usize)
-                        .enumerate()
-                    {
-                        if j == 0 {
-                            println!("   {}", context_line.dimmed());
-                        } else {
-                            println!("   {}", context_line.dimmed());
-                        }
+                    for context_line in context.iter().take(context_lines.unwrap_or(2)) {
+                        println!("   {}", context_line.dimmed());
                     }
                 }
 
@@ -3063,18 +3277,18 @@ impl ReplHandler {
                 sort_by,
             } => {
                 println!("{} Listing files with annotations", "📋".bold());
-                println!("{} Path: {}", "📁", path.yellow());
+                println!("📁 Path: {}", path.yellow());
 
                 if show_metadata {
-                    println!("{} Show metadata: {}", "ℹ️", "Enabled".green());
+                    println!("ℹ️ Show metadata: {}", "Enabled".green());
                 }
 
                 if show_tags {
-                    println!("{} Show tags: {}", "🏷️", "Enabled".green());
+                    println!("🏷️ Show tags: {}", "Enabled".green());
                 }
 
                 if let Some(sort) = sort_by {
-                    println!("{} Sort by: {}", "📊", sort.cyan());
+                    println!("📊 Sort by: {}", sort.cyan());
                 }
 
                 println!("\n{} Scanning directory...", "🔍".bold());
@@ -3115,15 +3329,15 @@ impl ReplHandler {
                     );
 
                     if show_metadata {
-                        println!("   {} Last modified: {}", "📅", modified.blue());
+                        println!("   📅 Last modified: {}", modified.blue());
                     }
 
                     if show_tags {
-                        println!("   {} Tags: {}", "🏷️", "rust, main, production".cyan());
+                        println!("   🏷️ Tags: {}", "rust, main, production".cyan());
                     }
                 }
 
-                println!("\n{} Total files: {}", "📊", files.len());
+                println!("\n📊 Total files: {}", files.len());
             }
 
             FileSubcommand::Tag {
@@ -3132,21 +3346,20 @@ impl ReplHandler {
                 auto_suggest,
             } => {
                 println!("{} Tagging file with semantic labels", "🏷️".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
-                println!("{} Tags: {}", "🏷️", tags.join(", ").green());
+                println!("📄 File: {}", file_path.cyan());
+                println!("🏷️ Tags: {}", tags.join(", ").green());
 
                 if auto_suggest {
-                    println!("{} Auto-suggest: {}", "💡", "Enabled".green());
+                    println!("💡 Auto-suggest: {}", "Enabled".green());
                 }
 
                 println!("\n{} Updating file metadata...", "📝".bold());
-                println!("{} Applied tags: {}", "✅", tags.join(", "));
+                println!("✅ Applied tags: {}", tags.join(", "));
 
                 if auto_suggest {
                     println!(
-                        "{} Suggested tags: {}",
-                        "💡",
-                        vec!["rust", "module", "core"].join(", ")
+                        "💡 Suggested tags: {}",
+                        ["rust", "module", "core"].join(", ")
                     );
                 }
 
@@ -3157,11 +3370,11 @@ impl ReplHandler {
                 println!("{} File operations status", "📊".bold());
 
                 if let Some(op) = operation {
-                    println!("{} Operation: {}", "⚙️", op.yellow());
+                    println!("⚙️ Operation: {}", op.yellow());
 
                     match op.as_str() {
                         "indexing" => {
-                            println!("{} Current file: {}", "📄", "/src/utils.rs");
+                            println!("📄 Current file: /src/utils.rs");
                             println!("{} Progress: 75% complete", "📈".yellow());
                             println!("{} Files processed: 112/150", "📊".cyan());
                         }
@@ -3183,274 +3396,156 @@ impl ReplHandler {
 
                 println!("\n{} File Operations Statistics:", "📊".bold());
                 println!("{}", "-".repeat(60));
-                println!("{} Total indexed files: {}", "📚", "1,247");
-                println!("{} Files with semantic metadata: {}", "🏷️", "987");
-                println!("{} Average processing time: {}ms", "⚡", "450");
-                println!("{} Cache hit rate: {}", "💾", "87%");
-                println!("{} Active background operations: {}", "⚙️", "2");
+                println!("📚 Total indexed files: 1,247");
+                println!("🏷️ Files with semantic metadata: 987");
+                println!("⚡ Average processing time: 450ms");
+                println!("💾 Cache hit rate: 87%");
+                println!("⚙️ Active background operations: 2");
 
-                println!("\n{} Last updated: {}", "🕐", "2025-01-18 16:45:30 UTC");
+                println!("\n🕐 Last updated: 2025-01-18 16:45:30 UTC");
             }
-        }
 
-        Ok(())
-    }
+            FileSubcommand::Edit {
+                file_path,
+                search,
+                replace,
+                strategy,
+            } => {
+                println!("{} Editing file with multi-strategy matching", "✏️".bold());
+                println!("📄 File: {}", file_path.cyan());
+                println!(
+                    "🎯 Strategy: {}",
+                    strategy.as_deref().unwrap_or("auto").yellow()
+                );
 
-    #[cfg(feature = "repl-custom")]
-    async fn handle_custom_command(
-        &mut self,
-        name: String,
-        parameters: std::collections::HashMap<String, String>,
-        execution_mode: super::commands::ExecutionMode,
-    ) -> Result<()> {
-        use super::commands as cmd;
-        use colored::Colorize;
+                // Use our proven edit functionality from terraphim_automata
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        // Import edit functionality
+                        use terraphim_automata::apply_edit;
 
-        // Check if command registry is initialized
-        if self.command_registry.is_none() || self.command_validator.is_none() {
-            println!(
-                "{}",
-                "⚠️  Command system not initialized. Run /commands init first.".yellow()
-            );
-            return Ok(());
-        }
-
-        let registry = self.command_registry.as_mut().unwrap();
-        let validator = self.command_validator.as_mut().unwrap();
-
-        // Try to find the command in registry
-        match registry.get_command(&name).await {
-            Some(command_def) => {
-                println!("{} Executing registered command:", "🔧".bold());
-                println!("  Name: {}", command_def.definition.name.green());
-                println!("  Description: {}", command_def.definition.description);
-                println!("  Risk Level: {:?}", command_def.definition.risk_level);
-
-                // Validate parameters
-                let json_parameters: std::collections::HashMap<String, serde_json::Value> =
-                    parameters
-                        .iter()
-                        .map(|(k, v)| (k.clone(), serde_json::Value::String(v.clone())))
-                        .collect();
-
-                if let Err(e) = registry
-                    .validate_parameters(&command_def.definition.name, &json_parameters)
-                    .await
-                {
-                    println!("{} Parameter validation failed: {}", "❌".red(), e);
-                    return Ok(());
-                }
-
-                // Validate command execution
-                let command_str = parameters.get("command").unwrap_or(&name);
-                match validator
-                    .validate_command_execution(command_str, &self.current_role, &parameters)
-                    .await
-                {
-                    Ok(validated_mode) => {
-                        println!(
-                            "  {} Validated for execution in {:?} mode",
-                            "✅".green(),
-                            validated_mode
-                        );
-
-                        // Convert ExecutionMode from commands to repl::commands
-                        let repl_mode = match validated_mode {
-                            crate::commands::ExecutionMode::Local => {
-                                super::commands::ExecutionMode::Local
+                        match apply_edit(&content, &search, &replace) {
+                            Ok(result) if result.success => {
+                                // Write the modified content
+                                match tokio::fs::write(
+                                    &file_path,
+                                    result.modified_content.as_bytes(),
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        println!("\n{} Edit applied successfully!", "✅".green());
+                                        println!(
+                                            "🎯 Strategy used: {}",
+                                            result.strategy_used.green()
+                                        );
+                                        println!(
+                                            "📊 Similarity score: {:.2}",
+                                            result.similarity_score
+                                        );
+                                        println!("💾 File saved: {}", file_path.cyan());
+                                    }
+                                    Err(e) => {
+                                        println!("{} Failed to write file: {}", "❌".red(), e);
+                                    }
+                                }
                             }
-                            crate::commands::ExecutionMode::Firecracker => {
-                                super::commands::ExecutionMode::Firecracker
+                            Ok(_result) => {
+                                println!("{} No matching content found", "❌".red());
+                                println!("{} All {} strategies failed", "ℹ️".yellow(), 4);
+                                println!("\n{} Try:", "💡".yellow());
+                                println!("   - Check search block exactly matches file content");
+                                println!("   - Use /file validate-edit to test first");
                             }
-                            crate::commands::ExecutionMode::Hybrid => {
-                                super::commands::ExecutionMode::Hybrid
+                            Err(e) => {
+                                println!("{} Edit error: {}", "❌".red(), e);
                             }
-                        };
-
-                        // Execute the command using the appropriate executor
-                        if let Err(e) = self
-                            .execute_custom_command(&command_def.definition, &parameters, repl_mode)
-                            .await
-                        {
-                            println!("{} Command execution failed: {}", "❌".red(), e);
-                        } else {
-                            println!("{} Command executed successfully", "✅".green());
                         }
                     }
                     Err(e) => {
-                        println!("{} Command validation failed: {}", "❌".red(), e);
+                        println!("{} Cannot read file: {}", "❌".red(), e);
                     }
                 }
             }
-            None => {
-                // Command not found in registry, treat as ad-hoc command
-                println!("{} Executing ad-hoc command:", "⚡".bold());
-                println!("  Name: {}", name.yellow());
-                println!("  Mode: {:?}", execution_mode);
 
-                // Basic validation for ad-hoc commands
-                if let Some(validator) = &mut self.command_validator {
-                    match validator
-                        .validate_command_execution(&name, &self.current_role, &parameters)
-                        .await
-                    {
-                        Ok(validated_mode) => {
-                            println!(
-                                "  {} Validated for execution in {:?} mode",
-                                "✅".green(),
-                                validated_mode
-                            );
+            FileSubcommand::ValidateEdit {
+                file_path,
+                search,
+                replace,
+            } => {
+                println!("{} Validating edit (dry-run)", "🔍".bold());
+                println!("📄 File: {}", file_path.cyan());
 
-                            // Convert ExecutionMode from commands to repl::commands
-                            let repl_mode = match validated_mode {
-                                crate::commands::ExecutionMode::Local => {
-                                    super::commands::ExecutionMode::Local
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        use terraphim_automata::apply_edit;
+
+                        match apply_edit(&content, &search, &replace) {
+                            Ok(result) if result.success => {
+                                println!("\n{} Validation PASSED ✅", "✅".green());
+                                println!(
+                                    "🎯 Strategy that would work: {}",
+                                    result.strategy_used.green()
+                                );
+                                println!("📊 Similarity score: {:.2}", result.similarity_score);
+                                println!("\n{} Preview of change:", "👀".bold());
+                                println!("{}", "-".repeat(60));
+
+                                // Show a preview of the change
+                                let lines: Vec<&str> = content.lines().collect();
+                                let modified_lines: Vec<&str> =
+                                    result.modified_content.lines().collect();
+
+                                for (old, new) in lines.iter().zip(modified_lines.iter()) {
+                                    if old != new {
+                                        println!("{} {}", "-".red(), old);
+                                        println!("{} {}", "+".green(), new);
+                                    }
                                 }
-                                crate::commands::ExecutionMode::Firecracker => {
-                                    super::commands::ExecutionMode::Firecracker
-                                }
-                                crate::commands::ExecutionMode::Hybrid => {
-                                    super::commands::ExecutionMode::Hybrid
-                                }
-                            };
 
-                            // Create a basic command definition for ad-hoc execution
-                            let ad_hoc_def = crate::commands::CommandDefinition {
-                                name: name.clone(),
-                                description: "Ad-hoc command".to_string(),
-                                risk_level: crate::RiskLevel::Medium,
-                                execution_mode: validated_mode.clone(),
-                                ..Default::default()
-                            };
-
-                            if let Err(e) = self
-                                .execute_custom_command(&ad_hoc_def, &parameters, repl_mode)
-                                .await
-                            {
-                                println!("{} Command execution failed: {}", "❌".red(), e);
-                            } else {
-                                println!("{} Command executed successfully", "✅".green());
+                                println!("{}", "-".repeat(60));
+                                println!("\n{} Run /file edit to apply this change", "💡".yellow());
+                            }
+                            Ok(_result) => {
+                                println!("\n{} Validation FAILED ❌", "❌".red());
+                                println!("{} No matching content found", "ℹ️".yellow());
+                                println!("📊 Tried all {} strategies", 4);
+                            }
+                            Err(e) => {
+                                println!("{} Validation error: {}", "❌".red(), e);
                             }
                         }
-                        Err(e) => {
-                            println!("{} Command validation failed: {}", "❌".red(), e);
-                        }
+                    }
+                    Err(e) => {
+                        println!("{} Cannot read file: {}", "❌".red(), e);
                     }
                 }
             }
-        }
 
-        Ok(())
-    }
+            FileSubcommand::Diff { file_path } => {
+                println!("{} File diff viewer", "📊".bold());
 
-    #[cfg(feature = "repl-custom")]
-    async fn execute_custom_command(
-        &mut self,
-        command_def: &crate::commands::CommandDefinition,
-        parameters: &std::collections::HashMap<String, String>,
-        execution_mode: super::commands::ExecutionMode,
-    ) -> Result<()> {
-        #[cfg(feature = "repl-custom")]
-        use crate::commands::modes::CommandExecutor;
-        #[cfg(feature = "repl-custom")]
-        use crate::commands::modes::{FirecrackerExecutor, HybridExecutor, LocalExecutor};
-
-        // Execute based on execution mode
-        // Use the hook-enabled command executor if available
-        if let Some(ref executor) = self.command_executor {
-            let result = executor
-                .execute_with_context(
-                    command_def,
-                    parameters,
-                    &command_def.name,
-                    &self.current_role,
-                    &self.current_role,
-                    ".",
-                )
-                .await;
-            self.display_command_result(&result).await?;
-        } else {
-            // Fallback to manual execution mode handling
-            match execution_mode {
-                super::commands::ExecutionMode::Local => {
-                    let executor = LocalExecutor::new();
-                    let result = executor.execute_command(command_def, parameters).await;
-                    self.display_command_result(&result).await?;
-                }
-                super::commands::ExecutionMode::Firecracker => {
-                    let executor = if let Some(ref api_client) = self.api_client {
-                        FirecrackerExecutor::with_api_client(api_client.clone())
-                    } else {
-                        FirecrackerExecutor::new()
-                    };
-                    let result = executor.execute_command(command_def, parameters).await;
-                    self.display_command_result(&result).await?;
-                }
-                super::commands::ExecutionMode::Hybrid => {
-                    let executor = if let Some(ref api_client) = self.api_client {
-                        HybridExecutor::with_api_client(api_client.clone())
-                    } else {
-                        HybridExecutor::new()
-                    };
-                    let result = executor.execute_command(command_def, parameters).await;
-                    self.display_command_result(&result).await?;
+                if let Some(path) = file_path {
+                    println!("📄 File: {}", path.cyan());
+                    println!("\n{} Git diff integration coming in Phase 5", "ℹ️".yellow());
+                    println!("{} For now, use: git diff {}", "💡".yellow(), path);
+                } else {
+                    println!("{} Showing all modified files...", "📊".bold());
+                    println!("\n{} Git integration coming in Phase 5", "ℹ️".yellow());
+                    println!("{} For now, use: git status", "💡".yellow());
                 }
             }
-        }
 
-        Ok(())
-    }
-
-    #[cfg(feature = "repl-custom")]
-    async fn display_command_result(
-        &self,
-        result: &Result<
-            crate::commands::CommandExecutionResult,
-            crate::commands::CommandExecutionError,
-        >,
-    ) -> Result<()> {
-        use colored::Colorize;
-
-        match result {
-            Ok(execution_result) => {
-                println!("{} Command execution completed", "✅".green());
-                println!("  Duration: {}ms", execution_result.duration_ms);
-                println!("  Exit code: {}", execution_result.exit_code);
-
-                if !execution_result.stdout.is_empty() {
-                    println!("{} Output:", "📄".bold());
-                    for line in execution_result.stdout.lines().take(10) {
-                        println!("  {}", line);
-                    }
-                    if execution_result.stdout.lines().count() > 10 {
-                        println!(
-                            "  ... ({} more lines)",
-                            execution_result.stdout.lines().count() - 10
-                        );
-                    }
-                }
-
-                if !execution_result.stderr.is_empty() {
-                    println!("{} Errors:", "⚠️".yellow().bold());
-                    for line in execution_result.stderr.lines().take(5) {
-                        println!("  {}", line.red());
-                    }
-                    if execution_result.stderr.lines().count() > 5 {
-                        println!(
-                            "  ... ({} more lines)",
-                            execution_result.stderr.lines().count() - 5
-                        );
-                    }
-                }
-
-                if let Some(usage) = &execution_result.resource_usage {
-                    println!("{} Resource usage:", "📊".blue().bold());
-                    println!("  Memory: {:.2} MB", usage.memory_mb);
-                    println!("  CPU time: {:.2}s", usage.cpu_time_seconds);
-                }
-            }
-            Err(e) => {
-                println!("{} Command execution failed: {}", "❌".red(), e);
+            FileSubcommand::Undo { steps } => {
+                let step_count = steps.unwrap_or(1);
+                println!(
+                    "{} Undoing last {} file operation(s)",
+                    "⏪".bold(),
+                    step_count
+                );
+                println!("\n{} Git-based undo coming in Phase 5", "ℹ️".yellow());
+                println!("{} For now, use: git restore <file>", "💡".yellow());
+                println!("{} Or: git reset --soft HEAD~{}", "💡".yellow(), step_count);
             }
         }
 
@@ -3598,19 +3693,223 @@ impl ReplHandler {
         Ok(())
     }
 
-    /// Create a visual usage bar (e.g., [████████░░░░] 80%)
-    fn create_usage_bar(&self, usage: f64, max_usage: f64) -> String {
-        let percentage = (usage / max_usage * 100.0).min(100.0);
-        let filled = (percentage / 10.0) as usize;
-        let empty = 10 - filled;
+    // ==================== RAG Workflow Handlers ====================
 
-        format!("[{}{}]", "█".repeat(filled), "░".repeat(empty))
+    #[cfg(feature = "repl-chat")]
+    async fn handle_context(&mut self, subcommand: ContextSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
+        let service = self
+            .tui_service
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No service available"))?;
+
+        // Ensure conversation exists
+        if self.current_conversation_id.is_none() {
+            let title = format!("Session {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"));
+            let conv_id = service.create_conversation(title.clone()).await?;
+            self.current_conversation_id = Some(conv_id);
+            println!("📝 Created conversation: {}", title.green());
+        }
+
+        let conv_id = self.current_conversation_id.as_ref().unwrap();
+
+        match subcommand {
+            ContextSubcommand::Add { indices } => {
+                // Parse indices: "1,2,3" or "1-5"
+                let index_list = Self::parse_indices(&indices)?;
+
+                for idx in index_list {
+                    if let Some(doc) = self.last_search_results.get(idx) {
+                        service.add_document_to_context(conv_id, doc).await?;
+                        println!("✅ Added [{}]: {}", idx, doc.title.green());
+                    } else {
+                        println!(
+                            "⚠️  Index {} out of range (have {} results)",
+                            idx,
+                            self.last_search_results.len()
+                        );
+                    }
+                }
+            }
+
+            ContextSubcommand::List => {
+                let items = service.list_context(conv_id).await?;
+                if items.is_empty() {
+                    println!("No context items");
+                } else {
+                    println!("Context items ({}):", items.len());
+                    for (i, item) in items.iter().enumerate() {
+                        println!(
+                            "  [{}] {} (score: {:?})",
+                            format!("{:2}", i).yellow(),
+                            item.title,
+                            item.relevance_score
+                        );
+                    }
+                }
+            }
+
+            ContextSubcommand::Clear => {
+                service.clear_context(conv_id).await?;
+                println!("✅ Context cleared");
+            }
+
+            ContextSubcommand::Remove { index } => {
+                let items = service.list_context(conv_id).await?;
+                if let Some(item) = items.get(index) {
+                    service.remove_context_item(conv_id, &item.id).await?;
+                    println!("✅ Removed: {}", item.title);
+                } else {
+                    println!(
+                        "⚠️  Index {} out of range (have {} items)",
+                        index,
+                        items.len()
+                    );
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-chat")]
+    async fn handle_conversation(&mut self, subcommand: ConversationSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        use colored::Colorize;
+
+        let service = self
+            .tui_service
+            .as_ref()
+            .ok_or_else(|| anyhow::anyhow!("No service available"))?;
+
+        match subcommand {
+            ConversationSubcommand::New { title } => {
+                let title = title.unwrap_or_else(|| {
+                    format!("Session {}", chrono::Utc::now().format("%Y-%m-%d %H:%M"))
+                });
+                let conv_id = service.create_conversation(title.clone()).await?;
+                self.current_conversation_id = Some(conv_id.clone());
+                println!(
+                    "✅ Created conversation: {} (ID: {})",
+                    title.green(),
+                    conv_id.as_str().yellow()
+                );
+            }
+
+            ConversationSubcommand::Load { id } => {
+                let conv_id = terraphim_types::ConversationId::from_string(id.clone());
+                let conv = service.load_conversation(&conv_id).await?;
+                self.current_conversation_id = Some(conv_id);
+                println!(
+                    "✅ Loaded: {} ({} messages, {} context items)",
+                    conv.title.green(),
+                    conv.messages.len(),
+                    conv.global_context.len()
+                );
+            }
+
+            ConversationSubcommand::List { limit } => {
+                let summaries = service.list_conversations().await?;
+                let display = if let Some(limit) = limit {
+                    &summaries[..limit.min(summaries.len())]
+                } else {
+                    &summaries
+                };
+
+                if display.is_empty() {
+                    println!("No conversations");
+                } else {
+                    println!("Conversations ({}):", summaries.len());
+                    for summary in display {
+                        let marker = if Some(&summary.id) == self.current_conversation_id.as_ref() {
+                            "▶".green()
+                        } else {
+                            " ".normal()
+                        };
+                        println!(
+                            "  {} {} - {} ({} msg, {} ctx)",
+                            marker,
+                            summary.id.as_str().yellow(),
+                            summary.title,
+                            summary.message_count,
+                            summary.context_count
+                        );
+                    }
+                }
+            }
+
+            ConversationSubcommand::Show => {
+                if let Some(conv_id) = &self.current_conversation_id {
+                    if let Some(conv) = service.get_conversation(conv_id).await? {
+                        println!("Conversation: {}", conv.title.green());
+                        println!("ID: {}", conv.id.as_str().yellow());
+                        println!("Role: {}", conv.role);
+                        println!("Messages: {}", conv.messages.len());
+                        println!("Context Items: {}", conv.global_context.len());
+                    } else {
+                        println!("⚠️  Conversation not found in memory");
+                    }
+                } else {
+                    println!(
+                        "No active conversation. Use {} to create one",
+                        "/conversation new".yellow()
+                    );
+                }
+            }
+
+            ConversationSubcommand::Delete { id } => {
+                let conv_id = terraphim_types::ConversationId::from_string(id.clone());
+                service.delete_conversation(&conv_id).await?;
+                if Some(&conv_id) == self.current_conversation_id.as_ref() {
+                    self.current_conversation_id = None;
+                }
+                println!("✅ Deleted conversation: {}", id.yellow());
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Parse index string like "1,2,3" or "1-5" into Vec<usize>
+    #[cfg(feature = "repl-chat")]
+    fn parse_indices(indices_str: &str) -> Result<Vec<usize>> {
+        let mut result = Vec::new();
+        for part in indices_str.split(',') {
+            let part = part.trim();
+            if part.contains('-') {
+                // Range: "1-5"
+                let range: Vec<&str> = part.split('-').collect();
+                if range.len() == 2 {
+                    let start: usize = range[0].trim().parse()?;
+                    let end: usize = range[1].trim().parse()?;
+                    for i in start..=end {
+                        result.push(i);
+                    }
+                }
+            } else {
+                // Single index: "3"
+                result.push(part.parse()?);
+            }
+        }
+        Ok(result)
     }
 }
 
 /// Run REPL in offline mode
 pub async fn run_repl_offline_mode() -> Result<()> {
     let mut handler = ReplHandler::new_offline();
+    handler.initialize_offline_service().await?;
+
+    #[cfg(feature = "repl-custom")]
+    {
+        // Initialize markdown command registry
+        if let Err(e) = handler.initialize_commands().await {
+            eprintln!("Warning: Failed to load custom commands: {}", e);
+        }
+    }
+
     handler.run().await
 }
 

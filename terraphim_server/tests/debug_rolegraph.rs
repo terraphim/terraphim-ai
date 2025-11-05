@@ -58,6 +58,7 @@ mod tests {
                     llm_chat_system_prompt: None,
                     llm_chat_model: None,
                     llm_context_window: None,
+                    mcp_namespaces: Vec::new(),
                     extra: AHashMap::new(),
                 },
             )

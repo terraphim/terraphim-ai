@@ -159,6 +159,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: ahash::AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -482,6 +483,7 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
                 llm_chat_model: None,
                 llm_context_window: None,
                 extra: ahash::AHashMap::new(),
+                mcp_namespaces: vec![],
             },
         )
         .build()

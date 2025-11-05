@@ -24,7 +24,7 @@ use crate::error::{Result, Status};
 pub type SearchResultsStream = Sender<IndexedDocument>;
 
 /// Health check endpoint
-pub(crate) async fn health() -> impl IntoResponse {
+pub async fn health() -> impl IntoResponse {
     (StatusCode::OK, "OK")
 }
 
@@ -398,6 +398,7 @@ pub struct AsyncSummarizeResponse {
 
 /// Request for task status
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Currently unused but reserved for future task status endpoints
 pub struct TaskStatusRequest {
     /// Task ID to check
     #[allow(dead_code)] // Task ID comes from URL path, not request body
@@ -693,6 +694,7 @@ pub(crate) async fn chat_completion(
     // Determine model name for response
     let model_name = request
         .model
+        .clone()
         .or({
             #[cfg(feature = "openrouter")]
             {
@@ -723,6 +725,7 @@ pub(crate) async fn chat_completion(
     let chat_opts = llm::ChatOptions {
         max_tokens: request.max_tokens.or(Some(1024)),
         temperature: request.temperature.or(Some(0.7)),
+        model: request.model,
     };
 
     // Call the LLM client FIRST

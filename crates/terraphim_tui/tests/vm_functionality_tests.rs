@@ -1,3 +1,4 @@
+#![cfg(feature = "repl")]
 use serde_json;
 use terraphim_tui::client::*;
 

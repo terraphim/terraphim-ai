@@ -33,6 +33,7 @@ tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread", "sync
 regex = "1.11.0"
 rusqlite = { version = "0.32", optional = true }
 chrono = { version = "0.4", features = ["serde"] }
+futures = "0.3"
 
 
 [dev-dependencies]

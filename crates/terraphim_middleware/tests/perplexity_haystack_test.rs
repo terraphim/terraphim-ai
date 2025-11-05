@@ -106,6 +106,7 @@ async fn test_perplexity_service_type_integration() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     assert_eq!(role.haystacks.len(), 1);
@@ -200,6 +201,7 @@ async fn test_perplexity_missing_api_key() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let mut config = ConfigBuilder::new()
@@ -296,6 +298,7 @@ async fn perplexity_live_api_test() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: ahash::AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     let mut config = ConfigBuilder::new()
