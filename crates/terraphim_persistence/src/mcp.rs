@@ -502,7 +502,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_namespace_persistence() {
-        let op = opendal::Operator::via_iter(opendal::Scheme::Memory, Default::default()).unwrap();
+        let op = opendal::Operator::via_iter(
+            opendal::Scheme::Memory,
+            std::iter::empty::<(String, String)>(),
+        )
+        .unwrap();
         let persistence = McpPersistenceImpl::new(op);
 
         let record = McpNamespaceRecord {
@@ -538,7 +542,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_api_key_verification() {
-        let op = opendal::Operator::via_iter(opendal::Scheme::Memory, Default::default()).unwrap();
+        let op = opendal::Operator::via_iter(
+            opendal::Scheme::Memory,
+            std::iter::empty::<(String, String)>(),
+        )
+        .unwrap();
         let persistence = McpPersistenceImpl::new(op);
 
         let record = McpApiKeyRecord {
@@ -569,7 +577,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_management() {
-        let op = opendal::Operator::via_iter(opendal::Scheme::Memory, Default::default()).unwrap();
+        let op = opendal::Operator::via_iter(
+            opendal::Scheme::Memory,
+            std::iter::empty::<(String, String)>(),
+        )
+        .unwrap();
         let persistence = McpPersistenceImpl::new(op);
 
         let tool = McpToolRecord {
@@ -608,7 +620,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_cache() {
-        let op = opendal::Operator::via_iter(opendal::Scheme::Memory, Default::default()).unwrap();
+        let op = opendal::Operator::via_iter(
+            opendal::Scheme::Memory,
+            std::iter::empty::<(String, String)>(),
+        )
+        .unwrap();
         let persistence = McpPersistenceImpl::new(op);
 
         let cache = ToolDiscoveryCache {
@@ -637,7 +653,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_audit_trail() {
-        let op = opendal::Operator::via_iter(opendal::Scheme::Memory, Default::default()).unwrap();
+        let op = opendal::Operator::via_iter(
+            opendal::Scheme::Memory,
+            std::iter::empty::<(String, String)>(),
+        )
+        .unwrap();
         let persistence = McpPersistenceImpl::new(op);
 
         let audit1 = McpAuditRecord {
@@ -692,7 +712,11 @@ mod tests {
 
     #[tokio::test]
     async fn test_namespace_visibility() {
-        let op = opendal::Operator::via_iter(opendal::Scheme::Memory, Default::default()).unwrap();
+        let op = opendal::Operator::via_iter(
+            opendal::Scheme::Memory,
+            std::iter::empty::<(String, String)>(),
+        )
+        .unwrap();
         let persistence = McpPersistenceImpl::new(op);
 
         let private_ns = McpNamespaceRecord {

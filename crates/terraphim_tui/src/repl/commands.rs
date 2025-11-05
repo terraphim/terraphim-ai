@@ -1514,14 +1514,12 @@ impl FromStr for ReplCommand {
                     }
                     "list" => {
                         let mut limit = None;
-                        if parts.len() > 2 && parts[2] == "--limit" {
-                            if parts.len() > 3 {
-                                limit = Some(
-                                    parts[3]
-                                        .parse::<usize>()
-                                        .map_err(|_| anyhow!("Invalid limit value"))?,
-                                );
-                            }
+                        if parts.len() > 2 && parts[2] == "--limit" && parts.len() > 3 {
+                            limit = Some(
+                                parts[3]
+                                    .parse::<usize>()
+                                    .map_err(|_| anyhow!("Invalid limit value"))?,
+                            );
                         }
                         Ok(ReplCommand::Conversation {
                             subcommand: ConversationSubcommand::List { limit },

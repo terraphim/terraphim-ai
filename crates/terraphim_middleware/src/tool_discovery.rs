@@ -1,27 +1,25 @@
+use crate::{Error, Result};
 use chrono::Utc;
 use std::sync::Arc;
-use terraphim_persistence::mcp::{McpPersistence, McpToolRecord, ToolDiscoveryCache, ToolStatus};
-
-use crate::{Error, Result};
 
 #[cfg(feature = "mcp-proxy")]
 use terraphim_config::Role;
 #[cfg(feature = "mcp-proxy")]
 use terraphim_mcp_proxy::Tool;
+use terraphim_persistence::mcp::{McpPersistence, McpToolRecord, ToolDiscoveryCache, ToolStatus};
 
 const CACHE_DURATION_HOURS: i64 = 1;
 
-#[cfg(feature = "mcp-proxy")]
 pub struct ToolDiscoveryService<P: McpPersistence> {
     persistence: Arc<P>,
 }
 
-#[cfg(feature = "mcp-proxy")]
 impl<P: McpPersistence> ToolDiscoveryService<P> {
     pub fn new(persistence: Arc<P>) -> Self {
         Self { persistence }
     }
 
+    #[cfg(feature = "mcp-proxy")]
     pub async fn discover_tools_with_overrides(
         &self,
         role: &Role,
@@ -29,9 +27,9 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
     ) -> Result<Vec<Tool>> {
         if let Some(cached) = self.get_cached_tools(namespace_uuid).await? {
             log::info!("Using cached tools for namespace {}", namespace_uuid);
-            return Ok(serde_json::from_str(&cached.tools_json).map_err(|e| {
+            return serde_json::from_str(&cached.tools_json).map_err(|e| {
                 Error::Indexation(format!("Failed to deserialize cached tools: {}", e))
-            })?);
+            });
         }
 
         log::info!("Discovering fresh tools for namespace {}", namespace_uuid);
@@ -41,7 +39,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
             .persistence
             .list_tools(Some(namespace_uuid))
             .await
-            .map_err(|e| Error::Persistence(e))?;
+            .map_err(Error::Persistence)?;
 
         let mut processed_tools = Vec::new();
         for mut tool in raw_tools {
@@ -61,7 +59,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
                         "Applying description override for tool: {}",
                         record.tool_name
                     );
-                    tool.description = Some(override_desc.clone());
+                    tool.description = override_desc.clone();
                 }
             }
 
@@ -78,21 +76,22 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
             .persistence
             .get_tool_cache(namespace_uuid)
             .await
-            .map_err(|e| Error::Persistence(e))?
+            .map_err(Error::Persistence)?
         {
             Some(cache) if cache.expires_at > Utc::now() => Ok(Some(cache)),
-            Some(cache) => {
+            Some(_cache) => {
                 log::info!("Cache expired for namespace {}", namespace_uuid);
                 self.persistence
                     .delete_tool_cache(namespace_uuid)
                     .await
-                    .map_err(|e| Error::Persistence(e))?;
+                    .map_err(Error::Persistence)?;
                 Ok(None)
             }
             None => Ok(None),
         }
     }
 
+    #[cfg(feature = "mcp-proxy")]
     async fn cache_tools(&self, namespace_uuid: &str, tools: &[Tool]) -> Result<()> {
         let tools_json = serde_json::to_string(tools)
             .map_err(|e| Error::Indexation(format!("Failed to serialize tools: {}", e)))?;
@@ -107,7 +106,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
         self.persistence
             .save_tool_cache(&cache)
             .await
-            .map_err(|e| Error::Persistence(e))?;
+            .map_err(Error::Persistence)?;
 
         log::info!(
             "Cached {} tools for namespace {}",
@@ -129,12 +128,13 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
         self.persistence
             .delete_tool_cache(namespace_uuid)
             .await
-            .map_err(|e| Error::Persistence(e))?;
+            .map_err(Error::Persistence)?;
 
         log::info!("Invalidated cache for namespace {}", namespace_uuid);
         Ok(())
     }
 
+    #[cfg(feature = "mcp-proxy")]
     pub async fn register_tool(
         &self,
         namespace_uuid: &str,
@@ -157,7 +157,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
         self.persistence
             .save_tool(&record)
             .await
-            .map_err(|e| Error::Persistence(e))?;
+            .map_err(Error::Persistence)?;
 
         log::info!("Registered tool: {}", tool.name);
         Ok(())
@@ -173,7 +173,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
             .persistence
             .get_tool(tool_uuid)
             .await
-            .map_err(|e| Error::Persistence(e))?
+            .map_err(Error::Persistence)?
             .ok_or_else(|| Error::Indexation(format!("Tool not found: {}", tool_uuid)))?;
 
         tool.override_name = override_name;
@@ -183,7 +183,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
         self.persistence
             .save_tool(&tool)
             .await
-            .map_err(|e| Error::Persistence(e))?;
+            .map_err(Error::Persistence)?;
 
         self.invalidate_cache(&tool.namespace_uuid).await?;
 

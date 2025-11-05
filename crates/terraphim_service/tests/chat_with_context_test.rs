@@ -81,6 +81,7 @@ async fn test_ollama_chat_with_context_real() {
     let chat_opts = ChatOptions {
         max_tokens: Some(512),
         temperature: Some(0.7),
+        model: None,
     };
 
     let response = llm_client
@@ -164,6 +165,7 @@ async fn test_ollama_multi_context_chat() {
     let chat_opts = ChatOptions {
         max_tokens: Some(1024),
         temperature: Some(0.8),
+        model: None,
     };
 
     let response = llm_client
@@ -288,6 +290,7 @@ fn create_test_ollama_role(base_url: &str) -> terraphim_config::Role {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     role.extra

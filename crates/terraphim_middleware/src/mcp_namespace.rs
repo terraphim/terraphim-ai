@@ -1,9 +1,9 @@
+use crate::{Error, Result};
+
 #[cfg(feature = "mcp-proxy")]
 use terraphim_config::Role;
 #[cfg(feature = "mcp-proxy")]
 use terraphim_mcp_proxy::{McpProxy, Tool, ToolCallRequest, ToolCallResponse};
-
-use crate::{Error, Result};
 
 #[cfg(feature = "mcp-proxy")]
 pub async fn list_namespace_tools(role: &Role) -> Result<Vec<Tool>> {

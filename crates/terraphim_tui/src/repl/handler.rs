@@ -318,8 +318,8 @@ impl ReplHandler {
                     }
 
                     // Search term suggestions based on role concepts
-                    if line.starts_with("/search ") {
-                        let search_term = line[8..].trim(); // Skip "/search "
+                    if let Some(search_term) = line.strip_prefix("/search ") {
+                        let search_term = search_term.trim();
                         if !search_term.is_empty() {
                             // Add role-based search suggestions
                             let role_suggestions = match self.current_role.as_str() {
@@ -1560,7 +1560,7 @@ impl ReplHandler {
                  // let role_name = &self.current_role;
 
                 // match api_client.replace_matches(role_name, &text, link_type).await {
-                //     Ok(result) => {
+                //     Ok(_result) => {
                 //         println!("\n{} {}\n", "📝".bold(), "Result:".bold());
                 //         println!("{}", result);
                 //     }
@@ -2375,10 +2375,10 @@ impl ReplHandler {
         match subcommand {
             WebSubcommand::Get { url, headers } => {
                 println!("{} Executing HTTP GET request", "🌐".bold());
-                println!("{} URL: {}", "📍", url.cyan());
+                println!("📍 URL: {}", url.cyan());
 
                 if let Some(headers) = &headers {
-                    println!("{} Headers:", "📋");
+                    println!("📋 Headers:");
                     for (key, value) in headers {
                         println!("  {}: {}", key.green(), value);
                     }
@@ -2408,11 +2408,11 @@ impl ReplHandler {
 
             WebSubcommand::Post { url, body, headers } => {
                 println!("{} Executing HTTP POST request", "🌐".bold());
-                println!("{} URL: {}", "📍", url.cyan());
-                println!("{} Body: {}", "📝", body.yellow());
+                println!("📍 URL: {}", url.cyan());
+                println!("📝 Body: {}", body.yellow());
 
                 if let Some(headers) = &headers {
-                    println!("{} Headers:", "📋");
+                    println!("📋 Headers:");
                     for (key, value) in headers {
                         println!("  {}: {}", key.green(), value);
                     }
@@ -2446,11 +2446,11 @@ impl ReplHandler {
                 wait: wait_for_element,
             } => {
                 println!("{} Executing web scraping operation", "🕷️".bold());
-                println!("{} URL: {}", "📍", url.cyan());
-                println!("{} CSS Selector: {}", "🎯", selector.yellow());
+                println!("📍 URL: {}", url.cyan());
+                println!("🎯 CSS Selector: {}", selector.yellow());
 
                 if let Some(wait_element) = &wait_for_element {
-                    println!("{} Wait for element: {}", "⏳", wait_element.green());
+                    println!("⏳ Wait for element: {}", wait_element.green());
                 }
 
                 let operation = if let Some(wait) = wait_for_element {
@@ -2482,13 +2482,13 @@ impl ReplHandler {
                 full_page,
             } => {
                 println!("{} Capturing webpage screenshot", "📸".bold());
-                println!("{} URL: {}", "📍", url.cyan());
+                println!("📍 URL: {}", url.cyan());
 
                 if let Some(w) = width {
-                    println!("{} Width: {}px", "📐", w.to_string().yellow());
+                    println!("📐 Width: {}px", w.to_string().yellow());
                 }
                 if let Some(h) = height {
-                    println!("{} Height: {}px", "📏", h.to_string().yellow());
+                    println!("📏 Height: {}px", h.to_string().yellow());
                 }
                 if full_page.unwrap_or(false) {
                     println!("{} Full page screenshot", "📄".green());
@@ -2520,10 +2520,10 @@ impl ReplHandler {
 
             WebSubcommand::Pdf { url, page_size } => {
                 println!("{} Generating PDF from webpage", "📄".bold());
-                println!("{} URL: {}", "📍", url.cyan());
+                println!("📍 URL: {}", url.cyan());
 
                 if let Some(size) = &page_size {
-                    println!("{} Page size: {}", "📋", size.yellow());
+                    println!("📋 Page size: {}", size.yellow());
                 }
 
                 let operation = if let Some(size) = page_size {
@@ -2550,8 +2550,8 @@ impl ReplHandler {
 
             WebSubcommand::Form { url, form_data } => {
                 println!("{} Submitting web form", "📝".bold());
-                println!("{} URL: {}", "📍", url.cyan());
-                println!("{} Form data:", "📋");
+                println!("📍 URL: {}", url.cyan());
+                println!("📋 Form data:");
                 for (key, value) in &form_data {
                     println!("  {}: {}", key.green(), value.yellow());
                 }
@@ -2579,14 +2579,14 @@ impl ReplHandler {
                 rate_limit: rate_limit_ms,
             } => {
                 println!("{} Executing API interaction", "🔌".bold());
-                println!("{} Base URL: {}", "📍", base_url.cyan());
-                println!("{} Endpoints:", "🎯");
+                println!("📍 Base URL: {}", base_url.cyan());
+                println!("🎯 Endpoints:");
                 for endpoint in &endpoints {
                     println!("  {}", endpoint.green());
                 }
 
                 if let Some(rate_limit) = rate_limit_ms {
-                    println!("{} Rate limit: {}ms", "⏱️", rate_limit.to_string().yellow());
+                    println!("⏱️ Rate limit: {}ms", rate_limit.to_string().yellow());
                 }
 
                 let operation = if let Some(rate) = rate_limit_ms {
@@ -2622,8 +2622,8 @@ impl ReplHandler {
                     "🆔",
                     operation_id.unwrap_or_default().cyan()
                 );
-                println!("{} Status: {}", "📋", "Running".yellow());
-                println!("{} Started: {}", "⏰", "2025-01-18 15:30:00 UTC".green());
+                println!("📋 Status: {}", "Running".yellow());
+                println!("⏰ Started: {}", "2025-01-18 15:30:00 UTC".green());
                 println!(
                     "{} This would query the actual operation status from the VM manager",
                     "ℹ️".blue()
@@ -2632,8 +2632,8 @@ impl ReplHandler {
 
             WebSubcommand::Cancel { operation_id } => {
                 println!("{} Canceling web operation", "❌".bold());
-                println!("{} Operation ID: {}", "🆔", operation_id.cyan());
-                println!("{} Status: {}", "📋", "Cancelled".red());
+                println!("🆔 Operation ID: {}", operation_id.cyan());
+                println!("📋 Status: {}", "Cancelled".red());
                 println!(
                     "{} This would send a cancel signal to the VM manager",
                     "ℹ️".blue()
@@ -2722,7 +2722,7 @@ impl ReplHandler {
 
                     WebConfigSubcommand::Set { key, value } => {
                         println!("{} Updating web operations configuration", "⚙️".bold());
-                        println!("{} Setting: {} = {}", "🔧", key.cyan(), value.yellow());
+                        println!("🔧 Setting: {} = {}", key.cyan(), value.yellow());
                         println!("{} Configuration updated successfully", "✅".green());
                         println!(
                             "{} This would persist the configuration to the config store",
@@ -2760,24 +2760,24 @@ impl ReplHandler {
                 limit,
             } => {
                 println!("{} Searching files with semantic awareness", "🔍".bold());
-                println!("{} Query: {}", "📋", query.cyan());
+                println!("📋 Query: {}", query.cyan());
 
                 if let Some(path) = &path {
-                    println!("{} Path: {}", "📁", path.yellow());
+                    println!("📁 Path: {}", path.yellow());
                 }
 
                 if let Some(types) = &file_types {
-                    println!("{} File types: {}", "📄", types.join(", ").green());
+                    println!("📄 File types: {}", types.join(", ").green());
                 }
 
                 if semantic {
-                    println!("{} Semantic search: {}", "🧠", "Enabled".green());
+                    println!("🧠 Semantic search: {}", "Enabled".green());
                 } else {
-                    println!("{} Semantic search: {}", "🧠", "Disabled".red());
+                    println!("🧠 Semantic search: {}", "Disabled".red());
                 }
 
                 if let Some(limit) = limit {
-                    println!("{} Max results: {}", "📊", limit.to_string().yellow());
+                    println!("📊 Max results: {}", limit.to_string().yellow());
                 }
 
                 println!(
@@ -2804,10 +2804,8 @@ impl ReplHandler {
                     ("/tests/integration_test.rs", "Integration test suite", 0.76),
                 ];
 
-                for (i, (file_path, description, score)) in mock_results
-                    .iter()
-                    .take(limit.unwrap_or(10) as usize)
-                    .enumerate()
+                for (i, (file_path, description, score)) in
+                    mock_results.iter().take(limit.unwrap_or(10)).enumerate()
                 {
                     let score_color = if *score >= 0.9 {
                         "🟢"
@@ -2833,16 +2831,16 @@ impl ReplHandler {
                 update_metadata,
             } => {
                 println!("{} Classifying files by content type", "📁".bold());
-                println!("{} Path: {}", "📁", path.yellow());
+                println!("📁 Path: {}", path.yellow());
 
                 if recursive {
-                    println!("{} Recursive search: {}", "🔄", "Enabled".green());
+                    println!("🔄 Recursive search: {}", "Enabled".green());
                 }
 
                 if update_metadata {
-                    println!("{} Update metadata: {}", "💾", "Enabled".green());
+                    println!("💾 Update metadata: {}", "Enabled".green());
                 } else {
-                    println!("{} Update metadata: {}", "💾", "Disabled".red());
+                    println!("💾 Update metadata: {}", "Disabled".red());
                 }
 
                 println!("\n{} Analyzing file content...", "⚙️".bold());
@@ -2888,15 +2886,15 @@ impl ReplHandler {
                 println!("{} Generating intelligent file suggestions", "💡".bold());
 
                 if let Some(ctx) = &context {
-                    println!("{} Context: {}", "💭", ctx.yellow());
+                    println!("💭 Context: {}", ctx.yellow());
                 }
 
                 if let Some(limit) = limit {
-                    println!("{} Suggestions: {}", "📊", limit.to_string().yellow());
+                    println!("📊 Suggestions: {}", limit.to_string().yellow());
                 }
 
                 if let Some(p) = &path {
-                    println!("{} Path: {}", "📁", p.yellow());
+                    println!("📁 Path: {}", p.yellow());
                 }
 
                 println!("\n{} Analyzing workspace patterns...", "🧠".bold());
@@ -2924,12 +2922,10 @@ impl ReplHandler {
                     ),
                 ];
 
-                for (i, (file_path, description, priority)) in suggestions
-                    .iter()
-                    .take(limit.unwrap_or(5) as usize)
-                    .enumerate()
+                for (i, (file_path, description, priority)) in
+                    suggestions.iter().take(limit.unwrap_or(5)).enumerate()
                 {
-                    let priority_color = match priority.as_ref() {
+                    let priority_color = match *priority {
                         "High" => "🔴",
                         "Medium" => "🟡",
                         _ => "🟢",
@@ -2957,14 +2953,14 @@ impl ReplHandler {
                 threshold,
             } => {
                 println!("{} Analyzing file relationships", "🔗".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 if find_similar {
-                    println!("{} Find similar files: {}", "🔍", "Enabled".green());
+                    println!("🔍 Find similar files: {}", "Enabled".green());
                 }
 
                 if find_related {
-                    println!("{} Find related files: {}", "🔗", "Enabled".green());
+                    println!("🔗 Find related files: {}", "Enabled".green());
                 }
 
                 if let Some(thresh) = threshold {
@@ -3070,14 +3066,14 @@ impl ReplHandler {
                 include_key_points,
             } => {
                 println!("{} Summarizing file content", "📝".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 if let Some(level) = &detail_level {
-                    println!("{} Detail level: {}", "📋", level.green());
+                    println!("📋 Detail level: {}", level.green());
                 }
 
                 if include_key_points {
-                    println!("{} Include key points: {}", "🎯", "Enabled".green());
+                    println!("🎯 Include key points: {}", "Enabled".green());
                 }
 
                 println!("\n{} Extracting semantic summary...", "🧠".bold());
@@ -3130,7 +3126,7 @@ impl ReplHandler {
                 update_index,
             } => {
                 println!("{} Extracting semantic metadata", "🏷️".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 let mut extractions = Vec::new();
                 if extract_concepts {
@@ -3143,10 +3139,10 @@ impl ReplHandler {
                     extractions.push("keywords");
                 }
 
-                println!("{} Extracting: {}", "🔧", extractions.join(", ").green());
+                println!("🔧 Extracting: {}", extractions.join(", ").green());
 
                 if update_index {
-                    println!("{} Update index: {}", "📝", "Enabled".green());
+                    println!("📝 Update index: {}", "Enabled".green());
                 }
 
                 println!(
@@ -3199,18 +3195,18 @@ impl ReplHandler {
                 force_reindex,
             } => {
                 println!("{} Indexing files for semantic search", "📚".bold());
-                println!("{} Path: {}", "📁", path.yellow());
+                println!("📁 Path: {}", path.yellow());
 
                 if recursive {
-                    println!("{} Recursive indexing: {}", "🔄", "Enabled".green());
+                    println!("🔄 Recursive indexing: {}", "Enabled".green());
                 } else {
-                    println!("{} Recursive indexing: {}", "🔄", "Disabled".red());
+                    println!("🔄 Recursive indexing: {}", "Disabled".red());
                 }
 
                 if force_reindex {
-                    println!("{} Force reindex: {}", "🔄", "Enabled".green());
+                    println!("🔄 Force reindex: {}", "Enabled".green());
                 } else {
-                    println!("{} Force reindex: {}", "🔄", "Disabled".yellow());
+                    println!("🔄 Force reindex: {}", "Disabled".yellow());
                 }
 
                 println!("\n{} Scanning directory structure...", "🔍".bold());
@@ -3219,16 +3215,16 @@ impl ReplHandler {
                 // Mock indexing progress
                 println!("\n{} Indexing Progress:", "📈".bold());
                 println!("{}", "-".repeat(60));
-                println!("{} Scanning {} files...", "🔍", 150);
+                println!("🔍 Scanning {} files...", 150);
                 println!("{} Processing semantic analysis...", "🧠".bold());
                 println!("{} Building search index...", "🏗️".bold());
                 println!("{} Optimizing for performance...", "⚡".bold());
                 println!("{} Finalizing index...", "✅".bold());
 
                 println!("\n{} Indexing completed successfully!", "✅".green());
-                println!("{} Files indexed: {}", "📊", 150);
-                println!("{} Index size: {} MB", "💾", "45");
-                println!("{} Processing time: {} seconds", "⏱️", 12);
+                println!("📊 Files indexed: {}", 150);
+                println!("💾 Index size: {} MB", "45");
+                println!("⏱️ Processing time: {} seconds", 12);
             }
 
             FileSubcommand::Find {
@@ -3239,26 +3235,26 @@ impl ReplHandler {
                 whole_word,
             } => {
                 println!("{} Finding pattern in files", "🔍".bold());
-                println!("{} Pattern: {}", "🎯", pattern.cyan());
+                println!("🎯 Pattern: {}", pattern.cyan());
 
                 if let Some(p) = &path {
-                    println!("{} Path: {}", "📁", p.yellow());
+                    println!("📁 Path: {}", p.yellow());
                 }
 
                 if let Some(ctx) = context_lines {
-                    println!("{} Context lines: {}", "📜", ctx.to_string().yellow());
+                    println!("📜 Context lines: {}", ctx.to_string().yellow());
                 }
 
                 if case_sensitive {
-                    println!("{} Case sensitive: {}", "🔤", "Enabled".green());
+                    println!("🔤 Case sensitive: {}", "Enabled".green());
                 } else {
-                    println!("{} Case sensitive: {}", "🔤", "Disabled".red());
+                    println!("🔤 Case sensitive: {}", "Disabled".red());
                 }
 
                 if whole_word {
-                    println!("{} Whole word: {}", "🎯", "Enabled".green());
+                    println!("🎯 Whole word: {}", "Enabled".green());
                 } else {
-                    println!("{} Whole word: {}", "🎯", "Disabled".yellow());
+                    println!("🎯 Whole word: {}", "Disabled".yellow());
                 }
 
                 println!("\n{} Searching through files...", "🔍".bold());
@@ -3327,18 +3323,18 @@ impl ReplHandler {
                 sort_by,
             } => {
                 println!("{} Listing files with annotations", "📋".bold());
-                println!("{} Path: {}", "📁", path.yellow());
+                println!("📁 Path: {}", path.yellow());
 
                 if show_metadata {
-                    println!("{} Show metadata: {}", "ℹ️", "Enabled".green());
+                    println!("ℹ️ Show metadata: {}", "Enabled".green());
                 }
 
                 if show_tags {
-                    println!("{} Show tags: {}", "🏷️", "Enabled".green());
+                    println!("🏷️ Show tags: {}", "Enabled".green());
                 }
 
                 if let Some(sort) = sort_by {
-                    println!("{} Sort by: {}", "📊", sort.cyan());
+                    println!("📊 Sort by: {}", sort.cyan());
                 }
 
                 println!("\n{} Scanning directory...", "🔍".bold());
@@ -3396,15 +3392,15 @@ impl ReplHandler {
                 auto_suggest,
             } => {
                 println!("{} Tagging file with semantic labels", "🏷️".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
-                println!("{} Tags: {}", "🏷️", tags.join(", ").green());
+                println!("📄 File: {}", file_path.cyan());
+                println!("🏷️ Tags: {}", tags.join(", ").green());
 
                 if auto_suggest {
-                    println!("{} Auto-suggest: {}", "💡", "Enabled".green());
+                    println!("💡 Auto-suggest: {}", "Enabled".green());
                 }
 
                 println!("\n{} Updating file metadata...", "📝".bold());
-                println!("{} Applied tags: {}", "✅", tags.join(", "));
+                println!("✅ Applied tags: {}", tags.join(", "));
 
                 if auto_suggest {
                     println!(
@@ -3421,11 +3417,11 @@ impl ReplHandler {
                 println!("{} File operations status", "📊".bold());
 
                 if let Some(op) = operation {
-                    println!("{} Operation: {}", "⚙️", op.yellow());
+                    println!("⚙️ Operation: {}", op.yellow());
 
                     match op.as_str() {
                         "indexing" => {
-                            println!("{} Current file: {}", "📄", "/src/utils.rs");
+                            println!("📄 Current file: {}", "/src/utils.rs");
                             println!("{} Progress: 75% complete", "📈".yellow());
                             println!("{} Files processed: 112/150", "📊".cyan());
                         }
@@ -3447,11 +3443,11 @@ impl ReplHandler {
 
                 println!("\n{} File Operations Statistics:", "📊".bold());
                 println!("{}", "-".repeat(60));
-                println!("{} Total indexed files: {}", "📚", "1,247");
-                println!("{} Files with semantic metadata: {}", "🏷️", "987");
-                println!("{} Average processing time: {}ms", "⚡", "450");
-                println!("{} Cache hit rate: {}", "💾", "87%");
-                println!("{} Active background operations: {}", "⚙️", "2");
+                println!("📚 Total indexed files: {}", "1,247");
+                println!("🏷️ Files with semantic metadata: {}", "987");
+                println!("⚡ Average processing time: {}ms", "450");
+                println!("💾 Cache hit rate: {}", "87%");
+                println!("⚙️ Active background operations: {}", "2");
 
                 println!("\n{} Last updated: {}", "🕐", "2025-01-18 16:45:30 UTC");
             }
@@ -3463,7 +3459,7 @@ impl ReplHandler {
                 strategy,
             } => {
                 println!("{} Editing file with multi-strategy matching", "✏️".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
                 println!(
                     "{} Strategy: {}",
                     "🎯",
@@ -3496,14 +3492,14 @@ impl ReplHandler {
                                             "{} Similarity score: {:.2}",
                                             "📊", result.similarity_score
                                         );
-                                        println!("{} File saved: {}", "💾", file_path.cyan());
+                                        println!("💾 File saved: {}", file_path.cyan());
                                     }
                                     Err(e) => {
                                         println!("{} Failed to write file: {}", "❌".red(), e);
                                     }
                                 }
                             }
-                            Ok(result) => {
+                            Ok(_result) => {
                                 println!("{} No matching content found", "❌".red());
                                 println!("{} All {} strategies failed", "ℹ️".yellow(), 4);
                                 println!("\n{} Try:", "💡".yellow());
@@ -3527,7 +3523,7 @@ impl ReplHandler {
                 replace,
             } => {
                 println!("{} Validating edit (dry-run)", "🔍".bold());
-                println!("{} File: {}", "📄", file_path.cyan());
+                println!("📄 File: {}", file_path.cyan());
 
                 match tokio::fs::read_to_string(&file_path).await {
                     Ok(content) => {
@@ -3553,7 +3549,7 @@ impl ReplHandler {
                                 let modified_lines: Vec<&str> =
                                     result.modified_content.lines().collect();
 
-                                for (i, (old, new)) in
+                                for (_i, (old, new)) in
                                     lines.iter().zip(modified_lines.iter()).enumerate()
                                 {
                                     if old != new {
@@ -3565,10 +3561,10 @@ impl ReplHandler {
                                 println!("{}", "-".repeat(60));
                                 println!("\n{} Run /file edit to apply this change", "💡".yellow());
                             }
-                            Ok(result) => {
+                            Ok(_result) => {
                                 println!("\n{} Validation FAILED ❌", "❌".red());
                                 println!("{} No matching content found", "ℹ️".yellow());
-                                println!("{} Tried all {} strategies", "📊", 4);
+                                println!("📊 Tried all {} strategies", 4);
                             }
                             Err(e) => {
                                 println!("{} Validation error: {}", "❌".red(), e);
@@ -3585,7 +3581,7 @@ impl ReplHandler {
                 println!("{} File diff viewer", "📊".bold());
 
                 if let Some(path) = file_path {
-                    println!("{} File: {}", "📄", path.cyan());
+                    println!("📄 File: {}", path.cyan());
                     println!("\n{} Git diff integration coming in Phase 5", "ℹ️".yellow());
                     println!("{} For now, use: git diff {}", "💡".yellow(), path);
                 } else {

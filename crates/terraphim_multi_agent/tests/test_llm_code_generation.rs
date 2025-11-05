@@ -120,7 +120,7 @@ edition = "2021"
 
     let output = std::process::Command::new("cargo")
         .current_dir(&project_dir)
-        .args(&["build", "--quiet"])
+        .args(["build", "--quiet"])
         .output()
         .unwrap();
 
@@ -137,7 +137,7 @@ edition = "2021"
 
     let output = std::process::Command::new("cargo")
         .current_dir(&project_dir)
-        .args(&["run", "--quiet"])
+        .args(["run", "--quiet"])
         .output()
         .unwrap();
 
@@ -186,7 +186,7 @@ async fn test_llm_generates_and_edits_code() {
     println!("╚══════════════════════════════════════════════════════════════════════╝\n");
 
     // Initialize client
-    let mut client = ValidatedGenAiClient::new_ollama(Some("llama3.2:3b".to_string()))
+    let client = ValidatedGenAiClient::new_ollama(Some("llama3.2:3b".to_string()))
         .expect("Ollama client creation failed");
 
     // Step 1: Generate initial code

@@ -47,6 +47,7 @@ async fn test_kg_preprocessing_basic_functionality() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
     config.roles.insert(role_name.clone(), role);
     config.selected_role = role_name.clone();
@@ -110,6 +111,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     // Role with KG disabled
@@ -131,6 +133,7 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     config
@@ -200,6 +203,7 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
     config.roles.insert(role_name.clone(), role);
     config.selected_role = role_name.clone();

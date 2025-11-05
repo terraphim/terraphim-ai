@@ -4,6 +4,7 @@ use axum::{
     Json,
 };
 use serde::{Deserialize, Serialize};
+#[cfg(feature = "mcp-proxy")]
 use terraphim_mcp_proxy::{ContentItem, McpProxy, Tool, ToolCallRequest};
 use terraphim_persistence::mcp::McpPersistence;
 use utoipa::ToSchema;
@@ -258,6 +259,7 @@ async fn create_proxy_from_namespace(
             )
         })?;
 
+    #[cfg(feature = "mcp-proxy")]
     let mcp_namespace: terraphim_mcp_proxy::McpNamespace = serde_json::from_value(config_json)
         .map_err(|e| {
             crate::error::ApiError(

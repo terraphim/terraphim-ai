@@ -38,6 +38,7 @@ async fn test_llm_client_integration() {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
@@ -74,6 +75,7 @@ async fn test_llm_client_integration() {
             ChatOptions {
                 max_tokens: Some(50),
                 temperature: Some(0.1),
+                model: None,
             },
         ),
     )
@@ -110,6 +112,7 @@ async fn test_llm_client_error_handling() {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
@@ -156,6 +159,7 @@ async fn test_role_validation() {
         llm_chat_model: None,
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     // Should return error for disabled LLM

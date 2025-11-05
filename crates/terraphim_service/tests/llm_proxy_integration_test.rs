@@ -79,10 +79,8 @@ async fn test_llm_proxy_auto_configuration() {
 
 #[tokio::test]
 async fn test_llm_proxy_fallback_mechanism() {
-    let mut test_env = TestEnv::new();
-
     // Test without proxy configuration (fallback to direct)
-    let _test_env = TestEnv::new();
+    let mut test_env = TestEnv::new();
     let client = LlmProxyClient::new("anthropic".to_string()).unwrap();
 
     // Should fall back to direct endpoint
@@ -91,6 +89,14 @@ async fn test_llm_proxy_fallback_mechanism() {
 
     // Should not be using proxy
     assert!(!client.is_using_proxy("anthropic"));
+
+    // Test environment variable removal functionality
+    test_env.set_var("TEST_VAR", "test_value");
+    assert_eq!(std::env::var("TEST_VAR").unwrap(), "test_value");
+
+    // Remove the variable and verify it's gone
+    test_env.remove_var("TEST_VAR");
+    assert!(std::env::var("TEST_VAR").is_err());
 }
 
 #[tokio::test]

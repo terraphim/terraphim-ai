@@ -21,7 +21,7 @@ terraphim_types = { path = "../crates/terraphim_types", version = "0.2.0" }
 terraphim_automata = { path = "../crates/terraphim_automata", version = "0.2.0", features = ["tokio-runtime"] }
 terraphim_service = { path = "../crates/terraphim_service", version = "0.2.0" }
 terraphim_multi_agent = { path = "../crates/terraphim_multi_agent", version = "0.2.0" }
-terraphim_mcp_proxy = { path = "../crates/terraphim_mcp_proxy", version = "0.1.0" }
+terraphim_mcp_proxy = { path = "../crates/terraphim_mcp_proxy", version = "0.1.0", optional = true }
 
 
 anyhow = "1.0.40"
@@ -55,9 +55,10 @@ opendal = "0.54"
 utoipa = { version = "5.3", features = ["axum_extras", "chrono", "uuid"] }
 
 [features]
-default = []
+default = ["mcp-proxy"]
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 ollama = ["terraphim_service/ollama"]
+mcp-proxy = ["terraphim_config/mcp-proxy", "terraphim_mcp_proxy"]
 # Optional database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
 rocksdb = ["terraphim_persistence/services-rocksdb"]

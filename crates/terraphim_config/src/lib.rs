@@ -128,25 +128,48 @@ pub struct Role {
 impl Role {
     /// Create a new Role with default values for all fields
     pub fn new(name: impl Into<RoleName>) -> Self {
-        Self {
-            shortname: None,
-            name: name.into(),
-            relevance_function: RelevanceFunction::TitleScorer,
-            terraphim_it: false,
-            theme: "default".to_string(),
-            kg: None,
-            haystacks: vec![],
-            #[cfg(feature = "mcp-proxy")]
-            mcp_namespaces: vec![],
-            llm_enabled: false,
-            llm_api_key: None,
-            llm_model: None,
-            llm_auto_summarize: false,
-            llm_chat_enabled: false,
-            llm_chat_system_prompt: None,
-            llm_chat_model: None,
-            llm_context_window: default_context_window(),
-            extra: AHashMap::new(),
+        #[cfg(feature = "mcp-proxy")]
+        {
+            Self {
+                shortname: None,
+                name: name.into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "default".to_string(),
+                kg: None,
+                haystacks: vec![],
+                mcp_namespaces: vec![],
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: default_context_window(),
+                extra: AHashMap::new(),
+            }
+        }
+        #[cfg(not(feature = "mcp-proxy"))]
+        {
+            Self {
+                shortname: None,
+                name: name.into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                terraphim_it: false,
+                theme: "default".to_string(),
+                kg: None,
+                haystacks: vec![],
+                llm_enabled: false,
+                llm_api_key: None,
+                llm_model: None,
+                llm_auto_summarize: false,
+                llm_chat_enabled: false,
+                llm_chat_system_prompt: None,
+                llm_chat_model: None,
+                llm_context_window: default_context_window(),
+                extra: AHashMap::new(),
+            }
         }
     }
 

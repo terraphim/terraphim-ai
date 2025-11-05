@@ -373,7 +373,7 @@ impl TuiService {
         let context_manager = self.context_manager.lock().await;
         Ok(context_manager
             .get_conversation(conversation_id)
-            .map(|c| (&*c).clone()))
+            .map(|c| (*c).clone()))
     }
 
     // ==================== Context Management ====================
@@ -443,7 +443,7 @@ impl TuiService {
 
         if let Some(conversation) = context_manager.get_conversation(conversation_id) {
             // Create updated conversation with cleared context
-            let mut updated_conv = (&*conversation).clone();
+            let mut updated_conv = (*conversation).clone();
             updated_conv.global_context.clear();
             updated_conv.updated_at = chrono::Utc::now();
 

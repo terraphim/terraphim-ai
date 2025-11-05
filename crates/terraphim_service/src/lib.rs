@@ -2789,6 +2789,7 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            mcp_namespaces: vec![],
         };
         config.roles.insert(role_name.clone(), role);
 
@@ -2851,6 +2852,7 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            mcp_namespaces: vec![],
         };
         config.roles.insert(role_name.clone(), role);
 
@@ -2966,6 +2968,7 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            mcp_namespaces: vec![],
         };
         config.roles.insert(role_name.clone(), role);
 
@@ -3082,6 +3085,7 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            mcp_namespaces: vec![],
         };
         config.roles.insert(role_name.clone(), role);
 

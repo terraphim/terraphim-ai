@@ -693,6 +693,7 @@ pub(crate) async fn chat_completion(
     // Determine model name for response
     let model_name = request
         .model
+        .clone()
         .or({
             #[cfg(feature = "openrouter")]
             {

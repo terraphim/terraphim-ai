@@ -197,6 +197,7 @@ async fn ollama_chat_context_live_test() {
     let chat_opts = ChatOptions {
         max_tokens: Some(2048),
         temperature: Some(0.7),
+        model: None,
     };
 
     // Perform chat completion with context
@@ -320,6 +321,7 @@ fn create_ollama_live_role(base_url: &str) -> terraphim_config::Role {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        mcp_namespaces: vec![],
     };
 
     // Configure for Ollama

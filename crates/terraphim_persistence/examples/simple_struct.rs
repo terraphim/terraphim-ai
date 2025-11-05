@@ -5,7 +5,6 @@ use terraphim_persistence::{Persistable, Result};
 
 // Import multi-agent system for enhanced persistence capabilities
 use std::sync::Arc;
-#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::test_utils::create_test_role;
 use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;
@@ -103,13 +102,7 @@ async fn main() -> Result<()> {
         let persistence = Arc::new(storage_copy);
 
         // Create intelligent agent for data management
-        #[cfg(feature = "test-utils")]
         let role = create_test_role();
-        #[cfg(not(feature = "test-utils"))]
-        let role = {
-            use terraphim_config::Role;
-            Role::new("default")
-        };
 
         let agent = TerraphimAgent::new(role, persistence, None)
             .await

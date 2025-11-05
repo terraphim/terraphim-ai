@@ -37,6 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             true,
         )
         .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+        mcp_namespaces: vec![],
         extra: {
             let mut extra = AHashMap::new();
 

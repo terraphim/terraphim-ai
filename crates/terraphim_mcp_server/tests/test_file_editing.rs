@@ -6,7 +6,6 @@
 use std::fs;
 use std::path::PathBuf;
 use tempfile::TempDir;
-use terraphim_mcp_server::McpService;
 
 /// Helper to create a test file and return its path
 fn create_test_file(dir: &TempDir, name: &str, content: &str) -> PathBuf {
