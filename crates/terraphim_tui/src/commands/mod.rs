@@ -9,21 +9,16 @@ pub mod registry;
 use serde::{Deserialize, Serialize};
 
 /// Execution mode for commands
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionMode {
     /// Execute locally on the host machine (safe commands only)
+    #[default]
     Local,
     /// Execute in isolated Firecracker microVM
     Firecracker,
     /// Smart hybrid mode based on risk assessment
     Hybrid,
-}
-
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        ExecutionMode::Local
-    }
 }
 
 /// Command parameter definition

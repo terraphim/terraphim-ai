@@ -536,8 +536,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
         // Add workflow management routes
         .merge(workflows::create_router())
         // MCP namespace and endpoint management routes - PROTECTED WITH AUTHENTICATION
-        .merge({
-            let protected_mcp_routes = Router::new()
+        .merge(
+            Router::new()
                 .route("/metamcp/namespaces", get(api_mcp::list_namespaces))
                 .route("/metamcp/namespaces", post(api_mcp::create_namespace))
                 .route("/metamcp/namespaces/{uuid}", get(api_mcp::get_namespace))
@@ -565,9 +565,8 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                 .route_layer(middleware::from_fn_with_state(
                     app_state.clone(),
                     mcp_auth::validate_api_key,
-                ));
-            protected_mcp_routes
-        })
+                )),
+        )
         // Public MCP endpoints (no authentication required)
         .route("/metamcp/health", get(api_mcp::get_mcp_health))
         .route(

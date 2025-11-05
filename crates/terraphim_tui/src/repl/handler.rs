@@ -2033,8 +2033,7 @@ impl ReplHandler {
                                     "Agent Execution Result:".bold()
                                 );
                                 println!(
-                                    "{} Task ID: {}",
-                                    "🆔".bold(),
+                                    "🆔 Task ID: {}",
                                     response.task_id.to_string()
                                 );
                                 println!("{} Agent: {}", "👤".bold(), response.agent_id);
@@ -2395,11 +2394,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Web operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2429,11 +2424,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Web operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2464,11 +2455,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Web scraping operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2507,11 +2494,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Screenshot operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2537,11 +2520,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} PDF generation operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2562,11 +2541,7 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} Form submission operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
@@ -2604,24 +2579,16 @@ impl ReplHandler {
                     .build();
 
                 println!("\n{} API interaction operation created", "✅".green());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    utils::generate_operation_id().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!(
                     "{} This operation would execute in a VM sandbox",
                     "ℹ️".blue()
                 );
             }
 
-            WebSubcommand::Status { operation_id } => {
+            WebSubcommand::Status { operation_id: _ } => {
                 println!("{} Checking web operation status", "📊".bold());
-                println!(
-                    "{} Operation ID: {}",
-                    "🆔",
-                    operation_id.unwrap_or_default().cyan()
-                );
+                println!("🆔 Operation ID: {}", utils::generate_operation_id().cyan());
                 println!("📋 Status: {}", "Running".yellow());
                 println!("⏰ Started: {}", "2025-01-18 15:30:00 UTC".green());
                 println!(
@@ -2645,8 +2612,7 @@ impl ReplHandler {
 
                 let limit_count = limit.unwrap_or(10);
                 println!(
-                    "{} Showing last {} operations",
-                    "📊",
+                    "📊 Showing last {} operations",
                     limit_count.to_string().cyan()
                 );
                 println!("\n{} Web Operations:", "🌐".bold());
@@ -2793,7 +2759,7 @@ impl ReplHandler {
                 println!("\n{} Found files:", "📄".bold());
                 println!("{}", "-".repeat(80));
 
-                let mock_results = vec![
+                let mock_results = [
                     ("/src/main.rs", "Rust application entry point", 0.95),
                     (
                         "/docs/architecture.md",
@@ -2903,7 +2869,7 @@ impl ReplHandler {
                 println!("\n{} Suggested Files:", "💡".bold());
                 println!("{}", "-".repeat(80));
 
-                let suggestions = vec![
+                let suggestions = [
                     (
                         "src/utils.rs",
                         "Utility functions matching current context",
@@ -2965,8 +2931,7 @@ impl ReplHandler {
 
                 if let Some(thresh) = threshold {
                     println!(
-                        "{} Similarity threshold: {}",
-                        "📏",
+                        "📏 Similarity threshold: {}",
                         format!("{:.2}", thresh).yellow()
                     );
                 }
@@ -2978,7 +2943,7 @@ impl ReplHandler {
                     println!("\n{} Similar Files:", "📄".bold());
                     println!("{}", "-".repeat(80));
 
-                    let similar_files = vec![
+                    let similar_files = [
                         (
                             "src/main.rs",
                             0.92,
@@ -3017,7 +2982,7 @@ impl ReplHandler {
                     println!("\n{} Related Files:", "🔗".bold());
                     println!("{}", "-".repeat(80));
 
-                    let related_files = vec![
+                    let related_files = [
                         (
                             "README.md",
                             "Project Documentation",
@@ -3041,7 +3006,7 @@ impl ReplHandler {
                     for (i, (path, relationship, confidence, explanation)) in
                         related_files.iter().enumerate()
                     {
-                        let conf_color = match confidence.as_ref() {
+                        let conf_color = match *confidence {
                             "High" => "🔴",
                             "Medium" => "🟡",
                             _ => "🟢",
@@ -3092,7 +3057,7 @@ impl ReplHandler {
                 println!("\n{} File Summary:", "📝".bold());
                 println!("{}", "-".repeat(80));
 
-                let summary_lines = vec![
+                let summary_lines = [
                     "This file implements the main application logic using Rust",
                     "It integrates with tokio for asynchronous operations",
                     "The code follows Rust best practices for error handling",
@@ -3114,7 +3079,7 @@ impl ReplHandler {
                     println!("  • Integration with Terraphim AI backend services");
                 }
 
-                println!("\n{} Reading time estimate: {}", "⏱️".bold(), "15 minutes");
+                println!("\n{} Reading time estimate: 15 minutes", "⏱️".bold());
                 // Mock reading time
             }
 
@@ -3156,16 +3121,14 @@ impl ReplHandler {
 
                 if extract_concepts {
                     println!(
-                        "{} Concepts: {}",
-                        "🧠",
+                        "🧠 Concepts: {}",
                         ["async", "tokio", "server", "api"].join(", ").cyan()
                     );
                 }
 
                 if extract_entities {
                     println!(
-                        "{} Entities: {}",
-                        "👥",
+                        "👥 Entities: {}",
                         ["tokio::runtime", "std::fs::File", "serde::Deserialize"]
                             .join(", ")
                             .cyan()
@@ -3174,8 +3137,7 @@ impl ReplHandler {
 
                 if extract_keywords {
                     println!(
-                        "{} Keywords: {}",
-                        "🔑",
+                        "🔑 Keywords: {}",
                         ["error_handling", "async_await", "Result", "HashMap"]
                             .join(", ")
                             .cyan()
@@ -3183,10 +3145,10 @@ impl ReplHandler {
                 }
 
                 println!("\n{} Content Properties:", "📊".bold());
-                println!("  {} Complexity Score: {:.2}", "📊", 0.75);
-                println!("  {} Reading Time: {} minutes", "⏱️", 15);
-                println!("  {} Semantic Fingerprint: {}", "🔍", "abc123def456");
-                println!("  {} Content Type: {}", "📄", "Rust Source Code");
+                println!("  📊 Complexity Score: {:.2}", 0.75);
+                println!("  ⏱️ Reading Time: {} minutes", 15);
+                println!("  🔍 Semantic Fingerprint: abc123def456");
+                println!("  📄 Content Type: Rust Source Code");
             }
 
             FileSubcommand::Index {
@@ -3223,7 +3185,7 @@ impl ReplHandler {
 
                 println!("\n{} Indexing completed successfully!", "✅".green());
                 println!("📊 Files indexed: {}", 150);
-                println!("💾 Index size: {} MB", "45");
+                println!("💾 Index size: 45 MB");
                 println!("⏱️ Processing time: {} seconds", 12);
             }
 
@@ -3295,16 +3257,8 @@ impl ReplHandler {
                         matched_line.green()
                     );
 
-                    for (j, context_line) in context
-                        .iter()
-                        .take(context_lines.unwrap_or(2) as usize)
-                        .enumerate()
-                    {
-                        if j == 0 {
-                            println!("   {}", context_line.dimmed());
-                        } else {
-                            println!("   {}", context_line.dimmed());
-                        }
+                    for context_line in context.iter().take(context_lines.unwrap_or(2)) {
+                        println!("   {}", context_line.dimmed());
                     }
                 }
 
@@ -3375,15 +3329,15 @@ impl ReplHandler {
                     );
 
                     if show_metadata {
-                        println!("   {} Last modified: {}", "📅", modified.blue());
+                        println!("   📅 Last modified: {}", modified.blue());
                     }
 
                     if show_tags {
-                        println!("   {} Tags: {}", "🏷️", "rust, main, production".cyan());
+                        println!("   🏷️ Tags: {}", "rust, main, production".cyan());
                     }
                 }
 
-                println!("\n{} Total files: {}", "📊", files.len());
+                println!("\n📊 Total files: {}", files.len());
             }
 
             FileSubcommand::Tag {
@@ -3404,8 +3358,7 @@ impl ReplHandler {
 
                 if auto_suggest {
                     println!(
-                        "{} Suggested tags: {}",
-                        "💡",
+                        "💡 Suggested tags: {}",
                         ["rust", "module", "core"].join(", ")
                     );
                 }
@@ -3421,7 +3374,7 @@ impl ReplHandler {
 
                     match op.as_str() {
                         "indexing" => {
-                            println!("📄 Current file: {}", "/src/utils.rs");
+                            println!("📄 Current file: /src/utils.rs");
                             println!("{} Progress: 75% complete", "📈".yellow());
                             println!("{} Files processed: 112/150", "📊".cyan());
                         }
@@ -3443,13 +3396,13 @@ impl ReplHandler {
 
                 println!("\n{} File Operations Statistics:", "📊".bold());
                 println!("{}", "-".repeat(60));
-                println!("📚 Total indexed files: {}", "1,247");
-                println!("🏷️ Files with semantic metadata: {}", "987");
-                println!("⚡ Average processing time: {}ms", "450");
-                println!("💾 Cache hit rate: {}", "87%");
-                println!("⚙️ Active background operations: {}", "2");
+                println!("📚 Total indexed files: 1,247");
+                println!("🏷️ Files with semantic metadata: 987");
+                println!("⚡ Average processing time: 450ms");
+                println!("💾 Cache hit rate: 87%");
+                println!("⚙️ Active background operations: 2");
 
-                println!("\n{} Last updated: {}", "🕐", "2025-01-18 16:45:30 UTC");
+                println!("\n🕐 Last updated: 2025-01-18 16:45:30 UTC");
             }
 
             FileSubcommand::Edit {
@@ -3461,8 +3414,7 @@ impl ReplHandler {
                 println!("{} Editing file with multi-strategy matching", "✏️".bold());
                 println!("📄 File: {}", file_path.cyan());
                 println!(
-                    "{} Strategy: {}",
-                    "🎯",
+                    "🎯 Strategy: {}",
                     strategy.as_deref().unwrap_or("auto").yellow()
                 );
 
@@ -3484,13 +3436,12 @@ impl ReplHandler {
                                     Ok(_) => {
                                         println!("\n{} Edit applied successfully!", "✅".green());
                                         println!(
-                                            "{} Strategy used: {}",
-                                            "🎯",
+                                            "🎯 Strategy used: {}",
                                             result.strategy_used.green()
                                         );
                                         println!(
-                                            "{} Similarity score: {:.2}",
-                                            "📊", result.similarity_score
+                                            "📊 Similarity score: {:.2}",
+                                            result.similarity_score
                                         );
                                         println!("💾 File saved: {}", file_path.cyan());
                                     }
@@ -3533,14 +3484,10 @@ impl ReplHandler {
                             Ok(result) if result.success => {
                                 println!("\n{} Validation PASSED ✅", "✅".green());
                                 println!(
-                                    "{} Strategy that would work: {}",
-                                    "🎯",
+                                    "🎯 Strategy that would work: {}",
                                     result.strategy_used.green()
                                 );
-                                println!(
-                                    "{} Similarity score: {:.2}",
-                                    "📊", result.similarity_score
-                                );
+                                println!("📊 Similarity score: {:.2}", result.similarity_score);
                                 println!("\n{} Preview of change:", "👀".bold());
                                 println!("{}", "-".repeat(60));
 
@@ -3549,9 +3496,7 @@ impl ReplHandler {
                                 let modified_lines: Vec<&str> =
                                     result.modified_content.lines().collect();
 
-                                for (_i, (old, new)) in
-                                    lines.iter().zip(modified_lines.iter()).enumerate()
-                                {
+                                for (old, new) in lines.iter().zip(modified_lines.iter()) {
                                     if old != new {
                                         println!("{} {}", "-".red(), old);
                                         println!("{} {}", "+".green(), new);
@@ -3599,7 +3544,7 @@ impl ReplHandler {
                     step_count
                 );
                 println!("\n{} Git-based undo coming in Phase 5", "ℹ️".yellow());
-                println!("{} For now, use: git restore {}", "💡".yellow(), "<file>");
+                println!("{} For now, use: git restore <file>", "💡".yellow());
                 println!("{} Or: git reset --soft HEAD~{}", "💡".yellow(), step_count);
             }
         }

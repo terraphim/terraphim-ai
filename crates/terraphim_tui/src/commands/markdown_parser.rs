@@ -166,6 +166,8 @@ impl MarkdownCommandParser {
         }
 
         // Validate parameter names and types
+        let param_name_regex = regex::Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap();
+
         for param in &definition.parameters {
             if param.name.is_empty() {
                 return Err(CommandRegistryError::invalid_frontmatter(
@@ -184,7 +186,6 @@ impl MarkdownCommandParser {
             }
 
             // Validate parameter name format
-            let param_name_regex = regex::Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap();
             if !param_name_regex.is_match(&param.name) {
                 return Err(CommandRegistryError::invalid_frontmatter(
                     source_path,

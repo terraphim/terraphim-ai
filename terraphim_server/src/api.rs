@@ -398,6 +398,7 @@ pub struct AsyncSummarizeResponse {
 
 /// Request for task status
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)] // Currently unused but reserved for future task status endpoints
 pub struct TaskStatusRequest {
     /// Task ID to check
     #[allow(dead_code)] // Task ID comes from URL path, not request body

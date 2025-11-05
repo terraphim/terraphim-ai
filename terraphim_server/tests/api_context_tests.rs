@@ -30,6 +30,7 @@ fn create_test_config() -> Config {
                 theme: "spacelab".to_string(),
                 kg: None,
                 haystacks: vec![],
+                mcp_namespaces: vec![],
                 llm_enabled: false,
                 llm_api_key: None,
                 llm_model: None,

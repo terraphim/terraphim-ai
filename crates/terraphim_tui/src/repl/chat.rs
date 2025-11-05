@@ -11,6 +11,7 @@ use terraphim_multi_agent::{LlmMessage, LlmRequest, MessageRole, ValidatedGenAiC
 
 #[cfg(feature = "repl-chat")]
 #[allow(dead_code)]
+#[derive(Default)]
 pub struct ChatHandler {
     client: Option<ValidatedGenAiClient>,
     conversation_history: Vec<LlmMessage>,

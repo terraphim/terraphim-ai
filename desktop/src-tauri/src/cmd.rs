@@ -643,6 +643,23 @@ pub async fn save_article_to_atomic(
     }
 }
 
+#[cfg(not(feature = "atomic"))]
+#[command]
+pub async fn save_article_to_atomic(
+    article: AtomicArticle,
+    _server_url: String,
+    _atomic_secret: Option<String>,
+) -> Result<AtomicSaveResponse> {
+    log::warn!(
+        "Attempted to save article '{}' to atomic server, but atomic feature is not enabled",
+        article.title
+    );
+    Err(TerraphimTauriError::Generic(
+        "Atomic server integration is not enabled. Please compile with the 'atomic' feature."
+            .to_string(),
+    ))
+}
+
 /// Get autocomplete suggestions using FST-based autocomplete
 ///
 /// This command provides fast, intelligent autocomplete suggestions based on the

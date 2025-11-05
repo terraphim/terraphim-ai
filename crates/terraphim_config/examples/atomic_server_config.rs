@@ -40,6 +40,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     true,
                 )
                 .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+                mcp_namespaces: vec![],
                 llm_enabled: false,
                 llm_api_key: None,
                 llm_model: None,
