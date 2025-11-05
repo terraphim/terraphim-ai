@@ -1,13 +1,73 @@
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13f00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13f00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f12fb0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13e90 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f12b40 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x145e05420 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
-[2025-10-10T10:26:45Z WARN  opendal::services] service=memory name=0x146f13f00 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z INFO  terraphim_settings] Loading device settings...
+[2025-11-05T14:26:09Z INFO  terraphim_server] Device settings hostname: "127.0.0.1:8000"
+[2025-11-05T14:26:09Z INFO  terraphim_server] 🔧 Pre-creating storage directories...
+[2025-11-05T14:26:09Z INFO  terraphim_server] Found 5 profiles: ["memory", "sqlite", "redb", "rocksdb", "dashmap"]
+[2025-11-05T14:26:09Z INFO  terraphim_server] Processing profile 'memory' of type 'memory'
+[2025-11-05T14:26:09Z INFO  terraphim_server] Processing profile 'sqlite' of type 'sqlite'
+[2025-11-05T14:26:09Z INFO  terraphim_server] 🔧 Creating SQLite directory: /tmp
+[2025-11-05T14:26:09Z INFO  terraphim_server] ✅ Created SQLite directory: /tmp
+[2025-11-05T14:26:09Z INFO  terraphim_server] Processing profile 'redb' of type 'redb'
+[2025-11-05T14:26:09Z INFO  terraphim_server] ReDB database will be created by OpenDAL
+[2025-11-05T14:26:09Z INFO  terraphim_server] Processing profile 'rocksdb' of type 'rocksdb'
+[2025-11-05T14:26:09Z INFO  terraphim_server] Processing profile 'dashmap' of type 'dashmap'
+[2025-11-05T14:26:09Z INFO  terraphim_server] 🔧 Creating DashMap directory: /tmp/terraphim_dash
+[2025-11-05T14:26:09Z INFO  terraphim_server] ✅ Created DashMap directory: /tmp/terraphim_dash
+[2025-11-05T14:26:09Z INFO  terraphim_server] ✅ Storage directory pre-creation completed
+[2025-11-05T14:26:09Z INFO  terraphim_server] Loading configuration from terraphim_server/default/default_role_config.json (role: Default)
+[2025-11-05T14:26:09Z INFO  terraphim_server] Loading Default role configuration from terraphim_server/default/default_role_config.json
+[2025-11-05T14:26:09Z INFO  terraphim_server] ✅ Successfully loaded Default role configuration
+[2025-11-05T14:26:09Z INFO  terraphim_settings] Loading device settings...
+[2025-11-05T14:26:09Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: false, default_data_path: "${HOME/.terraphim}", profiles: {"dashmap": {"type": "dashmap", "root": "/tmp/dashmaptest"}, "memory": {"type": "memory"}, "rock": {"datadir": "/tmp/opendal/rocksdb", "type": "rocksdb"}, "rocksdb": {"datadir": "/tmp/terraphim_rocksdb", "type": "rocksdb"}, "sqlite": {"type": "sqlite", "connection_string": "/tmp/terraphim_sqlite/terraphim.db", "table": "terraphim_kv", "datadir": "/tmp/terraphim_sqlite"}} }
+[2025-11-05T14:26:09Z INFO  terraphim_persistence] 🔧 Pre-creating DashMap directory: /tmp/dashmaptest
+[2025-11-05T14:26:09Z INFO  terraphim_persistence] ✅ Created DashMap directory: /tmp/dashmaptest
+[2025-11-05T14:26:09Z INFO  terraphim_persistence] 🔧 Pre-creating SQLite directory: /tmp/terraphim_sqlite
+[2025-11-05T14:26:09Z INFO  terraphim_persistence] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: dashmap
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'dashmap' using scheme: Dashmap
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] Got request for dashmap operator; initializing in-memory operator.
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: memory
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'memory' using scheme: Memory
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] Got request for memory operator; initializing in-memory operator.
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rock
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'rock' using scheme: Rocksdb
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rocksdb
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'rocksdb' using scheme: Rocksdb
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 📁 Parsing profile: sqlite
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] 🔧 Profile 'sqlite' using scheme: Sqlite
+[2025-11-05T14:26:09Z INFO  terraphim_persistence::settings] Got request for sqlite operator; initializing in-memory operator.
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34250 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34310 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34250 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34190 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34090 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c0c450 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34250 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:26:09Z INFO  terraphim_server] No saved config found, using Default role config: OpenDal(NotFound (permanent) at read => memory doesn't have this path
+    
+    Context:
+       service: memory
+       path: server_config.json
+       range: 0-
+    )
+[2025-11-05T14:26:09Z INFO  terraphim_config] Creating role Default
+[2025-11-05T14:26:09Z INFO  terraphim_server] Server started with 1 roles:
+[2025-11-05T14:26:09Z INFO  terraphim_server]   - Role: Default (relevance: TitleScorer, kg: false)
+[2025-11-05T14:26:09Z INFO  terraphim_server] Starting axum server
+[2025-11-05T14:26:09Z INFO  terraphim_server] Initialized summarization manager with default configuration
+[2025-11-05T14:26:09Z INFO  terraphim_service::summarization_worker] Starting summarization worker with 3 max concurrent workers
+[2025-11-05T14:26:09Z INFO  terraphim_service::summarization_worker] Worker 2 started
+[2025-11-05T14:26:09Z INFO  terraphim_service::summarization_worker] Worker 1 started
+[2025-11-05T14:26:09Z INFO  terraphim_service::summarization_worker] Worker 0 started
+[2025-11-05T14:26:09Z INFO  terraphim_server] Initialized workflow management system with WebSocket support
 listening on http://127.0.0.1:8000
-🧠 TerraphimGraph search initiated for role: Llama Rust Engineer
-[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
-[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
-[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
-[2025-10-10T10:27:30Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-11-05T14:36:47Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "docs/src",
+        service: Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-11-05T14:36:47Z INFO  terraphim_middleware::command::ripgrep] 🚀 Executing: rg --json --trim -C3 --ignore-case -tmarkdown rust docs/src
