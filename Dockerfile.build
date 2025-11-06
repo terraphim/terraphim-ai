@@ -1,0 +1,22 @@
+FROM rust:1.85-slim
+
+# Install required dependencies
+RUN apt-get update && apt-get install -y \
+    build-essential \
+    pkg-config \
+    libssl-dev \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# Copy source code
+COPY . .
+
+# Build the binaries
+RUN cargo build --release \
+    --package terraphim_server \
+    --package terraphim_mcp_server \
+    --package terraphim_tui
+
+# The binaries will be in /app/target/release/

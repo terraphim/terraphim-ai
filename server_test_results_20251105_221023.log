@@ -1,0 +1,7 @@
+=== Terraphim Server API Functional Test ===
+Started at: Wed  5 Nov 2025 22:10:23 GMT
+
+Starting server...
+=== API Endpoint Tests ===
+[1;33mTesting:[0m Health check endpoint
+Endpoint: GET /health
