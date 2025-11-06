@@ -27,6 +27,7 @@ export default defineConfig({
         if (warning.code === 'a11y_missing_attribute') return;
         if (warning.code === 'a11y_missing_content') return;
         if (warning.code === 'node_invalid_placement') return;
+        if (warning.code === 'node_invalid_placement_ssr') return;
         // Ignore Svelma-specific CSS issues
         if (warning.message && warning.message.includes('Tooltip.svelte')) return;
         if (warning.message && warning.message.includes('Expected a valid CSS identifier')) return;
