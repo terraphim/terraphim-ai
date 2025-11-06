@@ -136,7 +136,7 @@ fn test_chat_request_serialization() {
             role: "user".to_string(),
             content: "Hello, world!".to_string(),
         }],
-        model: Some("gpt-3.5-turbo".to_string()),
+        model: Some("gemma3:270m".to_string()),
     };
 
     let json_result = serde_json::to_string(&chat_request);
@@ -146,7 +146,7 @@ fn test_chat_request_serialization() {
     assert!(json_str.contains("TestRole"));
     assert!(json_str.contains("user"));
     assert!(json_str.contains("Hello, world!"));
-    assert!(json_str.contains("gpt-3.5-turbo"));
+    assert!(json_str.contains("gemma3:270m"));
 }
 
 /// Test ChatResponse deserialization
@@ -155,7 +155,7 @@ fn test_chat_response_deserialization() {
     let json_response = r#"{
         "status": "Success",
         "message": "Hello! How can I help you?",
-        "model_used": "gpt-3.5-turbo",
+        "model_used": "gemma3:270m",
         "error": null
     }"#;
 
@@ -165,7 +165,7 @@ fn test_chat_response_deserialization() {
     let chat_response = response.unwrap();
     assert_eq!(chat_response.status, "Success");
     assert_eq!(chat_response.message.unwrap(), "Hello! How can I help you?");
-    assert_eq!(chat_response.model_used.unwrap(), "gpt-3.5-turbo");
+    assert_eq!(chat_response.model_used.unwrap(), "gemma3:270m");
     assert!(chat_response.error.is_none());
 }
 

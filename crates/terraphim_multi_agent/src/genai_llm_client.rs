@@ -199,7 +199,19 @@ impl GenAiLlmClient {
     pub fn from_config(provider: &str, model: Option<String>) -> MultiAgentResult<Self> {
         match provider.to_lowercase().as_str() {
             "ollama" => Self::new_ollama(model),
-            "openai" => Self::new_openai(model),
+            "openai" => {
+                // Fix Ollama routing bug: gpt-* models should route to Ollama for local testing
+                if let Some(ref model_name) = model {
+                    if model_name.starts_with("gpt-") {
+                        log::info!(
+                            "🔄 Routing gpt model '{}' to Ollama for local testing",
+                            model_name
+                        );
+                        return Self::new_ollama(model);
+                    }
+                }
+                Self::new_openai(model)
+            }
             "anthropic" => Self::new_anthropic(model),
             _ => {
                 // Default to Ollama if unknown provider

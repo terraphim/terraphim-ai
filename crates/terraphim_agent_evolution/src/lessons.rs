@@ -560,9 +560,17 @@ pub struct VersionedLessons {
 
 #[async_trait]
 impl Persistable for VersionedLessons {
-    fn new(_key: String) -> Self {
+    fn new(key: String) -> Self {
+        // Extract agent_id from key format: "agent_{agent_id}/lessons/v_{timestamp}"
+        let agent_id = key
+            .split('/')
+            .next()
+            .and_then(|s| s.strip_prefix("agent_"))
+            .unwrap_or_default()
+            .to_string();
+
         Self {
-            agent_id: String::new(),
+            agent_id,
             timestamp: Utc::now(),
             state: LessonsState::default(),
         }

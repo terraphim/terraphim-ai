@@ -18,22 +18,22 @@ async fn test_multi_agent_integration_proof() {
     let persistence = Arc::new(storage_copy);
     println!("✅ Storage initialized successfully");
 
-    // Step 2: Create test role with OpenAI configuration
+    // Step 2: Create test role with Ollama configuration
     println!("2️⃣ Creating test role...");
     let role = create_test_role();
     println!("✅ Role created: {}", role.name);
     println!("   LLM Provider: {:?}", role.extra.get("llm_provider"));
-    println!("   Model: {:?}", role.extra.get("openai_model"));
+    println!("   Model: {:?}", role.extra.get("llm_model"));
 
-    // Step 3: Create agent with Rig integration
-    println!("3️⃣ Creating TerraphimAgent with Rig...");
+    // Step 3: Create agent with rust-genai integration
+    println!("3️⃣ Creating TerraphimAgent with rust-genai...");
     let agent = TerraphimAgent::new(role, persistence.clone(), None)
         .await
         .unwrap();
     println!("✅ Agent created with ID: {}", agent.agent_id);
     println!("   Status: {:?}", *agent.status.read().await);
 
-    // Step 4: Initialize agent (this sets up the Rig LLM client)
+    // Step 4: Initialize agent (this sets up the rust-genai LLM client)
     println!("4️⃣ Initializing agent...");
     agent.initialize().await.unwrap();
     println!(

@@ -68,7 +68,7 @@ pub enum LoadBalancingStrategy {
 }
 
 /// Agent pool entry with metadata
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct PooledAgent {
     /// The actual agent
     agent: Arc<TerraphimAgent>,
@@ -246,9 +246,33 @@ impl AgentPool {
     pub async fn get_agent(&self) -> MultiAgentResult<PooledAgentHandle> {
         // Try to get an available agent first
         if let Some(pooled_agent) = self.get_available_agent().await {
+            let agent_id = pooled_agent.agent.agent_id;
+
+            // Move agent to busy pool
+            {
+                let mut busy = self.busy_agents.write().await;
+                busy.insert(agent_id, pooled_agent);
+            }
+
+            // Update stats
+            {
+                let mut stats = self.stats.write().await;
+                stats.current_busy_agents += 1;
+                stats.last_updated = Utc::now();
+            }
+
+            // Get reference to the agent in busy pool for the handle
+            let busy_agents = self.busy_agents.clone();
+            let pooled_agent_ref = {
+                let busy = busy_agents.read().await;
+                busy.get(&agent_id).cloned()
+            }
+            .unwrap();
+
             return Ok(PooledAgentHandle::new(
-                pooled_agent,
+                pooled_agent_ref,
                 self.available_agents.clone(),
+                self.busy_agents.clone(),
                 self.stats.clone(),
             ));
         }
@@ -263,12 +287,20 @@ impl AgentPool {
         if current_total_size < self.config.max_pool_size {
             let agent = self.create_new_agent().await?;
             let pooled_agent = PooledAgent::new(agent, self.config.max_concurrent_operations);
+            let agent_id = pooled_agent.agent.agent_id;
+
+            // Move new agent to busy pool
+            {
+                let mut busy = self.busy_agents.write().await;
+                busy.insert(agent_id, pooled_agent.clone());
+            }
 
             // Update stats
             {
                 let mut stats = self.stats.write().await;
                 stats.total_agents_created += 1;
                 stats.current_pool_size = current_total_size + 1;
+                stats.current_busy_agents += 1;
                 stats.pool_hit_rate = (stats.pool_hit_rate
                     * stats.total_operations_processed as f64)
                     / (stats.total_operations_processed + 1) as f64;
@@ -278,6 +310,7 @@ impl AgentPool {
             return Ok(PooledAgentHandle::new(
                 pooled_agent,
                 self.available_agents.clone(),
+                self.busy_agents.clone(),
                 self.stats.clone(),
             ));
         }
@@ -456,6 +489,7 @@ impl AgentPool {
 pub struct PooledAgentHandle {
     pooled_agent: Option<PooledAgent>,
     available_agents: Arc<RwLock<VecDeque<PooledAgent>>>,
+    busy_agents: Arc<RwLock<HashMap<AgentId, PooledAgent>>>,
     stats: Arc<RwLock<PoolStats>>,
     operation_start: Instant,
 }
@@ -464,11 +498,13 @@ impl PooledAgentHandle {
     fn new(
         pooled_agent: PooledAgent,
         available_agents: Arc<RwLock<VecDeque<PooledAgent>>>,
+        busy_agents: Arc<RwLock<HashMap<AgentId, PooledAgent>>>,
         stats: Arc<RwLock<PoolStats>>,
     ) -> Self {
         Self {
             pooled_agent: Some(pooled_agent),
             available_agents,
+            busy_agents,
             stats,
             operation_start: Instant::now(),
         }
@@ -513,14 +549,35 @@ impl PooledAgentHandle {
 impl Drop for PooledAgentHandle {
     fn drop(&mut self) {
         if let Some(mut pooled_agent) = self.pooled_agent.take() {
+            let agent_id = pooled_agent.agent.agent_id;
             let duration = self.operation_start.elapsed();
             pooled_agent.release_operation(duration, true); // Assume success for now
 
-            // Return agent to available pool
+            // Move agent from busy back to available pool
             let available_agents = self.available_agents.clone();
+            let busy_agents = self.busy_agents.clone();
+            let stats = self.stats.clone();
+
             tokio::spawn(async move {
-                let mut available = available_agents.write().await;
-                available.push_back(pooled_agent);
+                // Remove from busy agents
+                {
+                    let mut busy = busy_agents.write().await;
+                    busy.remove(&agent_id);
+                }
+
+                // Add back to available agents
+                {
+                    let mut available = available_agents.write().await;
+                    available.push_back(pooled_agent);
+                }
+
+                // Update stats
+                {
+                    let mut stats_guard = stats.write().await;
+                    stats_guard.current_busy_agents =
+                        stats_guard.current_busy_agents.saturating_sub(1);
+                    stats_guard.last_updated = Utc::now();
+                }
             });
         }
     }

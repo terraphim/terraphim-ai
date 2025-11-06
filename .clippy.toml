@@ -6,6 +6,7 @@ allow-unwrap-in-tests = true
 allow-expect-in-tests = true
 allow-dbg-in-tests = true
 cognitive-complexity-threshold = 30
+literal-representation-threshold = 100
 # Reduce false positives and focus on important issues
 disallowed-names = []
 doc-valid-idents = ["Cli", "TODO", "FIXME", "XXX", "WIP", "WARN", "NOTE", "INFO", "DEBUG"]
@@ -15,3 +16,5 @@ max-fn-params-bools = 3
 enum-variant-name-threshold = 50
 # Allow certain patterns for faster development
 single-char-binding-names-threshold = 4
+# Skip expensive lints in CI
+cargo-ignore-publish = true

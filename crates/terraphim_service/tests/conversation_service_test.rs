@@ -33,7 +33,7 @@ async fn test_update_conversation() {
     conversation.add_message(ChatMessage::user("Hello".to_string()));
     conversation.add_message(ChatMessage::assistant(
         "Hi there!".to_string(),
-        Some("gpt-4".to_string()),
+        Some("gemma3:270m".to_string()),
     ));
 
     let conversation = service.update_conversation(conversation).await.unwrap();
@@ -149,7 +149,7 @@ async fn test_export_import_conversation() {
     conversation.add_message(ChatMessage::user("Test message".to_string()));
     conversation.add_message(ChatMessage::assistant(
         "Test response".to_string(),
-        Some("gpt-4".to_string()),
+        Some("gemma3:270m".to_string()),
     ));
     let conversation = service.update_conversation(conversation).await.unwrap();
 

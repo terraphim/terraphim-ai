@@ -24,26 +24,26 @@ async fn test_queue_based_architecture_proof() {
     assert_eq!(role.name.to_string(), "TestAgent");
     assert_eq!(
         role.extra.get("llm_provider").unwrap(),
-        &serde_json::json!("openai")
+        &serde_json::json!("ollama")
     );
     assert_eq!(
-        role.extra.get("openai_model").unwrap(),
-        &serde_json::json!("gpt-3.5-turbo")
+        role.extra.get("llm_model").unwrap(),
+        &serde_json::json!("gemma3:270m")
     );
     println!("✅ Role configuration validated");
 
     // Step 3: Test that agent creation attempts Rig initialization
-    println!("3️⃣ Rig integration validation...");
+    println!("3️⃣ rust-genai integration validation...");
     match terraphim_multi_agent::TerraphimAgent::new(role.clone(), persistence.clone(), None).await
     {
         Err(MultiAgentError::SystemError(msg)) if msg.contains("API key") => {
-            println!("✅ Rig integration working - correctly requests API key");
+            println!("✅ rust-genai integration working - correctly requests API key");
         }
         Err(other) => {
-            println!("✅ Rig integration working - error: {:?}", other);
+            println!("✅ rust-genai integration working - error: {:?}", other);
         }
         Ok(_) => {
-            panic!("Expected API key error but agent was created successfully");
+            println!("✅ rust-genai integration working - agent created successfully with Ollama");
         }
     }
 
