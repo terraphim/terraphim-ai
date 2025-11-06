@@ -59,7 +59,7 @@ export default defineConfig({
         manualChunks: {
           // Vendor libraries
           'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
-          'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
+          'vendor-editor': ['@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
           'vendor-charts': ['d3'],
           'vendor-atomic': ['@tomic/lib'],
           'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
