@@ -1,7 +1,7 @@
 <script lang="ts">
 import { onDestroy, onMount } from 'svelte';
 // @ts-expect-error
-import { JSONEditor } from 'svelte-jsoneditor';
+// import { JSONEditor } from 'svelte-jsoneditor'; // Removed - not needed
 import { is_tauri, role } from '$lib/stores';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
 import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';

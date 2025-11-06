@@ -1,0 +1,102 @@
+=== Terraphim TUI REPL Functional Test ===
+Started at: Wed  5 Nov 2025 22:10:22 GMT
+
+=== Command Tests ===
+[1;33mTesting:[0m Help command displays available commands
+Command: /help
+[0;31m✗ FAIL[0m
+Expected: Available commands
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m List all available roles
+Command: /role list
+[0;31m✗ FAIL[0m
+Expected: Available roles
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Show current configuration
+Command: /config show
+[0;31m✗ FAIL[0m
+Expected: config
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Search for documents containing 'test'
+Command: /search test
+[0;31m✗ FAIL[0m
+Expected: search
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Display knowledge graph information
+Command: /graph
+[0;31m✗ FAIL[0m
+Expected: graph
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Display thesaurus statistics
+Command: /thesaurus
+[0;31m✗ FAIL[0m
+Expected: thesaurus
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Autocomplete for 'terr'
+Command: /autocomplete terr
+[0;31m✗ FAIL[0m
+Expected: suggestion
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Extract entities from text
+Command: /extract "Find patterns"
+[0;31m✗ FAIL[0m
+Expected: extract
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Find pattern in documents
+Command: /find TODO
+[0;31m✗ FAIL[0m
+Expected: find
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Select Default role
+Command: /role select Default
+[0;31m✗ FAIL[0m
+Expected: role
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Send chat message
+Command: /chat Hello
+[0;31m✗ FAIL[0m
+Expected: chat
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Exit REPL cleanly
+Command: /quit
+[0;31m✗ FAIL[0m
+Expected: quit\|exit\|bye
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+
+=== Error Handling Tests ===
+[1;33mTesting:[0m Invalid command shows error
+Command: /invalid_command
+[0;31m✗ FAIL[0m
+Expected: unknown\|error\|invalid
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Missing parameter shows help
+Command: /search
+[0;31m✗ FAIL[0m
+Expected: usage\|help\|missing
+Got: tests/functional/test_tui_repl.sh: line 31: timeout: command not found
+---
+[1;33mTesting:[0m Non-existent role shows error
+Command: /role select NonExistent
+[0;32m✓ PASS[0m
+---
+
+=== Test Summary ===
+Total Tests: 15
+[0;32mPassed: 1[0m
+[0;31mFailed: 14[0m
+Pass Rate: 6%
+Completed at: Wed  5 Nov 2025 22:10:23 GMT
+[0;31mSome tests failed![0m
