@@ -2,7 +2,7 @@
 import { invoke } from '@tauri-apps/api/tauri';
 import { onMount } from 'svelte';
 import { get } from 'svelte/store';
-import { JSONEditor } from 'svelte-jsoneditor';
+// import { JSONEditor } from 'svelte-jsoneditor'; // Removed - using textarea instead
 // @ts-expect-error local store defined elsewhere
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../config';
@@ -51,6 +51,6 @@ onMount(() => {
     <i>The best editing experience is to configure Atomic Server, in the meantime use editor below. You will need to refresh page via Command R or Ctrl-R to see changes</i>
   </p>
   <div class="editor">
-    <JSONEditor content={_content} onChange={_handleChange} />
+    <textarea class="textarea" rows="20" bind:value={_content.json} on:change={() => _handleChange(_content)} style="font-family: monospace;" />
   </div>
 </div>

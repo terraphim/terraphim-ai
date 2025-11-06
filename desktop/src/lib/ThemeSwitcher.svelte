@@ -68,9 +68,18 @@ function updateStoresFromConfig(config: ConfigResponse['config']) {
 		theme.set(config.global_shortcut);
 	}
 
-	// Update selected role
+	// Update selected role (handle both string and RoleName object)
 	if (config.selected_role) {
-		role.set(config.selected_role);
+		const roleName = typeof config.selected_role === 'string' 
+			? config.selected_role 
+			: config.selected_role.original;
+		role.set(roleName);
+		
+		// Update theme based on the selected role
+		const selectedRoleSettings = config.roles[roleName];
+		if (selectedRoleSettings && selectedRoleSettings.theme) {
+			theme.set(selectedRoleSettings.theme);
+		}
 	}
 }
 
@@ -114,9 +123,78 @@ export function switchTheme(newTheme: string) {
 // Listen for theme changes from Tauri backend
 onMount(() => {
 	if ($is_tauri) {
+		// Listen for theme changes
 		listen('theme-changed', (event: any) => {
 			theme.set(event.payload);
 		});
+		
+		// Listen for role changes from system tray
+		listen('role_changed', (event: any) => {
+			console.log('Role changed event received from system tray:', event.payload);
+			updateStoresFromConfig(event.payload);
+		});
 	}
+	// Load config on mount
+	initializeConfig();
 });
+
+async function initializeConfig() {
+	await loadConfig();
+}
+
+function updateRole(event: Event) {
+	const target = event.currentTarget as HTMLSelectElement;
+	const newRoleName = target.value;
+	console.log('Role change requested:', newRoleName);
+
+	// Persist the newly selected role
+	role.set(newRoleName);
+
+	// Find role settings
+	const roleSettings = $roles.find((r) => {
+		const roleName = typeof r.name === 'string' ? r.name : r.name.original;
+		return roleName === newRoleName;
+	});
+	if (!roleSettings) {
+		console.error(`No role settings found for role: ${newRoleName}.`);
+		return;
+	}
+
+	const newTheme = roleSettings.theme || 'spacelab';
+	theme.set(newTheme);
+	console.log(`Theme changed to ${newTheme}`);
+
+	// Update selected role in config
+	configStore.update((cfg) => {
+		cfg.selected_role = newRoleName;
+		return cfg;
+	});
+
+	// In Tauri, notify the backend
+	if ($is_tauri) {
+		invoke('select_role', { roleName: newRoleName }).catch((e) =>
+			console.error('Error selecting role:', e)
+		);
+	} else {
+		// For web mode, update config on server
+		fetch(`${CONFIG.ServerURL}/config/`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify($configStore),
+		}).catch((error) => console.error('Error updating config on server:', error));
+	}
+}
 </script>
+
+<div class="field is-grouped is-grouped-right">
+	<div class="control">
+		<div class="select">
+			<select value={$role} on:change={updateRole}>
+				{#each $roles as r}
+					{@const roleName = typeof r.name === 'string' ? r.name : r.name.original}
+					<option value={roleName}>{roleName}</option>
+				{/each}
+			</select>
+		</div>
+	</div>
+</div>

@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
 import { store } from '@tomic/svelte';
 import { Button, Field, Input, Select, Switch } from 'svelma';
-import { JSONEditor } from 'svelte-jsoneditor';
+// import { JSONEditor } from 'svelte-jsoneditor'; // Removed - using textarea instead
 import { Route } from 'tinro';
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
@@ -168,7 +168,7 @@ $: console.log('Print roles', $_roles);
       >
     </p>
     <div class="editor">
-      <JSONEditor content={_content} onChange={_handleChange} />
+      <textarea class="textarea" rows="20" bind:value={_content.json} on:change={() => _handleChange(_content)} style="font-family: monospace;" />
     </div>
   </Route>
 </div>
