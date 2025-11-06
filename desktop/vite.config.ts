@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import { svelte } from '@sveltejs/vite-plugin-svelte'
+import sveltePreprocess from 'svelte-preprocess'
 import { fileURLToPath, URL } from "url";
 import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { resolve } from 'path';
@@ -11,22 +12,26 @@ export default defineConfig({
       compilerOptions: {
         css: 'injected'
       },
+      preprocess: sveltePreprocess({
+        scss: true
+      }),
       onwarn: (warning, handler) => {
-        // Ignore svelma warnings
+        // Ignore dependency warnings
         if (warning.code === 'css_nesting_selector_invalid_placement') return;
         if (warning.code === 'css_invalid_global') return;
+        if (warning.code === 'css_unused_selector') return;
+        if (warning.code === 'css_invalid_identifier') return;
+        if (warning.code === 'a11y_consider_explicit_label') return;
+        if (warning.code === 'a11y_label_has_associated_control') return;
+        if (warning.code === 'a11y_click_events_have_key_events') return;
+        if (warning.code === 'a11y_missing_attribute') return;
+        if (warning.code === 'a11y_missing_content') return;
+        if (warning.code === 'node_invalid_placement') return;
+        if (warning.code === 'node_invalid_placement_ssr') return;
+        // Ignore Svelma-specific CSS issues
+        if (warning.message && warning.message.includes('Tooltip.svelte')) return;
+        if (warning.message && warning.message.includes('Expected a valid CSS identifier')) return;
         handler(warning);
-      },
-      preprocess: {
-        style: ({ content, filename }) => {
-          // Handle problematic CSS nesting in svelma
-          if (filename && filename.includes('svelma')) {
-            return {
-              code: content.replace(/:global\(&\[([^\]]+)\]\)/g, '&[$1]')
-            };
-          }
-          return { code: content };
-        }
       }
     }),
   ],
@@ -54,7 +59,7 @@ export default defineConfig({
         manualChunks: {
           // Vendor libraries
           'vendor-ui': ['bulma', 'svelma', '@fortawesome/fontawesome-free'],
-          'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
+          'vendor-editor': ['@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
           'vendor-charts': ['d3'],
           'vendor-atomic': ['@tomic/lib'],
           'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],

@@ -11,7 +11,9 @@ ARG NODE_VERSION=20
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
 
 WORKDIR /app
-COPY desktop/package*.json desktop/yarn.lock ./
+# Copy package files - yarn.lock is optional
+COPY desktop/package*.json ./
+COPY desktop/yarn.lock* ./
 RUN yarn install --frozen-lockfile --network-timeout 300000
 
 COPY desktop ./
