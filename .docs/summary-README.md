@@ -1,20 +1,45 @@
 # Summary: README.md
 
 ## Purpose
-This is the main project README for Terraphim AI, serving as the primary documentation and entry point for users, developers, and contributors.
+Main project documentation for Terraphim AI, a privacy-first AI assistant that operates locally. Provides installation instructions, quick start guide, and project overview for end users and developers.
 
 ## Key Functionality
-- Introduces Terraphim as a privacy-first AI assistant with local operation and deterministic behavior
-- Explains core concepts: Haystacks (data sources), Knowledge Graphs, Profiles, Roles, and Rolegraphs
-- Provides comprehensive getting started guide with quick start, installation methods (Homebrew, Docker, Debian), and development setup
-- Documents configuration for storage backends (local vs cloud), environment variables, and deployment scenarios
-- Includes terminology definitions, contribution guidelines, and code style standards
-- Features build/lint/test commands for both Rust backend and Svelte frontend
+- **Project Vision**: Privacy-first local AI assistant for searching across personal, team, and public knowledge repositories
+- **Installation Methods**: Docker, Homebrew, Debian/Ubuntu packages, direct download, development setup
+- **Quick Start**: Automated installation scripts, manual setup instructions
+- **TUI Interface**: Comprehensive terminal UI with REPL, sub-2 second VM boot, markdown command system
+- **Multiple Interfaces**: Backend server, web frontend (Svelte), desktop app (Tauri), terminal UI
+
+## Critical Components
+- **Haystack**: Data sources (folders, Notion, email, Jira, Confluence)
+- **Knowledge Graph**: Structured information with node/edge relationships
+- **Role**: User profiles with specific knowledge domains and search preferences
+- **Rolegraph**: Knowledge graph using Aho-Corasick automata for ranking
+
+## Installation Options
+- **Docker**: `docker run ghcr.io/terraphim/terraphim-server:latest`
+- **Homebrew**: `brew install terraphim/terraphim-ai/terraphim-ai`
+- **Quick Install**: `curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/v0.2.3/install.sh | bash`
+
+## Development Setup
+1. Clone repository
+2. Install pre-commit hooks: `./scripts/install-hooks.sh`
+3. Start backend: `cargo run`
+4. Start frontend: `cd desktop && yarn run dev` (web) or `yarn run tauri dev` (desktop)
+5. TUI: `cargo build -p terraphim_tui --features repl-full --release`
 
 ## Important Details
-- Emphasizes privacy-first design with local infrastructure operation
-- Supports multiple installation methods for end users and developers
-- Includes detailed code style guidelines for Rust (Tokio, snake_case, Result<T,E>) and frontend (Svelte, Bulma CSS)
-- Mandates conventional commits and pre-commit checks for contributions
-- Documents deployment patterns using Caddy reverse proxy and 1Password CLI for secrets
-- Contains troubleshooting guides and links to additional documentation
+- Storage backends: Local by default (memory, dashmap, sqlite, redb); optional AWS S3 for cloud
+- No cloud dependencies required for local development
+- Dependency constraints enforced: wiremock 0.6.4, schemars 0.8.22, thiserror 1.0.x
+- Code quality: Conventional Commits, cargo fmt, Biome for JS/TS, no secrets in commits
+- License: Apache 2.0
+- Trademark: Terraphim registered in UK, US, and internationally (WIPO)
+
+## Key Features (TUI)
+- AI Chat Integration (OpenRouter, Ollama)
+- Sub-500ms VM allocation
+- Firecracker microVM pools
+- Markdown command system (YAML frontmatter)
+- Security-first execution modes (Local, Firecracker, Hybrid)
+- Knowledge graph validation before execution

@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_multi_agent"
-version = "0.2.0"
+version = "1.0.0"
 edition.workspace = true
 description = "Multi-agent system for Terraphim built on roles with Rig framework integration"
 license = "MIT"

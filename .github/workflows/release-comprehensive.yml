@@ -82,10 +82,11 @@ jobs:
 
       - name: Prepare artifacts (Windows)
         if: matrix.os == 'windows-latest'
+        shell: bash
         run: |
-          mkdir artifacts
-          copy target\${{ matrix.target }}\release\terraphim_server.exe artifacts\terraphim_server-${{ matrix.target }}.exe
-          copy target\${{ matrix.target }}\release\terraphim-tui.exe artifacts\terraphim-tui-${{ matrix.target }}.exe
+          mkdir -p artifacts
+          cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
+          cp target/${{ matrix.target }}/release/terraphim-tui.exe artifacts/terraphim-tui-${{ matrix.target }}.exe || true
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v5
@@ -136,13 +137,9 @@ jobs:
         include:
           - platform: macos-latest
             webkit-package: ""
-          - platform: ubuntu-18.04
-            webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: ubuntu-20.04
             webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: ubuntu-22.04
-            webkit-package: "libwebkit2gtk-4.0-dev"
-          - platform: ubuntu-24.04
             webkit-package: "libwebkit2gtk-4.0-dev"
           - platform: windows-latest
             webkit-package: ""
@@ -215,7 +212,7 @@ jobs:
     uses: ./.github/workflows/docker-multiarch.yml
     with:
       platforms: linux/amd64,linux/arm64,linux/arm/v7
-      ubuntu-versions: '["18.04", "20.04", "22.04", "24.04"]'
+      ubuntu-versions: '["20.04", "22.04"]'
       push: true
       tag: ${{ github.ref_name }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
