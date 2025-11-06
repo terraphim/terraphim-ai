@@ -204,7 +204,7 @@ parameters:
             modified: std::time::SystemTime::now(),
         };
 
-        let result = registry.add_command(parsed).await;
+        let result = registry.register_command(parsed).await;
         assert!(
             result.is_ok(),
             "Should successfully add command to registry"
@@ -232,10 +232,10 @@ parameters:
             modified: std::time::SystemTime::now(),
         };
 
-        let result1 = registry.add_command(parsed.clone()).await;
+        let result1 = registry.register_command(parsed.clone()).await;
         assert!(result1.is_ok());
 
-        let result2 = registry.add_command(parsed).await;
+        let result2 = registry.register_command(parsed).await;
         assert!(result2.is_err(), "Should fail to add duplicate command");
     }
 
@@ -250,7 +250,7 @@ parameters:
             modified: std::time::SystemTime::now(),
         };
 
-        registry.add_command(parsed).await.unwrap();
+        registry.register_command(parsed).await.unwrap();
 
         let retrieved = registry.get_command("test").await;
         assert!(
@@ -284,7 +284,7 @@ parameters:
                 modified: std::time::SystemTime::now(),
             };
 
-            registry.add_command(parsed).await.unwrap();
+            registry.register_command(parsed).await.unwrap();
         }
 
         // Test search functionality
@@ -339,7 +339,7 @@ parameters:
                 modified: std::time::SystemTime::now(),
             };
 
-            registry.add_command(parsed).await.unwrap();
+            registry.register_command(parsed).await.unwrap();
         }
 
         let updated_stats = registry.get_stats().await;
@@ -747,7 +747,7 @@ parameters:
 
         // Create registry and add command
         let mut registry = CommandRegistry::new().unwrap();
-        registry.add_command(parsed.clone()).await.unwrap();
+        registry.register_command(parsed.clone()).await.unwrap();
 
         // Create validator
         let mut validator = CommandValidator::new();
@@ -819,7 +819,7 @@ parameters:
             modified: std::time::SystemTime::now(),
         };
 
-        registry.add_command(parsed).await.unwrap();
+        registry.register_command(parsed).await.unwrap();
 
         // Test getting command by name
         let by_name = registry.get_command("test-command").await;
