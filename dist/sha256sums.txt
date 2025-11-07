@@ -1,0 +1,4 @@
+b2855a37b5d539ed4fcf300d584d31e33907a5222513a507a8ee541175686ce1  dist/linux/22.04/x86_64-unknown-linux-gnu/bin/terraphim_mcp_server
+edc16e7c1b1e294187ac3738d38877789c97151c8bd74deb700ab5b2dae3ca37  dist/linux/22.04/x86_64-unknown-linux-gnu/bin/terraphim-tui
+37b911a3796a4ac00686465895db7f176db43a567f4e682331186a29ba6f5e6d  dist/linux/22.04/x86_64-unknown-linux-gnu/bin/terraphim_server
+f1747084e96f8059a6b1988e462e56f8f5f42f612832f46408b294717732cf3c  dist/linux/22.04/x86_64-unknown-linux-gnu/deb/terraphim-server_22.04_x86_64.deb
