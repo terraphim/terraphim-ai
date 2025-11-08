@@ -22,11 +22,13 @@ use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
 use tracing::{error, info, warn};
 
+pub mod auth;
 pub mod recovery;
 pub mod resource_mapper;
 pub mod security;
 pub mod validation;
 
+use crate::auth::{AuthManager, AuthError};
 use crate::resource_mapper::TerraphimResourceMapper;
 use crate::validation::{ValidationContext, ValidationPipeline};
 
@@ -57,6 +59,7 @@ pub struct McpService {
     resource_mapper: Arc<TerraphimResourceMapper>,
     autocomplete_index: Arc<tokio::sync::RwLock<Option<AutocompleteIndex>>>,
     validation_pipeline: Arc<ValidationPipeline>,
+    auth_manager: Arc<AuthManager>,
 }
 
 impl McpService {
@@ -67,6 +70,7 @@ impl McpService {
             resource_mapper: Arc::new(TerraphimResourceMapper::new()),
             autocomplete_index: Arc::new(tokio::sync::RwLock::new(None)),
             validation_pipeline: Arc::new(ValidationPipeline::new()),
+            auth_manager: Arc::new(AuthManager::new()),
         }
     }
 
@@ -1394,9 +1398,14 @@ impl ServerHandler for McpService {
     async fn list_tools(
         &self,
         _request: Option<rmcp::model::PaginatedRequestParam>,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ListToolsResult, ErrorData> {
         tracing::debug!("list_tools function called!");
+
+        // Authenticate the request
+        if let Err(auth_error) = self.auth_manager.authenticate_request(&context).await {
+            return Err(auth_error.into());
+        }
 
         // Convert JSON values to Arc<Map<String, Value>> for input_schema
         let search_schema = serde_json::json!({
@@ -1884,8 +1893,20 @@ impl ServerHandler for McpService {
     async fn call_tool(
         &self,
         request: CallToolRequestParam,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<CallToolResult, ErrorData> {
+        // Authenticate the request
+        let api_key = match self.auth_manager.authenticate_request(&context).await {
+            Ok(api_key) => api_key,
+            Err(auth_error) => return Err(auth_error.into()),
+        };
+
+        // Check permission for this specific tool
+        let tool_permission = format!("tool:{}", request.name);
+        if !api_key.has_permission(&tool_permission) && !api_key.has_permission("tool:*") {
+            return Err(AuthError::InsufficientPermissions.into());
+        }
+
         match request.name.as_ref() {
             "search" => {
                 let arguments = request.arguments.unwrap_or_default();
@@ -2389,8 +2410,13 @@ impl ServerHandler for McpService {
     async fn list_resources(
         &self,
         _request: Option<rmcp::model::PaginatedRequestParam>,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ListResourcesResult, ErrorData> {
+        // Authenticate the request
+        if let Err(auth_error) = self.auth_manager.authenticate_request(&context).await {
+            return Err(auth_error.into());
+        }
+
         let mut service = self
             .terraphim_service()
             .await
@@ -2476,8 +2502,13 @@ impl ServerHandler for McpService {
     async fn read_resource(
         &self,
         request: ReadResourceRequestParam,
-        _context: RequestContext<RoleServer>,
+        context: RequestContext<RoleServer>,
     ) -> Result<ReadResourceResult, ErrorData> {
+        // Authenticate the request
+        if let Err(auth_error) = self.auth_manager.authenticate_request(&context).await {
+            return Err(auth_error.into());
+        }
+
         let doc_id = self
             .resource_mapper
             .uri_to_id(&request.uri)

@@ -1,52 +1,9 @@
 use crate::{
-    namespace::NamespaceManager, pool::McpServerPool, routing::ToolRouter, McpNamespace,
-    McpProxyError, Result,
+    namespace::NamespaceManager, pool::McpServerPool, routing::ToolRouter, ContentItem, McpNamespace,
+    McpProxyError, Result, Tool, ToolCallRequest, ToolCallResponse,
 };
-use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::RwLock;
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct Tool {
-    /// Tool name (will be prefixed with server name)
-    pub name: String,
-    /// Tool description
-    pub description: String,
-    /// Tool input schema
-    pub input_schema: Option<Value>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ToolCallRequest {
-    /// Prefixed tool name (ServerName__toolName)
-    pub name: String,
-    /// Tool arguments
-    pub arguments: Option<Value>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-pub struct ToolCallResponse {
-    /// Response content
-    pub content: Vec<ContentItem>,
-    /// Whether the call was successful
-    pub is_error: bool,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum ContentItem {
-    Text {
-        text: String,
-    },
-    Image {
-        data: String,
-        mime_type: String,
-    },
-    Resource {
-        uri: String,
-        mime_type: Option<String>,
-    },
-}
 
 #[derive(Clone)]
 pub struct McpProxy {

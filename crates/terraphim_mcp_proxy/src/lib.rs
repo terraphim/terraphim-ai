@@ -10,12 +10,53 @@ use ahash::AHashMap as HashMap;
 #[cfg(feature = "json-schema")]
 use std::collections::HashMap;
 
+/// Request to call a tool
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
+pub struct ToolCallRequest {
+    pub name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub arguments: Option<serde_json::Value>,
+}
+
+/// Response from a tool call
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
+pub struct ToolCallResponse {
+    pub content: Vec<ContentItem>,
+    #[serde(default)]
+    pub is_error: bool,
+}
+
+/// Content item in a tool response
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum ContentItem {
+    Text { text: String },
+    Image { data: String, mime_type: String },
+    Json { data: serde_json::Value },
+    Resource { uri: String, mime_type: Option<String> },
+}
+
+/// Tool definition
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "json-schema", derive(JsonSchema))]
+pub struct Tool {
+    pub name: String,
+    pub description: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub input_schema: Option<serde_json::Value>,
+}
+
+pub mod auth;
 pub mod middleware;
 pub mod namespace;
 pub mod pool;
 pub mod proxy;
 pub mod routing;
 
+pub use auth::*;
 pub use middleware::*;
 pub use namespace::*;
 pub use pool::*;
