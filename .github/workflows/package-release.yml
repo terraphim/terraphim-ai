@@ -45,7 +45,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
 
       - name: Create LICENSE file for cargo-deb
-        run: cp LICENSE-Apache-2.0 LICENSE
+        run: |
+          if [ ! -f LICENSE ]; then
+            cp LICENSE-Apache-2.0 LICENSE
+          fi
 
       - name: Temporarily disable panic abort for building
         run: |

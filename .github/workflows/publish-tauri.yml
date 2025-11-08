@@ -25,10 +25,20 @@ jobs:
 
     runs-on: ${{ matrix.platform }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v4
 
       - name: Install 1Password CLI
+        if: matrix.platform != 'windows-latest'
         uses: 1password/install-cli-action@v1
+
+      - name: Install 1Password CLI (Windows)
+        if: matrix.platform == 'windows-latest'
+        shell: pwsh
+        run: |
+          # Download and install 1Password CLI for Windows
+          Invoke-WebRequest -Uri "https://cache.agilebits.com/dist/1P/op2/pkg/v2.32.0/op_windows_amd64_v2.32.0.zip" -OutFile "op.zip"
+          Expand-Archive -Path "op.zip" -DestinationPath "C:\op"
+          echo "C:\op" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
 
       - name: Setup Node.js
         uses: actions/setup-node@v5
@@ -48,7 +58,20 @@ jobs:
         run: yarn install
         working-directory: ${{env.working-directory}}
 
-      - name: Inject secrets and build with Tauri
+      - name: Patch svelte-jsoneditor for build compatibility
+        working-directory: ${{env.working-directory}}
+        run: |
+          # Temporary fix for svelte-jsoneditor HTML validation issue
+          # This patches the problematic TransformWizard.svelte file
+          TRANSFORM_WIZARD_PATH="node_modules/svelte-jsoneditor/components/modals/TransformWizard.svelte"
+          if [ -f "$TRANSFORM_WIZARD_PATH" ]; then
+            # Add tbody wrapper around tr elements to fix HTML structure
+            sed -i 's/<table class="jse-transform-wizard">/<table class="jse-transform-wizard"><tbody>/' "$TRANSFORM_WIZARD_PATH"
+            sed -i 's/<\/table>/<\/tbody><\/table>/' "$TRANSFORM_WIZARD_PATH"
+          fi
+
+      - name: Inject secrets and build with Tauri (Non-Windows)
+        if: matrix.platform != 'windows-latest'
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         working-directory: ${{env.working-directory}}
@@ -65,8 +88,20 @@ jobs:
           # Build with injected signing keys
           op run --env-file=.env.ci -- yarn run tauri build
 
+      - name: Build with Tauri (Windows - without 1Password)
+        if: matrix.platform == 'windows-latest'
+        working-directory: ${{env.working-directory}}
+        run: |
+          # For Windows, build without 1Password integration for now
+          # Copy template to config
+          copy src-tauri\tauri.conf.json.template src-tauri\tauri.conf.json
+          
+          # Build without signing for now
+          yarn run tauri build
+
       - name: Generate updater manifest
         if: matrix.platform == 'ubuntu-22.04'
+        working-directory: ${{env.working-directory}}
         env:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
