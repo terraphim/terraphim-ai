@@ -1,50 +1,15 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/schema.json",
-  "package": {
-    "productName": "Terraphim Desktop",
-    "version": "0.3.0"
-  },
+  "productName": "Terraphim Desktop",
+  "version": "0.3.0",
+  "identifier": "com.terraphim.ai.desktop",
   "build": {
     "beforeDevCommand": "yarn run dev",
     "beforeBuildCommand": "yarn run build",
-    "devPath": "http://localhost:5173",
-    "distDir": "../dist"
+    "devUrl": "http://localhost:5173",
+    "frontendDist": "../dist"
   },
-  "tauri": {
-    "allowlist": {
-      "all": false,
-      "dialog": { "all": true },
-      "path": { "all": true },
-      "fs": { "all": true },
-      "globalShortcut": { "all": true }
-    },
-    "bundle": {
-      "active": true,
-      "targets": "all",
-      "identifier": "com.terraphim.ai.desktop",
-      "icon": [
-        "icons/32x32.png",
-        "icons/128x128.png",
-        "icons/128x128@2x.png",
-        "icons/icon.icns",
-        "icons/icon.ico"
-      ],
-      "resources": [
-        "../default/**/*",
-        "../public/assets/bulmaswatch/**/*.css"
-      ]
-    },
-    "systemTray": {
-      "iconPath": "icons/icon.png"
-    },
-    "updater": {
-      "active": true,
-      "endpoints": [
-        "https://github.com/terraphim/terraphim-ai/releases/latest/download/latest.json"
-      ],
-      "dialog": true,
-      "pubkey": "PLACEHOLDER_PUBLIC_KEY"
-    },
+  "app": {
     "windows": [
       {
         "label": "main",
@@ -54,6 +19,37 @@
         "resizable": true,
         "fullscreen": false
       }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ],
+    "resources": [
+      "../default/**/*",
+      "../public/assets/bulmaswatch/**/*.css"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "active": true,
+      "endpoints": [
+        "https://github.com/terraphim/terraphim-ai/releases/latest/download/latest.json"
+      ],
+      "dialog": true,
+      "pubkey": "PLACEHOLDER_PUBLIC_KEY"
+    },
+    "systemTray": {
+      "iconPath": "icons/icon.png"
+    }
   }
 }

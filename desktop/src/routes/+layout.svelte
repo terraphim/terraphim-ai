@@ -1,28 +1,49 @@
 <script lang="ts">
-import { active, Route, router } from 'tinro';
-import '@fortawesome/fontawesome-free/css/all.css';
-import logo from '/assets/terraphim_gray.png';
-import Chat from './lib/Chat/Chat.svelte';
-import ConfigJsonEditor from './lib/ConfigJsonEditor.svelte';
-import ConfigWizard from './lib/ConfigWizard.svelte';
-import RoleGraphVisualization from './lib/RoleGraphVisualization.svelte';
-import Search from './lib/Search/Search.svelte';
-import { theme } from './lib/stores';
-import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
+	import '../lib/themeManager'; // Injects Bulmaswatch stylesheet & keeps it in sync with the theme store
+	import '../styles/novel.css'; // Novel's compiled CSS lives in the package's dist directory.
+	import '@fortawesome/fontawesome-free/css/all.css';
 
-let _visible = 'is-hidden';
-function _toggleVissible() {
-	_visible = '';
-}
+	import { page } from '$app/stores';
+	import { goto } from '$app/navigation';
+	import { theme } from '$lib/stores';
+	import ThemeSwitcher from '$lib/ThemeSwitcher.svelte';
+	import Search from '$lib/Search/Search.svelte';
+	import Chat from '$lib/Chat/Chat.svelte';
+	import RoleGraphVisualization from '$lib/RoleGraphVisualization.svelte';
+	import ConfigWizard from '$lib/ConfigWizard.svelte';
+	import ConfigJsonEditor from '$lib/ConfigJsonEditor.svelte';
 
-function goBack() {
-	// Try to go back in browser history, fallback to home
-	if (window.history.length > 1) {
-		window.history.back();
-	} else {
-		router.goto('/');
+	let _visible = 'is-hidden';
+	function _toggleVissible() {
+		_visible = '';
 	}
-}
+
+	function goBack() {
+		// Try to go back in browser history, fallback to home
+		if (window.history.length > 1) {
+			window.history.back();
+		} else {
+			goto('/');
+		}
+	}
+
+	// Map current route to component
+	$: currentComponent = (() => {
+		switch ($page.route.id) {
+			case '/':
+				return Search;
+			case '/chat':
+				return Chat;
+			case '/graph':
+				return RoleGraphVisualization;
+			case '/config/wizard':
+				return ConfigWizard;
+			case '/config/json':
+				return ConfigJsonEditor;
+			default:
+				return Search;
+		}
+	})();
 </script>
 
 <svelte:head>
@@ -35,36 +56,36 @@ function goBack() {
     <div class="top-controls">
       <div class="main-navigation">
         <div class="navigation-row">
-  <button
-    class="logo-back-button"
-    on:click={goBack}
-    on:keydown={(e) => {
-      if (e.key === 'Enter' || e.key === ' ') {
-        e.preventDefault();
-        goBack();
-      }
-    }}
-    title="Go back"
-    aria-label="Go back"
-  >
-            <img src={logo} alt="Terraphim" class="logo-image" />
+          <button
+            class="logo-back-button"
+            on:click={goBack}
+            on:keydown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                goBack();
+              }
+            }}
+            title="Go back"
+            aria-label="Go back"
+          >
+            <img src="/assets/terraphim_gray.png" alt="Terraphim" class="logo-image" />
           </button>
           <div class="tabs is-boxed">
             <ul>
-              <li>
-                <a href="/" use:active data-exact data-testid="search-tab">
+              <li class:active={$page.route.id === '/'}>
+                <a href="/" data-testid="search-tab">
                   <span class="icon is-small"><i class="fas fa-search"></i></span>
                   <span>Search</span>
                 </a>
               </li>
-              <li>
-                <a href="/chat" use:active data-testid="chat-tab">
+              <li class:active={$page.route.id === '/chat'}>
+                <a href="/chat" data-testid="chat-tab">
                   <span class="icon is-small"><i class="fas fa-comments"></i></span>
                   <span>Chat</span>
                 </a>
               </li>
-              <li>
-                <a href="/graph" use:active data-testid="graph-tab">
+              <li class:active={$page.route.id === '/graph'}>
+                <a href="/graph" data-testid="graph-tab">
                   <span class="icon is-small"><i class="fas fa-project-diagram"></i></span>
                   <span>Graph</span>
                 </a>
@@ -78,19 +99,14 @@ function goBack() {
       </div>
     </div>
     <div class="main-area">
-      <Route path="/"><Search /></Route>
-      <Route path="/chat"><Chat /></Route>
-      <Route path="/graph"><RoleGraphVisualization /></Route>
+      <svelte:component this={currentComponent} />
     </div>
     <br />
-
-    <Route path="/config/wizard"><ConfigWizard /></Route>
-    <Route path="/config/json"><ConfigJsonEditor /></Route>
   </main>
 
   <footer on:mouseover={_toggleVissible} on:focus={_toggleVissible}>
     <div class={_visible}>
-      <Route path="/">
+      {#if $page.route.id === '/'}
         <nav class="navbar">
           <div class="navbar-brand">
             <a class="navbar-item" href="/" aria-label="Go to home search">
@@ -104,7 +120,7 @@ function goBack() {
             <a class="navbar-item" href="/chat">Chat</a>
           </div>
         </nav>
-      </Route>
+      {/if}
     </div>
   </footer>
 </div>
@@ -194,21 +210,14 @@ function goBack() {
   }
 
   /* Active navigation tab styles */
-  :global(.tabs li:has(a.active)) {
+  .tabs li.active {
     border-bottom-color: #3273dc;
   }
-  :global(.tabs a.active) {
+  .tabs li.active a {
     color: #3273dc !important;
     border-bottom-color: #3273dc !important;
   }
 
-  /* Fallback for browsers that don't support :has() selector */
-  @supports not (selector(:has(*))) {
-    :global(.tabs a.active) {
-      background-color: #f5f5f5;
-      border-bottom: 3px solid #3273dc;
-    }
-  }
   footer {
     flex-shrink: 0;
     text-align: center;

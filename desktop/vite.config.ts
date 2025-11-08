@@ -1,77 +1,65 @@
-import { defineConfig } from 'vite'
-import { svelte } from '@sveltejs/vite-plugin-svelte'
+import { sveltekit } from '@sveltejs/kit/vite';
+import { defineConfig } from 'vite';
 import { fileURLToPath, URL } from "url";
-import { writeFileSync, readFileSync, existsSync, mkdirSync } from 'fs';
-import { resolve } from 'path';
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    svelte({
-      compilerOptions: {
-        css: 'injected'
-      },
-      onwarn: (warning, handler) => {
-        // Ignore svelma warnings
-        if (warning.code === 'css_nesting_selector_invalid_placement') return;
-        if (warning.code === 'css_invalid_global') return;
-        handler(warning);
-      },
-      preprocess: {
-        style: ({ content, filename }) => {
-          // Handle problematic CSS nesting in svelma
-          if (filename && filename.includes('svelma')) {
-            return {
-              code: content.replace(/:global\(&\[([^\]]+)\]\)/g, '&[$1]')
-            };
-          }
-          return { code: content };
-        }
-      }
-    }),
-  ],
-  resolve: {
-    alias: {
-      '$lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
-      '$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
-      // Map specific Svelte sub-paths back to real runtime so they are **not** redirected to
-      // our shim (which would cause ENOTDIR errors like svelte-shim.js/store).
-      'svelte/internal': resolve(__dirname, 'node_modules/svelte/src/internal'),
-      'svelte/store': resolve(__dirname, 'node_modules/svelte/src/store/index-client.js'),
-      'svelte/transition': resolve(__dirname, 'node_modules/svelte/src/transition/index.js'),
-      'svelte/animate': resolve(__dirname, 'node_modules/svelte/src/animate/index.js'),
-      'svelte/easing': resolve(__dirname, 'node_modules/svelte/src/easing/index.js'),
-      'svelte/motion': resolve(__dirname, 'node_modules/svelte/src/motion/index.js'),
-      'svelte/reactivity': resolve(__dirname, 'node_modules/svelte/src/reactivity/index-client.js'),
-
-      // Real runtime entry alias so that shim can import without causing an alias loop.
-      'svelte-original': resolve(__dirname, 'node_modules/svelte/src/index-client.js'),
-    },
-  },
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          // Vendor libraries
-          'vendor-ui': ['bulma', '@fortawesome/fontawesome-free'],
-          'vendor-editor': ['svelte-jsoneditor', '@tiptap/core', '@tiptap/starter-kit', 'tiptap-markdown'],
-          'vendor-charts': ['d3'],
-          'vendor-atomic': ['@tomic/lib'],
-          'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
-          // Large components
-          'novel-editor': ['@paralect/novel-svelte']
-        }
-      }
-    },
-    chunkSizeWarningLimit: 1000 // Increase limit to 1MB
-  },
-  server: {
-    fs: {
-      // Allow serving files from project root
-      allow: ['..']
-    }
-  },
-  optimizeDeps: {
-    include: ['@tomic/lib', '@tomic/svelte']
-  }
+	plugins: [sveltekit()],
+	resolve: {
+		alias: {
+			'$lib': fileURLToPath(new URL('./src/lib', import.meta.url)),
+			'$workers': fileURLToPath(new URL('./src/workers', import.meta.url)),
+		},
+	},
+	build: {
+		rollupOptions: {
+			external: [
+				// Tauri APIs - these are provided by the Tauri runtime
+				'@tauri-apps/api/tauri',
+				'@tauri-apps/api/dialog',
+				'@tauri-apps/api/fs',
+				'@tauri-apps/api/window',
+				'@tauri-apps/api/app',
+				'@tauri-apps/api/shell',
+				// FontAwesome - served as static asset
+				'@fortawesome/fontawesome-free',
+				// TipTap - external dependencies
+				'@tiptap/core',
+				'@tiptap/starter-kit',
+				'tiptap-markdown',
+				// Other external packages
+				'd3',
+				'bulma',
+				'svelte-jsoneditor',
+				'@tomic/lib',
+				'@paralect/novel-svelte',
+				'comlink-fetch',
+				'marked'
+			],
+			output: {
+				// Let Vite handle chunking automatically to avoid external conflicts
+			}
+		},
+		chunkSizeWarningLimit: 1000 // Increase limit to 1MB
+	},
+	server: {
+		fs: {
+			// Allow serving files from project root
+			allow: ['..']
+		}
+	},
+	optimizeDeps: {
+		include: ['@tomic/lib', '@tomic/svelte'],
+		exclude: [
+			// Don't try to optimize Tauri APIs for dev mode
+			'@tauri-apps/api/tauri',
+			'@tauri-apps/api/dialog',
+			'@tauri-apps/api/fs',
+			'@tauri-apps/api/window',
+			'@tauri-apps/api/app',
+			'@tauri-apps/api/shell',
+			// Exclude problematic packages
+			'svelte-jsoneditor'
+		]
+	}
 });
