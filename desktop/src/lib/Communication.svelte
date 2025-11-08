@@ -1,6 +1,6 @@
 <script>
+import { invoke } from '@tauri-apps/api/core';
 import { emit, listen } from '@tauri-apps/api/event';
-import { invoke } from '@tauri-apps/api/tauri';
 import { onDestroy, onMount } from 'svelte';
 
 export let onMessage;

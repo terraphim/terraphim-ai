@@ -1,5 +1,5 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import * as d3 from 'd3';
 import { onMount } from 'svelte';
 import type { RoleGraphResponse } from './generated/types';

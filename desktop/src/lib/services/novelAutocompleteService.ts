@@ -1,4 +1,4 @@
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { get } from 'svelte/store';
 import { is_tauri } from '../stores';
 

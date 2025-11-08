@@ -1,5 +1,5 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import Modal from '$lib/components/Modal.svelte';
 import { configStore, is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
@@ -308,12 +308,7 @@ function _handleClose() {
               >
                 {#each atomicHaystacks as haystack}
                   <option value={haystack.location}>
-                    {haystack.location}
-                    {#if haystack.atomic_server_secret}
-                      <span class="has-text-success">🔐</span>
-                    {:else}
-                      <span class="has-text-warning">⚠️ No Auth</span>
-                    {/if}
+                    {haystack.location}{haystack.atomic_server_secret ? ' 🔐' : ' ⚠️ No Auth'}
                   </option>
                 {/each}
               </select>

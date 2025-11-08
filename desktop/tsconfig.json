@@ -1,17 +1,8 @@
 {
 	"extends": "./.svelte-kit/tsconfig.json",
 	"compilerOptions": {
-		"target": "esnext",
-		"useDefineForClassFields": true,
-		"module": "esnext",
-		"resolveJsonModule": true,
-		"baseUrl": ".",
 		"allowJs": true,
-		"checkJs": true,
-		"paths": {
-			"$lib/*": ["src/lib/*"],
-			"$workers/*": ["src/workers/*"]
-		}
+		"checkJs": true
 	},
 	"include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
 	"references": [{ "path": "./tsconfig.node.json" }]

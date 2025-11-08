@@ -224,7 +224,7 @@ export async function getSuggestions(
 	query: string,
 	role: string
 ): Promise<AutocompleteSuggestion[]> {
-	const { invoke } = await import('@tauri-apps/api/tauri');
+	const { invoke } = await import('@tauri-apps/api/core');
 	const suggestions: AutocompleteSuggestion[] = [];
 
 	// Parse the input to see if it contains operators

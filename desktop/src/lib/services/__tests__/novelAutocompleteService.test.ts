@@ -8,7 +8,7 @@ vi.mock('../../stores', () => ({
 }));
 
 // Mock Tauri API
-vi.mock('@tauri-apps/api/tauri', () => ({
+vi.mock('@tauri-apps/api/core', () => ({
 	invoke: vi.fn(),
 }));
 

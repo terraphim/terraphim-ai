@@ -1,5 +1,5 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { createEventDispatcher, onDestroy } from 'svelte';
 import Modal from '$lib/components/Modal.svelte';
 import { is_tauri, is_tauri as isTauriStore, role, role as roleStore } from '$lib/stores';
@@ -705,7 +705,7 @@ const addKGIndexToContext = _addKGIndexToContext;
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-      <div class="kg-search-container" on:keydown={_handleKeydown}>
+      <div class="kg-search-container" role="search" on:keydown={_handleKeydown}>
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 
@@ -729,7 +729,7 @@ const addKGIndexToContext = _addKGIndexToContext;
                 on:keydown={_handleKeydown}
                 placeholder="Search knowledge graph terms..."
                 disabled={_isSearching}
-                autofocus
+
                 data-testid="kg-search-input"
               />
               <span class="icon is-left">

@@ -1,49 +1,49 @@
 <script lang="ts">
-	import '../lib/themeManager'; // Injects Bulmaswatch stylesheet & keeps it in sync with the theme store
-	import '../styles/novel.css'; // Novel's compiled CSS lives in the package's dist directory.
-	import '@fortawesome/fontawesome-free/css/all.css';
+import '../lib/themeManager'; // Injects Bulmaswatch stylesheet & keeps it in sync with the theme store
+import '../styles/novel.css'; // Novel's compiled CSS lives in the package's dist directory.
+import '@fortawesome/fontawesome-free/css/all.css';
 
-	import { page } from '$app/stores';
-	import { goto } from '$app/navigation';
-	import { theme } from '$lib/stores';
-	import ThemeSwitcher from '$lib/ThemeSwitcher.svelte';
-	import Search from '$lib/Search/Search.svelte';
-	import Chat from '$lib/Chat/Chat.svelte';
-	import RoleGraphVisualization from '$lib/RoleGraphVisualization.svelte';
-	import ConfigWizard from '$lib/ConfigWizard.svelte';
-	import ConfigJsonEditor from '$lib/ConfigJsonEditor.svelte';
+import { goto } from '$app/navigation';
+import { page } from '$app/stores';
+import Chat from '$lib/Chat/Chat.svelte';
+import ConfigJsonEditor from '$lib/ConfigJsonEditor.svelte';
+import ConfigWizard from '$lib/ConfigWizard.svelte';
+import RoleGraphVisualization from '$lib/RoleGraphVisualization.svelte';
+import Search from '$lib/Search/Search.svelte';
+import { theme } from '$lib/stores';
+import ThemeSwitcher from '$lib/ThemeSwitcher.svelte';
 
-	let _visible = 'is-hidden';
-	function _toggleVissible() {
-		_visible = '';
+let _visible = 'is-hidden';
+function _toggleVissible() {
+	_visible = '';
+}
+
+function goBack() {
+	// Try to go back in browser history, fallback to home
+	if (window.history.length > 1) {
+		window.history.back();
+	} else {
+		goto('/');
 	}
+}
 
-	function goBack() {
-		// Try to go back in browser history, fallback to home
-		if (window.history.length > 1) {
-			window.history.back();
-		} else {
-			goto('/');
-		}
+// Map current route to component
+$: currentComponent = (() => {
+	switch ($page.route.id) {
+		case '/':
+			return Search;
+		case '/chat':
+			return Chat;
+		case '/graph':
+			return RoleGraphVisualization;
+		case '/config/wizard':
+			return ConfigWizard;
+		case '/config/json':
+			return ConfigJsonEditor;
+		default:
+			return Search;
 	}
-
-	// Map current route to component
-	$: currentComponent = (() => {
-		switch ($page.route.id) {
-			case '/':
-				return Search;
-			case '/chat':
-				return Chat;
-			case '/graph':
-				return RoleGraphVisualization;
-			case '/config/wizard':
-				return ConfigWizard;
-			case '/config/json':
-				return ConfigJsonEditor;
-			default:
-				return Search;
-		}
-	})();
+})();
 </script>
 
 <svelte:head>

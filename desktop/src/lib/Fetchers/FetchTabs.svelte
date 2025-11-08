@@ -1,9 +1,9 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { Agent } from '@tomic/lib';
 import { store } from '@tomic/svelte';
 import { JSONEditor } from 'svelte-jsoneditor';
-import { Route } from 'tinro';
+
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
 import FetchRole from './FetchRole.svelte';
@@ -107,7 +107,7 @@ $: console.log('Print roles', $_roles);
 
 <div class="box">
   <!-- <Tab label="Atomic"> -->
-  <Route path="/atomic">
+  <div class="tab-content">
     <div class="field">
       <div class="control">
         <input class="input" type="text" bind:value={atomicServerUrl} />
@@ -140,9 +140,9 @@ $: console.log('Print roles', $_roles);
         </button>
       </div>
     </div>
-  </Route>
+  </div>
   <!-- <Tab label="JSON"> -->
-  <Route path="/json">
+  <div class="tab-content">
     <div class="field is-grouped">
       <div class="control has-icons-left is-expanded">
         <input
@@ -186,8 +186,8 @@ $: console.log('Print roles', $_roles);
         </button>
       </div>
     </div>
-  </Route>
-  <Route path="/editor">
+  </div>
+  <div class="tab-content">
     <p>
       <i
         >The best editing experience is to configure Atomic Server, in the
@@ -198,7 +198,7 @@ $: console.log('Print roles', $_roles);
     <div class="editor">
       <JSONEditor content={_content} onChange={_handleChange} />
     </div>
-  </Route>
+  </div>
 </div>
 <hr />
 <div class="field is-grouped is-grouped-right">

@@ -25,7 +25,7 @@ export type ContextItem = {
 </script>
 
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { onMount } from 'svelte';
 import { get } from 'svelte/store';
 import { CONFIG } from '../../config';
@@ -41,8 +41,7 @@ import ContextEditModal from './ContextEditModal.svelte';
 import KGContextItem from '../Search/KGContextItem.svelte';
 import KGSearchModal from '../Search/KGSearchModal.svelte';
 import ArticleModal from '../Search/ArticleModal.svelte';
-// @ts-ignore
-import Markdown from 'svelte-markdown';
+import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
 
 // Tauri APIs for saving files (only used in desktop)
 let tauriDialog: any = null;
@@ -728,9 +727,9 @@ onMount(() => {
 	}
 
 	// Lazy-load Tauri modules if running in desktop
-	if (get(is_tauri)) {
-		import('@tauri-apps/api/dialog').then((m) => (tauriDialog = m)).catch(() => {});
-		import('@tauri-apps/api/fs').then((m) => (tauriFs = m)).catch(() => {});
+if (get(is_tauri)) {
+		import('@tauri-apps/plugin-dialog').then((m) => (tauriDialog = m)).catch(() => {});
+		import('@tauri-apps/plugin-fs').then((m) => (tauriFs = m)).catch(() => {});
 	}
 
 	// Initialize conversation and load context
@@ -1043,7 +1042,7 @@ function _toggleSessionList() {
             {#if m.role === 'assistant'}
               <!-- Assistant messages: show markdown or plain text based on toggle -->
               {#if renderMarkdown}
-                <div class="markdown-body"><Markdown source={m.content} /></div>
+                <div class="markdown-body"><MarkdownRenderer source={m.content} /></div>
               {:else}
                 <pre>{m.content}</pre>
               {/if}
@@ -1103,10 +1102,10 @@ function _toggleSessionList() {
 
         <div class="field has-addons chat-input">
           <div class="control is-expanded">
-            <textarea class="textarea" rows="3" bind:value={input} on:keydown={_handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
+            <textarea class="textarea" rows="3" bind:value={input} on:keydown={_handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input"></textarea>
           </div>
           <div class="control">
-            <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button">
+            <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button" aria-label="Send message">
               <span class="icon"><i class="fas fa-paper-plane"></i></span>
             </button>
           </div>
@@ -1156,10 +1155,10 @@ function _toggleSessionList() {
           {#if showAddContextForm}
             <div class="box has-background-light mb-4" data-testid="add-context-form">
               <div class="field">
-                <label class="label is-small">Context Type</label>
+                <label class="label is-small" for="context-type-select">Context Type</label>
                 <div class="control">
                   <div class="select is-small is-fullwidth">
-                    <select bind:value={newContextType} data-testid="context-type-select">
+                    <select id="context-type-select" bind:value={newContextType} data-testid="context-type-select">
                       <option value="document">Document</option>
                       <option value="search_result">Search Result</option>
                       <option value="user_input">User Input</option>
@@ -1170,16 +1169,16 @@ function _toggleSessionList() {
               </div>
 
               <div class="field">
-                <label class="label is-small">Title</label>
+                <label class="label is-small" for="context-title-input">Title</label>
                 <div class="control">
-                  <input class="input is-small" type="text" placeholder="Enter context title" bind:value={newContextTitle} data-testid="context-title-input" />
+                  <input id="context-title-input" class="input is-small" type="text" placeholder="Enter context title" bind:value={newContextTitle} data-testid="context-title-input" />
                 </div>
               </div>
 
               <div class="field">
-                <label class="label is-small">Content</label>
+                <label class="label is-small" for="context-content-textarea">Content</label>
                 <div class="control">
-                  <textarea class="textarea is-small" rows="4" placeholder="Enter context content" bind:value={newContextContent} data-testid="context-content-textarea"></textarea>
+                  <textarea id="context-content-textarea" class="textarea is-small" rows="4" placeholder="Enter context content" bind:value={newContextContent} data-testid="context-content-textarea"></textarea>
                 </div>
               </div>
 
@@ -1330,7 +1329,7 @@ function _toggleSessionList() {
 <!-- Debug Request Modal -->
 {#if _showDebugRequest}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => _showDebugRequest = false}></div>
+    <div class="modal-background" role="button" tabindex="0" on:click={() => _showDebugRequest = false} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') _showDebugRequest = false; }}></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">
@@ -1371,7 +1370,7 @@ function _toggleSessionList() {
 <!-- Debug Response Modal -->
 {#if _showDebugResponse}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => _showDebugResponse = false}></div>
+    <div class="modal-background" role="button" tabindex="0" on:click={() => _showDebugResponse = false} on:keydown={(e) => { if (e.key === 'Enter' || e.key === ' ') _showDebugResponse = false; }}></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">

@@ -1,9 +1,8 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { fade } from 'svelte/transition';
-// @ts-expect-error
-import SvelteMarkdown from 'svelte-markdown';
-import { router } from 'tinro';
+import { goto } from '$app/navigation';
+import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
 import { is_tauri, role, configStore as roleConfigStore } from '$lib/stores';
 import { CONFIG } from '../../config';
 import type { DocumentListResponse, Role } from '../generated/types';
@@ -491,8 +490,8 @@ async function downloadToMarkdown() {
 	try {
 		if ($is_tauri) {
 			// Import Tauri APIs dynamically
-			const { save } = await import('@tauri-apps/api/dialog');
-			const { writeTextFile } = await import('@tauri-apps/api/fs');
+			const { save } = await import('@tauri-apps/plugin-dialog');
+			const { writeTextFile } = await import('@tauri-apps/plugin-fs');
 
 			console.log('💾 Using Tauri save dialog...');
 			const savePath = await save({
@@ -919,7 +918,7 @@ async function addToContextAndChat() {
 		// Navigate to chat after a brief delay
 		setTimeout(() => {
 			notification.remove();
-			router.goto('/chat');
+			goto('/chat');
 		}, 1500);
 
 		// Reset states after navigation
@@ -1003,7 +1002,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
             <small class="description-label">Description:</small>
             <div class="description-content">
               {#if item.description}
-                <SvelteMarkdown source={item.description} />
+                <MarkdownRenderer source={item.description} />
               {:else}
                 <small class="no-description">No description available</small>
               {/if}
@@ -1076,7 +1075,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                   </button>
                 </div>
                 <div class="ai-summary-content">
-                  <SvelteMarkdown source={aiSummary} />
+                  <MarkdownRenderer source={aiSummary} />
                 </div>
                 <div class="ai-summary-actions">
                   <button
@@ -1112,7 +1111,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                     disabled={true}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </button>
                 {:else if item.isLink}
@@ -1124,7 +1123,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                     title={item.title}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </a>
                 {:else}
@@ -1137,7 +1136,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                     data-testid={item.testId || ''}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className?.includes('primary')} class:has-text-success={item.className?.includes('success')} class:has-text-danger={item.className?.includes('danger')}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </button>
                 {/if}
@@ -1152,7 +1151,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
   <!-- Context addition feedback -->
   {#if contextError}
     <div class="notification is-danger is-light mt-2">
-      <button class="delete" on:click={() => contextError = null}></button>
+      <button class="delete" on:click={() => contextError = null} aria-label="Close error notification"></button>
       {contextError}
     </div>
   {/if}

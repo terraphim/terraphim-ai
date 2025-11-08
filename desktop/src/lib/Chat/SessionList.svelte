@@ -1,5 +1,5 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { onMount } from 'svelte';
 import { role } from '../stores';
 
@@ -220,6 +220,7 @@ function _handleRoleFilterChange() {
         type="button"
         class="btn-close btn-close-sm"
         on:click={() => _error = null}
+        aria-label="Close error notification"
       ></button>
     </div>
   {/if}

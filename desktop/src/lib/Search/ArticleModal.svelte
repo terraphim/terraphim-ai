@@ -1,7 +1,6 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
-// @ts-expect-error
-import SvelteMarkdown from 'svelte-markdown';
+import { invoke } from '@tauri-apps/api/core';
+import MarkdownRenderer from '$lib/components/MarkdownRenderer.svelte';
 import Modal from '$lib/components/Modal.svelte';
 import { is_tauri, role } from '$lib/stores';
 import { CONFIG } from '../../config';
@@ -277,19 +276,19 @@ function _handleKeyDown(event: KeyboardEvent) {
     {:else}
       <div
         class="content-viewer"
+        role="region"
+        aria-label="Document content - Double-click to edit"
         bind:this={contentElement}
         on:dblclick={_handleDoubleClick}
         on:keydown={_handleKeyDown}
         on:click={_handleContentClick}
         tabindex="0"
-        role="button"
-        aria-label="Double-click to edit article content"
       >
         {#if isHtml}
           <div class="prose">{@html item.body}</div>
         {:else}
           <div class="markdown-content">
-            <SvelteMarkdown source={item.body} />
+            <MarkdownRenderer source={item.body} />
           </div>
         {/if}
         <div class="edit-hint">
@@ -331,7 +330,7 @@ function _handleKeyDown(event: KeyboardEvent) {
           <div class="prose">{@html kgDocument.body}</div>
         {:else}
           <div class="markdown-content">
-            <SvelteMarkdown source={kgDocument?.body || ''} />
+            <MarkdownRenderer source={kgDocument?.body || ''} />
           </div>
         {/if}
         <div class="edit-hint">

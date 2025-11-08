@@ -184,7 +184,7 @@ function _handleKeydown(event: KeyboardEvent) {
 
           <!-- Metadata editing temporarily disabled for build -->
           <div class="field mt-4">
-            <label class="label">Metadata</label>
+            <div class="label">Metadata</div>
             <div class="content">
               <p class="help">Metadata editing temporarily disabled</p>
               <pre>{JSON.stringify(editingContext?.metadata || {}, null, 2)}</pre>

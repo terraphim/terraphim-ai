@@ -1,8 +1,8 @@
 <script lang="ts">
-import { invoke } from '@tauri-apps/api/tauri';
+import { invoke } from '@tauri-apps/api/core';
 import { onDestroy, onMount } from 'svelte';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
-import logo from '/assets/terraphim.png';
+
 import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
@@ -620,7 +620,7 @@ async function handleSearchInputEvent() {
             type="search"
             bind:value={$input}
             placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-            autofocus
+
             on:click={handleSearchInputEvent}
             on:submit={handleSearchInputEvent}
             on:keydown={_handleKeydown}
@@ -714,7 +714,7 @@ async function handleSearchInputEvent() {
 {:else}
   <section class="section">
     <div class="content has-text-grey has-text-centered">
-      <img src={logo} alt="Terraphim Logo" />
+      <img src="/assets/terraphim.png" alt="Terraphim Logo" />
       <p>I am Terraphim, your personal assistant.</p>
       <button class="button is-primary" data-testid="wizard-start" on:click={() => window.location.href = '/config/wizard'}>
         <span class="icon">

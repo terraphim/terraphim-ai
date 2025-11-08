@@ -4,8 +4,8 @@
   "version": "0.3.0",
   "identifier": "com.terraphim.ai.desktop",
   "build": {
-    "beforeDevCommand": "yarn run dev",
-    "beforeBuildCommand": "yarn run build",
+    "beforeDevCommand": "npm run dev",
+    "beforeBuildCommand": "npm run build",
     "devUrl": "http://localhost:5173",
     "frontendDist": "../dist"
   },

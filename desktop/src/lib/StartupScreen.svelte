@@ -1,9 +1,9 @@
 <script lang="ts">
-import { open } from '@tauri-apps/api/dialog';
+import { invoke } from '@tauri-apps/api/core';
 import { register as registerShortcut } from '@tauri-apps/api/globalShortcut';
 import { appDataDir } from '@tauri-apps/api/path';
-import { invoke } from '@tauri-apps/api/tauri';
 import { appWindow } from '@tauri-apps/api/window';
+import { open } from '@tauri-apps/plugin-dialog';
 import { onMount } from 'svelte';
 import { isInitialSetupComplete } from '$lib/stores';
 
