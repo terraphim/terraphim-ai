@@ -1,7 +1,6 @@
 // Simplified test that only tests command parsing without full handler dependencies
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
 
     // Test basic command parsing for file operations
     #[test]

@@ -1,8 +1,14 @@
+#[cfg(feature = "atomic")]
 use serde_json::json;
+#[cfg(feature = "atomic")]
 use std::collections::HashMap;
+#[cfg(feature = "atomic")]
 use std::path::PathBuf;
+#[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
+#[cfg(feature = "atomic")]
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
+#[cfg(feature = "atomic")]
 use terraphim_middleware::{
     haystack::AtomicHaystackIndexer, indexer::IndexMiddleware, search_haystacks,
 };
@@ -11,7 +17,9 @@ use uuid::Uuid;
 
 /// Test that demonstrates atomic server haystack integration with Title Scorer role
 /// This test creates a complete config with atomic server haystack using TitleScorer,
-/// sets up sample documents, and tests the search functionality through the standard terraphim search pipeline.
+/// sets up sample documents, and tests search functionality through the standard terraphim search pipeline.
+#[cfg(feature = "atomic")]
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_haystack_title_scorer_role() {
     // Initialize logging for test debugging
@@ -352,6 +360,7 @@ async fn test_atomic_haystack_title_scorer_role() {
 /// Test that demonstrates atomic server haystack integration with Graph Embeddings role
 /// This test creates a complete config with atomic server haystack using TerraphimGraph,
 /// sets up sample documents, and tests the search functionality through the standard terraphim search pipeline.
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_haystack_graph_embeddings_role() {
     // Initialize logging for test debugging
@@ -644,6 +653,7 @@ async fn test_atomic_haystack_graph_embeddings_role() {
 }
 
 /// Test that compares the behavior difference between Title Scorer and Graph Embeddings roles
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_haystack_role_comparison() {
     // Initialize logging for test debugging
@@ -957,6 +967,7 @@ async fn test_atomic_haystack_role_comparison() {
 }
 
 /// Test configuration validation for both roles
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_roles_config_validation() {
     // Test Title Scorer role configuration
@@ -1063,6 +1074,7 @@ async fn test_atomic_roles_config_validation() {
 /// 2. Hybrid roles (Atomic + Ripgrep haystacks)
 /// 3. Role switching and comparison
 /// 4. Configuration validation
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_comprehensive_atomic_haystack_roles() {
     // Initialize logging for test debugging
@@ -1516,6 +1528,7 @@ async fn test_comprehensive_atomic_haystack_roles() {
 }
 
 /// Test atomic server error handling and graceful degradation
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_haystack_error_handling() {
     // Initialize logging for test debugging

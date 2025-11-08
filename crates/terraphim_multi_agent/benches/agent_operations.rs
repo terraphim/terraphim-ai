@@ -1,12 +1,14 @@
+#[cfg(feature = "test-utils")]
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
 use std::sync::Arc;
 use tokio::runtime::Runtime;
 
-use terraphim_multi_agent::{
-    AgentRegistry, CommandInput, CommandType, test_utils::create_test_agent_simple,
-};
+#[cfg(feature = "test-utils")]
+use terraphim_multi_agent::{AgentRegistry, CommandInput, CommandType, create_test_agent_simple};
 
+#[cfg(feature = "test-utils")]
 /// Benchmark agent creation time
+#[cfg(feature = "test-utils")]
 fn bench_agent_creation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -21,6 +23,7 @@ fn bench_agent_creation(c: &mut Criterion) {
 }
 
 /// Benchmark agent initialization
+#[cfg(feature = "test-utils")]
 fn bench_agent_initialization(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -36,6 +39,7 @@ fn bench_agent_initialization(c: &mut Criterion) {
 }
 
 /// Benchmark command processing for different command types
+#[cfg(feature = "test-utils")]
 fn bench_command_processing(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -77,6 +81,7 @@ fn bench_command_processing(c: &mut Criterion) {
 }
 
 /// Benchmark agent registry operations
+#[cfg(feature = "test-utils")]
 fn bench_registry_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -113,6 +118,7 @@ fn bench_registry_operations(c: &mut Criterion) {
 }
 
 /// Benchmark memory operations
+#[cfg(feature = "test-utils")]
 fn bench_memory_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -144,6 +150,7 @@ fn bench_memory_operations(c: &mut Criterion) {
 }
 
 /// Benchmark batch operations
+#[cfg(feature = "test-utils")]
 fn bench_batch_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -184,6 +191,7 @@ fn bench_batch_operations(c: &mut Criterion) {
 }
 
 /// Benchmark concurrent operations
+#[cfg(feature = "test-utils")]
 fn bench_concurrent_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -227,6 +235,7 @@ fn bench_concurrent_operations(c: &mut Criterion) {
 }
 
 /// Benchmark knowledge graph operations
+#[cfg(feature = "test-utils")]
 fn bench_knowledge_graph_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -272,6 +281,7 @@ fn bench_knowledge_graph_operations(c: &mut Criterion) {
 }
 
 /// Benchmark automata operations
+#[cfg(feature = "test-utils")]
 fn bench_automata_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -307,6 +317,7 @@ fn bench_automata_operations(c: &mut Criterion) {
 }
 
 /// Benchmark LLM client operations
+#[cfg(feature = "test-utils")]
 fn bench_llm_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -329,6 +340,7 @@ fn bench_llm_operations(c: &mut Criterion) {
 }
 
 /// Benchmark tracking operations
+#[cfg(feature = "test-utils")]
 fn bench_tracking_operations(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
 
@@ -372,6 +384,7 @@ fn bench_tracking_operations(c: &mut Criterion) {
     });
 }
 
+#[cfg(feature = "test-utils")]
 criterion_group!(
     benches,
     bench_agent_creation,
@@ -387,4 +400,11 @@ criterion_group!(
     bench_tracking_operations
 );
 
+#[cfg(feature = "test-utils")]
 criterion_main!(benches);
+
+#[cfg(not(feature = "test-utils"))]
+fn main() {
+    println!("Benchmark requires 'test-utils' feature to be enabled");
+    println!("Run with: cargo bench --features test-utils");
+}

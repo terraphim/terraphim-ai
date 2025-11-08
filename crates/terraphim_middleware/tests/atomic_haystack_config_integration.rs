@@ -1,7 +1,10 @@
+#[cfg(feature = "atomic")]
 use serde_json::json;
 use std::collections::HashMap;
+#[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
+#[cfg(feature = "atomic")]
 use terraphim_middleware::{
     haystack::AtomicHaystackIndexer, indexer::IndexMiddleware, search_haystacks,
 };
@@ -12,6 +15,8 @@ use uuid::Uuid;
 /// Test that demonstrates atomic server haystack integration with terraphim config
 /// This test creates a complete config with atomic server haystack, sets up sample documents,
 /// and tests the search functionality through the standard terraphim search pipeline.
+#[cfg(feature = "atomic")]
+#[cfg(feature = "atomic")]
 #[tokio::test]
 #[ignore] // Requires running Atomic Server at localhost:9883
 async fn test_atomic_haystack_with_terraphim_config() {
@@ -294,6 +299,7 @@ async fn test_atomic_haystack_with_terraphim_config() {
 }
 
 /// Test atomic haystack configuration validation
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_haystack_config_validation() {
     // Test that atomic haystack requires proper URL in location
@@ -312,6 +318,7 @@ async fn test_atomic_haystack_config_validation() {
 }
 
 /// Test atomic haystack with invalid secret
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_atomic_haystack_invalid_secret() {
     let haystack = Haystack::new(
@@ -335,6 +342,7 @@ async fn test_atomic_haystack_invalid_secret() {
 }
 
 /// Test atomic haystack without secret (anonymous access)
+#[cfg(feature = "atomic")]
 #[tokio::test]
 #[ignore] // Requires running Atomic Server
 async fn test_atomic_haystack_anonymous_access() {
@@ -356,6 +364,7 @@ async fn test_atomic_haystack_anonymous_access() {
 }
 
 /// Test comprehensive public vs authenticated access scenarios
+#[cfg(feature = "atomic")]
 #[tokio::test]
 #[ignore] // Requires running Atomic Server
 async fn test_atomic_haystack_public_vs_authenticated_access() {
@@ -525,6 +534,7 @@ async fn test_atomic_haystack_public_vs_authenticated_access() {
 }
 
 /// Test that demonstrates the behavior difference between public and private document access
+#[cfg(feature = "atomic")]
 #[tokio::test]
 #[ignore] // Requires running Atomic Server with specific test data
 async fn test_atomic_haystack_public_document_creation_and_access() {

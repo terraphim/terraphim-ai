@@ -1,6 +1,5 @@
 #[cfg(test)]
 mod file_operations_tests {
-    use std::str::FromStr;
 
     // Test file operations command parsing - this is the core functionality we need
     #[test]

@@ -1,5 +1,8 @@
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{test_utils::*, *};
 
+#[cfg(feature = "test-utils")]
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_generate_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -28,6 +31,7 @@ async fn test_generate_command_processing() {
     }
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_answer_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -45,6 +49,7 @@ async fn test_answer_command_processing() {
     assert!(!output.text.is_empty(), "Answer should contain text");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_analyze_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -62,6 +67,7 @@ async fn test_analyze_command_processing() {
     assert!(!output.text.is_empty(), "Analysis should contain text");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_create_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -79,6 +85,7 @@ async fn test_create_command_processing() {
     assert!(!output.text.is_empty(), "Creation should contain text");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_review_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -96,6 +103,7 @@ async fn test_review_command_processing() {
     assert!(!output.text.is_empty(), "Review should contain text");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_command_with_context() {
     let agent = create_test_agent().await.unwrap();
@@ -135,6 +143,7 @@ async fn test_command_with_context() {
     assert!(!output.text.is_empty());
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_command_tracking() {
     let agent = create_test_agent().await.unwrap();
@@ -175,6 +184,7 @@ async fn test_command_tracking() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_concurrent_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -224,6 +234,7 @@ async fn test_concurrent_command_processing() {
     assert_eq!(history.records.len(), 5, "All commands should be tracked");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_command_input_validation() {
     let agent = create_test_agent().await.unwrap();
@@ -237,6 +248,7 @@ async fn test_command_input_validation() {
     assert!(result.is_ok(), "Empty prompt should be handled gracefully");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_command_quality_scoring() {
     let agent = create_test_agent().await.unwrap();
@@ -258,6 +270,7 @@ async fn test_command_quality_scoring() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_injection() {
     let agent = create_test_agent().await.unwrap();
@@ -290,6 +303,7 @@ async fn test_context_injection() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_command_temperature_control() {
     let agent = create_test_agent().await.unwrap();

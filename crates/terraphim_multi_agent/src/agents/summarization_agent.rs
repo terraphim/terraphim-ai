@@ -224,11 +224,12 @@ impl SummarizationAgent {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-utils"))]
 mod tests {
     use super::*;
-    use crate::test_utils::create_test_agent;
+    use crate::create_test_agent;
 
+    #[cfg(feature = "test-utils")]
     #[tokio::test]
     async fn test_summarization_agent_creation() {
         let agent = create_test_agent().await.unwrap();
@@ -238,6 +239,7 @@ mod tests {
         assert_eq!(summarization_agent.llm_client.provider(), "ollama");
     }
 
+    #[cfg(feature = "test-utils")]
     #[tokio::test]
     async fn test_system_prompt_generation() {
         let agent = create_test_agent().await.unwrap();

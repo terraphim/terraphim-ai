@@ -3,10 +3,15 @@
 //! This example demonstrates how to use the new SummarizationAgent and ChatAgent
 //! that leverage the generic LLM interface instead of OpenRouter-specific code.
 
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{
-    ChatAgent, ChatConfig, SummarizationAgent, SummarizationConfig, SummaryStyle, test_utils,
+    ChatAgent, ChatConfig, SummarizationAgent, SummarizationConfig, SummaryStyle,
 };
 
+#[cfg(feature = "test-utils")]
+use terraphim_multi_agent::test_utils;
+
+#[cfg(feature = "test-utils")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🤖 Specialized Agents Example - Generic LLM Interface");
@@ -144,4 +149,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   - Future providers can be easily added");
 
     Ok(())
+}
+
+#[cfg(not(feature = "test-utils"))]
+fn main() {
+    println!("This example requires the 'test-utils' feature to be enabled");
+    println!("Run with: cargo run --example specialized_agents --features test-utils");
 }

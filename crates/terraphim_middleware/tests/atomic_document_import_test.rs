@@ -1,9 +1,12 @@
+#[cfg(feature = "atomic")]
 use serde_json::json;
 use std::collections::HashMap;
 use std::fs;
 use std::path::Path;
+#[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
 use terraphim_config::Haystack;
+#[cfg(feature = "atomic")]
 use terraphim_middleware::{haystack::AtomicHaystackIndexer, indexer::IndexMiddleware};
 use uuid::Uuid;
 use walkdir::WalkDir;
@@ -19,6 +22,7 @@ pub const PATH_PROPERTY_URI: &str = "http://localhost:9883/terraphim-drive/terra
 /// 2. Import each file as a Document resource in Atomic Server
 /// 3. Search the imported documents using the Atomic haystack indexer
 /// 4. Verify search results match expected content
+#[cfg(feature = "atomic")]
 #[tokio::test]
 // This test requires a running Atomic Server (http://localhost:9883) and .env with ATOMIC_SERVER_URL & ATOMIC_SERVER_SECRET.
 // It will be skipped at runtime if prerequisites are missing.

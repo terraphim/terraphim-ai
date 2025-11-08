@@ -106,11 +106,11 @@ run_test() {
 
 echo -e "${BLUE}🧪 Running Unit Tests${NC}"
 run_test "Unit Tests" \
-    "cargo test --workspace --lib"
+    "cargo test --workspace --lib --features test-utils"
 
 echo -e "${BLUE}🧪 Running Integration Tests${NC}"
 run_test "Integration Tests" \
-    "cargo test --workspace --test '*'"
+    "cargo test --workspace --test '*' --features test-utils"
 
 echo -e "${BLUE}🧪 Running Documentation Tests${NC}"
 run_test "Documentation Tests" \

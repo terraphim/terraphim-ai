@@ -6,16 +6,22 @@
 //! - Coordinated task execution
 //! - Knowledge sharing between agents
 
+#[cfg(feature = "test-utils")]
 use ahash::AHashMap;
 use std::sync::Arc;
+#[cfg(feature = "test-utils")]
 use terraphim_config::Role;
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{
     AgentRegistry, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
     test_utils::create_test_role,
 };
+#[cfg(feature = "test-utils")]
 use terraphim_persistence::DeviceStorage;
+#[cfg(feature = "test-utils")]
 use terraphim_types::RelevanceFunction;
 
+#[cfg(feature = "test-utils")]
 /// Create specialized agent roles for coordination example
 fn create_specialized_roles() -> Vec<Role> {
     vec![
@@ -149,6 +155,7 @@ fn create_specialized_roles() -> Vec<Role> {
 }
 
 /// Example 1: Agent Registry and Discovery
+#[cfg(feature = "test-utils")]
 async fn example_agent_registry() -> MultiAgentResult<()> {
     println!("🏢 Example 1: Agent Registry and Discovery");
     println!("==========================================");
@@ -207,6 +214,7 @@ async fn example_agent_registry() -> MultiAgentResult<()> {
 }
 
 /// Example 2: Coordinated Task Execution using Registry
+#[cfg(feature = "test-utils")]
 async fn example_coordinated_execution() -> MultiAgentResult<()> {
     println!("\n🤝 Example 2: Coordinated Task Execution using Registry");
     println!("=====================================================");
@@ -345,6 +353,7 @@ async fn example_coordinated_execution() -> MultiAgentResult<()> {
 }
 
 /// Example 3: Parallel Agent Processing
+#[cfg(feature = "test-utils")]
 async fn example_parallel_processing() -> MultiAgentResult<()> {
     println!("\n⚡ Example 3: Parallel Agent Processing");
     println!("=======================================");
@@ -417,6 +426,7 @@ async fn example_parallel_processing() -> MultiAgentResult<()> {
 }
 
 /// Example 4: Agent Performance Comparison
+#[cfg(feature = "test-utils")]
 async fn example_performance_comparison() -> MultiAgentResult<()> {
     println!("\n📊 Example 4: Agent Performance Comparison");
     println!("==========================================");
@@ -476,6 +486,7 @@ async fn example_performance_comparison() -> MultiAgentResult<()> {
 }
 
 #[tokio::main]
+#[cfg(feature = "test-utils")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🤝 Terraphim Multi-Agent Coordination Examples");
     println!("===============================================\n");
@@ -490,4 +501,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🎉 Multi-agent coordination is working perfectly!");
 
     Ok(())
+}
+
+#[cfg(not(feature = "test-utils"))]
+fn main() {
+    println!("This example requires the 'test-utils' feature to be enabled");
+    println!("Run with: cargo run --example multi_agent_coordination --features test-utils");
 }

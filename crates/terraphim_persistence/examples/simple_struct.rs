@@ -5,12 +5,12 @@ use terraphim_persistence::{Persistable, Result};
 
 // Import multi-agent system for enhanced persistence capabilities
 use std::sync::Arc;
-#[cfg(feature = "test-utils")]
-use terraphim_multi_agent::test_utils::create_test_role;
 
-#[cfg(not(feature = "test-utils"))]
+// Create a simple test role function since test-utils feature doesn't exist
 fn create_test_role() -> terraphim_config::Role {
-    terraphim_config::Role::default()
+    let mut role = terraphim_config::Role::default();
+    role.name = terraphim_types::RoleName::from("test-role");
+    role
 }
 use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;

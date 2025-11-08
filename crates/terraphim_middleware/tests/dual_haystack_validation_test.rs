@@ -1,9 +1,13 @@
+#[cfg(feature = "atomic")]
 use ahash::AHashMap;
+#[cfg(feature = "atomic")]
 use serde_json::json;
 use std::collections::HashMap;
 use std::path::PathBuf;
+#[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
+#[cfg(feature = "atomic")]
 use terraphim_middleware::{
     haystack::AtomicHaystackIndexer,
     indexer::{search_haystacks, IndexMiddleware},
@@ -15,6 +19,7 @@ use uuid::Uuid;
 /// Test comprehensive dual haystack validation with both Atomic and Ripgrep services
 /// This test validates that roles with multiple haystacks return results from both sources
 /// and demonstrates proper source differentiation and performance characteristics.
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_dual_haystack_comprehensive_validation() {
     // Initialize logging for test debugging
@@ -589,6 +594,7 @@ async fn test_dual_haystack_comprehensive_validation() {
 }
 
 /// Test configuration validation for dual haystack roles
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_dual_haystack_config_validation() {
     // Load dual haystack configuration from file
@@ -715,6 +721,7 @@ async fn test_dual_haystack_config_validation() {
 }
 
 /// Test source differentiation and result prefixing
+#[cfg(feature = "atomic")]
 #[tokio::test]
 async fn test_source_differentiation_validation() {
     // Initialize logging for test debugging

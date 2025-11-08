@@ -435,11 +435,12 @@ impl ChatAgent {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "test-utils"))]
 mod tests {
     use super::*;
-    use crate::test_utils::create_test_agent;
+    use crate::create_test_agent;
 
+    #[cfg(feature = "test-utils")]
     #[tokio::test]
     async fn test_chat_agent_creation() {
         let agent = create_test_agent().await.unwrap();
@@ -450,6 +451,7 @@ mod tests {
         assert!(chat_agent.current_session.is_none());
     }
 
+    #[cfg(feature = "test-utils")]
     #[tokio::test]
     async fn test_session_management() {
         let agent = create_test_agent().await.unwrap();

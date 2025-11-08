@@ -144,6 +144,7 @@ async fn test_default_ripgrep_ollama() {
             ChatOptions {
                 max_tokens: Some(1000),
                 temperature: Some(0.7),
+                model: None,
             },
         )
         .await;
@@ -188,6 +189,7 @@ async fn test_rust_engineer_ripgrep_ollama() {
             ChatOptions {
                 max_tokens: Some(1000),
                 temperature: Some(0.7),
+                model: None,
             },
         )
         .await;
@@ -245,6 +247,7 @@ async fn test_ai_engineer_ripgrep_ollama() {
             ChatOptions {
                 max_tokens: Some(1000),
                 temperature: Some(0.7),
+                model: None,
             },
         )
         .await;
@@ -299,6 +302,7 @@ async fn test_terraphim_engineer_knowledgegraph_ollama() {
             ChatOptions {
                 max_tokens: Some(1000),
                 temperature: Some(0.7),
+                model: None,
             },
         )
         .await;
@@ -345,6 +349,7 @@ async fn test_system_operator_ripgrep_ollama() {
             ChatOptions {
                 max_tokens: Some(1000),
                 temperature: Some(0.7),
+                model: None,
             },
         )
         .await;
@@ -468,6 +473,7 @@ async fn test_all_roles_with_ollama() {
                     ChatOptions {
                         max_tokens: Some(1000),
                         temperature: Some(0.7),
+                        model: None,
                     },
                 )
                 .await
@@ -563,6 +569,7 @@ async fn test_performance_benchmarks() {
                 ChatOptions {
                     max_tokens: Some(1000),
                     temperature: Some(0.7),
+                    model: None,
                 },
             )
             .await

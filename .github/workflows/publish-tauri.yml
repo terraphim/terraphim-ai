@@ -95,7 +95,7 @@ jobs:
           # For Windows, build without 1Password integration for now
           # Copy template to config
           copy src-tauri\tauri.conf.json.template src-tauri\tauri.conf.json
-          
+
           # Build without signing for now
           yarn run tauri build
 

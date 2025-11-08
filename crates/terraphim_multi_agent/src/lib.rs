@@ -62,6 +62,13 @@ pub use registry::*;
 pub use tracking::*;
 pub use workflows::*;
 
+// Test utilities - only available when test-utils feature is enabled
+#[cfg(feature = "test-utils")]
+pub use test_utils::{
+    create_memory_storage, create_test_agent, create_test_agent_simple, create_test_automata,
+    create_test_role, create_test_rolegraph,
+};
+
 /// Result type for multi-agent operations
 pub type MultiAgentResult<T> = Result<T, MultiAgentError>;
 

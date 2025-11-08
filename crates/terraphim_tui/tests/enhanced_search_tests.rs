@@ -1,6 +1,5 @@
 #![cfg(feature = "repl")]
 
-use std::str::FromStr;
 use terraphim_tui::repl::commands::*;
 
 /// Test basic search command parsing

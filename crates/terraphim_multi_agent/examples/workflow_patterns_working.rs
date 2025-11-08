@@ -4,17 +4,23 @@
 //! This example proves that the multi-agent system can power the interactive
 //! web examples in @examples/agent-workflows/
 
+#[cfg(feature = "test-utils")]
 use ahash::AHashMap;
 use std::sync::Arc;
+#[cfg(feature = "test-utils")]
 use terraphim_config::Role;
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{
     CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
+#[cfg(feature = "test-utils")]
 use terraphim_persistence::DeviceStorage;
+#[cfg(feature = "test-utils")]
 use terraphim_types::RelevanceFunction;
 
 /// Workflow Pattern 1: Prompt Chaining
 /// Sequential execution where each step's output feeds into the next step
+#[cfg(feature = "test-utils")]
 async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
     println!("🔗 WORKFLOW PATTERN 1: Prompt Chaining");
     println!("=====================================");
@@ -82,6 +88,7 @@ async fn demonstrate_prompt_chaining() -> MultiAgentResult<()> {
 
 /// Workflow Pattern 2: Routing
 /// Intelligent task distribution based on complexity
+#[cfg(feature = "test-utils")]
 async fn demonstrate_routing() -> MultiAgentResult<()> {
     println!("\n\n🧠 WORKFLOW PATTERN 2: Routing");
     println!("==============================");
@@ -145,6 +152,7 @@ async fn demonstrate_routing() -> MultiAgentResult<()> {
 
 /// Workflow Pattern 3: Parallelization
 /// Concurrent execution with result aggregation
+#[cfg(feature = "test-utils")]
 async fn demonstrate_parallelization() -> MultiAgentResult<()> {
     println!("\n\n⚡ WORKFLOW PATTERN 3: Parallelization");
     println!("=====================================");
@@ -204,6 +212,7 @@ async fn demonstrate_parallelization() -> MultiAgentResult<()> {
 
 /// Workflow Pattern 4: Orchestrator-Workers
 /// Hierarchical coordination with specialized roles
+#[cfg(feature = "test-utils")]
 async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
     println!("\n\n🕸️ WORKFLOW PATTERN 4: Orchestrator-Workers");
     println!("===========================================");
@@ -289,6 +298,7 @@ async fn demonstrate_orchestrator_workers() -> MultiAgentResult<()> {
 
 /// Workflow Pattern 5: Evaluator-Optimizer
 /// Iterative quality improvement through evaluation
+#[cfg(feature = "test-utils")]
 async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
     println!("\n\n🔄 WORKFLOW PATTERN 5: Evaluator-Optimizer");
     println!("==========================================");
@@ -365,6 +375,7 @@ async fn demonstrate_evaluator_optimizer() -> MultiAgentResult<()> {
 
 // Helper functions to create specialized roles
 
+#[cfg(feature = "test-utils")]
 fn create_simple_role() -> Role {
     let mut extra = AHashMap::new();
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.2));
@@ -389,6 +400,7 @@ fn create_simple_role() -> Role {
     }
 }
 
+#[cfg(feature = "test-utils")]
 fn create_complex_role() -> Role {
     let mut extra = AHashMap::new();
     extra.insert("llm_temperature".to_string(), serde_json::json!(0.4));
@@ -413,6 +425,7 @@ fn create_complex_role() -> Role {
     }
 }
 
+#[cfg(feature = "test-utils")]
 fn create_perspective_role(perspective: &str) -> Role {
     let mut extra = AHashMap::new();
     extra.insert("perspective".to_string(), serde_json::json!(perspective));
@@ -437,6 +450,7 @@ fn create_perspective_role(perspective: &str) -> Role {
     }
 }
 
+#[cfg(feature = "test-utils")]
 fn create_orchestrator_role() -> Role {
     let mut extra = AHashMap::new();
     extra.insert("role_type".to_string(), serde_json::json!("orchestrator"));
@@ -461,6 +475,7 @@ fn create_orchestrator_role() -> Role {
     }
 }
 
+#[cfg(feature = "test-utils")]
 fn create_worker_role(worker_name: &str) -> Role {
     let mut extra = AHashMap::new();
     extra.insert("worker_type".to_string(), serde_json::json!(worker_name));
@@ -485,6 +500,7 @@ fn create_worker_role(worker_name: &str) -> Role {
     }
 }
 
+#[cfg(feature = "test-utils")]
 fn create_generator_role() -> Role {
     let mut extra = AHashMap::new();
     extra.insert("role_type".to_string(), serde_json::json!("generator"));
@@ -509,6 +525,7 @@ fn create_generator_role() -> Role {
     }
 }
 
+#[cfg(feature = "test-utils")]
 fn create_evaluator_role() -> Role {
     let mut extra = AHashMap::new();
     extra.insert("role_type".to_string(), serde_json::json!("evaluator"));
@@ -534,6 +551,7 @@ fn create_evaluator_role() -> Role {
 }
 
 #[tokio::main]
+#[cfg(feature = "test-utils")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 AI Agent Workflow Patterns - Proof of Concept");
     println!("=================================================");
@@ -557,4 +575,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🔗 These backend implementations support @examples/agent-workflows/");
 
     Ok(())
+}
+
+#[cfg(not(feature = "test-utils"))]
+fn main() {
+    println!("This example requires the 'test-utils' feature to be enabled");
+    println!("Run with: cargo run --example workflow_patterns_working --features test-utils");
 }

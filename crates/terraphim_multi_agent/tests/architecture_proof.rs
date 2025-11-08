@@ -2,9 +2,12 @@
 //! without requiring actual LLM API calls
 
 use std::sync::Arc;
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{AgentRegistry, MultiAgentError, test_utils::create_test_role};
 use terraphim_persistence::DeviceStorage;
 
+#[cfg(feature = "test-utils")]
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_queue_based_architecture_proof() {
     println!("🏗️ Testing Queue-Based Multi-Agent Architecture");

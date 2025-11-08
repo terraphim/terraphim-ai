@@ -12,6 +12,7 @@ use terraphim_types::{
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
+#[allow(dead_code)]
 pub struct TuiService {
     config_state: ConfigState,
     service: Arc<Mutex<TerraphimService>>,
@@ -331,6 +332,7 @@ impl TuiService {
 
     // ==================== Conversation Management (RAG Workflow) ====================
 
+    #[allow(dead_code)]
     /// Create a new conversation for chat with context
     pub async fn create_conversation(&self, title: String) -> Result<ConversationId> {
         let role = self.get_selected_role().await;

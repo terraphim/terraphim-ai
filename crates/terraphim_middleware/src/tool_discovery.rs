@@ -8,6 +8,7 @@ use terraphim_config::Role;
 use terraphim_mcp_proxy::Tool;
 use terraphim_persistence::mcp::{McpPersistence, McpToolRecord, ToolDiscoveryCache, ToolStatus};
 
+#[cfg(feature = "mcp-proxy")]
 const CACHE_DURATION_HOURS: i64 = 1;
 
 pub struct ToolDiscoveryService<P: McpPersistence> {
@@ -71,6 +72,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
         Ok(processed_tools)
     }
 
+    #[cfg(feature = "mcp-proxy")]
     async fn get_cached_tools(&self, namespace_uuid: &str) -> Result<Option<ToolDiscoveryCache>> {
         match self
             .persistence
@@ -116,6 +118,7 @@ impl<P: McpPersistence> ToolDiscoveryService<P> {
         Ok(())
     }
 
+    #[cfg(feature = "mcp-proxy")]
     fn find_tool_record<'a>(
         &self,
         records: &'a [McpToolRecord],

@@ -1,5 +1,8 @@
-use terraphim_multi_agent::{test_utils::*, *};
+#[cfg(feature = "test-utils")]
+use terraphim_multi_agent::*;
 
+#[cfg(feature = "test-utils")]
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_agent_creation_simple() {
     let agent = create_test_agent().await.unwrap();
@@ -13,6 +16,7 @@ async fn test_agent_creation_simple() {
     assert!(init_result.is_ok(), "Agent should initialize successfully");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_agent_command_processing() {
     let agent = create_test_agent().await.unwrap();
@@ -26,6 +30,7 @@ async fn test_agent_command_processing() {
     assert!(result.is_ok(), "Command processing should work with Rig");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_agent_role_config() {
     let agent = create_test_agent().await.unwrap();

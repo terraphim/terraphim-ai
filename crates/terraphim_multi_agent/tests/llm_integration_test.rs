@@ -41,8 +41,8 @@ async fn test_llama_model_response() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
-        mcp_namespaces: Vec::new(),
         extra,
+        mcp_namespaces: vec![],
     };
 
     // Create storage and agent
@@ -126,8 +126,8 @@ async fn test_gemma_model_response() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
-        mcp_namespaces: Vec::new(),
         extra,
+        mcp_namespaces: vec![],
     };
 
     // Create storage and agent
