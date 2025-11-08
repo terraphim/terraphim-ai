@@ -1,6 +1,6 @@
 use crate::{
-    namespace::NamespaceManager, pool::McpServerPool, routing::ToolRouter, ContentItem, McpNamespace,
-    McpProxyError, Result, Tool, ToolCallRequest, ToolCallResponse,
+    namespace::NamespaceManager, pool::McpServerPool, routing::ToolRouter, ContentItem,
+    McpNamespace, McpProxyError, Result, Tool, ToolCallRequest, ToolCallResponse,
 };
 use std::sync::Arc;
 use tokio::sync::RwLock;

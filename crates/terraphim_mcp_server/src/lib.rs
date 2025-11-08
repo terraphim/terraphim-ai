@@ -28,7 +28,7 @@ pub mod resource_mapper;
 pub mod security;
 pub mod validation;
 
-use crate::auth::{AuthManager, AuthError};
+use crate::auth::{AuthError, AuthManager};
 use crate::resource_mapper::TerraphimResourceMapper;
 use crate::validation::{ValidationContext, ValidationPipeline};
 

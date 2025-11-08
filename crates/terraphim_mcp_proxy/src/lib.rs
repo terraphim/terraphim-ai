@@ -33,10 +33,20 @@ pub struct ToolCallResponse {
 #[cfg_attr(feature = "json-schema", derive(JsonSchema))]
 #[serde(tag = "type", rename_all = "snake_case")]
 pub enum ContentItem {
-    Text { text: String },
-    Image { data: String, mime_type: String },
-    Json { data: serde_json::Value },
-    Resource { uri: String, mime_type: Option<String> },
+    Text {
+        text: String,
+    },
+    Image {
+        data: String,
+        mime_type: String,
+    },
+    Json {
+        data: serde_json::Value,
+    },
+    Resource {
+        uri: String,
+        mime_type: Option<String>,
+    },
 }
 
 /// Tool definition

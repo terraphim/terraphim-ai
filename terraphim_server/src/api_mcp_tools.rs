@@ -73,8 +73,8 @@ impl From<ContentItem> for McpContentItem {
             ContentItem::Text { text } => McpContentItem::Text { text },
             ContentItem::Image { data, mime_type } => McpContentItem::Image { data, mime_type },
             ContentItem::Resource { uri, mime_type } => McpContentItem::Resource { uri, mime_type },
-            ContentItem::Json { data } => McpContentItem::Text { 
-                text: serde_json::to_string_pretty(&data).unwrap_or_else(|_| "{}".to_string())
+            ContentItem::Json { data } => McpContentItem::Text {
+                text: serde_json::to_string_pretty(&data).unwrap_or_else(|_| "{}".to_string()),
             },
         }
     }
