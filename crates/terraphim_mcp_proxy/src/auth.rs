@@ -82,18 +82,25 @@ pub struct RateLimitEntry {
     pub window_start: SystemTime,
 }
 
-impl RateLimitEntry {
-    pub fn new() -> Self {
+impl Default for RateLimitEntry {
+    fn default() -> Self {
         Self {
             count: 0,
             window_start: SystemTime::now(),
         }
     }
+}
+
+impl RateLimitEntry {
+    pub fn new() -> Self {
+        Self::default()
+    }
 
     pub fn is_expired(&self, window: Duration) -> bool {
         SystemTime::now()
             .duration_since(self.window_start)
-            .unwrap_or(Duration::MAX) > window
+            .unwrap_or(Duration::MAX)
+            > window
     }
 
     pub fn increment(&mut self) {
@@ -129,7 +136,7 @@ impl AuthMiddleware {
     pub async fn remove_user_auth(&self, user_id: &str) {
         let mut auths = self.user_auths.write().await;
         auths.remove(user_id);
-        
+
         // Also remove rate limit entry
         let mut rate_limits = self.rate_limits.write().await;
         rate_limits.remove(user_id);
@@ -137,14 +144,14 @@ impl AuthMiddleware {
 
     pub async fn validate_api_key(&self, api_key: &str) -> Option<UserAuth> {
         let auths = self.user_auths.read().await;
-        
+
         // Find user by API key
         for user_auth in auths.values() {
             if user_auth.api_key == api_key && !user_auth.is_expired() {
                 return Some(user_auth.clone());
             }
         }
-        
+
         None
     }
 
@@ -156,7 +163,9 @@ impl AuthMiddleware {
 
         if let Some(user_auth) = user_auth {
             let mut rate_limits = self.rate_limits.write().await;
-            let entry = rate_limits.entry(user_id.to_string()).or_insert_with(RateLimitEntry::new);
+            let entry = rate_limits
+                .entry(user_id.to_string())
+                .or_insert_with(RateLimitEntry::new);
 
             // Check if window has expired
             if entry.is_expired(user_auth.rate_limit_window) {
@@ -173,7 +182,9 @@ impl AuthMiddleware {
         } else {
             // Use global rate limit for unknown users
             let mut rate_limits = self.rate_limits.write().await;
-            let entry = rate_limits.entry(user_id.to_string()).or_insert_with(RateLimitEntry::new);
+            let entry = rate_limits
+                .entry(user_id.to_string())
+                .or_insert_with(RateLimitEntry::new);
 
             if entry.is_expired(self.config.rate_limit_window) {
                 entry.reset();
@@ -200,16 +211,21 @@ impl AuthMiddleware {
                 }
             }
         }
-        
+
         None
     }
 }
 
 #[async_trait]
 impl crate::McpMiddleware for AuthMiddleware {
-    async fn before_tool_call(&self, request: &ToolCallRequest) -> crate::Result<Option<ToolCallRequest>> {
+    async fn before_tool_call(
+        &self,
+        request: &ToolCallRequest,
+    ) -> crate::Result<Option<ToolCallRequest>> {
         // Extract user ID from request
-        let user_id = self.extract_user_id_from_request(request).await
+        let user_id = self
+            .extract_user_id_from_request(request)
+            .await
             .unwrap_or_else(|| "anonymous".to_string());
 
         // Check rate limit
@@ -268,6 +284,7 @@ impl ApiKeyAuthMiddleware {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::middleware::McpMiddleware;
     use serde_json::json;
 
     #[tokio::test]
@@ -285,16 +302,16 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_rate_limiting() {
         let auth_middleware = AuthMiddleware::new(AuthConfig::default());
-        
-        let user_auth = UserAuth::new("test_user", "test_key")
-            .with_rate_limit(2, Duration::from_secs(60));
-        
+
+        let user_auth =
+            UserAuth::new("test_user", "test_key").with_rate_limit(2, Duration::from_secs(60));
+
         auth_middleware.add_user_auth(user_auth).await;
 
         // First two requests should pass
         assert!(auth_middleware.check_rate_limit("test_user").await.unwrap());
         assert!(auth_middleware.check_rate_limit("test_user").await.unwrap());
-        
+
         // Third request should be rate limited
         assert!(!auth_middleware.check_rate_limit("test_user").await.unwrap());
     }
@@ -302,10 +319,10 @@ mod tests {
     #[tokio::test]
     async fn test_auth_middleware_permissions() {
         let auth_middleware = AuthMiddleware::new(AuthConfig::default());
-        
+
         let user_auth = UserAuth::new("test_user", "test_key")
             .with_permissions(vec!["tool:allowed_tool".to_string()]);
-        
+
         auth_middleware.add_user_auth(user_auth).await;
 
         let allowed_request = ToolCallRequest {

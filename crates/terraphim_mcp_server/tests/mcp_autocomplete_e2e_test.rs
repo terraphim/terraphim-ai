@@ -99,7 +99,6 @@ async fn create_autocomplete_test_config() -> Result<String> {
         llm_chat_model: None,
         llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
-        #[cfg(feature = "mcp-proxy")]
         mcp_namespaces: vec![],
     };
 
@@ -577,7 +576,6 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         llm_chat_model: None,
         llm_context_window: Some(4096),
         extra: ahash::AHashMap::new(),
-        #[cfg(feature = "mcp-proxy")]
         mcp_namespaces: vec![],
     };
 

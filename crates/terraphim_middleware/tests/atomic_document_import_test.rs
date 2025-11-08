@@ -341,6 +341,7 @@ async fn test_document_import_and_search() {
 }
 
 /// Extract title from markdown content by looking for the first heading
+#[allow(dead_code)]
 fn extract_title_from_markdown(content: &str) -> Option<String> {
     // Look for the first heading in the markdown
     for line in content.lines() {

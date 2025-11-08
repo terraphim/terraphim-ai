@@ -8,10 +8,12 @@ use std::env;
 use terraphim_service::openrouter::OpenRouterService;
 
 /// Test environment variable cleanup utility
+#[allow(dead_code)]
 struct TestEnv {
     original_vars: Vec<(String, Option<String>)>,
 }
 
+#[allow(dead_code)]
 impl TestEnv {
     fn new() -> Self {
         Self {

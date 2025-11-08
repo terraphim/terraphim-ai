@@ -21,6 +21,7 @@ pub struct TuiService {
     conversation_persistence: Arc<OpenDALConversationPersistence>,
 }
 
+#[allow(dead_code)]
 impl TuiService {
     /// Initialize a new TUI service with embedded configuration
     pub async fn new() -> Result<Self> {

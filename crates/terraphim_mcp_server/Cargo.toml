@@ -33,6 +33,7 @@ axum = { version = "0.8" }
 
 [features]
 openrouter = ["terraphim_config/openrouter"]
+mcp-proxy = ["terraphim_config/mcp-proxy"]
 
 [dev-dependencies]
 ahash = "0.8"
