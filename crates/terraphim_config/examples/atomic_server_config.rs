@@ -143,6 +143,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                mcp_namespaces: vec![],
             },
         )
         .add_role(
@@ -178,6 +179,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -219,6 +221,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                mcp_namespaces: vec![],
             },
         )
         .build()
@@ -258,6 +261,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         // Public company knowledge base (atomic_server_secret: None is default)
                     ),
                 ],
+                #[cfg(feature = "mcp-proxy")]
+                mcp_namespaces: vec![],
                 extra: ahash::AHashMap::new(),
                 llm_enabled: false,
                 llm_api_key: None,
@@ -415,6 +420,8 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 kg: None,
                 haystacks: vec![Haystack::new(server_url, ServiceType::Atomic, read_only)
                     .with_atomic_secret(secret)],
+                #[cfg(feature = "mcp-proxy")]
+                mcp_namespaces: vec![],
                 extra: ahash::AHashMap::new(),
                 llm_enabled: false,
                 llm_api_key: None,

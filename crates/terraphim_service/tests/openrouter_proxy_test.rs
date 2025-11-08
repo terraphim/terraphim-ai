@@ -4,6 +4,7 @@
 //! when ANTHROPIC_BASE_URL and ANTHROPIC_AUTH_TOKEN environment variables are set.
 
 use std::env;
+#[cfg(feature = "openrouter")]
 use terraphim_service::openrouter::OpenRouterService;
 
 /// Test environment variable cleanup utility
@@ -44,10 +45,11 @@ impl Drop for TestEnv {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "openrouter"))]
 mod tests {
     use super::*;
 
+    #[cfg(feature = "openrouter")]
     #[test]
     fn test_anthropic_model_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
@@ -66,6 +68,7 @@ mod tests {
         assert_eq!(service.base_url, "https://api.z.ai/api/anthropic");
     }
 
+    #[cfg(feature = "openrouter")]
     #[test]
     fn test_claude_model_with_z_ai_proxy() {
         let mut test_env = TestEnv::new();
