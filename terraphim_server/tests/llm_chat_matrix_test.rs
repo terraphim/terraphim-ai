@@ -401,6 +401,7 @@ async fn test_ai_engineer_ripgrep_openrouter() {
                 ChatOptions {
                     max_tokens: Some(1000),
                     temperature: Some(0.7),
+                    model: Some("gemini/gemini-pro".to_string()),
                 },
             )
             .await
@@ -473,7 +474,7 @@ async fn test_all_roles_with_ollama() {
                     ChatOptions {
                         max_tokens: Some(1000),
                         temperature: Some(0.7),
-                        model: None,
+                        model: Some("anthropic/claude-3-sonnet-20240229".to_string()),
                     },
                 )
                 .await
@@ -569,7 +570,7 @@ async fn test_performance_benchmarks() {
                 ChatOptions {
                     max_tokens: Some(1000),
                     temperature: Some(0.7),
-                    model: None,
+                    model: Some("openai/gpt-3.5-turbo".to_string()),
                 },
             )
             .await

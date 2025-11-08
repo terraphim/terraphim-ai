@@ -1,4 +1,3 @@
-use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
 use terraphim_persistence::mcp::{
@@ -121,7 +120,7 @@ async fn test_sqlite_concurrent_writes() {
 }
 
 // Helper function - GREEN phase implementation
-async fn create_sqlite_persistence(db_path: &PathBuf) -> McpPersistenceImpl {
+async fn create_sqlite_persistence(db_path: &std::path::Path) -> McpPersistenceImpl {
     use opendal::services::Sqlite;
     use opendal::Operator;
 

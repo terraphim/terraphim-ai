@@ -1,6 +1,10 @@
+#[cfg(feature = "test-utils")]
 use chrono::Utc;
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{test_utils::*, *};
 
+#[cfg(feature = "test-utils")]
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_item_creation() {
     let agent = create_test_agent().await.unwrap();
@@ -30,6 +34,7 @@ async fn test_context_item_creation() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_relevance_filtering() {
     let agent = create_test_agent().await.unwrap();
@@ -77,6 +82,7 @@ async fn test_context_relevance_filtering() {
     assert_eq!(limited_items[1].content, "High relevance item");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_different_item_types() {
     let agent = create_test_agent().await.unwrap();
@@ -132,6 +138,7 @@ async fn test_context_different_item_types() {
     assert_eq!(lesson_count, 1);
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_automatic_enrichment() {
     let agent = create_test_agent().await.unwrap();
@@ -170,6 +177,7 @@ async fn test_context_automatic_enrichment() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_token_aware_truncation() {
     let agent = create_test_agent().await.unwrap();
@@ -205,6 +213,7 @@ async fn test_context_token_aware_truncation() {
     }
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_update_and_cleanup() {
     let agent = create_test_agent().await.unwrap();
@@ -236,6 +245,7 @@ async fn test_context_update_and_cleanup() {
     assert_eq!(context.items[0].content, "Current task");
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_metadata_handling() {
     let agent = create_test_agent().await.unwrap();
@@ -266,6 +276,7 @@ async fn test_context_metadata_handling() {
     assert!(item.metadata.tags.contains(&"high_confidence".to_string()));
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_concurrent_access() {
     let agent = create_test_agent().await.unwrap();
@@ -301,6 +312,7 @@ async fn test_context_concurrent_access() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_relevance_scoring() {
     let agent = create_test_agent().await.unwrap();
@@ -344,6 +356,7 @@ async fn test_context_relevance_scoring() {
     );
 }
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_timestamp_handling() {
     let agent = create_test_agent().await.unwrap();
@@ -393,6 +406,7 @@ async fn test_context_timestamp_handling() {
 // Test removed - API has changed and test uses outdated memory API
 // TODO: Rewrite test with current MemoryItem API when needed
 
+#[cfg(feature = "test-utils")]
 #[tokio::test]
 async fn test_context_threshold_configuration() {
     let agent = create_test_agent().await.unwrap();

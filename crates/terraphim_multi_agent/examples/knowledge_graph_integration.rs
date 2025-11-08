@@ -6,14 +6,19 @@
 //! - Query-specific context injection
 //! - Multi-layered context assembly
 
+#[cfg(feature = "test-utils")]
 use std::sync::Arc;
+#[cfg(feature = "test-utils")]
 use terraphim_config::Role;
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{
     CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
+#[cfg(feature = "test-utils")]
 use terraphim_persistence::DeviceStorage;
 
 /// Create a role configured for knowledge graph demonstration
+#[cfg(feature = "test-utils")]
 fn create_knowledge_graph_role() -> Role {
     let mut role = create_test_role();
     role.name = "KnowledgeGraphAgent".into();
@@ -43,6 +48,7 @@ fn create_knowledge_graph_role() -> Role {
 }
 
 /// Example 1: Basic Knowledge Graph Context Enrichment
+#[cfg(feature = "test-utils")]
 async fn example_context_enrichment() -> MultiAgentResult<()> {
     println!("🧠 Example 1: Knowledge Graph Context Enrichment");
     println!("===============================================");
@@ -96,6 +102,7 @@ async fn example_context_enrichment() -> MultiAgentResult<()> {
 }
 
 /// Example 2: Semantic Relationship Discovery
+#[cfg(feature = "test-utils")]
 async fn example_semantic_relationships() -> MultiAgentResult<()> {
     println!("\n🕸️  Example 2: Semantic Relationship Discovery");
     println!("===============================================");
@@ -149,6 +156,7 @@ async fn example_semantic_relationships() -> MultiAgentResult<()> {
 }
 
 /// Example 3: Multi-layered Context Assembly
+#[cfg(feature = "test-utils")]
 async fn example_multilayer_context() -> MultiAgentResult<()> {
     println!("\n🏗️  Example 3: Multi-layered Context Assembly");
     println!("==============================================");
@@ -230,6 +238,7 @@ async fn example_multilayer_context() -> MultiAgentResult<()> {
 }
 
 /// Example 4: Context-Aware Command Comparison
+#[cfg(feature = "test-utils")]
 async fn example_context_aware_commands() -> MultiAgentResult<()> {
     println!("\n🎛️  Example 4: Context-Aware Command Comparison");
     println!("===============================================");
@@ -291,6 +300,7 @@ async fn example_context_aware_commands() -> MultiAgentResult<()> {
 }
 
 /// Example 5: Knowledge Graph Performance Analysis
+#[cfg(feature = "test-utils")]
 async fn example_performance_analysis() -> MultiAgentResult<()> {
     println!("\n⚡ Example 5: Knowledge Graph Performance Analysis");
     println!("=================================================");
@@ -358,6 +368,7 @@ async fn example_performance_analysis() -> MultiAgentResult<()> {
 }
 
 #[tokio::main]
+#[cfg(feature = "test-utils")]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🧠 Terraphim Knowledge Graph Integration Examples");
     println!("=================================================\n");
@@ -379,4 +390,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("   • Performance optimization with efficient knowledge retrieval");
 
     Ok(())
+}
+
+#[cfg(not(feature = "test-utils"))]
+fn main() {
+    println!("This example requires the 'test-utils' feature to be enabled");
+    println!("Run with: cargo run --example knowledge_graph_integration --features test-utils");
 }

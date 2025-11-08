@@ -138,6 +138,7 @@ impl CommandRegistry {
     }
 
     /// Get a specific command by name
+    #[allow(dead_code)]
     pub async fn get_command(&self, name: &str) -> Option<super::CommandDefinition> {
         let commands = self.commands.read().await;
         commands.get(name).map(|cmd| cmd.definition.clone())

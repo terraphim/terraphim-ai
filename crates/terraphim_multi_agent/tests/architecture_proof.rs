@@ -1,10 +1,8 @@
 //! Architecture proof test - demonstrates that the multi-agent architecture works
 //! without requiring actual LLM API calls
 
-use std::sync::Arc;
 #[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{AgentRegistry, MultiAgentError, test_utils::create_test_role};
-use terraphim_persistence::DeviceStorage;
 
 #[cfg(feature = "test-utils")]
 #[cfg(feature = "test-utils")]

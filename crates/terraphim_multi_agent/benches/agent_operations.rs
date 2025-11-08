@@ -1,7 +1,5 @@
 #[cfg(feature = "test-utils")]
 use criterion::{BenchmarkId, Criterion, black_box, criterion_group, criterion_main};
-use std::sync::Arc;
-use tokio::runtime::Runtime;
 
 #[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{AgentRegistry, CommandInput, CommandType, create_test_agent_simple};

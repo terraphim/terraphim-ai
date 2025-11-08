@@ -8,9 +8,10 @@ use std::sync::Arc;
 
 // Create a simple test role function since test-utils feature doesn't exist
 fn create_test_role() -> terraphim_config::Role {
-    let mut role = terraphim_config::Role::default();
-    role.name = terraphim_types::RoleName::from("test-role");
-    role
+    terraphim_config::Role {
+        name: terraphim_types::RoleName::from("test-role"),
+        ..Default::default()
+    }
 }
 use terraphim_multi_agent::{CommandInput, CommandType, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;

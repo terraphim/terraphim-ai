@@ -1,12 +1,9 @@
 #[cfg(feature = "atomic")]
 use serde_json::json;
-use std::collections::HashMap;
 #[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
-use terraphim_config::Haystack;
 #[cfg(feature = "atomic")]
 use terraphim_middleware::{haystack::AtomicHaystackIndexer, indexer::IndexMiddleware};
-use uuid::Uuid;
 
 #[cfg(feature = "atomic")]
 #[tokio::test]

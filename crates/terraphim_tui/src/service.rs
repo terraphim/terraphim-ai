@@ -404,6 +404,7 @@ impl TuiService {
     }
 
     /// Add multiple documents from search results as a single context item
+    #[allow(dead_code)]
     pub async fn add_search_results_to_context(
         &self,
         conversation_id: &ConversationId,

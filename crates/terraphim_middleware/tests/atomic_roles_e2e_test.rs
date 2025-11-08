@@ -12,8 +12,6 @@ use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_middleware::{
     haystack::AtomicHaystackIndexer, indexer::IndexMiddleware, search_haystacks,
 };
-use terraphim_types::{RelevanceFunction, SearchQuery};
-use uuid::Uuid;
 
 /// Test that demonstrates atomic server haystack integration with Title Scorer role
 /// This test creates a complete config with atomic server haystack using TitleScorer,

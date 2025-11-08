@@ -6,18 +6,13 @@
 #![cfg(feature = "repl-custom")]
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::time::Duration;
-use terraphim_tui::commands::{
-    CommandDefinition, CommandExecutionError, CommandExecutionResult, CommandParameter,
-    ExecutionMode, ResourceUsage, RiskLevel,
-};
+use terraphim_tui::commands::{CommandDefinition, CommandParameter, ExecutionMode, RiskLevel};
 
 /// Creates a test command definition
 fn create_test_command(
     name: &str,
-    risk_level: RiskLevel,
-    execution_mode: ExecutionMode,
+    risk_level: &RiskLevel,
+    execution_mode: &ExecutionMode,
 ) -> CommandDefinition {
     CommandDefinition {
         name: name.to_string(),
@@ -25,8 +20,8 @@ fn create_test_command(
         usage: Some(format!("{} [options]", name)),
         category: Some("Testing".to_string()),
         version: "1.0.0".to_string(),
-        risk_level,
-        execution_mode,
+        risk_level: risk_level.clone(),
+        execution_mode: execution_mode.clone(),
         permissions: vec!["read".to_string(), "execute".to_string()],
         knowledge_graph_required: vec![],
         namespace: None,
@@ -58,7 +53,8 @@ mod local_execution_tests {
         // This test would verify that safe commands execute locally
         // Implementation depends on having a working LocalExecutor
 
-        let command_def = create_test_command("safe-command", RiskLevel::Low, ExecutionMode::Local);
+        let command_def =
+            create_test_command("safe-command", &RiskLevel::Low, &ExecutionMode::Local);
 
         let mut parameters = HashMap::new();
         parameters.insert("input".to_string(), "test".to_string());
@@ -78,7 +74,8 @@ mod local_execution_tests {
 
     #[tokio::test]
     async fn test_local_command_timeout() {
-        let command_def = create_test_command("timeout-test", RiskLevel::Low, ExecutionMode::Local);
+        let command_def =
+            create_test_command("timeout-test", &RiskLevel::Low, &ExecutionMode::Local);
 
         // Test timeout configuration
         assert_eq!(command_def.timeout, Some(30));
@@ -90,7 +87,7 @@ mod local_execution_tests {
     #[tokio::test]
     async fn test_local_command_resource_monitoring() {
         let command_def =
-            create_test_command("resource-test", RiskLevel::Medium, ExecutionMode::Local);
+            create_test_command("resource-test", &RiskLevel::Medium, &ExecutionMode::Local);
 
         // Test resource limits are properly set
         assert!(command_def.resource_limits.is_some());
@@ -112,8 +109,11 @@ mod firecracker_execution_tests {
 
     #[tokio::test]
     async fn test_firecracker_high_risk_command_execution() {
-        let command_def =
-            create_test_command("risky-command", RiskLevel::High, ExecutionMode::Firecracker);
+        let command_def = create_test_command(
+            "risky-command",
+            &RiskLevel::High,
+            &ExecutionMode::Firecracker,
+        );
 
         let mut parameters = HashMap::new();
         parameters.insert("input".to_string(), "sensitive_data".to_string());
@@ -207,7 +207,7 @@ mod hybrid_execution_tests {
         ];
 
         for (name, risk_level, expected_mode) in test_cases {
-            let command_def = create_test_command(name, risk_level, expected_mode);
+            let command_def = create_test_command(name, &risk_level, &expected_mode);
 
             // Verify the command is configured with the expected execution mode
             assert_eq!(
@@ -227,9 +227,9 @@ mod hybrid_execution_tests {
         // 3. System state
         // 4. Resource availability
 
-        let low_risk_cmd = create_test_command("low-risk", RiskLevel::Low, ExecutionMode::Hybrid);
+        let low_risk_cmd = create_test_command("low-risk", &RiskLevel::Low, &ExecutionMode::Hybrid);
         let high_risk_cmd =
-            create_test_command("high-risk", RiskLevel::High, ExecutionMode::Hybrid);
+            create_test_command("high-risk", &RiskLevel::High, &ExecutionMode::Hybrid);
 
         // In a full implementation, this would test the hybrid decision logic
         // For now, verify both commands are configured for hybrid mode
@@ -243,7 +243,7 @@ mod hybrid_execution_tests {
         // execution mode is unavailable
 
         let command_def =
-            create_test_command("fallback-test", RiskLevel::Medium, ExecutionMode::Hybrid);
+            create_test_command("fallback-test", &RiskLevel::Medium, &ExecutionMode::Hybrid);
 
         // Test that hybrid mode commands have comprehensive configuration
         assert!(command_def.timeout.is_some());
@@ -261,9 +261,12 @@ mod execution_mode_security_tests {
     #[tokio::test]
     async fn test_execution_mode_isolation() {
         // Test that different execution modes provide appropriate isolation
-        let local_cmd = create_test_command("local-test", RiskLevel::Low, ExecutionMode::Local);
-        let firecracker_cmd =
-            create_test_command("isolated-test", RiskLevel::High, ExecutionMode::Firecracker);
+        let local_cmd = create_test_command("local-test", &RiskLevel::Low, &ExecutionMode::Local);
+        let firecracker_cmd = create_test_command(
+            "isolated-test",
+            &RiskLevel::High,
+            &ExecutionMode::Firecracker,
+        );
 
         // Verify isolation configurations
         assert_eq!(local_cmd.execution_mode, ExecutionMode::Local);
@@ -318,7 +321,7 @@ mod execution_mode_security_tests {
         ];
 
         for (name, risk_level, mode) in test_cases {
-            let command_def = create_test_command(name, risk_level, mode);
+            let command_def = create_test_command(name, &risk_level, &mode);
 
             // Verify command structure
             assert_eq!(command_def.name, name);
@@ -365,8 +368,11 @@ mod performance_tests {
     async fn test_parameter_validation_performance() {
         // Test performance of parameter validation
 
-        let command_def =
-            create_test_command("param-perf-test", RiskLevel::Medium, ExecutionMode::Hybrid);
+        let _command_def = create_test_command(
+            "param-perf-test",
+            &RiskLevel::Medium,
+            &ExecutionMode::Hybrid,
+        );
 
         let start = Instant::now();
 

@@ -3,7 +3,6 @@
 use chrono::Utc;
 use std::collections::HashMap;
 use terraphim_multi_agent::*;
-use terraphim_multi_agent::*;
 
 #[tokio::test]
 async fn test_token_usage_tracking_accuracy() {

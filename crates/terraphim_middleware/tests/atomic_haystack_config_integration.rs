@@ -1,16 +1,11 @@
 #[cfg(feature = "atomic")]
 use serde_json::json;
-use std::collections::HashMap;
 #[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
-use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 #[cfg(feature = "atomic")]
 use terraphim_middleware::{
     haystack::AtomicHaystackIndexer, indexer::IndexMiddleware, search_haystacks,
 };
-use terraphim_types::RelevanceFunction;
-use terraphim_types::{Index, SearchQuery};
-use uuid::Uuid;
 
 /// Test that demonstrates atomic server haystack integration with terraphim config
 /// This test creates a complete config with atomic server haystack, sets up sample documents,

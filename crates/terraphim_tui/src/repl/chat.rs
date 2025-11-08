@@ -19,6 +19,7 @@ pub struct ChatHandler {
 
 #[cfg(feature = "repl-chat")]
 impl ChatHandler {
+    #[allow(dead_code)]
     pub fn new() -> Self {
         Self {
             client: None,
@@ -27,6 +28,7 @@ impl ChatHandler {
     }
 
     /// Initialize with Ollama (default for local use)
+    #[allow(dead_code)]
     pub fn with_ollama(model: Option<String>) -> Result<Self> {
         let client = ValidatedGenAiClient::new_ollama(model)?;
         Ok(Self {
@@ -36,6 +38,7 @@ impl ChatHandler {
     }
 
     /// Initialize with OpenAI
+    #[allow(dead_code)]
     pub fn with_openai(model: Option<String>) -> Result<Self> {
         let client = ValidatedGenAiClient::new_openai(model)?;
         Ok(Self {
@@ -45,6 +48,7 @@ impl ChatHandler {
     }
 
     /// Initialize with Anthropic
+    #[allow(dead_code)]
     pub fn with_anthropic(model: Option<String>) -> Result<Self> {
         let client = ValidatedGenAiClient::new_anthropic(model)?;
         Ok(Self {
@@ -54,6 +58,7 @@ impl ChatHandler {
     }
 
     /// Send message with full validation pipeline
+    #[allow(dead_code)]
     pub async fn send_message(&mut self, message: &str) -> Result<String> {
         if let Some(client) = &self.client {
             // Add user message to history
@@ -87,11 +92,13 @@ impl ChatHandler {
     }
 
     /// Clear conversation history
+    #[allow(dead_code)]
     pub fn clear_history(&mut self) {
         self.conversation_history.clear();
     }
 
     /// Get conversation length
+    #[allow(dead_code)]
     pub fn history_len(&self) -> usize {
         self.conversation_history.len()
     }

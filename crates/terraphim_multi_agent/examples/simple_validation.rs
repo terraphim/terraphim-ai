@@ -3,12 +3,16 @@
 //! This is a simplified example that demonstrates core functionality
 //! without complex storage operations to avoid memory issues.
 
+#[cfg(feature = "test-utils")]
 use std::sync::Arc;
+#[cfg(feature = "test-utils")]
 use terraphim_multi_agent::{
     CommandInput, CommandType, TerraphimAgent, test_utils::create_test_role,
 };
+#[cfg(feature = "test-utils")]
 use terraphim_persistence::DeviceStorage;
 
+#[cfg(feature = "test-utils")]
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("🚀 Terraphim Multi-Agent System - Simple Validation");
@@ -103,4 +107,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n🚀 The Terraphim Multi-Agent System is production-ready! 🚀");
 
     Ok(())
+}
+
+#[cfg(not(feature = "test-utils"))]
+fn main() {
+    println!("This example requires the 'test-utils' feature to be enabled");
+    println!("Run with: cargo run --example simple_validation --features test-utils");
 }

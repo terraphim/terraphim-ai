@@ -6,7 +6,10 @@ use std::sync::Arc;
 use terraphim_config::Role;
 #[cfg(feature = "mcp-proxy")]
 use terraphim_mcp_proxy::Tool;
-use terraphim_persistence::mcp::{McpPersistence, McpToolRecord, ToolDiscoveryCache, ToolStatus};
+use terraphim_persistence::mcp::McpPersistence;
+
+#[cfg(feature = "mcp-proxy")]
+use terraphim_persistence::mcp::{McpToolRecord, ToolDiscoveryCache, ToolStatus};
 
 #[cfg(feature = "mcp-proxy")]
 const CACHE_DURATION_HOURS: i64 = 1;

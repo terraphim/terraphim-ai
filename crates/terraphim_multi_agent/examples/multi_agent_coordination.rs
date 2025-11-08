@@ -8,7 +8,6 @@
 
 #[cfg(feature = "test-utils")]
 use ahash::AHashMap;
-use std::sync::Arc;
 #[cfg(feature = "test-utils")]
 use terraphim_config::Role;
 #[cfg(feature = "test-utils")]

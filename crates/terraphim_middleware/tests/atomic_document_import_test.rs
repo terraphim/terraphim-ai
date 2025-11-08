@@ -1,15 +1,9 @@
 #[cfg(feature = "atomic")]
 use serde_json::json;
-use std::collections::HashMap;
-use std::fs;
-use std::path::Path;
 #[cfg(feature = "atomic")]
 use terraphim_atomic_client::{self, Store};
-use terraphim_config::Haystack;
 #[cfg(feature = "atomic")]
 use terraphim_middleware::{haystack::AtomicHaystackIndexer, indexer::IndexMiddleware};
-use uuid::Uuid;
-use walkdir::WalkDir;
 
 // Terraphim ontology property URIs used for storing full document body and path.
 pub const BODY_PROPERTY_URI: &str = "http://localhost:9883/terraphim-drive/terraphim/property/body";

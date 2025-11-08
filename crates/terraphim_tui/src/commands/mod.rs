@@ -9,7 +9,7 @@ pub mod registry;
 use serde::{Deserialize, Serialize};
 
 /// Execution mode for commands
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionMode {
     /// Execute locally on the host machine (safe commands only)
@@ -106,7 +106,7 @@ fn default_risk_level() -> RiskLevel {
 }
 
 /// Risk assessment level
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum RiskLevel {
     #[default]
