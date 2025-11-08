@@ -64,9 +64,7 @@ function updateStoresFromConfig(config: ConfigResponse['config']) {
 	roles.set(roleArray);
 
 	// Update theme
-	if (config.global_shortcut) {
-		theme.set(config.global_shortcut);
-	}
+	// Do NOT derive theme from global_shortcut; use role theme instead.
 
 	// Update selected role (handle both string and RoleName object)
 	if (config.selected_role) {

@@ -3,7 +3,7 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input, Tag, Taglist } from 'svelma';
 import { onDestroy, onMount } from 'svelte';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
-import logo from '/assets/terraphim.png';
+import logo from '/assets/terraphim_gray.png';
 import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
@@ -59,7 +59,19 @@ function saveSearchState() {
 		const data = { input: $input, results };
 		localStorage.setItem(searchStateKey(), JSON.stringify(data));
 	} catch (e) {
-		console.warn('Failed to save search state:', e);
+		// Handle quota exceeded error
+		if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+			console.warn('localStorage quota exceeded, clearing old search state');
+			try {
+				// Try to clear old state and save again
+				localStorage.removeItem(searchStateKey());
+				localStorage.setItem(searchStateKey(), JSON.stringify(data));
+			} catch (retryError) {
+				console.warn('Failed to save search state after quota cleanup:', retryError);
+			}
+		} else {
+			console.warn('Failed to save search state:', e);
+		}
 	}
 }
 
@@ -109,6 +121,13 @@ function startSummarizationStreaming() {
 		return;
 	}
 
+	// SSE endpoint not implemented on server, use polling instead
+	// The /summarization/stream endpoint doesn't exist, so we fall back to polling
+	startPollingForSummaries();
+	return;
+
+	// Legacy SSE code (disabled - endpoint not implemented)
+	/*
 	if (sseConnection) {
 		sseConnection.close();
 	}
@@ -149,6 +168,7 @@ function startSummarizationStreaming() {
 	} catch (error) {
 		console.error('Failed to create SSE connection:', error);
 	}
+	*/
 }
 
 // Polling fallback for Tauri (since EventSource isn't supported)
@@ -621,7 +641,7 @@ async function handleSearchInputEvent() {
           placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
           icon="search"
           expanded
-          autofocus
+          autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
           on:click={handleSearchInputEvent}
           on:submit={handleSearchInputEvent}
           on:keydown={_handleKeydown}

@@ -1,10 +1,12 @@
 <script lang="ts">
 import { onDestroy, onMount } from 'svelte';
-// @ts-expect-error
-// import { JSONEditor } from 'svelte-jsoneditor'; // Removed - not needed
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
 import { is_tauri, role } from '$lib/stores';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
 import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
+import { SlashCommand, slashCommandStyles } from './SlashCommand';
 
 export let html: string = ''; // initial content in HTML/JSON
 export const readOnly: boolean = false;
@@ -21,6 +23,9 @@ let _autocompleteStatus = '⏳ Initializing...';
 let autocompleteReady = false;
 let connectionTested = false;
 let styleElement: HTMLStyleElement | null = null;
+let editorInstance: Editor | null = null;
+let editorElement: HTMLDivElement | null = null;
+let isInitializing = false;
 
 // Markdown plugin removed - not available in svelte-jsoneditor
 
@@ -32,8 +37,40 @@ onMount(async () => {
 	// Inject CSS styles for suggestions
 	if (typeof document !== 'undefined') {
 		styleElement = document.createElement('style');
-		styleElement.textContent = terraphimSuggestionStyles;
+		styleElement.textContent = `${terraphimSuggestionStyles}\n${slashCommandStyles}`;
 		document.head.appendChild(styleElement);
+	}
+
+	// Initialize TipTap editor
+	if (typeof document !== 'undefined' && editorElement) {
+		editorInstance = new Editor({
+			element: editorElement as HTMLElement,
+			extensions: [
+				StarterKit,
+				Markdown.configure({ html: true }),
+				SlashCommand.configure({
+					trigger: '/',
+				}),
+				...(enableAutocomplete
+					? [
+							TerraphimSuggestion.configure({
+								trigger: suggestionTrigger,
+								allowSpaces: false,
+								limit: maxSuggestions,
+								minLength: minQueryLength,
+								debounce: debounceDelay,
+							}),
+						]
+					: []),
+			],
+			content: html,
+			editable: !readOnly,
+			onUpdate: ({ editor }) => {
+				_handleUpdate(editor as any);
+			},
+		});
+		// Keep reference for other handlers
+		editor = editorInstance as unknown;
 	}
 });
 
@@ -42,15 +79,23 @@ onDestroy(() => {
 	if (styleElement?.parentNode) {
 		styleElement.parentNode.removeChild(styleElement);
 	}
+	if (editorInstance) {
+		editorInstance.destroy();
+		editorInstance = null;
+	}
 });
 
 // Watch for role changes and reinitialize
-$: if ($role && enableAutocomplete && autocompleteReady) {
+$: if ($role && enableAutocomplete) {
+	// Only update the role on change; avoid re-triggering full initialization here
 	novelAutocompleteService.setRole($role);
-	initializeAutocomplete();
 }
 
 async function initializeAutocomplete() {
+	if (isInitializing) {
+		return;
+	}
+	isInitializing = true;
 	_autocompleteStatus = '⏳ Initializing autocomplete...';
 	autocompleteReady = false;
 	connectionTested = false;
@@ -65,20 +110,13 @@ async function initializeAutocomplete() {
 		connectionTested = true;
 
 		if (connectionOk) {
-			// Build the autocomplete index
-			_autocompleteStatus = '🔨 Building autocomplete index...';
-			const success = await novelAutocompleteService.buildAutocompleteIndex();
-
-			if (success) {
-				if ($is_tauri) {
-					_autocompleteStatus = '✅ Ready - Using Tauri backend';
-				} else {
-					_autocompleteStatus = '✅ Ready - Using MCP server backend';
-				}
-				autocompleteReady = true;
+			// Defer heavy index building until first suggestion request to avoid race loops.
+			if ($is_tauri) {
+				_autocompleteStatus = '✅ Ready - Using Tauri backend';
 			} else {
-				_autocompleteStatus = '❌ Failed to build autocomplete index';
+				_autocompleteStatus = '✅ Ready - Using MCP server backend';
 			}
+			autocompleteReady = true;
 		} else {
 			if ($is_tauri) {
 				_autocompleteStatus = '❌ Tauri backend not available';
@@ -89,6 +127,8 @@ async function initializeAutocomplete() {
 	} catch (error) {
 		console.error('Error initializing autocomplete:', error);
 		_autocompleteStatus = '❌ Autocomplete initialization error';
+	} finally {
+		isInitializing = false;
 	}
 }
 
@@ -220,23 +260,7 @@ Start typing below:`;
 };
 </script>
 
-<JSONEditor
-  defaultValue={html}
-  isEditable={!readOnly}
-  disableLocalStorage={true}
-  onUpdate={_handleUpdate}
-  extensions={[
-    ...(enableAutocomplete ? [
-      TerraphimSuggestion.configure({
-        trigger: suggestionTrigger,
-        allowSpaces: false,
-        limit: maxSuggestions,
-        minLength: minQueryLength,
-        debounce: debounceDelay,
-      })
-    ] : [])
-  ]}
-/>
+<div class="novel-editor" bind:this={editorElement}></div>
 
 <!-- Autocomplete Status and Controls -->
 {#if enableAutocomplete}

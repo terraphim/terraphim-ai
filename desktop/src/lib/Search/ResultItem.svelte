@@ -1113,7 +1113,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                     disabled={true}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </button>
                 {:else if item.isLink}
@@ -1125,7 +1125,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                     title={item.title}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </a>
                 {:else}
@@ -1138,7 +1138,7 @@ if (configStore[$role as keyof typeof configStore] !== undefined) {
                     data-testid={item.testId || ''}
                   >
                     <span class="icon is-medium" class:has-text-primary={item.className?.includes('primary')} class:has-text-success={item.className?.includes('success')} class:has-text-danger={item.className?.includes('danger')}>
-                      <i class={item.icon} />
+                      <i class={item.icon}></i>
                     </span>
                   </button>
                 {/if}
