@@ -11,9 +11,10 @@ use std::error::Error;
 use std::path::Path;
 use std::sync::Arc;
 use tauri::{
-    CustomMenuItem, GlobalShortcutManager, Manager, RunEvent, SystemTray, SystemTrayEvent,
-    SystemTrayMenu, SystemTrayMenuItem, WindowBuilder,
+    AppHandle, CustomMenuItem, Manager, RunEvent, SystemTray, SystemTrayEvent, SystemTrayMenu,
+    SystemTrayMenuItem, Window, WindowBuilder,
 };
+use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
 use rmcp::service::ServiceExt;
@@ -112,7 +113,7 @@ fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
 
     let mut menu = SystemTrayMenu::new()
         .add_item(CustomMenuItem::new("toggle", "Show/Hide"))
-        .add_native_item(SystemTrayMenuItem::Separator);
+        .add_item(SystemTrayMenuItem::Separator);
 
     for (role_name, _role) in roles {
         // Use a unique id for each role menu item
@@ -126,8 +127,7 @@ fn build_tray_menu(config: &terraphim_config::Config) -> SystemTrayMenu {
 
     let quit = CustomMenuItem::new("quit".to_string(), "Quit");
 
-    menu.add_native_item(SystemTrayMenuItem::Separator)
-        .add_item(quit)
+    menu.add_item(SystemTrayMenuItem::Separator).add_item(quit)
 }
 
 /// Runs the Terraphim MCP server over stdio (blocking)
@@ -268,6 +268,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let system_tray = SystemTray::new().with_menu(tray_menu);
 
     let app = tauri::Builder::default()
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_updater::Builder::new().build())
         .system_tray(system_tray)
         .on_system_tray_event(|app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
@@ -285,7 +287,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         {
                             Ok(config_response) => {
                                 let new_tray_menu = build_tray_menu(&config_response.config);
-                                if let Err(e) = app_handle.tray_handle().set_menu(new_tray_menu) {
+                                if let Err(e) = app_handle.tray().set_menu(new_tray_menu) {
                                     log::error!("Failed to set new tray menu: {}", e);
                                 }
                             }
@@ -295,7 +297,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         }
                     });
                 } else {
-                    let item_handle = app.tray_handle().get_item(&id_clone);
+                    let item_handle = app.tray().get_item(&id_clone);
                     match id_clone.as_str() {
                         "quit" => {
                             std::process::exit(0);
@@ -436,7 +438,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     tauri::async_runtime::spawn(async move {
                         let splashscreen_window = WindowBuilder::new(
                             &handle,
-                            "splashscreen",
                             tauri::WindowUrl::App("../dist/splashscreen.html".into()),
                         )
                         .title("Splashscreen")
@@ -476,9 +477,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 if let Some(window) = app_handle.get_window(label) {
                     let _ = window.hide();
                     let window_clone = window.clone();
+                    let shortcut = global_shortcut.clone();
                     app_handle
-                        .global_shortcut_manager()
-                        .register(&global_shortcut, move || match window_clone.is_visible() {
+                        .plugin()
+                        .global_shortcut()
+                        .register(shortcut, move || match window_clone.is_visible() {
                             Ok(true) => {
                                 let _ = window_clone.hide();
                             }
@@ -508,9 +511,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 if let Some((_, window)) = windows.iter().next() {
                     let _ = window.hide();
                     let window_clone = window.clone();
+                    let shortcut = global_shortcut.clone();
                     app_handle
-                        .global_shortcut_manager()
-                        .register(&global_shortcut, move || match window_clone.is_visible() {
+                        .plugin()
+                        .global_shortcut()
+                        .register(shortcut, move || match window_clone.is_visible() {
                             Ok(true) => {
                                 let _ = window_clone.hide();
                             }
