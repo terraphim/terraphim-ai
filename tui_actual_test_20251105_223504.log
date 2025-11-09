@@ -6,7 +6,7 @@ Started at: Wed  5 Nov 2025 22:35:04 GMT
 [1;33mTesting:[0m /help returns command list
 Command: /help
 [0;32m✅ PASS[0m - Found: Available commands:
-Output snippet: 
+Output snippet:
 Available commands:
   /search <query> - Search documents
   /config [show|set] - Manage configuration
@@ -16,7 +16,7 @@ Available commands:
 [1;33mTesting:[0m /role list returns available roles
 Command: /role list
 [0;32m✅ PASS[0m - Found: Available roles:
-Output snippet: 
+Output snippet:
 Available roles:
     Terraphim Engineer
     Rust Engineer
@@ -26,7 +26,7 @@ Available roles:
 [1;33mTesting:[0m /config show returns configuration with selected_role
 Command: /config show
 [0;32m✅ PASS[0m - Found: selected_role
-Output snippet: 
+Output snippet:
   "selected_role": "Terraphim Engineer"
 }
 Goodbye! 👋
@@ -35,7 +35,7 @@ Goodbye! 👋
 [1;33mTesting:[0m /search returns search results
 Command: /search rust
 [0;32m✅ PASS[0m - Found: result\|Found\|No documents
-Output snippet: 
+Output snippet:
 [2025-11-05T22:35:05Z WARN  opendal::services] service=memory name=0x6000008ac590 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
 [2025-11-05T22:35:05Z WARN  opendal::services] service=memory name=0x6000008ac790 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
 [2025-11-05T22:35:05Z WARN  opendal::services] service=memory name=0x6000008ac850 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
@@ -45,7 +45,7 @@ Output snippet:
 [1;33mTesting:[0m /role select switches roles
 Command: /role select Default
 [0;32m✅ PASS[0m - Found: Switched to role
-Output snippet: 
+Output snippet:
 ✅ Switched to role: Default
 Goodbye! 👋
 ---
@@ -53,7 +53,7 @@ Goodbye! 👋
 [1;33mTesting:[0m /chat provides response
 Command: /chat Hello
 [0;32m✅ PASS[0m - Found: Response:\|No LLM configured
-Output snippet: 
+Output snippet:
 🤖 Response:
 
 No LLM configured for role Terraphim Engineer. Prompt was: Hello
@@ -63,7 +63,7 @@ Goodbye! 👋
 [1;33mTesting:[0m Invalid commands show error
 Command: /invalid_command
 [0;32m✅ PASS[0m - Found: Unknown command\|Invalid\|Error
-Output snippet: 
+Output snippet:
 Error: Unknown command: invalid_command
 Goodbye! 👋
 ---

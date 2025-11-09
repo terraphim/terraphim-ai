@@ -7,6 +7,7 @@ import logo from '/assets/terraphim_gray.png';
 import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
+import KGSearchInput from './KGSearchInput.svelte';
 
 let results: Document[] = [];
 let _error: string | null = null;
@@ -296,7 +297,7 @@ async function getTermSuggestions(query: string): Promise<string[]> {
 		if ($is_tauri) {
 			const response: any = await invoke('get_autocomplete_suggestions', {
 				query: query,
-				roleName: $role,
+				role_name: $role,
 				limit: 8,
 			});
 
@@ -635,40 +636,56 @@ async function handleSearchInputEvent() {
   <Field>
     <div class="search-row">
       <div class="input-wrapper">
-        <Input
-          type="search"
-          bind:value={$input}
-          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-          icon="search"
-          expanded
-          autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
-          on:click={handleSearchInputEvent}
-          on:submit={handleSearchInputEvent}
-          on:keydown={_handleKeydown}
-          on:input={() => {}}
-        />
-      {#if suggestions.length > 0}
-        <ul class="suggestions">
-          {#each suggestions as suggestion, index}
-            <li
-              class:active={index === suggestionIndex}
-              on:click={() => applySuggestion(suggestion)}
-              on:keydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  applySuggestion(suggestion);
-                }
-              }}
-              tabindex="0"
-              role="option"
-              aria-selected={index === suggestionIndex}
-              aria-label={`Apply suggestion: ${suggestion}`}
-            >
-              {suggestion}
-            </li>
-          {/each}
-        </ul>
-      {/if}
+        {#if $typeahead}
+          <KGSearchInput
+            roleName={$role}
+            placeholder={`Search knowledge graph items`}
+            autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
+            initialValue={$input}
+            onInputChange={(value) => {
+              $input = value;
+            }}
+            onSelect={(term) => {
+              $input = term;
+              handleSearchInputEvent();
+            }}
+          />
+        {:else}
+          <Input
+            type="search"
+            bind:value={$input}
+            placeholder="Search"
+            icon="search"
+            expanded
+            autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
+            on:click={handleSearchInputEvent}
+            on:submit={handleSearchInputEvent}
+            on:keydown={_handleKeydown}
+            on:input={_updateSuggestions}
+          />
+          {#if suggestions.length > 0}
+            <ul class="suggestions">
+              {#each suggestions as suggestion, index}
+                <li
+                  class:active={index === suggestionIndex}
+                  on:click={() => applySuggestion(suggestion)}
+                  on:keydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      applySuggestion(suggestion);
+                    }
+                  }}
+                  tabindex="0"
+                  role="option"
+                  aria-selected={index === suggestionIndex}
+                  aria-label={`Apply suggestion: ${suggestion}`}
+                >
+                  {suggestion}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
       </div>
 
       <!-- Selected terms display -->

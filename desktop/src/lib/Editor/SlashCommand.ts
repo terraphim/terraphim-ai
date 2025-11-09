@@ -307,5 +307,3 @@ export const slashCommandStyles = `
   .slash-icon { color: #94a3b8; }
 }
 `;
-
-

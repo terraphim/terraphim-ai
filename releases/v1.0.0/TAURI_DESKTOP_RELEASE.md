@@ -60,11 +60,11 @@
    - Full Tauri application
    - System tray support
    - Auto-updater enabled
-   
+
 3. **TerraphimServer.app** (15MB)
    - Standalone server
    - HTTP API on port 8000
-   
+
 4. **TerraphimTUI.app** (10MB)
    - Terminal interface
    - REPL support

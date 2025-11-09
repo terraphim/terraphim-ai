@@ -45,7 +45,7 @@
 [2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c0c450 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
 [2025-11-05T14:26:09Z WARN  opendal::services] service=memory name=0x600003c34250 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
 [2025-11-05T14:26:09Z INFO  terraphim_server] No saved config found, using Default role config: OpenDal(NotFound (permanent) at read => memory doesn't have this path
-    
+
     Context:
        service: memory
        path: server_config.json
