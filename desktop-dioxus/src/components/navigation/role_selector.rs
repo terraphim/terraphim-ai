@@ -3,39 +3,25 @@ use crate::state::ConfigState;
 
 #[component]
 pub fn RoleSelector() -> Element {
-    let config_state = use_context::<ConfigState>();
+    let mut config_state = use_context::<ConfigState>();
     let selected_role = config_state.selected_role();
-
-    let roles = use_resource(move || {
-        let config_state = config_state.clone();
-        async move {
-            let config = config_state.get_config().await;
-            config.roles.keys().map(|k| k.original.clone()).collect::<Vec<_>>()
-        }
-    });
+    let roles = config_state.available_roles();
 
     rsx! {
         div { class: "select",
             select {
                 value: "{selected_role}",
                 onchange: move |evt| {
-                    let role_name = evt.value().clone();
-                    let config_state = config_state.clone();
-                    spawn(async move {
-                        if let Err(e) = config_state.select_role(role_name).await {
-                            tracing::error!("Failed to select role: {:?}", e);
-                        }
-                    });
+                    let role_name = evt.value();
+                    config_state.select_role(role_name);
+                    tracing::info!("Role changed to: {}", role_name);
                 },
-
-                match &*roles.read() {
-                    Some(role_list) => rsx! {
-                        for role_name in role_list {
-                            option { value: "{role_name}", "{role_name}" }
-                        }
-                    },
-                    None => rsx! {
-                        option { "Loading roles..." }
+                
+                for role_name in roles {
+                    option {
+                        value: "{role_name}",
+                        selected: role_name == selected_role,
+                        "{role_name}"
                     }
                 }
             }
