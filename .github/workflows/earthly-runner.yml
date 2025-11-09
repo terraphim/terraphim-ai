@@ -62,6 +62,7 @@ jobs:
         run: |
           earthly --ci +fmt
           earthly --ci +lint
+          earthly --ci +kg-lint
 
   build-frontend:
     needs: setup

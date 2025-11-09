@@ -22,6 +22,7 @@ pipeline:
   BUILD +build-debug-native
   BUILD +fmt
   BUILD +lint
+  BUILD +kg-lint
   BUILD +test
   BUILD +build-native
   BUILD +docs-pages
@@ -228,6 +229,11 @@ fmt:
 lint:
   FROM +workspace-debug
   RUN cargo clippy --workspace --all-targets --all-features
+
+kg-lint:
+  FROM +workspace-debug
+  # Validate markdown KG schemas (commands/types/permissions) and thesaurus indexability
+  RUN cargo run -p terraphim_kg_linter -- --path docs/src/kg --strict -o json
 
 build-focal:
   FROM ubuntu:20.04
