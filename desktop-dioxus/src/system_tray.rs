@@ -24,7 +24,7 @@ impl SystemTrayManager {
         self.menu = Menu::new();
 
         // Toggle window item
-        let toggle_item = MenuItem::new("Show/Hide", true, None);
+        let toggle_item = MenuItem::new("Show/Hide", true, Some("toggle".into()));
         self.menu.append(&toggle_item)?;
         self.menu.append(&PredefinedMenuItem::separator())?;
 
@@ -80,6 +80,7 @@ impl SystemTrayManager {
     }
 }
 
+#[derive(Debug, Clone)]
 pub enum TrayEvent {
     Toggle,
     RoleChanged(String),

@@ -57,14 +57,19 @@ impl ConfigState {
             lowercase: role_name.to_lowercase(),
         };
         drop(config);
-        
+
         self.selected_role.set(role_name);
-        
+
         let config_clone = self.config.read().clone();
         spawn(async move {
             use terraphim_persistence::Persistable;
             if let Err(e) = config_clone.save().await {
                 tracing::error!("Failed to save config: {:?}", e);
+            }
+
+            // Update tray menu to reflect new role
+            if let Err(e) = crate::update_tray_menu(&config_clone).await {
+                tracing::error!("Failed to update tray menu: {:?}", e);
             }
         });
     }

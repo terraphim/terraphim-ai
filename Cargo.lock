@@ -2057,7 +2057,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "generational-box",
- "global-hotkey",
+ "global-hotkey 0.5.5",
  "infer 0.11.0",
  "jni 0.21.1",
  "lazy-js-bundle",
@@ -3546,6 +3546,22 @@ dependencies = [
  "once_cell",
  "thiserror 1.0.69",
  "windows-sys 0.52.0",
+ "x11-dl",
+]
+
+[[package]]
+name = "global-hotkey"
+version = "0.6.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "41fbb3a4e56c901ee66c190fdb3fa08344e6d09593cc6c61f8eb9add7144b271"
+dependencies = [
+ "crossbeam-channel",
+ "keyboard-types",
+ "objc2 0.6.3",
+ "objc2-app-kit 0.3.2",
+ "once_cell",
+ "thiserror 2.0.17",
+ "windows-sys 0.59.0",
  "x11-dl",
 ]
 
@@ -5592,7 +5608,7 @@ version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ff32365de1b6743cb203b710788263c44a03de03802daf96092f2da4fe6ba4d7"
 dependencies = [
- "proc-macro-crate 1.3.1",
+ "proc-macro-crate 3.4.0",
  "proc-macro2",
  "quote",
  "syn 2.0.108",
@@ -9078,7 +9094,9 @@ dependencies = [
  "dioxus-desktop",
  "dioxus-router",
  "futures",
+ "global-hotkey 0.6.4",
  "image",
+ "once_cell",
  "pulldown-cmark 0.12.2",
  "reqwest 0.12.24",
  "serde",
