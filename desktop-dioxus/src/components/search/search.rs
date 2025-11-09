@@ -2,6 +2,7 @@ use dioxus::prelude::*;
 use crate::state::{ConfigState, SearchState};
 use crate::services::SearchService;
 use terraphim_config::ConfigState as CoreConfigState;
+use terraphim_automata::AutocompleteResult;
 
 #[component]
 pub fn Search() -> Element {
@@ -13,12 +14,20 @@ pub fn Search() -> Element {
     let loading = search_state.is_loading();
     let error = search_state.error();
 
+    // Autocomplete state
+    let mut autocomplete_suggestions = use_signal(|| Vec::<AutocompleteResult>::new());
+    let mut show_autocomplete = use_signal(|| false);
+    let mut selected_suggestion_index = use_signal(|| 0_usize);
+
     // Handle search
     let search = move || {
         let input_value = search_state.input();
         if input_value.is_empty() {
             return;
         }
+
+        // Hide autocomplete when searching
+        show_autocomplete.set(false);
 
         search_state.set_loading(true);
         search_state.set_error(None);
@@ -53,8 +62,48 @@ pub fn Search() -> Element {
         });
     };
 
+    // Handle autocomplete
+    let update_autocomplete = move |prefix: String| {
+        if prefix.len() < 2 {
+            show_autocomplete.set(false);
+            return;
+        }
+
+        spawn(async move {
+            match CoreConfigState::from_config(config_state.get_config()).await {
+                Ok(core_config) => {
+                    let mut service = SearchService::new(core_config);
+
+                    // Initialize autocomplete index
+                    let role = terraphim_types::RoleName::from(config_state.selected_role());
+                    if let Err(e) = service.initialize_autocomplete(&role).await {
+                        tracing::warn!("Failed to initialize autocomplete: {:?}", e);
+                        return;
+                    }
+
+                    let suggestions = service.autocomplete(&prefix);
+                    autocomplete_suggestions.set(suggestions.clone());
+                    show_autocomplete.set(!suggestions.is_empty());
+                    selected_suggestion_index.set(0);
+                }
+                Err(e) => {
+                    tracing::error!("Failed to create config state for autocomplete: {:?}", e);
+                }
+            }
+        });
+    };
+
+    // Select suggestion
+    let select_suggestion = move |term: String| {
+        search_state.set_input(term);
+        show_autocomplete.set(false);
+        search();
+    };
+
     rsx! {
         div { class: "search-container",
+            style: "position: relative;",
+
             div { class: "field",
                 div { class: "control has-icons-left",
                     input {
@@ -64,23 +113,105 @@ pub fn Search() -> Element {
                         value: "{input}",
                         disabled: loading,
                         oninput: move |evt| {
-                            search_state.set_input(evt.value());
+                            let value = evt.value();
+                            search_state.set_input(value.clone());
+                            update_autocomplete(value);
                         },
                         onkeydown: move |evt| {
-                            if evt.key() == Key::Enter {
-                                search();
+                            match evt.key() {
+                                Key::Enter => {
+                                    if show_autocomplete() && !autocomplete_suggestions().is_empty() {
+                                        // Select current suggestion
+                                        let suggestions = autocomplete_suggestions();
+                                        let idx = selected_suggestion_index();
+                                        if idx < suggestions.len() {
+                                            select_suggestion(suggestions[idx].term.clone());
+                                        }
+                                    } else {
+                                        search();
+                                    }
+                                }
+                                Key::ArrowDown => {
+                                    if show_autocomplete() {
+                                        let max = autocomplete_suggestions().len();
+                                        if max > 0 {
+                                            let current = selected_suggestion_index();
+                                            selected_suggestion_index.set((current + 1) % max);
+                                        }
+                                    }
+                                }
+                                Key::ArrowUp => {
+                                    if show_autocomplete() {
+                                        let max = autocomplete_suggestions().len();
+                                        if max > 0 {
+                                            let current = selected_suggestion_index();
+                                            selected_suggestion_index.set(if current == 0 { max - 1 } else { current - 1 });
+                                        }
+                                    }
+                                }
+                                Key::Escape => {
+                                    show_autocomplete.set(false);
+                                }
+                                _ => {}
                             }
+                        },
+                        onblur: move |_| {
+                            // Delay hiding to allow click events on suggestions
+                            spawn(async move {
+                                tokio::time::sleep(tokio::time::Duration::from_millis(200)).await;
+                                show_autocomplete.set(false);
+                            });
                         }
                     }
                     span { class: "icon is-left",
                         i { class: if loading { "fas fa-spinner fa-spin" } else { "fas fa-search" } }
                     }
                 }
+
+                // Autocomplete dropdown
+                if show_autocomplete() && !autocomplete_suggestions().is_empty() {
+                    div {
+                        class: "autocomplete-dropdown box",
+                        style: "position: absolute; top: 100%; left: 0; right: 0; z-index: 1000; max-height: 300px; overflow-y: auto; margin-top: 0.5rem;",
+
+                        for (idx, suggestion) in autocomplete_suggestions().iter().enumerate() {
+                            div {
+                                class: if idx == selected_suggestion_index() {
+                                    "autocomplete-item p-2 is-active"
+                                } else {
+                                    "autocomplete-item p-2"
+                                },
+                                style: if idx == selected_suggestion_index() {
+                                    "background: #3273dc; color: white; cursor: pointer;"
+                                } else {
+                                    "cursor: pointer; border-bottom: 1px solid #f5f5f5;"
+                                },
+                                onmousedown: {
+                                    let term = suggestion.term.clone();
+                                    move |_| select_suggestion(term.clone())
+                                },
+                                onmouseenter: move |_| selected_suggestion_index.set(idx),
+
+                                div { class: "is-flex is-justify-content-space-between",
+                                    span { class: "has-text-weight-semibold",
+                                        "{suggestion.term}"
+                                    }
+                                    if let Some(url) = &suggestion.url {
+                                        span { class: "is-size-7 has-text-grey",
+                                            style: if idx == selected_suggestion_index() { "color: #e8e8e8 !important;" } else { "" },
+                                            "📎"
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
 
             // Error display
             if let Some(error_msg) = error {
-                div { class: "notification is-danger",
+                div { class: "notification is-danger mt-4",
                     button {
                         class: "delete",
                         onclick: move |_| search_state.set_error(None)
@@ -107,6 +238,9 @@ pub fn Search() -> Element {
                 } else if results.is_empty() {
                     div { class: "has-text-centered has-text-grey",
                         p { "Enter a search term to get started" }
+                        p { class: "mt-2 is-size-7",
+                            "💡 Tip: Start typing to see autocomplete suggestions"
+                        }
                     }
                 } else {
                     div { class: "columns is-multiline",

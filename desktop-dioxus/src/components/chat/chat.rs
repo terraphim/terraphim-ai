@@ -1,6 +1,6 @@
 use dioxus::prelude::*;
 use crate::state::{ConfigState, ConversationState};
-use crate::services::ChatService;
+use crate::services::{ChatService, render_markdown};
 use terraphim_types::{Conversation, ChatMessage, RoleName};
 
 #[component]
@@ -41,7 +41,7 @@ pub fn Chat() -> Element {
                 }
                 Err(e) => {
                     tracing::error!("Failed to initialize LLM: {:?}", e);
-                    error.set(Some(format!("LLM not configured. Check your config.")));
+                    error.set(Some("LLM not configured. Check your config.".to_string()));
                 }
             }
         });
@@ -69,7 +69,7 @@ pub fn Chat() -> Element {
                 }
 
                 match service.send_message(&mut conv, input_value).await {
-                    Ok(assistant_msg) => {
+                    Ok(_assistant_msg) => {
                         tracing::info!("Got AI response");
                         conversation.set(Some(conv.clone()));
                         messages.set(conv.messages.clone());
@@ -131,7 +131,7 @@ pub fn Chat() -> Element {
                                 "background: #f5f5f5; padding: 1rem; border-radius: 8px; margin-right: 20%;"
                             },
 
-                            div { class: "message-header",
+                            div { class: "message-header mb-2",
                                 strong { 
                                     if msg.role == "user" { "You" } else { "AI Assistant" }
                                 }
@@ -141,8 +141,16 @@ pub fn Chat() -> Element {
                                 }
                             }
 
-                            div { class: "message-content mt-2",
-                                "{msg.content}"
+                            // Render markdown for assistant messages, plain text for user
+                            if msg.role == "assistant" {
+                                div { 
+                                    class: "message-content markdown-content",
+                                    dangerous_inner_html: "{render_markdown(&msg.content)}"
+                                }
+                            } else {
+                                div { class: "message-content",
+                                    "{msg.content}"
+                                }
                             }
                         }
                     }
@@ -163,16 +171,17 @@ pub fn Chat() -> Element {
             // Input area
             div { class: "field has-addons",
                 div { class: "control is-expanded",
-                    input {
-                        class: "input is-medium",
-                        r#type: "text",
-                        placeholder: "Type your message...",
+                    textarea {
+                        class: "textarea",
+                        placeholder: "Type your message... (Shift+Enter for new line)",
                         value: "{input()}",
                         disabled: loading(),
+                        rows: 3,
                         oninput: move |evt| input.set(evt.value()),
                         onkeydown: move |evt| {
-                            if evt.key() == Key::Enter && !loading() {
+                            if evt.key() == Key::Enter && !evt.shift_key() && !loading() {
                                 send_message();
+                                evt.prevent_default();
                             }
                         }
                     }
@@ -180,6 +189,7 @@ pub fn Chat() -> Element {
                 div { class: "control",
                     button {
                         class: "button is-primary is-medium",
+                        style: "height: 100%;",
                         disabled: loading() || input().trim().is_empty(),
                         onclick: move |_| send_message(),
 
@@ -195,6 +205,11 @@ pub fn Chat() -> Element {
                         span { "Send" }
                     }
                 }
+            }
+
+            // Helpful tip
+            div { class: "has-text-grey is-size-7 mt-2",
+                "💡 Tip: AI responses support markdown formatting including code blocks, lists, and links"
             }
         }
     }
