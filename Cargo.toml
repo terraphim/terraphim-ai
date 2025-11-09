@@ -1,7 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_server", "desktop/src-tauri", "terraphim_firecracker"]
-exclude = ["crates/terraphim_agent_application"]  # Experimental crate with incomplete API implementations
+members = ["crates/*", "terraphim_server", "desktop-dioxus", "terraphim_firecracker"]
+exclude = [
+    "crates/terraphim_agent_application",  # Experimental crate with incomplete API implementations
+    "desktop/src-tauri"  # Temporarily excluded during Dioxus migration (webkit2gtk version conflict)
+]
 default-members = ["terraphim_server"]
 
 [workspace.package]

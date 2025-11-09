@@ -1,0 +1,50 @@
+[application]
+name = "terraphim-desktop"
+default_platform = "desktop"
+
+[application.desktop]
+title = "Terraphim AI"
+icon = "assets/icons/icon.png"
+
+[web.app]
+title = "Terraphim AI"
+base_path = "."
+
+[web.watcher]
+reload_html = true
+watch_path = ["src", "assets"]
+
+[web.resource]
+# CSS bundles
+style = ["assets/bulma/bulma.min.css", "assets/styles/custom.css"]
+# JS libraries (if needed)
+script = []
+
+[[web.resource.dev.script]]
+# Development scripts
+
+[bundle]
+identifier = "com.terraphim.desktop"
+publisher = "Terraphim Team"
+homepage = "https://github.com/terraphim/terraphim-ai"
+icon = ["assets/icons/icon.png"]
+resources = ["assets/**/*"]
+copyright = "Copyright (c) Terraphim Team"
+category = "Productivity"
+short_description = "Privacy-first AI assistant"
+long_description = """
+Terraphim AI is a privacy-first AI assistant that operates locally,
+providing semantic search across multiple knowledge repositories.
+"""
+
+[bundle.linux]
+# Linux-specific bundle configuration
+app_image = true
+
+[bundle.windows]
+# Windows-specific bundle configuration
+wix = true
+
+[bundle.macos]
+# macOS-specific bundle configuration
+frameworks = []

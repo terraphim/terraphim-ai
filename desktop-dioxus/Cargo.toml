@@ -1,0 +1,72 @@
+[package]
+name = "terraphim-desktop-dioxus"
+version = "1.0.0"
+edition = "2024"
+authors = ["Terraphim Team"]
+description = "Terraphim AI Desktop Application - Dioxus Edition"
+license = "MIT"
+
+[dependencies]
+# Dioxus framework
+dioxus = { version = "0.6", features = ["desktop", "router"] }
+dioxus-desktop = "0.6"
+dioxus-router = "0.6"
+
+# Async runtime
+tokio = { version = "1", features = ["full"] }
+futures = "0.3"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# HTTP client
+reqwest = { version = "0.12", features = ["json"] }
+
+# Markdown rendering
+pulldown-cmark = "0.12"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# System tray (using tray-icon crate, compatible with Dioxus desktop)
+tray-icon = "0.18"
+image = "0.25"
+
+# Terraphim core crates (existing)
+terraphim_config = { path = "../crates/terraphim_config" }
+terraphim_service = { path = "../crates/terraphim_service" }
+terraphim_types = { path = "../crates/terraphim_types" }
+terraphim_automata = { path = "../crates/terraphim_automata" }
+terraphim_rolegraph = { path = "../crates/terraphim_rolegraph" }
+terraphim_middleware = { path = "../crates/terraphim_middleware" }
+terraphim_persistence = { path = "../crates/terraphim_persistence" }
+terraphim_settings = { path = "../crates/terraphim_settings" }
+
+[dev-dependencies]
+# Testing
+tokio-test = "0.4"
+assert_matches = "1.5"
+
+# E2E testing (Note: dioxus-playwright may not exist yet, use headless browser testing)
+# For now, we'll use integration tests and manual E2E validation
+# Future: Add proper E2E framework when available
+
+[[bin]]
+name = "terraphim-desktop"
+path = "src/main.rs"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+debug = true

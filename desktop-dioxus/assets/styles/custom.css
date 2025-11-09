@@ -1,0 +1,34 @@
+.is-full-height {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.main-area {
+    flex: 1;
+    padding: 1rem;
+}
+
+.search-container {
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.results {
+    margin-top: 2rem;
+}
+
+.chat-container {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+/* Loading animation */
+.fa-spinner {
+    animation: fa-spin 1s infinite linear;
+}
+
+@keyframes fa-spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
