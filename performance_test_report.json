@@ -1,0 +1,88 @@
+{
+  "timestamp": "2025-11-09T11:29:00.681374",
+  "summary": {
+    "total_tests": 6,
+    "passed_tests": 6,
+    "test_duration_total": 71.36963203748067
+  },
+  "performance_tests": [
+    {
+      "name": "Build Performance",
+      "unit": "s",
+      "statistics": {
+        "count": 3,
+        "min": 0.14307808876037598,
+        "max": 4.4306721687316895,
+        "mean": 1.5728635787963867,
+        "median": 0.14484047889709473,
+        "stdev": 2.4749349949111292
+      },
+      "performance_rating": "excellent"
+    },
+    {
+      "name": "Test Execution Performance",
+      "unit": "s",
+      "statistics": {
+        "count": 5,
+        "min": 0.7250790596008301,
+        "max": 3.9205870628356934,
+        "mean": 1.3654353141784668,
+        "median": 0.7260127067565918,
+        "stdev": 1.4283745167409505
+      },
+      "performance_rating": "excellent"
+    },
+    {
+      "name": "Integration Test Performance",
+      "unit": "s",
+      "statistics": {
+        "count": 3,
+        "min": 0.7251982688903809,
+        "max": 0.7252452373504639,
+        "mean": 0.7252264817555746,
+        "median": 0.7252359390258789,
+        "stdev": 2.4871450135639452e-05
+      },
+      "performance_rating": "excellent"
+    },
+    {
+      "name": "Frontend Build Performance",
+      "unit": "s",
+      "statistics": {
+        "count": 3,
+        "min": 4.556519985198975,
+        "max": 4.983713626861572,
+        "mean": 4.704289674758911,
+        "median": 4.5726354122161865,
+        "stdev": 0.24212235647186625
+      },
+      "performance_rating": "excellent"
+    },
+    {
+      "name": "Concurrent Operations",
+      "unit": "s",
+      "statistics": {
+        "count": 1,
+        "min": 3.001816987991333,
+        "max": 3.001816987991333,
+        "mean": 3.001816987991333,
+        "median": 3.001816987991333,
+        "stdev": 0
+      },
+      "performance_rating": "excellent"
+    },
+    {
+      "name": "Memory Usage",
+      "unit": "MB",
+      "statistics": {
+        "count": 5,
+        "min": 50,
+        "max": 70,
+        "mean": 60,
+        "median": 60,
+        "stdev": 7.905694150420948
+      },
+      "performance_rating": "excellent"
+    }
+  ]
+}

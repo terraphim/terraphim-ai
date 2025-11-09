@@ -17,8 +17,10 @@ serde_json = "1.0.96"
 thiserror = "1.0.56"
 log = "0.4.14"
 regex = "1.10.2"
-tokio = { version = "1.35.1", features = ["process", "rt", "macros", "time"] }
+tokio = { version = "1.35.1", features = ["process", "rt", "macros", "time", "sync", "fs", "io-util"] }
 async-trait = "0.1.74"
+chrono = { version = "0.4.38", features = ["serde"] }
+uuid = { version = "1.11", features = ["v4", "serde"] }
 
 [dev-dependencies]
 tempfile = "3.23.0"

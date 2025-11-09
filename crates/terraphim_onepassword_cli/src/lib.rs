@@ -11,6 +11,13 @@ use std::sync::LazyLock;
 use thiserror::Error;
 use tokio::process::Command;
 
+pub mod centralized_monitoring;
+pub mod integration_tests;
+pub mod security_monitoring;
+pub use centralized_monitoring::*;
+pub use integration_tests::*;
+pub use security_monitoring::*;
+
 /// Errors that can occur during 1Password operations
 #[derive(Error, Debug)]
 pub enum OnePasswordError {

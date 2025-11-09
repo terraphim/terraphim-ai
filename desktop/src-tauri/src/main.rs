@@ -14,6 +14,7 @@ use tauri::{
     AppHandle, CustomMenuItem, Manager, RunEvent, SystemTray, SystemTrayEvent, SystemTrayMenu,
     SystemTrayMenuItem, Window, WindowBuilder,
 };
+use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_updater::UpdaterExt;
 use tokio::sync::Mutex;
 
@@ -23,6 +24,7 @@ use terraphim_mcp_server::McpService;
 use terraphim_settings::DeviceSettings;
 use tokio::io::{stdin, stdout};
 use tracing_subscriber::prelude::*;
+use updater::{UpdateConfig, UpdateManager};
 
 /// Initialize user data folder with bundled docs/src content if empty
 async fn initialize_user_data_folder(
@@ -270,6 +272,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = tauri::Builder::default()
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .system_tray(system_tray)
         .on_system_tray_event(|app, event| {
             if let SystemTrayEvent::MenuItemClick { id, .. } = event {
@@ -290,9 +293,31 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 if let Err(e) = app_handle.tray().set_menu(new_tray_menu) {
                                     log::error!("Failed to set new tray menu: {}", e);
                                 }
+
+                                // Show notification for successful role change
+                                if let Err(e) = app_handle
+                                    .notification()
+                                    .builder()
+                                    .title("Role Changed")
+                                    .body(&format!("Switched to {} role", role_name))
+                                    .show()
+                                {
+                                    log::error!("Failed to show role change notification: {}", e);
+                                }
                             }
                             Err(e) => {
                                 log::error!("Failed to select role from tray menu: {}", e);
+
+                                // Show notification for role change failure
+                                if let Err(notif_err) = app_handle
+                                    .notification()
+                                    .builder()
+                                    .title("Role Change Failed")
+                                    .body(&format!("Could not switch to {} role", role_name))
+                                    .show()
+                                {
+                                    log::error!("Failed to show error notification: {}", notif_err);
+                                }
                             }
                         }
                     });
@@ -305,6 +330,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         "toggle" => {
                             let window_labels = ["main", ""];
                             let mut window_found = false;
+                            let mut window_shown = false;
 
                             for label in &window_labels {
                                 if let Some(window) = app.get_window(label) {
@@ -315,6 +341,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         }
                                         Ok(false) => {
                                             let _ = window.show();
+                                            window_shown = true;
                                             "Hide"
                                         }
                                         Err(e) => {
@@ -329,6 +356,35 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                     window_found = true;
                                     break;
                                 }
+                            }
+
+                            // Show notification for window state change
+                            if window_found {
+                                let app_handle_notif = app.clone();
+                                tauri::async_runtime::spawn(async move {
+                                    // Small delay to allow window to update
+                                    tokio::time::sleep(tokio::time::Duration::from_millis(100))
+                                        .await;
+
+                                    let message = if window_shown {
+                                        "Terraphim AI window shown"
+                                    } else {
+                                        "Terraphim AI window hidden"
+                                    };
+
+                                    if let Err(e) = app_handle_notif
+                                        .notification()
+                                        .builder()
+                                        .title("Window State Changed")
+                                        .body(message)
+                                        .show()
+                                    {
+                                        log::error!(
+                                            "Failed to show window toggle notification: {}",
+                                            e
+                                        );
+                                    }
+                                });
                             }
 
                             if !window_found {
@@ -408,7 +464,44 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::onepassword_status,
             cmd::onepassword_resolve_secret,
             cmd::onepassword_process_config,
-            cmd::onepassword_load_settings
+            cmd::onepassword_load_settings,
+            // Advanced updater commands
+            updater::check_for_updates,
+            updater::install_update,
+            updater::rollback_update,
+            // WASM-enhanced autocomplete commands
+            wasm_autocomplete::wasm_autocomplete,
+            wasm_autocomplete::wasm_autocomplete_metrics,
+            wasm_autocomplete::wasm_autocomplete_clear_cache,
+            wasm_autocomplete::wasm_autocomplete_pre_warm,
+            // Performance optimization commands
+            performance::performance_get_metrics,
+            performance::performance_optimize,
+            performance::performance_cleanup_cache,
+            performance::performance_get_history,
+            // Security audit commands
+            security_audit::security_perform_audit,
+            security_audit::security_get_latest_report,
+            security_audit::security_get_scan_history,
+            security_audit::security_get_components,
+            security_audit::security_clear_cache,
+            // Security monitoring commands
+            security_monitoring::security_get_events,
+            security_monitoring::security_record_event,
+            security_monitoring::security_generate_report,
+            security_monitoring::security_get_config,
+            security_monitoring::security_update_config,
+            security_monitoring::security_clear_events,
+            security_monitoring::security_get_statistics,
+            security_monitoring::security_test_monitoring,
+            // Centralized monitoring commands
+            security_monitoring::security_get_alerts,
+            security_monitoring::security_acknowledge_alert,
+            security_monitoring::security_resolve_alert,
+            security_monitoring::security_get_alert_statistics,
+            security_monitoring::security_add_notification_channel,
+            security_monitoring::security_get_notification_channels,
+            security_monitoring::security_test_centralized_monitoring
         ])
         .setup(move |app| {
             let settings = device_settings_read.clone();
@@ -468,6 +561,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
     app.run(move |app_handle, e| match e {
         RunEvent::Ready => {
             let app_handle = app_handle.clone();
+
+            // Show startup notification
+            let app_handle_clone = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                // Small delay to ensure app is fully loaded
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+
+                if let Err(e) = app_handle_clone
+                    .notification()
+                    .builder()
+                    .title("Terraphim AI Ready")
+                    .body("Your privacy-first AI assistant is now active")
+                    .show()
+                {
+                    log::error!("Failed to show startup notification: {}", e);
+                }
+            });
+
+            // Initialize advanced updater
+            let update_config = UpdateConfig::default();
+            let mut update_manager = UpdateManager::new(update_config);
+            let app_handle_updater = app_handle.clone();
+
+            // Start background update checker
+            update_manager.start_background_checker(app_handle_updater);
+
+            // Check for updates on startup
+            let app_handle_update = app_handle.clone();
+            tauri::async_runtime::spawn(async move {
+                if let Some(update) = app_handle_update.updater().check().await.ok().flatten() {
+                    log::info!("Update available: {:?}", update);
+
+                    if let Err(e) = app_handle_update
+                        .notification()
+                        .builder()
+                        .title("Update Available")
+                        .body(&format!(
+                            "Terraphim AI {} is ready to install",
+                            update.version
+                        ))
+                        .show()
+                    {
+                        log::error!("Failed to show update notification: {}", e);
+                    }
+                } else {
+                    log::info!("No updates available");
+                }
+            });
 
             // Try to get the window with different possible labels
             let window_labels = ["main", ""];
