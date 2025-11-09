@@ -118,3 +118,27 @@ cargo run -p terraphim_kg_linter -- --path docs/src/kg --strict
 \`\`\`
 
 Expected output: \`No issues found\` and non-zero exit only when issues exist.
+
+## For AI Agents
+
+- Preferred command (machine-readable):
+  - `cargo run -p terraphim_kg_linter -- --path docs/src/kg -o json --strict`
+- Behavior:
+  - Exit code 0 when no issues; 2 when issues are present
+  - JSON schema: `{ scanned_files, issues: [{ path, severity, code, message }], stats }`
+- Typical workflow:
+  - Run linter → parse JSON → group by `code` → suggest minimal edits in offending file(s)
+  - Apply fixes (e.g., kebab-case command names; PascalCase types; fix unknown types)
+  - Re-run until zero issues
+
+Issue codes and quick actions:
+- `types.invalid` → fix type names (PascalCase), field names, or referenced type existence
+- `types.duplicate` → deduplicate type definitions across files
+- `commands.invalid` → enforce kebab-case command names; ensure args reference valid types
+- `permissions.invalid` → ensure `execute` references an existing command; add or correct command
+
+Programmatic example:
+
+1) Execute the JSON command.
+2) Parse and map issues to file edits.
+3) Re-run the same command to verify a clean state.
