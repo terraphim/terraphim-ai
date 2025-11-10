@@ -15,9 +15,9 @@
 ## Root Causes Identified
 
 ### Issue 1: Missing .cargo/config.toml
-**Workflow**: Package Release  
-**Error**: `sed: can't read .cargo/config.toml: No such file or directory`  
-**Line**: Step "Temporarily disable panic abort for building"  
+**Workflow**: Package Release
+**Error**: `sed: can't read .cargo/config.toml: No such file or directory`
+**Line**: Step "Temporarily disable panic abort for building"
 **Impact**: Workflow fails at line 52 before building
 
 **Fix**:
@@ -37,8 +37,8 @@ EOF
 ```
 
 ### Issue 2: Svelte Accessibility Warnings (Tauri Build)
-**Workflow**: Publish Tauri with Auto-Update  
-**Errors**: Multiple accessibility warnings in Svelte components  
+**Workflow**: Publish Tauri with Auto-Update
+**Errors**: Multiple accessibility warnings in Svelte components
 **Impact**: Build may treat warnings as errors
 
 **Files Needing Fixes**:
@@ -65,7 +65,7 @@ EOF
 ```
 
 ### Issue 3: Package.json Dependency Conflicts
-**Warnings**: Multiple collisions between optionalDependencies and devDependencies  
+**Warnings**: Multiple collisions between optionalDependencies and devDependencies
 **Impact**: May cause npm/yarn resolution issues
 
 **Conflicting Packages**:
@@ -142,7 +142,7 @@ sed -i 's/<textarea \([^>]*\)\/>/     <textarea \1><\/textarea>/g' desktop/src/l
 ```bash
 cd desktop
 # Remove duplicates from optionalDependencies that are in devDependencies
-jq 'del(.optionalDependencies["@tauri-apps/cli"], 
+jq 'del(.optionalDependencies["@tauri-apps/cli"],
         .optionalDependencies["@testing-library/jest-dom"],
         .optionalDependencies["@testing-library/svelte"],
         .optionalDependencies["dotenv"],

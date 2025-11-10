@@ -25,18 +25,18 @@ test_command() {
     local cmd="$1"
     local expected_pattern="$2"
     local description="$3"
-    
+
     echo -e "${YELLOW}Testing:${NC} $description" | tee -a $TEST_LOG
     echo "Command: $cmd" | tee -a $TEST_LOG
-    
+
     # Execute command
     output=$(echo -e "$cmd\n/quit" | $BINARY repl 2>&1 || true)
-    
+
     # Check if expected pattern is in output
     if echo "$output" | grep -q "$expected_pattern"; then
         echo -e "${GREEN}✅ PASS${NC} - Found: $expected_pattern" | tee -a $TEST_LOG
         ((PASS_COUNT++))
-        
+
         # Extract and show relevant output
         relevant=$(echo "$output" | grep -A 3 "$expected_pattern" | head -4)
         echo "Output snippet: " | tee -a $TEST_LOG
@@ -44,7 +44,7 @@ test_command() {
     else
         echo -e "${RED}❌ FAIL${NC} - Expected pattern not found: $expected_pattern" | tee -a $TEST_LOG
         ((FAIL_COUNT++))
-        
+
         # Show what we got instead
         echo "Got instead:" | tee -a $TEST_LOG
         echo "$output" | tail -10 | tee -a $TEST_LOG

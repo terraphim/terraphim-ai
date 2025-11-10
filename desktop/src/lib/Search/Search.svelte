@@ -3,10 +3,11 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input, Tag, Taglist } from 'svelma';
 import { onDestroy, onMount } from 'svelte';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
-import logo from '/assets/terraphim.png';
+import logo from '/assets/terraphim_gray.png';
 import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
+import KGSearchInput from './KGSearchInput.svelte';
 
 let results: Document[] = [];
 let _error: string | null = null;
@@ -59,7 +60,19 @@ function saveSearchState() {
 		const data = { input: $input, results };
 		localStorage.setItem(searchStateKey(), JSON.stringify(data));
 	} catch (e) {
-		console.warn('Failed to save search state:', e);
+		// Handle quota exceeded error
+		if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+			console.warn('localStorage quota exceeded, clearing old search state');
+			try {
+				// Try to clear old state and save again
+				localStorage.removeItem(searchStateKey());
+				localStorage.setItem(searchStateKey(), JSON.stringify(data));
+			} catch (retryError) {
+				console.warn('Failed to save search state after quota cleanup:', retryError);
+			}
+		} else {
+			console.warn('Failed to save search state:', e);
+		}
 	}
 }
 
@@ -109,6 +122,13 @@ function startSummarizationStreaming() {
 		return;
 	}
 
+	// SSE endpoint not implemented on server, use polling instead
+	// The /summarization/stream endpoint doesn't exist, so we fall back to polling
+	startPollingForSummaries();
+	return;
+
+	// Legacy SSE code (disabled - endpoint not implemented)
+	/*
 	if (sseConnection) {
 		sseConnection.close();
 	}
@@ -149,6 +169,7 @@ function startSummarizationStreaming() {
 	} catch (error) {
 		console.error('Failed to create SSE connection:', error);
 	}
+	*/
 }
 
 // Polling fallback for Tauri (since EventSource isn't supported)
@@ -276,7 +297,7 @@ async function getTermSuggestions(query: string): Promise<string[]> {
 		if ($is_tauri) {
 			const response: any = await invoke('get_autocomplete_suggestions', {
 				query: query,
-				roleName: $role,
+				role_name: $role,
 				limit: 8,
 			});
 
@@ -615,40 +636,56 @@ async function handleSearchInputEvent() {
   <Field>
     <div class="search-row">
       <div class="input-wrapper">
-        <Input
-          type="search"
-          bind:value={$input}
-          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-          icon="search"
-          expanded
-          autofocus
-          on:click={handleSearchInputEvent}
-          on:submit={handleSearchInputEvent}
-          on:keydown={_handleKeydown}
-          on:input={() => {}}
-        />
-      {#if suggestions.length > 0}
-        <ul class="suggestions">
-          {#each suggestions as suggestion, index}
-            <li
-              class:active={index === suggestionIndex}
-              on:click={() => applySuggestion(suggestion)}
-              on:keydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  applySuggestion(suggestion);
-                }
-              }}
-              tabindex="0"
-              role="option"
-              aria-selected={index === suggestionIndex}
-              aria-label={`Apply suggestion: ${suggestion}`}
-            >
-              {suggestion}
-            </li>
-          {/each}
-        </ul>
-      {/if}
+        {#if $typeahead}
+          <KGSearchInput
+            roleName={$role}
+            placeholder={`Search knowledge graph items`}
+            autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
+            initialValue={$input}
+            onInputChange={(value) => {
+              $input = value;
+            }}
+            onSelect={(term) => {
+              $input = term;
+              handleSearchInputEvent();
+            }}
+          />
+        {:else}
+          <Input
+            type="search"
+            bind:value={$input}
+            placeholder="Search"
+            icon="search"
+            expanded
+            autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
+            on:click={handleSearchInputEvent}
+            on:submit={handleSearchInputEvent}
+            on:keydown={_handleKeydown}
+            on:input={_updateSuggestions}
+          />
+          {#if suggestions.length > 0}
+            <ul class="suggestions">
+              {#each suggestions as suggestion, index}
+                <li
+                  class:active={index === suggestionIndex}
+                  on:click={() => applySuggestion(suggestion)}
+                  on:keydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      applySuggestion(suggestion);
+                    }
+                  }}
+                  tabindex="0"
+                  role="option"
+                  aria-selected={index === suggestionIndex}
+                  aria-label={`Apply suggestion: ${suggestion}`}
+                >
+                  {suggestion}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
       </div>
 
       <!-- Selected terms display -->

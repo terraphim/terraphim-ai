@@ -2,7 +2,7 @@
 
 ## 🎯 Release Status: PUBLISHED
 
-**GitHub Release URL:** https://github.com/terraphim/terraphim-ai/releases/tag/v1.0.0  
+**GitHub Release URL:** https://github.com/terraphim/terraphim-ai/releases/tag/v1.0.0
 **Published:** 2025-11-05 17:04 UTC
 
 ---
@@ -115,8 +115,8 @@
 
 **Status:** The v1.0.0 release has been successfully published to GitHub with all artifacts available for download. The release includes a fully functional Tauri desktop application with system tray support, auto-updater capability, and comprehensive AI-powered search features.
 
-**Total Artifacts:** 7 files (40.3 MB total)  
-**Supported Platform:** macOS ARM64 (Apple Silicon)  
+**Total Artifacts:** 7 files (40.3 MB total)
+**Supported Platform:** macOS ARM64 (Apple Silicon)
 **Next Steps:** Monitor downloads and user feedback
 
 ---

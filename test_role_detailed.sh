@@ -23,7 +23,7 @@ echo "----------------------------------------------------------------"
 echo -e "/role select \"Rust Engineer\"\n/search async\n/quit" | $BINARY repl 2>/dev/null | head -20 | tail -15
 echo ""
 
-echo "4. SWITCHING TO 'Default' ROLE" 
+echo "4. SWITCHING TO 'Default' ROLE"
 echo "----------------------------------------------------------------"
 echo -e "/role select Default\n/role list\n/quit" | $BINARY repl 2>/dev/null | grep -A 10 -E "(Switched to role:|Available roles:)"
 echo ""

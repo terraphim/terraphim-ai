@@ -47,9 +47,9 @@ run_test() {
     local test_name="$1"
     local test_script="$2"
     local log_file="$RESULTS_DIR/${test_name}.log"
-    
+
     echo -e "${BLUE}Running $test_name tests...${NC}"
-    
+
     if $test_script 2>&1 | tee "$log_file"; then
         echo -e "${GREEN}✓ $test_name tests completed successfully${NC}"
         # Extract pass/fail counts from log

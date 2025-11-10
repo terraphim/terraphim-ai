@@ -35,10 +35,10 @@ test_endpoint() {
     local data="$3"
     local expected="$4"
     local description="$5"
-    
+
     echo -e "${YELLOW}Testing:${NC} $description" | tee -a $TEST_LOG
     echo "Endpoint: $method $endpoint" | tee -a $TEST_LOG
-    
+
     # Execute request
     if [ "$method" = "GET" ]; then
         response=$(curl -s -w "\nHTTP_STATUS:%{http_code}" "$SERVER_URL$endpoint" || true)
@@ -48,11 +48,11 @@ test_endpoint() {
             -d "$data" \
             "$SERVER_URL$endpoint" || true)
     fi
-    
+
     # Extract status code
     http_status=$(echo "$response" | grep HTTP_STATUS | cut -d: -f2)
     body=$(echo "$response" | grep -v HTTP_STATUS)
-    
+
     # Check response
     if [ "$http_status" -ge 200 ] && [ "$http_status" -lt 300 ]; then
         if [ -n "$expected" ] && echo "$body" | grep -qi "$expected"; then
