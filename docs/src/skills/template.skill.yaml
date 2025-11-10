@@ -1,0 +1,38 @@
+name: template-skill
+version: 0.1.0
+summary: Short description of what this skill does
+tags: [documentation]
+
+inputs:
+  example_param:
+    type: string
+    required: false
+    default: ""
+
+tools:
+  - run_terminal_command
+  - read_files
+  - write_file
+
+constraints:
+  max_iterations: 5
+  stop_on_success: true
+
+steps:
+  - id: step-1
+    name: describe-action
+    instruction: |
+      Explain what you are about to do and why. Then run the command if applicable.
+    run: echo "hello world"
+    parse: none
+    on_error: abort
+
+outputs:
+  success_criteria:
+    - "Command(s) executed as expected"
+  artifacts:
+    - "Any files produced or modified by this skill"
+
+notes:
+  - Keep commands deterministic and idempotent.
+  - Prefer JSON outputs when calling validators.

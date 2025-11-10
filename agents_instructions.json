@@ -302,6 +302,23 @@
           "fuzzy_autocomplete_search_jaro_winkler"
         ],
         "transports": ["stdio", "sse/http"]
+      },
+      "cli_tools": {
+        "terraphim-kg-lint": {
+          "binary": "terraphim-kg-lint",
+          "run_from_repo_root": true,
+          "build": "cargo build -p terraphim_kg_linter",
+          "usage_text": "cargo run -p terraphim_kg_linter -- --path docs/src/kg -o json --strict",
+          "json_output": true,
+          "exit_codes": { "ok": 0, "issues": 2 },
+          "issue_codes": ["types.invalid", "types.duplicate", "commands.invalid", "permissions.invalid"],
+          "quick_fixes": {
+            "types.invalid": "Use PascalCase type names; valid field type expressions; ensure referenced types exist or use primitives",
+            "types.duplicate": "Deduplicate or merge type definitions",
+            "commands.invalid": "Use kebab-case command names; fix argument types to primitives or declared types",
+            "permissions.invalid": "Ensure execute.command names match declared commands"
+          }
+        }
       }
     },
 
@@ -360,6 +377,13 @@
         "Use terraphim_automata::load_thesaurus() for loading",
         "RoleGraph manages document-to-concept relationships",
         "Thesaurus format: id/nterm/url JSON structure"
+      ],
+      "kg_schema_lint_workflow": [
+        "Run terraphim-kg-lint in JSON strict mode",
+        "Parse issues and map to files and codes",
+        "Apply minimal required edits to resolve each issue",
+        "Re-run linter until zero issues",
+        "Commit changes with clear description"
       ]
     }
   }

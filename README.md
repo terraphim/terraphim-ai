@@ -96,6 +96,42 @@ For detailed installation instructions, see our [Installation Guide](https://git
 
 (See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
 
+### ✅ LLM Agent Linting (KG Schema)
+
+Terraphim ships a linter for markdown-based Knowledge Graph schemas (commands, types, permissions), designed for LLMs to use in an agentic loop.
+
+- Run locally (JSON strict):
+  - `cargo run -p terraphim_kg_linter -- --path docs/src/kg -o json --strict`
+  - Exit codes: 0 = OK, 2 = issues
+- Skill for agentic loop:
+  - `docs/src/skills/kg-schema-lint.skill.yaml` — run → parse JSON → plan minimal diffs → apply → re-run until clean
+- Agent example:
+  - `.agents/examples/04-kg-lint-check.ts`
+- Full spec and guidance:
+  - `docs/src/kg/schema-linter.md` and `docs/src/skills/README.md`
+
+#### Run this Skill with Claude (Desktop)
+
+Use Claude Skills to run an agentic loop locally against the linter.
+
+- Requirements: Rust/cargo installed; run within this repo directory.
+- Install the skill:
+  ```bash
+  mkdir -p ~/.config/superpowers/skills
+  cp docs/src/skills/kg-schema-lint.skill.yaml ~/.config/superpowers/skills/kg-schema-lint.skill.yaml
+  ```
+- In Claude Desktop (with Superpowers), reload skills and select `kg-schema-lint-autofix`.
+- Provide inputs (examples):
+  - `kg_path`: `docs/src/kg`
+  - `max_iterations`: `5`
+- The skill will:
+  - Run the linter in strict JSON mode
+  - Parse issues → plan minimal edits → apply changes
+  - Re-run until exit code `0` or iteration cap
+
+See also: `CLAUDE.md` (Skills + .agents usage) and the example agent `.agents/examples/04-kg-lint-check.ts`.
+
+
 ## Terminal User Interface (TUI)
 
 Terraphim includes a comprehensive TUI that provides both interactive REPL functionality and CLI commands for advanced operations:
