@@ -96,6 +96,21 @@ For detailed installation instructions, see our [Installation Guide](https://git
 
 (See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
 
+### ✅ LLM Agent Linting (KG Schema)
+
+Terraphim ships a linter for markdown-based Knowledge Graph schemas (commands, types, permissions), designed for LLMs to use in an agentic loop.
+
+- Run locally (JSON strict):
+  - `cargo run -p terraphim_kg_linter -- --path docs/src/kg -o json --strict`
+  - Exit codes: 0 = OK, 2 = issues
+- Skill for agentic loop:
+  - `docs/src/skills/kg-schema-lint.skill.yaml` — run → parse JSON → plan minimal diffs → apply → re-run until clean
+- Agent example:
+  - `.agents/examples/04-kg-lint-check.ts`
+- Full spec and guidance:
+  - `docs/src/kg/schema-linter.md` and `docs/src/skills/README.md`
+
+
 ## Terminal User Interface (TUI)
 
 Terraphim includes a comprehensive TUI that provides both interactive REPL functionality and CLI commands for advanced operations:
