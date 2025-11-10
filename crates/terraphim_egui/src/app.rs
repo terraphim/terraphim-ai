@@ -99,7 +99,7 @@ impl EguiApp {
 
         // Create the main application layout
         egui::TopBottomPanel::top("top_panel")
-            .min_height(40.0)
+            .min_height(50.0)
             .show(ctx, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(
@@ -121,10 +121,82 @@ impl EguiApp {
     }
 
     /// Render header section
-    fn render_header(&self, ui: &mut egui::Ui) {
-        // Header content (role, tab navigation, etc.)
-        // TODO: Implement in Phase 2
-        ui.label("Header - TODO: Implement in Phase 2");
+    fn render_header(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal_wrapped(|ui| {
+            // Current Role Display
+            let role = self.state.get_current_role();
+            ui.label(egui::RichText::new("👤 Role:").small().weak());
+            ui.label(
+                egui::RichText::new(role.name.as_str())
+                    .strong()
+                    .color(self.theme_manager.accent_color()),
+            );
+            drop(role);
+
+            ui.add_space(16.0);
+
+            // Search Statistics
+            let search_count = self.state.get_search_results().len();
+            ui.label(egui::RichText::new("🔍").small());
+            ui.label(egui::RichText::new(format!("Searches: {}", search_count)).small());
+
+            ui.add_space(8.0);
+
+            // Context Statistics
+            let context = self.state.get_context_manager();
+            let context_count = context.selected_documents.len();
+            let concept_count = context.selected_concepts.len();
+            let total_context = context_count + concept_count;
+            drop(context);
+
+            ui.label(egui::RichText::new("📋").small());
+            ui.label(egui::RichText::new(format!("Context: {}", total_context)).small());
+
+            ui.add_space(16.0);
+
+            // Quick Action Buttons
+            ui.add_space(8.0);
+            if ui
+                .button("🗑️ Clear Context")
+                .on_hover_text("Clear all context items")
+                .clicked()
+            {
+                self.state.clear_context();
+            }
+
+            if ui
+                .button("💬 Clear Chat")
+                .on_hover_text("Clear conversation history")
+                .clicked()
+            {
+                self.state.clear_conversation();
+            }
+
+            // Right side - Theme toggle and shortcuts
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                ui.add_space(8.0);
+
+                // Theme toggle button
+                let ui_state = self.state.get_ui_state();
+                let current_theme = ui_state.theme.clone();
+                drop(ui_state);
+
+                if ui
+                    .button("🎨 Theme")
+                    .on_hover_text("Change theme (not implemented yet)")
+                    .clicked()
+                {
+                    // TODO: Implement theme switching
+                }
+
+                // Keyboard shortcut hint
+                ui.label(
+                    egui::RichText::new("⌨️ Shortcuts: Ctrl+F (Search) | Ctrl+Enter (Send)")
+                        .small()
+                        .weak(),
+                );
+            });
+        });
     }
 
     /// Render status bar

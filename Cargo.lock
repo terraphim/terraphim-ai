@@ -10003,6 +10003,7 @@ dependencies = [
  "egui",
  "env_logger 0.10.2",
  "log",
+ "rand 0.8.5",
  "reqwest 0.11.27",
  "rstest",
  "serde",
