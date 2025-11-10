@@ -1,0 +1,19 @@
+[package]
+name = "test-desktop-services"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+terraphim_service = { path = "../crates/terraphim_service" }
+terraphim_automata = { path = "../crates/terraphim_automata" }
+terraphim_types = { path = "../crates/terraphim_types" }
+terraphim_config = { path = "../crates/terraphim_config" }
+terraphim_persistence = { path = "../crates/terraphim_persistence" }
+pulldown-cmark = "0.12"
+tokio = { version = "1", features = ["full"] }
+ahash = "0.8"
+
+[[test]]
+name = "services"
+path = "tests/services.rs"
+[workspace]
