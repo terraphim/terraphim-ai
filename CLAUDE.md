@@ -282,7 +282,58 @@ cargo test --features mcp-rust-sdk
 
 # Build TUI with full REPL
 cargo build -p terraphim_tui --features repl-full
+
+# Build terraphim_automata for WASM
+cargo build -p terraphim_automata --target wasm32-unknown-unknown --features wasm
 ```
+
+### WASM Support
+
+The `terraphim_automata` crate supports WebAssembly for browser-based autocomplete functionality.
+
+**Prerequisites:**
+```bash
+# Install WASM target
+rustup target add wasm32-unknown-unknown
+
+# Install wasm-pack
+cargo install wasm-pack
+```
+
+**Build WASM module:**
+```bash
+# Development build
+./scripts/build-wasm.sh web dev
+
+# Production build (optimized)
+./scripts/build-wasm.sh web release
+
+# Node.js target
+./scripts/build-wasm.sh nodejs release
+```
+
+**Test WASM module:**
+```bash
+# Test in Chrome (headless)
+./scripts/test-wasm.sh chrome headless
+
+# Test in Firefox
+./scripts/test-wasm.sh firefox headless
+
+# Test in Node.js
+./scripts/test-wasm.sh node
+```
+
+**WASM Features:**
+- ✅ Full autocomplete API exposed to JavaScript
+- ✅ TypeScript type definitions via `tsify`
+- ✅ Browser-compatible random number generation
+- ✅ ~200KB compressed bundle size (release build)
+- ✅ Compatible with Chrome 57+, Firefox 52+, Safari 11+
+
+**Example WASM directory:**
+- `crates/terraphim_automata/wasm-test/` - Complete WASM example with tests
+- See `crates/terraphim_automata/wasm-test/README.md` for detailed usage
 
 ### Testing
 ```bash
