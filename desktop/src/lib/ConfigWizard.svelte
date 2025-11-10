@@ -898,7 +898,7 @@ function _closeWizard() {
             <div class="field">
               <label class="label" for={`openrouter-chat-system-${idx}`}>System Prompt (optional)</label>
               <div class="control">
-                <textarea class="textarea" id={`openrouter-chat-system-${idx}`} rows="3" placeholder="You are a helpful Rust engineer assistant..." bind:value={$draft.roles[idx].openrouter_chat_system_prompt} />
+                <textarea class="textarea" id={`openrouter-chat-system-${idx}`} rows="3" placeholder="You are a helpful Rust engineer assistant..." bind:value={$draft.roles[idx].openrouter_chat_system_prompt}></textarea>
               </div>
             </div>
           {/if}

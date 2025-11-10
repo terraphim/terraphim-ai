@@ -137,7 +137,7 @@
 
 ---
 
-**Summary**: Release v1.0.0 is 75% complete with all infrastructure in place. 
+**Summary**: Release v1.0.0 is 75% complete with all infrastructure in place.
 Waiting for CI to pass, then ready to publish!
 
 **Kudos**: Excellent progress on first major release with signed Tauri updates! 🎊

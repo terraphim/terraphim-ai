@@ -6,7 +6,7 @@
 - [ ] Selecting a role from dropdown changes the theme
 - [ ] Role selection persists after app restart
 
-## 2. System Tray Tests  
+## 2. System Tray Tests
 - [ ] System tray icon is visible
 - [ ] Right-click shows menu with roles
 - [ ] Selecting role from tray menu changes role in UI dropdown
@@ -64,11 +64,11 @@
 | Integration | | | |
 
 ## Issues Found
-1. 
-2. 
-3. 
+1.
+2.
+3.
 
 ## Recommendations
-- 
-- 
-- 
+-
+-
+-

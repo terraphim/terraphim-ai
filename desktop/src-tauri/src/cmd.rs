@@ -385,6 +385,9 @@ pub async fn get_rolegraph(
 
 /// Select a role (change `selected_role`) without sending the entire config back and
 /// forth. Returns the updated `Config` so the frontend can reflect the change.
+///
+/// If the selected role has a knowledge graph configured, the thesaurus will be
+/// prewarmed (built immediately) to avoid "will be built on first use" delays.
 #[command]
 pub async fn select_role(
     app_handle: tauri::AppHandle,
@@ -393,9 +396,59 @@ pub async fn select_role(
 ) -> Result<ConfigResponse> {
     log::info!("Select role called: {}", role_name);
     let terraphim_service = TerraphimService::new(config_state.inner().clone());
+    let role_name_typed = terraphim_types::RoleName::new(&role_name);
+
+    // Update selected role
     let config = terraphim_service
-        .update_selected_role(terraphim_types::RoleName::new(&role_name))
+        .update_selected_role(role_name_typed.clone())
         .await?;
+
+    // Prewarm thesaurus if the role has a KG configured
+    let role_config = config.roles.get(&role_name_typed);
+    if let Some(role) = role_config {
+        let has_kg = role.kg.is_some()
+            && (role
+                .kg
+                .as_ref()
+                .and_then(|kg| kg.automata_path.as_ref())
+                .is_some()
+                || role
+                    .kg
+                    .as_ref()
+                    .and_then(|kg| kg.knowledge_graph_local.as_ref())
+                    .is_some());
+
+        if has_kg {
+            log::info!(
+                "Role '{}' has KG configured, prewarming thesaurus...",
+                role_name
+            );
+            // Build thesaurus in background - don't block the response
+            let role_name_clone = role_name_typed.clone();
+            let mut service_clone = TerraphimService::new(config_state.inner().clone());
+            tokio::spawn(async move {
+                match service_clone
+                    .ensure_thesaurus_loaded(&role_name_clone)
+                    .await
+                {
+                    Ok(thesaurus) => {
+                        log::info!(
+                            "✅ Thesaurus prewarmed for role '{}': {} terms loaded",
+                            role_name_clone.original,
+                            thesaurus.len()
+                        );
+                    }
+                    Err(e) => {
+                        log::warn!(
+                            "⚠️ Failed to prewarm thesaurus for role '{}': {}",
+                            role_name_clone.original,
+                            e
+                        );
+                    }
+                }
+            });
+        }
+    }
 
     // Notify the frontend that the role has changed, sending the whole new config
     if let Err(e) = app_handle.emit_all("role_changed", &config) {

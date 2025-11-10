@@ -1,6 +1,6 @@
 # Terraphim AI v1.0.0 Release Build Summary
 
-**Date:** 2025-11-05  
+**Date:** 2025-11-05
 **Build Status:** ✅ SUCCESSFUL
 
 ## Build Artifacts
@@ -14,7 +14,7 @@
 - **Status:** ✅ Built successfully
 
 #### 2. terraphim-tui
-- **Path:** `target/release/terraphim-tui`  
+- **Path:** `target/release/terraphim-tui`
 - **Size:** ~12MB (optimized)
 - **Features:** repl-full
 - **Status:** ✅ Built successfully

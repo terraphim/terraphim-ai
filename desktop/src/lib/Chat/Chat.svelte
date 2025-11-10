@@ -1103,7 +1103,7 @@ function _toggleSessionList() {
 
         <div class="field has-addons chat-input">
           <div class="control is-expanded">
-            <textarea class="textarea" rows="3" bind:value={input} on:keydown={_handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input" />
+            <textarea class="textarea" rows="3" bind:value={input} on:keydown={_handleKeydown} placeholder="Type your message and press Enter..." data-testid="chat-input"></textarea>
           </div>
           <div class="control">
             <button class="button is-primary" on:click={sendMessage} disabled={sending || !input.trim()} data-testid="send-message-button">
@@ -1330,7 +1330,7 @@ function _toggleSessionList() {
 <!-- Debug Request Modal -->
 {#if _showDebugRequest}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => _showDebugRequest = false}></div>
+    <div class="modal-background" on:click={() => _showDebugRequest = false} role="button" tabindex="0" aria-label="Close debug request modal"></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">
@@ -1371,7 +1371,7 @@ function _toggleSessionList() {
 <!-- Debug Response Modal -->
 {#if _showDebugResponse}
   <div class="modal is-active">
-    <div class="modal-background" on:click={() => _showDebugResponse = false}></div>
+    <div class="modal-background" on:click={() => _showDebugResponse = false} role="button" tabindex="0" aria-label="Close debug response modal"></div>
     <div class="modal-card">
       <header class="modal-card-head">
         <p class="modal-card-title">

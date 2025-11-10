@@ -705,7 +705,7 @@ const addKGIndexToContext = _addKGIndexToContext;
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-      <div class="kg-search-container" on:keydown={_handleKeydown}>
+      <div class="kg-search-container" on:keydown={_handleKeydown} role="textbox" tabindex="0">
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 

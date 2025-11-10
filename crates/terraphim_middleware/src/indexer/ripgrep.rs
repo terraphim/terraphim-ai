@@ -7,12 +7,83 @@ use terraphim_types::{Document, Index};
 use super::IndexMiddleware;
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
+use cached::proc_macro::cached;
 use terraphim_config::Haystack;
+use tokio::fs as tfs;
 
 /// Middleware that uses ripgrep to index Markdown haystacks.
 #[derive(Default)]
-pub struct RipgrepIndexer {
-    command: RipgrepCommand,
+pub struct RipgrepIndexer {}
+
+/// Cached wrapper that performs ripgrep indexing for a given haystack/query.
+#[cached(
+    result = true,
+    size = 64,
+    key = "String",
+    convert = r#"{ format!("{}::{}::{:?}", haystack.location, needle, haystack.get_extra_parameters()) }"#
+)]
+async fn cached_ripgrep_index(needle: &str, haystack: &Haystack) -> Result<Index> {
+    let command = RipgrepCommand::default();
+    let haystack_path = Path::new(&haystack.location);
+    log::debug!(
+        "RipgrepIndexer::index called with needle: '{}' haystack: {:?}",
+        needle,
+        haystack_path
+    );
+
+    // Check if haystack path exists
+    if !haystack_path.exists() {
+        log::warn!("Haystack path does not exist: {:?}", haystack_path);
+        return Ok(Index::default());
+    }
+
+    // List files in haystack directory
+    if let Ok(entries) = fs::read_dir(haystack_path) {
+        let files: Vec<_> = entries
+            .filter_map(|entry| entry.ok())
+            .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "md"))
+            .collect();
+        log::debug!(
+            "Found {} markdown files in haystack: {:?}",
+            files.len(),
+            files.iter().map(|e| e.path()).collect::<Vec<_>>()
+        );
+    }
+
+    // Parse extra parameters from haystack configuration
+    let extra_params = haystack.get_extra_parameters();
+    log::debug!("Haystack extra_parameters: {:?}", extra_params);
+
+    let extra_args = command.parse_extra_parameters(extra_params);
+    if !extra_args.is_empty() {
+        log::info!("🏷️ Using extra ripgrep parameters: {:?}", extra_args);
+        log::info!("🔍 This will modify the ripgrep command to include tag filtering");
+    } else {
+        log::debug!("No extra parameters provided for ripgrep command");
+    }
+
+    // Run ripgrep with extra arguments if any
+    let messages = if extra_args.is_empty() {
+        command.run(needle, haystack_path).await?
+    } else {
+        command
+            .run_with_extra_args(needle, haystack_path, &extra_args)
+            .await?
+    };
+
+    log::debug!("Ripgrep returned {} messages", messages.len());
+
+    // Debug: Log the first few messages to understand the JSON structure
+    log::debug!("RipgrepIndexer got {} messages", messages.len());
+    for (i, message) in messages.iter().take(3).enumerate() {
+        log::debug!("Message {}: {:?}", i, message);
+    }
+
+    let indexer = RipgrepIndexer::default();
+    let documents = indexer.index_inner(messages).await;
+    log::debug!("Index_inner created {} documents", documents.len());
+
+    Ok(documents)
 }
 
 impl IndexMiddleware for RipgrepIndexer {
@@ -22,65 +93,7 @@ impl IndexMiddleware for RipgrepIndexer {
     ///
     /// Returns an error if the middleware fails to index the haystack
     async fn index(&self, needle: &str, haystack: &Haystack) -> Result<Index> {
-        let haystack_path = Path::new(&haystack.location);
-        log::debug!(
-            "RipgrepIndexer::index called with needle: '{}' haystack: {:?}",
-            needle,
-            haystack_path
-        );
-
-        // Check if haystack path exists
-        if !haystack_path.exists() {
-            log::warn!("Haystack path does not exist: {:?}", haystack_path);
-            return Ok(Index::default());
-        }
-
-        // List files in haystack directory
-        if let Ok(entries) = fs::read_dir(haystack_path) {
-            let files: Vec<_> = entries
-                .filter_map(|entry| entry.ok())
-                .filter(|entry| entry.path().extension().is_some_and(|ext| ext == "md"))
-                .collect();
-            log::debug!(
-                "Found {} markdown files in haystack: {:?}",
-                files.len(),
-                files.iter().map(|e| e.path()).collect::<Vec<_>>()
-            );
-        }
-
-        // Parse extra parameters from haystack configuration
-        let extra_params = haystack.get_extra_parameters();
-        log::debug!("Haystack extra_parameters: {:?}", extra_params);
-
-        let extra_args = self.command.parse_extra_parameters(extra_params);
-        if !extra_args.is_empty() {
-            log::info!("🏷️ Using extra ripgrep parameters: {:?}", extra_args);
-            log::info!("🔍 This will modify the ripgrep command to include tag filtering");
-        } else {
-            log::debug!("No extra parameters provided for ripgrep command");
-        }
-
-        // Run ripgrep with extra arguments if any
-        let messages = if extra_args.is_empty() {
-            self.command.run(needle, haystack_path).await?
-        } else {
-            self.command
-                .run_with_extra_args(needle, haystack_path, &extra_args)
-                .await?
-        };
-
-        log::debug!("Ripgrep returned {} messages", messages.len());
-
-        // Debug: Log the first few messages to understand the JSON structure
-        log::debug!("RipgrepIndexer got {} messages", messages.len());
-        for (i, message) in messages.iter().take(3).enumerate() {
-            log::debug!("Message {}: {:?}", i, message);
-        }
-
-        let documents = self.index_inner(messages);
-        log::debug!("Index_inner created {} documents", documents.len());
-
-        Ok(documents)
+        cached_ripgrep_index(needle, haystack).await
     }
 }
 
@@ -135,10 +148,9 @@ impl RipgrepIndexer {
         Ok(())
     }
 
-    // #[cached] - temporarily disabled for debugging
     /// This is the inner function that indexes the documents
     /// which allows us to cache requests to the index service
-    fn index_inner(&self, messages: Vec<Message>) -> Index {
+    async fn index_inner(&self, messages: Vec<Message>) -> Index {
         log::debug!("index_inner called with {} messages", messages.len());
 
         // Cache of already processed documents
@@ -192,7 +204,7 @@ impl RipgrepIndexer {
 
                     log::trace!("Processing match {} for document: {}", match_count, path);
 
-                    let body = match fs::read_to_string(&path) {
+                    let body = match tfs::read_to_string(&path).await {
                         Ok(body) => {
                             log::trace!("Successfully read file: {} ({} bytes)", path, body.len());
                             body
