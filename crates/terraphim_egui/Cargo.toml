@@ -44,6 +44,9 @@ thiserror = "1.0"
 uuid = { version = "1.0", features = ["v4"] }
 chrono = { version = "0.4", features = ["serde"] }
 
+# HTTP client for LLM communication
+reqwest = { version = "0.11", features = ["json"], optional = true }
+
 # Global shortcuts (optional)
 # egui = "0.27" includes support for keyboard events
 
@@ -55,8 +58,9 @@ tokio-test = "0.4"
 reqwest = { version = "0.11", features = ["json"] }
 
 [features]
-default = []
+default = ["reqwest"]
 # Reserved for future feature flags
+reqwest = ["dep:reqwest"]
 
 [profile.release]
 opt-level = 3

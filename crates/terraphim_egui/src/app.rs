@@ -4,7 +4,7 @@
 //! and handles the main application lifecycle and rendering.
 
 use eframe::egui;
-use tracing::{error, info, warn};
+use tracing::info;
 
 use crate::state::AppState;
 use crate::ui::{Panels, ThemeManager};
