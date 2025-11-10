@@ -29,10 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v5
 
-      - name: Setup Node.js
+      - name: Setup Node.js (LTS)
         uses: actions/setup-node@v5
         with:
-          node-version: latest
+          node-version: 20
 
       - name: Install Rust stable
         uses: actions-rs/toolchain@v1
@@ -45,11 +45,54 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} libjavascriptcoregtk-4.0-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+          # Try WebKitGTK 4.0 first; on Ubuntu 24.04 this may fail, so fall back to 4.1
+          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} libjavascriptcoregtk-4.0-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config \
+            || sudo apt-get install -y libgtk-3-dev libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+
+      - name: WebKitGTK 4.1 compatibility shim (Ubuntu)
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          set -e
+          PC_DIR=/usr/lib/x86_64-linux-gnu/pkgconfig
+          LIB_DIR=/usr/lib/x86_64-linux-gnu
+          # Only create shims if 4.1 exists and 4.0 is missing
+          if [ -f "$PC_DIR/webkit2gtk-4.1.pc" ] && [ ! -f "$PC_DIR/webkit2gtk-4.0.pc" ]; then
+            echo "Creating pkg-config shim for webkit2gtk 4.0 -> 4.1"
+            sudo ln -sf "$PC_DIR/webkit2gtk-4.1.pc" "$PC_DIR/webkit2gtk-4.0.pc"
+          fi
+          if [ -f "$PC_DIR/javascriptcoregtk-4.1.pc" ] && [ ! -f "$PC_DIR/javascriptcoregtk-4.0.pc" ]; then
+            echo "Creating pkg-config shim for javascriptcoregtk 4.0 -> 4.1"
+            sudo ln -sf "$PC_DIR/javascriptcoregtk-4.1.pc" "$PC_DIR/javascriptcoregtk-4.0.pc"
+          fi
+          if [ -f "$LIB_DIR/libwebkit2gtk-4.1.so" ] && [ ! -f "$LIB_DIR/libwebkit2gtk-4.0.so" ]; then
+            echo "Creating library shim for libwebkit2gtk 4.0 -> 4.1"
+            sudo ln -sf "$LIB_DIR/libwebkit2gtk-4.1.so" "$LIB_DIR/libwebkit2gtk-4.0.so"
+          fi
+          if [ -f "$LIB_DIR/libjavascriptcoregtk-4.1.so" ] && [ ! -f "$LIB_DIR/libjavascriptcoregtk-4.0.so" ]; then
+            echo "Creating library shim for libjavascriptcoregtk 4.0 -> 4.1"
+            sudo ln -sf "$LIB_DIR/libjavascriptcoregtk-4.1.so" "$LIB_DIR/libjavascriptcoregtk-4.0.so"
+          fi
 
       - name: Install and Build Application
-        run: yarn install && yarn build
+        run: yarn install --frozen-lockfile && yarn build
         working-directory: ${{ env.WORKING_DIRECTORY }}
+
+      - name: Prepare Tauri config (no secrets on PRs)
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        run: |
+          if [ -f src-tauri/tauri.conf.json ]; then
+            echo "tauri.conf.json already present"
+            exit 0
+          fi
+          if [ -f src-tauri/tauri.conf.json.template ]; then
+            cp src-tauri/tauri.conf.json.template src-tauri/tauri.conf.json
+            # Replace any op:// references with a dummy placeholder so build does not fail
+            sed -i.bak 's|"op://[^"]*"|"DEV_NO_KEY"|g' src-tauri/tauri.conf.json || true
+            rm -f src-tauri/tauri.conf.json.bak || true
+            echo "Prepared src-tauri/tauri.conf.json from template"
+          else
+            echo "No tauri.conf.json or template found"
+          fi
 
       - uses: tauri-apps/tauri-action@v0
         env:

@@ -31,6 +31,19 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Load 1Password secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        secrets: |
+          TAURI_PRIVATE_KEY=op://TerraphimPlatform/tauri.update.signing/TAURI_PRIVATE_KEY
+          TAURI_PUBLIC_KEY=op://TerraphimPlatform/tauri.update.signing/TAURI_PUBLIC_KEY
+
       - name: Setup Node.js
         uses: actions/setup-node@v5
         with:
@@ -67,19 +80,51 @@ jobs:
             libjavascriptcoregtk-4.0-dev \
             pkg-config
 
+      - name: WebKitGTK 4.1 compatibility shim (Ubuntu)
+        if: matrix.platform == 'ubuntu-20.04' || matrix.platform == 'ubuntu-22.04' || matrix.platform == 'ubuntu-24.04'
+        run: |
+          set -e
+          PC_DIR=/usr/lib/x86_64-linux-gnu/pkgconfig
+          LIB_DIR=/usr/lib/x86_64-linux-gnu
+          if [ -f "$PC_DIR/webkit2gtk-4.1.pc" ] && [ ! -f "$PC_DIR/webkit2gtk-4.0.pc" ]; then
+            echo "Creating pkg-config shim for webkit2gtk 4.0 -> 4.1"
+            sudo ln -sf "$PC_DIR/webkit2gtk-4.1.pc" "$PC_DIR/webkit2gtk-4.0.pc"
+          fi
+          if [ -f "$PC_DIR/javascriptcoregtk-4.1.pc" ] && [ ! -f "$PC_DIR/javascriptcoregtk-4.0.pc" ]; then
+            echo "Creating pkg-config shim for javascriptcoregtk 4.0 -> 4.1"
+            sudo ln -sf "$PC_DIR/javascriptcoregtk-4.1.pc" "$PC_DIR/javascriptcoregtk-4.0.pc"
+          fi
+          if [ -f "$LIB_DIR/libwebkit2gtk-4.1.so" ] && [ ! -f "$LIB_DIR/libwebkit2gtk-4.0.so" ]; then
+            echo "Creating library shim for libwebkit2gtk 4.0 -> 4.1"
+            sudo ln -sf "$LIB_DIR/libwebkit2gtk-4.1.so" "$LIB_DIR/libwebkit2gtk-4.0.so"
+          fi
+          if [ -f "$LIB_DIR/libjavascriptcoregtk-4.1.so" ] && [ ! -f "$LIB_DIR/libjavascriptcoregtk-4.0.so" ]; then
+            echo "Creating library shim for libjavascriptcoregtk 4.0 -> 4.1"
+            sudo ln -sf "$LIB_DIR/libjavascriptcoregtk-4.1.so" "$LIB_DIR/libjavascriptcoregtk-4.0.so"
+          fi
+
       - name: Install frontend dependencies
         working-directory: ${{ env.WORKING_DIRECTORY }}
         run: yarn install --frozen-lockfile
+
+      - name: Generate Tauri config from template
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          op inject --force -i src-tauri/tauri.conf.json.template -o src-tauri/tauri.conf.json
+          chmod 600 src-tauri/tauri.conf.json
 
       - name: Build frontend
         working-directory: ${{ env.WORKING_DIRECTORY }}
         run: yarn run build
 
-      - name: Build Tauri app
+      - name: Build Tauri app (signed)
         working-directory: ${{ env.WORKING_DIRECTORY }}
-        run: yarn tauri build
         env:
+          TAURI_PRIVATE_KEY: ${{ env.TAURI_PRIVATE_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: yarn tauri build
 
       - name: Collect artifact paths
         id: artifacts
