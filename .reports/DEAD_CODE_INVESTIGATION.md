@@ -3,7 +3,7 @@
 ## Issue Summary
 The public `terraphim-ai` repository has dead code warnings for several methods in `crates/terraphim_middleware/src/haystack/query_rs.rs`:
 - `should_fetch_url()` - line 48
-- `get_fetched_count()` - line 72  
+- `get_fetched_count()` - line 72
 - `normalize_document_id()` - line 201
 - `fetch_and_scrape_content()` - line 336
 - `scrape_content()` - line 417
@@ -44,7 +44,7 @@ The public repository has a **SIMPLIFIED** version that:
 
 The private repository has:
 - `FetchStats` struct (lines 14-25) - tracks fetch success/failure
-- `PersistenceStats` struct (lines 28-41) - tracks cache hits/misses  
+- `PersistenceStats` struct (lines 28-41) - tracks cache hits/misses
 - Full content enhancement logic with `disable_content_enhancement` flag
 - Active usage of all the "dead" methods
 

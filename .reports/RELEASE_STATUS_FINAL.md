@@ -7,7 +7,7 @@
 - ✅ Updated `tauri.conf.json` with public key for signed updates
 - ✅ Bumped version to 1.0.0 across all files:
   - `desktop/src-tauri/Cargo.toml`: 0.1.0 → 1.0.0
-  - `desktop/src-tauri/tauri.conf.json`: 0.3.0 → 1.0.0  
+  - `desktop/src-tauri/tauri.conf.json`: 0.3.0 → 1.0.0
   - `desktop/package.json`: 0.3.0 → 1.0.0
 
 ### Git & GitHub
@@ -28,7 +28,7 @@
 ### GitHub Actions
 - ⚙️ CI workflows triggered by v1.0.0 tag:
   - Earthly CI/CD: Queued
-  - CI Native: Queued  
+  - CI Native: Queued
   - CI Optimized: Queued
   - Package Release: Failed (investigating)
   - Publish Tauri: Failed (build issues)
@@ -96,6 +96,6 @@ Once release is published:
 
 ---
 
-**Status**: Release prepared but waiting for CI to complete successfully.  
-**Next Action**: Fix build issues and rerun workflows.  
+**Status**: Release prepared but waiting for CI to complete successfully.
+**Next Action**: Fix build issues and rerun workflows.
 **ETA**: Complete once CI passes (likely within 24 hours).

@@ -222,6 +222,22 @@ describe('Search Component - Real API Integration', () => {
 		expect(searchInput).toHaveAttribute('placeholder', expect.stringMatching(/search/i));
 	});
 
+	it('does not render KGSearchInput when typeahead is false', () => {
+		typeahead.set(false);
+		render(Search);
+		const kgInput = screen.queryByTestId('kg-search-input');
+		expect(kgInput).toBeNull();
+	});
+
+	it('renders KGSearchInput when typeahead is true', () => {
+		typeahead.set(true);
+		role.set('Engineer');
+		render(Search);
+		const kgInput = screen.getByTestId('kg-search-input');
+		expect(kgInput).toBeInTheDocument();
+		expect(kgInput).toHaveAttribute('placeholder', expect.stringMatching(/knowledge graph/i));
+	});
+
 	it(
 		'performs search on form submission',
 		async () => {

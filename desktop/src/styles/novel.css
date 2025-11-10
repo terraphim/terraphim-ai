@@ -1,0 +1,62 @@
+.ProseMirror {
+  min-height: 200px;
+  padding: 12px;
+  outline: none;
+  background: white;
+  color: #1f2937;
+  line-height: 1.6;
+}
+
+.ProseMirror p {
+  margin: 0.5rem 0;
+}
+
+.ProseMirror h1,
+.ProseMirror h2,
+.ProseMirror h3 {
+  margin: 1rem 0 0.5rem;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.ProseMirror ul,
+.ProseMirror ol {
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
+}
+
+.ProseMirror blockquote {
+  border-left: 3px solid #ddd;
+  margin: 0.75rem 0;
+  padding-left: 0.75rem;
+  color: #555;
+}
+
+.ProseMirror pre,
+.PrettyCode {
+  background: #f6f8fa;
+  padding: 0.75rem;
+  border-radius: 6px;
+  overflow: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.9em;
+}
+
+/* Dark scheme adjustments */
+@media (prefers-color-scheme: dark) {
+  .ProseMirror {
+    background: #0b1220;
+    color: #e5e7eb;
+  }
+
+  .ProseMirror blockquote {
+    border-left-color: #334155;
+    color: #cbd5e1;
+  }
+
+  .ProseMirror pre,
+  .PrettyCode {
+    background: #0f172a;
+  }
+}

@@ -1,6 +1,6 @@
 # Terraphim AI v1.0.0 Release Notes
 
-**Release Date:** 2025-11-05  
+**Release Date:** 2025-11-05
 **Platform:** macOS ARM64
 
 ## 🎉 Release Highlights

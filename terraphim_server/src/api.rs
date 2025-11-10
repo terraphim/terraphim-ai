@@ -396,14 +396,6 @@ pub struct AsyncSummarizeResponse {
     pub error: Option<String>,
 }
 
-/// Request for task status
-#[derive(Debug, Deserialize)]
-pub struct TaskStatusRequest {
-    /// Task ID to check
-    #[allow(dead_code)] // Task ID comes from URL path, not request body
-    pub task_id: String,
-}
-
 /// Response for task status
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct TaskStatusResponse {

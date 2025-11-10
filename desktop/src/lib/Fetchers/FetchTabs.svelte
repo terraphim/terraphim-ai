@@ -168,7 +168,7 @@ $: console.log('Print roles', $_roles);
       >
     </p>
     <div class="editor">
-      <textarea class="textarea" rows="20" bind:value={_content.json} on:change={() => _handleChange(_content)} style="font-family: monospace;" />
+      <textarea class="textarea" rows="20" bind:value={_content.json} on:change={() => _handleChange(_content)} style="font-family: monospace;"></textarea>
     </div>
   </Route>
 </div>

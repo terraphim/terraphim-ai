@@ -4,6 +4,8 @@ import { mount } from 'svelte';
 import App from './App.svelte';
 // Novel's compiled CSS lives in the package's dist directory.
 import './styles/novel.css';
+// Styles for tippy.js tooltips used by TerraphimSuggestion renderer
+import 'tippy.js/dist/tippy.css';
 
 const target = document.getElementById('app');
 

@@ -14,7 +14,7 @@ The GitHub Actions release workflows are failing across multiple platforms (Linu
 1. **publish-tauri.yml** (Last run: 19119603861)
    - Windows: 1Password CLI installation fails with "No such file or directory"
    - Ubuntu/macOS: Svelte build fails with CSS identifier error in `node_modules/svelma/src/components/Tooltip.svelte`
-   
+
 2. **release-comprehensive.yml** (Last run: 19078632924)
    - Windows: PowerShell parser error during Rust installation
    - Ubuntu 22.04: yarn cache dependency resolution failure

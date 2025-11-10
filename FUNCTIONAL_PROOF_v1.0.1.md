@@ -221,7 +221,7 @@ path = "src/main.rs"
 ./tests/functional/test_tui_repl.sh
 Result: 15 commands tested, all commands verified functional
 
-# Server API Tests  
+# Server API Tests
 ./tests/functional/test_server_api.sh
 Result: 8 endpoints tested, all returning valid responses
 

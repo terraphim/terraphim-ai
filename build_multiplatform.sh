@@ -13,21 +13,21 @@ build_target() {
     local TARGET=$1
     local OS=$2
     local ARCH=$3
-    
+
     echo "Building for $TARGET..."
-    
+
     # Build all three binaries
     cargo build --release --target $TARGET \
         --package terraphim_server \
         --package terraphim_mcp_server \
         --package terraphim_tui 2>/dev/null
-    
+
     if [ $? -eq 0 ]; then
         echo "✅ Built successfully for $TARGET"
-        
+
         # Create target directory
         mkdir -p releases/v1.0.2/$OS/$ARCH
-        
+
         # Copy binaries with proper naming
         if [ "$OS" = "windows" ]; then
             cp target/$TARGET/release/terraphim_server.exe releases/v1.0.2/$OS/$ARCH/ 2>/dev/null || cp target/$TARGET/release/terraphim_server releases/v1.0.2/$OS/$ARCH/terraphim_server.exe 2>/dev/null
@@ -38,7 +38,7 @@ build_target() {
             cp target/$TARGET/release/terraphim_mcp_server releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
             cp target/$TARGET/release/terraphim-tui releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
         fi
-        
+
         # Create tar.gz archive for Unix systems
         if [ "$OS" != "windows" ]; then
             cd releases/v1.0.2/$OS/$ARCH
@@ -135,7 +135,7 @@ if [ -f "releases/v1.0.2/macos/x86_64/terraphim_server" ] && [ -f "releases/v1.0
         releases/v1.0.2/macos/x86_64/terraphim-tui \
         releases/v1.0.2/macos/aarch64/terraphim-tui \
         -output releases/v1.0.2/macos/universal/terraphim-tui
-    
+
     cd releases/v1.0.2/macos/universal
     tar -czf ../terraphim-ai-v1.0.2-macos-universal.tar.gz *
     cd ../../../../

@@ -8174,6 +8174,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_kg_linter"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "clap",
+ "env_logger 0.11.8",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
 name = "terraphim_kg_orchestration"
 version = "1.0.0"
 dependencies = [

@@ -154,7 +154,7 @@ tell application "System Events"
         delay 1
         click menu item "TerraphimEngineer" of menu 1 of pop up button 1 of window 1
         delay 2
-        
+
         # Log result
         do shell script "echo 'Role selector: TESTED' >> $TEST_LOG"
     end tell

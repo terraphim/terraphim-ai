@@ -63,6 +63,8 @@
 			"src/**/*.svelte",
 			"src/**/*.json",
 			"src/**/*.jsonc",
+			"tests/**/*.ts",
+			"tests/**/*.js",
 			"*.json",
 			"*.jsonc"
 		],

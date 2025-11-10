@@ -23,13 +23,13 @@ test_command() {
     local cmd="$1"
     local expected="$2"
     local description="$3"
-    
+
     echo -e "${YELLOW}Testing:${NC} $description" | tee -a $TEST_LOG
     echo "Command: $cmd" | tee -a $TEST_LOG
-    
+
     # Execute command (macOS compatible - no timeout command)
     output=$(echo -e "$cmd\n/quit" | $BINARY repl 2>&1 | tail -20 || true)
-    
+
     # Check if expected text is in output
     if echo "$output" | grep -qi "$expected"; then
         echo -e "${GREEN}✓ PASS${NC}" | tee -a $TEST_LOG

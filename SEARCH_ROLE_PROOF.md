@@ -32,7 +32,7 @@ Based on the configuration analysis, here's how each role differs:
 
 When searching for "tokio":
 - **Default Role**: Top result rank = 248370459
-- **Rust Engineer**: Top result rank = 263779995  
+- **Rust Engineer**: Top result rank = 263779995
 - **Terraphim Engineer**: Top result rank = 263772681
 
 The different rank scores show that the scoring algorithms produce different relevance calculations.
@@ -48,7 +48,7 @@ From `desktop/default/combined_desktop_roles_config.json`:
 }
 
 "Rust Engineer": {
-  "relevance_function": "title-scorer",  
+  "relevance_function": "title-scorer",
   "haystacks": [{"location": "https://query.rs", "service": "QueryRs"}]
 }
 

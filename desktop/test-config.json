@@ -1,32 +1,32 @@
 {
-	"id": "Desktop",
-	"global_shortcut": "Ctrl+Shift+T",
-	"roles": {
-		"Terraphim Engineer": {
-			"shortname": "Terraphim Engineer",
-			"name": "Terraphim Engineer",
-			"relevance_function": "TerraphimGraph",
-			"theme": "lumen",
-			"kg": {
-				"automata_path": null,
-				"knowledge_graph_local": {
-					"input_type": "Markdown",
-					"path": "./docs/src/kg"
-				},
-				"public": true,
-				"publish": true
-			},
-			"haystacks": [
-				{
-					"location": "./docs/src",
-					"service": "Ripgrep",
-					"read_only": true,
-					"atomic_server_secret": null
-				}
-			],
-			"extra": {}
-		}
-	},
-	"default_role": "Terraphim Engineer",
-	"selected_role": "Terraphim Engineer"
+  "id": "Desktop",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Terraphim Engineer": {
+      "shortname": "Terraphim Engineer",
+      "name": "Terraphim Engineer",
+      "relevance_function": "TerraphimGraph",
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "Markdown",
+          "path": "./docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "./docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
 }
