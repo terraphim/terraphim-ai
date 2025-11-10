@@ -1,0 +1,74 @@
+name: kg-schema-lint-autofix
+version: 0.1.0
+summary: Validate and auto-fix markdown KG schemas (commands, types, permissions) using terraphim-kg-lint
+tags: [kg, linter, automata, rolegraph, agentic-loop]
+
+inputs:
+  kg_path:
+    type: path
+    required: false
+    default: docs/src/kg
+  max_iterations:
+    type: integer
+    required: false
+    default: 5
+
+tools:
+  - run_terminal_command
+  - read_files
+  - write_file
+  - find_files
+  - code_search
+
+constraints:
+  max_iterations: ${max_iterations}
+  stop_on_success: true
+
+steps:
+  - id: run-linter
+    name: Run linter in strict JSON mode
+    instruction: |
+      Execute the linter against the KG path. Capture JSON results. Exit codes: 0 OK, 2 issues.
+    run: cargo run -p terraphim_kg_linter -- --path ${kg_path} -o json --strict
+    capture: linter_json
+    on_exit_codes:
+      "0": success
+      "2": analyze
+      "*": abort
+
+  - id: analyze
+    name: Analyze issues and propose fixes
+    instruction: |
+      Parse the JSON, group issues by file and code, and plan minimal fixes:
+      - types.invalid: enforce PascalCase type names; validate field type expressions; ensure referenced types exist or use primitives [string|integer|number|boolean|object|array|ulid|url|path]
+      - types.duplicate: deduplicate or merge conflicting type definitions
+      - commands.invalid: enforce kebab-case command names; ensure arg types are primitives or declared types
+      - permissions.invalid: ensure execute.command references existing command
+      Read files, prepare precise diffs, and apply minimal changes.
+    parse_json: ${linter_json}
+    plan_edits: true
+    apply_edits: true
+    next: re-run
+
+  - id: re-run
+    name: Re-run linter after edits
+    instruction: |
+      Execute the linter again. If still failing, repeat until clean or the iteration limit is reached.
+    run: cargo run -p terraphim_kg_linter -- --path ${kg_path} -o json --strict
+    capture: linter_json
+    on_exit_codes:
+      "0": success
+      "2": analyze
+      "*": abort
+
+outputs:
+  success_criteria:
+    - "Linter returns exit code 0 with no issues"
+  artifacts:
+    - "Updated KG markdown files with fixes applied"
+    - "Final linter JSON report"
+
+notes:
+  - Use minimal, targeted edits. Do not reformat unrelated content.
+  - Prefer preserving author intent; only change what fails lint checks.
+  - Keep each iteration’s diff small and easy to review.

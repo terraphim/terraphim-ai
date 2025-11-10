@@ -832,3 +832,8 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
 - **Technology**: Vanilla JavaScript, HTML, CSS (no frameworks)
 - **Pattern**: No build step, static files only
 - **Purpose**: Simple, deployable examples that work without compilation
+- Claude Skills (project-level)
+  - Location: `docs/src/skills/`
+  - Purpose: Declarative, LLM-executable workflows (e.g., linters with autofix loops)
+  - Example: `kg-schema-lint.skill.yaml` — runs the KG linter, plans minimal fixes, and re-runs until clean
+  - Author new skills using `template.skill.yaml`; keep steps idempotent and success criteria strict
