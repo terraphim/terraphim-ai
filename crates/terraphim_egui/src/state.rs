@@ -4,6 +4,7 @@
 //! State is wrapped in Arc<Mutex<>> for thread-safe concurrent access.
 
 use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use terraphim_automata::AutocompleteIndex;
 use terraphim_config::Role;
 use terraphim_types::Document;
@@ -51,7 +52,7 @@ pub struct ContextManager {
 }
 
 /// Chat message structure
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ChatMessage {
     /// Message ID
     pub id: uuid::Uuid,
@@ -70,7 +71,7 @@ pub struct ChatMessage {
 }
 
 /// Chat message role
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum ChatMessageRole {
     User,
     Assistant,
@@ -78,7 +79,7 @@ pub enum ChatMessageRole {
 }
 
 /// Chat message metadata
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct ChatMessageMetadata {
     /// Tokens used
     pub tokens_used: Option<usize>,
