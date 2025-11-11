@@ -1,5 +1,8 @@
+#![cfg(feature = "test-utils")]
+
 use std::sync::Arc;
-use terraphim_multi_agent::{test_utils::*, *};
+use terraphim_multi_agent::test_utils::*;
+use terraphim_multi_agent::*;
 
 #[tokio::test]
 async fn test_agent_creation_with_defaults() {

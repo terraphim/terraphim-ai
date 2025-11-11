@@ -8,8 +8,11 @@ use terraphim_types::{
     Document, Edge, IndexedDocument, Node, NormalizedTermValue, RoleName, Thesaurus,
 };
 use tokio::sync::{Mutex, MutexGuard};
+pub mod code_graph;
 pub mod input;
+
 use aho_corasick::{AhoCorasick, MatchKind};
+pub use code_graph::{CodeGraph, CodeGraphStats};
 use unicode_segmentation::UnicodeSegmentation;
 
 #[derive(thiserror::Error, Debug)]
@@ -43,6 +46,8 @@ pub struct GraphStats {
 /// It is used to index documents and search for them.
 /// Currently it maps from synonyms to concepts, so only the normalized term
 /// gets returned when a reverse lookup is performed.
+///
+/// Extended in Phase 4 to also support code symbols alongside concepts.
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     /// The role of the graph
@@ -61,6 +66,8 @@ pub struct RoleGraph {
     pub ac: AhoCorasick,
     /// reverse lookup - matched id into normalized term
     pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
+    /// Code symbol graph (Phase 4 extension)
+    pub code_graph: code_graph::CodeGraph,
 }
 
 impl RoleGraph {
@@ -97,6 +104,7 @@ impl RoleGraph {
             aho_corasick_values: values,
             ac,
             ac_reverse_nterm,
+            code_graph: code_graph::CodeGraph::new(),
         })
     }
 

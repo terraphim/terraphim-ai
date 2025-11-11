@@ -133,6 +133,82 @@ impl ReplHandler {
         }
 
         impl Helper for CommandCompleter {}
+
+        // External editor handler for Ctrl-G
+        #[cfg(feature = "repl-editor")]
+        #[derive(Clone)]
+        struct ExternalEditorHandler;
+
+        #[cfg(feature = "repl-editor")]
+        impl rustyline::ConditionalEventHandler for ExternalEditorHandler {
+            fn handle(
+                &self,
+                _evt: &rustyline::Event,
+                _n: rustyline::RepeatCount,
+                _: bool,
+                ctx: &rustyline::EventContext,
+            ) -> Option<rustyline::Cmd> {
+                use rustyline::{Cmd, Movement};
+
+                let current_line = ctx.line().to_string();
+
+                match Self::launch_editor(&current_line) {
+                    Ok(edited) if !edited.is_empty() && edited != current_line => {
+                        // Replace current line with edited content
+                        Some(Cmd::Replace(Movement::WholeLine, Some(edited)))
+                    }
+                    Ok(_) => None, // No changes or empty, keep current line
+                    Err(e) => {
+                        eprintln!("\n❌ Editor error: {}", e);
+                        None
+                    }
+                }
+            }
+        }
+
+        #[cfg(feature = "repl-editor")]
+        impl ExternalEditorHandler {
+            fn launch_editor(content: &str) -> Result<String> {
+                use std::io::Write;
+                use std::process::Command;
+                use tempfile::NamedTempFile;
+
+                // Try VISUAL, then EDITOR, then platform-specific defaults
+                let editor = std::env::var("VISUAL")
+                    .or_else(|_| std::env::var("EDITOR"))
+                    .unwrap_or_else(|_| {
+                        if cfg!(windows) {
+                            "notepad.exe".to_string()
+                        } else {
+                            "vi".to_string()
+                        }
+                    });
+
+                // Create temp file with content
+                let mut temp_file = NamedTempFile::with_suffix(".txt")?;
+                temp_file.write_all(content.as_bytes())?;
+                temp_file.flush()?;
+
+                let temp_path = temp_file.path().to_path_buf();
+
+                // Launch editor and wait for it to close
+                let status = Command::new(&editor)
+                    .arg(&temp_path)
+                    .status()
+                    .map_err(|e| anyhow::anyhow!("Failed to launch editor '{}': {}", editor, e))?;
+
+                if !status.success() {
+                    return Err(anyhow::anyhow!("Editor exited with status: {}", status));
+                }
+
+                // Read edited content
+                let edited_content = std::fs::read_to_string(&temp_path)?;
+
+                // Return trimmed content (preserve intentional whitespace within, trim ends)
+                Ok(edited_content.trim_end().to_string())
+            }
+        }
+
         impl Hinter for CommandCompleter {
             type Hint = String;
 
@@ -310,6 +386,21 @@ impl ReplHandler {
 
         let mut rl = Editor::<CommandCompleter, rustyline::history::DefaultHistory>::new()?;
         rl.set_helper(Some(CommandCompleter::new(self.current_role.clone())));
+
+        // Bind Ctrl-G to open external editor
+        #[cfg(feature = "repl-editor")]
+        {
+            use rustyline::{EventHandler, KeyEvent};
+
+            rl.bind_sequence(
+                KeyEvent::ctrl('G'),
+                EventHandler::Conditional(Box::new(ExternalEditorHandler)),
+            );
+            println!(
+                "{}",
+                "💡 Tip: Press Ctrl-G to edit in external editor ($EDITOR)".dimmed()
+            );
+        }
 
         // Load command history if it exists
         let history_file = dirs::home_dir()
@@ -3363,6 +3454,157 @@ impl ReplHandler {
                 println!("{} Active background operations: {}", "⚙️", "2");
 
                 println!("\n{} Last updated: {}", "🕐", "2025-01-18 16:45:30 UTC");
+            }
+
+            FileSubcommand::Edit {
+                file_path,
+                search,
+                replace,
+                strategy,
+            } => {
+                println!("{} Editing file with multi-strategy matching", "✏️".bold());
+                println!("{} File: {}", "📄", file_path.cyan());
+                println!(
+                    "{} Strategy: {}",
+                    "🎯",
+                    strategy.as_deref().unwrap_or("auto").yellow()
+                );
+
+                // Use our proven edit functionality from terraphim_automata
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        // Import edit functionality
+                        use terraphim_automata::apply_edit;
+
+                        match apply_edit(&content, &search, &replace) {
+                            Ok(result) if result.success => {
+                                // Write the modified content
+                                match tokio::fs::write(
+                                    &file_path,
+                                    result.modified_content.as_bytes(),
+                                )
+                                .await
+                                {
+                                    Ok(_) => {
+                                        println!("\n{} Edit applied successfully!", "✅".green());
+                                        println!(
+                                            "{} Strategy used: {}",
+                                            "🎯",
+                                            result.strategy_used.green()
+                                        );
+                                        println!(
+                                            "{} Similarity score: {:.2}",
+                                            "📊", result.similarity_score
+                                        );
+                                        println!("{} File saved: {}", "💾", file_path.cyan());
+                                    }
+                                    Err(e) => {
+                                        println!("{} Failed to write file: {}", "❌".red(), e);
+                                    }
+                                }
+                            }
+                            Ok(result) => {
+                                println!("{} No matching content found", "❌".red());
+                                println!("{} All {} strategies failed", "ℹ️".yellow(), 4);
+                                println!("\n{} Try:", "💡".yellow());
+                                println!("   - Check search block exactly matches file content");
+                                println!("   - Use /file validate-edit to test first");
+                            }
+                            Err(e) => {
+                                println!("{} Edit error: {}", "❌".red(), e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{} Cannot read file: {}", "❌".red(), e);
+                    }
+                }
+            }
+
+            FileSubcommand::ValidateEdit {
+                file_path,
+                search,
+                replace,
+            } => {
+                println!("{} Validating edit (dry-run)", "🔍".bold());
+                println!("{} File: {}", "📄", file_path.cyan());
+
+                match tokio::fs::read_to_string(&file_path).await {
+                    Ok(content) => {
+                        use terraphim_automata::apply_edit;
+
+                        match apply_edit(&content, &search, &replace) {
+                            Ok(result) if result.success => {
+                                println!("\n{} Validation PASSED ✅", "✅".green());
+                                println!(
+                                    "{} Strategy that would work: {}",
+                                    "🎯",
+                                    result.strategy_used.green()
+                                );
+                                println!(
+                                    "{} Similarity score: {:.2}",
+                                    "📊", result.similarity_score
+                                );
+                                println!("\n{} Preview of change:", "👀".bold());
+                                println!("{}", "-".repeat(60));
+
+                                // Show a preview of the change
+                                let lines: Vec<&str> = content.lines().collect();
+                                let modified_lines: Vec<&str> =
+                                    result.modified_content.lines().collect();
+
+                                for (i, (old, new)) in
+                                    lines.iter().zip(modified_lines.iter()).enumerate()
+                                {
+                                    if old != new {
+                                        println!("{} {}", "-".red(), old);
+                                        println!("{} {}", "+".green(), new);
+                                    }
+                                }
+
+                                println!("{}", "-".repeat(60));
+                                println!("\n{} Run /file edit to apply this change", "💡".yellow());
+                            }
+                            Ok(result) => {
+                                println!("\n{} Validation FAILED ❌", "❌".red());
+                                println!("{} No matching content found", "ℹ️".yellow());
+                                println!("{} Tried all {} strategies", "📊", 4);
+                            }
+                            Err(e) => {
+                                println!("{} Validation error: {}", "❌".red(), e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("{} Cannot read file: {}", "❌".red(), e);
+                    }
+                }
+            }
+
+            FileSubcommand::Diff { file_path } => {
+                println!("{} File diff viewer", "📊".bold());
+
+                if let Some(path) = file_path {
+                    println!("{} File: {}", "📄", path.cyan());
+                    println!("\n{} Git diff integration coming in Phase 5", "ℹ️".yellow());
+                    println!("{} For now, use: git diff {}", "💡".yellow(), path);
+                } else {
+                    println!("{} Showing all modified files...", "📊".bold());
+                    println!("\n{} Git integration coming in Phase 5", "ℹ️".yellow());
+                    println!("{} For now, use: git status", "💡".yellow());
+                }
+            }
+
+            FileSubcommand::Undo { steps } => {
+                let step_count = steps.unwrap_or(1);
+                println!(
+                    "{} Undoing last {} file operation(s)",
+                    "⏪".bold(),
+                    step_count
+                );
+                println!("\n{} Git-based undo coming in Phase 5", "ℹ️".yellow());
+                println!("{} For now, use: git restore {}", "💡".yellow(), "<file>");
+                println!("{} Or: git reset --soft HEAD~{}", "💡".yellow(), step_count);
             }
         }
 

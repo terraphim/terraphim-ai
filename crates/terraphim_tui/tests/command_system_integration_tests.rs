@@ -3,6 +3,8 @@
 //! These tests verify the end-to-end functionality of the markdown-based
 //! command system including parsing, validation, execution, and security.
 
+#![cfg(feature = "repl-custom")]
+
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};

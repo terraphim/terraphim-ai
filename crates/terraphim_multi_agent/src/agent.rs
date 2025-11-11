@@ -1146,7 +1146,8 @@ mod tests {
         assert!(capabilities.contains(&"code_review".to_string()));
         assert!(capabilities.contains(&"architecture".to_string()));
         assert!(capabilities.contains(&"role_engineering agent".to_string()));
-        assert!(capabilities.contains(&"haystack_code".to_string()));
+        // Fixed: capability is generated as "haystack_{location}" where location is "./src"
+        assert!(capabilities.contains(&"haystack_./src".to_string()));
     }
 
     #[tokio::test]

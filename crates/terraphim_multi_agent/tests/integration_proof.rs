@@ -1,8 +1,11 @@
 //! Integration proof test - demonstrates that the multi-agent system works
 //! with Rig integration and queue-based architecture
 
+#![cfg(feature = "test-utils")]
+
 use std::sync::Arc;
-use terraphim_multi_agent::{AgentRegistry, TerraphimAgent, test_utils::create_test_role};
+use terraphim_multi_agent::test_utils::create_test_role;
+use terraphim_multi_agent::{AgentRegistry, TerraphimAgent};
 use terraphim_persistence::DeviceStorage;
 
 #[tokio::test]
