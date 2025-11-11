@@ -31,6 +31,10 @@ wasm-bindgen = { version = "0.2.51" }
 cached = { version = "0.56.0", features = ["proc_macro", "async", "serde", "ahash"] }
 tsify = { version = "0.5", features = ["js"], optional = true }
 
+# WASM-specific dependencies
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+getrandom = { version = "0.3", features = ["wasm_js"] }
+
 [[bench]]
 name = "autocomplete_bench"
 harness = false
@@ -40,6 +44,7 @@ default = []
 remote-loading = ["tokio", "reqwest"]
 tokio-runtime = ["tokio"]
 typescript = ["tsify"]
+wasm = ["typescript"]
 
 [dev-dependencies]
 criterion = "0.5"
