@@ -246,7 +246,7 @@ if [ "$RUN_UNIT" = "true" ] || [ "$CATEGORY" = "core" ]; then
         echo -e "${RED}❌ Core test script not found. Running fallback tests...${NC}"
         # Fallback to basic tests
         TOTAL_TESTS=$((TOTAL_TESTS + 3))
-        
+
         if run_test "Terraphim Types Unit Tests" "cargo test -p terraphim_types --lib $CARGO_VERBOSE"; then
             PASSED_TESTS=$((PASSED_TESTS + 1))
         else
