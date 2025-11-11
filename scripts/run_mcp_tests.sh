@@ -33,10 +33,10 @@ print_status() {
 run_mcp_tests() {
     print_status "$BLUE" "🔧 Running MCP Server Tests"
     echo "=================================="
-    
+
     local mcp_success=0
     local mcp_total=0
-    
+
     # Test MCP middleware compilation (correct package)
     print_status "$YELLOW" "Testing MCP middleware compilation..."
     if cargo check -p terraphim_middleware --features mcp-rust-sdk; then
@@ -46,7 +46,7 @@ run_mcp_tests() {
         print_status "$RED" "❌ MCP middleware compilation failed"
     fi
     ((mcp_total++))
-    
+
     # Test MCP middleware unit tests
     print_status "$YELLOW" "Testing MCP middleware unit tests..."
     if cargo test -p terraphim_middleware --features mcp-rust-sdk --lib; then
@@ -56,7 +56,7 @@ run_mcp_tests() {
         print_status "$RED" "❌ MCP middleware unit tests failed"
     fi
     ((mcp_total++))
-    
+
     # Test MCP server compilation (without feature flag)
     print_status "$YELLOW" "Testing MCP server compilation..."
     if cargo check -p terraphim_server; then
@@ -66,7 +66,7 @@ run_mcp_tests() {
         print_status "$RED" "❌ MCP server compilation failed"
     fi
     ((mcp_total++))
-    
+
     # Test MCP server unit tests
     print_status "$YELLOW" "Testing MCP server unit tests..."
     if cargo test -p terraphim_server --lib; then
@@ -76,7 +76,7 @@ run_mcp_tests() {
         print_status "$RED" "❌ MCP server unit tests failed"
     fi
     ((mcp_total++))
-    
+
     # Test MCP integration tests if they exist
     if [ -d "${PROJECT_ROOT}/crates/terraphim_server/tests/mcp" ]; then
         print_status "$YELLOW" "Testing MCP integration tests..."
@@ -90,7 +90,7 @@ run_mcp_tests() {
     else
         print_status "$YELLOW" "⚠️  MCP integration tests not found"
     fi
-    
+
     return $((mcp_total - mcp_success))
 }
 
@@ -98,22 +98,22 @@ run_mcp_tests() {
 test_mcp_examples() {
     print_status "$BLUE" "📚 Testing MCP Examples"
     echo "==========================="
-    
+
     local examples_success=0
     local examples_total=0
-    
+
     # Find MCP examples
     local mcp_examples=($(find "${PROJECT_ROOT}/examples" -name "*mcp*" -type f 2>/dev/null || true))
-    
+
     if [ ${#mcp_examples[@]} -eq 0 ]; then
         print_status "$YELLOW" "⚠️  No MCP examples found"
         return 0
     fi
-    
+
     for example in "${mcp_examples[@]}"; do
         print_status "$YELLOW" "Testing example: $(basename "$example")"
         ((examples_total++))
-        
+
         case "$example" in
             *.py)
                 if python3 "$example" --help 2>/dev/null; then
@@ -141,7 +141,7 @@ test_mcp_examples() {
                 ;;
         esac
     done
-    
+
     return $((examples_total - examples_success))
 }
 
@@ -149,7 +149,7 @@ test_mcp_examples() {
 generate_report() {
     local mcp_failures=$1
     local examples_failures=$2
-    
+
     cat > "${REPORT_FILE}" << EOF
 # MCP Test Report
 
@@ -198,7 +198,7 @@ EOF
 - Ensure all MCP dependencies are properly configured
 EOF
     fi
-    
+
     print_status "$GREEN" "📄 Report generated: ${REPORT_FILE}"
 }
 
@@ -209,26 +209,26 @@ main() {
     print_status "$BLUE" "Timestamp: ${TIMESTAMP}"
     print_status "$BLUE" "Results will be saved to: ${RESULTS_DIR}"
     echo
-    
+
     # Run MCP tests
     local mcp_failures=0
     if ! run_mcp_tests; then
         mcp_failures=$?
     fi
-    
+
     echo
-    
+
     # Test MCP examples
     local examples_failures=0
     if ! test_mcp_examples; then
         examples_failures=$?
     fi
-    
+
     echo
-    
+
     # Generate report
     generate_report $mcp_failures $examples_failures
-    
+
     # Final status
     local total_failures=$((mcp_failures + examples_failures))
     if [ $total_failures -eq 0 ]; then
@@ -243,11 +243,11 @@ main() {
 # Check if required tools are available
 check_dependencies() {
     local missing_deps=()
-    
+
     if ! command -v cargo &> /dev/null; then
         missing_deps+=("cargo")
     fi
-    
+
     if [ ${#missing_deps[@]} -ne 0 ]; then
         print_status "$RED" "❌ Missing dependencies: ${missing_deps[*]}"
         exit 1
