@@ -43,7 +43,7 @@ run_rust_benchmarks() {
     echo "Running cargo bench with criterion..."
     CARGO_BENCH_OUTPUT="${RESULTS_DIR}/${TIMESTAMP}/rust_benchmarks.txt"
 
-    if cargo bench --bench agent_operations > "${CARGO_BENCH_OUTPUT}" 2>&1; then
+    if cargo bench --features test-utils --bench agent_operations > "${CARGO_BENCH_OUTPUT}" 2>&1; then
         echo -e "${GREEN}✅ Rust benchmarks completed successfully${NC}"
 
         # Copy HTML reports if available

@@ -1,0 +1,237 @@
+# TerraphimAgent Performance Benchmark Report
+
+**Generated:** Tue 11 Nov 2025 11:56:22 AM CET
+**Timestamp:** 20251111_115602
+
+## Executive Summary
+
+This report contains performance benchmarks for TerraphimAgent operations including:
+
+- Agent creation and initialization
+- Command processing across different types
+- Memory and context operations
+- Knowledge graph queries
+- WebSocket communication performance
+- Concurrent operation handling
+
+## Benchmark Categories
+
+### 1. Rust Core Agent Operations
+
+**Location:** `crates/terraphim_multi_agent/benches/agent_operations.rs`
+
+Key operations benchmarked:
+- Agent creation time
+- Agent initialization
+- Command processing (Generate, Answer, Analyze, Create, Review)
+- Registry operations
+- Memory operations
+- Batch operations
+- Concurrent operations
+- Knowledge graph operations
+- Automata operations
+- LLM operations
+- Tracking operations
+
+### 2. JavaScript WebSocket Performance
+
+**Location:** `desktop/tests/benchmarks/agent-performance.benchmark.js`
+
+Key operations benchmarked:
+- WebSocket connection establishment
+- Message processing throughput
+- Workflow start latency
+- Command processing end-to-end
+- Concurrent workflow execution
+- Memory operation efficiency
+- Error handling performance
+- Throughput under load
+
+## Performance Thresholds
+
+The benchmarks include automated threshold checking for:
+
+- WebSocket Connection: avg < 500ms, p95 < 1000ms
+- Message Processing: avg < 100ms, p95 < 200ms
+- Workflow Start: avg < 2000ms, p95 < 5000ms
+- Command Processing: avg < 3000ms, p95 < 10000ms
+- Memory Operations: avg < 50ms, p95 < 100ms
+
+## Raw Results
+
+### Rust Benchmarks
+
+```
+   Compiling serde_core v1.0.228
+   Compiling zerocopy v0.8.27
+   Compiling serde_json v1.0.145
+   Compiling getrandom v0.2.16
+   Compiling zerocopy-derive v0.8.27
+   Compiling tokio v1.48.0
+   Compiling num-traits v0.2.19
+   Compiling unicode-xid v0.2.6
+   Compiling tracing-log v0.2.0
+   Compiling minimal-lexical v0.2.1
+   Compiling derive_more-impl v1.0.0
+   Compiling rayon-core v1.13.0
+   Compiling crossbeam-deque v0.8.6
+   Compiling plotters-backend v0.3.7
+   Compiling futures-timer v3.0.3
+   Compiling ciborium-io v0.2.2
+   Compiling cast v0.3.0
+   Compiling serde_with_macros v3.15.1
+   Compiling same-file v1.0.6
+   Compiling is-terminal v0.4.17
+   Compiling anes v0.1.6
+   Compiling oorandom v11.1.5
+   Compiling derive_more-impl v2.0.1
+   Compiling ring v0.17.14
+   Compiling ahash v0.7.8
+   Compiling rand_core v0.6.4
+   Compiling tracing-subscriber v0.3.20
+   Compiling walkdir v2.5.0
+   Compiling nom v7.1.3
+   Compiling plotters-svg v0.3.7
+   Compiling hashbrown v0.12.3
+   Compiling atoi v2.0.0
+   Compiling plotters v0.3.7
+   Compiling lru v0.7.8
+   Compiling derive_more v1.0.0
+   Compiling memoize v0.5.1
+   Compiling eventsource-stream v0.2.3
+   Compiling rustls-webpki v0.103.7
+   Compiling derive_more v2.0.1
+   Compiling selectors v0.31.0
+   Compiling serde v1.0.228
+   Compiling serde_with v3.15.1
+   Compiling ppv-lite86 v0.2.21
+   Compiling half v2.7.1
+   Compiling either v1.15.0
+   Compiling ahash v0.8.12
+   Compiling url v2.5.7
+   Compiling serde_urlencoded v0.7.1
+   Compiling string_cache v0.8.9
+   Compiling uuid v1.18.1
+   Compiling chrono v0.4.42
+   Compiling envy v0.4.2
+   Compiling toml v0.5.11
+   Compiling quick-xml v0.38.3
+   Compiling bincode v1.3.3
+   Compiling toml_datetime v0.6.11
+   Compiling serde_spanned v0.6.9
+   Compiling serde-wasm-bindgen v0.6.5
+   Compiling markup5ever v0.12.1
+   Compiling web_atoms v0.1.3
+   Compiling hashbrown v0.14.5
+   Compiling rustls v0.23.34
+   Compiling itertools v0.13.0
+   Compiling toml_edit v0.22.27
+   Compiling itertools v0.10.5
+   Compiling ciborium-ll v0.2.2
+   Compiling rand_chacha v0.9.0
+   Compiling rand_chacha v0.3.1
+   Compiling rayon v1.11.0
+   Compiling ciborium v0.2.2
+   Compiling rand v0.9.2
+   Compiling rand v0.8.5
+   Compiling schemars v0.8.22
+   Compiling twelf v0.15.0
+   Compiling dashmap v6.1.0
+   Compiling hashlink v0.9.1
+   Compiling html5ever v0.27.0
+   Compiling xml5ever v0.18.1
+   Compiling ulid v1.2.1
+   Compiling terraphim_settings v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_settings)
+   Compiling markup5ever v0.35.0
+   Compiling gloo-utils v0.2.0
+   Compiling rusqlite v0.32.1
+   Compiling html5ever v0.35.0
+   Compiling tsify v0.5.6
+   Compiling value-ext v0.1.2
+   Compiling tinytemplate v1.2.1
+   Compiling criterion-plot v0.5.0
+   Compiling markup5ever_rcdom v0.3.0
+   Compiling terraphim_types v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_types)
+   Compiling scraper v0.24.0
+   Compiling toml v0.8.23
+   Compiling criterion v0.5.1
+   Compiling tokio-util v0.7.16
+   Compiling tokio-native-tls v0.3.1
+   Compiling tower v0.5.2
+   Compiling tokio-stream v0.1.17
+   Compiling backon v1.6.0
+   Compiling cached v0.56.0
+   Compiling html2md v0.2.15
+   Compiling h2 v0.4.12
+   Compiling tower-http v0.6.6
+   Compiling tokio-test v0.4.4
+   Compiling tokio-rustls v0.26.4
+   Compiling sqlx-core v0.8.6
+   Compiling hyper v1.7.0
+   Compiling sqlx-sqlite v0.8.6
+   Compiling hyper-util v0.1.17
+   Compiling sqlx v0.8.6
+   Compiling hyper-rustls v0.27.7
+   Compiling hyper-tls v0.6.0
+   Compiling reqwest v0.12.24
+   Compiling opendal v0.54.1
+   Compiling terraphim_automata v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_automata)
+   Compiling reqwest-eventsource v0.6.0
+   Compiling genai v0.4.3-wip (https://github.com/terraphim/rust-genai.git?branch=main#a61208e2)
+   Compiling terraphim_rolegraph v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_rolegraph)
+   Compiling terraphim_persistence v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_persistence)
+   Compiling terraphim_config v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_config)
+   Compiling terraphim_agent_evolution v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_agent_evolution)
+   Compiling terraphim_middleware v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware)
+   Compiling terraphim_service v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service)
+   Compiling terraphim_multi_agent v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_multi_agent)
+error[E0432]: unresolved import `terraphim_multi_agent::test_utils`
+  --> crates/terraphim_multi_agent/benches/agent_operations.rs:6:47
+   |
+ 6 |     AgentRegistry, CommandInput, CommandType, test_utils::create_test_agent_simple,
+   |                                               ^^^^^^^^^^ could not find `test_utils` in `terraphim_multi_agent`
+   |
+note: found an item that was configured out
+  --> /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_multi_agent/src/lib.rs:71:9
+   |
+70 | #[cfg(any(test, feature = "test-utils"))]
+   |          ------------------------------ the item is gated here
+71 | pub mod test_utils {
+   |         ^^^^^^^^^^
+
+For more information about this error, try `rustc --explain E0432`.
+error: could not compile `terraphim_multi_agent` (bench "agent_operations") due to 1 previous error
+```
+
+### JavaScript Benchmarks
+
+## Recommendations
+
+Based on benchmark results:
+
+1. **Performance Hotspots:** Identify operations that consistently exceed thresholds
+2. **Scaling Limits:** Note concurrency levels where performance degrades
+3. **Memory Efficiency:** Monitor memory operations for optimization opportunities
+4. **Network Performance:** Evaluate WebSocket communication patterns
+
+## Files Generated
+
+- Performance Report: `performance_report.md`
+- Rust Benchmarks: `rust_benchmarks.txt`
+- JavaScript Benchmarks: `js_benchmarks.json` or `js_benchmarks_alt.txt`
+- Criterion Reports: `rust_criterion_reports/` (if available)
+
+## Running Benchmarks
+
+To reproduce these benchmarks:
+
+```bash
+# Run all benchmarks
+./scripts/run-benchmarks.sh
+
+# Run only Rust benchmarks
+cd crates/terraphim_multi_agent && cargo bench
+
+# Run only JavaScript benchmarks
+cd desktop && yarn run vitest --config vitest.benchmark.config.ts
+```

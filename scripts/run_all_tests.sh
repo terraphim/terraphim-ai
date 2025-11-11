@@ -59,8 +59,10 @@ SETUP_ENV=true
 RUN_UNIT=true
 RUN_INTEGRATION=true
 RUN_E2E=false
+RUN_MCP=false
 CLEANUP=true
 VERBOSE=false
+CATEGORY="all"
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -71,12 +73,60 @@ while [[ $# -gt 0 ]]; do
         --unit-only)
             RUN_INTEGRATION=false
             RUN_E2E=false
+            RUN_MCP=false
+            CATEGORY="core"
             shift
             ;;
         --integration-only)
             RUN_UNIT=false
             RUN_E2E=false
+            RUN_MCP=false
+            CATEGORY="integration"
             shift
+            ;;
+        --mcp-only)
+            RUN_UNIT=false
+            RUN_INTEGRATION=false
+            RUN_E2E=false
+            RUN_MCP=true
+            CATEGORY="mcp"
+            shift
+            ;;
+        --category)
+            if [[ -n "$2" && "$2" =~ ^(core|integration|mcp|all)$ ]]; then
+                case $2 in
+                    core)
+                        RUN_INTEGRATION=false
+                        RUN_E2E=false
+                        RUN_MCP=false
+                        CATEGORY="core"
+                        ;;
+                    integration)
+                        RUN_UNIT=false
+                        RUN_E2E=false
+                        RUN_MCP=false
+                        CATEGORY="integration"
+                        ;;
+                    mcp)
+                        RUN_UNIT=false
+                        RUN_INTEGRATION=false
+                        RUN_E2E=false
+                        RUN_MCP=true
+                        CATEGORY="mcp"
+                        ;;
+                    all)
+                        RUN_UNIT=true
+                        RUN_INTEGRATION=true
+                        RUN_E2E=false
+                        RUN_MCP=false
+                        CATEGORY="all"
+                        ;;
+                esac
+                shift 2
+            else
+                echo "Error: --category requires one of: core, integration, mcp, all"
+                exit 1
+            fi
             ;;
         --include-e2e)
             RUN_E2E=true
@@ -94,12 +144,20 @@ while [[ $# -gt 0 ]]; do
             echo "Usage: $0 [OPTIONS]"
             echo "Options:"
             echo "  --no-setup        Skip environment setup"
-            echo "  --unit-only       Run only unit tests"
-            echo "  --integration-only Run only integration tests"
+            echo "  --unit-only       Run only unit tests (same as --category core)"
+            echo "  --integration-only Run only integration tests (same as --category integration)"
+            echo "  --mcp-only       Run only MCP tests (same as --category mcp)"
+            echo "  --category TYPE   Run specific category: core, integration, mcp, all"
             echo "  --include-e2e     Include end-to-end tests"
             echo "  --no-cleanup      Don't stop services after tests"
             echo "  --verbose         Show detailed test output"
             echo "  --help           Show this help message"
+            echo ""
+            echo "Examples:"
+            echo "  $0 --category core          # Run only core unit tests"
+            echo "  $0 --category integration   # Run only integration tests"
+            echo "  $0 --category mcp           # Run only MCP tests"
+            echo "  $0 --unit-only             # Same as --category core"
             exit 0
             ;;
         *)
@@ -149,8 +207,10 @@ fi
 
 echo ""
 echo -e "${BLUE}📋 Test Configuration:${NC}"
+echo "• Category: $CATEGORY"
 echo "• Unit Tests: $([ "$RUN_UNIT" = "true" ] && echo "✅" || echo "❌")"
 echo "• Integration Tests: $([ "$RUN_INTEGRATION" = "true" ] && echo "✅" || echo "❌")"
+echo "• MCP Tests: $([ "$RUN_MCP" = "true" ] && echo "✅" || echo "❌")"
 echo "• E2E Tests: $([ "$RUN_E2E" = "true" ] && echo "✅" || echo "❌")"
 echo "• Verbose Output: $([ "$VERBOSE" = "true" ] && echo "✅" || echo "❌")"
 echo ""
@@ -166,47 +226,52 @@ if [ "$VERBOSE" = "true" ]; then
     CARGO_VERBOSE="-- --nocapture"
 fi
 
-# Unit Tests
-if [ "$RUN_UNIT" = "true" ]; then
-    echo -e "${BLUE}1️⃣ UNIT TESTS${NC}"
-    echo -e "${BLUE}=============${NC}"
+# Core Tests (fast unit tests)
+if [ "$RUN_UNIT" = "true" ] || [ "$CATEGORY" = "core" ]; then
+    echo -e "${BLUE}1️⃣ CORE UNIT TESTS${NC}"
+    echo -e "${BLUE}==================${NC}"
     echo ""
 
-    TOTAL_TESTS=$((TOTAL_TESTS + 4))
-
-    # Core library tests
-    if run_test "Core Libraries Unit Tests" "cargo test --lib --all-features $CARGO_VERBOSE"; then
-        PASSED_TESTS=$((PASSED_TESTS + 1))
+    # Run the core test script instead of inline tests
+    if [ -f "scripts/run_core_tests.sh" ]; then
+        echo -e "${BLUE}🔄 Delegating to core test script...${NC}"
+        if ./scripts/run_core_tests.sh ${VERBOSE:+--verbose}; then
+            PASSED_TESTS=$((PASSED_TESTS + 6))  # Approximate count from core script
+            TOTAL_TESTS=$((TOTAL_TESTS + 6))
+        else
+            FAILED_TESTS=$((FAILED_TESTS + 6))
+            TOTAL_TESTS=$((TOTAL_TESTS + 6))
+        fi
     else
-        FAILED_TESTS=$((FAILED_TESTS + 1))
-    fi
-    echo ""
+        echo -e "${RED}❌ Core test script not found. Running fallback tests...${NC}"
+        # Fallback to basic tests
+        TOTAL_TESTS=$((TOTAL_TESTS + 3))
+        
+        if run_test "Terraphim Types Unit Tests" "cargo test -p terraphim_types --lib $CARGO_VERBOSE"; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+        else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+        echo ""
 
-    # Specific crate tests
-    if run_test "TerraphimGraph Unit Tests" "cargo test -p terraphim_rolegraph $CARGO_VERBOSE"; then
-        PASSED_TESTS=$((PASSED_TESTS + 1))
-    else
-        FAILED_TESTS=$((FAILED_TESTS + 1))
-    fi
-    echo ""
+        if run_test "Terraphim Automata Unit Tests" "cargo test -p terraphim_automata --lib $CARGO_VERBOSE"; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+        else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+        echo ""
 
-    if run_test "Service Layer Unit Tests" "cargo test -p terraphim_service --lib $CARGO_VERBOSE"; then
-        PASSED_TESTS=$((PASSED_TESTS + 1))
-    else
-        FAILED_TESTS=$((FAILED_TESTS + 1))
+        if run_test "Terraphim Persistence Unit Tests" "cargo test -p terraphim_persistence --lib $CARGO_VERBOSE"; then
+            PASSED_TESTS=$((PASSED_TESTS + 1))
+        else
+            FAILED_TESTS=$((FAILED_TESTS + 1))
+        fi
+        echo ""
     fi
-    echo ""
-
-    if run_test "Middleware Unit Tests" "cargo test -p terraphim_middleware --lib $CARGO_VERBOSE"; then
-        PASSED_TESTS=$((PASSED_TESTS + 1))
-    else
-        FAILED_TESTS=$((FAILED_TESTS + 1))
-    fi
-    echo ""
 fi
 
 # Integration Tests
-if [ "$RUN_INTEGRATION" = "true" ]; then
+if [ "$RUN_INTEGRATION" = "true" ] || [ "$CATEGORY" = "integration" ]; then
     echo -e "${BLUE}2️⃣ INTEGRATION TESTS${NC}"
     echo -e "${BLUE}===================${NC}"
     echo ""
@@ -264,9 +329,42 @@ if [ "$RUN_INTEGRATION" = "true" ]; then
     echo ""
 fi
 
+# MCP Tests (separate category)
+if [ "$RUN_MCP" = "true" ] || [ "$CATEGORY" = "mcp" ]; then
+    echo -e "${BLUE}3️⃣ MCP TESTS${NC}"
+    echo -e "${BLUE}==============${NC}"
+    echo ""
+
+    TOTAL_TESTS=$((TOTAL_TESTS + 3))
+
+    # MCP server compilation
+    if run_test "MCP Server Compilation" "cargo check -p terraphim_mcp_server" 300; then
+        PASSED_TESTS=$((PASSED_TESTS + 1))
+    else
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+    echo ""
+
+    # MCP integration tests
+    if run_test "MCP Integration Tests" "cargo test -p terraphim_mcp_server --lib" 600; then
+        PASSED_TESTS=$((PASSED_TESTS + 1))
+    else
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+    echo ""
+
+    # MCP protocol validation
+    if run_test "MCP Protocol Validation" "cargo test -p terraphim_mcp_server test_tools_list" 300; then
+        PASSED_TESTS=$((PASSED_TESTS + 1))
+    else
+        FAILED_TESTS=$((FAILED_TESTS + 1))
+    fi
+    echo ""
+fi
+
 # End-to-End Tests
 if [ "$RUN_E2E" = "true" ]; then
-    echo -e "${BLUE}3️⃣ END-TO-END TESTS${NC}"
+    echo -e "${BLUE}4️⃣ END-TO-END TESTS${NC}"
     echo -e "${BLUE}==================${NC}"
     echo ""
 

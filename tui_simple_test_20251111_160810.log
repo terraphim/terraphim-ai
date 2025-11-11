@@ -1,0 +1,1082 @@
+[0;34m=== Simplified Terraphim TUI Test ===[0m
+Started at: Tue 11 Nov 2025 04:08:10 PM CET
+
+[1;33mTesting TUI with command batch...[0m
+Full output captured:
+[2025-11-11T15:08:10Z INFO  terraphim_tui::service] Initializing TUI service with embedded configuration
+[2025-11-11T15:08:10Z INFO  terraphim_settings] Loading device settings...
+[2025-11-11T15:08:10Z INFO  terraphim_settings] Loading device settings...
+[2025-11-11T15:08:10Z INFO  terraphim_persistence] Loaded settings: DeviceSettings { server_hostname: "127.0.0.1:8000", api_endpoint: "http://localhost:8000/api", initialized: false, default_data_path: "${HOME/.terraphim}", profiles: {"dashmap": {"type": "dashmap", "root": "/tmp/dashmaptest"}, "memory": {"type": "memory"}, "rock": {"datadir": "/tmp/opendal/rocksdb", "type": "rocksdb"}, "rocksdb": {"datadir": "/tmp/terraphim_rocksdb", "type": "rocksdb"}, "sqlite": {"datadir": "/tmp/terraphim_sqlite", "connection_string": "/tmp/terraphim_sqlite/terraphim.db", "type": "sqlite", "table": "terraphim_kv"}} }
+[2025-11-11T15:08:10Z INFO  terraphim_persistence] 🔧 Pre-creating DashMap directory: /tmp/dashmaptest
+[2025-11-11T15:08:10Z INFO  terraphim_persistence] ✅ Created DashMap directory: /tmp/dashmaptest
+[2025-11-11T15:08:10Z INFO  terraphim_persistence] 🔧 Pre-creating SQLite directory: /tmp/terraphim_sqlite
+[2025-11-11T15:08:10Z INFO  terraphim_persistence] ✅ Created SQLite directory: /tmp/terraphim_sqlite
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 📁 Parsing profile: dashmap
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 🔧 Profile 'dashmap' using scheme: Dashmap
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] Got request for dashmap operator; initializing in-memory operator.
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 📁 Parsing profile: memory
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 🔧 Profile 'memory' using scheme: Memory
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] Got request for memory operator; initializing in-memory operator.
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rock
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 🔧 Profile 'rock' using scheme: Rocksdb
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 📁 Parsing profile: rocksdb
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 🔧 Profile 'rocksdb' using scheme: Rocksdb
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] Got request for rocksdb operator; initializing in-memory operator.
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 📁 Parsing profile: sqlite
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] 🔧 Profile 'sqlite' using scheme: Sqlite
+[2025-11-11T15:08:10Z INFO  terraphim_persistence::settings] Got request for sqlite operator; initializing in-memory operator.
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba11851900 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba11839a90 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba11851c60 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba11851900 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba11851b40 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba117672c0 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z WARN  opendal::services] service=memory name=0x55ba11851900 path=embedded_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: embedded_config.json, range: 0- } => memory doesn't have this path
+[2025-11-11T15:08:10Z INFO  terraphim_tui::service] Failed to load config: OpenDal(NotFound (permanent) at read => memory doesn't have this path
+    
+    Context:
+       service: memory
+       path: embedded_config.json
+       range: 0-
+    ), using default embedded
+[2025-11-11T15:08:10Z INFO  terraphim_config] Creating role Terraphim Engineer
+[2025-11-11T15:08:10Z INFO  terraphim_config] Role Terraphim Engineer has no automata_path, building thesaurus from local KG files at "docs/src/kg"
+[2025-11-11T15:08:10Z INFO  terraphim_config] Successfully built thesaurus from local KG for role Terraphim Engineer
+[2025-11-11T15:08:10Z INFO  terraphim_config] Creating role Rust Engineer
+[2025-11-11T15:08:10Z INFO  terraphim_config] Creating role Default
+============================================================
+🌍 Terraphim TUI REPL
+============================================================
+Type /help for help, /quit to exit
+Mode: Offline Mode | Current Role: Default
+
+Available commands:
+  /search <query> - Search documents
+  /config [show|set] - Manage configuration
+  /role [list|select] - Manage roles
+  /graph - Show knowledge graph
+  /chat [message] - Chat with AI
+  /summarize <target> - Summarize content
+  /autocomplete <query> - Autocomplete terms
+  /extract <text> - Extract paragraphs
+  /find <text> - Find matches
+  /replace <text> - Replace matches
+  /thesaurus - Show thesaurus
+  /help [command] - Show help
+  /quit - Exit REPL
+
+
+Available commands:
+  /search <query> - Search documents
+  /config [show|set] - Manage configuration
+  /role [list|select] - Manage roles
+  /graph - Show knowledge graph
+  /chat [message] - Chat with AI
+  /summarize <target> - Summarize content
+  /autocomplete <query> - Autocomplete terms
+  /extract <text> - Extract paragraphs
+  /find <text> - Find matches
+  /replace <text> - Replace matches
+  /thesaurus - Show thesaurus
+  /help [command] - Show help
+  /quit - Exit REPL
+Available roles:
+    Terraphim Engineer
+    Rust Engineer
+  ▶ Default
+{
+  "id": "Embedded",
+  "global_shortcut": "Ctrl+X",
+  "roles": {
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true
+        }
+      ],
+      "llm_enabled": false,
+      "llm_api_key": null,
+      "llm_model": null,
+      "llm_auto_summarize": false,
+      "llm_chat_enabled": false,
+      "llm_chat_system_prompt": null,
+      "llm_chat_model": null,
+      "llm_context_window": 32768
+    },
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "cosmo",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://query.rs",
+          "service": "QueryRs",
+          "read_only": true
+        }
+      ],
+      "llm_enabled": false,
+      "llm_api_key": null,
+      "llm_model": null,
+      "llm_auto_summarize": false,
+      "llm_chat_enabled": false,
+      "llm_chat_system_prompt": null,
+      "llm_chat_model": null,
+      "llm_context_window": 32768
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true
+        }
+      ],
+      "llm_enabled": false,
+      "llm_api_key": null,
+      "llm_model": null,
+      "llm_auto_summarize": false,
+      "llm_chat_enabled": false,
+      "llm_chat_system_prompt": null,
+      "llm_chat_model": null,
+      "llm_context_window": 32768
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
+}
+🔍 Searching for: 'test'
+[2025-11-11T15:08:10Z INFO  terraphim_middleware::indexer] Finding documents in haystack: Haystack {
+        location: "docs/src",
+        service: Ripgrep,
+        read_only: true,
+        fetch_content: false,
+        atomic_server_secret: None,
+        extra_parameters: {},
+    }
+[2025-11-11T15:08:10Z INFO  terraphim_middleware::command::ripgrep] 🚀 Executing: rg --json --trim -C3 --ignore-case -tmarkdown test docs/src
+🧠 TerraphimGraph search initiated for role: Terraphim Engineer
+[2025-11-11T15:08:12Z INFO  terraphim_middleware::thesaurus] Thesaurus for role `Terraphim Engineer` saved to persistence
+[2025-11-11T15:08:12Z INFO  terraphim_middleware::thesaurus] Successfully updated rolegraph for role: Terraphim Engineer
+[2025-11-11T15:08:12Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Indexed 45 new documents into rolegraph for role 'Terraphim Engineer'
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Re-running TerraphimGraph search after indexing new documents
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document '@memory' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'data analysis' → kg:data analysis, 'haystack' → kg:haystack, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'thesaurus' → kg:thesaurus, 'graph' → kg:graph, 'automata' → kg:automata, 'service' → kg:service, 'search' → kg:search
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'data analysis' -> 'data analysis' (url: Some("kg:comprehensive-testing-strategies")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim AI Project Memory
+    
+    ## ✅ COMPREHENSIVE CLIPPY WARNINGS CLEANUP - COMPLETED SUCCESSFULLY (2025-01-31)
+    
+    ### Major Code Quality Improvements - COMPLETED ✅
+    
+    **Task**: Run cargo clippy and syste...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document '@memory' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 497991 chars, processed: 544148 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [search], [service], [search], [graph], [haystack], [haystack], [graph], [graph], [haystack], [service], [graph], [service], [service], [haystack], [service], [haystack], [graph], [search], [search], [search], [haystack], [graph], [haystack], [service], [graph], [search], [service], [service], [service], [service], [service], [graph], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [search], [graph], [search], [search], [graph], [graph], [service], [graph], [service], [haystack], [haystack], [haystack], [search], [haystack], [search], [search], [search], [haystack], [search], [search], [haystack], [haystack], [haystack], [search], [search], [haystack], [search], [haystack], [haystack], [service], [service], [search], [search], [search], [haystack], [service], [haystack], [search], [haystack], [search], [service], [haystack], [search], [search], [haystack], [search], [search], [automata], [graph], [graph], [search], [service], [service], [search], [search], [automata], [graph], [service], [service], [search], [haystack], [graph], [graph], [search], [graph], [search], [graph], [haystack], [search], [search], [search], [search], [search], [search], [haystack], [search], [search], [search], [search], [graph], [search], [graph], [search], [graph], [graph], [graph], [search], [search], [service], [search], [service], [service], [service], [service], [service], [service], [service], [service], [service], [service], [service], [service], [service], [search], [search], [service], [graph], [graph], [graph], [service], [service], [thesaurus], [graph], [thesaurus], [term], [automata], [graph], [thesaurus], [thesaurus], [graph], [search], [search], [search], [graph], [search], [search], [graph], [search], [graph], [graph], [graph], [service], [service], [search], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [service], [haystack], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [haystack], [haystack], [service], [search], [haystack], [haystack], [haystack], [service], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [service], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [graph], [graph], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [haystack], [haystack], [service], [service], [search], [service], [service], [haystack], [service], [service], [service], [haystack], [haystack], [haystack], [service], [haystack], [haystack], [haystack], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [service], [haystack], [thesaurus], [graph], [graph], [graph], [thesaurus], [graph], [data analysis], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [search], [search], [search], [data analysis], [graph], [graph], [search], [graph], [thesaurus], [search], [graph], [search], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [search], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [service], [service], [haystack], [haystack], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [service], [service], [search], [search], [graph], [graph], [graph], [graph], [thesaurus], [graph], [thesaurus], [graph], [search], [search], [graph], [haystack], [search], [graph], [search], [search], [graph], [search], [search], [search], [graph], [graph], [search], [service], [search], [graph], [graph], [graph], [graph], [graph], [search], [search], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [automata], [thesaurus], [automata], [thesaurus], [search], [graph], [search], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [search], [search], [thesaurus], [search], [automata], [search], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [search], [search], [thesaurus], [search], [haystack], [graph], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [thesaurus], [search], [haystack], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [thesaurus], [search], [graph], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [graph], [search], [graph], [graph], [haystack], [haystack], [graph], [haystack], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [search], [search], [graph], [graph], [search], [graph], [graph], [thesaurus], [search], [thesaurus], [graph], [thesaurus], [search], [search], [search], [search], [search], [search], [search], [search], [haystack], [haystack], [search], [search], [search], [search], [haystack], [search], [search], [search], [search], [haystack], [graph], [thesaurus], [search], [haystack], [graph], [graph], [search], [search], [search], [search], [service], [thesaurus], [service], [search], [search], [search], [service], [service], [search], [search], [search], [search], [search], [search], [search], [search], [service], [search], [haystack], [search], [search], [service], [search], [search], [search], [haystack], [haystack], [search], [search], [search], [search], [search], [thesaurus], [graph], [service], [search], [search], [thesaurus], [thesaurus], [thesaurus], [service], [thesaurus], [thesaurus], [service], [search], [search], [thesaurus], [search], [search], [search], [search], [thesaurus], [search], [search], [search], [search], [search], [search], [search], [search], [search], [search], [haystack], [haystack], [service], [haystack], [haystack], [haystack], [graph], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [automata], [graph], [haystack], [service], [graph], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [search], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [thesaurus], [search], [thesaurus], [automata], [search], [search], [search], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [service], [graph], [thesaurus], [graph], [service], [automata], [graph], [thesaurus], [search], [search], [graph], [service], [service], [thesaurus], [search], [graph], [graph], [graph], [haystack], [service], [automata], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [automata], [thesaurus], [automata], [thesaurus], [automata], [search], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [thesaurus], [service], [graph], [thesaurus], [automata], [search], [search], [search], [haystack], [haystack], [graph], [search], [graph], [search], [graph], [search], [graph], [search], [haystack], [graph], [graph], [graph], [haystack], [search], [thesaurus], [search], [search], [haystack], [graph], [graph], [haystack], [haystack], [graph], [graph], [haystack], [search], [search], [graph], [graph], [haystack], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [search], [graph], [search], [search], [graph], [graph], [service], [graph], [service], [search], [search], [graph], [graph], [graph], [search], [graph], [search], [graph], [search], [search], [graph], [graph], [service], [graph], [service], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [haystack], [haystack], [search], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [automata], [graph], [haystack], [service], [graph], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [search], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [thesaurus], [search], [thesaurus], [automata], [search], [search], [search], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [service], [graph], [thesaurus], [graph], [service], [automata], [graph], [thesaurus], [search], [search], [graph], [service], [service], [thesaurus], [search], [graph], [graph], [graph], [haystack], [service], [automata], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [automata], [thesaurus], [automata], [thesaurus], [automata], [search], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [thesaurus], [service], [graph], [thesaurus], [automata], [search], [search], [search], [haystack], [haystack], [graph], [search], [graph], [search], [graph], [search], [graph], [search], [haystack], [graph], [graph], [graph], [haystack], [search], [thesaurus], [search], [search], [haystack], [graph], [graph], [haystack], [haystack], [graph], [graph], [haystack], [search], [search], [graph], [graph], [haystack], [search], [search], [search], [search], [search], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [haystack], [haystack], [search], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [automata], [graph], [haystack], [service], [graph], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [search], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [thesaurus], [search], [thesaurus], [automata], [search], [search], [search], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [service], [graph], [thesaurus], [graph], [service], [automata], [graph], [thesaurus], [search], [search], [graph], [service], [service], [thesaurus], [search], [graph], [graph], [graph], [haystack], [service], [automata], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [automata], [thesaurus], [automata], [thesaurus], [automata], [search], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [thesaurus], [service], [graph], [thesaurus], [automata], [search], [search], [search], [haystack], [haystack], [graph], [search], [graph], [search], [graph], [search], [graph], [search], [haystack], [graph], [graph], [graph], [haystack], [search], [thesaurus], [search], [search], [haystack], [graph], [graph], [haystack], [haystack], [graph], [graph], [haystack], [search], [search], [graph], [graph], [haystack], [search], [search], [search], [search], [search], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [haystack], [haystack], [search], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [automata], [graph], [haystack], [service], [graph], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [search], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [thesaurus], [search], [thesaurus], [automata], [search], [search], [search], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [service], [graph], [thesaurus], [graph], [service], [automata], [graph], [thesaurus], [search], [search], [graph], [service], [service], [thesaurus], [search], [graph], [graph], [graph], [haystack], [service], [automata], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [automata], [thesaurus], [automata], [thesaurus], [automata], [search], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [thesaurus], [service], [graph], [thesaurus], [automata], [search], [search], [search], [haystack], [haystack], [graph], [search], [graph], [search], [graph], [search], [graph], [search], [haystack], [graph], [graph], [graph], [haystack], [search], [thesaurus], [search], [search], [haystack], [graph], [graph], [haystack], [haystack], [graph], [graph], [haystack], [search], [search], [graph], [graph], [haystack], [search], [search], [search], [search], [search], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [haystack], [haystack], [search], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [automata], [graph], [haystack], [service], [graph], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [search], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [thesaurus], [search], [thesaurus], [automata], [search], [search], [search], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [service], [graph], [thesaurus], [graph], [service], [automata], [graph], [thesaurus], [search], [search], [graph], [service], [service], [thesaurus], [search], [graph], [graph], [graph], [haystack], [service], [automata], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [automata], [thesaurus], [automata], [thesaurus], [automata], [search], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [thesaurus], [service], [graph], [thesaurus], [automata], [search], [search], [search], [haystack], [haystack], [graph], [search], [graph], [search], [graph], [search], [graph], [search], [haystack], [graph], [graph], [graph], [haystack], [search], [thesaurus], [search], [search], [haystack], [graph], [graph], [haystack], [haystack], [graph], [graph], [haystack], [search], [search], [graph], [graph], [haystack], [search], [search], [search], [search], [search], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [haystack], [haystack], [search], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [automata], [graph], [haystack], [service], [graph], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [search], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [thesaurus], [search], [thesaurus], [automata], [search], [search], [search], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [service], [graph], [thesaurus], [graph], [service], [automata], [graph], [thesaurus], [search], [search], [graph], [service], [service], [thesaurus], [search], [graph], [graph], [graph], [haystack], [service], [automata], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [automata], [thesaurus], [automata], [thesaurus], [automata], [search], [graph], [graph], [search], [search], [search], [search], [search], [search], [search], [thesaurus], [service], [graph], [thesaurus], [automata], [search], [search], [search], [haystack], [haystack], [graph], [search], [graph], [search], [graph], [search], [graph], [search], [haystack], [graph], [graph], [graph], [haystack], [search], [thesaurus], [search], [search], [haystack], [graph], [graph], [haystack], [haystack], [graph], [graph], [haystack], [search], [search], [graph], [graph], [haystack], [search], [search], [search], [search], [search], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [service], [haystack], [search], [haystack], [haystack], [haystack], [search], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [haystack], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [haystack], [graph], [graph], [graph], [search], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [thesaurus], [thesaurus], [search], [thesaurus], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [search], [graph], [graph], [graph], [search], [search], [search], [graph], [search], [search], [search], [search], [search], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...)
+      - Various compilation errors with Role/[search](kg:search)Query structs: All fixed
+    
+    **Key Technical Improvements**:
+    - Moved regex compilation outs...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'knowledge-graph-system' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'service' → kg:service, 'graph' → kg:graph, 'graph processing' → kg:graph processing, 'haystack' → kg:haystack
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'automata' -> 'automata' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim Knowledge Graph System
+    
+    ## Overview
+    
+    The Terraphim Knowledge Graph (KG) system provides semantic search capabilities by building thesauri from markdown files and using graph-based ranking ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'knowledge-graph-system' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 14403 chars, processed: 17220 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [search], [graph], [graph], [search], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [service], [service], [haystack], [haystack], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [haystack], [service], [service], [graph], [graph], [graph], [thesaurus], [search], [graph], [graph], [thesaurus], [thesaurus], [search], [graph], [graph], [graph], [thesaurus], [graph], [graph], [search], [graph], [search], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [thesaurus], [graph], [graph], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [graph], [thesaurus], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph processing], [graph], [graph processing], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [graph], [graph], [thesaurus], [search], [search], [thesaurus], [graph], [search], [thesaurus], [graph], [search], [graph], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [search], [graph], [graph], [search], [graph], [graph], [graph], [graph], [service], [graph processing], [graph], [graph], [graph], [search], [graph], [search], [graph], [graph], [search], [search], [graph], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Terraphim Knowledge [graph](kg:terraphim-graph) System
+    
+    ## Overview
+    
+    The Terraphim Knowledge [graph](kg:terraphim-graph) (KG) ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'mcp-integration-testing' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'data analysis' → kg:data analysis, 'thesaurus' → kg:thesaurus, 'service' → kg:service, 'search' → kg:search, 'graph' → kg:graph, 'haystack' → kg:haystack, 'automata' → kg:automata, 'network analysis' → kg:network analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'data analysis' -> 'data analysis' (url: Some("kg:comprehensive-testing-strategies")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # MCP Integration Testing
+    
+    ## Overview
+    
+    The MCP (Model Context Protocol) integration testing validates the comprehensive functionality of the Terraphim MCP server, including knowledge graph integratio...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'mcp-integration-testing' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 12931 chars, processed: 14000 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [service], [service], [graph], [graph], [automata], [service], [service], [service], [graph], [automata], [graph], [graph], [graph], [graph], [graph], [graph], [service], [service], [service], [service], [service], [data analysis], [network analysis], [graph], [service], [haystack], [service], [service], [graph], [graph], [service], [service], [graph], [graph], [service], [service], [service], [service], [graph], [automata], [graph], [service], [service], [service], [graph], [service], [data analysis], [network analysis], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...e Terraphim MCP server, including knowledge [graph](kg:terraphim-graph) integration, autocomplete functionality, and advanced text processing capabili...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'comprehensive-testing-strategies' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'graph' → kg:graph, 'automata' → kg:automata, 'search' → kg:search, 'haystack' → kg:haystack, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'graph processing' → kg:graph processing, 'thesaurus' → kg:thesaurus, 'service' → kg:service
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Comprehensive Testing Strategies for Terraphim
+    
+    ## Overview
+    
+    This document outlines the comprehensive testing framework developed for Terraphim AI, covering knowledge graph validation, dual haystack...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'comprehensive-testing-strategies' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 11637 chars, processed: 13422 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [haystack], [graph], [search], [haystack], [search], [service], [graph], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [search], [graph], [thesaurus], [graph], [thesaurus], [graph], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [graph], [haystack], [search], [graph], [haystack], [haystack], [graph], [search], [haystack], [search], [search], [search], [search], [search], [search], [search], [haystack], [haystack], [search], [search], [search], [search], [search], [search], [graph], [thesaurus], [thesaurus], [graph], [search], [graph], [graph], [graph processing], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [search], [search], [search], [search], [search], [search], [graph], [search], [search], [search], [graph], [graph], [graph], [graph], [haystack], [haystack], [graph], [search], [service], [graph], [haystack], [graph], [search], [haystack], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...eloped for Terraphim AI, covering knowledge [graph](kg:terraphim-graph) validation, dual [haystack](kg:haystack) systems, atomic server integration, a...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'Introduction' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'thesaurus' → kg:thesaurus, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'search' → kg:search, 'graph' → kg:graph, 'data analysis' → kg:data analysis, 'service' → kg:service, 'haystack' → kg:haystack, 'automata' → kg:automata
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Introduction
+    
+    Terraphim is a privacy-first AI assistant which works for you under your complete control. It starts as a local search engine, which can be configured to search for different types of ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'Introduction' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 8087 chars, processed: 8466 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [graph], [service], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...our complete control. It starts as a local [search](kg:search) engine, which can be configured to [search](kg:search) for different types of content, ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'PACKAGE_MANAGER_REPLACEMENT' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'network analysis' → kg:network analysis, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'graph' → kg:graph, 'search' → kg:search, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'service' → kg:service, 'haystack' → kg:haystack
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'network analysis' -> 'network analysis' (url: Some("kg:comprehensive-testing-strategies")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Package Manager Replacement with Bun
+    
+    This guide shows how to use Terraphim's knowledge graph and replace functionality to automatically convert package manager commands (pnpm, npm, yarn) to Bun.
+    
+    #...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'PACKAGE_MANAGER_REPLACEMENT' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 6269 chars, processed: 6753 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [thesaurus], [automata], [thesaurus], [graph], [graph], [graph], [graph], [automata], [graph], [thesaurus], [automata], [graph], [graph], [graph], [thesaurus], [thesaurus], [automata], [automata](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...uide shows how to use Terraphim's knowledge [graph](kg:terraphim-graph) and replace functionality to automatically convert package manager commands (p...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document '@scratchpad' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'thesaurus' → kg:thesaurus, 'network analysis' → kg:network analysis, 'search' → kg:search, 'graph processing' → kg:graph processing, 'haystack' → kg:haystack, 'service' → kg:service, 'graph' → kg:graph, 'automata' → kg:automata
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'network analysis' -> 'network analysis' (url: Some("kg:comprehensive-testing-strategies")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Current Work: Terraphim Multi-Role Agent System Testing & Production 🚀
+    
+    ## **CURRENT STATUS: VM Execution System Complete - All Tests and Documentation Delivered** ✅
+    
+    ### **MAJOR ACHIEVEMENT: Compre...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document '@scratchpad' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 44718 chars, processed: 45804 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [automata], [graph], [graph], [graph], [automata], [graph], [graph], [automata], [graph], [service], [haystack], [graph], [automata], [graph], [graph], [graph], [graph], [graph], [haystack], [graph], [graph], [graph], [graph], [graph], [haystack], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [haystack], [search], [haystack], [haystack], [search], [haystack], [graph], [graph], [haystack], [search], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...tegration with existing infrastructure (role[graph](kg:terraphim-graph), [automata](kg:thesaurus), persistence)
+    
+    ### **Current Phase: Testing & Produc...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'knowledge-graph-bug-reporting-enhancement' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'search' → kg:search, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'service' → kg:service, 'automata' → kg:automata, 'graph' → kg:graph
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'search' -> 'search' (url: Some("kg:search")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Knowledge Graph Bug Reporting Enhancement
+    
+    ## Overview
+    
+    The Terraphim Knowledge Graph system has been significantly enhanced with comprehensive bug reporting and issue tracking terminology, providin...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'knowledge-graph-bug-reporting-enhancement' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 9613 chars, processed: 10387 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [service], [graph], [graph], [graph], [automata], [graph], [service], [graph], [automata], [service], [search], [graph], [search], [graph], [search], [search], [search], [service], [graph], [service], [graph], [graph], [graph], [graph], [graph], [graph], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Knowledge [graph](kg:terraphim-graph) Bug Reporting Enhancement
+    
+    ## Overview
+    
+    The Terraphim Knowledge [graph](kg:ter...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document '@lessons-learned' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'haystack' → kg:haystack, 'data analysis' → kg:data analysis, 'graph processing' → kg:graph processing, 'service' → kg:service, 'graph' → kg:graph, 'search' → kg:search
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Lessons Learned
+    
+    ## Technical Lessons
+    
+    ### Rust Type System Challenges
+    1. **Trait Objects with Generics** - StateManager trait with generic methods can't be made into `dyn StateManager`
+       - Solutio...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document '@lessons-learned' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 76589 chars, processed: 77286 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [automata], [service], [haystack], [graph], [graph], [graph], [automata], [graph], [automata], [graph], [graph], [graph], [graph], [automata], [haystack], [graph], [graph], [thesaurus], [automata], [graph], [service], [graph], [graph], [service], [graph], [graph], [graph], [automata], [graph], [graph], [graph], [graph], [graph], [haystack], [service], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...s Proliferation** - Having multiple `Mock[automata](kg:thesaurus)` in different modules causes type conflicts
+       - Solution: Single shared mock type i...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'Architecture' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'service' → kg:service, 'haystack' → kg:haystack, 'search' → kg:search, 'network analysis' → kg:network analysis, 'graph' → kg:graph, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'graph processing' → kg:graph processing
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'service' -> 'service' (url: Some("kg:service")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim AI Architecture
+    
+    This document provides a comprehensive architectural overview of Terraphim AI, a privacy-first AI assistant that operates locally, providing semantic search across multipl...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'Architecture' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 26162 chars, processed: 32482 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [graph], [graph], [graph], [graph], [service], [service], [service], [service], [search], [graph], [graph], [graph], [automata], [automata], [graph], [graph], [haystack], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [search], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [graph], [graph], [service], [service], [service], [service], [service], [service], [service], [service], [automata], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [automata], [automata], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [service], [haystack], [service], [service], [automata], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [search], [haystack], [service], [haystack], [search], [search], [search], [search], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [search], [haystack], [search], [search], [search], [haystack], [service], [haystack], [haystack], [search], [haystack], [search], [haystack], [search], [search], [haystack], [haystack], [service], [service], [service], [haystack], [service], [graph], [graph], [search], [graph], [search], [search], [graph], [search], [graph], [haystack], [search], [graph], [graph], [thesaurus], [thesaurus], [automata], [automata], [graph], [graph], [graph], [graph], [graph], [graph], [search], [thesaurus], [thesaurus], [automata], [automata], [graph], [graph], [graph], [graph], [graph], [thesaurus], [automata], [graph], [graph], [graph], [graph], [graph], [service], [service], [service], [search], [graph], [graph], [graph], [graph], [automata], [automata], [graph], [graph], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [service], [service], [service], [service], [graph], [service], [automata], [graph], [automata], [graph], [automata], [service], [service], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [service], [haystack], [service], [service], [graph], [automata], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [graph], [graph], [graph], [haystack], [graph], [graph], [graph], [haystack], [search], [graph], [haystack], [graph], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [haystack], [graph], [haystack], [graph processing], [graph], [thesaurus], [graph], [thesaurus], [automata], [graph], [graph], [graph], [automata], [graph], [graph], [search], [search], [search], [automata], [automata], [graph], [automata], [graph], [graph], [graph], [search], [automata], [graph], [graph], [search], [graph], [graph], [search], [search], [graph], [graph], [graph], [graph], [service], [service], [search], [graph], [search], [search], [search], [graph], [service], [service], [service], [search], [search], [search], [search], [search], [graph], [service], [search], [service], [service], [graph], [automata], [automata], [haystack], [search], [service], [service], [automata], [automata], [service], [service], [search], [haystack], [haystack], [service], [service], [search], [service], [automata], [thesaurus], [haystack], [graph], [graph], [search], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [graph], [automata], [automata], [graph], [graph], [graph], [graph], [thesaurus], [automata], [automata], [graph], [graph], [thesaurus], [automata], [graph], [thesaurus], [automata], [graph], [automata], [graph], [search], [haystack], [search], [service], [search], [service], [search], [graph processing], [haystack], [service], [haystack], [haystack], [haystack], [search], [search], [haystack], [search], [graph], [graph], [haystack], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... that operates locally, providing semantic [search](kg:search) across multiple knowledge repositories.
+    
+    ## Overall System Architecture
+    
+    The system fol...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'testing-overview' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'network analysis' → kg:network analysis, 'data analysis' → kg:data analysis, 'haystack' → kg:haystack, 'automata' → kg:automata, 'service' → kg:service, 'graph' → kg:graph, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'network analysis' -> 'network analysis' (url: Some("kg:comprehensive-testing-strategies")), 'data analysis' -> 'data analysis' (url: Some("kg:comprehensive-testing-strategies")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Testing Overview
+    
+    Terraphim employs a comprehensive testing strategy to ensure code quality, reliability, and maintainability across all components and platforms.
+    
+    ## Testing Strategy
+    
+    ### Multi-Lev...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'testing-overview' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 11960 chars, processed: 12918 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [haystack], [search], [graph], [graph], [service], [service], [search], [service], [service], [search], [search], [search], [service], [search], [search], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [service], [service], [service], [graph], [automata], [graph], [graph], [service], [search], [search], [search], [search], [search], [search], [search], [search], [search], [search], [haystack], [search], [search], [search], [automata], [automata], [automata], [automata], [search], [automata], [automata], [automata], [automata], [search], [service], [service], [service], [search], [service], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... Real Atomic Data server integration
+    - **[haystack](kg:haystack)**: Document indexing and [search](kg:search) validation
+    - **Knowledge [graph](kg:terr...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'testing_matrix' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'data analysis' → kg:data analysis, 'automata' → kg:automata, 'service' → kg:service, 'graph' → kg:graph, 'thesaurus' → kg:thesaurus, 'search' → kg:search, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'haystack' → kg:haystack
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'data analysis' -> 'data analysis' (url: Some("kg:comprehensive-testing-strategies")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim AI Agent Evolution System - Testing Matrix
+    
+    ## Overview
+    
+    This document provides a comprehensive testing matrix for the Terraphim AI Agent Evolution System, covering all components, workflo...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'testing_matrix' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 23178 chars, processed: 23226 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [search], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...g Strategy
+    
+    ### Testing Pyramid
+    
+    ```mermaid
+    [graph](kg:terraphim-graph) TD
+        A[End-to-End Tests] --> B[Integration Tests]
+        B --> C[Unit Tests]
+    
+     ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'openrouter-integration' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'service' → kg:service, 'search' → kg:search, 'automata' → kg:automata, 'graph' → kg:graph, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'service' -> 'service' (url: Some("kg:service")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # OpenRouter AI-Powered Article Summarization
+    
+    Terraphim AI supports AI-powered article summarization through OpenRouter integration. This feature replaces basic text excerpts with intelligent, contex...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'openrouter-integration' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 9290 chars, processed: 9498 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [service], [search], [graph], [haystack], [search], [search], [search], [search], [search], [service], [service], [service], [haystack], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... support
+    cargo build --features terraphim_[service](kg:service)/openrouter,terraphim_config/openrouter
+    
+    # Or for the server
+    cargo build --package terr...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'crates-overview' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'graph' → kg:graph, 'haystack' → kg:haystack, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'service' → kg:service, 'graph processing' → kg:graph processing, 'search' → kg:search
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim Crates Overview
+    
+    Terraphim is built as a modular Rust project with multiple crates, each serving specific purposes in the knowledge graph and document management system.
+    
+    ## Core Crates
+    
+    #...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'crates-overview' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 5853 chars, processed: 6448 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [search], [search], [graph], [thesaurus], [graph], [service], [service], [service], [search], [search], [search], [graph], [haystack], [graph], [graph], [automata], [automata], [automata], [graph], [graph], [graph], [graph], [graph], [service], [search], [service], [service], [service], [search], [automata], [service], [service], [service], [service], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... serving specific purposes in the knowledge [graph](kg:terraphim-graph) and document management system.
+    
+    ## Core Crates
+    
+    ### terraphim_types
+    **Purpose...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'tsify-implementation' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'graph processing' → kg:graph processing, 'haystack' → kg:haystack, 'thesaurus' → kg:thesaurus, 'search' → kg:search, 'automata' → kg:automata, 'service' → kg:service, 'network analysis' → kg:network analysis, 'graph' → kg:graph
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # TypeScript Bindings with tsify
+    
+    This document describes the implementation of automatic TypeScript binding generation from Rust types using the `tsify` crate.
+    
+    ## Overview
+    
+    We have implemented a com...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'tsify-implementation' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 7582 chars, processed: 8142 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [automata], [automata], [service], [service], [haystack], [service], [graph], [graph], [graph], [haystack], [search], [search], [search], [graph], [automata], [automata], [automata], [automata], [search], [search], [service], [service], [graph], [haystack], [haystack], [service], [service], [service], [graph], [haystack], [haystack], [service], [graph], [haystack], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... - Core domain types
+    - `crates/terraphim_[automata](kg:thesaurus)` - [automata](kg:thesaurus) and path types
+    - `desktop/src-tauri` - Tauri command res...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document '@memories' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'network analysis' → kg:network analysis, 'graph' → kg:graph, 'haystack' → kg:haystack, 'service' → kg:service, 'search' → kg:search, 'automata' → kg:automata, 'data analysis' → kg:data analysis, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'network analysis' -> 'network analysis' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Progress Memories
+    
+    ## Current Status: Terraphim Multi-Role Agent System - VM EXECUTION COMPLETE! 🎉
+    
+    ### **LATEST ACHIEVEMENT: LLM-to-Firecracker VM Code Execution Implementation (2025-10-05)** 🚀
+    
+    **...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document '@memories' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 34865 chars, processed: 35142 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...l TerraphimAgent instances
+       - **Knowledge [graph](kg:terraphim-graph) Intelligence**: Context enrichment from Role[graph](kg:terraphim-graph) and Au...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'terraphim-automata' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'thesaurus' → kg:thesaurus, 'automata' → kg:automata, 'haystack' → kg:haystack, 'network analysis' → kg:network analysis, 'graph' → kg:graph, 'service' → kg:service, 'search' → kg:search, 'data analysis' → kg:data analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim Automata
+    
+    The `terraphim_automata` crate provides high-performance text processing capabilities using finite state automata (FST) for term matching, autocomplete, and fuzzy search.
+    
+    ## Arc...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'terraphim-automata' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 8859 chars, processed: 10070 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [automata], [automata], [automata], [search], [automata], [automata], [search], [automata], [automata], [automata], [automata], [automata], [automata], [automata], [search], [automata], [search], [automata], [search], [search], [search], [search], [automata], [thesaurus], [thesaurus], [thesaurus], [search], [automata], [automata], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [term], [automata], [automata], [automata], [automata], [automata], [automata], [search], [search], [automata], [automata], [automata], [automata], [search], [search], [automata], [automata], [automata], [search], [search], [search], [search], [search], [search], [search], [search], [automata], [automata], [graph], [automata], [automata], [automata], [automata], [search], [search], [automata], [search], [search], [graph], [thesaurus], [graph], [thesaurus], [search], [search], [automata], [search], [search], [automata](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Terraphim [automata](kg:thesaurus)
+    
+    The `terraphim_[automata](kg:thesaurus)` crate provides high-performance text proce...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'terraphim-service' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'service' → kg:service, 'haystack' → kg:haystack, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis, 'network analysis' → kg:network analysis, 'graph' → kg:graph
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'service' -> 'service' (url: Some("kg:service")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim Service
+    
+    The `terraphim_service` crate is the core service layer that provides document search, ranking, and management capabilities for the Terraphim system.
+    
+    ## Architecture
+    
+    ### Core Co...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'terraphim-service' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 7368 chars, processed: 8358 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [service], [service], [service], [search], [service], [service], [service], [search], [graph], [search], [service], [search], [service], [search], [search], [search], [search], [search], [search], [search], [service], [service], [search], [search], [search], [service], [search], [search], [search], [service], [search], [search], [service], [service], [service], [service], [service], [search], [search], [search], [graph], [thesaurus], [thesaurus], [search], [service], [thesaurus], [search], [thesaurus], [thesaurus], [service], [thesaurus], [service], [service], [service], [service], [service], [search], [graph], [service], [thesaurus], [search], [service], [search], [service], [service], [search], [service], [service], [service], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Terraphim [service](kg:service)
+    
+    The `terraphim_[service](kg:service)` crate is the core [service](kg:service) layer t...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'knowledge-graph' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'graph' → kg:graph, 'service' → kg:service, 'search' → kg:search, 'data analysis' → kg:data analysis, 'graph processing' → kg:graph processing, 'automata' → kg:automata, 'haystack' → kg:haystack, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'service' -> 'service' (url: Some("kg:service")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Knowledge Graph
+    
+    The Terraphim Knowledge Graph system provides semantic understanding and relationship mapping between concepts, enabling advanced document ranking and search capabilities.
+    
+    ## Archi...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'knowledge-graph' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 8984 chars, processed: 11868 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [search], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [thesaurus], [graph], [graph], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [graph], [search], [graph], [service], [search], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [service], [automata], [thesaurus], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [search], [graph], [graph], [graph], [graph], [graph], [thesaurus], [thesaurus], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [graph], [graph], [graph], [service], [service], [search], [search], [search], [service], [search], [search], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Knowledge [graph](kg:terraphim-graph)
+    
+    The Terraphim Knowledge [graph](kg:terraphim-graph) system provides semantic ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'haystack-extra-parameters' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'graph' → kg:graph, 'service' → kg:service, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'search' → kg:search, 'haystack' → kg:haystack, 'network analysis' → kg:network analysis, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'service' -> 'service' (url: Some("kg:service")), 'automata' -> 'automata' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Haystack Configuration with Extra Parameters
+    
+    This document describes the enhanced haystack configuration system that supports both Ripgrep and Atomic Server services with advanced configuration opt...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'haystack-extra-parameters' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 7632 chars, processed: 8337 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [haystack], [haystack], [service], [haystack], [service], [search], [service], [haystack], [haystack], [service], [service], [service], [service], [service], [search], [service], [haystack], [service], [haystack], [service], [search], [service], [haystack], [service], [service], [search], [service], [service], [haystack], [service], [service], [haystack], [service], [service], [graph], [haystack], [service], [service], [haystack], [service], [haystack], [service], [service], [service], [haystack], [haystack], [haystack], [service], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# [haystack](kg:haystack) Configuration with Extra Parameters
+    
+    This document describes the enhanced [haystack](...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'knowledge-graph-ranking-expansion' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'data analysis' → kg:data analysis, 'graph' → kg:graph, 'haystack' → kg:haystack, 'service' → kg:service, 'automata' → kg:automata, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'data analysis' -> 'data analysis' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Knowledge Graph Ranking Expansion Testing
+    
+    ## Overview
+    
+    The Knowledge Graph Ranking Expansion Test validates how adding synonyms to the knowledge graph dramatically improves search ranking performan...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'knowledge-graph-ranking-expansion' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 6725 chars, processed: 8371 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [search], [graph], [search], [graph], [graph], [graph], [graph], [graph], [service], [haystack], [graph], [thesaurus], [graph], [graph], [thesaurus], [thesaurus], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [data analysis], [graph], [graph], [graph], [graph], [data analysis], [graph], [graph], [graph], [thesaurus], [graph], [graph], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [search], [graph], [search], [search], [data analysis], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [search], [search], [search], [search], [graph], [search], [search], [graph], [thesaurus], [graph], [search], [search], [graph], [search], [graph], [graph], [search], [graph], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Knowledge [graph](kg:terraphim-graph) Ranking Expansion Testing
+    
+    ## Overview
+    
+    The Knowledge [graph](kg:terraphim-gra...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'CONTRIBUTE' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'graph' → kg:graph, 'thesaurus' → kg:thesaurus, 'haystack' → kg:haystack, 'automata' → kg:automata, 'network analysis' → kg:network analysis, 'service' → kg:service, 'data analysis' → kg:data analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Contributing to Terraphim AI
+    
+    ## Overview
+    
+    This guide covers the complete contribution workflow for Terraphim AI, including our dual-repository approach, branch protection, and development setup.
+    
+    #...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'CONTRIBUTE' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 4565 chars, processed: 4578 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...anches
+    feat/new-ui-component
+    feat/semantic-[search](kg:search)
+    fix/memory-leak
+    docs/update-readme
+    refactor/cleanup-code
+    test/add-unit-tests
+    
+    # Develop...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'test-kg-demo' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'automata' → kg:automata, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'graph processing' → kg:graph processing, 'thesaurus' → kg:thesaurus, 'graph' → kg:graph, 'service' → kg:service, 'haystack' → kg:haystack, 'search' → kg:search
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Test KG Auto-linking Demo
+    
+    This document demonstrates the KG auto-linking functionality.
+    
+    When using the Terraphim Engineer role with `terraphim_it: true`, terms from the knowledge graph should auto...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'test-kg-demo' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 967 chars, processed: 1294 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [haystack], [service], [graph], [search], [term], [graph], [graph], [graph], [haystack], [haystack], [haystack], [service], [service], [service], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...rraphim_it: true`, terms from the knowledge [graph](kg:terraphim-graph) should automatically become clickable links:
+    
+    - The **[graph](kg:terraphim-gra...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'ai_agents_workflows' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'haystack' → kg:haystack, 'network analysis' → kg:network analysis, 'data analysis' → kg:data analysis, 'thesaurus' → kg:thesaurus, 'automata' → kg:automata, 'service' → kg:service, 'graph' → kg:graph
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'network analysis' -> 'network analysis' (url: Some("kg:comprehensive-testing-strategies")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): ---
+    created: 2025-09-13T10:50:11 (UTC +01:00)
+    tags: []
+    source: https://medium.com/data-science-collective/5-agent-workflows-you-need-to-master-and-exactly-how-to-use-them-1b8726d17d4c
+    author: Paolo Pe...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'ai_agents_workflows' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 24251 chars, processed: 24361 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...le
+    
+    ```
+    <span id="301d" data-selectable-para[graph](kg:terraphim-graph)=""><span>from</span> typing <span>import</span> <span>List</span><br><span>fro...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'workflow_patterns_guide' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'graph processing' → kg:graph processing, 'graph' → kg:graph, 'automata' → kg:automata, 'network analysis' → kg:network analysis, 'service' → kg:service, 'haystack' → kg:haystack, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim AI Agent Workflow Patterns Guide
+    
+    ## Introduction
+    
+    This guide provides comprehensive documentation for the 5 core workflow patterns implemented in the Terraphim AI Agent Evolution System. ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'workflow_patterns_guide' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 24630 chars, processed: 24708 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [search], [search], [search], [search], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...uation".to_string(),
+        },
+    ];
+    ```
+    
+    #### Re[search](kg:search) Tasks
+    ```rust
+    let re[search](kg:search)_tasks = vec![
+        ParallelTask {
+            task_i...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'atomic-server-integration' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'graph' → kg:graph, 'automata' → kg:automata, 'haystack' → kg:haystack, 'graph processing' → kg:graph processing, 'search' → kg:search, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'service' → kg:service, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Atomic Server Integration
+    
+    ## Overview
+    
+    Terraphim provides comprehensive integration with Atomic Data servers, enabling both read and write operations for document management and search functionalit...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'atomic-server-integration' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 7326 chars, processed: 7714 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [search], [haystack], [haystack], [haystack], [search], [haystack], [haystack], [service], [haystack], [service], [search], [search], [search], [search], [haystack], [haystack], [haystack], [search], [search], [haystack], [search], [search], [search], [search], [haystack], [search], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...ite operations for document management and [search](kg:search) functionality. This integration supports both public access (for reading documents) and...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'graph-embedding-analysis' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'service' → kg:service, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis, 'graph' → kg:graph, 'haystack' → kg:haystack, 'network analysis' → kg:network analysis, 'automata' → kg:automata
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'service' -> 'service' (url: Some("kg:service")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim Graph Embeddings vs Cleora
+    
+    ## 1. Terraphim Graph (Current Implementation)
+    
+    ### 1.1 Data structures
+    - `RoleGraph` (crate `terraphim_rolegraph`) maintains:
+      - `nodes: HashMap<u64, Node>` –...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'graph-embedding-analysis' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 5826 chars, processed: 6376 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [thesaurus], [graph], [graph], [search], [graph], [thesaurus], [automata], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Terraphim [graph](kg:terraphim-graph) Embeddings vs Cleora
+    
+    ## 1. Terraphim [graph](kg:terraphim-graph) (Current Imp...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'ClaudeDesktop' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'network analysis' → kg:network analysis, 'graph' → kg:graph, 'thesaurus' → kg:thesaurus, 'automata' → kg:automata, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'search' → kg:search, 'service' → kg:service
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'network analysis' -> 'network analysis' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Using Terraphim Desktop with Claude via MCP
+    
+    Terraphim AI provides **two ways** to expose MCP (Model Context Protocol) server functionality for Claude Desktop integration:
+    
+    ## MCP Server Options
+    
+    ##...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'ClaudeDesktop' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 5046 chars, processed: 5425 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [haystack], [search], [search], [graph], [graph], [graph], [haystack], [service], [graph], [search], [graph], [haystack], [graph], [search], [search], [search], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...raphim Engineer role** with local knowledge [graph](kg:terraphim-graph) by default
+    - ✅ **Consistent behavior** between GUI and MCP modes
+    - ✅ **Sin...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'SUMMARY' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'automata' → kg:automata, 'graph processing' → kg:graph processing, 'thesaurus' → kg:thesaurus, 'graph' → kg:graph, 'haystack' → kg:haystack, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'service' → kg:service, 'search' → kg:search
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Summary
+    
+    - [Introduction](./Introduction.md)
+    - [Contributing](./CONTRIBUTE.md)
+    - [Branch Protection and Security](./branch-protection.md)
+    - [Architecture](./Architecture.md)
+    - [Claude Desktop Integr...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'SUMMARY' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 1590 chars, processed: 1990 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [service], [service], [automata], [automata], [automata], [graph], [automata], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...overview.md)
+    
+    ## Components
+    
+    - [Terraphim [service](kg:service)](./components/terraphim-[service](kg:service).md)
+    - [Terraphim [automata](kg:thesaurus...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'homebrew-formula' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'automata' → kg:automata, 'haystack' → kg:haystack, 'search' → kg:search, 'network analysis' → kg:network analysis, 'graph' → kg:graph, 'service' → kg:service, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Homebrew Formula for Terraphim AI
+    
+    This page provides instructions for installing Terraphim AI using Homebrew on macOS and Linux.
+    
+    ## Installation
+    
+    ### Option 1: Install from Tap (Recommended)
+    
+    Once...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'homebrew-formula' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 6649 chars, processed: 6852 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [service], [service], [service], [service], [service], [service], [service], [service], [service], [service], [search], [graph], [service], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...lications/Terraphim Desktop.app"
+    ```
+    
+    ### [service](kg:service) Management
+    ```bash
+    # Start as background [service](kg:service)
+    brew [service](kg:servi...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'agent_evolution_architecture' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'search' → kg:search, 'thesaurus' → kg:thesaurus, 'service' → kg:service, 'data analysis' → kg:data analysis, 'automata' → kg:automata, 'graph processing' → kg:graph processing, 'graph' → kg:graph
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'search' -> 'search' (url: Some("kg:search")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim AI Agent Evolution System Architecture
+    
+    ## Overview
+    
+    The Terraphim AI Agent Evolution System is a comprehensive orchestration framework that enables AI agents to track their development ov...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'agent_evolution_architecture' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 13493 chars, processed: 13792 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [graph], [graph], [graph], [graph], [search], [graph], [graph], [graph], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...cution.
+    
+    ## System Architecture
+    
+    ```mermaid
+    [graph](kg:terraphim-graph) TD
+        A[User Request] --> B[EvolutionWorkflowManager]
+        B --> C[Task Analys...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'lessons-learned-security-testing' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'service' → kg:service, 'graph' → kg:graph, 'automata' → kg:automata, 'search' → kg:search, 'thesaurus' → kg:thesaurus, 'network analysis' → kg:network analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Security Testing Lessons Learned (2025-10-07)
+    
+    ## Critical Success: Phase 1 & 2 Security Test Implementation Complete
+    
+    Successfully implemented comprehensive test coverage for all 4 critical securit...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'lessons-learned-security-testing' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: false (original: 12440 chars, processed: 12440 chars)
+[2025-11-11T15:08:14Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'README' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'service' → kg:service, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'automata' → kg:automata, 'search' → kg:search, 'graph processing' → kg:graph processing, 'graph' → kg:graph, 'haystack' → kg:haystack, 'thesaurus' → kg:thesaurus
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'service' -> 'service' (url: Some("kg:service")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'automata' -> 'automata' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim documentation
+    
+    This folder is a source for Terraphim documentation as well as demonstration for Terraphim Engineer role:
+    
+    [kg](./kg) folder is an example of personal knowledge graph used f...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'README' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 967 chars, processed: 1078 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [graph], [automata], [graph], [haystack], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... folder is an example of personal knowledge [graph](kg:terraphim-graph) used for testing, fixtures, and domain-specific terminology including bug repo...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'development-setup' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'graph processing' → kg:graph processing, 'graph' → kg:graph, 'service' → kg:service, 'search' → kg:search, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'haystack' → kg:haystack
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Development Setup Guide
+    
+    This guide walks you through setting up a development environment for contributing to Terraphim AI, including code quality tools and pre-commit hooks.
+    
+    ## Prerequisites
+    
+    ###...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'development-setup' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: false (original: 11753 chars, processed: 11753 chars)
+[2025-11-11T15:08:14Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'branch-protection' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'graph' → kg:graph, 'automata' → kg:automata, 'thesaurus' → kg:thesaurus, 'network analysis' → kg:network analysis, 'search' → kg:search, 'haystack' → kg:haystack, 'service' → kg:service
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'automata' -> 'automata' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Branch Protection and Security
+    
+    ## Overview
+    
+    Terraphim AI implements comprehensive branch protection to prevent private or sensitive code from leaking into the public repository. This system uses mu...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'branch-protection' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 10765 chars, processed: 10806 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [haystack], [search], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...al_*
+    
+    # Explicit private branches
+    sqlite_[haystack](kg:haystack), private-feature, internal-docs, customer-data, private_tf
+    ```
+    
+    **Allowed Patterns:**...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'release-process' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'thesaurus' → kg:thesaurus, 'haystack' → kg:haystack, 'service' → kg:service, 'automata' → kg:automata, 'graph' → kg:graph, 'search' → kg:search, 'data analysis' → kg:data analysis, 'graph processing' → kg:graph processing
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Release Process for Terraphim AI
+    
+    This document describes the complete release process for Terraphim AI, including all three main components: server, TUI, and desktop application.
+    
+    ## Overview
+    
+    Terr...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'release-process' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: false (original: 7207 chars, processed: 7207 chars)
+[2025-11-11T15:08:14Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'Use-cases' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'graph processing' → kg:graph processing, 'service' → kg:service, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis, 'haystack' → kg:haystack, 'automata' → kg:automata, 'graph' → kg:graph
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Use cases for Terraphim AI
+    
+    ## Search your local markdown files, build your own personal knowledge graph, then publish your knowledge to the web, then reuse
+    
+    ### End to End flow
+    
+    The current focus i...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'Use-cases' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 1698 chars, processed: 1946 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [graph], [graph], [thesaurus], [thesaurus], [graph], [search], [search], [graph], [search], [search], [search], [graph], [search], [haystack](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# Use cases for Terraphim AI
+    
+    ## [search](kg:search) your local markdown files, build your own personal knowledge [graph](kg:terraphim-graph...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'api_reference' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'haystack' → kg:haystack, 'thesaurus' → kg:thesaurus, 'graph' → kg:graph, 'graph processing' → kg:graph processing, 'network analysis' → kg:network analysis, 'service' → kg:service, 'automata' → kg:automata
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim AI Agent Evolution System - API Reference
+    
+    ## Overview
+    
+    This document provides comprehensive API reference for the Terraphim AI Agent Evolution System. The API is designed around trait-bas...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'api_reference' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 23842 chars, processed: 23907 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [search], [search], [search], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...ng>
+        ) -> EvolutionResult<()>;
+    
+        /// [search](kg:search) memories by content or tags
+        pub fn [search](kg:search)_memories(
+            &self,
+       ...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'terraphim-atomic-client' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'graph processing' → kg:graph processing, 'search' → kg:search, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'graph' → kg:graph, 'thesaurus' → kg:thesaurus, 'automata' → kg:automata, 'service' → kg:service
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'graph processing' -> 'graph processing' (url: Some("kg:comprehensive-testing-strategies")), 'search' -> 'search' (url: Some("kg:search")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Terraphim Atomic Client
+    
+    The `terraphim_atomic_client` crate provides a comprehensive client implementation for the Atomic Data protocol, enabling seamless integration with Atomic Data servers and r...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'terraphim-atomic-client' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 10482 chars, processed: 10625 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search], [search], [search], [search], [search], [search], [search], [search], [search], [search], [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ....example.com/resource1"
+    ).await?;
+    ```
+    
+    ### [search](kg:search) Operations
+    
+    #### Basic [search](kg:search)
+    ```rust
+    let results = client.[search](kg:sea...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'bm25-scorers' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'automata' → kg:automata, 'haystack' → kg:haystack, 'service' → kg:service, 'graph' → kg:graph, 'search' → kg:search, 'thesaurus' → kg:thesaurus, 'graph processing' → kg:graph processing
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # BM25 Scorers
+    
+    Terraphim supports multiple BM25-based scoring algorithms for document ranking and relevance calculation. These scorers provide different approaches to information retrieval, from trad...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'bm25-scorers' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 5256 chars, processed: 5269 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [search](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ...le Ranking
+    ```rust
+    let query = Query::new("[search](kg:search) term").name_scorer(Some(QueryScorer::TFIDF));
+    ```
+    
+    ## Performance Considerations
+    
+    - **B...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'mcp-integration' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'automata' → kg:automata, 'service' → kg:service, 'graph' → kg:graph, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis, 'network analysis' → kg:network analysis, 'haystack' → kg:haystack
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # MCP Integration
+    
+    This guide explains how to use Model Context Protocol (MCP) haystacks in Terraphim via the middleware MCP indexer.
+    
+    ## Features
+    - Transports:
+      - SSE (localhost) with optional OAuth...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'mcp-integration' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: true (original: 2144 chars, processed: 2301 chars)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔗 Found KG links in processed content: [haystack], [search], [haystack], [haystack], [service], [haystack], [service], [haystack], [search], [service], [service](kg:...)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📄 Content snippet with KG link: ... how to use Model Context Protocol (MCP) [haystack](kg:haystack)s in Terraphim via the middleware MCP indexer.
+    
+    ## Features
+    - Transports:
+      - SSE (loc...
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'bug-reporting' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:14Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'thesaurus' → kg:thesaurus, 'graph' → kg:graph, 'haystack' → kg:haystack, 'service' → kg:service, 'automata' → kg:automata, 'data analysis' → kg:data analysis
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'comprehensive-testing-strategies' -> 'comprehensive-testing-strategies' (url: Some("kg:comprehensive-testing-strategies")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")) (total terms: 8)
+[2025-11-11T15:08:14Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Bug Reporting
+    
+    ## Steps to Reproduce
+    
+    The steps to reproduce section documents the exact sequence of actions needed to recreate the issue. This section provides a detailed walkthrough that allows de...
+[2025-11-11T15:08:14Z INFO  terraphim_service] ✅ Successfully preprocessed document 'bug-reporting' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🔄 Content changed: false (original: 2349 chars, processed: 2349 chars)
+[2025-11-11T15:08:14Z WARN  terraphim_service] ⚠️ No KG links found in processed content despite successful replacement
+[2025-11-11T15:08:14Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'issue-tracking' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:15Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'haystack' → kg:haystack, 'automata' → kg:automata, 'service' → kg:service, 'search' → kg:search, 'thesaurus' → kg:thesaurus, 'data analysis' → kg:data analysis, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'graph' → kg:graph
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'haystack' -> 'haystack' (url: Some("kg:haystack")), 'automata' -> 'automata' (url: Some("kg:thesaurus")), 'service' -> 'service' (url: Some("kg:service")) (total terms: 8)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Issue Tracking
+    
+    ## Payroll System Issues
+    
+    Payroll system problems affect employee compensation and HR processes requiring careful tracking and resolution.
+    
+    synonyms:: payroll system, payroll process...
+[2025-11-11T15:08:15Z INFO  terraphim_service] ✅ Successfully preprocessed document 'issue-tracking' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔄 Content changed: true (original: 2463 chars, processed: 2477 chars)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔗 Found KG links in processed content: [service](kg:...)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📄 Content snippet with KG link: ...cation, data exchange, middleware issues, [service](kg:service) integration, system connectivity, interface problems, integration errors
+    
+    ## Performan...
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'graph-connectivity' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:15Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'data analysis' → kg:data analysis, 'graph' → kg:graph, 'haystack' → kg:haystack, 'automata' → kg:automata, 'graph processing' → kg:graph processing, 'service' → kg:service, 'thesaurus' → kg:thesaurus, 'search' → kg:search
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'data analysis' -> 'data analysis' (url: Some("kg:comprehensive-testing-strategies")), 'graph' -> 'graph' (url: Some("kg:terraphim-graph")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Graph Connectivity Check for Matched Terms
+    
+    Goal: Given an input text, detect terms via automata and verify whether there exists a single path in the role graph that connects all matched terms.
+    
+    ## ...
+[2025-11-11T15:08:15Z INFO  terraphim_service] ✅ Successfully preprocessed document 'graph-connectivity' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔄 Content changed: true (original: 1254 chars, processed: 1512 chars)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔗 Found KG links in processed content: [graph], [automata], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph], [graph](kg:...)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# [graph](kg:terraphim-graph) Connectivity Check for Matched Terms
+    
+    Goal: Given an input text, detect terms ...
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🧠 Starting KG preprocessing for document 'automata-paragraph-extraction' in role 'Terraphim Engineer' (terraphim_it enabled)
+[2025-11-11T15:08:15Z INFO  terraphim_service] Rolegraph loaded: for role name RoleName { original: "Terraphim Engineer", lowercase: "terraphim engineer" }
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📋 KG thesaurus filtering: 195 → 8 terms (prioritizing: graph, haystack, service, terraphim, knowledge, embedding, search, automata, thesaurus, rolegraph, filters: len>5, hyphenated, or important KG terms)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔍 KG terms selected for linking: 'search' → kg:search, 'thesaurus' → kg:thesaurus, 'haystack' → kg:haystack, 'comprehensive-testing-strategies' → kg:comprehensive-testing-strategies, 'service' → kg:service, 'automata' → kg:automata, 'graph' → kg:graph, 'graph processing' → kg:graph processing
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔧 Passing to replace_matches: 'search' -> 'search' (url: Some("kg:search")), 'thesaurus' -> 'thesaurus' (url: Some("kg:thesaurus")), 'haystack' -> 'haystack' (url: Some("kg:haystack")) (total terms: 8)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📝 Document body preview (first 200 chars): # Automata Paragraph Extraction
+    
+    Goal: Given a thesaurus-backed automata, find paragraphs in a text starting from matched automata terms.
+    
+    ## Plan
+    - Build/obtain a `Thesaurus` for the automata
+    - Use `...
+[2025-11-11T15:08:15Z INFO  terraphim_service] ✅ Successfully preprocessed document 'automata-paragraph-extraction' with 8 KG terms → created [term](kg:concept) links
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔄 Content changed: true (original: 1784 chars, processed: 2362 chars)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 🔗 Found KG links in processed content: [automata], [graph], [thesaurus], [automata], [graph], [automata], [thesaurus], [automata], [thesaurus], [graph], [graph], [automata], [graph], [automata], [thesaurus], [graph], [automata], [graph], [automata], [thesaurus], [thesaurus], [thesaurus], [thesaurus], [graph], [graph], [automata], [thesaurus], [automata], [graph], [automata], [graph], [automata](kg:...)
+[2025-11-11T15:08:15Z INFO  terraphim_service] 📄 Content snippet with KG link: ...# [automata](kg:thesaurus) Para[graph](kg:terraphim-graph) Extraction
+    
+    Goal: Given a [thesaurus](kg:thesaurus)-...
+╭───────────┬───────────────────────────────────────────┬───────────────────────────────────────────────────────╮
+│ Rank      ┆ Title                                     ┆ URL                                                   │
+╞═══════════╪═══════════════════════════════════════════╪═══════════════════════════════════════════════════════╡
+│ 289196580 ┆ @memory                                   ┆ docs/src/history/@memory.md                           │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 261059220 ┆ knowledge-graph-system                    ┆ docs/src/kg/knowledge-graph-system.md                 │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 252352412 ┆ mcp-integration-testing                   ┆ docs/src/testing/mcp-integration-testing.md           │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 252346829 ┆ comprehensive-testing-strategies          ┆ docs/src/testing/comprehensive-testing-strategies.md  │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 252338790 ┆ Introduction                              ┆ docs/src/Introduction.md                              │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 252327720 ┆ PACKAGE_MANAGER_REPLACEMENT               ┆ docs/src/kg/PACKAGE_MANAGER_REPLACEMENT.md            │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 243795493 ┆ @scratchpad                               ┆ docs/src/history/@scratchpad.md                       │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 243635765 ┆ knowledge-graph-bug-reporting-enhancement ┆ docs/src/knowledge-graph-bug-reporting-enhancement.md │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 235238677 ┆ @lessons-learned                          ┆ docs/src/history/@lessons-learned.md                  │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 234993255 ┆ Architecture                              ┆ docs/src/Architecture.md                              │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 234952243 ┆ testing-overview                          ┆ docs/src/testing/testing-overview.md                  │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 217606671 ┆ testing_matrix                            ┆ docs/src/testing_matrix.md                            │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 217544800 ┆ openrouter-integration                    ┆ docs/src/openrouter-integration.md                    │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 217525440 ┆ crates-overview                           ┆ docs/src/crates-overview.md                           │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 208835775 ┆ tsify-implementation                      ┆ docs/src/tsify-implementation.md                      │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 200253863 ┆ @memories                                 ┆ docs/src/history/@memories.md                         │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 200140315 ┆ terraphim-automata                        ┆ docs/src/components/terraphim-automata.md             │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 200132195 ┆ terraphim-service                         ┆ docs/src/components/terraphim-service.md              │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 182738695 ┆ knowledge-graph                           ┆ docs/src/kg/knowledge-graph.md                        │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 182735010 ┆ haystack-extra-parameters                 ┆ docs/src/haystack-extra-parameters.md                 │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 182727821 ┆ knowledge-graph-ranking-expansion         ┆ docs/src/testing/knowledge-graph-ranking-expansion.md │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 174022980 ┆ CONTRIBUTE                                ┆ docs/src/CONTRIBUTE.md                                │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 174004865 ┆ test-kg-demo                              ┆ docs/src/test-kg-demo.md                              │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 165418610 ┆ ai_agents_workflows                       ┆ docs/src/ai_agents_workflows.md                       │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 165417710 ┆ workflow_patterns_guide                   ┆ docs/src/workflow_patterns_guide.md                   │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 165333046 ┆ atomic-server-integration                 ┆ docs/src/atomic-server-integration.md                 │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 165328265 ┆ graph-embedding-analysis                  ┆ docs/src/scorers/graph-embedding-analysis.md          │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 165322320 ┆ ClaudeDesktop                             ┆ docs/src/ClaudeDesktop.md                             │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 165307075 ┆ SUMMARY                                   ┆ docs/src/SUMMARY.md                                   │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 156629360 ┆ homebrew-formula                          ┆ docs/src/homebrew-formula.md                          │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 147963970 ┆ agent_evolution_architecture              ┆ docs/src/agent_evolution_architecture.md              │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 147957984 ┆ lessons-learned-security-testing          ┆ docs/src/history/lessons-learned-security-testing.md  │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 147905800 ┆ README                                    ┆ docs/src/README.md                                    │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 130557605 ┆ development-setup                         ┆ docs/src/development-setup.md                         │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 130552035 ┆ branch-protection                         ┆ docs/src/branch-protection.md                         │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 130533350 ┆ release-process                           ┆ docs/src/release-process.md                           │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 130508500 ┆ Use-cases                                 ┆ docs/src/Use-cases.md                                 │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 121914060 ┆ api_reference                             ┆ docs/src/api_reference.md                             │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 113150030 ┆ terraphim-atomic-client                   ┆ docs/src/components/terraphim-atomic-client.md        │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 113126105 ┆ bm25-scorers                              ┆ docs/src/scorers/bm25-scorers.md                      │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 104410330 ┆ mcp-integration                           ┆ docs/src/mcp-integration.md                           │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 95706795  ┆ bug-reporting                             ┆ docs/src/kg/bug-reporting.md                          │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 95705200  ┆ issue-tracking                            ┆ docs/src/kg/issue-tracking.md                         │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 78306010  ┆ graph-connectivity                        ┆ docs/src/graph-connectivity.md                        │
+├╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┼╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌╌┤
+│ 60907870  ┆ automata-paragraph-extraction             ┆ docs/src/automata-paragraph-extraction.md             │
+╰───────────┴───────────────────────────────────────────┴───────────────────────────────────────────────────────╯
+✅ Found 45 result(s)
+✅ Switched to role: Default
+💬 Sending message: 'Hello test'
+
+🤖 Response:
+
+No LLM configured for role Terraphim Engineer. Prompt was: Hello test
+Goodbye! 👋
+
+[1;33mTesting:[0m Help command works
+[0;31m✗ FAIL[0m
+Expected pattern: Available commands:
