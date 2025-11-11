@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-BINARY="./target/release/terraphim-tui"
+BINARY="./target/debug/terraphim-tui"
 TEST_LOG="tui_test_results_$(date +%Y%m%d_%H%M%S).log"
 PASS_COUNT=0
 FAIL_COUNT=0
@@ -27,8 +27,12 @@ test_command() {
     echo -e "${YELLOW}Testing:${NC} $description" | tee -a $TEST_LOG
     echo "Command: $cmd" | tee -a $TEST_LOG
 
-    # Execute command (macOS compatible - no timeout command)
-    output=$(echo -e "$cmd\n/quit" | $BINARY repl 2>&1 | tail -20 || true)
+    # Execute command with extended timeout for TUI initialization
+    output=$(timeout 30 bash -c "echo -e \"$cmd\n/quit\" | $BINARY repl 2>&1" || echo "TIMEOUT_OR_ERROR")
+    if [ "$output" = "TIMEOUT_OR_ERROR" ]; then
+        # Try with just the command output if timeout
+        output=$(echo -e "$cmd\n/quit" | timeout 10 $BINARY repl 2>&1 | tail -20 || echo "Initialization failed - but checking for partial output")
+    fi
 
     # Check if expected text is in output
     if echo "$output" | grep -qi "$expected"; then
