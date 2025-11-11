@@ -58,7 +58,7 @@ echo -e "\n${GREEN}✓ All tests passed!${NC}"
 
 # Additional validation
 echo -e "\n${BLUE}Validating WASM build compatibility...${NC}"
-cargo check --target wasm32-unknown-unknown --features wasm
+cargo check -p terraphim_automata --target wasm32-unknown-unknown --features wasm
 
 echo -e "${GREEN}✓ WASM build compatibility verified!${NC}"
 
