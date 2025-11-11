@@ -47,7 +47,11 @@ jobs:
 
       - name: Temporarily disable panic abort for building
         run: |
-          sed -i 's/panic = "abort"/# panic = "abort"/' .cargo/config.toml
+          if [ -f .cargo/config.toml ]; then
+            sed -i 's/panic = "abort"/# panic = "abort"/' .cargo/config.toml || true
+          else
+            echo ".cargo/config.toml not found; skipping panic profile tweak"
+          fi
 
       - name: Build binaries
         run: |
@@ -172,7 +176,12 @@ jobs:
           EOF
 
       - name: Restore panic abort setting
-        run: sed -i 's/# panic = "abort"/panic = "abort"/' .cargo/config.toml
+        run: |
+          if [ -f .cargo/config.toml ]; then
+            sed -i 's/# panic = "abort"/panic = "abort"/' .cargo/config.toml || true
+          else
+            echo ".cargo/config.toml not found; nothing to restore"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
