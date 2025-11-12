@@ -227,8 +227,15 @@ impl ReplHandler {
         let command = ReplCommand::from_str(input)?;
 
         match command {
-            ReplCommand::Search { query, role, limit } => {
-                self.handle_search(query, role, limit).await?;
+            ReplCommand::Search {
+                query,
+                role,
+                limit,
+                semantic,
+                concepts,
+            } => {
+                self.handle_search(query, role, limit, semantic, concepts)
+                    .await?;
             }
             ReplCommand::Config { subcommand } => {
                 self.handle_config(subcommand).await?;
@@ -283,6 +290,16 @@ impl ReplHandler {
             ReplCommand::Thesaurus { role } => {
                 self.handle_thesaurus(role).await?;
             }
+
+            #[cfg(feature = "repl-file")]
+            ReplCommand::File { subcommand } => {
+                self.handle_file(subcommand).await?;
+            }
+
+            #[cfg(feature = "repl-web")]
+            ReplCommand::Web { subcommand } => {
+                self.handle_web(subcommand).await?;
+            }
         }
 
         Ok(false)
@@ -293,6 +310,8 @@ impl ReplHandler {
         query: String,
         role: Option<String>,
         limit: Option<usize>,
+        semantic: bool,
+        concepts: bool,
     ) -> Result<()> {
         #[cfg(feature = "repl")]
         {
@@ -301,7 +320,15 @@ impl ReplHandler {
             use comfy_table::presets::UTF8_FULL;
             use comfy_table::{Cell, Table};
 
-            println!("{} Searching for: '{}'", "🔍".bold(), query.cyan());
+            let search_mode = if semantic { "semantic " } else { "" }.to_string()
+                + if concepts { "concepts " } else { "" };
+
+            println!(
+                "{} {}Searching for: '{}'",
+                "🔍".bold(),
+                search_mode,
+                query.cyan()
+            );
 
             if let Some(service) = &self.service {
                 // Offline mode
@@ -983,6 +1010,159 @@ impl ReplHandler {
         #[cfg(not(feature = "repl"))]
         {
             println!("Thesaurus functionality requires repl feature");
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-file")]
+    async fn handle_file(&self, subcommand: super::commands::FileSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        {
+            use colored::Colorize;
+
+            match subcommand {
+                super::commands::FileSubcommand::Search { query } => {
+                    println!("🔍 File search: {}", query.green());
+                    println!("File search functionality is not yet implemented.");
+                    println!("This would search for files matching: {}", query);
+                }
+                super::commands::FileSubcommand::List => {
+                    println!("📂 File listing");
+                    println!("File listing functionality is not yet implemented.");
+                }
+                super::commands::FileSubcommand::Info { path } => {
+                    println!("ℹ️  File info: {}", path.green());
+                    println!("File info functionality is not yet implemented.");
+                    println!("This would show information about: {}", path);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "repl"))]
+        {
+            println!("File operations require repl feature");
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-web")]
+    async fn handle_web(&self, subcommand: super::commands::WebSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        {
+            use colored::Colorize;
+
+            match subcommand {
+                super::commands::WebSubcommand::Get { url, headers } => {
+                    println!("🌐 Web GET: {}", url.green());
+                    if let Some(headers) = headers {
+                        println!("Headers: {:?}", headers);
+                    }
+                    println!("Web GET functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Post { url, body, headers } => {
+                    println!("🌐 Web POST: {}", url.green());
+                    if !body.is_empty() {
+                        println!("Body: {}", body);
+                    }
+                    if let Some(headers) = headers {
+                        println!("Headers: {:?}", headers);
+                    }
+                    println!("Web POST functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Scrape {
+                    url,
+                    selector,
+                    wait_for_element,
+                } => {
+                    println!("🌐 Web Scrape: {}", url.green());
+                    if let Some(selector) = selector {
+                        println!("Selector: {}", selector);
+                    }
+                    if let Some(wait) = wait_for_element {
+                        println!("Wait for: {}", wait);
+                    }
+                    println!("Web scraping functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Screenshot {
+                    url,
+                    width,
+                    height,
+                    full_page,
+                } => {
+                    println!("🌐 Web Screenshot: {}", url.green());
+                    if let Some(width) = width {
+                        println!("Width: {}", width);
+                    }
+                    if let Some(height) = height {
+                        println!("Height: {}", height);
+                    }
+                    if let Some(full_page) = full_page {
+                        println!("Full page: {}", full_page);
+                    }
+                    println!("Web screenshot functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Pdf { url, page_size } => {
+                    println!("🌐 Web PDF: {}", url.green());
+                    if let Some(page_size) = page_size {
+                        println!("Page size: {}", page_size);
+                    }
+                    println!("Web PDF functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Form { url, form_data } => {
+                    println!("🌐 Web Form: {}", url.green());
+                    println!("Form data: {:?}", form_data);
+                    println!("Web form functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Api {
+                    endpoint,
+                    method,
+                    data,
+                } => {
+                    println!("🌐 Web API: {} {}", method.bold(), endpoint.green());
+                    if let Some(data) = data {
+                        println!("Data: {}", data);
+                    }
+                    println!("Web API functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Status { operation_id } => {
+                    println!("🌐 Web Status: {}", operation_id.green());
+                    println!("Web status functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Cancel { operation_id } => {
+                    println!("🌐 Web Cancel: {}", operation_id.green());
+                    println!("Web cancel functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::History { limit } => {
+                    println!("🌐 Web History");
+                    if let Some(limit) = limit {
+                        println!("Limit: {}", limit);
+                    }
+                    println!("Web history functionality is not yet implemented.");
+                }
+                super::commands::WebSubcommand::Config {
+                    subcommand: web_config_subcommand,
+                } => match web_config_subcommand {
+                    super::commands::WebConfigSubcommand::Show => {
+                        println!("🌐 Web Config Show");
+                        println!("Web config show functionality is not yet implemented.");
+                    }
+                    super::commands::WebConfigSubcommand::Set { key, value } => {
+                        println!("🌐 Web Config Set: {} = {}", key.green(), value.green());
+                        println!("Web config set functionality is not yet implemented.");
+                    }
+                    super::commands::WebConfigSubcommand::Reset => {
+                        println!("🌐 Web Config Reset");
+                        println!("Web config reset functionality is not yet implemented.");
+                    }
+                },
+            }
+        }
+
+        #[cfg(not(feature = "repl"))]
+        {
+            println!("Web operations require repl feature");
         }
 
         Ok(())
