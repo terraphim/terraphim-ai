@@ -10,6 +10,9 @@ pub mod commands;
 #[cfg(feature = "repl")]
 pub mod handler;
 
+#[cfg(feature = "repl-web")]
+pub mod web_operations;
+
 #[cfg(feature = "repl-chat")]
 pub mod chat;
 
