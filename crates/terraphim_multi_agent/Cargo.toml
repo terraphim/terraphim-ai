@@ -25,7 +25,7 @@ log = { workspace = true }
 reqwest = { version = "0.12", features = ["json", "stream"] }
 
 # Multi-provider generative AI client (using terraphim fork with OpenRouter support)
-genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "main" }
+genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
