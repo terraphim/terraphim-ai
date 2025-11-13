@@ -6,11 +6,12 @@ edition = "2021"
 [features]
 default = []
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
-repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom"]
+repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web"]
 repl-chat = ["repl"]  # Chat functionality
 repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
+repl-web = ["repl"]   # Web operations and configuration
 
 [dependencies]
 anyhow = "1.0"
@@ -60,6 +61,9 @@ portpicker = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 tokio = { version = "1", features = ["full"] }
 tempfile = "3.0"
+
+# Enable REPL features for testing
+terraphim_tui = { path = ".", features = ["repl-full"] }
 
 [[bin]]
 name = "terraphim-tui"

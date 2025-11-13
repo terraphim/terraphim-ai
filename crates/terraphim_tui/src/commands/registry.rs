@@ -3,7 +3,7 @@
 //! This module provides the command registry that handles loading, storing, and managing
 //! command definitions discovered from markdown files.
 
-use super::{CommandDefinition, CommandRegistryError, ExecutionMode, ParsedCommand, RiskLevel};
+use super::{CommandRegistryError, ExecutionMode, ParsedCommand, RiskLevel};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -386,7 +386,7 @@ impl CommandRegistry {
     pub async fn can_execute_command(
         &self,
         command_name: &str,
-        role: &str,
+        _role: &str,
         user_permissions: &[String],
     ) -> Result<ExecutionMode, super::CommandValidationError> {
         let command = self.resolve_command(command_name).await.ok_or_else(|| {
@@ -484,8 +484,8 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
 
     let mut matrix = vec![vec![0; len2 + 1]; len1 + 1];
 
-    for i in 0..=len1 {
-        matrix[i][0] = i;
+    for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
+        row[0] = i;
     }
     for j in 0..=len2 {
         matrix[0][j] = j;

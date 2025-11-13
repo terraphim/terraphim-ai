@@ -3,13 +3,13 @@
 //! This module provides validation for commands against knowledge graphs,
 //! role permissions, and security policies.
 
-use super::{CommandDefinition, CommandValidationError, ExecutionMode};
+use super::{CommandValidationError, ExecutionMode};
 use crate::client::ApiClient;
 use chrono::{Datelike, Timelike};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, SystemTime};
 
 /// Security event for auditing
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -151,6 +151,18 @@ impl CommandValidator {
         }
     }
 
+    /// Set rate limit for a specific command (for testing)
+    pub fn set_rate_limit(&mut self, command: &str, max_requests: u32, window: Duration) {
+        self.rate_limits.insert(
+            command.to_string(),
+            RateLimit {
+                max_requests: max_requests as usize,
+                window,
+                current_requests: Vec::new(),
+            },
+        );
+    }
+
     /// Create a new command validator with API client
     pub fn with_api_client(api_client: Arc<ApiClient>) -> Self {
         let mut validator = Self::new();
@@ -268,7 +280,7 @@ impl CommandValidator {
 
     /// Check if command is high risk
     fn is_high_risk_command(&self, command: &str) -> bool {
-        let high_risk_patterns = vec![
+        let high_risk_patterns = [
             "rm -rf",
             "dd if=",
             "mkfs",
@@ -289,7 +301,7 @@ impl CommandValidator {
 
     /// Check if command is safe for local execution
     fn is_safe_command(&self, command: &str) -> bool {
-        let safe_commands = vec![
+        let safe_commands = [
             "ls", "cat", "echo", "pwd", "date", "whoami", "grep", "find", "head", "tail", "wc",
             "sort",
         ];
