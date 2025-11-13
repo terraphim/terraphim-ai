@@ -4,7 +4,7 @@
 //! extracting both metadata and content for command registration.
 
 use super::{CommandDefinition, CommandRegistryError, ParsedCommand};
-use regex::Regex;
+use regex::{Regex, RegexBuilder};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -18,7 +18,9 @@ pub struct MarkdownCommandParser {
 impl MarkdownCommandParser {
     /// Create a new markdown command parser
     pub fn new() -> Result<Self, CommandRegistryError> {
-        let frontmatter_regex = Regex::new(r"^---\s*\n(.*?)\n---\s*\n(.*)$")
+        let frontmatter_regex = RegexBuilder::new(r"^---\s*\n(.*?)\n---\s*\n(.*)$")
+            .dot_matches_new_line(true)
+            .build()
             .map_err(|e| CommandRegistryError::parse_error("regex", e.to_string()))?;
 
         Ok(Self { frontmatter_regex })
@@ -34,7 +36,7 @@ impl MarkdownCommandParser {
         // Read the file content
         let content = tokio::fs::read_to_string(path)
             .await
-            .map_err(|e| CommandRegistryError::FileNotFound(path.to_string_lossy().to_string()))?;
+            .map_err(|_e| CommandRegistryError::FileNotFound(path.to_string_lossy().to_string()))?;
 
         // Get file metadata
         let metadata = tokio::fs::metadata(path)
@@ -231,25 +233,9 @@ impl MarkdownCommandParser {
         }
 
         // Validate parameter names and types
+        let param_name_regex = regex::Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap();
         for param in &definition.parameters {
-            if param.name.is_empty() {
-                return Err(CommandRegistryError::invalid_frontmatter(
-                    source_path,
-                    "Parameter name cannot be empty",
-                ));
-            }
-
-            // Validate parameter type
-            match param.param_type.as_str() {
-                "string" | "number" | "boolean" | "array" | "object" => {},
-                _ => return Err(CommandRegistryError::invalid_frontmatter(
-                    source_path,
-                    format!("Invalid parameter type '{}' for parameter '{}'. Valid types: string, number, boolean, array, object", param.param_type, param.name)
-                )),
-            }
-
             // Validate parameter name format
-            let param_name_regex = regex::Regex::new(r"^[a-zA-Z][a-zA-Z0-9_]*$").unwrap();
             if !param_name_regex.is_match(&param.name) {
                 return Err(CommandRegistryError::invalid_frontmatter(
                     source_path,

@@ -5,20 +5,23 @@
 
 use super::{CommandExecutionError, CommandHook, HookContext, HookResult};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use chrono::Utc;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// Hook that logs command execution details
+#[derive(Default)]
 pub struct LoggingHook {
     log_file: Option<std::path::PathBuf>,
 }
 
 impl LoggingHook {
     pub fn new() -> Self {
-        Self { log_file: None }
+        Self::default()
     }
+}
 
+impl LoggingHook {
     pub fn with_file<P: AsRef<Path>>(log_file: P) -> Self {
         Self {
             log_file: Some(log_file.as_ref().to_path_buf()),
@@ -80,6 +83,7 @@ impl CommandHook for LoggingHook {
 }
 
 /// Hook that performs pre-flight checks before command execution
+#[derive(Default)]
 pub struct PreflightCheckHook {
     allowed_working_dirs: Vec<std::path::PathBuf>,
     blocked_commands: Vec<String>,
@@ -87,12 +91,11 @@ pub struct PreflightCheckHook {
 
 impl PreflightCheckHook {
     pub fn new() -> Self {
-        Self {
-            allowed_working_dirs: vec![],
-            blocked_commands: vec![],
-        }
+        Self::default()
     }
+}
 
+impl PreflightCheckHook {
     pub fn with_allowed_dirs<P: AsRef<Path>>(dirs: Vec<P>) -> Self {
         Self {
             allowed_working_dirs: dirs.into_iter().map(|p| p.as_ref().to_path_buf()).collect(),
@@ -175,14 +178,22 @@ pub struct NotificationHook {
     webhook_url: Option<String>,
 }
 
-impl NotificationHook {
-    pub fn new() -> Self {
+impl Default for NotificationHook {
+    fn default() -> Self {
         Self {
             important_commands: vec!["deploy".to_string(), "security-audit".to_string()],
             webhook_url: None,
         }
     }
+}
 
+impl NotificationHook {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl NotificationHook {
     pub fn with_webhook(mut self, webhook_url: String) -> Self {
         self.webhook_url = Some(webhook_url);
         self
@@ -236,17 +247,18 @@ impl CommandHook for NotificationHook {
 }
 
 /// Hook that sets up environment variables for commands
+#[derive(Default)]
 pub struct EnvironmentHook {
     env_vars: std::collections::HashMap<String, String>,
 }
 
 impl EnvironmentHook {
     pub fn new() -> Self {
-        Self {
-            env_vars: std::collections::HashMap::new(),
-        }
+        Self::default()
     }
+}
 
+impl EnvironmentHook {
     pub fn with_env<K: Into<String>, V: Into<String>>(mut self, key: K, value: V) -> Self {
         self.env_vars.insert(key.into(), value.into());
         self
@@ -396,6 +408,7 @@ impl CommandHook for BackupHook {
 }
 
 /// Hook that monitors resource usage during command execution
+#[derive(Default)]
 pub struct ResourceMonitoringHook {
     max_memory_mb: Option<u64>,
     max_duration_seconds: Option<u64>,
@@ -403,12 +416,11 @@ pub struct ResourceMonitoringHook {
 
 impl ResourceMonitoringHook {
     pub fn new() -> Self {
-        Self {
-            max_memory_mb: None,
-            max_duration_seconds: None,
-        }
+        Self::default()
     }
+}
 
+impl ResourceMonitoringHook {
     pub fn with_memory_limit(mut self, limit_mb: u64) -> Self {
         self.max_memory_mb = Some(limit_mb);
         self
@@ -430,7 +442,7 @@ impl CommandHook for ResourceMonitoringHook {
         60
     }
 
-    async fn execute(&self, context: &HookContext) -> Result<HookResult, CommandExecutionError> {
+    async fn execute(&self, _context: &HookContext) -> Result<HookResult, CommandExecutionError> {
         let mut warnings = vec![];
 
         // Check memory limits

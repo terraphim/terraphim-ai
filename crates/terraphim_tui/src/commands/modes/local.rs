@@ -5,10 +5,10 @@
 
 use super::{
     default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
-    ExecutorCapabilities, ResourceUsage,
+    ExecutorCapabilities,
 };
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
 
@@ -100,7 +100,7 @@ impl LocalExecutor {
         &self,
         command_str: &str,
     ) -> Result<(String, Vec<String>), CommandExecutionError> {
-        let parts: Vec<&str> = command_str.trim().split_whitespace().collect();
+        let parts: Vec<&str> = command_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(CommandExecutionError::LocalExecutionError(
                 "Empty command".to_string(),
@@ -119,7 +119,7 @@ impl LocalExecutor {
         definition: &CommandDefinition,
         args: &[String],
     ) -> Result<(), CommandExecutionError> {
-        if let Some(ref limits) = definition.resource_limits {
+        if let Some(_limits) = &definition.resource_limits {
             // Simple argument count limit as a basic safety measure
             if args.len() > 50 {
                 return Err(CommandExecutionError::ResourceLimitExceeded(

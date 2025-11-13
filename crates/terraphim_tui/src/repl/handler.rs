@@ -300,6 +300,10 @@ impl ReplHandler {
             ReplCommand::Web { subcommand } => {
                 self.handle_web(subcommand).await?;
             }
+
+            ReplCommand::Vm { subcommand } => {
+                self.handle_vm(subcommand).await?;
+            }
         }
 
         Ok(false)
@@ -1163,6 +1167,116 @@ impl ReplHandler {
         #[cfg(not(feature = "repl"))]
         {
             println!("Web operations require repl feature");
+        }
+
+        Ok(())
+    }
+
+    async fn handle_vm(&self, subcommand: super::commands::VmSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        {
+            use colored::Colorize;
+
+            match subcommand {
+                super::commands::VmSubcommand::List => {
+                    println!("🖥️  VM List");
+                    println!("VM listing functionality is not yet implemented.");
+                    println!("This would show all available VMs.");
+                }
+                super::commands::VmSubcommand::Pool => {
+                    println!("🏊 VM Pool");
+                    println!("VM pool information is not yet implemented.");
+                    println!("This would show VM pool status and availability.");
+                }
+                super::commands::VmSubcommand::Status { vm_id } => {
+                    if let Some(id) = vm_id {
+                        println!("📊 VM Status: {}", id.green());
+                        println!("VM status functionality is not yet implemented.");
+                        println!("This would show status for VM: {}", id);
+                    } else {
+                        println!("📊 All VM Status");
+                        println!("All VM status functionality is not yet implemented.");
+                        println!("This would show status for all VMs.");
+                    }
+                }
+                super::commands::VmSubcommand::Metrics { vm_id } => {
+                    if let Some(id) = vm_id {
+                        println!("📈 VM Metrics: {}", id.green());
+                        println!("VM metrics functionality is not yet implemented.");
+                        println!("This would show metrics for VM: {}", id);
+                    } else {
+                        println!("📈 All VM Metrics");
+                        println!("All VM metrics functionality is not yet implemented.");
+                        println!("This would show metrics for all VMs.");
+                    }
+                }
+                super::commands::VmSubcommand::Execute {
+                    code,
+                    language,
+                    vm_id,
+                } => {
+                    if let Some(id) = vm_id {
+                        println!("⚡ Execute on VM: {}", id.green());
+                        println!("Language: {}", language.cyan());
+                        println!("Code: {}", code.yellow());
+                        println!("VM execution functionality is not yet implemented.");
+                    } else {
+                        println!("⚡ Execute on default VM");
+                        println!("Language: {}", language.cyan());
+                        println!("Code: {}", code.yellow());
+                        println!("VM execution functionality is not yet implemented.");
+                    }
+                }
+                super::commands::VmSubcommand::Agent {
+                    agent_id,
+                    task,
+                    vm_id,
+                } => {
+                    if let Some(id) = vm_id {
+                        println!("🤖 Agent: {} on VM: {}", agent_id.green(), id.cyan());
+                        println!("Task: {}", task.yellow());
+                        println!("VM agent functionality is not yet implemented.");
+                    } else {
+                        println!("🤖 Agent: {} on default VM", agent_id.green());
+                        println!("Task: {}", task.yellow());
+                        println!("VM agent functionality is not yet implemented.");
+                    }
+                }
+                super::commands::VmSubcommand::Tasks { vm_id } => {
+                    println!("📋 Tasks for VM: {}", vm_id.green());
+                    println!("VM tasks functionality is not yet implemented.");
+                    println!("This would show tasks for VM: {}", vm_id);
+                }
+                super::commands::VmSubcommand::Allocate { vm_id } => {
+                    println!("➕ Allocate VM: {}", vm_id.green());
+                    println!("VM allocation functionality is not yet implemented.");
+                    println!("This would allocate VM: {}", vm_id);
+                }
+                super::commands::VmSubcommand::Release { vm_id } => {
+                    println!("➖ Release VM: {}", vm_id.green());
+                    println!("VM release functionality is not yet implemented.");
+                    println!("This would release VM: {}", vm_id);
+                }
+                super::commands::VmSubcommand::Monitor { vm_id, refresh } => {
+                    if let Some(interval) = refresh {
+                        println!("👁️  Monitor VM: {} (refresh: {}s)", vm_id.green(), interval);
+                        println!("VM monitoring functionality is not yet implemented.");
+                        println!(
+                            "This would monitor VM: {} with {}s refresh interval",
+                            vm_id, interval
+                        );
+                    } else {
+                        println!("👁️  Monitor VM: {} (default refresh)", vm_id.green());
+                        println!("VM monitoring functionality is not yet implemented.");
+                        println!("This would monitor VM: {} with default refresh", vm_id);
+                    }
+                }
+            }
+        }
+
+        #[cfg(not(feature = "repl"))]
+        {
+            println!("VM operations require repl feature");
         }
 
         Ok(())
