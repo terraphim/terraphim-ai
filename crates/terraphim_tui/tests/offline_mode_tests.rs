@@ -1,7 +1,8 @@
+use std::process::Command;
+use std::str::{self, FromStr};
+
 use anyhow::Result;
 use serial_test::serial;
-use std::process::Command;
-use std::str;
 
 /// Test helper to run TUI commands in offline mode
 fn run_offline_command(args: &[&str]) -> Result<(String, String, i32)> {

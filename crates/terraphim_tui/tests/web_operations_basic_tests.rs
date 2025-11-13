@@ -1,5 +1,9 @@
+use std::str::FromStr;
+
 #[cfg(all(test, feature = "repl"))]
 mod tests {
+    use super::*;
+
     // Test basic command parsing - this is the core functionality we need
     #[test]
     fn test_web_get_command_parsing() {

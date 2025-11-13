@@ -4,12 +4,7 @@
 //! with proper isolation and security validation.
 
 use std::collections::HashMap;
-use std::path::PathBuf;
-use std::time::Duration;
-use terraphim_tui::commands::{
-    CommandDefinition, CommandExecutionError, CommandExecutionResult, CommandParameter,
-    ExecutionMode, ResourceUsage, RiskLevel,
-};
+use terraphim_tui::commands::{CommandDefinition, CommandParameter, ExecutionMode, RiskLevel};
 
 /// Creates a test command definition
 fn create_test_command(
@@ -205,13 +200,16 @@ mod hybrid_execution_tests {
         ];
 
         for (name, risk_level, expected_mode) in test_cases {
-            let command_def = create_test_command(name, risk_level, expected_mode);
+            let command_def = create_test_command(name, risk_level.clone(), expected_mode.clone());
 
             // Verify the command is configured with the expected execution mode
             assert_eq!(
-                command_def.execution_mode, expected_mode,
+                command_def.execution_mode,
+                expected_mode,
                 "Command '{}' with risk level {:?} should use {:?} mode",
-                name, risk_level, expected_mode
+                name,
+                risk_level.clone(),
+                expected_mode.clone()
             );
         }
     }
@@ -316,7 +314,7 @@ mod execution_mode_security_tests {
         ];
 
         for (name, risk_level, mode) in test_cases {
-            let command_def = create_test_command(name, risk_level, mode);
+            let command_def = create_test_command(name, risk_level.clone(), mode.clone());
 
             // Verify command structure
             assert_eq!(command_def.name, name);
@@ -363,7 +361,7 @@ mod performance_tests {
     async fn test_parameter_validation_performance() {
         // Test performance of parameter validation
 
-        let command_def =
+        let _command_def =
             create_test_command("param-perf-test", RiskLevel::Medium, ExecutionMode::Hybrid);
 
         let start = Instant::now();
