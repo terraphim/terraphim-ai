@@ -966,6 +966,16 @@ impl ReplCommand {
             ]);
         }
 
+        #[cfg(feature = "repl-file")]
+        {
+            commands.extend_from_slice(&["file"]);
+        }
+
+        #[cfg(feature = "repl-web")]
+        {
+            commands.extend_from_slice(&["web"]);
+        }
+
         commands
     }
 
