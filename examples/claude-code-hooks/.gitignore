@@ -1,0 +1,8 @@
+# Build artifacts
+crates/
+target/
+*.log
+*.tmp
+
+# Test artifacts
+test-output/
