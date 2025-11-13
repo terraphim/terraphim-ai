@@ -134,6 +134,36 @@ Only logs what would be replaced, doesn't modify input.
 
 **Documentation**: See `examples/claude-code-hooks/README.md`
 
+### Real-World Examples
+
+**1. Package Manager Replacement (bun)**
+
+Knowledge Graph Files:
+- `docs/src/kg/bun.md` - Maps npm/yarn/pnpm → bun
+- `docs/src/kg/bun_install.md` - Maps installation commands → bun_install
+
+Example Replacements:
+```bash
+$ terraphim-tui replace "npm install && yarn test"
+bun_install && bun test
+```
+
+**2. Attribution Replacement (Claude → Terraphim)**
+
+Knowledge Graph Files:
+- `docs/src/kg/terraphim_ai.md` - Maps "Claude Code" → terraphim_ai
+- `docs/src/kg/https___terraphim_ai.md` - Maps Claude URLs → Terraphim URLs
+- `docs/src/kg/generated_with_terraphim.md` - Maps attribution text
+- `docs/src/kg/noreply_terraphim.md` - Maps email addresses
+
+Example Replacements:
+```bash
+$ terraphim-tui replace "🤖 Generated with [Claude Code](https://claude.com/claude-code) Co-Authored-By: Claude <noreply@anthropic.com>"
+🤖 Generated with [terraphim_ai](https___terraphim_ai) Co-Authored-By: terraphim_ai <noreply_terraphim>
+```
+
+**Note on Output Format**: Replacement text uses filename stems, so spaces become underscores and special characters are converted (e.g., "https://terraphim.ai" → "https___terraphim_ai"). This is a fundamental design of the system where filenames serve as normalized replacement terms.
+
 ## Claude Skills
 
 ### What Are Skills?
