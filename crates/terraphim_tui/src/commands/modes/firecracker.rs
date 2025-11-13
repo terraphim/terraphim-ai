@@ -82,7 +82,7 @@ impl FirecrackerExecutor {
         // Generate a unique VM ID for this command
         let vm_id = format!(
             "firecracker-{}-{}",
-            command.replace('/', "-").replace(' ', "-"),
+            command.replace(['/', ' '], "-"),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
                 .unwrap()
@@ -104,7 +104,7 @@ impl FirecrackerExecutor {
         vm_id: &str,
         command: &str,
         args: &[String],
-        timeout: Duration,
+        _timeout: Duration,
     ) -> Result<CommandExecutionResult, CommandExecutionError> {
         let api_client = self.api_client.as_ref().ok_or_else(|| {
             CommandExecutionError::VmExecutionError("No API client available".to_string())
@@ -152,8 +152,6 @@ impl FirecrackerExecutor {
             "go".to_string()
         } else if command.contains("rust") || command.contains("cargo") {
             "rust".to_string()
-        } else if command.contains("bash") || command.contains("sh") {
-            "bash".to_string()
         } else {
             "bash".to_string() // Default to bash
         }
@@ -162,7 +160,7 @@ impl FirecrackerExecutor {
     /// Calculate resource usage from VM response
     fn calculate_resource_usage(
         &self,
-        response: &crate::client::VmExecuteResponse,
+        _response: &crate::client::VmExecuteResponse,
     ) -> ResourceUsage {
         // This would be enhanced in a real implementation
         // For now, return default values
@@ -187,7 +185,7 @@ impl FirecrackerExecutor {
         &self,
         command_str: &str,
     ) -> Result<(String, Vec<String>), CommandExecutionError> {
-        let parts: Vec<&str> = command_str.trim().split_whitespace().collect();
+        let parts: Vec<&str> = command_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(CommandExecutionError::VmExecutionError(
                 "Empty command".to_string(),
@@ -207,7 +205,7 @@ impl FirecrackerExecutor {
         args: &[String],
     ) -> Result<(), CommandExecutionError> {
         // Check for commands that might not work well in VMs
-        let vm_incompatible_commands = vec![
+        let vm_incompatible_commands = [
             "systemctl",
             "service",
             "init",

@@ -75,6 +75,11 @@ pub enum ReplCommand {
         subcommand: WebSubcommand,
     },
 
+    // VM commands
+    Vm {
+        subcommand: VmSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -102,6 +107,41 @@ pub enum FileSubcommand {
     Search { query: String },
     List,
     Info { path: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum VmSubcommand {
+    List,
+    Pool,
+    Status {
+        vm_id: Option<String>,
+    },
+    Metrics {
+        vm_id: Option<String>,
+    },
+    Execute {
+        code: String,
+        language: String,
+        vm_id: Option<String>,
+    },
+    Agent {
+        agent_id: String,
+        task: String,
+        vm_id: Option<String>,
+    },
+    Tasks {
+        vm_id: String,
+    },
+    Allocate {
+        vm_id: String,
+    },
+    Release {
+        vm_id: String,
+    },
+    Monitor {
+        vm_id: String,
+        refresh: Option<u32>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -192,8 +232,8 @@ impl FromStr for ReplCommand {
                 let mut query = String::new();
                 let mut role = None;
                 let mut limit = None;
-                let mut semantic = false;
-                let mut concepts = false;
+                let _semantic = false;
+                let _concepts = false;
                 let mut i = 1;
 
                 while i < parts.len() {
@@ -231,7 +271,7 @@ impl FromStr for ReplCommand {
                 // Handle --semantic and --concepts flags that might be in the query
                 let mut semantic = false;
                 let mut concepts = false;
-                let mut query_parts: Vec<&str> = query.split_whitespace().collect();
+                let query_parts: Vec<&str> = query.split_whitespace().collect();
                 let mut filtered_query_parts = Vec::new();
 
                 for part in query_parts {
@@ -713,6 +753,178 @@ impl FromStr for ReplCommand {
                 "Web operations not enabled. Rebuild with --features repl-web"
             )),
 
+            "vm" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("VM command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "list" => Ok(ReplCommand::Vm {
+                        subcommand: VmSubcommand::List,
+                    }),
+                    "pool" => Ok(ReplCommand::Vm {
+                        subcommand: VmSubcommand::Pool,
+                    }),
+                    "status" => {
+                        let vm_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Status { vm_id },
+                        })
+                    }
+                    "metrics" => {
+                        let vm_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Metrics { vm_id },
+                        })
+                    }
+                    "execute" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM execute requires a language"));
+                        }
+                        let language = parts[2].to_string();
+                        if parts.len() < 4 {
+                            return Err(anyhow!("VM execute requires code to execute"));
+                        }
+
+                        let mut code = String::new();
+                        let mut vm_id = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--vm-id" => {
+                                    if i + 1 < parts.len() {
+                                        vm_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--vm-id requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    if !code.is_empty() {
+                                        code.push(' ');
+                                    }
+                                    code.push_str(parts[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Execute { code, language, vm_id },
+                        })
+                    }
+                    "agent" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM agent requires an agent ID"));
+                        }
+                        let agent_id = parts[2].to_string();
+                        if parts.len() < 4 {
+                            return Err(anyhow!("VM agent requires a task"));
+                        }
+
+                        let mut task = String::new();
+                        let mut vm_id = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--vm-id" => {
+                                    if i + 1 < parts.len() {
+                                        vm_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--vm-id requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    if !task.is_empty() {
+                                        task.push(' ');
+                                    }
+                                    task.push_str(parts[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Agent { agent_id, task, vm_id },
+                        })
+                    }
+                    "tasks" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM tasks requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Tasks { vm_id },
+                        })
+                    }
+                    "allocate" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM allocate requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Allocate { vm_id },
+                        })
+                    }
+                    "release" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM release requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Release { vm_id },
+                        })
+                    }
+                    "monitor" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM monitor requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        let mut refresh = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--refresh" => {
+                                    if i + 1 < parts.len() {
+                                        if let Ok(refresh_val) = parts[i + 1].parse::<u32>() {
+                                            refresh = Some(refresh_val);
+                                        } else {
+                                            return Err(anyhow!("--refresh must be a positive integer"));
+                                        }
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--refresh requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    return Err(anyhow!("Unknown monitor option: {}", parts[i]));
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Monitor { vm_id, refresh },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown VM subcommand: {}. Use: list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor",
+                        parts[1]
+                    )),
+                }
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -735,7 +947,7 @@ impl ReplCommand {
     /// Get available commands based on compiled features
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "vm", "help", "quit", "exit", "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
@@ -768,6 +980,7 @@ impl ReplCommand {
             "quit" | "q" => Some("/quit, /q - Exit REPL"),
             "exit" => Some("/exit - Exit REPL"),
             "clear" => Some("/clear - Clear screen"),
+            "vm" => Some("/vm <subcommand> [args] - VM management (list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor)"),
 
             #[cfg(feature = "repl-file")]
             "file" => Some("/file <subcommand> [args] - File operations (search, list, info)"),
