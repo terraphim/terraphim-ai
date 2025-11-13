@@ -521,8 +521,9 @@ mod tests {
 
     #[test]
     fn test_high_risk_keywords() {
-        let hybrid = HybridExecutor::new();
+        let _hybrid = HybridExecutor::new();
 
+        let command_str = "rm -rf /important/data";
         let settings = RiskAssessmentSettings::default();
         assert!(settings
             .high_risk_keywords
