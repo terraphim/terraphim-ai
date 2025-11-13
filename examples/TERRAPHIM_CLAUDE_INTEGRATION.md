@@ -8,6 +8,7 @@ This guide explains how to integrate Terraphim's knowledge graph capabilities wi
 - [Approach Comparison](#approach-comparison)
 - [Claude Code Hooks](#claude-code-hooks)
 - [Claude Skills](#claude-skills)
+- [Codebase Evaluation](#codebase-evaluation)
 - [Which Approach to Use](#which-approach-to-use)
 - [Getting Started](#getting-started)
 - [Advanced Integration](#advanced-integration)
@@ -266,6 +267,208 @@ Skills activate automatically when Claude detects relevant context:
 - `examples/` - Example package.json and scripts
 
 **Documentation**: See `examples/claude-skills/terraphim-package-manager/README.md`
+
+## Codebase Evaluation
+
+Beyond text replacement, Terraphim AI provides a powerful framework for **evaluating whether AI agents improve or deteriorate codebases**. This deterministic, knowledge graph-based evaluation system measures code quality before and after AI changes.
+
+### Overview
+
+The evaluation system uses Terraphim's core capabilities to:
+- **Index codebases** as searchable haystacks
+- **Build knowledge graphs** for quality, security, and performance patterns
+- **Run standardized queries** to detect issues
+- **Compare metrics** before and after AI changes
+- **Generate verdicts**: Improvement, Deterioration, or Neutral
+
+### Key Features
+
+- **Deterministic**: Aho-Corasick automata provide consistent, repeatable scoring
+- **Local & Private**: No external API dependencies for evaluation
+- **Role-Based**: Evaluate from multiple perspectives (security, performance, quality)
+- **Quantifiable**: Numeric scores for objective comparison
+- **CI/CD Ready**: Integrate with GitHub Actions, GitLab CI, etc.
+
+### Quick Start
+
+```bash
+# Run complete evaluation
+cd examples/codebase-evaluation
+./scripts/evaluate-ai-agent.sh /path/to/your/codebase
+
+# The script will:
+# 1. Create baseline evaluation
+# 2. Prompt you to apply AI changes
+# 3. Re-evaluate after changes
+# 4. Generate verdict report
+```
+
+### Evaluation Metrics
+
+**Knowledge Graph Metrics**:
+- Semantic matches for quality issues
+- Pattern detection using Aho-Corasick
+- Concept relationship density
+
+**Code Quality Metrics** (Rust example):
+- Clippy warnings count
+- Test pass/fail rates
+- Anti-pattern occurrences (unwrap, panic, etc.)
+- TODO/FIXME counts
+
+**Verdict Logic**:
+- ✅ **IMPROVEMENT**: More metrics improved than deteriorated
+- ❌ **DETERIORATION**: More metrics deteriorated than improved
+- ➖ **NEUTRAL**: Mixed or minimal changes
+
+### Example Use Cases
+
+**1. Evaluate Pull Request from AI Agent**
+
+```bash
+# Checkout baseline (main branch)
+git checkout main
+./scripts/baseline-evaluation.sh . "Code Reviewer"
+
+# Checkout AI-generated PR
+git checkout ai-agent-pr-123
+./scripts/post-evaluation.sh . "Code Reviewer"
+
+# Generate verdict
+./scripts/compare-evaluations.sh
+```
+
+**2. Continuous Evaluation in CI/CD**
+
+```yaml
+# GitHub Actions example
+- name: Baseline evaluation
+  run: ./scripts/baseline-evaluation.sh ${{ github.workspace }}
+
+- name: Apply AI changes
+  run: # Your AI agent step
+
+- name: Post-change evaluation
+  run: ./scripts/post-evaluation.sh ${{ github.workspace }}
+
+- name: Generate verdict (fails on deterioration)
+  run: ./scripts/compare-evaluations.sh
+```
+
+**3. Multi-Role Evaluation**
+
+Evaluate from different perspectives:
+
+```bash
+# Code quality focus
+./scripts/evaluate-ai-agent.sh ./codebase claude-code "Code Reviewer"
+
+# Security focus
+./scripts/evaluate-ai-agent.sh ./codebase claude-code "Security Auditor"
+
+# Performance focus
+./scripts/evaluate-ai-agent.sh ./codebase claude-code "Performance Analyst"
+```
+
+### Evaluation Roles
+
+Define custom evaluation perspectives using knowledge graphs:
+
+**Code Reviewer Role** (`code-quality.md`):
+```markdown
+# Code Quality
+
+synonyms:: code smell, technical debt, refactoring opportunity, bad practice
+```
+
+**Security Auditor Role** (`security.md`):
+```markdown
+# Security Vulnerability
+
+synonyms:: SQL injection, XSS, CSRF, authentication flaw, command injection
+```
+
+**Performance Analyst Role** (`performance.md`):
+```markdown
+# Performance Bottleneck
+
+synonyms:: slow code, inefficient algorithm, O(n^2) complexity, blocking operation
+```
+
+### Sample Verdict Report
+
+```markdown
+# Codebase Evaluation Verdict
+
+## Summary
+
+### Clippy Warnings
+| Metric   | Baseline | After | Delta |
+|----------|----------|-------|-------|
+| Warnings | 15       | 8     | -7    |
+
+✅ **Improvement**: Reduced warnings by 7
+
+### Anti-Patterns
+| Metric | Baseline | After | Delta |
+|--------|----------|-------|-------|
+| Count  | 23       | 18    | -5    |
+
+✅ **Improvement**: Removed 5 anti-patterns
+
+## Overall Verdict
+
+✅ **IMPROVEMENT**: The AI agent improved the codebase quality.
+
+- ✅ Improved metrics: **3**
+- ❌ Deteriorated metrics: **0**
+- ➖ Neutral metrics: **1**
+
+## Recommendations
+
+- ✅ No critical issues found
+- 📝 Review remaining 8 clippy warnings for completion
+```
+
+### Integration with Claude
+
+Combine codebase evaluation with hooks or skills:
+
+**Hook Integration**: Automatically evaluate changes before commits
+```bash
+# pre-commit hook
+./scripts/baseline-evaluation.sh .
+# ... make changes with Claude ...
+./scripts/post-evaluation.sh .
+./scripts/compare-evaluations.sh || exit 1
+```
+
+**Skill Integration**: Ask Claude to evaluate changes
+```markdown
+---
+name: terraphim-codebase-eval
+description: Evaluate code quality using Terraphim's knowledge graph system
+---
+
+When the user asks to evaluate code quality or AI changes, run:
+./scripts/evaluate-ai-agent.sh <codebase>
+```
+
+### Documentation
+
+Complete documentation and scripts available:
+- **Design Document**: `examples/codebase-evaluation/CODEBASE_EVALUATION_DESIGN.md`
+- **Quick Start Guide**: `examples/codebase-evaluation/README.md`
+- **Evaluation Scripts**: `examples/codebase-evaluation/scripts/`
+- **KG Templates**: `examples/codebase-evaluation/kg-templates/`
+
+### Benefits
+
+- **Objective Assessment**: Quantifiable metrics over subjective opinions
+- **Early Detection**: Catch quality issues before they reach production
+- **CI/CD Integration**: Automated quality gates in pipelines
+- **Historical Tracking**: Monitor quality trends over time
+- **Multi-Dimensional**: Evaluate security, performance, and quality simultaneously
 
 ## Which Approach to Use
 
