@@ -1,12 +1,14 @@
 #[cfg(feature = "atomic")]
 pub mod atomic;
 pub mod clickup;
+pub mod grep_app;
 pub mod mcp;
 pub mod perplexity;
 pub mod query_rs;
 #[cfg(feature = "atomic")]
 pub use atomic::AtomicHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
+pub use grep_app::GrepAppHaystackIndexer;
 pub use mcp::McpHaystackIndexer;
 pub use perplexity::PerplexityHaystackIndexer;
 pub use query_rs::QueryRsHaystackIndexer;
