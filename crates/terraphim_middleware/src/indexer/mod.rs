@@ -8,7 +8,8 @@ mod ripgrep;
 #[cfg(feature = "atomic")]
 use crate::haystack::AtomicHaystackIndexer;
 use crate::haystack::{
-    ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
+    ClickUpHaystackIndexer, GrepAppHaystackIndexer, McpHaystackIndexer,
+    PerplexityHaystackIndexer, QueryRsHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -100,6 +101,11 @@ pub async fn search_haystacks(
                     }
                 };
                 perplexity.index(needle, haystack).await?
+            }
+            ServiceType::GrepApp => {
+                // Search using grep.app for code across GitHub repositories
+                let grep_app = GrepAppHaystackIndexer::default();
+                grep_app.index(needle, haystack).await?
             }
         };
 
