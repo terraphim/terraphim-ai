@@ -6,6 +6,8 @@ This guide shows how to use Terraphim-TUI and its knowledge graph capabilities a
 
 Claude Code supports "hooks" - shell commands that execute in response to events like user prompt submission. This example demonstrates how to use Terraphim's knowledge graph and text replacement features to automatically convert package manager commands (npm, yarn, pnpm) to your preferred tool (bun).
 
+> **Alternative Approach**: If you want Claude to actively help with package manager replacements (with explanations and context-awareness), see the **[Claude Skill approach](../claude-skills/terraphim-package-manager/README.md)** instead. For a complete comparison of both approaches, see **[Terraphim Claude Integration Guide](../TERRAPHIM_CLAUDE_INTEGRATION.md)**.
+
 ## Why Use Terraphim as a Hook?
 
 - **Knowledge Graph-Based**: Uses Terraphim's semantic matching for context-aware replacements
