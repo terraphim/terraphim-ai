@@ -1180,34 +1180,133 @@ impl ReplHandler {
             match subcommand {
                 super::commands::VmSubcommand::List => {
                     println!("🖥️  VM List");
-                    println!("VM listing functionality is not yet implemented.");
-                    println!("This would show all available VMs.");
+                    if let Some(api_client) = &self.api_client {
+                        match api_client.list_vms().await {
+                            Ok(response) => {
+                                println!("Available VMs:");
+                                if response.vms.is_empty() {
+                                    println!("  No VMs currently running");
+                                } else {
+                                    for vm in &response.vms {
+                                        println!(
+                                            "  {} ({})",
+                                            vm.vm_id.bright_green(),
+                                            vm.ip_address.bright_blue()
+                                        );
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("❌ Error listing VMs: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("❌ API client not available");
+                    }
                 }
                 super::commands::VmSubcommand::Pool => {
-                    println!("🏊 VM Pool");
-                    println!("VM pool information is not yet implemented.");
-                    println!("This would show VM pool status and availability.");
+                    println!("🏊 VM Pool Status");
+                    if let Some(api_client) = &self.api_client {
+                        match api_client.get_vm_pool_stats().await {
+                            Ok(response) => {
+                                println!("VM Pool Statistics:");
+                                println!(
+                                    "  Available IPs: {}",
+                                    response.available_ips.to_string().bright_green()
+                                );
+                                println!(
+                                    "  Allocated IPs: {}",
+                                    response.allocated_ips.to_string().bright_yellow()
+                                );
+                                println!(
+                                    "  Total IPs: {}",
+                                    response.total_ips.to_string().bright_blue()
+                                );
+                                println!("  Utilization: {}%", response.utilization_percent);
+                            }
+                            Err(e) => {
+                                println!("❌ Error getting VM pool stats: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("❌ API client not available");
+                    }
                 }
                 super::commands::VmSubcommand::Status { vm_id } => {
-                    if let Some(id) = vm_id {
-                        println!("📊 VM Status: {}", id.green());
-                        println!("VM status functionality is not yet implemented.");
-                        println!("This would show status for VM: {}", id);
+                    if let Some(api_client) = &self.api_client {
+                        if let Some(id) = vm_id {
+                            println!("📊 VM Status: {}", id.green());
+                            match api_client.get_vm_status(&id).await {
+                                Ok(response) => {
+                                    println!("  Status: {}", response.status.bright_green());
+                                    println!("  IP Address: {}", response.ip_address.bright_blue());
+                                    println!("  Created: {}", response.created_at);
+                                    if let Some(updated_at) = response.updated_at {
+                                        println!("  Updated: {}", updated_at);
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("❌ Error getting VM status: {}", e);
+                                }
+                            }
+                        } else {
+                            println!("📊 All VM Status");
+                            match api_client.list_vms().await {
+                                Ok(response) => {
+                                    for vm in &response.vms {
+                                        println!(
+                                            "  {} ({})",
+                                            vm.vm_id.bright_green(),
+                                            vm.ip_address.bright_blue()
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("❌ Error listing VMs: {}", e);
+                                }
+                            }
+                        }
                     } else {
-                        println!("📊 All VM Status");
-                        println!("All VM status functionality is not yet implemented.");
-                        println!("This would show status for all VMs.");
+                        println!("❌ API client not available");
                     }
                 }
                 super::commands::VmSubcommand::Metrics { vm_id } => {
-                    if let Some(id) = vm_id {
-                        println!("📈 VM Metrics: {}", id.green());
-                        println!("VM metrics functionality is not yet implemented.");
-                        println!("This would show metrics for VM: {}", id);
+                    if let Some(api_client) = &self.api_client {
+                        if let Some(id) = vm_id {
+                            println!("📈 VM Metrics: {}", id.green());
+                            match api_client.get_vm_metrics(&id).await {
+                                Ok(response) => {
+                                    println!("  Status: {}", response.status.bright_green());
+                                    println!("  CPU Usage: {:.1}%", response.cpu_usage_percent);
+                                    println!("  Memory Usage: {} MB", response.memory_usage_mb);
+                                    println!("  Disk Usage: {:.1}%", response.disk_usage_percent);
+                                    println!("  Network I/O: {:.1} Mbps", response.network_io_mbps);
+                                    println!("  Uptime: {} seconds", response.uptime_seconds);
+                                }
+                                Err(e) => {
+                                    println!("❌ Error getting VM metrics: {}", e);
+                                }
+                            }
+                        } else {
+                            println!("📈 All VM Metrics");
+                            match api_client.get_all_vm_metrics().await {
+                                Ok(metrics) => {
+                                    for metric in &metrics {
+                                        println!(
+                                            "  {} - CPU: {:.1}%, Memory: {} MB",
+                                            metric.vm_id.bright_green(),
+                                            metric.cpu_usage_percent,
+                                            metric.memory_usage_mb
+                                        );
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("❌ Error getting all VM metrics: {}", e);
+                                }
+                            }
+                        }
                     } else {
-                        println!("📈 All VM Metrics");
-                        println!("All VM metrics functionality is not yet implemented.");
-                        println!("This would show metrics for all VMs.");
+                        println!("❌ API client not available");
                     }
                 }
                 super::commands::VmSubcommand::Execute {
@@ -1215,16 +1314,41 @@ impl ReplHandler {
                     language,
                     vm_id,
                 } => {
-                    if let Some(id) = vm_id {
-                        println!("⚡ Execute on VM: {}", id.green());
-                        println!("Language: {}", language.cyan());
-                        println!("Code: {}", code.yellow());
-                        println!("VM execution functionality is not yet implemented.");
+                    if let Some(api_client) = &self.api_client {
+                        if let Some(id) = vm_id {
+                            println!("⚡ Execute on VM: {}", id.green());
+                            println!("Language: {}", language.cyan());
+                            println!("Code: {}", code.yellow());
+                            match api_client
+                                .execute_vm_code(&id, &code, Some(&language))
+                                .await
+                            {
+                                Ok(response) => {
+                                    println!("✅ Execution successful!");
+                                    println!("  Exit Code: {}", response.exit_code);
+                                    if !response.stdout.is_empty() {
+                                        println!("  Output:\n{}", response.stdout.bright_green());
+                                    }
+                                    if !response.stderr.is_empty() {
+                                        println!("  Errors:\n{}", response.stderr.bright_red());
+                                    }
+                                    // Note: execution_time_ms field not available in current response type
+                                    // if let Some(execution_time) = response.execution_time_ms {
+                                    //     println!("  Execution Time: {}ms", execution_time);
+                                    // }
+                                }
+                                Err(e) => {
+                                    println!("❌ Error executing code: {}", e);
+                                }
+                            }
+                        } else {
+                            println!("⚡ Execute on default VM");
+                            println!("Language: {}", language.cyan());
+                            println!("Code: {}", code.yellow());
+                            println!("💡 Default VM execution not yet implemented. Please specify a VM ID with --vm-id");
+                        }
                     } else {
-                        println!("⚡ Execute on default VM");
-                        println!("Language: {}", language.cyan());
-                        println!("Code: {}", code.yellow());
-                        println!("VM execution functionality is not yet implemented.");
+                        println!("❌ API client not available");
                     }
                 }
                 super::commands::VmSubcommand::Agent {
@@ -1232,43 +1356,147 @@ impl ReplHandler {
                     task,
                     vm_id,
                 } => {
-                    if let Some(id) = vm_id {
-                        println!("🤖 Agent: {} on VM: {}", agent_id.green(), id.cyan());
-                        println!("Task: {}", task.yellow());
-                        println!("VM agent functionality is not yet implemented.");
+                    if let Some(api_client) = &self.api_client {
+                        if let Some(id) = vm_id {
+                            println!("🤖 Agent: {} on VM: {}", agent_id.green(), id.cyan());
+                            println!("Task: {}", task.yellow());
+                            match api_client
+                                .execute_agent_task(&id, &agent_id, Some(&task))
+                                .await
+                            {
+                                Ok(response) => {
+                                    println!("✅ Agent task executed successfully!");
+                                    println!("  Task ID: {}", response.task_id.bright_green());
+                                    println!("  Status: {}", response.status.bright_yellow());
+                                    if !response.result.is_empty() {
+                                        println!("  Result:\n{}", response.result.bright_blue());
+                                    }
+                                }
+                                Err(e) => {
+                                    println!("❌ Error executing agent task: {}", e);
+                                }
+                            }
+                        } else {
+                            println!("🤖 Agent: {} on default VM", agent_id.green());
+                            println!("Task: {}", task.yellow());
+                            println!("💡 Default VM agent execution not yet implemented. Please specify a VM ID with --vm-id");
+                        }
                     } else {
-                        println!("🤖 Agent: {} on default VM", agent_id.green());
-                        println!("Task: {}", task.yellow());
-                        println!("VM agent functionality is not yet implemented.");
+                        println!("❌ API client not available");
                     }
                 }
                 super::commands::VmSubcommand::Tasks { vm_id } => {
-                    println!("📋 Tasks for VM: {}", vm_id.green());
-                    println!("VM tasks functionality is not yet implemented.");
-                    println!("This would show tasks for VM: {}", vm_id);
+                    if let Some(api_client) = &self.api_client {
+                        println!("📋 Tasks for VM: {}", vm_id.green());
+                        match api_client.list_vm_tasks(&vm_id).await {
+                            Ok(response) => {
+                                if response.tasks.is_empty() {
+                                    println!("  No tasks found for VM");
+                                } else {
+                                    for task in &response.tasks {
+                                        println!(
+                                            "  {} - {}",
+                                            task.id.bright_green(),
+                                            task.status.bright_yellow()
+                                        );
+                                        // Note: agent_type field not available in current VmTask type
+                                        // task.agent_type.bright_blue()
+                                        println!("    Created: {}", task.created_at);
+                                    }
+                                }
+                            }
+                            Err(e) => {
+                                println!("❌ Error listing VM tasks: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("❌ API client not available");
+                    }
                 }
                 super::commands::VmSubcommand::Allocate { vm_id } => {
-                    println!("➕ Allocate VM: {}", vm_id.green());
-                    println!("VM allocation functionality is not yet implemented.");
-                    println!("This would allocate VM: {}", vm_id);
+                    if let Some(api_client) = &self.api_client {
+                        println!("➕ Allocate VM: {}", vm_id.green());
+                        match api_client.allocate_vm_ip(&vm_id).await {
+                            Ok(response) => {
+                                println!("✅ VM allocated successfully!");
+                                println!("  VM ID: {}", response.vm_id.bright_green());
+                                println!("  IP Address: {}", response.ip_address.bright_blue());
+                                // Note: pool_id field not available in current VmAllocateResponse type
+                                // println!("  Pool ID: {}", response.pool_id.bright_yellow());
+                            }
+                            Err(e) => {
+                                println!("❌ Error allocating VM: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("❌ API client not available");
+                    }
                 }
                 super::commands::VmSubcommand::Release { vm_id } => {
-                    println!("➖ Release VM: {}", vm_id.green());
-                    println!("VM release functionality is not yet implemented.");
-                    println!("This would release VM: {}", vm_id);
+                    if let Some(api_client) = &self.api_client {
+                        println!("➖ Release VM: {}", vm_id.green());
+                        match api_client.release_vm_ip(&vm_id).await {
+                            Ok(_) => {
+                                println!("✅ VM released successfully!");
+                                println!("  VM {} resources have been freed", vm_id.bright_green());
+                            }
+                            Err(e) => {
+                                println!("❌ Error releasing VM: {}", e);
+                            }
+                        }
+                    } else {
+                        println!("❌ API client not available");
+                    }
                 }
                 super::commands::VmSubcommand::Monitor { vm_id, refresh } => {
-                    if let Some(interval) = refresh {
+                    if let Some(api_client) = &self.api_client {
+                        let interval = refresh.unwrap_or(5); // Default 5 seconds
                         println!("👁️  Monitor VM: {} (refresh: {}s)", vm_id.green(), interval);
-                        println!("VM monitoring functionality is not yet implemented.");
-                        println!(
-                            "This would monitor VM: {} with {}s refresh interval",
-                            vm_id, interval
-                        );
+                        println!("Starting VM monitoring... Press Ctrl+C to stop");
+
+                        // Simple monitoring loop
+                        let mut count = 0;
+                        loop {
+                            count += 1;
+                            println!("\n--- Check #{} ---", count);
+
+                            // Get VM status
+                            match api_client.get_vm_status(&vm_id).await {
+                                Ok(status) => {
+                                    println!(
+                                        "Status: {} | IP: {} | Created: {}",
+                                        status.status.bright_green(),
+                                        status.ip_address.bright_blue(),
+                                        status.created_at
+                                    );
+                                }
+                                Err(e) => {
+                                    println!("❌ Error getting status: {}", e);
+                                }
+                            }
+
+                            // Get VM metrics
+                            match api_client.get_vm_metrics(&vm_id).await {
+                                Ok(metrics) => {
+                                    println!(
+                                        "CPU: {:.1}% | Memory: {}MB | Disk: {:.1}% | Uptime: {}s",
+                                        metrics.cpu_usage_percent,
+                                        metrics.memory_usage_mb,
+                                        metrics.disk_usage_percent,
+                                        metrics.uptime_seconds
+                                    );
+                                }
+                                Err(e) => {
+                                    println!("❌ Error getting metrics: {}", e);
+                                }
+                            }
+
+                            // Wait before next check
+                            tokio::time::sleep(tokio::time::Duration::from_secs(interval as u64))
+                                .await;
+                        }
                     } else {
-                        println!("👁️  Monitor VM: {} (default refresh)", vm_id.green());
-                        println!("VM monitoring functionality is not yet implemented.");
-                        println!("This would monitor VM: {} with default refresh", vm_id);
+                        println!("❌ API client not available");
                     }
                 }
             }

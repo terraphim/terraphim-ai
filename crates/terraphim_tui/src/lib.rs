@@ -21,6 +21,9 @@ pub mod test_exports {
     #[cfg(feature = "repl")]
     pub use crate::repl::*;
 
+    #[cfg(feature = "repl")]
+    pub use std::str::FromStr;
+
     #[cfg(feature = "repl-custom")]
     pub use crate::commands::*;
 }
