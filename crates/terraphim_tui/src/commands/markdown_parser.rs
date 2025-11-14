@@ -311,6 +311,12 @@ impl MarkdownCommandParser {
             "cert",
             "encryption",
             "hash",
+            "helm",
+            "charts",
+            "configmaps",
+            "microservice",
+            "deploys",
+            "deployments",
         ];
 
         let word_lower = word.to_lowercase();
@@ -626,7 +632,7 @@ impl MarkdownCommandParser {
                             } else {
                                 format!("```{}", fence)
                             }
-                        },
+                        }
                         _ => "```".to_string(),
                     };
                     output.push_str(&code_block_fence);
