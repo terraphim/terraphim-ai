@@ -132,7 +132,9 @@ test-command --input "hello" --verbose
         assert_eq!(parsed.definition.parameters.len(), 2);
         // Test that markdown structure is preserved
         assert!(parsed.content.contains("# Test Command"));
-        assert!(parsed.content.contains("This is a test command for unit testing purposes."));
+        assert!(parsed
+            .content
+            .contains("This is a test command for unit testing purposes."));
     }
 
     #[tokio::test]

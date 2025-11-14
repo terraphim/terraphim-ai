@@ -121,11 +121,11 @@ async fn test_desktop_config_roles_consistency() {
         "Terraphim Engineer role should exist"
     );
 
-    // Verify we have exactly 2 roles in desktop configuration
+    // Verify we have exactly 3 roles in desktop configuration
     assert_eq!(
         config.roles.len(),
-        2,
-        "Desktop config should have exactly 2 roles"
+        3,
+        "Desktop config should have exactly 3 roles"
     );
 
     // Verify default role is set correctly

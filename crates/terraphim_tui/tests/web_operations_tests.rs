@@ -7,8 +7,6 @@ use terraphim_tui::repl::web_operations::*;
 mod tests {
     use super::*;
     use terraphim_tui::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
-    
-    
 
     #[test]
     fn test_web_get_command_parsing() {

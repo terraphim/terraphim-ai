@@ -6,7 +6,7 @@ description = "Multi-agent system for Terraphim built on roles with Rig framewor
 license = "MIT"
 
 [features]
-default = []
+default = ["test-utils"]
 test-utils = []
 
 [dependencies]

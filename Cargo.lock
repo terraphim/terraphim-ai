@@ -2506,8 +2506,8 @@ dependencies = [
 
 [[package]]
 name = "genai"
-version = "0.4.3-wip"
-source = "git+https://github.com/terraphim/rust-genai.git?branch=main#a61208e25bf7b1b7d86b05d9658b706b3cc42ce8"
+version = "0.4.4-WIP"
+source = "git+https://github.com/terraphim/rust-genai.git?branch=merge-upstream-20251103#0f8839adb4666a35c102e507d544c514a928800d"
 dependencies = [
  "bytes",
  "derive_more 2.0.1",
@@ -8313,6 +8313,7 @@ dependencies = [
  "terraphim_agent_evolution",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_multi_agent",
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_service",
@@ -8517,6 +8518,7 @@ dependencies = [
 name = "terraphim_tui"
 version = "1.0.0"
 dependencies = [
+ "ahash 0.8.12",
  "anyhow",
  "async-trait",
  "chrono",
