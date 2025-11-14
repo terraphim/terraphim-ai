@@ -127,7 +127,10 @@ mod tests {
 
         let response: SearchResponse = serde_json::from_str(json).unwrap();
         assert_eq!(response.hits.hits.len(), 1);
-        assert_eq!(response.hits.hits[0].source.repo.raw, "terraphim/terraphim-ai");
+        assert_eq!(
+            response.hits.hits[0].source.repo.raw,
+            "terraphim/terraphim-ai"
+        );
 
         let facets = response.facets.unwrap();
         assert!(facets.lang.is_some());
