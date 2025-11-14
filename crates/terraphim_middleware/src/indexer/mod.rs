@@ -8,8 +8,8 @@ mod ripgrep;
 #[cfg(feature = "atomic")]
 use crate::haystack::AtomicHaystackIndexer;
 use crate::haystack::{
-    ClickUpHaystackIndexer, GrepAppHaystackIndexer, McpHaystackIndexer,
-    PerplexityHaystackIndexer, QueryRsHaystackIndexer,
+    ClickUpHaystackIndexer, GrepAppHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
+    QueryRsHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 

@@ -29,38 +29,29 @@ impl IndexMiddleware for GrepAppHaystackIndexer {
             log::info!("GrepApp: Starting search for query: '{}'", needle);
 
             // Extract optional filters from haystack extra_parameters
-            let language = haystack
-                .extra_parameters
-                .get("language")
-                .and_then(|v| {
-                    if v.is_empty() {
-                        None
-                    } else {
-                        Some(v.clone())
-                    }
-                });
+            let language = haystack.extra_parameters.get("language").and_then(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.clone())
+                }
+            });
 
-            let repo = haystack
-                .extra_parameters
-                .get("repo")
-                .and_then(|v| {
-                    if v.is_empty() {
-                        None
-                    } else {
-                        Some(v.clone())
-                    }
-                });
+            let repo = haystack.extra_parameters.get("repo").and_then(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.clone())
+                }
+            });
 
-            let path = haystack
-                .extra_parameters
-                .get("path")
-                .and_then(|v| {
-                    if v.is_empty() {
-                        None
-                    } else {
-                        Some(v.clone())
-                    }
-                });
+            let path = haystack.extra_parameters.get("path").and_then(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.clone())
+                }
+            });
 
             log::debug!(
                 "GrepApp: Filters - language: {:?}, repo: {:?}, path: {:?}",
@@ -101,13 +92,13 @@ impl IndexMiddleware for GrepAppHaystackIndexer {
                 let branch = &hit.source.branch.raw;
 
                 // Construct GitHub URL
-                let url = format!(
-                    "https://github.com/{}/blob/{}/{}",
-                    repo, branch, path
-                );
+                let url = format!("https://github.com/{}/blob/{}/{}", repo, branch, path);
 
                 // Extract plain text from HTML snippet (remove <mark> tags but keep content)
-                let snippet = hit.source.content.snippet
+                let snippet = hit
+                    .source
+                    .content
+                    .snippet
                     .replace("<mark>", "")
                     .replace("</mark>", "");
 
@@ -127,7 +118,11 @@ impl IndexMiddleware for GrepAppHaystackIndexer {
                     title,
                     body: snippet.clone(),
                     description: Some(format!("Code from {} in {}", path, repo)),
-                    tags: Some(vec![repo.to_string(), file_name.to_string(), "grep.app".to_string()]),
+                    tags: Some(vec![
+                        repo.to_string(),
+                        file_name.to_string(),
+                        "grep.app".to_string(),
+                    ]),
                     source_haystack: Some("GrepApp".to_string()),
                     ..Default::default()
                 };
