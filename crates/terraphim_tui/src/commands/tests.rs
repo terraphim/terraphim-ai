@@ -69,8 +69,8 @@ description: Test command for unit testing
 usage: "test-command [options]"
 category: Testing
 version: "1.0.0"
-risk_level: Low
-execution_mode: Local
+risk_level: low
+execution_mode: local
 permissions:
   - read
 aliases:
@@ -130,7 +130,9 @@ test-command --input "hello" --verbose
         assert_eq!(parsed.definition.risk_level, RiskLevel::Low);
         assert_eq!(parsed.definition.execution_mode, ExecutionMode::Local);
         assert_eq!(parsed.definition.parameters.len(), 2);
+        // Test that markdown structure is preserved
         assert!(parsed.content.contains("# Test Command"));
+        assert!(parsed.content.contains("This is a test command for unit testing purposes."));
     }
 
     #[tokio::test]
@@ -175,8 +177,9 @@ parameters:
   - name: number
     type: number
     required: true
-    min: 0
-    max: 100
+    validation:
+      min: 0
+      max: 100
 ---
 
 # Test Command
@@ -260,7 +263,7 @@ parameters:
 
         registry.register_command(parsed).await.unwrap();
 
-        let retrieved = registry.get_command("test").await;
+        let retrieved = registry.resolve_command("test").await;
         assert!(
             retrieved.is_some(),
             "Should be able to retrieve command by alias"
@@ -401,8 +404,8 @@ parameters:
 
         // Test that validator can be created and configured
         assert!(
-            validator.is_blacklisted("rm -rf /") == false,
-            "Should not blacklist by default"
+            validator.is_blacklisted("ls -la") == false,
+            "Should not blacklist safe commands by default"
         );
 
         // Test public interface methods
@@ -826,7 +829,7 @@ parameters:
         assert!(by_name.is_some(), "Should find command by name");
 
         // Test getting command by alias
-        let by_alias = registry.get_command("test").await;
+        let by_alias = registry.resolve_command("test").await;
         assert!(by_alias.is_some(), "Should find command by alias");
 
         // Test getting non-existent command
