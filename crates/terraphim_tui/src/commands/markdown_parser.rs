@@ -7,6 +7,7 @@ use super::{CommandDefinition, CommandRegistryError, ParsedCommand};
 use regex::{Regex, RegexBuilder};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
+use pulldown_cmark::{Parser, Event, Tag, TagEnd};
 
 /// Parser for markdown command definitions
 #[derive(Debug)]
@@ -78,12 +79,12 @@ impl MarkdownCommandParser {
         // Validate the command definition
         self.validate_definition(&definition, &source_path)?;
 
-        // Parse markdown content to extract description
-        let description = self.extract_description(markdown_content);
+        // Parse markdown content to extract and preserve structure
+        let content = self.extract_markdown_content(markdown_content);
 
         Ok(ParsedCommand {
             definition,
-            content: description,
+            content,
             source_path,
             modified,
         })
@@ -152,63 +153,73 @@ impl MarkdownCommandParser {
         Ok(commands)
     }
 
-    /// Extract a clean description from markdown content
-    fn extract_description(&self, markdown_content: &str) -> String {
-        // Remove markdown formatting and extract plain text description
-        let mut description_lines = Vec::new();
+    /// Extract and preserve markdown content structure
+    fn extract_markdown_content(&self, markdown_content: &str) -> String {
+        let parser = Parser::new(markdown_content);
+        let mut output = String::new();
+        let mut code_block_fence = String::new();
 
-        for line in markdown_content.lines() {
-            let line = line.trim();
+        for event in parser {
+            match event {
+                Event::Start(Tag::Heading { level, .. }) => {
+                    output.push_str(&"#".repeat(level as usize));
+                    output.push(' ');
+                }
+                Event::End(TagEnd::Heading(_)) => {
+                    output.push('\n');
+                }
 
-            // Skip empty lines and code blocks
-            if line.is_empty() || line.starts_with("```") {
-                continue;
-            }
+                Event::Start(Tag::CodeBlock(kind)) => {
+                    code_block_fence = match kind {
+                        pulldown_cmark::CodeBlockKind::Fenced(fence) => fence.to_string(),
+                        _ => "```".to_string(),
+                    };
+                    output.push_str(&code_block_fence);
+                    output.push('\n');
+                }
+                Event::End(TagEnd::CodeBlock) => {
+                    output.push_str(&code_block_fence);
+                    output.push('\n');
+                }
 
-            // Remove markdown formatting
-            let clean_line = self.remove_markdown_formatting(line);
+                Event::Start(Tag::List(..)) => {
+                    // Just let the list items handle their own formatting
+                }
+                Event::End(TagEnd::List(_)) => {
+                    output.push('\n');
+                }
 
-            // Skip if line becomes empty after cleaning
-            if clean_line.is_empty() {
-                continue;
-            }
+                Event::Start(Tag::Item) => {
+                    output.push_str("- ");
+                }
+                Event::End(TagEnd::Item) => {
+                    output.push('\n');
+                }
 
-            description_lines.push(clean_line);
+                Event::Text(text) => {
+                    output.push_str(&text);
+                }
 
-            // Limit description length
-            if description_lines.len() >= 5 {
-                break;
+                Event::Code(code) => {
+                    output.push('`');
+                    output.push_str(&code);
+                    output.push('`');
+                }
+
+                Event::SoftBreak | Event::HardBreak => {
+                    output.push('\n');
+                }
+
+                // Skip other events for simplicity
+                _ => {}
             }
         }
 
-        description_lines.join(" ").trim().to_string()
+        // Clean up trailing whitespace while preserving structure
+        output.trim().to_string()
     }
 
-    /// Remove markdown formatting from text
-    fn remove_markdown_formatting(&self, text: &str) -> String {
-        // Remove headers (# Header)
-        let text = regex::Regex::new(r"^#+\s*").unwrap().replace(text, "");
-
-        // Remove bold/italic formatting
-        let text = regex::Regex::new(r"\*\*(.*?)\*\*")
-            .unwrap()
-            .replace(&text, "$1");
-        let text = regex::Regex::new(r"\*(.*?)\*")
-            .unwrap()
-            .replace(&text, "$1");
-
-        // Remove inline code formatting
-        let text = regex::Regex::new(r"`(.*?)`").unwrap().replace(&text, "$1");
-
-        // Remove links [text](url)
-        let text = regex::Regex::new(r"\[(.*?)\]\(.*?\)")
-            .unwrap()
-            .replace(&text, "$1");
-
-        // Clean up extra whitespace
-        text.trim().to_string()
-    }
-
+    
     /// Validate command definition
     fn validate_definition(
         &self,
@@ -434,6 +445,60 @@ Some additional content that might be included.
             .content
             .contains("bold description with italic text and code blocks"));
         assert!(!parsed.content.contains("https://example.com"));
+    }
+
+    #[test]
+    fn test_markdown_content_preservation() {
+        let parser = MarkdownCommandParser::new().unwrap();
+
+        let markdown = r#"---
+name: "test-command"
+description: "Test command with markdown"
+execution_mode: "local"
+risk_level: "low"
+---
+
+# Test Command
+
+This is a **bold** description with *italic* text and `code` blocks.
+
+## Examples
+
+```bash
+test-command --input "hello"
+```
+
+### Sub-section
+
+Some additional content here.
+
+- List item 1
+- List item 2
+- List item 3
+"#;
+
+        let result =
+            parser.parse_content(markdown, PathBuf::from("test.md"), SystemTime::UNIX_EPOCH);
+
+        assert!(result.is_ok());
+        let parsed = result.unwrap();
+
+        // Test that markdown structure is preserved
+        assert!(parsed.content.contains("# Test Command"));
+        assert!(parsed.content.contains("## Examples"));
+        assert!(parsed.content.contains("### Sub-section"));
+        assert!(parsed.content.contains("```bash"));
+        assert!(parsed.content.contains("- List item 1"));
+        assert!(parsed.content.contains("- List item 2"));
+        assert!(parsed.content.contains("- List item 3"));
+
+        // Test that content is preserved, not stripped
+        assert!(parsed.content.contains("This is a **bold** description"));
+        assert!(parsed.content.contains("test-command --input \"hello\""));
+
+        // Test that newlines are preserved for structure
+        let lines: Vec<&str> = parsed.content.lines().collect();
+        assert!(lines.len() > 5); // Should have multiple lines preserved
     }
 }
 
