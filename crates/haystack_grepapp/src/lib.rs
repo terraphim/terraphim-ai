@@ -51,13 +51,13 @@ impl GrepAppHaystack {
         let branch = &hit.source.branch.raw;
 
         // Construct GitHub URL
-        let url = format!(
-            "https://github.com/{}/blob/{}/{}",
-            repo, branch, path
-        );
+        let url = format!("https://github.com/{}/blob/{}/{}", repo, branch, path);
 
         // Extract plain text from HTML snippet (remove <mark> tags but keep content)
-        let snippet = hit.source.content.snippet
+        let snippet = hit
+            .source
+            .content
+            .snippet
             .replace("<mark>", "")
             .replace("</mark>", "");
 
@@ -110,10 +110,7 @@ impl HaystackProvider for GrepAppHaystack {
 
         let hits = self.client.search(&params).await?;
 
-        let documents: Vec<Document> = hits
-            .iter()
-            .map(|hit| self.hit_to_document(hit))
-            .collect();
+        let documents: Vec<Document> = hits.iter().map(|hit| self.hit_to_document(hit)).collect();
 
         tracing::info!("Found {} documents from grep.app", documents.len());
 
@@ -136,10 +133,7 @@ mod tests {
             None,
         );
         assert!(haystack.is_ok());
-        assert_eq!(
-            haystack.unwrap().default_language,
-            Some("Rust".to_string())
-        );
+        assert_eq!(haystack.unwrap().default_language, Some("Rust".to_string()));
     }
 
     #[test]
@@ -165,7 +159,10 @@ mod tests {
 
         let doc = haystack.hit_to_document(&hit);
 
-        assert_eq!(doc.url, "https://github.com/terraphim/terraphim-ai/blob/main/src/main.rs");
+        assert_eq!(
+            doc.url,
+            "https://github.com/terraphim/terraphim-ai/blob/main/src/main.rs"
+        );
         assert_eq!(doc.title, "terraphim/terraphim-ai - main.rs");
         assert_eq!(doc.body, "async fn search() { }");
         assert!(doc.tags.is_some());

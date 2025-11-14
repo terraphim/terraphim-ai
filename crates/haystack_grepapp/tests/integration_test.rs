@@ -101,12 +101,9 @@ async fn live_multi_language_test() {
 #[tokio::test]
 #[ignore]
 async fn live_path_filter_test() {
-    let haystack = GrepAppHaystack::with_filters(
-        Some("Rust".to_string()),
-        None,
-        Some("src/".to_string()),
-    )
-    .expect("Failed to create haystack");
+    let haystack =
+        GrepAppHaystack::with_filters(Some("Rust".to_string()), None, Some("src/".to_string()))
+            .expect("Failed to create haystack");
 
     let query = SearchQuery {
         search_term: "impl Default".into(),

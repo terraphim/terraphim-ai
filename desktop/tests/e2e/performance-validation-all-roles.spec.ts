@@ -9,10 +9,10 @@ import {
 } from '../../src/test-utils/ci-friendly';
 
 /**
- * Comprehensive Performance Validation Test for All Three Roles
+ * Comprehensive Performance Validation Test for All Five Roles
  *
  * This test validates that:
- * 1. All three roles (Default, Rust Engineer, Terraphim Engineer) work correctly
+ * 1. All five roles (Default, Rust Engineer, Terraphim Engineer, Python Engineer, Front End Engineer) work correctly
  * 2. Search is fast and responsive (< 2 seconds)
  * 3. No opendal warnings in logs
  * 4. UI doesn't freeze during search
@@ -84,10 +84,42 @@ test.describe('Performance Validation - All Roles', () => {
     console.log(`✅ Terraphim Engineer role: ${metrics.searchTime}ms, ${metrics.resultCount} results`);
   });
 
+  test('should validate Python Engineer role search performance', async ({ page }) => {
+    console.log('🔍 Testing Python Engineer role search performance...');
+
+    // Switch to Python Engineer role
+    await switchToRole(page, 'Python Engineer');
+
+    const metrics = await performSearchWithTiming(page, 'async def pandas', 'Python Engineer');
+    performanceMetrics.push(metrics);
+
+    // Validate performance
+    expect(metrics.searchTime).toBeLessThan(2000); // Should be under 2 seconds
+    expect(metrics.uiResponsive).toBe(true);
+
+    console.log(`✅ Python Engineer role: ${metrics.searchTime}ms, ${metrics.resultCount} results`);
+  });
+
+  test('should validate Front End Engineer role search performance', async ({ page }) => {
+    console.log('🔍 Testing Front End Engineer role search performance...');
+
+    // Switch to Front End Engineer role
+    await switchToRole(page, 'Front End Engineer');
+
+    const metrics = await performSearchWithTiming(page, 'useState react', 'Front End Engineer');
+    performanceMetrics.push(metrics);
+
+    // Validate performance
+    expect(metrics.searchTime).toBeLessThan(2000); // Should be under 2 seconds
+    expect(metrics.uiResponsive).toBe(true);
+
+    console.log(`✅ Front End Engineer role: ${metrics.searchTime}ms, ${metrics.resultCount} results`);
+  });
+
   test('should validate role switching performance', async ({ page }) => {
     console.log('🔄 Testing role switching performance...');
 
-    const roles = ['Default', 'Rust Engineer', 'Terraphim Engineer'];
+    const roles = ['Default', 'Rust Engineer', 'Terraphim Engineer', 'Python Engineer', 'Front End Engineer'];
     const switchTimes: number[] = [];
 
     for (const role of roles) {
@@ -176,7 +208,9 @@ test.describe('Performance Validation - All Roles', () => {
     const testCases = [
       { role: 'Default', query: 'artificial intelligence', minResults: 0 },
       { role: 'Rust Engineer', query: 'async tokio', minResults: 0 },
-      { role: 'Terraphim Engineer', query: 'knowledge graph', minResults: 0 }
+      { role: 'Terraphim Engineer', query: 'knowledge graph', minResults: 0 },
+      { role: 'Python Engineer', query: 'async def', minResults: 0 },
+      { role: 'Front End Engineer', query: 'useState', minResults: 0 }
     ];
 
     for (const testCase of testCases) {
