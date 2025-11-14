@@ -10,9 +10,9 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 // Automata imports for term extraction
+use ahash::AHashMap;
 use terraphim_automata::{find_matches, Matched};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
-use ahash::AHashMap;
 
 /// Parsed command with enriched content analysis
 #[derive(Debug, Clone)]
@@ -220,7 +220,11 @@ impl MarkdownCommandParser {
 
         // Split on whitespace and punctuation
         for word in text.split_whitespace() {
-            let clean_word = word.trim_matches(&[':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\'', '!', '?', '-', '_'][..]);
+            let clean_word = word.trim_matches(
+                &[
+                    ':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\'', '!', '?', '-', '_',
+                ][..],
+            );
 
             // Filter by length and common patterns
             if clean_word.len() > 3 && !self.is_stop_word(clean_word) {
@@ -242,14 +246,70 @@ impl MarkdownCommandParser {
     fn is_technical_term(&self, word: &str) -> bool {
         // Technical indicators
         let tech_indicators = [
-            "config", "deploy", "build", "test", "api", "http", "json", "yaml", "docker",
-            "kubernetes", "service", "database", "cache", "queue", "server", "client", "request",
-            "response", "endpoint", "route", "handler", "middleware", "auth", "token", "session",
-            "cluster", "node", "container", "pod", "namespace", "helm", "terraform", "ansible",
-            "ci", "cd", "pipeline", "github", "gitlab", "jenkins", "artifact", "registry",
-            "monitoring", "logging", "metrics", "alerting", "grafana", "prometheus", "kibana",
-            "elasticsearch", "redis", "postgresql", "mysql", "mongodb", "cassandra", "kafka",
-            "rabbitmq", "nginx", "apache", "ssl", "tls", "https", "cert", "encryption", "hash",
+            "config",
+            "deploy",
+            "build",
+            "test",
+            "api",
+            "http",
+            "json",
+            "yaml",
+            "docker",
+            "kubernetes",
+            "service",
+            "database",
+            "cache",
+            "queue",
+            "server",
+            "client",
+            "request",
+            "response",
+            "endpoint",
+            "route",
+            "handler",
+            "middleware",
+            "auth",
+            "token",
+            "session",
+            "cluster",
+            "node",
+            "container",
+            "pod",
+            "namespace",
+            "helm",
+            "terraform",
+            "ansible",
+            "ci",
+            "cd",
+            "pipeline",
+            "github",
+            "gitlab",
+            "jenkins",
+            "artifact",
+            "registry",
+            "monitoring",
+            "logging",
+            "metrics",
+            "alerting",
+            "grafana",
+            "prometheus",
+            "kibana",
+            "elasticsearch",
+            "redis",
+            "postgresql",
+            "mysql",
+            "mongodb",
+            "cassandra",
+            "kafka",
+            "rabbitmq",
+            "nginx",
+            "apache",
+            "ssl",
+            "tls",
+            "https",
+            "cert",
+            "encryption",
+            "hash",
         ];
 
         let word_lower = word.to_lowercase();
@@ -260,19 +320,20 @@ impl MarkdownCommandParser {
         }
 
         // Check for common technical patterns
-        if word_lower.ends_with("config") ||
-           word_lower.ends_with("service") ||
-           word_lower.ends_with("server") ||
-           word_lower.ends_with("client") ||
-           word_lower.ends_with("manager") ||
-           word_lower.ends_with("handler") ||
-           word_lower.ends_with("worker") ||
-           word_lower.ends_with("process") ||
-           word_lower.ends_with("thread") ||
-           word_lower.contains("config") ||
-           word_lower.contains("deploy") ||
-           word_lower.contains("build") ||
-           word_lower.contains("test") {
+        if word_lower.ends_with("config")
+            || word_lower.ends_with("service")
+            || word_lower.ends_with("server")
+            || word_lower.ends_with("client")
+            || word_lower.ends_with("manager")
+            || word_lower.ends_with("handler")
+            || word_lower.ends_with("worker")
+            || word_lower.ends_with("process")
+            || word_lower.ends_with("thread")
+            || word_lower.contains("config")
+            || word_lower.contains("deploy")
+            || word_lower.contains("build")
+            || word_lower.contains("test")
+        {
             return true;
         }
 
@@ -291,21 +352,26 @@ impl MarkdownCommandParser {
     /// Check if a word is a stop word
     fn is_stop_word(&self, word: &str) -> bool {
         let stop_words = [
-            "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
-            "from", "up", "about", "into", "through", "during", "before", "after", "above", "below",
-            "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
-            "did", "will", "would", "could", "should", "may", "might", "must", "can", "this", "that",
-            "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us",
-            "them", "my", "your", "his", "its", "our", "their", "a", "an", "as", "if", "when",
-            "where", "why", "how", "what", "which", "who", "whom", "whose", "all", "any", "both",
-            "each", "every", "few", "many", "most", "other", "some", "such", "only", "own", "same",
-            "so", "than", "too", "very", "just", "now", "also", "here", "there", "more", "most",
+            "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from",
+            "up", "about", "into", "through", "during", "before", "after", "above", "below", "is",
+            "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+            "will", "would", "could", "should", "may", "might", "must", "can", "this", "that",
+            "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
+            "us", "them", "my", "your", "his", "its", "our", "their", "a", "an", "as", "if",
+            "when", "where", "why", "how", "what", "which", "who", "whom", "whose", "all", "any",
+            "both", "each", "every", "few", "many", "most", "other", "some", "such", "only", "own",
+            "same", "so", "than", "too", "very", "just", "now", "also", "here", "there", "more",
+            "most",
         ];
         stop_words.contains(&word)
     }
 
     /// Calculate complexity metrics for content
-    fn calculate_complexity_metrics(&self, content: &str, matched_terms: &[Matched]) -> ContentMetrics {
+    fn calculate_complexity_metrics(
+        &self,
+        content: &str,
+        matched_terms: &[Matched],
+    ) -> ContentMetrics {
         let word_count = content.split_whitespace().count();
         let technical_term_count = matched_terms.len();
 
@@ -333,7 +399,11 @@ impl MarkdownCommandParser {
     }
 
     /// Extract contextual paragraphs around matched terms
-    fn extract_contextual_paragraphs(&self, content: &str, matched_terms: &[Matched]) -> Vec<(Matched, String)> {
+    fn extract_contextual_paragraphs(
+        &self,
+        content: &str,
+        matched_terms: &[Matched],
+    ) -> Vec<(Matched, String)> {
         let mut paragraphs = Vec::new();
 
         for matched in matched_terms {
@@ -393,7 +463,11 @@ impl MarkdownCommandParser {
     }
 
     /// Identify related concepts based on term analysis
-    fn identify_related_concepts(&self, matched_terms: &[Matched], keywords: &[String]) -> Vec<String> {
+    fn identify_related_concepts(
+        &self,
+        matched_terms: &[Matched],
+        keywords: &[String],
+    ) -> Vec<String> {
         let mut concepts = Vec::new();
 
         // Extract concept names from matched terms
@@ -421,11 +495,16 @@ impl MarkdownCommandParser {
     fn learn_terms_from_content(&mut self, content: &str) {
         // Extract potential new technical terms
         for word in content.split_whitespace() {
-            let clean_word = word.trim_matches(&[':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\'', '!', '?'][..]);
+            let clean_word = word.trim_matches(
+                &[
+                    ':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\'', '!', '?',
+                ][..],
+            );
 
             if clean_word.len() > 4 && self.is_technical_term(clean_word) {
                 let normalized = NormalizedTermValue::from(clean_word.to_lowercase());
-                self.learned_terms.insert(clean_word.to_lowercase(), normalized);
+                self.learned_terms
+                    .insert(clean_word.to_lowercase(), normalized);
             }
         }
     }
@@ -938,7 +1017,7 @@ Set up the database connection and cache layer."#;
 
         assert!(metrics.word_count > 0);
         assert_eq!(metrics.code_block_count, 1); // One code block
-        assert_eq!(metrics.heading_count, 3);     // Three headings
+        assert_eq!(metrics.heading_count, 3); // Three headings
         assert!(metrics.richness_score > 0.0);
         assert!(metrics.richness_score <= 1.0);
     }
@@ -1039,10 +1118,18 @@ Third paragraph with more information.";
         assert!(!thesaurus.is_empty());
 
         // Should contain learned terms
-        assert!(thesaurus.get(&NormalizedTermValue::from("deploy")).is_some());
-        assert!(thesaurus.get(&NormalizedTermValue::from("microservice")).is_some());
-        assert!(thesaurus.get(&NormalizedTermValue::from("cluster")).is_some());
-        assert!(thesaurus.get(&NormalizedTermValue::from("database")).is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::from("deploy"))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::from("microservice"))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::from("cluster"))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::from("database"))
+            .is_some());
     }
 
     #[tokio::test]
@@ -1085,8 +1172,14 @@ The service requires proper database configuration and SSL certificates for secu
         let enriched_command = result.unwrap();
 
         // Should have basic parsing results
-        assert_eq!(enriched_command.parsed_command.definition.name, "deploy-service");
-        assert!(enriched_command.parsed_command.content.contains("Deploy Service Command"));
+        assert_eq!(
+            enriched_command.parsed_command.definition.name,
+            "deploy-service"
+        );
+        assert!(enriched_command
+            .parsed_command
+            .content
+            .contains("Deploy Service Command"));
 
         // Should have enriched content analysis
         assert!(enriched_command.enriched_content.is_some());
@@ -1094,9 +1187,15 @@ The service requires proper database configuration and SSL certificates for secu
 
         // Should have extracted keywords
         assert!(!enriched.extracted_keywords.is_empty());
-        assert!(enriched.extracted_keywords.contains(&"microservice".to_string()));
-        assert!(enriched.extracted_keywords.contains(&"kubernetes".to_string()));
-        assert!(enriched.extracted_keywords.contains(&"database".to_string()));
+        assert!(enriched
+            .extracted_keywords
+            .contains(&"microservice".to_string()));
+        assert!(enriched
+            .extracted_keywords
+            .contains(&"kubernetes".to_string()));
+        assert!(enriched
+            .extracted_keywords
+            .contains(&"database".to_string()));
 
         // Should have complexity metrics
         assert!(enriched.complexity_metrics.word_count > 0);
@@ -1140,7 +1239,10 @@ The service requires proper database configuration and SSL certificates for secu
         // Should find matches from thesaurus
         assert!(!analysis.matched_terms.is_empty());
         assert!(analysis.matched_terms.iter().any(|m| m.term == "database"));
-        assert!(analysis.matched_terms.iter().any(|m| m.term == "kubernetes"));
+        assert!(analysis
+            .matched_terms
+            .iter()
+            .any(|m| m.term == "kubernetes"));
     }
 }
 
