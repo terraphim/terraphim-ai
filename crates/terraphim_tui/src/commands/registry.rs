@@ -11,11 +11,11 @@ use std::sync::Arc;
 use tokio::sync::RwLock;
 
 // Automata imports for enhanced functionality
-use terraphim_automata::{
-    build_autocomplete_index, autocomplete_search, find_matches, extract_paragraphs_from_automata,
-    AutocompleteIndex, AutocompleteConfig, Matched,
-};
 use ahash::AHashMap;
+use terraphim_automata::{
+    autocomplete_search, build_autocomplete_index, extract_paragraphs_from_automata, find_matches,
+    AutocompleteConfig, AutocompleteIndex, Matched,
+};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 /// Command registry that manages all discovered commands
@@ -547,32 +547,41 @@ impl CommandRegistry {
         for (name, command) in commands.iter() {
             // Add command name
             let term_value = NormalizedTermValue::from(name.clone());
-            thesaurus_data.insert(term_value.clone(), NormalizedTerm {
-                id: command.definition.name.len() as u64,
-                value: term_value.clone(),
-                url: Some(format!("command:{}", name)),
-            });
+            thesaurus_data.insert(
+                term_value.clone(),
+                NormalizedTerm {
+                    id: command.definition.name.len() as u64,
+                    value: term_value.clone(),
+                    url: Some(format!("command:{}", name)),
+                },
+            );
 
             // Add keywords from description
             let keywords = self.extract_keywords_from_text(&command.definition.description);
             for keyword in keywords {
                 let keyword_value = NormalizedTermValue::from(keyword.clone());
-                thesaurus_data.insert(keyword_value.clone(), NormalizedTerm {
-                    id: command.definition.name.len() as u64,
-                    value: keyword_value,
-                    url: Some(format!("command:{}", name)),
-                });
+                thesaurus_data.insert(
+                    keyword_value.clone(),
+                    NormalizedTerm {
+                        id: command.definition.name.len() as u64,
+                        value: keyword_value,
+                        url: Some(format!("command:{}", name)),
+                    },
+                );
             }
 
             // Add parameter names
             for param in &command.definition.parameters {
                 let param_key = format!("{}:{}", name, param.name);
                 let param_value = NormalizedTermValue::from(param_key.clone());
-                thesaurus_data.insert(param_value.clone(), NormalizedTerm {
-                    id: param.name.len() as u64,
-                    value: param_value,
-                    url: Some(format!("command:{}:param:{}", name, param.name)),
-                });
+                thesaurus_data.insert(
+                    param_value.clone(),
+                    NormalizedTerm {
+                        id: param.name.len() as u64,
+                        value: param_value,
+                        url: Some(format!("command:{}:param:{}", name, param.name)),
+                    },
+                );
             }
         }
 
@@ -608,7 +617,11 @@ impl CommandRegistry {
     }
 
     /// Intelligent command discovery using automata autocomplete
-    pub async fn discover_commands(&self, query: &str, limit: Option<usize>) -> Result<Vec<CommandDiscoveryResult>, CommandRegistryError> {
+    pub async fn discover_commands(
+        &self,
+        query: &str,
+        limit: Option<usize>,
+    ) -> Result<Vec<CommandDiscoveryResult>, CommandRegistryError> {
         // Build index if not already built
         {
             let autocomplete_index = self.autocomplete_index.read().await;
@@ -630,7 +643,12 @@ impl CommandRegistry {
         for result in results {
             // Extract command name from result (remove parameter suffixes if present)
             let command_name = if result.term.contains(':') {
-                result.term.split(':').next().unwrap_or(&result.term).to_string()
+                result
+                    .term
+                    .split(':')
+                    .next()
+                    .unwrap_or(&result.term)
+                    .to_string()
             } else {
                 result.term.clone()
             };
@@ -646,15 +664,23 @@ impl CommandRegistry {
         }
 
         // Sort by relevance score
-        discovery_results.sort_by(|a, b| b.match_score.partial_cmp(&a.match_score).unwrap_or(std::cmp::Ordering::Equal));
+        discovery_results.sort_by(|a, b| {
+            b.match_score
+                .partial_cmp(&a.match_score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         Ok(discovery_results)
     }
 
     /// Enhanced content analysis using term matching
-    pub async fn analyze_command_content(&self, command_name: &str) -> Result<Vec<Matched>, CommandRegistryError> {
-        let command = self.resolve_command(command_name).await.ok_or_else(|| {
-            CommandRegistryError::CommandNotFound(command_name.to_string())
-        })?;
+    pub async fn analyze_command_content(
+        &self,
+        command_name: &str,
+    ) -> Result<Vec<Matched>, CommandRegistryError> {
+        let command = self
+            .resolve_command(command_name)
+            .await
+            .ok_or_else(|| CommandRegistryError::CommandNotFound(command_name.to_string()))?;
 
         // Build thesaurus if not already built
         {
@@ -675,20 +701,28 @@ impl CommandRegistry {
     }
 
     /// Extract contextual paragraphs for command help
-    pub async fn extract_help_paragraphs(&self, command_name: &str, query_terms: &[String]) -> Result<Vec<(Matched, String)>, CommandRegistryError> {
-        let command = self.resolve_command(command_name).await.ok_or_else(|| {
-            CommandRegistryError::CommandNotFound(command_name.to_string())
-        })?;
+    pub async fn extract_help_paragraphs(
+        &self,
+        command_name: &str,
+        query_terms: &[String],
+    ) -> Result<Vec<(Matched, String)>, CommandRegistryError> {
+        let command = self
+            .resolve_command(command_name)
+            .await
+            .ok_or_else(|| CommandRegistryError::CommandNotFound(command_name.to_string()))?;
 
         // Build thesaurus from query terms
         let mut thesaurus_data: AHashMap<NormalizedTermValue, NormalizedTerm> = AHashMap::new();
         for (idx, term) in query_terms.iter().enumerate() {
             let term_value = NormalizedTermValue::from(term.clone());
-            thesaurus_data.insert(term_value.clone(), NormalizedTerm {
-                id: idx as u64,
-                value: term_value,
-                url: None,
-            });
+            thesaurus_data.insert(
+                term_value.clone(),
+                NormalizedTerm {
+                    id: idx as u64,
+                    value: term_value,
+                    url: None,
+                },
+            );
         }
 
         let mut thesaurus = Thesaurus::new("help_query".to_string());
@@ -709,7 +743,8 @@ impl CommandRegistry {
         };
 
         let mut related = Vec::new();
-        let target_keywords = self.extract_keywords_from_text(&target_command.definition.description);
+        let target_keywords =
+            self.extract_keywords_from_text(&target_command.definition.description);
 
         for (name, command) in commands.iter() {
             if name == command_name {
@@ -719,7 +754,8 @@ impl CommandRegistry {
             let command_keywords = self.extract_keywords_from_text(&command.definition.description);
             let similarity = self.calculate_keyword_similarity(&target_keywords, &command_keywords);
 
-            if similarity > 0.3 { // Threshold for relatedness
+            if similarity > 0.3 {
+                // Threshold for relatedness
                 related.push(name.clone());
             }
         }
@@ -751,7 +787,8 @@ impl CommandRegistry {
 
         // Split on whitespace, punctuation, and common separators
         for word in text.split_whitespace() {
-            let clean_word = word.trim_matches(&[':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\''][..]);
+            let clean_word = word
+                .trim_matches(&[':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\''][..]);
             if clean_word.len() > 3 && !self.is_stop_word(clean_word) {
                 keywords.push(clean_word.to_lowercase());
             }
@@ -765,12 +802,12 @@ impl CommandRegistry {
     /// Check if a word is a common stop word
     fn is_stop_word(&self, word: &str) -> bool {
         let stop_words = [
-            "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by",
-            "from", "up", "about", "into", "through", "during", "before", "after", "above", "below",
-            "is", "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does",
-            "did", "will", "would", "could", "should", "may", "might", "must", "can", "this", "that",
-            "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her", "us",
-            "them", "my", "your", "his", "its", "our", "their", "a", "an",
+            "the", "and", "or", "but", "in", "on", "at", "to", "for", "of", "with", "by", "from",
+            "up", "about", "into", "through", "during", "before", "after", "above", "below", "is",
+            "are", "was", "were", "be", "been", "being", "have", "has", "had", "do", "does", "did",
+            "will", "would", "could", "should", "may", "might", "must", "can", "this", "that",
+            "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
+            "us", "them", "my", "your", "his", "its", "our", "their", "a", "an",
         ];
         stop_words.contains(&word)
     }
@@ -962,15 +999,13 @@ mod tests {
                     name: name.to_string(),
                     description: desc.to_string(),
                     execution_mode: ExecutionMode::Local,
-                    parameters: vec![
-                        CommandParameter {
-                            name: "environment".to_string(),
-                            param_type: "string".to_string(),
-                            required: false,
-                            description: Some("Target environment".to_string()),
-                            ..Default::default()
-                        }
-                    ],
+                    parameters: vec![CommandParameter {
+                        name: "environment".to_string(),
+                        param_type: "string".to_string(),
+                        required: false,
+                        description: Some("Target environment".to_string()),
+                        ..Default::default()
+                    }],
                     ..Default::default()
                 },
                 content: format!("This is the content for {} command.", name),
@@ -986,9 +1021,15 @@ mod tests {
         // Verify index was built
         {
             let autocomplete_index = registry.autocomplete_index.read().await;
-            assert!(autocomplete_index.is_some(), "Autocomplete index should be built");
+            assert!(
+                autocomplete_index.is_some(),
+                "Autocomplete index should be built"
+            );
             let index = autocomplete_index.as_ref().unwrap();
-            assert!(index.len() > commands.len(), "Index should contain commands + parameters + keywords");
+            assert!(
+                index.len() > commands.len(),
+                "Index should contain commands + parameters + keywords"
+            );
         }
     }
 
@@ -1028,16 +1069,21 @@ mod tests {
         // Test prefix match
         let results = registry.discover_commands("dep", Some(5)).await.unwrap();
         assert!(!results.is_empty());
-        assert!(results.iter().any(|r| r.command.definition.name == "deploy"));
+        assert!(results
+            .iter()
+            .any(|r| r.command.definition.name == "deploy"));
 
         // Test content-based discovery (should find commands with matching content)
-        let results = registry.discover_commands("comprehensive", Some(5)).await.unwrap();
+        let results = registry
+            .discover_commands("comprehensive", Some(5))
+            .await
+            .unwrap();
         assert!(!results.is_empty());
         assert!(results.iter().any(|r| r.command.definition.name == "test"));
 
         // Test that results are sorted by relevance
         for i in 1..results.len() {
-            assert!(results[i-1].match_score >= results[i].match_score);
+            assert!(results[i - 1].match_score >= results[i].match_score);
         }
     }
 
@@ -1066,7 +1112,10 @@ mod tests {
         // Analyze command content
         let matches = registry.analyze_command_content("deploy").await.unwrap();
         // Should find some matches based on thesaurus entries
-        assert!(!matches.is_empty(), "Should find some matches in command content");
+        assert!(
+            !matches.is_empty(),
+            "Should find some matches in command content"
+        );
     }
 
     #[tokio::test]
@@ -1093,7 +1142,8 @@ Usage:
 
 Options:
   --release  Build in release mode
-  --verbose   Show detailed output".to_string(),
+  --verbose   Show detailed output"
+                .to_string(),
             source_path: PathBuf::from("build.md"),
             modified: SystemTime::UNIX_EPOCH,
         };
@@ -1102,13 +1152,18 @@ Options:
 
         // Test paragraph extraction for specific terms
         let query_terms = vec!["cargo".to_string(), "release".to_string()];
-        let paragraphs = registry.extract_help_paragraphs("build", &query_terms).await.unwrap();
+        let paragraphs = registry
+            .extract_help_paragraphs("build", &query_terms)
+            .await
+            .unwrap();
 
         assert!(!paragraphs.is_empty(), "Should extract relevant paragraphs");
 
         // Verify that extracted paragraphs contain the query terms
         for (matched, paragraph) in &paragraphs {
-            assert!(paragraph.to_lowercase().contains(&matched.term.to_lowercase()));
+            assert!(paragraph
+                .to_lowercase()
+                .contains(&matched.term.to_lowercase()));
         }
     }
 
@@ -1145,12 +1200,19 @@ Options:
         // Test related commands discovery
         let results = registry.discover_commands("build", Some(10)).await.unwrap();
         if let Some(build_result) = results.first() {
-            assert!(!build_result.related_commands.is_empty(),
-                    "Should find related commands for build command");
+            assert!(
+                !build_result.related_commands.is_empty(),
+                "Should find related commands for build command"
+            );
 
             // Should include other build-related commands
-            assert!(build_result.related_commands.iter().any(|cmd| cmd.contains("build")),
-                    "Related commands should include other build commands");
+            assert!(
+                build_result
+                    .related_commands
+                    .iter()
+                    .any(|cmd| cmd.contains("build")),
+                "Related commands should include other build commands"
+            );
         }
     }
 
@@ -1164,36 +1226,77 @@ Options:
         assert!(!keywords.is_empty(), "Should extract keywords");
 
         // Should extract meaningful keywords (not stop words)
-        assert!(keywords.contains(&"comprehensive".to_string()), "Should extract 'comprehensive'");
-        assert!(keywords.contains(&"deployment".to_string()), "Should extract 'deployment'");
-        assert!(keywords.contains(&"system".to_string()), "Should extract 'system'");
-        assert!(keywords.contains(&"docker".to_string()), "Should extract 'docker'");
-        assert!(keywords.contains(&"containers".to_string()), "Should extract 'containers'");
+        assert!(
+            keywords.contains(&"comprehensive".to_string()),
+            "Should extract 'comprehensive'"
+        );
+        assert!(
+            keywords.contains(&"deployment".to_string()),
+            "Should extract 'deployment'"
+        );
+        assert!(
+            keywords.contains(&"system".to_string()),
+            "Should extract 'system'"
+        );
+        assert!(
+            keywords.contains(&"docker".to_string()),
+            "Should extract 'docker'"
+        );
+        assert!(
+            keywords.contains(&"containers".to_string()),
+            "Should extract 'containers'"
+        );
 
         // Should not contain stop words
-        assert!(!keywords.contains(&"this".to_string()), "Should not extract 'this'");
-        assert!(!keywords.contains(&"with".to_string()), "Should not extract 'with'");
-        assert!(!keywords.contains(&"the".to_string()), "Should not extract 'the'");
+        assert!(
+            !keywords.contains(&"this".to_string()),
+            "Should not extract 'this'"
+        );
+        assert!(
+            !keywords.contains(&"with".to_string()),
+            "Should not extract 'with'"
+        );
+        assert!(
+            !keywords.contains(&"the".to_string()),
+            "Should not extract 'the'"
+        );
     }
 
     #[tokio::test]
     async fn test_keyword_similarity() {
         let registry = CommandRegistry::new().unwrap();
 
-        let keywords1 = vec!["build".to_string(), "project".to_string(), "cargo".to_string()];
-        let keywords2 = vec!["build".to_string(), "release".to_string(), "cargo".to_string()];
+        let keywords1 = vec![
+            "build".to_string(),
+            "project".to_string(),
+            "cargo".to_string(),
+        ];
+        let keywords2 = vec![
+            "build".to_string(),
+            "release".to_string(),
+            "cargo".to_string(),
+        ];
         let keywords3 = vec!["deploy".to_string(), "production".to_string()];
 
         // Test high similarity
         let similarity1 = registry.calculate_keyword_similarity(&keywords1, &keywords2);
-        assert!(similarity1 > 0.5, "Should have high similarity between related keywords");
+        assert!(
+            similarity1 > 0.5,
+            "Should have high similarity between related keywords"
+        );
 
         // Test low similarity
         let similarity2 = registry.calculate_keyword_similarity(&keywords1, &keywords3);
-        assert!(similarity2 < 0.3, "Should have low similarity between unrelated keywords");
+        assert!(
+            similarity2 < 0.3,
+            "Should have low similarity between unrelated keywords"
+        );
 
         // Test empty case
         let similarity3 = registry.calculate_keyword_similarity(&keywords1, &vec![]);
-        assert_eq!(similarity3, 0.0, "Should have zero similarity when one list is empty");
+        assert_eq!(
+            similarity3, 0.0,
+            "Should have zero similarity when one list is empty"
+        );
     }
 }

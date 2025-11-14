@@ -1031,7 +1031,9 @@ mod tests {
             ReplCommand::Search {
                 query: "hello world".to_string(),
                 role: None,
-                limit: None
+                limit: None,
+                semantic: false,
+                concepts: false,
             }
         );
 
@@ -1043,7 +1045,9 @@ mod tests {
             ReplCommand::Search {
                 query: "test".to_string(),
                 role: Some("Engineer".to_string()),
-                limit: Some(5)
+                limit: Some(5),
+                semantic: false,
+                concepts: false,
             }
         );
     }

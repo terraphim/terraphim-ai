@@ -1159,7 +1159,11 @@ mod tests {
         if let Err(ref e) = result {
             println!("Workflow start error: {:?}", e);
         }
-        assert!(result.is_ok(), "Workflow start should succeed, got error: {:?}", result);
+        assert!(
+            result.is_ok(),
+            "Workflow start should succeed, got error: {:?}",
+            result
+        );
         let workflow = result.unwrap();
         assert_eq!(workflow.workflow_id, "test_workflow");
         assert!(!workflow.agent_assignments.is_empty());
