@@ -30,6 +30,7 @@ tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
 log = "0.4"
 jiff = "0.1"
 urlencoding = "2.1"
+ahash = "0.8"
 terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 pulldown-cmark = { version = "0.12", default-features = false, features = ["html"] }
 handlebars = "6.0"
