@@ -267,6 +267,15 @@ pub enum CommandRegistryError {
 
     #[error("YAML parsing error: {0}")]
     YamlError(#[from] serde_yaml::Error),
+
+    #[error("Automata processing error: {0}")]
+    AutomataError(String),
+
+    #[error("Command not found: {0}")]
+    CommandNotFound(String),
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 /// Hook execution context
