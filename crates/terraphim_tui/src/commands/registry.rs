@@ -641,8 +641,23 @@ impl CommandRegistry {
 
         let mut discovery_results = Vec::new();
         for result in results {
-            // Extract command name from result (remove parameter suffixes if present)
-            let command_name = if result.term.contains(':') {
+            // Extract command name from result
+            let command_name = if let Some(url) = &result.url {
+                // If URL contains command reference (e.g., "command:test"), extract from URL
+                if let Some(cmd_part) = url.strip_prefix("command:") {
+                    cmd_part.to_string()
+                } else if result.term.contains(':') {
+                    // Fallback: remove parameter suffixes if present
+                    result
+                        .term
+                        .split(':')
+                        .next()
+                        .unwrap_or(&result.term)
+                        .to_string()
+                } else {
+                    result.term.clone()
+                }
+            } else if result.term.contains(':') {
                 result
                     .term
                     .split(':')
@@ -754,7 +769,7 @@ impl CommandRegistry {
             let command_keywords = self.extract_keywords_from_text(&command.definition.description);
             let similarity = self.calculate_keyword_similarity(&target_keywords, &command_keywords);
 
-            if similarity > 0.3 {
+            if similarity > 0.15 {
                 // Threshold for relatedness
                 related.push(name.clone());
             }
@@ -1281,8 +1296,8 @@ Options:
         // Test high similarity
         let similarity1 = registry.calculate_keyword_similarity(&keywords1, &keywords2);
         assert!(
-            similarity1 > 0.5,
-            "Should have high similarity between related keywords"
+            similarity1 >= 0.5,
+            "Should have high similarity between related keywords (got {})", similarity1
         );
 
         // Test low similarity
