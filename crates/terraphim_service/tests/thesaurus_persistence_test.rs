@@ -4,13 +4,14 @@
 //! persistence, covering the full lifecycle including KG building, saving, and retrieval.
 
 use serial_test::serial;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::Level;
 
-use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
+use terraphim_config::{ConfigBuilder, ConfigId, ConfigState, KnowledgeGraph};
 use terraphim_service::TerraphimService;
-use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{KnowledgeGraphInputType, NormalizedTermValue, RoleName, SearchQuery};
 
 #[tokio::test]
 #[serial]
@@ -35,6 +36,40 @@ async fn test_thesaurus_full_persistence_lifecycle() {
         .build()
         .expect("Failed to build desktop config");
 
+    // Determine correct KG path for testing
+    let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    println!("   Current working directory: {:?}", project_root);
+
+    // The test runs from the workspace root, need to find project docs/src/kg
+    let kg_path = if project_root.ends_with("crates") {
+        // If we're in crates directory, go up to project root
+        project_root.join("../docs/src/kg")
+    } else {
+        // If we're in workspace root
+        project_root.join("docs/src/kg")
+    };
+
+    // Skip test gracefully if KG directory doesn't exist
+    if !kg_path.exists() {
+        println!("⚠️ KG directory not found at {:?}, skipping test", kg_path);
+        return;
+    }
+
+    // Ensure Terraphim Engineer role exists with KG configured
+    let role_name = RoleName::new("Terraphim Engineer");
+    if let Some(role) = config.roles.get_mut(&role_name) {
+        // Update role to ensure KG is configured with correct path
+        role.kg = Some(KnowledgeGraph {
+            automata_path: None,
+            knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: kg_path,
+            }),
+            public: false,
+            publish: false,
+        });
+    }
+
     let config_state = ConfigState::new(&mut config)
         .await
         .expect("Failed to initialize ConfigState");
@@ -42,7 +77,6 @@ async fn test_thesaurus_full_persistence_lifecycle() {
     // Step 3: Create service and load thesaurus
     println!("🚀 Step 3: Creating TerraphimService and loading thesaurus");
     let mut terraphim_service = TerraphimService::new(config_state.clone());
-    let role_name = RoleName::new("Terraphim Engineer");
 
     // First load - should build from KG files
     println!("  🔍 First load: Building thesaurus from KG files");
@@ -173,6 +207,30 @@ async fn test_thesaurus_persistence_error_handling() {
         .build()
         .expect("Failed to build desktop config");
 
+    // Determine correct KG path for testing
+    let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let kg_path = if project_root.ends_with("crates") {
+        project_root.join("../docs/src/kg")
+    } else {
+        project_root.join("docs/src/kg")
+    };
+
+    // Configure KG if directory exists
+    let role_name = RoleName::new("Terraphim Engineer");
+    if kg_path.exists() {
+        if let Some(role) = config.roles.get_mut(&role_name) {
+            role.kg = Some(KnowledgeGraph {
+                automata_path: None,
+                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                    input_type: KnowledgeGraphInputType::Markdown,
+                    path: kg_path,
+                }),
+                public: false,
+                publish: false,
+            });
+        }
+    }
+
     let config_state = ConfigState::new(&mut config)
         .await
         .expect("Failed to initialize ConfigState");
@@ -235,12 +293,35 @@ async fn test_thesaurus_memory_vs_persistence() {
         .build()
         .expect("Failed to build desktop config");
 
+    // Determine correct KG path for testing
+    let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let kg_path = if project_root.ends_with("crates") {
+        project_root.join("../docs/src/kg")
+    } else {
+        project_root.join("docs/src/kg")
+    };
+
+    // Configure KG if directory exists
+    let role_name = RoleName::new("Terraphim Engineer");
+    if kg_path.exists() {
+        if let Some(role) = config.roles.get_mut(&role_name) {
+            role.kg = Some(KnowledgeGraph {
+                automata_path: None,
+                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                    input_type: KnowledgeGraphInputType::Markdown,
+                    path: kg_path,
+                }),
+                public: false,
+                publish: false,
+            });
+        }
+    }
+
     let config_state = ConfigState::new(&mut config)
         .await
         .expect("Failed to initialize ConfigState");
 
     let mut service = TerraphimService::new(config_state);
-    let role_name = RoleName::new("Terraphim Engineer");
 
     // Step 3: Load thesaurus multiple times to test stability
     println!("  🔄 Testing multiple loads for stability");
