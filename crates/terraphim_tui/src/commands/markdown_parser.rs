@@ -227,7 +227,7 @@ impl MarkdownCommandParser {
             );
 
             // Filter by length and common patterns
-            if clean_word.len() > 3 && !self.is_stop_word(clean_word) {
+            if clean_word.len() >= 3 && !self.is_stop_word(clean_word) {
                 // Add technical-looking words
                 if self.is_technical_term(clean_word) {
                     keywords.push(clean_word.to_lowercase());
@@ -305,6 +305,7 @@ impl MarkdownCommandParser {
             "nginx",
             "apache",
             "ssl",
+            "certificates",
             "tls",
             "https",
             "cert",
@@ -619,7 +620,13 @@ impl MarkdownCommandParser {
 
                 Event::Start(Tag::CodeBlock(kind)) => {
                     code_block_fence = match kind {
-                        pulldown_cmark::CodeBlockKind::Fenced(fence) => fence.to_string(),
+                        pulldown_cmark::CodeBlockKind::Fenced(fence) => {
+                            if fence.is_empty() {
+                                "```".to_string()
+                            } else {
+                                format!("```{}", fence)
+                            }
+                        },
                         _ => "```".to_string(),
                     };
                     output.push_str(&code_block_fence);
@@ -652,6 +659,22 @@ impl MarkdownCommandParser {
                     output.push('`');
                     output.push_str(&code);
                     output.push('`');
+                }
+
+                Event::Start(Tag::Strong) => {
+                    output.push_str("**");
+                }
+
+                Event::End(TagEnd::Strong) => {
+                    output.push_str("**");
+                }
+
+                Event::Start(Tag::Emphasis) => {
+                    output.push('*');
+                }
+
+                Event::End(TagEnd::Emphasis) => {
+                    output.push('*');
                 }
 
                 Event::SoftBreak | Event::HardBreak => {
@@ -890,7 +913,7 @@ Some additional content that might be included.
         assert!(parsed.content.contains("Test Command"));
         assert!(parsed
             .content
-            .contains("bold description with italic text and code blocks"));
+            .contains("**bold** description with *italic* text and `code` blocks"));
         assert!(!parsed.content.contains("https://example.com"));
     }
 

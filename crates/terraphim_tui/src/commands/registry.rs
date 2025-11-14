@@ -789,7 +789,7 @@ impl CommandRegistry {
         for word in text.split_whitespace() {
             let clean_word = word
                 .trim_matches(&[':', ',', '.', ';', '(', ')', '[', ']', '{', '}', '"', '\''][..]);
-            if clean_word.len() > 3 && !self.is_stop_word(clean_word) {
+            if clean_word.len() >= 3 && !self.is_stop_word(clean_word) {
                 keywords.push(clean_word.to_lowercase());
             }
         }
@@ -809,7 +809,7 @@ impl CommandRegistry {
             "these", "those", "i", "you", "he", "she", "it", "we", "they", "me", "him", "her",
             "us", "them", "my", "your", "his", "its", "our", "their", "a", "an",
         ];
-        stop_words.contains(&word)
+        stop_words.contains(&word.to_lowercase().as_str())
     }
 
     /// Calculate similarity between two keyword lists
