@@ -500,7 +500,7 @@ This should work fine.
         "#;
 
         let blocks = extractor.extract_code_blocks(text);
-        assert_eq!(blocks.len(), 1);
+        assert_eq!(blocks.len(), 2); // One fenced block + one inline executable line
         assert_eq!(blocks[0].language, "python");
         assert!(blocks[0].code.contains("Hello, World!"));
         assert!(blocks[0].execution_confidence > 0.0);
