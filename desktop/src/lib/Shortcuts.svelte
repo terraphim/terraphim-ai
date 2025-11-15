@@ -8,12 +8,12 @@ import { appWindow } from '@tauri-apps/api/window';
 import { writable } from 'svelte/store';
 
 const selectedWindow = appWindow.label;
-let isvisible = true;
+let isvisible = $state(true);
 const _windowMap = {
 	[selectedWindow]: appWindow,
 };
 
-export let onMessage;
+let { onMessage } = $props();
 const shortcuts = writable([]);
 const shortcut = 'CmdOrControl+X';
 
