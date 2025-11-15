@@ -29,33 +29,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.12"
 
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Install dependencies
-        working-directory: crates/terraphim_automata_py
-        run: |
-          uv venv
-          uv pip install black ruff mypy
+        run: uv pip install --system black ruff mypy
 
       - name: Check formatting with Black
         working-directory: crates/terraphim_automata_py
-        run: uv run black --check python/
+        run: black --check python/
 
       - name: Lint with Ruff
         working-directory: crates/terraphim_automata_py
-        run: uv run ruff check python/
+        run: ruff check python/
 
       - name: Type check with mypy
         working-directory: crates/terraphim_automata_py
-        run: uv run mypy python/terraphim_automata/ --ignore-missing-imports
+        run: mypy python/terraphim_automata/ --ignore-missing-imports
         continue-on-error: true
 
   test:
@@ -96,7 +93,6 @@ jobs:
         run: maturin develop
 
       - name: Install test dependencies
-        working-directory: crates/terraphim_automata_py
         run: uv pip install --system pytest pytest-cov
 
       - name: Run tests
@@ -107,9 +103,11 @@ jobs:
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
         uses: codecov/codecov-action@v4
         with:
-          files: ./crates/terraphim_automata_py/coverage.xml
+          files: crates/terraphim_automata_py/coverage.xml
           flags: python-bindings
           name: python-${{ matrix.python-version }}
+          fail_ci_if_error: false
+        continue-on-error: true
 
   benchmark:
     name: Benchmark Performance
@@ -122,6 +120,8 @@ jobs:
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/terraphim_automata_py -> target"
 
       - name: Install uv
         uses: astral-sh/setup-uv@v5
@@ -141,7 +141,6 @@ jobs:
         run: maturin develop --release
 
       - name: Install benchmark dependencies
-        working-directory: crates/terraphim_automata_py
         run: uv pip install --system pytest pytest-benchmark
 
       - name: Run benchmarks
@@ -179,7 +178,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           working-directory: crates/terraphim_automata_py
-          args: --release --out dist --interpreter 3.9 3.10 3.11 3.12
+          args: --release --out dist --find-interpreter
           sccache: "true"
           manylinux: auto
 
