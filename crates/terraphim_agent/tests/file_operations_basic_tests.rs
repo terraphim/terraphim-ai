@@ -13,23 +13,24 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Search {
-                        query,
-                        path,
-                        file_types,
-                        semantic,
-                        limit,
-                    } => {
-                        assert_eq!(query, "async rust");
-                        assert_eq!(path, Some("./src".to_string()));
-                        assert_eq!(semantic, true);
-                        assert_eq!(limit, Some(5));
-                        assert!(file_types.is_none());
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Search {
+                            query,
+                            path,
+                            file_types,
+                            semantic,
+                            limit,
+                        } => {
+                            assert_eq!(query, "async rust");
+                            assert_eq!(path, Some("./src".to_string()));
+                            assert_eq!(semantic, true);
+                            assert_eq!(limit, Some(5));
+                            assert!(file_types.is_none());
+                        }
+                        _ => panic!("Expected Search subcommand"),
                     }
-                    _ => panic!("Expected Search subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -45,19 +46,20 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Classify {
-                        path,
-                        recursive,
-                        update_metadata,
-                    } => {
-                        assert_eq!(path, "./src");
-                        assert_eq!(recursive, true);
-                        assert_eq!(update_metadata, true);
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Classify {
+                            path,
+                            recursive,
+                            update_metadata,
+                        } => {
+                            assert_eq!(path, "./src");
+                            assert_eq!(recursive, true);
+                            assert_eq!(update_metadata, true);
+                        }
+                        _ => panic!("Expected Classify subcommand"),
                     }
-                    _ => panic!("Expected Classify subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -101,19 +103,20 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Summarize {
-                        file_path,
-                        detail_level,
-                        include_key_points,
-                    } => {
-                        assert_eq!(file_path, "./README.md");
-                        assert_eq!(detail_level, Some("detailed".to_string()));
-                        assert_eq!(include_key_points, true);
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Summarize {
+                            file_path,
+                            detail_level,
+                            include_key_points,
+                        } => {
+                            assert_eq!(file_path, "./README.md");
+                            assert_eq!(detail_level, Some("detailed".to_string()));
+                            assert_eq!(include_key_points, true);
+                        }
+                        _ => panic!("Expected Summarize subcommand"),
                     }
-                    _ => panic!("Expected Summarize subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -129,19 +132,20 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Tag {
-                        file_path,
-                        tags,
-                        auto_suggest,
-                    } => {
-                        assert_eq!(file_path, "./src/lib.rs");
-                        assert_eq!(tags, vec!["rust", "core", "module"]);
-                        assert_eq!(auto_suggest, true);
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Tag {
+                            file_path,
+                            tags,
+                            auto_suggest,
+                        } => {
+                            assert_eq!(file_path, "./src/lib.rs");
+                            assert_eq!(tags, vec!["rust", "core", "module"]);
+                            assert_eq!(auto_suggest, true);
+                        }
+                        _ => panic!("Expected Tag subcommand"),
                     }
-                    _ => panic!("Expected Tag subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -164,8 +168,9 @@ mod file_operations_tests {
             assert!(result.is_err());
 
             // Test invalid subcommand
-            let result =
-                terraphim_agent::repl::commands::ReplCommand::from_str("/file invalid_command ./src");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
+                "/file invalid_command ./src",
+            );
             assert!(result.is_err());
         }
     }

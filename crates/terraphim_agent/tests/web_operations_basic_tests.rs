@@ -59,15 +59,17 @@ mod tests {
 
     #[test]
     fn test_web_status_command_parsing() {
-        let result =
-            terraphim_agent::repl::commands::ReplCommand::from_str("/web status webop-1642514400000");
+        let result = terraphim_agent::repl::commands::ReplCommand::from_str(
+            "/web status webop-1642514400000",
+        );
         assert!(result.is_ok());
     }
 
     #[test]
     fn test_web_cancel_command_parsing() {
-        let result =
-            terraphim_agent::repl::commands::ReplCommand::from_str("/web cancel webop-1642514400000");
+        let result = terraphim_agent::repl::commands::ReplCommand::from_str(
+            "/web cancel webop-1642514400000",
+        );
         assert!(result.is_ok());
     }
 
