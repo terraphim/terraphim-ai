@@ -19,6 +19,7 @@
 - [Terraphim Service](./components/terraphim-service.md)
 - [Terraphim Automata](./components/terraphim-automata.md)
 - [Terraphim Atomic Client](./components/terraphim-atomic-client.md)
+- [Code Assistant Implementation](./code-assistant-implementation.md)
 
 ## Integrations
 
