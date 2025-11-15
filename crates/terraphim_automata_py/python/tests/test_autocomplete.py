@@ -189,6 +189,65 @@ class TestFuzzySearch:
         assert len(results) <= 2
 
 
+class TestSerialization:
+    """Test index serialization and deserialization"""
+
+    def test_serialize_and_deserialize(self, index):
+        """Test that an index can be serialized and deserialized"""
+        from terraphim_automata import AutocompleteIndex
+
+        # Serialize the index
+        serialized = index.serialize()
+        assert isinstance(serialized, bytes)
+        assert len(serialized) > 0
+
+        # Deserialize to a new index
+        deserialized = AutocompleteIndex.deserialize(serialized)
+        assert deserialized.name == index.name
+        assert len(deserialized) == len(index)
+
+    def test_deserialized_index_works(self, index):
+        """Test that a deserialized index works correctly"""
+        from terraphim_automata import AutocompleteIndex
+
+        # Serialize and deserialize
+        serialized = index.serialize()
+        deserialized = AutocompleteIndex.deserialize(serialized)
+
+        # Test search works on both
+        original_results = index.search("machine")
+        deserialized_results = deserialized.search("machine")
+
+        assert len(original_results) == len(deserialized_results)
+        for orig, deser in zip(original_results, deserialized_results):
+            assert orig.term == deser.term
+            assert orig.id == deser.id
+
+    def test_roundtrip_preserves_data(self):
+        """Test that serialize->deserialize preserves all data"""
+        from terraphim_automata import AutocompleteIndex
+
+        # Build a small index
+        thesaurus = """{
+            "name": "Test",
+            "data": {
+                "test term": {"id": 42, "nterm": "test", "url": "https://example.com"}
+            }
+        }"""
+        original = build_index(thesaurus)
+
+        # Serialize and deserialize
+        serialized = original.serialize()
+        restored = AutocompleteIndex.deserialize(serialized)
+
+        # Verify data is preserved
+        results = restored.search("test")
+        assert len(results) == 1
+        assert results[0].term == "test term"
+        assert results[0].id == 42
+        assert results[0].url == "https://example.com"
+
+
 class TestErrorHandling:
     """Test error handling"""
 
