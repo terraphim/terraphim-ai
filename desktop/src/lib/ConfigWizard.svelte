@@ -139,18 +139,19 @@ const _availableThemes = [
 	'yeti',
 ];
 
-onMount(async () => {
-	try {
-		let schemaJson: unknown;
-		if (get(is_tauri)) {
-			schemaJson = await invoke('get_config_schema');
-		} else {
-			const res = await fetch('/config/schema');
-			schemaJson = await res.json();
-		}
-		schema.set(schemaJson);
-		// initialize draft from existing config
-		const current: any = get(configStore);
+$effect(() => {
+	(async () => {
+		try {
+			let schemaJson: unknown;
+			if (get(is_tauri)) {
+				schemaJson = await invoke('get_config_schema');
+			} else {
+				const res = await fetch('/config/schema');
+				schemaJson = await res.json();
+			}
+			schema.set(schemaJson);
+			// initialize draft from existing config
+			const current: any = get(configStore);
 		if (current?.id) {
 			draft.update((d) => ({
 				...d,
@@ -199,14 +200,15 @@ onMount(async () => {
 					};
 				}),
 			}));
+			}
+		} catch (e) {
+			console.error('Failed to load schema', e);
 		}
-	} catch (e) {
-		console.error('Failed to load schema', e);
-	}
+	})();
 });
 
 // Handle ESC to close wizard and return to _previous screen
-onMount(() => {
+$effect(() => {
 	const onKeyDown = (e: KeyboardEvent) => {
 		if (e.key === 'Escape') {
 			if (typeof window !== 'undefined') {

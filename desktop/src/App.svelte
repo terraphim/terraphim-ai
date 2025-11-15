@@ -10,7 +10,9 @@ import Search from './lib/Search/Search.svelte';
 import { theme } from './lib/stores';
 import ThemeSwitcher from './lib/ThemeSwitcher.svelte';
 
-let _visible = 'is-hidden';
+// Svelte 5: Use $state rune for reactive local state
+let _visible = $state('is-hidden');
+
 function _toggleVissible() {
 	_visible = '';
 }

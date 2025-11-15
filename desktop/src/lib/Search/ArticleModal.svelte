@@ -9,46 +9,59 @@ import NovelWrapper from '../Editor/NovelWrapper.svelte';
 import type { DocumentListResponse } from '../generated/types';
 import type { Document } from './SearchResult';
 
-export let active: boolean = false;
-export let item: Document;
-export const initialEdit: boolean = false;
-// New props for KG context
-export const kgTerm: string | null = null;
-export const kgRank: number | null = null;
+let {
+	active = $bindable(false),
+	item,
+	initialEdit = false,
+	kgTerm = null,
+	kgRank = null,
+}: {
+	active?: boolean;
+	item: Document;
+	initialEdit?: boolean;
+	kgTerm?: string | null;
+	kgRank?: number | null;
+} = $props();
 
-let editing = false;
-let contentElement: HTMLElement;
+let editing = $state(false);
+let contentElement = $state<HTMLElement>();
 
 // KG modal state (similar to ResultItem.svelte)
-let _showKgModal = false;
-let kgDocument: Document | null = null;
-let _kgTermForModal: string | null = null;
-let kgRankForModal: number | null = null;
-let _loadingKg = false;
+let _showKgModal = $state(false);
+let kgDocument = $state<Document | null>(null);
+let _kgTermForModal = $state<string | null>(null);
+let kgRankForModal = $state<number | null>(null);
+let _loadingKg = $state(false);
 
 // Set initial edit mode when modal becomes active
-$: if (active && initialEdit) {
-	editing = true;
-}
+$effect(() => {
+	if (active && initialEdit) {
+		editing = true;
+	}
+});
 
 // Whenever the modal becomes active for a given item, refresh its content from persistence.
 // Only load document if not in edit mode to avoid interfering with initialEdit
-$: if (active && item && !editing) {
-	loadDocument();
-}
+$effect(() => {
+	if (active && item && !editing) {
+		loadDocument();
+	}
+});
 
 // More precise HTML detection - only treat as HTML if it looks like actual HTML document structure
-$: isHtml = item?.body
-	? // Check for common HTML document patterns, not just any < tag
-		/<html/i.test(item.body) ||
-		/<body/i.test(item.body) ||
-		/<head/i.test(item.body) ||
-		// Or if it starts with HTML-like structure (not markdown)
-		/^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
-	: false;
+let isHtml = $derived(
+	item?.body
+		? // Check for common HTML document patterns, not just any < tag
+			/<html/i.test(item.body) ||
+			/<body/i.test(item.body) ||
+			/<head/i.test(item.body) ||
+			// Or if it starts with HTML-like structure (not markdown)
+			/^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
+		: false
+);
 
 // Determine the original format for editing to preserve it
-$: originalFormat = isHtml ? 'html' : 'markdown';
+let originalFormat = $derived(isHtml ? 'html' : 'markdown');
 
 async function loadDocument() {
 	if (!$is_tauri) return;
