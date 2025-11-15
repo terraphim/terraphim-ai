@@ -6,9 +6,9 @@ use ::terraphim_automata::autocomplete::{
     AutocompleteResult,
 };
 use ::terraphim_automata::matcher::{
-    extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,
+    extract_paragraphs_from_automata, find_matches, LinkType, Matched,
 };
-use ::terraphim_automata::load_thesaurus_from_json;
+use ::terraphim_automata::{load_thesaurus_from_json, load_thesaurus_from_json_and_replace};
 
 /// Python wrapper for AutocompleteIndex
 #[pyclass(name = "AutocompleteIndex")]
@@ -297,9 +297,6 @@ fn find_all_matches(
 ///     >>> result = replace_with_links(text, json_str, "markdown")
 #[pyfunction]
 fn replace_with_links(text: &str, json_str: &str, link_type: &str) -> PyResult<String> {
-    let thesaurus = load_thesaurus_from_json(json_str)
-        .map_err(|e| PyValueError::new_err(format!("Failed to load thesaurus: {}", e)))?;
-
     let link_type_enum = match link_type.to_lowercase().as_str() {
         "wiki" => LinkType::WikiLinks,
         "html" => LinkType::HTMLLinks,
@@ -313,7 +310,8 @@ fn replace_with_links(text: &str, json_str: &str, link_type: &str) -> PyResult<S
         }
     };
 
-    let result = replace_matches(text, thesaurus, link_type_enum)
+    // Use the Rust convenience function that loads and replaces in one step
+    let result = load_thesaurus_from_json_and_replace(json_str, text, link_type_enum)
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to replace matches: {}", e)))?;
 
     String::from_utf8(result)
