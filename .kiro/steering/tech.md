@@ -35,7 +35,7 @@
 cargo run
 
 # Run specific binary
-cargo run --bin terraphim-tui
+cargo run --bin terraphim-agent
 
 # Run tests
 cargo test --workspace

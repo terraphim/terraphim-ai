@@ -56,7 +56,7 @@ Thank you for your interest in contributing to Terraphim AI! This guide will hel
    yarn run tauri dev
 
    # Alternative: Terminal interface
-   cargo run --bin terraphim-tui
+   cargo run --bin terraphim-agent
    ```
 
 ## Development Environment Setup
@@ -315,7 +315,7 @@ terraphim-ai/
 ├── crates/                    # Rust library crates
 │   ├── terraphim_service/    # Main service logic
 │   ├── terraphim_config/     # Configuration management
-│   ├── terraphim_tui/        # Terminal UI
+│   ├── terraphim_agent/        # Terminal UI
 │   └── ...                   # Other crates
 ├── desktop/                   # Svelte frontend + Tauri app
 ├── terraphim_server/         # HTTP server binary

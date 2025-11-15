@@ -29,7 +29,7 @@ This release includes comprehensive testing validation and multi-platform binary
 Each archive contains:
 - `terraphim_server` - Main server application
 - `terraphim_mcp_server` - MCP integration server
-- `terraphim-tui` - Terminal user interface with REPL
+- `terraphim-agent` - Terminal user interface with REPL
 
 ## 🔧 Installation
 
@@ -39,10 +39,10 @@ Each archive contains:
 tar -xzf terraphim-ai-v1.0.2-macos-universal.tar.gz
 
 # Make binaries executable
-chmod +x terraphim_server terraphim_mcp_server terraphim-tui
+chmod +x terraphim_server terraphim_mcp_server terraphim-agent
 
 # Run the TUI
-./terraphim-tui repl
+./terraphim-agent repl
 
 # Or run the server
 ./terraphim_server

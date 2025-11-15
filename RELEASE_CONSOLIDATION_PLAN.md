@@ -34,7 +34,7 @@ The priority is to ensure TUI and REPL are fully functional first, then terraphi
 
 #### 1. TUI and REPL (Priority 1) ⚠️ NEEDS FIXES
 
-**Location:** `crates/terraphim_tui/`
+**Location:** `crates/terraphim_agent/`
 
 **Current Issues:**
 - Tests fail to compile with REPL features enabled
@@ -44,20 +44,20 @@ The priority is to ensure TUI and REPL are fully functional first, then terraphi
 **Test Compilation Errors:**
 ```
 error[E0599]: no method named `add_command` found for struct `CommandRegistry`
-  --> crates/terraphim_tui/src/commands/tests.rs:207:18
-  --> crates/terraphim_tui/src/commands/tests.rs:235:18
-  --> crates/terraphim_tui/src/commands/tests.rs:238:18
+  --> crates/terraphim_agent/src/commands/tests.rs:207:18
+  --> crates/terraphim_agent/src/commands/tests.rs:235:18
+  --> crates/terraphim_agent/src/commands/tests.rs:238:18
   (and more...)
 ```
 
 **Files Affected:**
-- `crates/terraphim_tui/src/commands/tests.rs` (8 occurrences of `add_command()`)
-- `crates/terraphim_tui/src/commands/registry.rs` (implementation file)
+- `crates/terraphim_agent/src/commands/tests.rs` (8 occurrences of `add_command()`)
+- `crates/terraphim_agent/src/commands/registry.rs` (implementation file)
 
-**Cargo.toml Configuration:** `crates/terraphim_tui/Cargo.toml`
+**Cargo.toml Configuration:** `crates/terraphim_agent/Cargo.toml`
 - Version: 1.0.0
 - Features: repl, repl-full, repl-chat, repl-mcp, repl-file, repl-custom
-- Binary: terraphim-tui
+- Binary: terraphim-agent
 
 #### 2. Terraphim Server (Priority 2) ✅ COMPILES
 
@@ -157,20 +157,20 @@ Finished `test` profile [unoptimized + debuginfo] target(s) in 49.91s
    - Update test files to use correct method names
    - Replace `registry.add_command(parsed)` with `registry.register_command(parsed)`
    - Files to modify:
-     - `crates/terraphim_tui/src/commands/tests.rs` (8 locations)
+     - `crates/terraphim_agent/src/commands/tests.rs` (8 locations)
 
 2. **Run TUI Tests** (15 min)
    ```bash
-   cargo test -p terraphim_tui --features repl-full
+   cargo test -p terraphim_agent --features repl-full
    ```
    - Verify all tests pass
    - Fix any remaining compilation errors
 
 3. **Build and Test TUI Binary** (15 min)
    ```bash
-   cargo build -p terraphim_tui --bin terraphim-tui --features repl-full --release
-   ./target/release/terraphim-tui --help
-   ./target/release/terraphim-tui repl
+   cargo build -p terraphim_agent --bin terraphim-agent --features repl-full --release
+   ./target/release/terraphim-agent --help
+   ./target/release/terraphim-agent repl
    ```
    - Verify binary builds
    - Test REPL interactive mode
@@ -327,7 +327,7 @@ Finished `test` profile [unoptimized + debuginfo] target(s) in 49.91s
 5. **Build All Artifacts** (30 min)
    ```bash
    # TUI
-   cargo build -p terraphim_tui --features repl-full --release
+   cargo build -p terraphim_agent --features repl-full --release
 
    # Server
    cargo build -p terraphim_server --release
@@ -384,7 +384,7 @@ Finished `test` profile [unoptimized + debuginfo] target(s) in 49.91s
    - Go to GitHub Releases
    - Create new release from v1.0.3 tag
    - Upload release artifacts:
-     - terraphim-tui binary
+     - terraphim-agent binary
      - terraphim_server binary
      - TerraphimDesktop_v1.0.3_aarch64.dmg
      - App bundles (.app directories as .tar.gz)

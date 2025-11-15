@@ -134,7 +134,7 @@ echo "Building main binaries for target $TARGET..."
 BUILD_PACKAGES=(
     "terraphim_server"
     "terraphim_mcp_server"
-    "terraphim_tui"
+    "terraphim_agent"
 )
 
 BUILD_SUCCESS=true
@@ -153,7 +153,7 @@ if [[ "$BUILD_SUCCESS" == "true" ]]; then
 
     # Test binaries exist and can run version command (same as CI)
     BINARY_PATH="target/$TARGET/release"
-    for binary in "terraphim_server" "terraphim_mcp_server" "terraphim-tui"; do
+    for binary in "terraphim_server" "terraphim_mcp_server" "terraphim-agent"; do
         if [[ -f "$BINARY_PATH/$binary" ]]; then
             echo "Testing $binary --version"
             if "$BINARY_PATH/$binary" --version; then

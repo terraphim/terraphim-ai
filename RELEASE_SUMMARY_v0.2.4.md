@@ -9,15 +9,15 @@ This release brings comprehensive package distribution support for Terraphim AI,
 ### Linux Packages
 - **Debian/Ubuntu**: `.deb` packages created with `cargo-deb`
   - `terraphim-server_0.2.3-1_amd64.deb` (15MB)
-  - `terraphim-tui_0.2.3-1_amd64.deb` (8MB)
+  - `terraphim-agent_0.2.3-1_amd64.deb` (8MB)
 
 - **Arch Linux**: Native `.tar.zst` packages
   - `terraphim-server-0.2.3-1-x86_64.pkg.tar.zst` (15MB)
-  - `terraphim-tui-0.2.3-1-x86_64.pkg.tar.zst` (8MB)
+  - `terraphim-agent-0.2.3-1-x86_64.pkg.tar.zst` (8MB)
 
 - **RHEL/CentOS/Fedora**: `.rpm` packages (converted via alien)
   - `terraphim-server-0.2.3-2.x86_64.rpm` (12MB)
-  - `terraphim-tui-0.2.3-2.x86_64.rpm` (5MB)
+  - `terraphim-agent-0.2.3-2.x86_64.rpm` (5MB)
 
 ### macOS Packages
 - **App Bundles**: Native macOS `.app` packages with Terminal integration

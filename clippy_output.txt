@@ -287,7 +287,7 @@ warning: redundant closure
 
 warning: `terraphim_service` (lib) generated 24 warnings (run `cargo clippy --fix --lib -p terraphim_service` to apply 5 suggestions)
     Checking terraphim_mcp_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server)
-    Checking terraphim_tui v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_tui)
+    Checking terraphim_agent v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_agent)
 warning: terraphim_server@0.1.0: No changes in JS source files, skipping JS build.
 warning: terraphim_server@0.1.0: Found ./dist, skipping copy
     Checking terraphim_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/terraphim_server)

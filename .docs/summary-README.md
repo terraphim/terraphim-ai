@@ -26,7 +26,7 @@ Main project documentation for Terraphim AI, a privacy-first AI assistant that o
 2. Install pre-commit hooks: `./scripts/install-hooks.sh`
 3. Start backend: `cargo run`
 4. Start frontend: `cd desktop && yarn run dev` (web) or `yarn run tauri dev` (desktop)
-5. TUI: `cargo build -p terraphim_tui --features repl-full --release`
+5. TUI: `cargo build -p terraphim_agent --features repl-full --release`
 
 ## Important Details
 - Storage backends: Local by default (memory, dashmap, sqlite, redb); optional AWS S3 for cloud

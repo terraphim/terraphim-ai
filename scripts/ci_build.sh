@@ -215,20 +215,20 @@ build_rust_target() {
     cargo build $build_flag --target "$target" \
         --package terraphim_server \
         --package terraphim_mcp_server \
-        --package terraphim_tui
+        --package terraphim_agent
 
     # Test binaries
     local target_dir="target/$target/$BUILD_TYPE"
     "$target_dir/terraphim_server" --version
     "$target_dir/terraphim_mcp_server" --version
-    "$target_dir/terraphim-tui" --version
+    "$target_dir/terraphim-agent" --version
 
     # Copy binaries to artifacts
     local artifact_dir="$ARTIFACTS_DIR/binaries/$target-ubuntu$ubuntu_version"
     mkdir -p "$artifact_dir"
     cp "$target_dir/terraphim_server" "$artifact_dir/"
     cp "$target_dir/terraphim_mcp_server" "$artifact_dir/"
-    cp "$target_dir/terraphim-tui" "$artifact_dir/"
+    cp "$target_dir/terraphim-agent" "$artifact_dir/"
 
     log_success "Rust build complete for $target"
 }

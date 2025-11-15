@@ -30,7 +30,7 @@
 2. **terraphim_server_macos_aarch64** (15.6 MB)
    - Standalone server binary for macOS ARM64
 
-3. **terraphim-tui_macos_aarch64** (10.7 MB)
+3. **terraphim-agent_macos_aarch64** (10.7 MB)
    - Terminal interface binary for macOS ARM64
 
 #### App Bundle Archives
@@ -64,7 +64,7 @@
 
 ### Command Line Tools
 - ✅ **terraphim_server**: HTTP API with multiple search algorithms
-- ✅ **terraphim-tui**: Terminal interface with REPL support
+- ✅ **terraphim-agent**: Terminal interface with REPL support
 
 ### Technical Achievements
 - ✅ **162/162 unit tests passing**

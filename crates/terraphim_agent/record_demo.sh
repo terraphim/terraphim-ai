@@ -7,9 +7,9 @@ echo "🎬 Terraphim TUI Demo Recording Script"
 echo "====================================="
 
 # Configuration
-OUTPUT_DIR="$HOME/terraphim-tui-demos"
+OUTPUT_DIR="$HOME/terraphim-agent-demos"
 SESSION_NAME="terraphim-demo"
-VIDEO_FILE="$OUTPUT_DIR/terraphim-tui-comprehensive-demo-$(date +%Y%m%d-%H%M%S).mp4"
+VIDEO_FILE="$OUTPUT_DIR/terraphim-agent-comprehensive-demo-$(date +%Y%m%d-%H%M%S).mp4"
 
 # Create output directory
 mkdir -p "$OUTPUT_DIR"

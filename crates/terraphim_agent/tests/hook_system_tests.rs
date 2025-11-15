@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use std::path::PathBuf;
 use tempfile::TempDir;
-use terraphim_tui::commands::{
+use terraphim_agent::commands::{
     hooks, CommandExecutionResult, CommandHook, ExecutionMode, HookContext, HookManager, HookResult,
 };
 use tokio::fs;

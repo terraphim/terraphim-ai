@@ -41,7 +41,7 @@ This automatically creates mappings:
    - Implemented `PlainText` handling in `replace_matches()` function
    - Allows direct synonym→term replacement without link formatting
 
-2. **`crates/terraphim_tui/src/repl/handler.rs`**
+2. **`crates/terraphim_agent/src/repl/handler.rs`**
    - Updated default link type from `MarkdownLinks` to `PlainText`
    - Added `"plain"` format option
    - Ensures package manager replacements work without markdown formatting
@@ -74,7 +74,7 @@ This automatically creates mappings:
 cargo run --release -- --config context_engineer_config.json
 
 # Terminal 2: Start TUI REPL
-cargo run --release -p terraphim_tui --bin terraphim-tui --features repl,repl-mcp -- repl
+cargo run --release -p terraphim_agent --bin terraphim-agent --features repl,repl-mcp -- repl
 ```
 
 ### Replace Commands
@@ -96,7 +96,7 @@ cargo run --release -p terraphim_tui --bin terraphim-tui --features repl,repl-mc
 ### Build Verification
 ```bash
 # Compiles successfully
-cargo build --release -p terraphim_tui --bin terraphim-tui --features repl,repl-mcp
+cargo build --release -p terraphim_agent --bin terraphim-agent --features repl,repl-mcp
 ✓ Finished in 54.22s
 ```
 

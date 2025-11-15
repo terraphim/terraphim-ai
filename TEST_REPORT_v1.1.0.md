@@ -10,16 +10,16 @@
 
 **Build Status:** ✅ SUCCESS
 ```bash
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 Status: Finished in 1m 12s
-Binary: target/release/terraphim-tui
+Binary: target/release/terraphim-agent
 Size: To be measured
 ```
 
 **Version Check:** ✅ PASS
 ```bash
-./target/release/terraphim-tui --version
-Output: terraphim-tui 1.0.0
+./target/release/terraphim-agent --version
+Output: terraphim-agent 1.0.0
 ```
 
 **Binary Functionality:** ✅ PASS
@@ -117,7 +117,7 @@ Status: Skipped - frontend validated via Playwright E2E tests instead
 
 ### TUI/REPL Tests Completed:
 1. ✅ Built with repl-full features (1m 12s)
-2. ✅ Version check: terraphim-tui 1.0.0
+2. ✅ Version check: terraphim-agent 1.0.0
 3. ✅ Roles command: Lists all 3 roles correctly
 4. ✅ Search command: Returns 45+ results via server
 5. ✅ Server connectivity: Verified working
@@ -147,7 +147,7 @@ cargo test --workspace
 ```
 
 **Package-Specific Tests:**
-- terraphim_tui: Compilation errors in tests (not blocking binary)
+- terraphim_agent: Compilation errors in tests (not blocking binary)
 - terraphim_server: Some tests fail (not blocking core functionality)
 - Desktop: Frontend tests not run
 

@@ -8,7 +8,7 @@ This document describes the comprehensive test matrix framework that validates e
 
 ### 🎯 Test Matrix Framework
 
-**Location**: `crates/terraphim_tui/tests/scoring_haystack_matrix_tests.rs`
+**Location**: `crates/terraphim_agent/tests/scoring_haystack_matrix_tests.rs`
 
 A comprehensive testing framework that systematically tests every scoring function with every haystack type to ensure compatibility, performance, and correctness.
 
@@ -72,11 +72,11 @@ For advanced TitleScorer combinations:
 #### Manual Execution
 ```bash
 # Run individual test categories
-cargo test -p terraphim_tui test_complete_scoring_haystack_matrix -- --nocapture
-cargo test -p terraphim_tui test_priority_combinations -- --nocapture
-cargo test -p terraphim_tui test_scoring_function_performance_comparison -- --nocapture
-cargo test -p terraphim_tui test_extended_matrix_with_query_scorers -- --nocapture
-cargo test -p terraphim_tui test_title_scorer_query_combinations -- --nocapture
+cargo test -p terraphim_agent test_complete_scoring_haystack_matrix -- --nocapture
+cargo test -p terraphim_agent test_priority_combinations -- --nocapture
+cargo test -p terraphim_agent test_scoring_function_performance_comparison -- --nocapture
+cargo test -p terraphim_agent test_extended_matrix_with_query_scorers -- --nocapture
+cargo test -p terraphim_agent test_title_scorer_query_combinations -- --nocapture
 ```
 
 #### Automated Execution Script

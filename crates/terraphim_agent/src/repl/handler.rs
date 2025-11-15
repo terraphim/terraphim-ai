@@ -104,8 +104,8 @@ impl ReplHandler {
 
         // Load command history if it exists
         let history_file = dirs::home_dir()
-            .map(|h| h.join(".terraphim_tui_history"))
-            .unwrap_or_else(|| std::path::PathBuf::from(".terraphim_tui_history"));
+            .map(|h| h.join(".terraphim_agent_history"))
+            .unwrap_or_else(|| std::path::PathBuf::from(".terraphim_agent_history"));
 
         let _ = rl.load_history(&history_file);
 

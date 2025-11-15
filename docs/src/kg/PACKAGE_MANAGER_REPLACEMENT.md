@@ -4,7 +4,7 @@ This guide shows how to use Terraphim's knowledge graph and replace functionalit
 
 ## Overview
 
-The knowledge graph in `docs/src/kg/bun.md` defines synonyms for package managers that all map to "Bun". The terraphim-tui's `/replace` command uses this knowledge graph to perform text replacements.
+The knowledge graph in `docs/src/kg/bun.md` defines synonyms for package managers that all map to "Bun". The terraphim-agent's `/replace` command uses this knowledge graph to perform text replacements.
 
 ## Knowledge Graph Entry
 
@@ -41,7 +41,7 @@ The server will build a knowledge graph from all markdown files in `docs/src/kg/
 
 ```bash
 # Terminal 2: Start TUI REPL in offline mode
-cargo run --release -p terraphim_tui --bin terraphim-tui --features repl,repl-mcp -- repl
+cargo run --release -p terraphim_agent --bin terraphim-agent --features repl,repl-mcp -- repl
 ```
 
 ### Use Replace Command
@@ -86,7 +86,7 @@ The `/replace` command supports different output formats:
 
 ```bash
 # Pipe text through replace command
-echo "npm install" | cargo run --release -p terraphim_tui --bin terraphim-tui -- \
+echo "npm install" | cargo run --release -p terraphim_agent --bin terraphim-agent -- \
   replace --text "npm install"
 ```
 
@@ -94,7 +94,7 @@ echo "npm install" | cargo run --release -p terraphim_tui --bin terraphim-tui --
 
 ```bash
 # Replace in a file
-cargo run --release -p terraphim_tui --bin terraphim-tui -- \
+cargo run --release -p terraphim_agent --bin terraphim-agent -- \
   replace --file package.json
 ```
 

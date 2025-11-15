@@ -19,7 +19,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-TUI_PACKAGE="terraphim_tui"
+TUI_PACKAGE="terraphim_agent"
 SERVER_PACKAGE="terraphim_server"
 TEST_TIMEOUT=30
 CLEANUP_ON_EXIT=true
@@ -60,7 +60,7 @@ cleanup() {
 
         # Kill any running test servers
         pkill -f "terraphim_server" || true
-        pkill -f "terraphim-tui" || true
+        pkill -f "terraphim-agent" || true
 
         # Clean up test persistence files
         rm -rf /tmp/terraphim_sqlite || true
@@ -605,19 +605,19 @@ main() {
         echo
         echo "🚀 Usage Examples Validated:"
         echo "  # Offline mode (default) - uses selected_role from config"
-        echo "  cargo run -p terraphim_tui -- search \"rust programming\""
-        echo "  cargo run -p terraphim_tui -- roles list"
-        echo "  cargo run -p terraphim_tui -- config show"
+        echo "  cargo run -p terraphim_agent -- search \"rust programming\""
+        echo "  cargo run -p terraphim_agent -- roles list"
+        echo "  cargo run -p terraphim_agent -- config show"
         echo
         echo "  # Override role temporarily"
-        echo "  cargo run -p terraphim_tui -- search \"rust\" --role \"Default\""
+        echo "  cargo run -p terraphim_agent -- search \"rust\" --role \"Default\""
         echo
         echo "  # Server mode - connects to API server"
-        echo "  cargo run -p terraphim_tui -- --server search \"rust programming\""
-        echo "  cargo run -p terraphim_tui -- --server-url http://localhost:3000 roles list"
+        echo "  cargo run -p terraphim_agent -- --server search \"rust programming\""
+        echo "  cargo run -p terraphim_agent -- --server-url http://localhost:3000 roles list"
         echo
         echo "  # Interactive TUI"
-        echo "  cargo run -p terraphim_tui"
+        echo "  cargo run -p terraphim_agent"
         exit 0
     else
         echo -e "${RED}✗ Some tests failed${NC}"

@@ -7,15 +7,15 @@ mod file_operations_tests {
     fn test_file_search_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str(
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
                 "/file search \"async rust\" --path ./src --semantic --limit 5",
             );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
                 {
-                    terraphim_tui::repl::commands::FileSubcommand::Search {
+                    terraphim_agent::repl::commands::FileSubcommand::Search {
                         query,
                         path,
                         file_types,
@@ -39,15 +39,15 @@ mod file_operations_tests {
     fn test_file_classify_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str(
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
                 "/file classify ./src --recursive --update-metadata",
             );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
                 {
-                    terraphim_tui::repl::commands::FileSubcommand::Classify {
+                    terraphim_agent::repl::commands::FileSubcommand::Classify {
                         path,
                         recursive,
                         update_metadata,
@@ -67,15 +67,15 @@ mod file_operations_tests {
     fn test_file_analyze_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str(
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
                 "/file analyze ./src/main.rs --classification --semantic --extract-entities",
             );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => {
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
                     match subcommand {
-                        terraphim_tui::repl::commands::FileSubcommand::Analyze {
+                        terraphim_agent::repl::commands::FileSubcommand::Analyze {
                             file_path,
                             analysis_types,
                             config: _,
@@ -95,15 +95,15 @@ mod file_operations_tests {
     fn test_file_summarize_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str(
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
                 "/file summarize ./README.md --detailed --key-points",
             );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
                 {
-                    terraphim_tui::repl::commands::FileSubcommand::Summarize {
+                    terraphim_agent::repl::commands::FileSubcommand::Summarize {
                         file_path,
                         detail_level,
                         include_key_points,
@@ -123,15 +123,15 @@ mod file_operations_tests {
     fn test_file_tag_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str(
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
                 "/file tag ./src/lib.rs rust,core,module --auto-suggest",
             );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
                 {
-                    terraphim_tui::repl::commands::FileSubcommand::Tag {
+                    terraphim_agent::repl::commands::FileSubcommand::Tag {
                         file_path,
                         tags,
                         auto_suggest,
@@ -152,20 +152,20 @@ mod file_operations_tests {
         #[cfg(feature = "repl-file")]
         {
             // Test missing subcommand
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str("/file");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str("/file");
             assert!(result.is_err());
 
             // Test missing file path for search
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str("/file search");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str("/file search");
             assert!(result.is_err());
 
             // Test missing file path for classify
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str("/file classify");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str("/file classify");
             assert!(result.is_err());
 
             // Test invalid subcommand
             let result =
-                terraphim_tui::repl::commands::ReplCommand::from_str("/file invalid_command ./src");
+                terraphim_agent::repl::commands::ReplCommand::from_str("/file invalid_command ./src");
             assert!(result.is_err());
         }
     }
@@ -175,11 +175,11 @@ mod file_operations_tests {
         #[cfg(feature = "repl-file")]
         {
             // Test that file command is included in available commands
-            let commands = terraphim_tui::repl::commands::ReplCommand::available_commands();
+            let commands = terraphim_agent::repl::commands::ReplCommand::available_commands();
             assert!(commands.contains(&"file"));
 
             // Test that file command has help text
-            let help_text = terraphim_tui::repl::commands::ReplCommand::get_command_help("file");
+            let help_text = terraphim_agent::repl::commands::ReplCommand::get_command_help("file");
             assert!(help_text.is_some());
             let help_text = help_text.unwrap();
             assert!(help_text.contains("file operations"));
@@ -207,11 +207,11 @@ mod file_operations_tests {
             ];
 
             for test_case in test_cases {
-                let result = terraphim_tui::repl::commands::ReplCommand::from_str(test_case);
+                let result = terraphim_agent::repl::commands::ReplCommand::from_str(test_case);
                 assert!(result.is_ok(), "Failed to parse: {}", test_case);
 
                 match result.unwrap() {
-                    terraphim_tui::repl::commands::ReplCommand::File { .. } => {
+                    terraphim_agent::repl::commands::ReplCommand::File { .. } => {
                         // Expected
                     }
                     _ => panic!("Expected File command for: {}", test_case),

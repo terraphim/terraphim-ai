@@ -78,7 +78,7 @@ Release v1.0.1 addresses critical issues found in v1.0.0, specifically:
 | TerraphimDesktop.app | 11MB | ✅ Built | Full desktop app bundle |
 | TerraphimDesktop_v1.0.1_aarch64.dmg | 11MB | ✅ Built | macOS installer |
 | terraphim_server | 31MB | ✅ Built | Server binary |
-| terraphim-tui | 10MB | ✅ Built | TUI binary |
+| terraphim-agent | 10MB | ✅ Built | TUI binary |
 | TerraphimServer.app.tar.gz | 6.7MB | ✅ Built | Server app bundle |
 | TerraphimTUI.app.tar.gz | 4.6MB | ✅ Built | TUI app bundle |
 

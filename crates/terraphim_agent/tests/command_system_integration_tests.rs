@@ -7,7 +7,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tempfile::TempDir;
-use terraphim_tui::commands::{
+use terraphim_agent::commands::{
     hooks, CommandDefinition, CommandExecutor, CommandParameter, CommandRegistry, CommandValidator,
     ExecutionMode, HookContext, HookManager, ParsedCommand, RiskLevel,
 };
@@ -346,7 +346,7 @@ async fn test_hook_system_integration() {
     assert!(pre_result.is_ok(), "Pre-hooks should execute successfully");
 
     // Mock command execution result
-    let execution_result = terraphim_tui::commands::CommandExecutionResult {
+    let execution_result = terraphim_agent::commands::CommandExecutionResult {
         command: hello_cmd.name.clone(),
         execution_mode: ExecutionMode::Local,
         exit_code: 0,

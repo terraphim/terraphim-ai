@@ -13,8 +13,8 @@
 - **Version:** 0.2.3
 - **Status:** ✅ Built successfully
 
-#### 2. terraphim-tui
-- **Path:** `target/release/terraphim-tui`
+#### 2. terraphim-agent
+- **Path:** `target/release/terraphim-agent`
 - **Size:** ~12MB (optimized)
 - **Features:** repl-full
 - **Status:** ✅ Built successfully
@@ -52,13 +52,13 @@
 ```bash
 # Run release binaries
 ./target/release/terraphim_server --help
-./target/release/terraphim-tui --help
+./target/release/terraphim-agent --help
 
 # Start server
 ./target/release/terraphim_server --role Default
 
 # Start TUI
-./target/release/terraphim-tui --server
+./target/release/terraphim-agent --server
 ```
 
 ## Next Steps for Full Release

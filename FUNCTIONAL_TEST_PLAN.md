@@ -32,7 +32,7 @@ Prove that EVERY function in REPL, TUI, Server, and Desktop is fully functional 
 #!/bin/bash
 # test_tui_repl.sh
 
-BINARY="./target/release/terraphim-tui"
+BINARY="./target/release/terraphim-agent"
 TEST_LOG="tui_test_results.log"
 
 # Test each command
@@ -213,7 +213,7 @@ curl -X POST "$SERVER_URL/config" -d '{"selected_role": "TerraphimEngineer"}'
 # test_error_handling.sh
 
 # Test invalid TUI commands
-echo "/invalid_command" | ./target/release/terraphim-tui repl 2>&1 | grep -i error
+echo "/invalid_command" | ./target/release/terraphim-agent repl 2>&1 | grep -i error
 
 # Test invalid API requests
 curl -X POST "$SERVER_URL/search" -d "invalid json" -v 2>&1 | grep "400"

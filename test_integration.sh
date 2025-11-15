@@ -5,11 +5,11 @@ echo "================================="
 # Test 1: Feature Flag Integration
 echo "Testing feature flag compilation..."
 echo "Testing repl-full feature..."
-cargo check -p terraphim_tui --features repl-full 2>/dev/null && echo "✅ repl-full feature compiles" || echo "❌ repl-full feature failed"
+cargo check -p terraphim_agent --features repl-full 2>/dev/null && echo "✅ repl-full feature compiles" || echo "❌ repl-full feature failed"
 echo "Testing repl-file feature..."
-cargo check -p terraphim_tui --features repl-file 2>/dev/null && echo "✅ repl-file feature compiles" || echo "❌ repl-file feature failed"
+cargo check -p terraphim_agent --features repl-file 2>/dev/null && echo "✅ repl-file feature compiles" || echo "❌ repl-file feature failed"
 echo "Testing individual features..."
-cargo check -p terraphim_tui --features repl,repl-chat,repl-file 2>/dev/null && echo "✅ individual features compile" || echo "❌ individual features failed"
+cargo check -p terraphim_agent --features repl,repl-chat,repl-file 2>/dev/null && echo "✅ individual features compile" || echo "❌ individual features failed"
 
 echo
 
@@ -17,21 +17,21 @@ echo
 echo "Testing command availability in help system..."
 # Test if commands are properly exported
 echo "Testing file command availability..."
-if grep -r "FileSubcommand" crates/terraphim_tui/src/repl/ >/dev/null; then
+if grep -r "FileSubcommand" crates/terraphim_agent/src/repl/ >/dev/null; then
     echo "✅ File operations commands found in codebase"
 else
     echo "❌ File operations commands not found"
 fi
 
 echo "Testing web command availability..."
-if grep -r "WebSubcommand" crates/terraphim_tui/src/repl/ >/dev/null; then
+if grep -r "WebSubcommand" crates/terraphim_agent/src/repl/ >/dev/null; then
     echo "✅ Web operations commands found in codebase"
 else
     echo "❌ Web operations commands not found"
 fi
 
 echo "Testing VM command availability..."
-if grep -r "VMSubcommand" crates/terraphim_tui/src/repl/ >/dev/null; then
+if grep -r "VMSubcommand" crates/terraphim_agent/src/repl/ >/dev/null; then
     echo "✅ VM management commands found in codebase"
 else
     echo "❌ VM management commands not found"
@@ -160,9 +160,9 @@ echo
 
 # Test 4: Available Commands Check
 echo "Testing available commands in TUI..."
-if [ -f "crates/terraphim_tui/src/repl/commands.rs" ]; then
+if [ -f "crates/terraphim_agent/src/repl/commands.rs" ]; then
     echo "Checking command availability in commands.rs..."
-    grep -c "pub enum.*Subcommand" crates/terraphim_tui/src/repl/commands.rs && echo "✅ Multiple command subcommands found"
+    grep -c "pub enum.*Subcommand" crates/terraphim_agent/src/repl/commands.rs && echo "✅ Multiple command subcommands found"
 fi
 
 echo "🔗 Integration testing completed!"

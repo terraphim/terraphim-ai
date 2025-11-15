@@ -9,7 +9,7 @@ This document provides comprehensive proof that EVERY function in Terraphim AI v
 
 ### Test Evidence
 ```bash
-$ echo -e "/help\n/quit" | ./target/release/terraphim-tui repl
+$ echo -e "/help\n/quit" | ./target/release/terraphim-agent repl
 ```
 
 ### Proven Commands

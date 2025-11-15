@@ -99,7 +99,7 @@ The local CI testing scripts mirror the GitHub Actions workflows, allowing you t
 **What it does:**
 - Installs system dependencies for cross-compilation
 - Sets up cross-compilation toolchain (if needed)
-- Builds main binaries (terraphim_server, terraphim_mcp_server, terraphim_tui)
+- Builds main binaries (terraphim_server, terraphim_mcp_server, terraphim_agent)
 - Tests that binaries can run with `--version`
 
 **Time:** ~8-15 minutes (varies by target)

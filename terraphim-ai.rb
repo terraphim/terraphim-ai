@@ -16,7 +16,7 @@ class TerraphimAi < Formula
   def install
     # Build all Rust components
     system "cargo", "build", "--release", "--bin", "terraphim_server"
-    system "cargo", "build", "--release", "--bin", "terraphim-tui"
+    system "cargo", "build", "--release", "--bin", "terraphim-agent"
 
     # Build the desktop app (if on macOS)
     if OS.mac?
@@ -34,7 +34,7 @@ class TerraphimAi < Formula
 
     # Install all binaries
     bin.install "target/release/terraphim_server"
-    bin.install "target/release/terraphim-tui"
+    bin.install "target/release/terraphim-agent"
 
     # Install configuration files
     (etc/"terraphim-ai").mkpath
@@ -50,7 +50,7 @@ class TerraphimAi < Formula
       Terraphim AI has been installed with the following components:
 
       1. Server: Run with `terraphim_server`
-      2. TUI: Run with `terraphim-tui` for terminal interface
+      2. TUI: Run with `terraphim-agent` for terminal interface
       3. Desktop App: Available in Applications folder (macOS only)
 
       Default configuration files are located in:
@@ -58,7 +58,7 @@ class TerraphimAi < Formula
 
       For first-time setup:
         1. Run `terraphim_server --help` to see server options
-        2. Run `terraphim-tui --help` to see TUI options
+        2. Run `terraphim-agent --help` to see TUI options
         3. Configuration files can be customized in #{etc}/terraphim-ai/
         4. The desktop app will create its own config on first run
 
@@ -80,7 +80,7 @@ class TerraphimAi < Formula
     system "#{bin}/terraphim_server", "--version"
 
     # Test that the TUI binary was installed and shows version info
-    system "#{bin}/terraphim-tui", "--version"
+    system "#{bin}/terraphim-agent", "--version"
 
     # Test that config files were installed
     assert_predicate etc/"terraphim-ai", :exist?
@@ -89,7 +89,7 @@ class TerraphimAi < Formula
     server_help = shell_output("#{bin}/terraphim_server --help")
     assert_match "Terraphim", server_help
 
-    tui_help = shell_output("#{bin}/terraphim-tui --help")
+    tui_help = shell_output("#{bin}/terraphim-agent --help")
     assert_match "Terraphim", tui_help
   end
 end

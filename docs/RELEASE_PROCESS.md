@@ -15,7 +15,7 @@ This document describes the complete process for creating and publishing a new r
 ### 1. Update Version Numbers
 
 1. Update version in `terraphim_server/Cargo.toml`
-2. Update version in `crates/terraphim_tui/Cargo.toml`
+2. Update version in `crates/terraphim_agent/Cargo.toml`
 3. Update any other references to the old version number
 
 ### 2. Create Release Tag
@@ -42,11 +42,11 @@ cp LICENSE-Apache-2.0 LICENSE
 
 # Build binaries
 cargo build --release --package terraphim_server
-cargo build --release --package terraphim_tui --features repl-full
+cargo build --release --package terraphim_agent --features repl-full
 
 # Create Debian packages
 cargo deb --package terraphim_server
-cargo deb --package terraphim_tui
+cargo deb --package terraphim_agent
 
 # Restore panic abort
 sed -i 's/# panic = "abort"/panic = "abort"/' .cargo/config.toml

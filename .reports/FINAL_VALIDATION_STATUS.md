@@ -96,24 +96,24 @@ Features:
 
 ## ⚠️ PARTIAL / NEEDS WORK
 
-### terraphim_tui Binary - BUILD FAILED ❌
+### terraphim_agent Binary - BUILD FAILED ❌
 
 **Status:** Library builds, binary has import errors
 
 **Library Build:**
 ```bash
-cargo build -p terraphim_tui --lib --features repl-full
+cargo build -p terraphim_agent --lib --features repl-full
 ✅ SUCCESS with 39 warnings (unused imports/variables)
 ```
 
 **Binary Build:**
 ```bash
-cargo build -p terraphim_tui --features repl-full
+cargo build -p terraphim_agent --features repl-full
 ❌ FAILED - 24 compilation errors
 ```
 
 **Root Cause:** Module path resolution issues
-- Uses `crate::commands::*` but should use `terraphim_tui::commands::*`
+- Uses `crate::commands::*` but should use `terraphim_agent::commands::*`
 - Affects handler.rs test modules (lines 26, 28, 30, 66, 96, etc.)
 - 24 E0433 errors (unresolved imports)
 
@@ -191,7 +191,7 @@ Duration: 22.28s
 
 | Component | Status | Issue | Severity |
 |-----------|--------|-------|----------|
-| terraphim_tui binary | ❌ Failed | Module import errors | High |
+| terraphim_agent binary | ❌ Failed | Module import errors | High |
 | Release builds | ⚠️ Partial | Panic strategy mismatch | Medium |
 | Frontend tests | ⚠️ 53% | Svelte store issues | Medium |
 | Integration tests | ⏸️ Pending | Awaiting test execution | Low |
@@ -226,8 +226,8 @@ Overall Release Readiness:   🟡  80%
    ```
 
 2. **Fix TUI Module Imports** 🔧 Required
-   - Update `crates/terraphim_tui/src/repl/handler.rs`
-   - Change `crate::commands::*` to `terraphim_tui::commands::*`
+   - Update `crates/terraphim_agent/src/repl/handler.rs`
+   - Change `crate::commands::*` to `terraphim_agent::commands::*`
    - Or add proper `use` statements at module top
 
 3. **Test Search API** ⏸️ Pending server start

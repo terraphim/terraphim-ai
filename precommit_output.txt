@@ -47,9 +47,9 @@ warning: terraphim_server@0.1.0: Found ./dist, skipping copy
     Checking terraphim_middleware v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_middleware)
     Checking terraphim_service v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_service)
     Checking terraphim_mcp_server v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server)
-    Checking terraphim_tui v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_tui)
+    Checking terraphim_agent v0.1.0 (/Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_agent)
 error: useless use of `vec!`
-   --> crates/terraphim_tui/tests/persistence_tests.rs:164:25
+   --> crates/terraphim_agent/tests/persistence_tests.rs:164:25
     |
 164 |     let roles_to_test = vec!["Role1", "Role2", "Role3", "Final Role"];
     |                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ help: you can use an array directly: `["Role1", "Role2", "Role3", "Final Role"]`
@@ -58,10 +58,10 @@ error: useless use of `vec!`
     = note: `-D clippy::useless-vec` implied by `-D warnings`
     = help: to override `-D warnings` add `#[allow(clippy::useless_vec)]`
 
-error: could not compile `terraphim_tui` (test "persistence_tests") due to 1 previous error
+error: could not compile `terraphim_agent` (test "persistence_tests") due to 1 previous error
 warning: build failed, waiting for other jobs to finish...
 error: the borrowed expression implements the required traits
-   --> crates/terraphim_tui/tests/server_mode_tests.rs:416:15
+   --> crates/terraphim_agent/tests/server_mode_tests.rs:416:15
     |
 416 |         .args(&["config", "show"]);
     |               ^^^^^^^^^^^^^^^^^^^ help: change this to: `["config", "show"]`
@@ -70,9 +70,9 @@ error: the borrowed expression implements the required traits
     = note: `-D clippy::needless-borrows-for-generic-args` implied by `-D warnings`
     = help: to override `-D warnings` add `#[allow(clippy::needless_borrows_for_generic_args)]`
 
-error: could not compile `terraphim_tui` (test "server_mode_tests") due to 1 previous error
+error: could not compile `terraphim_agent` (test "server_mode_tests") due to 1 previous error
 error: unused variable: `limit`
-  --> crates/terraphim_tui/src/repl/mcp_tools.rs:18:9
+  --> crates/terraphim_agent/src/repl/mcp_tools.rs:18:9
    |
 18 |         limit: Option<usize>,
    |         ^^^^^ help: if this is intentional, prefix it with an underscore: `_limit`
@@ -81,31 +81,31 @@ error: unused variable: `limit`
    = help: to override `-D warnings` add `#[allow(unused_variables)]`
 
 error: unused variable: `exclude_term`
-  --> crates/terraphim_tui/src/repl/mcp_tools.rs:27:9
+  --> crates/terraphim_agent/src/repl/mcp_tools.rs:27:9
    |
 27 |         exclude_term: bool,
    |         ^^^^^^^^^^^^ help: if this is intentional, prefix it with an underscore: `_exclude_term`
 
 error: unused variable: `text`
-  --> crates/terraphim_tui/src/repl/mcp_tools.rs:33:38
+  --> crates/terraphim_agent/src/repl/mcp_tools.rs:33:38
    |
 33 |     pub async fn find_matches(&self, text: &str) -> anyhow::Result<Vec<String>> {
    |                                      ^^^^ help: if this is intentional, prefix it with an underscore: `_text`
 
 error: unused variable: `format`
-  --> crates/terraphim_tui/src/repl/mcp_tools.rs:41:9
+  --> crates/terraphim_agent/src/repl/mcp_tools.rs:41:9
    |
 41 |         format: Option<String>,
    |         ^^^^^^ help: if this is intentional, prefix it with an underscore: `_format`
 
 error: unused variable: `role`
-  --> crates/terraphim_tui/src/repl/mcp_tools.rs:49:9
+  --> crates/terraphim_agent/src/repl/mcp_tools.rs:49:9
    |
 49 |         role: Option<String>,
    |         ^^^^ help: if this is intentional, prefix it with an underscore: `_role`
 
 error: struct `ChatHandler` is never constructed
- --> crates/terraphim_tui/src/repl/chat.rs:5:12
+ --> crates/terraphim_agent/src/repl/chat.rs:5:12
   |
 5 | pub struct ChatHandler {
   |            ^^^^^^^^^^^
@@ -114,7 +114,7 @@ error: struct `ChatHandler` is never constructed
   = help: to override `-D warnings` add `#[allow(dead_code)]`
 
 error: associated items `new` and `send_message` are never used
-  --> crates/terraphim_tui/src/repl/chat.rs:11:12
+  --> crates/terraphim_agent/src/repl/chat.rs:11:12
    |
 10 | impl ChatHandler {
    | ---------------- associated items in this implementation
@@ -125,13 +125,13 @@ error: associated items `new` and `send_message` are never used
    |                  ^^^^^^^^^^^^
 
 error: struct `McpToolsHandler` is never constructed
- --> crates/terraphim_tui/src/repl/mcp_tools.rs:5:12
+ --> crates/terraphim_agent/src/repl/mcp_tools.rs:5:12
   |
 5 | pub struct McpToolsHandler {
   |            ^^^^^^^^^^^^^^^
 
 error: associated items `new`, `autocomplete_terms`, `extract_paragraphs`, `find_matches`, `replace_matches`, and `get_thesaurus` are never used
-  --> crates/terraphim_tui/src/repl/mcp_tools.rs:11:12
+  --> crates/terraphim_agent/src/repl/mcp_tools.rs:11:12
    |
 10 | impl McpToolsHandler {
    | -------------------- associated items in this implementation
@@ -154,13 +154,13 @@ error: associated items `new`, `autocomplete_terms`, `extract_paragraphs`, `find
    |                  ^^^^^^^^^^^^^
 
 error: stripping a prefix manually
-  --> crates/terraphim_tui/src/repl/commands.rs:96:13
+  --> crates/terraphim_agent/src/repl/commands.rs:96:13
    |
 96 |             &input[1..]
    |             ^^^^^^^^^^^
    |
 note: the prefix was tested here
-  --> crates/terraphim_tui/src/repl/commands.rs:95:21
+  --> crates/terraphim_agent/src/repl/commands.rs:95:21
    |
 95 |         let input = if input.starts_with('/') {
    |                     ^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -174,13 +174,13 @@ help: try using the `strip_prefix` method
    |
 
 error: stripping a prefix manually
-  --> crates/terraphim_tui/src/repl/handler.rs:75:25
+  --> crates/terraphim_agent/src/repl/handler.rs:75:25
    |
 75 |                         &line[1..]
    |                         ^^^^^^^^^^
    |
 note: the prefix was tested here
-  --> crates/terraphim_tui/src/repl/handler.rs:74:34
+  --> crates/terraphim_agent/src/repl/handler.rs:74:34
    |
 74 |                     let prefix = if line.starts_with('/') {
    |                                  ^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -192,7 +192,7 @@ help: try using the `strip_prefix` method
    |
 
 error: unnecessary closure used to substitute value for `Option::None`
-   --> crates/terraphim_tui/src/repl/handler.rs:578:44
+   --> crates/terraphim_agent/src/repl/handler.rs:578:44
     |
 578 | ...                   println!("{}", response.message.unwrap_or_else(|| response.status));
     |                                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -206,8 +206,8 @@ help: use `unwrap_or` instead
 578 +                             println!("{}", response.message.unwrap_or(response.status));
     |
 
-error: could not compile `terraphim_tui` (bin "terraphim-tui") due to 12 previous errors
-error: could not compile `terraphim_tui` (bin "terraphim-tui" test) due to 12 previous errors
+error: could not compile `terraphim_agent` (bin "terraphim-agent") due to 12 previous errors
+error: could not compile `terraphim_agent` (bin "terraphim-agent" test) due to 12 previous errors
 
 Biome lint and format check..............................................Passed
 Detect secrets...........................................................Passed

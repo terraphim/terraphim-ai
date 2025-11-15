@@ -103,9 +103,9 @@ validate_artifacts() {
 
     local artifacts=(
         "terraphim-server_${VERSION}-1_amd64.deb"
-        "terraphim-tui_${VERSION}-1_amd64.deb"
+        "terraphim-agent_${VERSION}-1_amd64.deb"
         "terraphim-server-${VERSION}-1-x86_64.pkg.tar.zst"
-        "terraphim-tui-${VERSION}-1-x86_64.pkg.tar.zst"
+        "terraphim-agent-${VERSION}-1-x86_64.pkg.tar.zst"
         "install.sh"
         "docker-run.sh"
         "README.md"
@@ -150,7 +150,7 @@ validate_artifacts() {
 validate_debian_packages() {
     print_status "Validating Debian packages..."
 
-    for deb_file in terraphim-server_${VERSION}-1_amd64.deb terraphim-tui_${VERSION}-1_amd64.deb; do
+    for deb_file in terraphim-server_${VERSION}-1_amd64.deb terraphim-agent_${VERSION}-1_amd64.deb; do
         if [ -f "$deb_file" ]; then
             print_status "Validating $deb_file..."
 
@@ -186,7 +186,7 @@ validate_debian_packages() {
 validate_arch_packages() {
     print_status "Validating Arch Linux packages..."
 
-    for pkg_file in terraphim-server-${VERSION}-1-x86_64.pkg.tar.zst terraphim-tui-${VERSION}-1-x86_64.pkg.tar.zst; do
+    for pkg_file in terraphim-server-${VERSION}-1-x86_64.pkg.tar.zst terraphim-agent-${VERSION}-1-x86_64.pkg.tar.zst; do
         if [ -f "$pkg_file" ]; then
             print_status "Validating $pkg_file..."
 

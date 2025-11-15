@@ -95,16 +95,16 @@ build_from_source() {
     cargo build --release --package terraphim_server
 
     print_status "Building Terraphim TUI..."
-    cargo build --release --package terraphim_tui --features repl-full
+    cargo build --release --package terraphim_agent --features repl-full
 
     # Copy binaries to installation directory
     print_status "Installing binaries..."
     cp target/release/terraphim_server "$INSTALL_DIR/"
-    cp target/release/terraphim-tui "$INSTALL_DIR/"
+    cp target/release/terraphim-agent "$INSTALL_DIR/"
 
     # Make them executable
     chmod +x "$INSTALL_DIR/terraphim_server"
-    chmod +x "$INSTALL_DIR/terraphim-tui"
+    chmod +x "$INSTALL_DIR/terraphim-agent"
 
     # Clean up
     cd /
@@ -123,11 +123,11 @@ verify_installation() {
         return 1
     fi
 
-    if command -v terraphim-tui &> /dev/null; then
-        print_status "✓ terraphim-tui is installed"
-        terraphim-tui --version
+    if command -v terraphim-agent &> /dev/null; then
+        print_status "✓ terraphim-agent is installed"
+        terraphim-agent --version
     else
-        print_error "terraphim-tui installation failed"
+        print_error "terraphim-agent installation failed"
         return 1
     fi
 }
@@ -174,8 +174,8 @@ main() {
     print_status "🎉 Installation completed successfully!"
     print_status ""
     print_status "To get started:"
-    print_status "  terraphim-tui --help                 # Show TUI help"
-    print_status "  terraphim-tui search 'rust'          # Search with TUI"
+    print_status "  terraphim-agent --help                 # Show TUI help"
+    print_status "  terraphim-agent search 'rust'          # Search with TUI"
     print_status "  terraphim_server --config ~/.config/terraphim/config.json  # Start server"
     print_status ""
     print_status "Documentation: https://github.com/terraphim/terraphim-ai/wiki"

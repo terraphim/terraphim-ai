@@ -87,11 +87,11 @@ For detailed installation instructions, see our [Installation Guide](https://git
    **Terminal Interface (TUI):**
    ```bash
    # Build with all features (recommended)
-   cargo build -p terraphim_tui --features repl-full --release
-   ./target/release/terraphim-tui
+   cargo build -p terraphim_agent --features repl-full --release
+   ./target/release/terraphim-agent
 
    # Or run minimal version
-   cargo run --bin terraphim-tui
+   cargo run --bin terraphim-agent
    ```
 
 (See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
@@ -116,10 +116,10 @@ Terraphim includes a comprehensive TUI that provides both interactive REPL funct
 
 ```bash
 # Build with all features
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 
 # Launch interactive REPL
-./target/release/terraphim-tui
+./target/release/terraphim-agent
 
 # Available REPL commands:
 /help           # Show all commands
@@ -222,7 +222,7 @@ This installs the server, TUI, and desktop app (macOS only).
 ```bash
 # Download from GitHub releases
 sudo dpkg -i terraphim-server_*.deb
-sudo dpkg -i terraphim-tui_*.deb
+sudo dpkg -i terraphim-agent_*.deb
 sudo dpkg -i terraphim-ai-desktop_*.deb
 ```
 

@@ -24,11 +24,11 @@ fn extract_clean_output(output: &str) -> String {
 /// Build a thesaurus from the existing KG markdown files in docs/src/kg/
 async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn std::error::Error>> {
     // Use CARGO_MANIFEST_DIR to find workspace root
-    // CARGO_MANIFEST_DIR points to crates/terraphim_tui
+    // CARGO_MANIFEST_DIR points to crates/terraphim_agent
     let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
     let manifest_path = PathBuf::from(manifest_dir);
 
-    // Go up two levels: crates/terraphim_tui -> crates -> workspace_root
+    // Go up two levels: crates/terraphim_agent -> crates -> workspace_root
     let workspace_root = manifest_path
         .parent()
         .and_then(|p| p.parent())
@@ -139,7 +139,7 @@ mod tests {
                 "run",
                 "--quiet",
                 "-p",
-                "terraphim_tui",
+                "terraphim_agent",
                 "--bin",
                 "terraphim-tui",
                 "--",

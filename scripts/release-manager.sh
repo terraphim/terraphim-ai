@@ -267,7 +267,7 @@ build_packages() {
         return 1
     fi
 
-    if cargo deb --package terraphim_tui --no-build; then
+    if cargo deb --package terraphim_agent --no-build; then
         print_success "Debian TUI package built"
     else
         print_error "Failed to build Debian TUI package"

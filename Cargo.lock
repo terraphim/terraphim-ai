@@ -7925,6 +7925,51 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_agent"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "colored",
+ "comfy-table",
+ "crossterm 0.27.0",
+ "dirs 5.0.1",
+ "futures",
+ "handlebars",
+ "indicatif 0.18.1",
+ "jiff 0.1.29",
+ "log",
+ "portpicker",
+ "pulldown-cmark 0.12.2",
+ "ratatui",
+ "regex",
+ "reqwest 0.12.24",
+ "rustyline",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "serial_test",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_config",
+ "terraphim_middleware",
+ "terraphim_persistence",
+ "terraphim_rolegraph",
+ "terraphim_service",
+ "terraphim_settings",
+ "terraphim_types",
+ "terraphim_update",
+ "thiserror 1.0.69",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "urlencoding",
+ "walkdir",
+]
+
+[[package]]
 name = "terraphim_agent_evolution"
 version = "1.0.0"
 dependencies = [
@@ -8416,6 +8461,7 @@ dependencies = [
  "serial_test",
  "static-files",
  "tempfile",
+ "terraphim_agent",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
@@ -8424,7 +8470,6 @@ dependencies = [
  "terraphim_rolegraph",
  "terraphim_service",
  "terraphim_settings",
- "terraphim_tui",
  "terraphim_types",
  "tokio",
  "tokio-stream",
@@ -8511,51 +8556,6 @@ dependencies = [
  "tokio",
  "tokio-test",
  "uuid",
-]
-
-[[package]]
-name = "terraphim_tui"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "async-trait",
- "chrono",
- "clap",
- "colored",
- "comfy-table",
- "crossterm 0.27.0",
- "dirs 5.0.1",
- "futures",
- "handlebars",
- "indicatif 0.18.1",
- "jiff 0.1.29",
- "log",
- "portpicker",
- "pulldown-cmark 0.12.2",
- "ratatui",
- "regex",
- "reqwest 0.12.24",
- "rustyline",
- "serde",
- "serde_json",
- "serde_yaml",
- "serial_test",
- "tempfile",
- "terraphim_automata",
- "terraphim_config",
- "terraphim_middleware",
- "terraphim_persistence",
- "terraphim_rolegraph",
- "terraphim_service",
- "terraphim_settings",
- "terraphim_types",
- "terraphim_update",
- "thiserror 1.0.69",
- "tokio",
- "tracing",
- "tracing-subscriber",
- "urlencoding",
- "walkdir",
 ]
 
 [[package]]

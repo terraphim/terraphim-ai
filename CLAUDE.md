@@ -204,7 +204,7 @@ The workspace uses Rust edition 2024 and resolver version 2 for optimal dependen
 - `terraphim_settings`: Device and server settings
 - `terraphim_types`: Shared type definitions
 - `terraphim_mcp_server`: MCP server for AI tool integration
-- `terraphim_tui`: Terminal UI implementation with REPL
+- `terraphim_agent`: Terminal UI implementation with REPL
 - `terraphim_atomic_client`: Atomic Data integration
 - `terraphim_onepassword_cli`: 1Password CLI integration
 - `terraphim-markdown-parser`: Markdown parsing utilities
@@ -251,16 +251,16 @@ cd desktop
 yarn run tauri build --debug
 ```
 
-### TUI Build Options
+### Agent Build Options
 ```bash
 # Build with all features (recommended)
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 
 # Run minimal version
-cargo run --bin terraphim-tui
+cargo run --bin terraphim-agent
 
 # Launch interactive REPL
-./target/release/terraphim-tui
+./target/release/terraphim-agent
 
 # Available REPL commands:
 # /help           - Show all commands
@@ -280,8 +280,8 @@ cargo test --features openrouter
 cargo build --features mcp-rust-sdk
 cargo test --features mcp-rust-sdk
 
-# Build TUI with full REPL
-cargo build -p terraphim_tui --features repl-full
+# Build Agent with full REPL
+cargo build -p terraphim_agent --features repl-full
 
 # Build terraphim_automata for WASM
 cargo build -p terraphim_automata --target wasm32-unknown-unknown --features wasm
@@ -575,7 +575,7 @@ terraphim-ai/
 │   ├── terraphim_settings/         # Device and server settings
 │   ├── terraphim_types/            # Shared type definitions
 │   ├── terraphim_mcp_server/       # MCP server for AI tool integration
-│   ├── terraphim_tui/              # Terminal UI implementation
+│   ├── terraphim_agent/              # Terminal UI implementation
 │   ├── terraphim_atomic_client/    # Atomic Data integration
 │   ├── terraphim_onepassword_cli/  # 1Password CLI integration
 │   ├── terraphim-markdown-parser/  # Markdown parsing utilities
@@ -711,7 +711,7 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 ### Advanced Features
 - **Paragraph Extraction**: Extract paragraphs starting at matched terms
 - **Graph Path Connectivity**: Verify if matched terms connect via single path
-- **TUI Interface**: Terminal UI with hierarchical commands and ASCII graphs
+- **Agent Interface**: Terminal UI with hierarchical commands and ASCII graphs
 - **Autocomplete Service**: MCP-based autocomplete for Novel editor
 - **Firecracker VMs**: Sub-2 second boot, secure execution sandboxing
 
@@ -864,10 +864,10 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
    ./start_local_dev.sh
    ```
 
-7. **Run TUI Interface**
+7. **Run Agent Interface**
    ```bash
-   cargo build -p terraphim_tui --features repl-full --release
-   ./target/release/terraphim-tui
+   cargo build -p terraphim_agent --features repl-full --release
+   ./target/release/terraphim-agent
    ```
 
 ## Frontend Technology Guidelines

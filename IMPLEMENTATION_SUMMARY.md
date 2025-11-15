@@ -15,7 +15,7 @@ We've successfully completed a comprehensive enhancement of the Terraphim system
 - **Performance**: Identified top-performing combinations (7+ results/sec)
 
 **Files Created/Modified:**
-- `crates/terraphim_tui/tests/scoring_haystack_matrix_tests.rs` - Complete test framework
+- `crates/terraphim_agent/tests/scoring_haystack_matrix_tests.rs` - Complete test framework
 - `run_test_matrix.sh` - Automated test execution script
 - `TEST_MATRIX_DOCUMENTATION.md` - Comprehensive documentation
 
@@ -26,8 +26,8 @@ We've successfully completed a comprehensive enhancement of the Terraphim system
 - **Maintained**: Backward compatibility with embedded configurations
 
 **Files Modified:**
-- `crates/terraphim_tui/src/main.rs` - CLI argument parsing
-- `crates/terraphim_tui/src/service.rs` - Service initialization
+- `crates/terraphim_agent/src/main.rs` - CLI argument parsing
+- `crates/terraphim_agent/src/service.rs` - Service initialization
 
 ### ✅ **3. Advanced Configuration Validation**
 - **File Validation**: Existence, readability, format checks
@@ -92,19 +92,19 @@ We've successfully completed a comprehensive enhancement of the Terraphim system
 ### **CLI Enhancement Example**
 ```bash
 # New --config parameter support
-terraphim-tui --config /path/to/config.json search "test query"
+terraphim-agent --config /path/to/config.json search "test query"
 
 # Comprehensive help text
-terraphim-tui --help  # Shows detailed configuration guidance
+terraphim-agent --help  # Shows detailed configuration guidance
 ```
 
 ### **Robust Error Handling**
 ```bash
 # User-friendly error messages
-$ terraphim-tui --config nonexistent.json search test
+$ terraphim-agent --config nonexistent.json search test
 Error: Configuration file not found: 'nonexistent.json'
 Please ensure the file exists and the path is correct.
-Example: terraphim-tui --config /path/to/config.json search query
+Example: terraphim-agent --config /path/to/config.json search query
 ```
 
 ### **Automated Testing**

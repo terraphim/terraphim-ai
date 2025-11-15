@@ -28,7 +28,7 @@ terraphim-ai/
 - `terraphim_types/` - Shared type definitions
 
 ### Specialized Components
-- `terraphim_tui/` - Terminal user interface
+- `terraphim_agent/` - Terminal user interface
 - `terraphim_mcp_server/` - Model Context Protocol server
 - `terraphim_atomic_client/` - Atomic server integration
 - `terraphim_settings/` - Settings management
@@ -96,6 +96,6 @@ desktop/
 
 ## Binary Outputs
 - `terraphim_server` - Main HTTP API server
-- `terraphim-tui` - Terminal interface
+- `terraphim-agent` - Terminal interface
 - `terraphim-mcp-server` - MCP protocol server
 - Desktop app - Built via Tauri in `desktop/src-tauri/`

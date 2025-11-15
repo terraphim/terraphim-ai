@@ -7,7 +7,7 @@
 This session completed two major deliverables for the Terraphim AI project:
 
 1. **Sub-2 Second VM Boot Optimization System** (terraphim_firecracker crate)
-2. **Comprehensive TUI Command System** (terraphim_tui crate enhancements)
+2. **Comprehensive TUI Command System** (terraphim_agent crate enhancements)
 
 ---
 
@@ -79,7 +79,7 @@ This session completed two major deliverables for the Terraphim AI project:
 ## 🎯 2. Comprehensive TUI Command System
 
 ### 📋 Implementation Summary
-- **Integration**: Enhanced terraphim_tui with markdown-based commands
+- **Integration**: Enhanced terraphim_agent with markdown-based commands
 - **Security**: Production-ready security with knowledge graph validation
 - **Flexibility**: Three execution modes with intelligent selection
 

@@ -78,8 +78,8 @@
 
 ### TUI Server
 ```bash
-cargo check -p terraphim_tui  # ✅ Compiles successfully
-cargo test -p terraphim_tui   # ✅ Tests pass
+cargo check -p terraphim_agent  # ✅ Compiles successfully
+cargo test -p terraphim_agent   # ✅ Tests pass
 ```
 
 ### MCP Server

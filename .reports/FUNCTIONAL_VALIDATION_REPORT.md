@@ -88,7 +88,7 @@ cargo build --workspace --lib
 cargo clippy --workspace --lib --all-features
 ```
 **Result:** ✅ Core middleware and service pass all warnings
-**Note:** terraphim_tui has 189 clippy warnings (vec! usage - pedantic level, not errors)
+**Note:** terraphim_agent has 189 clippy warnings (vec! usage - pedantic level, not errors)
 
 ### 3. Integration Tests Status
 
@@ -107,7 +107,7 @@ cargo clippy --workspace --lib --all-features
 
 #### External Dependency Issue ⚠️
 **Package:** html2md (external crate)
-**Impact:** Blocks release binary builds for terraphim_server and terraphim_tui
+**Impact:** Blocks release binary builds for terraphim_server and terraphim_agent
 **Severity:** Medium - does not affect core functionality or library code
 **Workaround Options:**
 1. Update html2md dependency version

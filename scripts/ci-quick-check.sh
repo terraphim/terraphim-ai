@@ -88,7 +88,7 @@ run_check "Cargo Check" \
 # 4. Rust build for default target (if not skipped)
 if [[ "$SKIP_BUILD" == "false" ]]; then
     run_check "Quick Rust Build" \
-        "cargo build --package terraphim_server --package terraphim_mcp_server --package terraphim_tui" \
+        "cargo build --package terraphim_server --package terraphim_mcp_server --package terraphim_agent" \
         "Build main packages for default target"
 else
     echo -e "\n${YELLOW}⏭️  Skipping Build (SKIP_BUILD=true)${NC}"

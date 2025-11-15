@@ -255,7 +255,7 @@ build_binaries() {
     execute cargo build --release --package terraphim_server
 
     # Build TUI
-    execute cargo build --release --package terraphim_tui --features repl-full
+    execute cargo build --release --package terraphim_agent --features repl-full
 }
 
 # Function to create Debian packages
@@ -266,7 +266,7 @@ create_deb_packages() {
     execute cargo deb --package terraphim_server --no-build
 
     # Create TUI package
-    execute cargo deb --package terraphim_tui --no-build
+    execute cargo deb --package terraphim_agent --no-build
 }
 
 # Function to create Arch Linux packages
@@ -281,8 +281,8 @@ create_arch_packages() {
         execute cp target/release/terraphim_server "$RELEASE_DIR/"
     fi
 
-    if [[ -f "target/release/terraphim_tui" ]]; then
-        execute cp target/release/terraphim_tui "$RELEASE_DIR/"
+    if [[ -f "target/release/terraphim_agent" ]]; then
+        execute cp target/release/terraphim_agent "$RELEASE_DIR/"
     fi
 
     # Create PKGBUILD for server
@@ -305,7 +305,7 @@ EOF
 
     # Create PKGBUILD for TUI
     cat > "${RELEASE_DIR}/PKGBUILD-tui" << EOF
-pkgname=terraphim-tui
+pkgname=terraphim-agent
 pkgver=$VERSION
 pkgrel=1
 pkgdesc="Terraphim AI TUI - Terminal User Interface"
@@ -313,11 +313,11 @@ arch=('x86_64')
 url="https://github.com/terraphim/terraphim-ai"
 license=('Apache-2.0')
 depends=('openssl')
-conflicts=('terraphim-tui-bin')
-provides=('terraphim-tui')
+conflicts=('terraphim-agent-bin')
+provides=('terraphim-agent')
 
 package() {
-    install -Dm755 "\$srcdir/terraphim_tui" "\$pkgdir/usr/bin/terraphim_tui"
+    install -Dm755 "\$srcdir/terraphim_agent" "\$pkgdir/usr/bin/terraphim_agent"
 }
 EOF
 
@@ -332,9 +332,9 @@ EOF
         fi
 
         # Build TUI package
-        if [[ -f "terraphim_tui" ]]; then
-            tar -cJf "terraphim-tui-${VERSION}-1-x86_64.pkg.tar.zst" \
-                --owner=root --group=root terraphim_tui PKGBUILD-tui
+        if [[ -f "terraphim_agent" ]]; then
+            tar -cJf "terraphim-agent-${VERSION}-1-x86_64.pkg.tar.zst" \
+                --owner=root --group=root terraphim_agent PKGBUILD-tui
         fi
 
         cd - > /dev/null
@@ -520,8 +520,8 @@ curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release
 wget https://github.com/terraphim/terraphim-ai/releases/download/$TAG/terraphim-server_$VERSION-1_amd64.deb
 sudo dpkg -i terraphim-server_$VERSION-1_amd64.deb
 
-wget https://github.com/terraphim/terraphim-ai/releases/download/$TAG/terraphim-tui_$VERSION-1_amd64.deb
-sudo dpkg -i terraphim-tui_$VERSION-1_amd64.deb
+wget https://github.com/terraphim/terraphim-ai/releases/download/$TAG/terraphim-agent_$VERSION-1_amd64.deb
+sudo dpkg -i terraphim-agent_$VERSION-1_amd64.deb
 \`\`\`
 
 #### Arch Linux (.tar.zst packages)
@@ -554,7 +554,7 @@ After installation, you can verify the installation:
 
 \`\`\`bash
 terraphim_server --version
-terraphim_tui --version
+terraphim_agent --version
 \`\`\`
 
 ## Support

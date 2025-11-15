@@ -14,7 +14,7 @@ echo "=================================================="
 if [ ! -f "$BINARIES_DIR/terraphim_server" ]; then
     echo "🔨 Building Rust binaries..."
     cargo build --release --package terraphim_server
-    cargo build --release --package terraphim_tui --features repl-full
+    cargo build --release --package terraphim_agent --features repl-full
 fi
 
 # Create server app bundle
@@ -32,12 +32,12 @@ fi
 # Create TUI app bundle
 echo "📱 Creating Terraphim TUI app bundle..."
 
-if [ -f "$BINARIES_DIR/terraphim-tui" ]; then
-    cp "$BINARIES_DIR/terraphim-tui" "$BUNDLE_DIR/TerraphimTUI.app/Contents/MacOS/terraphim-tui"
-    chmod +x "$BUNDLE_DIR/TerraphimTUI.app/Contents/MacOS/terraphim-tui"
+if [ -f "$BINARIES_DIR/terraphim-agent" ]; then
+    cp "$BINARIES_DIR/terraphim-agent" "$BUNDLE_DIR/TerraphimTUI.app/Contents/MacOS/terraphim-agent"
+    chmod +x "$BUNDLE_DIR/TerraphimTUI.app/Contents/MacOS/terraphim-agent"
     echo "✅ Terraphim TUI app bundle created"
 else
-    echo "❌ terraphim-tui binary not found"
+    echo "❌ terraphim-agent binary not found"
     exit 1
 fi
 
@@ -107,7 +107,7 @@ echo "⚙️ Updating app bundle configurations..."
 sed -i '' 's|<string>terraphim_server</string>|<string>launch-server.sh</string>|' "$BUNDLE_DIR/TerraphimServer.app/Contents/Info.plist"
 
 # Update TUI Info.plist to use launch script
-sed -i '' 's|<string>terraphim-tui</string>|<string>launch-tui.sh</string>|' "$BUNDLE_DIR/TerraphimTUI.app/Contents/Info.plist"
+sed -i '' 's|<string>terraphim-agent</string>|<string>launch-tui.sh</string>|' "$BUNDLE_DIR/TerraphimTUI.app/Contents/Info.plist"
 
 # Create simple icon placeholder (text-based)
 echo "🎨 Creating app icons..."

@@ -168,10 +168,10 @@ The long initialization time (26+ seconds) suggests:
 ### **Profiling Commands**
 ```bash
 # CPU profiling
-cargo flamegraph --bin terraphim-tui -- --config config.json search "test query"
+cargo flamegraph --bin terraphim-agent -- --config config.json search "test query"
 
 # Memory profiling
-cargo instruments -t "Allocations" --bin terraphim-tui -- search "test query"
+cargo instruments -t "Allocations" --bin terraphim-agent -- search "test query"
 
 # Benchmark specific combinations
 cargo bench --bench scoring_performance

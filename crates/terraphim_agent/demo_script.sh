@@ -32,7 +32,7 @@ tmux select-pane -t terraphim-demo:0.0
 
 # Start the demo
 echo "🚀 Launching Terraphim TUI..."
-run_tmux "cd crates/terraphim_tui"
+run_tmux "cd crates/terraphim_agent"
 wait_for_demo
 
 echo "📋 Showing available commands..."

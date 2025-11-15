@@ -245,19 +245,19 @@ validate_local_artifacts() {
 
     # Validate built binaries
     validate_binary "target/release/terraphim_server" "Terraphim Server binary" || validation_errors=$((validation_errors + 1))
-    validate_binary "target/release/terraphim_tui" "Terraphim TUI binary" || validation_errors=$((validation_errors + 1))
+    validate_binary "target/release/terraphim_agent" "Terraphim TUI binary" || validation_errors=$((validation_errors + 1))
 
     # Validate Debian packages
     validate_package "target/debian/terraphim-server_${VERSION}-1_amd64.deb" "deb" "Terraphim Server Debian package" || validation_errors=$((validation_errors + 1))
-    validate_package "target/debian/terraphim-tui_${VERSION}-1_amd64.deb" "deb" "Terraphim TUI Debian package" || validation_errors=$((validation_errors + 1))
+    validate_package "target/debian/terraphim-agent_${VERSION}-1_amd64.deb" "deb" "Terraphim TUI Debian package" || validation_errors=$((validation_errors + 1))
 
     # Validate Arch Linux packages
     validate_package "$RELEASE_DIR/terraphim-server-${VERSION}-1-x86_64.pkg.tar.zst" "tar.zst" "Terraphim Server Arch package" || validation_errors=$((validation_errors + 1))
-    validate_package "$RELEASE_DIR/terraphim-tui-${VERSION}-1-x86_64.pkg.tar.zst" "tar.zst" "Terraphim TUI Arch package" || validation_errors=$((validation_errors + 1))
+    validate_package "$RELEASE_DIR/terraphim-agent-${VERSION}-1-x86_64.pkg.tar.zst" "tar.zst" "Terraphim TUI Arch package" || validation_errors=$((validation_errors + 1))
 
     # Validate RPM packages
     validate_package "$RELEASE_DIR/terraphim-server-${VERSION}-1.x86_64.rpm" "rpm" "Terraphim Server RPM package" || validation_errors=$((validation_errors + 1))
-    validate_package "$RELEASE_DIR/terraphim-tui-${VERSION}-1.x86_64.rpm" "rpm" "Terraphim TUI RPM package" || validation_errors=$((validation_errors + 1))
+    validate_package "$RELEASE_DIR/terraphim-agent-${VERSION}-1.x86_64.rpm" "rpm" "Terraphim TUI RPM package" || validation_errors=$((validation_errors + 1))
 
     # Validate macOS packages (if on macOS)
     if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -315,9 +315,9 @@ validate_remote_release() {
         "docker-run.sh"
         "README.md"
         "terraphim-server_${VERSION}-1_amd64.deb"
-        "terraphim-tui_${VERSION}-1_amd64.deb"
+        "terraphim-agent_${VERSION}-1_amd64.deb"
         "terraphim-server-${VERSION}-1-x86_64.pkg.tar.zst"
-        "terraphim-tui-${VERSION}-1-x86_64.pkg.tar.zst"
+        "terraphim-agent-${VERSION}-1-x86_64.pkg.tar.zst"
     )
 
     local missing_assets=()
@@ -433,9 +433,9 @@ run_comprehensive_tests() {
         fi
     fi
 
-    if [[ -f "target/release/terraphim_tui" ]]; then
+    if [[ -f "target/release/terraphim_agent" ]]; then
         print_status "Testing TUI binary execution..."
-        if timeout 5 target/release/terraphim_tui --help >/dev/null 2>&1; then
+        if timeout 5 target/release/terraphim_agent --help >/dev/null 2>&1; then
             print_success "TUI binary executes successfully"
         else
             print_warning "TUI binary execution test failed"
@@ -492,12 +492,12 @@ $([ "$QUICK_VALIDATION" == "true" ] && echo "- Skipped (quick mode)" || echo "- 
 
 ### Binaries
 - \`target/release/terraphim_server\`
-- \`target/release/terraphim_tui\`
+- \`target/release/terraphim_agent\`
 
 ### Packages
-- Debian (.deb): terraphim-server, terraphim-tui
-- Arch Linux (.tar.zst): terraphim-server, terraphim-tui
-- RHEL/CentOS (.rpm): terraphim-server, terraphim-tui
+- Debian (.deb): terraphim-server, terraphim-agent
+- Arch Linux (.tar.zst): terraphim-server, terraphim-agent
+- RHEL/CentOS (.rpm): terraphim-server, terraphim-agent
 - macOS (.tar.gz): TerraphimServer, TerraphimTUI
 
 ### Scripts

@@ -8,16 +8,16 @@ Build from the workspace with optional feature flags:
 
 ```bash
 # Build with all features (recommended)
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 
 # Build with specific features
-cargo build -p terraphim_tui --features repl,repl-chat,repl-file,repl-mcp --release
+cargo build -p terraphim_agent --features repl,repl-chat,repl-file,repl-mcp --release
 
 # Build minimal TUI (basic functionality only)
-cargo build -p terraphim_tui --release
+cargo build -p terraphim_agent --release
 ```
 
-Binary: `terraphim-tui`
+Binary: `terraphim-agent`
 
 Set the server URL (defaults to `http://localhost:8000`):
 
@@ -36,7 +36,7 @@ export TERRAPHIM_SERVER=http://localhost:8000
 ## Interactive REPL Mode
 
 ```bash
-terraphim-tui
+terraphim-agent
 ```
 
 The TUI provides a comprehensive REPL (Read-Eval-Print Loop) with access to all features:
@@ -81,32 +81,32 @@ Traditional CLI commands are also supported:
 
 - **Search**
   ```bash
-  terraphim-tui search --query "terraphim-graph" --role "Default" --limit 10
+  terraphim-agent search --query "terraphim-graph" --role "Default" --limit 10
   ```
 
 - **Roles**
   ```bash
-  terraphim-tui roles list
-  terraphim-tui roles select "Default"
+  terraphim-agent roles list
+  terraphim-agent roles select "Default"
   ```
 
 - **Config**
   ```bash
-  terraphim-tui config show
-  terraphim-tui config set selected_role=Default
-  terraphim-tui config set global_shortcut=Ctrl+X
-  terraphim-tui config set role.Default.theme=spacelab
+  terraphim-agent config show
+  terraphim-agent config set selected_role=Default
+  terraphim-agent config set global_shortcut=Ctrl+X
+  terraphim-agent config set role.Default.theme=spacelab
   ```
 
 - **Rolegraph (ASCII)**
   ```bash
-  terraphim-tui graph --role "Default" --top-k 10
+  terraphim-agent graph --role "Default" --top-k 10
   # Prints: - [rank] label -> neighbor1, neighbor2, ...
   ```
 
 - **Chat** (OpenRouter/Ollama)
   ```bash
-  terraphim-tui chat --role "Default" --prompt "Summarize terraphim graph" --model anthropic/claude-3-sonnet
+  terraphim-agent chat --role "Default" --prompt "Summarize terraphim graph" --model anthropic/claude-3-sonnet
   ```
 
 ## Behavior

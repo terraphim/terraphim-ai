@@ -15,7 +15,7 @@ Terraphim AI uses an automated release process powered by:
 
 ### Main Binaries
 1. **terraphim_server**: HTTP API server for backend operations
-2. **terraphim-tui**: Terminal User Interface with REPL capabilities
+2. **terraphim-agent**: Terminal User Interface with REPL capabilities
 3. **terraphim-ai-desktop**: Tauri-based desktop application
 
 ### Package Formats
@@ -55,19 +55,19 @@ terraphim_server-macos-x64
 terraphim_server-macos-arm64
 terraphim_server-windows.exe
 
-terraphim-tui-linux-x64
-terraphim-tui-linux-arm64
-terraphim-tui-macos-x64
-terraphim-tui-macos-arm64
-terraphim-tui-windows.exe
+terraphim-agent-linux-x64
+terraphim-agent-linux-arm64
+terraphim-agent-macos-x64
+terraphim-agent-macos-arm64
+terraphim-agent-windows.exe
 ```
 
 #### Debian Packages
 ```
 terraphim-server_0.1.0_amd64.deb
 terraphim-server_0.1.0_arm64.deb
-terraphim-tui_0.1.0_amd64.deb
-terraphim-tui_0.1.0_arm64.deb
+terraphim-agent_0.1.0_amd64.deb
+terraphim-agent_0.1.0_arm64.deb
 terraphim-ai-desktop_0.1.0_amd64.deb
 terraphim-ai-desktop_0.1.0_arm64.deb
 ```
@@ -112,8 +112,8 @@ name = "terraphim-ai-desktop"
 changelog_path = "./desktop/CHANGELOG.md"
 
 [[package]]
-name = "terraphim_tui"
-changelog_path = "./crates/terraphim_tui/CHANGELOG.md"
+name = "terraphim_agent"
+changelog_path = "./crates/terraphim_agent/CHANGELOG.md"
 ```
 
 ### Debian Package Metadata
@@ -132,7 +132,7 @@ cargo install cargo-deb
 # Build packages
 cargo deb -p terraphim_server
 cargo deb -p terraphim-ai-desktop
-cargo deb -p terraphim_tui
+cargo deb -p terraphim_agent
 
 # Test installation
 sudo dpkg -i target/debian/*.deb

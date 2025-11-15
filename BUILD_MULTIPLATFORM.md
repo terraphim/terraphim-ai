@@ -43,7 +43,7 @@ cargo build --release --target x86_64-pc-windows-gnu
 cargo build --release \
     --package terraphim_server \
     --package terraphim_mcp_server \
-    --package terraphim_tui
+    --package terraphim_agent
 ```
 
 #### Cross-Platform Targets

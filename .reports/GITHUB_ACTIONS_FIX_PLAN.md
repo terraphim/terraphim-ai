@@ -297,7 +297,7 @@ These need manual code review and fixes:
 
 ✅ **Package Release Workflow**:
 - Builds terraphim_server binary
-- Builds terraphim-tui binary
+- Builds terraphim-agent binary
 - Creates .deb packages
 - Creates Arch packages
 - Uploads to GitHub release

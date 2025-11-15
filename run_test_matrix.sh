@@ -36,12 +36,12 @@ print_error() {
 check_compilation() {
     print_header "Checking Project Compilation"
 
-    if cargo build -p terraphim_tui > /dev/null 2>&1; then
+    if cargo build -p terraphim_agent > /dev/null 2>&1; then
         print_success "Project compiles successfully"
     else
         print_error "Project compilation failed"
         echo "Running cargo build to show errors:"
-        cargo build -p terraphim_tui
+        cargo build -p terraphim_agent
         exit 1
     fi
 }
@@ -52,7 +52,7 @@ run_basic_matrix() {
 
     echo "Testing all scoring function x haystack combinations..."
 
-    if cargo test -p terraphim_tui test_complete_scoring_haystack_matrix -- --nocapture; then
+    if cargo test -p terraphim_agent test_complete_scoring_haystack_matrix -- --nocapture; then
         print_success "Basic matrix test completed successfully"
     else
         print_warning "Basic matrix test had some failures (expected for remote services)"
@@ -65,7 +65,7 @@ run_priority_test() {
 
     echo "Testing high-priority combinations that should always work..."
 
-    if cargo test -p terraphim_tui test_priority_combinations -- --nocapture; then
+    if cargo test -p terraphim_agent test_priority_combinations -- --nocapture; then
         print_success "Priority combinations test completed successfully"
     else
         print_error "Priority combinations test failed - this indicates core functionality issues"
@@ -79,7 +79,7 @@ run_performance_test() {
 
     echo "Testing performance across different scoring functions..."
 
-    if cargo test -p terraphim_tui test_scoring_function_performance_comparison -- --nocapture; then
+    if cargo test -p terraphim_agent test_scoring_function_performance_comparison -- --nocapture; then
         print_success "Performance comparison test completed successfully"
     else
         print_warning "Performance comparison test failed - may indicate configuration issues"
@@ -92,7 +92,7 @@ run_extended_matrix() {
 
     echo "Testing all combinations including query scorer variations..."
 
-    if cargo test -p terraphim_tui test_extended_matrix_with_query_scorers -- --nocapture; then
+    if cargo test -p terraphim_agent test_extended_matrix_with_query_scorers -- --nocapture; then
         print_success "Extended matrix test completed successfully"
     else
         print_warning "Extended matrix test had some failures (expected for advanced combinations)"
@@ -105,7 +105,7 @@ run_title_scorer_test() {
 
     echo "Testing TitleScorer with various query scoring algorithms..."
 
-    if cargo test -p terraphim_tui test_title_scorer_query_combinations -- --nocapture; then
+    if cargo test -p terraphim_agent test_title_scorer_query_combinations -- --nocapture; then
         print_success "Title scorer combinations test completed successfully"
     else
         print_warning "Title scorer combinations test had failures"

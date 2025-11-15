@@ -11,7 +11,7 @@ graph TB
     subgraph "Frontend Layer"
         UI[Svelte Desktop UI<br/>with Tauri]
         WebUI[Web Interface<br/>Alternative]
-        TUI[Terminal UI<br/>terraphim_tui]
+        TUI[Terminal UI<br/>terraphim_agent]
         VSCODE[VS Code Extension<br/>TypeScript]
         NODEJS[Node.js Bindings<br/>NAPI Integration]
     end
@@ -333,7 +333,7 @@ graph TD
     subgraph "Application Layer"
         Server[terraphim_server<br/>HTTP API + Main Binary]
         Desktop[Desktop App<br/>Svelte + Tauri]
-        TUI[terraphim_tui<br/>Terminal Interface]
+        TUI[terraphim_agent<br/>Terminal Interface]
     end
 
     subgraph "Service Layer"

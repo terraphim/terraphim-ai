@@ -120,7 +120,7 @@ TOTAL_TESTS=0
 # Test 1: TUI Unit Tests
 echo -e "\n${BLUE}📋 Phase 1: Unit Tests${NC}"
 if run_test "TUI Unit Tests" \
-    "cargo test -p terraphim_tui unit_test" \
+    "cargo test -p terraphim_agent unit_test" \
     "Testing serialization, deserialization, and basic client functionality"; then
     ((PASSED_TESTS++))
 else
@@ -132,7 +132,7 @@ fi
 echo -e "\n${BLUE}📋 Phase 2: Integration Tests${NC}"
 export TERRAPHIM_SERVER
 if run_test "TUI Integration Tests" \
-    "cargo test -p terraphim_tui integration_test" \
+    "cargo test -p terraphim_agent integration_test" \
     "Testing TUI client against live server API"; then
     ((PASSED_TESTS++))
 else
@@ -142,7 +142,7 @@ fi
 
 # Test 3: TUI Error Handling Tests
 if run_test "TUI Error Handling Tests" \
-    "cargo test -p terraphim_tui error_handling_test" \
+    "cargo test -p terraphim_agent error_handling_test" \
     "Testing error scenarios, timeouts, and edge cases"; then
     ((PASSED_TESTS++))
 else
@@ -164,7 +164,7 @@ fi
 # Test 5: CLI Command Tests
 echo -e "\n${BLUE}📋 Phase 4: CLI Command Validation${NC}"
 if run_test "TUI CLI Search Command" \
-    "cargo run -p terraphim_tui -- search 'test query' --limit 3" \
+    "cargo run -p terraphim_agent -- search 'test query' --limit 3" \
     "Testing CLI search functionality"; then
     ((PASSED_TESTS++))
 else
@@ -173,7 +173,7 @@ fi
 ((TOTAL_TESTS++))
 
 if run_test "TUI CLI Roles List" \
-    "cargo run -p terraphim_tui -- roles list" \
+    "cargo run -p terraphim_agent -- roles list" \
     "Testing CLI roles listing"; then
     ((PASSED_TESTS++))
 else
@@ -182,7 +182,7 @@ fi
 ((TOTAL_TESTS++))
 
 if run_test "TUI CLI Config Show" \
-    "cargo run -p terraphim_tui -- config show" \
+    "cargo run -p terraphim_agent -- config show" \
     "Testing CLI config display"; then
     ((PASSED_TESTS++))
 else
@@ -191,7 +191,7 @@ fi
 ((TOTAL_TESTS++))
 
 if run_test "TUI CLI Graph Display" \
-    "cargo run -p terraphim_tui -- graph --top-k 5" \
+    "cargo run -p terraphim_agent -- graph --top-k 5" \
     "Testing CLI graph visualization"; then
     ((PASSED_TESTS++))
 else
@@ -217,7 +217,7 @@ fi
 # Test 7: Performance and Load Tests
 echo -e "\n${BLUE}📋 Phase 6: Performance Validation${NC}"
 if run_test "TUI Performance Test" \
-    "cargo test -p terraphim_tui test_concurrent_request_handling" \
+    "cargo test -p terraphim_agent test_concurrent_request_handling" \
     "Testing concurrent request handling"; then
     ((PASSED_TESTS++))
 else

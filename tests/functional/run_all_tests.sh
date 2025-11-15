@@ -24,7 +24,7 @@ echo ""
 
 # Check if binaries exist
 echo -e "${YELLOW}Checking binaries...${NC}"
-if [ ! -f "./target/release/terraphim-tui" ]; then
+if [ ! -f "./target/release/terraphim-agent" ]; then
     echo -e "${RED}Error: TUI binary not found. Please build first.${NC}"
     exit 1
 fi

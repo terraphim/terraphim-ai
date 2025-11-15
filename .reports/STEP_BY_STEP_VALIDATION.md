@@ -142,10 +142,10 @@ Testing each component independently, then integration, then end-to-end.
 **Status:** 🔄 IN PROGRESS
 **Note:** Waiting for frontend assets build to complete
 
-### Step 3.3: Build terraphim_tui
-**Command:** `cargo build -p terraphim_tui --features repl-full --release`
+### Step 3.3: Build terraphim_agent
+**Command:** `cargo build -p terraphim_agent --features repl-full --release`
 **Status:** 🔄 IN PROGRESS
-**Existing Binary:** Found terraphim-tui from Oct 29 (16MB)
+**Existing Binary:** Found terraphim-agent from Oct 29 (16MB)
 **Action:** Rebuilding with latest changes
 
 ### Step 3.4: Build Tauri Desktop App

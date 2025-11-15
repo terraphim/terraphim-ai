@@ -23,7 +23,7 @@ The GitHub Actions release workflows are failing across multiple platforms (Linu
 ### Project Structure
 - **Main workspace**: `/Users/alex/projects/terraphim/terraphim-ai/Cargo.toml`
 - **Server binary**: `terraphim_server` (path: `terraphim_server/`)
-- **TUI binary**: `terraphim_tui` (path: `crates/terraphim_tui/`)
+- **TUI binary**: `terraphim_agent` (path: `crates/terraphim_agent/`)
 - **Desktop app**: `terraphim-ai-desktop` (path: `desktop/src-tauri/`)
 - **Docker builds**: Multi-arch support for Ubuntu 18.04, 20.04, 22.04, 24.04
 
@@ -77,7 +77,7 @@ image = "ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:latest"
   run: |
     mkdir -p artifacts
     cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe
-    cp target/${{ matrix.target }}/release/terraphim-tui.exe artifacts/terraphim-tui-${{ matrix.target }}.exe
+    cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe
 ```
 
 ### 6. Update GitHub Actions Dependencies

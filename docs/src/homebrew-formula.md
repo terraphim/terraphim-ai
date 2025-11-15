@@ -35,7 +35,7 @@ The Homebrew formula installs the following components:
 
 ### Binaries
 - **Server**: `terraphim_server` command-line tool
-- **TUI**: `terraphim-tui` terminal user interface
+- **TUI**: `terraphim-agent` terminal user interface
 - **Desktop App**: "Terraphim Desktop.app" (macOS only)
 
 ### Configuration
@@ -62,13 +62,13 @@ terraphim_server --help
 ### Terminal UI (TUI)
 ```bash
 # Start the interactive terminal interface
-terraphim-tui
+terraphim-agent
 
 # Use REPL mode with full features
-terraphim-tui --features repl-full
+terraphim-agent --features repl-full
 
 # View available commands
-terraphim-tui --help
+terraphim-agent --help
 ```
 
 ### Desktop App (macOS)

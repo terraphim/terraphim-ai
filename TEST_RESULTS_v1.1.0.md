@@ -47,14 +47,14 @@ Note: Returns web interface HTML (expected for root search endpoint)
 
 ### Build & Version
 ```bash
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 Status: ✅ SUCCESS
-Version: terraphim-tui 1.0.0 ✅
+Version: terraphim-agent 1.0.0 ✅
 ```
 
 ### Roles Command ✅ PASS
 ```bash
-./target/release/terraphim-tui roles list
+./target/release/terraphim-agent roles list
 Output:
 - Rust Engineer ✅
 - Terraphim Engineer ✅
@@ -63,7 +63,7 @@ Output:
 
 ### Search Command with Server ✅ PASS
 ```bash
-./target/release/terraphim-tui --server --server-url http://localhost:8000 search "test"
+./target/release/terraphim-agent --server --server-url http://localhost:8000 search "test"
 Results returned: 45+ documents found ✅
 Sample results:
 - terraphim-service
@@ -271,9 +271,9 @@ tmux new-session -d -s server './target/release/terraphim_server --role Default'
 curl http://localhost:8000/health
 
 # TUI
-./target/release/terraphim-tui --version
-./target/release/terraphim-tui roles list
-./target/release/terraphim-tui --server search "test"
+./target/release/terraphim-agent --version
+./target/release/terraphim-agent roles list
+./target/release/terraphim-agent --server search "test"
 
 # Desktop
 cd desktop
