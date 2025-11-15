@@ -74,18 +74,20 @@ Implements four distinct file editing strategies using `terraphim-automata` for 
 
 ### Four-Layer Validation Pipeline
 
-```
-LLM Input
-    ↓
-[Layer 1] Pre-LLM Context Validation
-    ↓
-[Layer 2] Post-LLM Output Parsing
-    ↓
-[Layer 3] Pre-Tool File Verification
-    ↓
-[Layer 4] Post-Tool Integrity Checks
-    ↓
-File System
+```mermaid
+graph TD
+    A["LLM Input"] --> B["[Layer 1]<br/>Pre-LLM Context Validation"]
+    B --> C["[Layer 2]<br/>Post-LLM Output Parsing"]
+    C --> D["[Layer 3]<br/>Pre-Tool File Verification"]
+    D --> E["[Layer 4]<br/>Post-Tool Integrity Checks"]
+    E --> F["File System"]
+
+    style A fill:#e1f5ff
+    style B fill:#fff3e0
+    style C fill:#f3e5f5
+    style D fill:#e8f5e9
+    style E fill:#fce4ec
+    style F fill:#e0f2f1
 ```
 
 ### Layer 1: Pre-LLM Context Validation
@@ -257,14 +259,27 @@ The knowledge graph stores both:
 - **Conceptual Information**: Domain knowledge, relationships between concepts
 - **Code-Level Information**: Functions, classes, dependencies, call chains
 
-```
-                    Concept Graph
-                   /            \
-             Domain Terms    Code Symbols
-            /          \    /         \
-    "Search"    "Performance"  Function  Struct
-        ↓              ↓           ↓       ↓
-   [concept]    [connection]  [code]  [code]
+```mermaid
+graph TD
+    A["Knowledge Graph"] --> B["Domain Terms"]
+    A --> C["Code Symbols"]
+
+    B --> D["'Search'<br/>[concept]"]
+    B --> E["'Performance'<br/>[connection]"]
+
+    C --> F["Function<br/>[code]"]
+    C --> G["Struct<br/>[code]"]
+
+    D -.->|semantic connection| E
+    F -.->|call dependency| G
+
+    style A fill:#2196f3,color:#fff
+    style B fill:#4caf50,color:#fff
+    style C fill:#ff9800,color:#fff
+    style D fill:#c8e6c9
+    style E fill:#ffe0b2
+    style F fill:#ffe0b2
+    style G fill:#ffe0b2
 ```
 
 ### PageRank-Style Relevance Ranking
@@ -351,18 +366,27 @@ impl SnapshotManager {
 
 ### Recovery Workflow
 
-```
-Edit Attempt
-    ↓
-Pre-edit Snapshot Created
-    ↓
-Edit Executed
-    ↓
-Validation Success?
-    ├─ Yes → Checkpoint Created
-    └─ No  → Restore from Snapshot
-         ↓
-    Report Error
+```mermaid
+graph TD
+    A["Edit Attempt"] --> B["Pre-edit Snapshot Created"]
+    B --> C["Edit Executed"]
+    C --> D{{"Validation<br/>Success?"}}
+
+    D -->|Yes| E["Checkpoint Created"]
+    D -->|No| F["Restore from Snapshot"]
+    F --> G["Report Error"]
+
+    E --> H["Ready for Next Operation"]
+    G --> H
+
+    style A fill:#e3f2fd
+    style B fill:#c8e6c9
+    style C fill:#fff9c4
+    style D fill:#ffccbc
+    style E fill:#a5d6a7
+    style F fill:#ef9a9a
+    style G fill:#ffccbc
+    style H fill:#b3e5fc
 ```
 
 ## Phase 6: Integration & Testing

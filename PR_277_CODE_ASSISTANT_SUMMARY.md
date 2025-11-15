@@ -75,37 +75,41 @@ Complete ecosystem validation:
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Code Assistant System                     │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  ┌────────────────────────────────────────────────────┐   │
-│  │         REPL Interface (Phase 3)                    │   │
-│  │  /file edit, validate-edit, diff, undo             │   │
-│  └────────────────────────────────────────────────────┘   │
-│                           ↓                                 │
-│  ┌────────────────────────────────────────────────────┐   │
-│  │    Validated LLM Client (Phase 2)                  │   │
-│  │  4-Layer Security Pipeline + Context Validation    │   │
-│  └────────────────────────────────────────────────────┘   │
-│                           ↓                                 │
-│  ┌────────────────────────────────────────────────────┐   │
-│  │    File Editor (Phase 1)                           │   │
-│  │  Exact | Whitespace | Block | Fuzzy Strategies    │   │
-│  └────────────────────────────────────────────────────┘   │
-│                           ↓                                 │
-│  ┌────────────────────────────────────────────────────┐   │
-│  │   Recovery Systems (Phase 5)                       │   │
-│  │  GitRecovery + SnapshotManager                      │   │
-│  └────────────────────────────────────────────────────┘   │
-│                                                              │
-│  ┌────────────────────────────────────────────────────┐   │
-│  │  Knowledge Graph Extensions (Phase 4)              │   │
-│  │  CodeSymbol Types + Semantic Search                │   │
-│  └────────────────────────────────────────────────────┘   │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
+```mermaid
+graph TD
+    subgraph System["Code Assistant System"]
+        subgraph UI["User Interface"]
+            REPL["REPL Interface Phase 3<br/>/file edit, validate-edit, diff, undo"]
+        end
+
+        subgraph Security["Security & Validation"]
+            LLM["Validated LLM Client Phase 2<br/>4-Layer Security Pipeline"]
+        end
+
+        subgraph Editing["File Editing"]
+            FE["File Editor Phase 1<br/>Exact | Whitespace | Block | Fuzzy"]
+        end
+
+        subgraph Recovery["Recovery & State"]
+            REC["Recovery Systems Phase 5<br/>GitRecovery + SnapshotManager"]
+        end
+
+        subgraph Knowledge["Knowledge Management"]
+            KG["Knowledge Graph Extensions Phase 4<br/>CodeSymbol Types + Semantic Search"]
+        end
+
+        REPL --> LLM
+        LLM --> FE
+        FE --> REC
+        REC -.->|state management| KG
+        REPL -.->|semantic queries| KG
+    end
+
+    style REPL fill:#bbdefb
+    style LLM fill:#fff9c4
+    style FE fill:#c8e6c9
+    style REC fill:#f8bbd0
+    style KG fill:#b2dfdb
 ```
 
 ## Use Cases
@@ -154,27 +158,50 @@ Complete ecosystem validation:
 
 **Automated Test Suite**: 167/167 passing
 
+```mermaid
+pie title Test Suite Coverage (167/167 passing)
+    "File Editing Tests" : 40
+    "Security Validation Tests" : 35
+    "Recovery System Tests" : 30
+    "REPL Integration Tests" : 25
+    "Knowledge Graph Tests" : 20
+    "Integration Tests" : 17
 ```
-File Editing Tests ............ 40/40 ✓
-Security Validation Tests ..... 35/35 ✓
-REPL Integration Tests ........ 25/25 ✓
-Knowledge Graph Tests ......... 20/20 ✓
-Recovery System Tests ......... 30/30 ✓
-Integration Tests ............. 17/17 ✓
-                              ────────
-                    TOTAL: 167/167 ✓
-```
+
+| Test Category | Count | Status |
+|---------------|-------|--------|
+| File Editing Tests | 40/40 | ✓ |
+| Security Validation Tests | 35/35 | ✓ |
+| REPL Integration Tests | 25/25 | ✓ |
+| Knowledge Graph Tests | 20/20 | ✓ |
+| Recovery System Tests | 30/30 | ✓ |
+| Integration Tests | 17/17 | ✓ |
+| **TOTAL** | **167/167** | **✓** |
 
 **Live Demonstrations**: 8/8 successful
 
-1. ✓ Auto-fix compilation errors
-2. ✓ Implement new features
-3. ✓ Refactor code sections
-4. ✓ Apply security patches
-5. ✓ Code review automation
-6. ✓ Cross-cutting concerns
-7. ✓ Dependency updates with migration
-8. ✓ AI-generated Rust code (Ollama)
+```mermaid
+graph LR
+    D1["✓ Auto-fix<br/>Compilation<br/>Errors"]
+    D2["✓ Implement<br/>New<br/>Features"]
+    D3["✓ Refactor<br/>Code<br/>Sections"]
+    D4["✓ Apply<br/>Security<br/>Patches"]
+    D5["✓ Code<br/>Review<br/>Automation"]
+    D6["✓ Cross-cutting<br/>Concerns"]
+    D7["✓ Dependency<br/>Updates<br/>with Migration"]
+    D8["✓ AI-generated<br/>Rust Code<br/>Ollama"]
+
+    D1 --> D2 --> D3 --> D4 --> D5 --> D6 --> D7 --> D8
+
+    style D1 fill:#a5d6a7
+    style D2 fill:#a5d6a7
+    style D3 fill:#a5d6a7
+    style D4 fill:#a5d6a7
+    style D5 fill:#a5d6a7
+    style D6 fill:#a5d6a7
+    style D7 fill:#a5d6a7
+    style D8 fill:#a5d6a7
+```
 
 ## Configuration
 
