@@ -86,6 +86,41 @@ class AutocompleteIndex:
         """
         ...
 
+    def serialize(self) -> bytes:
+        """
+        Serialize the index to bytes for caching
+
+        Returns:
+            Bytes representation of the index
+
+        Example:
+            >>> index = build_index(thesaurus_json)
+            >>> data = index.serialize()
+            >>> # Save to file
+            >>> with open("index.bin", "wb") as f:
+            ...     f.write(data)
+        """
+        ...
+
+    @staticmethod
+    def deserialize(data: bytes) -> "AutocompleteIndex":
+        """
+        Deserialize an index from bytes
+
+        Args:
+            data: Bytes representation of the index
+
+        Returns:
+            AutocompleteIndex object
+
+        Example:
+            >>> # Load from file
+            >>> with open("index.bin", "rb") as f:
+            ...     data = f.read()
+            >>> index = AutocompleteIndex.deserialize(data)
+        """
+        ...
+
     def __repr__(self) -> str: ...
     def __str__(self) -> str: ...
 

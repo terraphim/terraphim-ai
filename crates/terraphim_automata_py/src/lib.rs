@@ -1,9 +1,9 @@
 use pyo3::prelude::*;
 use pyo3::exceptions::{PyValueError, PyRuntimeError};
 use ::terraphim_automata::autocomplete::{
-    autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search,
-    fuzzy_autocomplete_search_levenshtein, AutocompleteConfig, AutocompleteIndex,
-    AutocompleteResult,
+    autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
+    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
+    AutocompleteConfig, AutocompleteIndex, AutocompleteResult,
 };
 use ::terraphim_automata::matcher::{
     extract_paragraphs_from_automata, find_matches, LinkType, Matched,
@@ -183,6 +183,42 @@ impl PyAutocompleteIndex {
         .map_err(|e| PyValueError::new_err(format!("Fuzzy search error: {}", e)))?;
 
         Ok(results.into_iter().map(PyAutocompleteResult::from).collect())
+    }
+
+    /// Serialize the index to bytes for caching
+    ///
+    /// Returns:
+    ///     Bytes representation of the index
+    ///
+    /// Example:
+    ///     >>> index = build_index(thesaurus_json)
+    ///     >>> data = index.serialize()
+    ///     >>> # Save to file
+    ///     >>> with open("index.bin", "wb") as f:
+    ///     ...     f.write(data)
+    fn serialize(&self) -> PyResult<Vec<u8>> {
+        serialize_autocomplete_index(&self.inner)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to serialize index: {}", e)))
+    }
+
+    /// Deserialize an index from bytes
+    ///
+    /// Args:
+    ///     data: Bytes representation of the index
+    ///
+    /// Returns:
+    ///     AutocompleteIndex object
+    ///
+    /// Example:
+    ///     >>> # Load from file
+    ///     >>> with open("index.bin", "rb") as f:
+    ///     ...     data = f.read()
+    ///     >>> index = AutocompleteIndex.deserialize(data)
+    #[staticmethod]
+    fn deserialize(data: &[u8]) -> PyResult<PyAutocompleteIndex> {
+        let index = deserialize_autocomplete_index(data)
+            .map_err(|e| PyRuntimeError::new_err(format!("Failed to deserialize index: {}", e)))?;
+        Ok(PyAutocompleteIndex { inner: index })
     }
 
     fn __repr__(&self) -> String {
