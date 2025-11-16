@@ -2,6 +2,14 @@
 name = "terraphim_agent"
 version = "1.0.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim AI Agent CLI - Command-line interface with interactive REPL and ASCII graph visualization"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["cli", "ai", "agent", "search", "repl", "terminal"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [features]
 default = []
