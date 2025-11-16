@@ -1,5 +1,95 @@
-[profile.release]
-panic = "unwind"
-opt-level = 3
-lto = true
-codegen-units = 1
+# Cargo configuration for Terraphim AI project
+# Based on patterns from ripgrep and jiff for consistent cross-compilation
+
+# Use default crate registry configuration
+# Note: Vendor directory disabled - using standard crates.io registry
+# This ensures compatibility with standard cargo workflows
+
+# Target-specific configurations for cross-compilation
+[target.aarch64-unknown-linux-gnu]
+linker = "aarch64-linux-gnu-gcc"
+
+[target.aarch64-unknown-linux-musl]
+linker = "aarch64-linux-musl-gcc"
+
+[target.armv7-unknown-linux-gnueabihf]
+linker = "arm-linux-gnueabihf-gcc"
+
+[target.armv7-unknown-linux-musleabihf]
+linker = "arm-linux-musleabihf-gcc"
+
+[target.x86_64-unknown-linux-musl]
+linker = "x86_64-linux-musl-gcc"
+
+[target.powerpc64le-unknown-linux-gnu]
+linker = "powerpc64le-linux-gnu-gcc"
+
+[target.riscv64gc-unknown-linux-gnu]
+linker = "riscv64-linux-gnu-gcc"
+
+# Optimized rustflags for specific targets
+# Comment these out if not needed to avoid conflicts
+# [target.x86_64-pc-windows-msvc]
+# rustflags = "-C target-feature=+crt-static"
+
+# [target.x86_64-unknown-linux-gnu]
+# rustflags = "-C target-cpu=native -C link-arg=-Wl,--as-needed"
+
+# [target.aarch64-apple-darwin]
+# rustflags = "-C target-cpu=apple-m1 -C link-arg=-Wl,--as-needed"
+
+# [target.x86_64-apple-darwin]
+# rustflags = "-C target-cpu=native -C link-arg=-Wl,--as-needed"
+
+# Build configuration
+[build]
+# Default target for builds
+target = "x86_64-unknown-linux-gnu"
+
+# Cross-compilation settings (commented out - let cross-rs handle Docker images)
+# The cross-rs tool automatically manages Docker images for cross-compilation
+# Uncomment and customize if you need specific image overrides
+
+# Registry configuration
+[registry]
+# Use sparse protocol for faster downloads
+crates-io = { protocol = "sparse" }
+
+# Network configuration
+[http]
+# Check for newer versions
+check-revoke = false
+
+# Installation configuration
+[net]
+# Use GitHub's API for dependency resolution
+git-fetch-with-cli = true
+
+# Doc configuration
+[doc]
+# Browser to use for documentation
+browser = ["firefox", "google-chrome", "safari"]
+
+# FFI configuration for TUI and other native dependencies
+# Comment these out if not needed to avoid conflicts
+# [target.x86_64-unknown-linux-gnu.ffi]
+# rustflags = "-L /usr/lib/x86_64-linux-gnu"
+
+# [target.aarch64-unknown-linux-gnu.ffi]
+# rustflags = "-L /usr/lib/aarch64-linux-gnu"
+
+# WASM configuration
+# [target.wasm32-unknown-unknown]
+# WebAssembly configuration
+# rustflags = "-C opt-level=3 -C target-feature=+bulk-memory -C lto=fat"
+
+# Testing configuration
+[term]
+# Use colored output
+color = "auto"
+
+# Quiet output for cargo
+quiet = false
+
+# Verbose output
+verbose = false
