@@ -30,7 +30,7 @@ genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-u
 # Additional dependencies
 ahash = { version = "0.8.8", features = ["serde"] }
 futures = "0.3"
-rand = "0.8"
+rand = "0.9"
 # tiktoken-rs = "0.6" # Now handled by rust-genai
 tracing = "0.1"
 regex = "1.10"
