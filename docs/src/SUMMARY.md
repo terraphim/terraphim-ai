@@ -53,3 +53,7 @@
 - [Bug Reporting Enhancement](./knowledge-graph-bug-reporting-enhancement.md)
 - [Bug Reporting Terminology](./kg/bug-reporting.md)
 - [Issue Tracking Terminology](./kg/issue-tracking.md)
+
+## Deployment
+
+- [Cloudflare Pages Deployment](../CLOUDFLARE_DEPLOYMENT.md)
