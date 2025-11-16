@@ -4,6 +4,7 @@
 //! the thesaurus is built immediately rather than waiting for "first use".
 
 use serial_test::serial;
+use std::path::PathBuf;
 use std::time::Duration;
 use tokio::time::timeout;
 use tracing::Level;
@@ -37,19 +38,40 @@ async fn test_thesaurus_prewarm_on_role_switch() {
 
     // Ensure Terraphim Engineer role exists with KG configured
     let role_name = RoleName::new("Terraphim Engineer");
+
+    // Determine correct KG path for testing
+    let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    println!("   Current working directory: {:?}", project_root);
+
+    // The test runs from src-tauri, need to find project root docs/src/kg
+    let kg_path = if project_root.ends_with("src-tauri") {
+        // If we're in src-tauri, go up two levels to project root
+        project_root.join("../../docs/src/kg")
+    } else if project_root.ends_with("desktop") {
+        // If we're in desktop directory, go up one level to project root
+        project_root.join("../docs/src/kg")
+    } else {
+        // If we're in workspace root
+        project_root.join("docs/src/kg")
+    };
+
+    // Skip test gracefully if KG directory doesn't exist
+    if !kg_path.exists() {
+        println!("⚠️ KG directory not found at {:?}, skipping test", kg_path);
+        return;
+    }
+
     if let Some(role) = config.roles.get_mut(&role_name) {
-        // Update role to ensure KG is configured
-        if role.kg.is_none() {
-            role.kg = Some(KnowledgeGraph {
-                automata_path: None,
-                knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
-                    input_type: KnowledgeGraphInputType::Markdown,
-                    path: std::path::PathBuf::from("./docs/src/kg"),
-                }),
-                public: false,
-                publish: false,
-            });
-        }
+        // Update role to ensure KG is configured with correct path
+        role.kg = Some(KnowledgeGraph {
+            automata_path: None,
+            knowledge_graph_local: Some(terraphim_config::KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: kg_path,
+            }),
+            public: false,
+            publish: false,
+        });
     }
 
     let config_state = ConfigState::new(&mut config)

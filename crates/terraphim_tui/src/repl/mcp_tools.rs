@@ -3,6 +3,7 @@
 
 #[cfg(feature = "repl-mcp")]
 #[allow(dead_code)]
+#[derive(Default)]
 pub struct McpToolsHandler {
     // MCP tools implementation will go here
 }
@@ -11,7 +12,7 @@ pub struct McpToolsHandler {
 #[allow(dead_code)]
 impl McpToolsHandler {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
     pub async fn autocomplete_terms(

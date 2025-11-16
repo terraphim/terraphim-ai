@@ -1,0 +1,25 @@
+   Compiling terraphim_service v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_service)
+warning: terraphim_server@1.0.0: Source file modified: "../desktop/src-tauri/tests/thesaurus_prewarm_test.rs", rebuilding...
+warning: terraphim_server@1.0.0: install js packages...
+warning: terraphim_server@1.0.0: build js assets...
+warning: terraphim_server@1.0.0: js build successful
+warning: terraphim-ai-desktop@1.0.0: Successfully copied config files to build
+error[E0433]: failed to resolve: use of undeclared type `PathBuf`
+    --> crates/terraphim_service/src/lib.rs:2673:71
+     |
+2673 |         let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+     |                                                                       ^^^^^^^ use of undeclared type `PathBuf`
+     |
+help: consider importing this struct
+     |
+2638 +     use std::path::PathBuf;
+     |
+
+   Compiling terraphim_multi_agent v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_multi_agent)
+   Compiling terraphim_tui v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_tui)
+   Compiling terraphim_mcp_server v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_mcp_server)
+   Compiling terraphim-ai-desktop v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/desktop/src-tauri)
+   Compiling terraphim_server v1.0.0 (/home/alex/projects/terraphim/terraphim-ai/terraphim_server)
+For more information about this error, try `rustc --explain E0433`.
+error: could not compile `terraphim_service` (lib test) due to 1 previous error
+warning: build failed, waiting for other jobs to finish...

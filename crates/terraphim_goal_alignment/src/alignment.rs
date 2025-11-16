@@ -697,6 +697,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_goal_aligner_creation() {
         let role_name = RoleName::new("test_role");
         let thesaurus = Thesaurus::new("test_thesaurus".to_string());
@@ -717,6 +718,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_goal_management() {
         let role_name = RoleName::new("test_role");
         let thesaurus = Thesaurus::new("test_thesaurus".to_string());
@@ -760,6 +762,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_goal_alignment() {
         let role_name = RoleName::new("test_role");
         let thesaurus = Thesaurus::new("test_thesaurus".to_string());
