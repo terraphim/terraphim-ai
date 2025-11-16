@@ -19,7 +19,7 @@ bucket = "./book"
 # Deployment environment configurations
 [env.production]
 name = "terraphim-docs"
-route = "doc.terraphim.ai/*"
+route = "docs.terraphim.ai/*"
 
 [env.preview]
 name = "terraphim-docs-preview"

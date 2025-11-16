@@ -27,6 +27,10 @@ on:
 
 env:
   MDBOOK_VERSION: '0.4.40'
+  # 1Password secret references
+  OP_API_TOKEN: op://TerraphimPlatform/terraphim-md-book-cloudflare/workers-api-token
+  OP_ACCOUNT_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/account-id
+  OP_ZONE_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/zone-id
 
 jobs:
   build:
@@ -66,6 +70,7 @@ jobs:
       contents: read
       deployments: write
       pull-requests: write
+      id-token: write
     environment:
       name: docs-preview
       url: ${{ steps.deploy.outputs.deployment-url }}
@@ -79,12 +84,22 @@ jobs:
           name: docs-build
           path: docs/book/
 
+      - name: Load secrets from 1Password
+        id: op-load-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.OP_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.OP_ACCOUNT_ID }}
+
       - name: Deploy to Cloudflare Pages (Preview)
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy docs/book --project-name=terraphim-docs --branch=${{ github.head_ref || github.ref_name }}
 
       - name: Comment PR with preview URL
@@ -115,9 +130,10 @@ jobs:
     permissions:
       contents: read
       deployments: write
+      id-token: write
     environment:
       name: docs-production
-      url: https://doc.terraphim.ai
+      url: https://docs.terraphim.ai
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -128,12 +144,23 @@ jobs:
           name: docs-build
           path: docs/book/
 
+      - name: Load secrets from 1Password
+        id: op-load-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.OP_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ env.OP_ACCOUNT_ID }}
+          CLOUDFLARE_ZONE_ID: ${{ env.OP_ZONE_ID }}
+
       - name: Deploy to Cloudflare Pages (Production)
         id: deploy
         uses: cloudflare/wrangler-action@v3
         with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          apiToken: ${{ env.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ env.CLOUDFLARE_ACCOUNT_ID }}
           command: pages deploy docs/book --project-name=terraphim-docs --branch=main --commit-dirty=true
 
       - name: Deployment Summary
@@ -141,7 +168,7 @@ jobs:
           echo "## Deployment Complete" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "Documentation has been deployed to:" >> $GITHUB_STEP_SUMMARY
-          echo "- **Production URL**: https://doc.terraphim.ai" >> $GITHUB_STEP_SUMMARY
+          echo "- **Production URL**: https://docs.terraphim.ai" >> $GITHUB_STEP_SUMMARY
           echo "- **Cloudflare Pages URL**: ${{ steps.deploy.outputs.deployment-url }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Commit**: ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
@@ -152,10 +179,22 @@ jobs:
     name: Purge CDN Cache
     needs: deploy-production
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
     steps:
+      - name: Load secrets from 1Password
+        id: op-load-secrets
+        uses: 1password/load-secrets-action@v2
+        with:
+          export-env: true
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+          CLOUDFLARE_API_TOKEN: ${{ env.OP_API_TOKEN }}
+          CLOUDFLARE_ZONE_ID: ${{ env.OP_ZONE_ID }}
+
       - name: Purge Cloudflare Cache
         run: |
-          curl -X POST "https://api.cloudflare.com/client/v4/zones/${{ secrets.CLOUDFLARE_ZONE_ID }}/purge_cache" \
-            -H "Authorization: Bearer ${{ secrets.CLOUDFLARE_API_TOKEN }}" \
+          curl -X POST "https://api.cloudflare.com/client/v4/zones/${CLOUDFLARE_ZONE_ID}/purge_cache" \
+            -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
             -H "Content-Type: application/json" \
             --data '{"purge_everything":true}' || true

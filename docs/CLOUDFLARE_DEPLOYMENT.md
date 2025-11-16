@@ -1,10 +1,10 @@
 # Cloudflare Pages Deployment for Terraphim AI Documentation
 
-This document describes how to deploy the Terraphim AI documentation to Cloudflare Pages.
+This document describes how to deploy the Terraphim AI documentation to Cloudflare Pages at https://docs.terraphim.ai.
 
 ## Overview
 
-The documentation is built using [mdBook](https://rust-lang.github.io/mdBook/) and deployed to Cloudflare Pages. The migration from Netlify to Cloudflare Pages provides:
+The documentation is built using [mdBook](https://rust-lang.github.io/mdBook/) and deployed to Cloudflare Pages with secrets managed via 1Password. The migration from Netlify to Cloudflare Pages provides:
 
 - **Global CDN**: Content served from 200+ edge locations
 - **Automatic SSL**: Free SSL certificates with automatic renewal
@@ -38,11 +38,22 @@ The documentation is built using [mdBook](https://rust-lang.github.io/mdBook/) a
 
 ### For CI/CD (GitHub Actions)
 
-Configure the following secrets in your GitHub repository:
+The workflow uses 1Password for secret management. Configure the following:
 
-- `CLOUDFLARE_API_TOKEN`: API token with "Cloudflare Pages — Edit" permission
-- `CLOUDFLARE_ACCOUNT_ID`: Your Cloudflare account ID
-- `CLOUDFLARE_ZONE_ID`: (Optional) Zone ID for cache purging
+1. **GitHub Secret**:
+   - `OP_SERVICE_ACCOUNT_TOKEN`: Your 1Password service account token
+
+2. **1Password Vault** (TerraphimPlatform):
+   The workflow automatically reads from:
+   - `op://TerraphimPlatform/terraphim-md-book-cloudflare/workers-api-token`
+   - `op://TerraphimPlatform/terraphim-md-book-cloudflare/account-id`
+   - `op://TerraphimPlatform/terraphim-md-book-cloudflare/zone-id`
+
+3. **Setup 1Password Service Account**:
+   ```bash
+   # Create service account with vault access
+   # See: https://developer.1password.com/docs/service-accounts/
+   ```
 
 ## Local Development
 
@@ -79,8 +90,9 @@ The `serve` command automatically watches for changes and rebuilds.
 
 The documentation is automatically deployed when:
 
-1. **Production** (https://doc.terraphim.ai):
+1. **Production** (https://docs.terraphim.ai):
    - Push to `main` branch with changes in `docs/`
+   - Secrets are loaded from 1Password automatically
 
 2. **Preview**:
    - Pull requests with changes in `docs/`
@@ -89,15 +101,24 @@ The documentation is automatically deployed when:
 3. **Manual**:
    - Trigger via GitHub Actions workflow dispatch
 
-### Manual Deployment
+### Manual Deployment with 1Password
 
-Use the deployment script:
+First, set up 1Password integration:
 
 ```bash
-# Preview deployment
-./scripts/deploy-docs.sh preview
+# Run setup script
+./scripts/setup-1password-cloudflare.sh
+```
 
-# Production deployment
+Then deploy using 1Password credentials:
+
+```bash
+# Deploy with 1Password (recommended)
+op run --env-file=docs/.env.1password -- ./scripts/deploy-docs.sh production
+
+# Or manually export credentials
+export CLOUDFLARE_API_TOKEN=$(op read 'op://TerraphimPlatform/terraphim-md-book-cloudflare/workers-api-token')
+export CLOUDFLARE_ACCOUNT_ID=$(op read 'op://TerraphimPlatform/terraphim-md-book-cloudflare/account-id')
 ./scripts/deploy-docs.sh production
 ```
 
@@ -138,7 +159,7 @@ The `docs/book.toml` file configures mdBook:
 ## Custom Domain Setup
 
 1. Go to Cloudflare Dashboard > Pages > terraphim-docs > Custom domains
-2. Add `doc.terraphim.ai`
+2. Add `docs.terraphim.ai`
 3. Follow DNS configuration instructions
 4. SSL certificate is automatically provisioned
 
@@ -217,23 +238,29 @@ terraphim-ai/
 ├── docs/
 │   ├── book.toml              # mdBook configuration
 │   ├── wrangler.toml          # Cloudflare Pages configuration
+│   ├── .env.example           # Environment variable template
+│   ├── .env.1password         # 1Password environment file (generated)
 │   ├── CLOUDFLARE_DEPLOYMENT.md  # This file
 │   └── src/
 │       ├── SUMMARY.md         # Table of contents
 │       └── *.md               # Documentation pages
 ├── scripts/
-│   └── deploy-docs.sh         # Manual deployment script
+│   ├── deploy-docs.sh         # Manual deployment script
+│   └── setup-1password-cloudflare.sh  # 1Password setup script
 └── .github/
     └── workflows/
-        └── deploy-docs.yml    # CI/CD workflow
+        └── deploy-docs.yml    # CI/CD workflow (uses 1Password)
 ```
 
 ## Security Considerations
 
+- Secrets are stored in 1Password, not in GitHub or plaintext files
+- 1Password service accounts have minimal vault access
 - API tokens should have minimal permissions (Pages Edit only)
 - Use GitHub Environments with protection rules for production
 - Review preview deployments before merging to main
 - Security headers are configured in wrangler.toml
+- Never commit `.env` files (excluded in .gitignore)
 
 ## Performance Optimization
 

@@ -35,6 +35,8 @@ docs/src/*.json
 demo_data
 rust-sdk
 .env
+.env.1password
+docs/.env.1password
 .aider*
 scratchpad/firecracker-rust
 terraphim_server/dist/
