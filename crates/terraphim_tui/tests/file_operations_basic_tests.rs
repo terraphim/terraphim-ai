@@ -7,18 +7,20 @@ mod file_operations_tests {
     fn test_file_search_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result =
-                terraphim_agent::repl::commands::ReplCommand::from_str("/file search \"async rust\"");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
+                "/file search \"async rust\"",
+            );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Search { query } => {
-                        assert_eq!(query, "\"async rust\"");
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Search { query } => {
+                            assert_eq!(query, "\"async rust\"");
+                        }
+                        _ => panic!("Expected Search subcommand"),
                     }
-                    _ => panic!("Expected Search subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -32,13 +34,14 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::List => {
-                        // List command has no fields
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::List => {
+                            // List command has no fields
+                        }
+                        _ => panic!("Expected List subcommand"),
                     }
-                    _ => panic!("Expected List subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -53,13 +56,14 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Info { path } => {
-                        assert_eq!(path, "./src/main.rs");
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Info { path } => {
+                            assert_eq!(path, "./src/main.rs");
+                        }
+                        _ => panic!("Expected Info subcommand"),
                     }
-                    _ => panic!("Expected Info subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -108,13 +112,14 @@ mod file_operations_tests {
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_agent::repl::commands::FileSubcommand::Search { query } => {
-                        assert_eq!(query, "\"async rust patterns\" --recursive");
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Search { query } => {
+                            assert_eq!(query, "\"async rust patterns\" --recursive");
+                        }
+                        _ => panic!("Expected Search subcommand"),
                     }
-                    _ => panic!("Expected Search subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
