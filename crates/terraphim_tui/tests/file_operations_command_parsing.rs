@@ -7,7 +7,7 @@ mod tests {
     #[test]
     #[cfg(feature = "repl-file")]
     fn test_file_command_parsing_basic() {
-        use terraphim_tui::repl::commands::ReplCommand;
+        use terraphim_agent::repl::commands::ReplCommand;
 
         // Test file search command
         let result = ReplCommand::from_str("/file search \"test query\"");
@@ -25,7 +25,7 @@ mod tests {
     #[test]
     #[cfg(feature = "repl-file")]
     fn test_file_command_help_available() {
-        use terraphim_tui::repl::commands::ReplCommand;
+        use terraphim_agent::repl::commands::ReplCommand;
 
         // Test that file command is in available commands
         let commands = ReplCommand::available_commands();
@@ -50,7 +50,7 @@ mod tests {
     #[test]
     #[cfg(feature = "repl-file")]
     fn test_variations_of_file_commands() {
-        use terraphim_tui::repl::commands::ReplCommand;
+        use terraphim_agent::repl::commands::ReplCommand;
 
         let test_commands = vec![
             "/file search \"rust async\"",
@@ -81,7 +81,7 @@ mod tests {
     #[test]
     #[cfg(feature = "repl-file")]
     fn test_invalid_file_commands() {
-        use terraphim_tui::repl::commands::ReplCommand;
+        use terraphim_agent::repl::commands::ReplCommand;
 
         let invalid_commands = vec![
             "/file",                          // missing subcommand
@@ -104,7 +104,7 @@ mod tests {
     #[test]
     #[cfg(feature = "repl-file")]
     fn test_file_command_with_various_flags() {
-        use terraphim_tui::repl::commands::ReplCommand;
+        use terraphim_agent::repl::commands::ReplCommand;
 
         let complex_commands = vec![
             "/file search \"async rust\" --path ./src --semantic --limit 10",

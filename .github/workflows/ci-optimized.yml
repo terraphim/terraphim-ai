@@ -207,7 +207,7 @@ jobs:
               # Test binaries
               ./target/${{ matrix.target }}/release/terraphim_server --version
               ./target/${{ matrix.target }}/release/terraphim_mcp_server --version
-              ./target/${{ matrix.target }}/release/terraphim-tui --version
+              ./target/${{ matrix.target }}/release/terraphim-agent --version
             "
 
       - name: Create .deb package
