@@ -84,21 +84,21 @@ For detailed installation instructions, see our [Installation Guide](https://git
    yarn run tauri dev
    ```
 
-   **Terminal Interface (TUI):**
+   **Terminal Interface (Agent):**
    ```bash
    # Build with all features (recommended)
-   cargo build -p terraphim_tui --features repl-full --release
-   ./target/release/terraphim-tui
+   cargo build -p terraphim_agent --features repl-full --release
+   ./target/release/terraphim-agent
 
    # Or run minimal version
-   cargo run --bin terraphim-tui
+   cargo run -p terraphim_agent --bin terraphim-agent
    ```
 
 (See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
 
-## Terminal User Interface (TUI)
+## Terminal Agent Interface
 
-Terraphim includes a comprehensive TUI that provides both interactive REPL functionality and CLI commands for advanced operations:
+Terraphim includes a comprehensive terminal agent that provides both interactive REPL functionality and CLI commands for advanced operations:
 
 ### Key Features
 
@@ -216,7 +216,7 @@ export TERRAPHIM_PROFILE_S3_ENDPOINT="https://s3.amazonaws.com/"
 ```bash
 brew install terraphim/terraphim-ai/terraphim-ai
 ```
-This installs the server, TUI, and desktop app (macOS only).
+This installs the server, terminal agent, and desktop app (macOS only).
 
 #### Debian/Ubuntu
 ```bash
