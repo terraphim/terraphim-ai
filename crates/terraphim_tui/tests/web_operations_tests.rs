@@ -1,5 +1,5 @@
-#[cfg(feature = "repl")]
-use terraphim_tui::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
+use std::str::FromStr;
+
 #[cfg(feature = "repl")]
 use terraphim_tui::repl::web_operations::*;
 
@@ -7,8 +7,6 @@ use terraphim_tui::repl::web_operations::*;
 mod tests {
     use super::*;
     use terraphim_tui::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
-    use terraphim_tui::repl::web_operations::utils::*;
-    use terraphim_tui::repl::web_operations::*;
 
     #[test]
     fn test_web_get_command_parsing() {
@@ -105,11 +103,11 @@ mod tests {
                 WebSubcommand::Scrape {
                     url,
                     selector,
-                    wait,
+                    wait_for_element,
                 } => {
                     assert_eq!(url, "https://example.com");
-                    assert_eq!(selector, ".content");
-                    assert!(wait.is_none());
+                    assert_eq!(selector, Some(".content".to_string()));
+                    assert!(wait_for_element.is_none());
                 }
                 _ => panic!("Expected WebSubcommand::Scrape"),
             },
@@ -129,11 +127,11 @@ mod tests {
                 WebSubcommand::Scrape {
                     url,
                     selector,
-                    wait,
+                    wait_for_element,
                 } => {
                     assert_eq!(url, "https://example.com");
-                    assert_eq!(selector, "#dynamic-content");
-                    assert_eq!(wait, Some(".loader".to_string()));
+                    assert_eq!(selector, Some("#dynamic-content".to_string()));
+                    assert_eq!(wait_for_element, Some(".loader".to_string()));
                 }
                 _ => panic!("Expected WebSubcommand::Scrape"),
             },
@@ -266,24 +264,18 @@ mod tests {
 
     #[test]
     fn test_web_api_command_parsing() {
-        let cmd = ReplCommand::from_str(
-            "/web api https://api.github.com /users/user1,/users/user2,/repos/repo1",
-        )
-        .unwrap();
+        let cmd = ReplCommand::from_str("/web api https://api.github.com/users/user1").unwrap();
 
         match cmd {
             ReplCommand::Web { subcommand } => match subcommand {
                 WebSubcommand::Api {
-                    base_url,
-                    endpoints,
-                    rate_limit,
+                    endpoint,
+                    method,
+                    data,
                 } => {
-                    assert_eq!(base_url, "https://api.github.com");
-                    assert_eq!(
-                        endpoints,
-                        vec!["/users/user1", "/users/user2", "/repos/repo1"]
-                    );
-                    assert!(rate_limit.is_none());
+                    assert_eq!(endpoint, "https://api.github.com/users/user1");
+                    assert_eq!(method, "GET");
+                    assert!(data.is_none());
                 }
                 _ => panic!("Expected WebSubcommand::Api"),
             },
@@ -292,22 +284,19 @@ mod tests {
     }
 
     #[test]
-    fn test_web_api_with_rate_limit_parsing() {
-        let cmd = ReplCommand::from_str(
-            "/web api https://api.example.com /endpoint1,/endpoint2 --rate-limit 1000",
-        )
-        .unwrap();
+    fn test_web_api_with_data_parsing() {
+        let cmd = ReplCommand::from_str("/web api https://api.example.com/users").unwrap();
 
         match cmd {
             ReplCommand::Web { subcommand } => match subcommand {
                 WebSubcommand::Api {
-                    base_url,
-                    endpoints,
-                    rate_limit,
+                    endpoint,
+                    method,
+                    data,
                 } => {
-                    assert_eq!(base_url, "https://api.example.com");
-                    assert_eq!(endpoints, vec!["/endpoint1", "/endpoint2"]);
-                    assert_eq!(rate_limit, Some(1000));
+                    assert_eq!(endpoint, "https://api.example.com/users");
+                    assert_eq!(method, "GET");
+                    assert!(data.is_none());
                 }
                 _ => panic!("Expected WebSubcommand::Api"),
             },
@@ -322,7 +311,7 @@ mod tests {
         match cmd {
             ReplCommand::Web { subcommand } => match subcommand {
                 WebSubcommand::Status { operation_id } => {
-                    assert_eq!(operation_id, Some("webop-1642514400000".to_string()));
+                    assert_eq!(operation_id, "webop-1642514400000");
                 }
                 _ => panic!("Expected WebSubcommand::Status"),
             },

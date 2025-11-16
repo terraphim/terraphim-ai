@@ -9,6 +9,11 @@ pub mod markdown_parser;
 pub mod registry;
 pub mod validator;
 
+// Re-export main types for easier access
+pub use executor::CommandExecutor;
+pub use registry::CommandRegistry;
+pub use validator::CommandValidator;
+
 #[cfg(test)]
 mod tests;
 
@@ -16,24 +21,18 @@ mod tests;
 pub mod modes;
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 
 /// Execution mode for commands
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
 pub enum ExecutionMode {
     /// Execute locally on the host machine (safe commands only)
+    #[default]
     Local,
     /// Execute in isolated Firecracker microVM
     Firecracker,
     /// Smart hybrid mode based on risk assessment
     Hybrid,
-}
-
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        ExecutionMode::Local
-    }
 }
 
 /// Command parameter definition
@@ -268,6 +267,15 @@ pub enum CommandRegistryError {
 
     #[error("YAML parsing error: {0}")]
     YamlError(#[from] serde_yaml::Error),
+
+    #[error("Automata processing error: {0}")]
+    AutomataError(String),
+
+    #[error("Command not found: {0}")]
+    CommandNotFound(String),
+
+    #[error("Validation error: {0}")]
+    ValidationError(String),
 }
 
 /// Hook execution context
@@ -324,14 +332,14 @@ impl HookManager {
     pub fn add_pre_hook(&mut self, hook: Box<dyn CommandHook + Send + Sync>) {
         self.pre_hooks.push(hook);
         self.pre_hooks
-            .sort_by(|a, b| b.priority().cmp(&a.priority()));
+            .sort_by_key(|b| std::cmp::Reverse(b.priority()));
     }
 
     /// Add a post-command hook
     pub fn add_post_hook(&mut self, hook: Box<dyn CommandHook + Send + Sync>) {
         self.post_hooks.push(hook);
         self.post_hooks
-            .sort_by(|a, b| b.priority().cmp(&a.priority()));
+            .sort_by_key(|b| std::cmp::Reverse(b.priority()));
     }
 
     /// Execute all pre-command hooks
@@ -366,7 +374,7 @@ impl HookManager {
     pub async fn execute_post_hooks(
         &self,
         context: &HookContext,
-        result: &CommandExecutionResult,
+        _result: &CommandExecutionResult,
     ) -> Result<(), CommandExecutionError> {
         for hook in &self.post_hooks {
             match hook.execute(context).await {

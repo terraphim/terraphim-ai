@@ -1591,12 +1591,13 @@ impl RoutingDecision {
 }
 
 /// Routing scenario types
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum RoutingScenario {
     /// Default routing scenario
     #[serde(rename = "default")]
+    #[default]
     Default,
 
     /// Background processing (low priority, cost-optimized)
@@ -1630,12 +1631,6 @@ pub enum RoutingScenario {
     /// Custom scenario
     #[serde(rename = "custom")]
     Custom(String),
-}
-
-impl Default for RoutingScenario {
-    fn default() -> Self {
-        Self::Default
-    }
 }
 
 impl fmt::Display for RoutingScenario {

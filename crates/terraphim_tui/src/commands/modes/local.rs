@@ -5,10 +5,10 @@
 
 use super::{
     default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
-    ExecutorCapabilities, ResourceUsage,
+    ExecutorCapabilities,
 };
 use std::collections::HashMap;
-use std::process::{Command, Stdio};
+use std::process::Stdio;
 use std::time::{Duration, Instant};
 use tokio::process::Command as TokioCommand;
 
@@ -70,28 +70,23 @@ impl LocalExecutor {
 
     /// Check if a command is safe to execute locally
     fn is_safe_command(&self, command: &str, args: &[String]) -> bool {
-        // Check against safe command whitelist
-        if let Some(safe_paths) = self.safe_commands.get(command) {
-            // Verify the command exists in one of the safe paths
-            for safe_path in safe_paths {
-                if std::path::Path::new(safe_path).exists() {
-                    return true;
+        // Check against safe command whitelist first
+        if self.safe_commands.contains_key(command) {
+            // Additional safety checks for arguments
+            for arg in args {
+                if arg.contains(";")
+                    || arg.contains("|")
+                    || arg.contains("&")
+                    || arg.contains(">")
+                    || arg.contains("`")
+                {
+                    return false;
                 }
             }
+            return true;
         }
 
-        // Additional safety checks
-        if command.contains("..") || command.contains("$") || command.contains("`") {
-            return false;
-        }
-
-        // Check for dangerous arguments
-        for arg in args {
-            if arg.contains(";") || arg.contains("|") || arg.contains("&") || arg.contains(">") {
-                return false;
-            }
-        }
-
+        // Command not in whitelist - unsafe
         false
     }
 
@@ -100,7 +95,7 @@ impl LocalExecutor {
         &self,
         command_str: &str,
     ) -> Result<(String, Vec<String>), CommandExecutionError> {
-        let parts: Vec<&str> = command_str.trim().split_whitespace().collect();
+        let parts: Vec<&str> = command_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(CommandExecutionError::LocalExecutionError(
                 "Empty command".to_string(),
@@ -119,7 +114,7 @@ impl LocalExecutor {
         definition: &CommandDefinition,
         args: &[String],
     ) -> Result<(), CommandExecutionError> {
-        if let Some(ref limits) = definition.resource_limits {
+        if let Some(_limits) = &definition.resource_limits {
             // Simple argument count limit as a basic safety measure
             if args.len() > 50 {
                 return Err(CommandExecutionError::ResourceLimitExceeded(

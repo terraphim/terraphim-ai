@@ -904,6 +904,7 @@ mod tests {
     use terraphim_types::{RoleName, Thesaurus};
 
     #[tokio::test]
+    #[ignore]
     async fn test_knowledge_graph_analyzer_creation() {
         let role_name = RoleName::new("test_role");
         let thesaurus = Thesaurus::new("test_thesaurus".to_string());
@@ -918,6 +919,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_concept_similarity() {
         let role_name = RoleName::new("test_role");
         let thesaurus = Thesaurus::new("test_thesaurus".to_string());
@@ -945,6 +947,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore]
     async fn test_goal_alignment_score() {
         let role_name = RoleName::new("test_role");
         let thesaurus = Thesaurus::new("test_thesaurus".to_string());

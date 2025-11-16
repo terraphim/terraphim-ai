@@ -5,11 +5,11 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::time::{SystemTime, UNIX_EPOCH};
+
 use tempfile::TempDir;
+use terraphim_tui::commands::validator::{SecurityAction, SecurityResult};
 use terraphim_tui::commands::{
-    hooks, CommandDefinition, CommandExecutor, CommandParameter, CommandRegistry, CommandValidator,
-    ExecutionMode, HookContext, HookManager, ParsedCommand, RiskLevel,
+    hooks, CommandHook, CommandRegistry, CommandValidator, ExecutionMode, HookContext, HookManager,
 };
 use tokio::fs;
 
@@ -29,8 +29,8 @@ description: Search files and content using ripgrep
 usage: "search <query> [--type] [--case-sensitive]"
 category: File Operations
 version: "1.0.0"
-risk_level: Low
-execution_mode: Local
+risk_level: low
+execution_mode: local
 permissions:
   - read
 aliases:
@@ -69,8 +69,8 @@ description: Deploy applications with safety checks
 usage: "deploy <environment> [--dry-run]"
 category: Deployment
 version: "1.0.0"
-risk_level: High
-execution_mode: Firecracker
+risk_level: high
+execution_mode: firecracker
 permissions:
   - read
   - write
@@ -86,7 +86,7 @@ parameters:
     required: true
     allowed_values: ["staging", "production"]
     description: Target environment
-  - name: dry-run
+  - name: dry_run
     type: boolean
     required: false
     default_value: false
@@ -118,8 +118,8 @@ description: Perform comprehensive security audit and vulnerability scanning
 usage: "security-audit [target] [--deep] [--report]"
 category: Security
 version: "1.0.0"
-risk_level: Critical
-execution_mode: Firecracker
+risk_level: critical
+execution_mode: firecracker
 permissions:
   - read
   - execute
@@ -170,8 +170,8 @@ description: Simple hello world command for testing
 usage: "hello-world [name] [--greeting]"
 category: Testing
 version: "1.0.0"
-risk_level: Low
-execution_mode: Local
+risk_level: low
+execution_mode: local
 permissions:
   - read
 aliases:
@@ -231,22 +231,22 @@ async fn test_full_command_lifecycle() {
     assert!(deploy_cmd.is_some(), "Should find deploy command");
 
     // Test alias resolution
-    let hello_alias = registry.get_command("hello").await;
+    let hello_alias = registry.resolve_command("hello").await;
     assert!(hello_alias.is_some(), "Should find command by alias");
-    assert_eq!(hello_alias.unwrap().name, "hello-world");
+    assert_eq!(hello_alias.unwrap().definition.name, "hello-world");
 
     // Test search functionality
-    let search_results = registry.search("security").await;
+    let search_results = registry.search_commands("security").await;
     assert_eq!(
         search_results.len(),
         1,
         "Should find 1 security-related command"
     );
-    assert_eq!(search_results[0].name, "security-audit");
+    assert_eq!(search_results[0].definition.name, "security-audit");
 
-    let deploy_results = registry.search("dep").await;
+    let deploy_results = registry.search_commands("dep").await;
     assert_eq!(deploy_results.len(), 1, "Should find deploy command");
-    assert_eq!(deploy_results[0].name, "deploy");
+    assert_eq!(deploy_results[0].definition.name, "deploy");
 
     // Test statistics
     let stats = registry.get_stats().await;
@@ -268,7 +268,7 @@ async fn test_security_validation_integration() {
     // Test low-risk command validation
     let hello_cmd = registry.get_command("hello-world").await.unwrap();
     let result = validator
-        .validate_command_execution(&hello_cmd.name, "Default", &HashMap::new())
+        .validate_command_execution(&hello_cmd.definition.name, "Default", &HashMap::new())
         .await;
 
     assert!(
@@ -280,7 +280,7 @@ async fn test_security_validation_integration() {
     // Test high-risk command with default role
     let deploy_cmd = registry.get_command("deploy").await.unwrap();
     let result = validator
-        .validate_command_execution(&deploy_cmd.name, "Default", &HashMap::new())
+        .validate_command_execution(&deploy_cmd.definition.name, "Default", &HashMap::new())
         .await;
 
     // Default role might not have execute permissions for high-risk commands
@@ -289,7 +289,11 @@ async fn test_security_validation_integration() {
 
     // Test high-risk command with engineer role
     let result = validator
-        .validate_command_execution(&deploy_cmd.name, "Terraphim Engineer", &HashMap::new())
+        .validate_command_execution(
+            &deploy_cmd.definition.name,
+            "Terraphim Engineer",
+            &HashMap::new(),
+        )
         .await;
 
     assert!(
@@ -300,7 +304,11 @@ async fn test_security_validation_integration() {
     // Test critical risk command
     let audit_cmd = registry.get_command("security-audit").await.unwrap();
     let result = validator
-        .validate_command_execution(&audit_cmd.name, "Terraphim Engineer", &HashMap::new())
+        .validate_command_execution(
+            &audit_cmd.definition.name,
+            "Terraphim Engineer",
+            &HashMap::new(),
+        )
         .await;
 
     assert!(
@@ -319,7 +327,7 @@ async fn test_hook_system_integration() {
     registry.add_command_directory(commands_dir);
     registry.load_all_commands().await.unwrap();
 
-    let mut validator = CommandValidator::new();
+    let _validator = CommandValidator::new();
 
     // Create hook manager with test hooks
     let mut hook_manager = HookManager::new();
@@ -333,7 +341,7 @@ async fn test_hook_system_integration() {
     parameters.insert("name".to_string(), "Test".to_string());
 
     let hook_context = HookContext {
-        command: hello_cmd.name.clone(),
+        command: hello_cmd.definition.name.clone(),
         parameters: parameters.clone(),
         user: "test_user".to_string(),
         role: "Terraphim Engineer".to_string(),
@@ -347,7 +355,7 @@ async fn test_hook_system_integration() {
 
     // Mock command execution result
     let execution_result = terraphim_tui::commands::CommandExecutionResult {
-        command: hello_cmd.name.clone(),
+        command: hello_cmd.definition.name.clone(),
         execution_mode: ExecutionMode::Local,
         exit_code: 0,
         stdout: "Hello, Test!".to_string(),
@@ -371,14 +379,7 @@ async fn test_rate_limiting_integration() {
     let mut validator = CommandValidator::new();
 
     // Set up rate limiting for search command
-    validator.rate_limits.insert(
-        "search".to_string(),
-        validator::RateLimit {
-            max_requests: 2,
-            window: std::time::Duration::from_secs(60),
-            current_requests: Vec::new(),
-        },
-    );
+    validator.set_rate_limit("search", 2, std::time::Duration::from_secs(60));
 
     // First two requests should succeed
     let result1 = validator.check_rate_limit("search");
@@ -410,24 +411,24 @@ async fn test_security_event_logging() {
     validator.log_security_event(
         "test_user",
         "hello-world",
-        validator::SecurityAction::CommandValidation,
-        validator::SecurityResult::Allowed,
+        SecurityAction::CommandValidation,
+        SecurityResult::Allowed,
         "Command validation passed",
     );
 
     validator.log_security_event(
         "test_user",
         "deploy",
-        validator::SecurityAction::PermissionCheck,
-        validator::SecurityResult::Denied("Insufficient permissions".to_string()),
+        SecurityAction::PermissionCheck,
+        SecurityResult::Denied("Insufficient permissions".to_string()),
         "User lacks execute permissions",
     );
 
     validator.log_security_event(
         "admin_user",
         "security-audit",
-        validator::SecurityAction::KnowledgeGraphCheck,
-        validator::SecurityResult::Allowed,
+        SecurityAction::KnowledgeGraphCheck,
+        SecurityResult::Allowed,
         "Knowledge graph concepts verified",
     );
 
@@ -475,7 +476,7 @@ async fn test_backup_hook_integration() {
     assert!(backup_dir.exists(), "Backup directory should be created");
 
     // Verify backup file was created
-    let mut backup_files: Vec<_> = std::fs::read_dir(&backup_dir)
+    let backup_files: Vec<_> = std::fs::read_dir(&backup_dir)
         .unwrap()
         .map(|entry| entry.unwrap())
         .collect();
@@ -553,25 +554,26 @@ async fn test_command_suggestion_system() {
     registry.load_all_commands().await.unwrap();
 
     // Test partial name suggestions
-    let suggestions = registry.search("sec").await;
+    let suggestions = registry.search_commands("sec").await;
     assert_eq!(suggestions.len(), 1, "Should suggest security-audit");
-    assert_eq!(suggestions[0].name, "security-audit");
+    assert_eq!(suggestions[0].definition.name, "security-audit");
 
     // Test category-based suggestions
-    let security_commands = registry.search("security").await;
+    let security_commands = registry.search_commands("security").await;
     assert_eq!(security_commands.len(), 1, "Should find security commands");
 
     // Test description-based search
-    let deploy_commands = registry.search("application").await;
+    let deploy_commands = registry.search_commands("application").await;
     assert_eq!(deploy_commands.len(), 1, "Should find deploy command");
     assert!(deploy_commands[0]
+        .definition
         .description
         .contains("Deploy applications"));
 
     // Test case-insensitive search
-    let hello_commands = registry.search("HeLLo").await;
+    let hello_commands = registry.search_commands("HeLLo").await;
     assert_eq!(hello_commands.len(), 1, "Should be case-insensitive");
-    assert_eq!(hello_commands[0].name, "hello-world");
+    assert_eq!(hello_commands[0].definition.name, "hello-world");
 }
 
 #[tokio::test]
@@ -593,12 +595,12 @@ async fn test_parameter_validation_integration() {
     // This would require implementing parameter validation logic
     // For now, we just verify the parameter structure
     assert_eq!(
-        deploy_cmd.parameters.len(),
+        deploy_cmd.definition.parameters.len(),
         2,
         "Deploy command should have 2 parameters"
     );
 
-    let env_param = &deploy_cmd.parameters[0];
+    let env_param = &deploy_cmd.definition.parameters[0];
     assert_eq!(env_param.name, "environment");
     assert_eq!(env_param.param_type, "string");
     assert!(env_param.required);
@@ -609,7 +611,7 @@ async fn test_parameter_validation_integration() {
         .allowed_values
         .is_some());
 
-    let dry_run_param = &deploy_cmd.parameters[1];
+    let dry_run_param = &deploy_cmd.definition.parameters[1];
     assert_eq!(dry_run_param.name, "dry-run");
     assert_eq!(dry_run_param.param_type, "boolean");
     assert!(!dry_run_param.required);
@@ -618,16 +620,16 @@ async fn test_parameter_validation_integration() {
     // Test search command parameter validation
     let search_cmd = registry.get_command("search").await.unwrap();
     assert_eq!(
-        search_cmd.parameters.len(),
+        search_cmd.definition.parameters.len(),
         2,
         "Search command should have 2 parameters"
     );
 
-    let query_param = &search_cmd.parameters[0];
+    let query_param = &search_cmd.definition.parameters[0];
     assert_eq!(query_param.name, "query");
     assert!(query_param.required);
 
-    let type_param = &search_cmd.parameters[1];
+    let type_param = &search_cmd.definition.parameters[1];
     assert_eq!(type_param.name, "type");
     assert!(!type_param.required);
     assert!(type_param.default_value.is_some());

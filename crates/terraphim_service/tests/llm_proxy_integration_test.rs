@@ -3,6 +3,7 @@
 //! These tests verify that the z.ai proxy integration works correctly
 //! with environment variables and fallback mechanisms.
 
+use serial_test::serial;
 use std::env;
 use std::time::Duration;
 use terraphim_service::llm_proxy::{LlmProxyClient, ProxyConfig};
@@ -14,8 +15,32 @@ struct TestEnv {
 
 impl TestEnv {
     fn new() -> Self {
-        Self {
+        let mut instance = Self {
             original_vars: Vec::new(),
+        };
+        // Clean up any pre-existing LLM environment variables
+        instance.cleanup_llm_env_vars();
+        instance
+    }
+
+    fn cleanup_llm_env_vars(&mut self) {
+        // List of LLM-related environment variables to clean up
+        let llm_vars = [
+            "ANTHROPIC_BASE_URL",
+            "ANTHROPIC_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY",
+            "OPENROUTER_BASE_URL",
+            "OPENROUTER_API_KEY",
+            "OLLAMA_API_BASE",
+            "OLLAMA_API_KEY",
+        ];
+
+        for var in &llm_vars {
+            if env::var(var).is_ok() {
+                self.original_vars
+                    .push((var.to_string(), env::var(var).ok()));
+                env::remove_var(var);
+            }
         }
     }
 
@@ -26,6 +51,7 @@ impl TestEnv {
         env::set_var(key, value);
     }
 
+    #[allow(dead_code)]
     fn remove_var(&mut self, key: &str) {
         self.original_vars
             .push((key.to_string(), env::var(key).ok()));
@@ -46,6 +72,7 @@ impl Drop for TestEnv {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_llm_proxy_auto_configuration() {
     let mut test_env = TestEnv::new();
 
@@ -79,10 +106,9 @@ async fn test_llm_proxy_auto_configuration() {
 
 #[tokio::test]
 async fn test_llm_proxy_fallback_mechanism() {
-    let mut test_env = TestEnv::new();
+    let _test_env = TestEnv::new();
 
     // Test without proxy configuration (fallback to direct)
-    let _test_env = TestEnv::new();
     let client = LlmProxyClient::new("anthropic".to_string()).unwrap();
 
     // Should fall back to direct endpoint
@@ -158,6 +184,7 @@ async fn test_custom_proxy_configuration() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_connectivity_testing() {
     let mut test_env = TestEnv::new();
 
@@ -187,6 +214,7 @@ async fn test_connectivity_testing() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_proxy_url_detection() {
     let mut test_env = TestEnv::new();
 
@@ -247,6 +275,7 @@ fn test_proxy_config_builder() {
 }
 
 #[test]
+#[serial]
 fn test_environment_variable_precedence() {
     let mut test_env = TestEnv::new();
 
