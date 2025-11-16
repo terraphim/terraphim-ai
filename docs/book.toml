@@ -34,7 +34,7 @@ optional = true
 command = "mdbook-mermaid"
 
 # [output.pandoc]
-# hosted-html = "https://docs.terraphim.ai/" # URL of a HTML version of the book
+# hosted-html = "https://doc.terraphim.ai/" # URL of a HTML version of the book
 
 # [output.pandoc.code]
 # # Display hidden lines in code blocks (e.g., lines in Rust blocks prefixed by '#').

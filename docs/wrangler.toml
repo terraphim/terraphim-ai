@@ -1,0 +1,72 @@
+# Cloudflare Pages configuration for Terraphim AI Documentation
+# https://developers.cloudflare.com/pages/configuration/wrangler-configuration/
+
+name = "terraphim-docs"
+compatibility_date = "2024-01-01"
+pages_build_output_dir = "book"
+
+# Custom domain configuration
+# Configure this in Cloudflare Dashboard: Pages > Custom Domains
+# Target: doc.terraphim.ai
+
+[build]
+command = "mdbook build"
+cwd = "docs"
+
+[site]
+bucket = "./book"
+
+# Deployment environment configurations
+[env.production]
+name = "terraphim-docs"
+route = "doc.terraphim.ai/*"
+
+[env.preview]
+name = "terraphim-docs-preview"
+
+# Headers configuration for security and performance
+[[headers]]
+for = "/*"
+[headers.values]
+X-Frame-Options = "DENY"
+X-Content-Type-Options = "nosniff"
+Referrer-Policy = "strict-origin-when-cross-origin"
+Permissions-Policy = "accelerometer=(), camera=(), geolocation=(), gyroscope=(), magnetometer=(), microphone=(), payment=(), usb=()"
+
+# Cache static assets for 1 year
+[[headers]]
+for = "/*.css"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/*.js"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/*.woff2"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/*.png"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+for = "/*.svg"
+[headers.values]
+Cache-Control = "public, max-age=31536000, immutable"
+
+# HTML pages should revalidate
+[[headers]]
+for = "/*.html"
+[headers.values]
+Cache-Control = "public, max-age=0, must-revalidate"
+
+# Redirects
+[[redirects]]
+from = "/docs/*"
+to = "/:splat"
+status = 301

@@ -21,6 +21,10 @@ localsearch
 
 # Local Netlify folder
 .netlify
+
+# mdBook build output
+docs/book/
+
 .DS_Store
 cargo_vendored
 node_modules
