@@ -8,10 +8,9 @@ use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
-use terraphim_automata::extract_paragraphs_from_automata;
 use terraphim_rolegraph::RoleGraph;
 
-use crate::{AgentMetadata, RegistryError, RegistryResult};
+use crate::{AgentMetadata, RegistryResult};
 
 /// Knowledge graph-based agent discovery and matching
 #[allow(dead_code)]
@@ -197,9 +196,21 @@ impl KnowledgeGraphIntegration {
         // Analyze the query using knowledge graph
         let query_analysis = self.analyze_query(&query).await?;
 
-        // Score and rank agents
-        let mut matches = Vec::new();
+        // Filter agents that meet basic requirements
+        let mut eligible_agents = Vec::new();
         for agent in available_agents {
+            if self
+                .check_basic_requirements(agent, &query)
+                .await
+                .unwrap_or(false)
+            {
+                eligible_agents.push(agent);
+            }
+        }
+
+        // Score and rank eligible agents
+        let mut matches = Vec::new();
+        for agent in eligible_agents {
             if let Ok(agent_match) = self.score_agent_match(agent, &query, &query_analysis).await {
                 matches.push(agent_match);
             }
@@ -222,6 +233,52 @@ impl KnowledgeGraphIntegration {
             query_analysis,
             suggestions,
         })
+    }
+
+    /// Check if agent meets basic requirements for the query
+    async fn check_basic_requirements(
+        &self,
+        agent: &AgentMetadata,
+        query: &AgentDiscoveryQuery,
+    ) -> RegistryResult<bool> {
+        // Check if agent meets required roles
+        if !query.required_roles.is_empty() {
+            let has_required_role = query.required_roles.iter().any(|required_role| {
+                agent.primary_role.role_id == *required_role
+                    || agent
+                        .secondary_roles
+                        .iter()
+                        .any(|role| role.role_id == *required_role)
+            });
+
+            if !has_required_role {
+                return Ok(false);
+            }
+        }
+
+        // Check if agent meets required capabilities
+        if !query.required_capabilities.is_empty() {
+            let has_required_capability = query.required_capabilities.iter().any(|required_cap| {
+                agent
+                    .capabilities
+                    .iter()
+                    .any(|cap| cap.capability_id == *required_cap)
+            });
+
+            if !has_required_capability {
+                return Ok(false);
+            }
+        }
+
+        // Check if agent meets maximum resource usage if specified
+        // Note: For now, we'll accept all agents for resource usage since the statistics
+        // structure would need to be enhanced to support current resource tracking
+        if query.max_resource_usage.is_some() {
+            // TODO: Implement proper resource usage checking when AgentStatistics
+            // supports current resource usage tracking
+        }
+
+        Ok(true)
     }
 
     /// Analyze a discovery query using knowledge graph
@@ -317,26 +374,27 @@ impl KnowledgeGraphIntegration {
 
     /// Extract concepts from text using automata
     async fn extract_concepts_from_text(&self, text: &str) -> RegistryResult<Vec<String>> {
-        // Create an empty thesaurus for basic text processing
-        let thesaurus = terraphim_types::Thesaurus::new("agent_registry".to_string());
-
-        // Use the existing extract_paragraphs_from_automata function
-        let paragraphs = extract_paragraphs_from_automata(
-            text, thesaurus, true, // include_term
-        )
-        .map_err(|e| {
-            RegistryError::KnowledgeGraphError(format!("Failed to extract paragraphs: {}", e))
-        })?;
-
-        // Extract concepts from paragraphs
+        // Simple concept extraction - split text into words and filter
         let mut concepts = HashSet::new();
-        for (_matched, paragraph_text) in paragraphs {
-            // Simple concept extraction - in practice, this would use more sophisticated NLP
-            let words: Vec<&str> = paragraph_text.split_whitespace().collect();
-            for word in words {
-                if word.len() > 3 && !word.chars().all(|c| c.is_ascii_punctuation()) {
-                    concepts.insert(word.to_lowercase());
-                }
+
+        // Split by whitespace and common punctuation
+        let words: Vec<&str> = text
+            .split(|c: char| c.is_whitespace() || c == ',' || c == '.' || c == ';' || c == ':')
+            .collect();
+
+        for word in words {
+            let clean_word = word.trim().to_lowercase();
+            // Filter out short words and common stop words
+            if clean_word.len() > 2
+                && ![
+                    "the", "and", "for", "with", "using", "from", "that", "this", "are", "was",
+                    "were", "been", "have", "has", "had", "not", "but", "they", "you", "their",
+                    "can", "will",
+                ]
+                .contains(&clean_word.as_str())
+                && !clean_word.chars().all(|c| c.is_ascii_punctuation())
+            {
+                concepts.insert(clean_word);
             }
         }
 
@@ -367,6 +425,20 @@ impl KnowledgeGraphIntegration {
             }
             if concept_lower.contains("coordinate") || concept_lower.contains("manage") {
                 domains.insert("coordination".to_string());
+            }
+            if concept_lower.contains("neural")
+                || concept_lower.contains("network")
+                || concept_lower.contains("deep")
+                || concept_lower.contains("learning")
+                || concept_lower.contains("machine")
+                || concept_lower.contains("model")
+                || concept_lower.contains("classification")
+                || concept_lower.contains("image")
+            {
+                domains.insert("machine_learning".to_string());
+            }
+            if concept_lower.contains("tensor") || concept_lower.contains("flow") {
+                domains.insert("tensorflow".to_string());
             }
         }
 
