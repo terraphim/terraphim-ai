@@ -77,8 +77,8 @@ default = ["custom-protocol"]
 # this feature is used used for production builds where `devPath` points to the filesystem
 # DO NOT remove this
 custom-protocol = ["tauri/custom-protocol"]
-# Enable atomic server client integration
-atomic = ["terraphim_atomic_client", "terraphim_middleware/atomic"]
+# Enable atomic server client integration (temporarily disabled for publishing)
+# atomic = ["terraphim_atomic_client", "terraphim_middleware/atomic"]
 # OpenRouter AI integration feature
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 # Optional database backends
