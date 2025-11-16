@@ -45,7 +45,7 @@ jobs:
       - name: Authenticate with 1Password
         run: |
           # Set up 1Password authentication for CI
-          echo "${{ secrets.ONEPASSWORD_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
+          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4

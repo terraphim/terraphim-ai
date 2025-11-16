@@ -4,7 +4,7 @@ This guide explains how to set up the required GitHub secrets for publishing Ter
 
 ## Required Secrets
 
-### 1. ONEPASSWORD_SERVICE_ACCOUNT_TOKEN
+### 1. OP_SERVICE_ACCOUNT_TOKEN
 
 This token allows GitHub Actions to authenticate with 1Password and retrieve the crates.io publishing token.
 
@@ -20,7 +20,7 @@ This token allows GitHub Actions to authenticate with 1Password and retrieve the
    - Go to your repository on GitHub
    - Navigate to Settings > Secrets and variables > Actions
    - Click "New repository secret"
-   - Name: `ONEPASSWORD_SERVICE_ACCOUNT_TOKEN`
+   - Name: `OP_SERVICE_ACCOUNT_TOKEN`
    - Value: Paste the service account token from step 1
    - Click "Add secret"
 
@@ -112,7 +112,7 @@ cargo publish --dry-run --package terraphim_types
    - Ensure service account has proper permissions
 
 2. **"no token found" error in CI**
-   - Verify GitHub secret is correctly named: `ONEPASSWORD_SERVICE_ACCOUNT_TOKEN`
+   - Verify GitHub secret is correctly named: `OP_SERVICE_ACCOUNT_TOKEN`
    - Check that the secret is added to the correct repository/environment
    - Ensure the service account has access to the vault
 
