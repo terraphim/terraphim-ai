@@ -1,0 +1,34 @@
+[package]
+name = "terraphim_mcp_codegen"
+version = "0.1.0"
+edition = "2021"
+description = "Code generator for MCP server tools - creates TypeScript and Python wrappers"
+license = "MIT"
+
+[dependencies]
+# Workspace dependencies
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Template engine for code generation
+tera = "1.19"
+
+# Case conversion for naming conventions
+convert_case = "0.6"
+
+# MCP server integration
+terraphim_mcp_server = { path = "../terraphim_mcp_server" }
+terraphim_config = { path = "../terraphim_config" }
+
+# Runtime support
+rmcp = "0.2"
+
+[[bin]]
+name = "mcp-codegen"
+path = "src/bin/codegen.rs"
+
+[dev-dependencies]
+tempfile = "3.10"
