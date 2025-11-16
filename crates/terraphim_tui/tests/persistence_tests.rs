@@ -3,7 +3,7 @@ use serial_test::serial;
 use std::fs;
 use std::path::Path;
 use std::process::Command;
-use std::str::{self, FromStr};
+use std::str;
 use std::thread;
 use std::time::Duration;
 

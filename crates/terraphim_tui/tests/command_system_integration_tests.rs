@@ -5,7 +5,6 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
 
 use tempfile::TempDir;
 use terraphim_tui::commands::validator::{SecurityAction, SecurityResult};
@@ -328,7 +327,7 @@ async fn test_hook_system_integration() {
     registry.add_command_directory(commands_dir);
     registry.load_all_commands().await.unwrap();
 
-    let mut validator = CommandValidator::new();
+    let _validator = CommandValidator::new();
 
     // Create hook manager with test hooks
     let mut hook_manager = HookManager::new();
@@ -477,7 +476,7 @@ async fn test_backup_hook_integration() {
     assert!(backup_dir.exists(), "Backup directory should be created");
 
     // Verify backup file was created
-    let mut backup_files: Vec<_> = std::fs::read_dir(&backup_dir)
+    let backup_files: Vec<_> = std::fs::read_dir(&backup_dir)
         .unwrap()
         .map(|entry| entry.unwrap())
         .collect();
