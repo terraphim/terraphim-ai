@@ -502,8 +502,8 @@ fn levenshtein_distance(s1: &str, s2: &str) -> usize {
     for (i, row) in matrix.iter_mut().enumerate().take(len1 + 1) {
         row[0] = i;
     }
-    for j in 0..=len2 {
-        matrix[0][j] = j;
+    for (j, cell) in matrix[0].iter_mut().enumerate().take(len2 + 1) {
+        *cell = j;
     }
 
     for i in 1..=len1 {
@@ -989,10 +989,9 @@ mod tests {
             .any(|cmd| cmd.definition.name == "hello-world"));
 
         // Test fuzzy match (current implementation may return different results)
-        let suggestions = registry.suggest_commands("hlp", None).await;
+        let _suggestions = registry.suggest_commands("hlp", None).await;
         // Note: Fuzzy matching implementation may need improvement
         // For now, just verify it doesn't panic and returns reasonable results
-        assert!(suggestions.len() >= 0);
     }
 
     // Automata integration tests
@@ -1297,7 +1296,8 @@ Options:
         let similarity1 = registry.calculate_keyword_similarity(&keywords1, &keywords2);
         assert!(
             similarity1 >= 0.5,
-            "Should have high similarity between related keywords (got {})", similarity1
+            "Should have high similarity between related keywords (got {})",
+            similarity1
         );
 
         // Test low similarity
