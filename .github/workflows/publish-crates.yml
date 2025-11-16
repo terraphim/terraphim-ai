@@ -22,7 +22,7 @@ permissions:
 
 jobs:
   publish:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, terraphim, production, docker]
     environment: production
 
     steps:
