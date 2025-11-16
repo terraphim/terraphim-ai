@@ -42,11 +42,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        profile: minimal
-        override: true
         components: rustfmt, clippy
 
     - name: Cache cargo dependencies
@@ -112,11 +110,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Install system dependencies
       run: |
@@ -212,11 +208,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Cache cargo dependencies
       uses: actions/cache@v4
@@ -289,11 +283,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Cache cargo dependencies
       uses: actions/cache@v4
@@ -381,11 +373,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Cache cargo dependencies
       uses: actions/cache@v4
@@ -473,11 +463,9 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@stable
       with:
         toolchain: stable
-        profile: minimal
-        override: true
 
     - name: Cache cargo dependencies
       uses: actions/cache@v4
@@ -612,11 +600,8 @@ jobs:
       uses: actions/checkout@v4
 
     - name: Install Rust nightly
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@nightly
       with:
-        toolchain: nightly
-        profile: minimal
-        override: true
         components: rustfmt, clippy, llvm-tools-preview
 
     - name: Install grcov
