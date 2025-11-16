@@ -46,14 +46,14 @@ comfy-table = { version = "7.0", optional = true }
 indicatif = { version = "0.18", optional = true }
 dirs = { version = "5.0", optional = true }
 
-terraphim_types = { path = "../terraphim_types" }
-terraphim_settings = { path = "../terraphim_settings" }
-terraphim_persistence = { path = "../terraphim_persistence" }
-terraphim_config = { path = "../terraphim_config" }
-terraphim_automata = { path = "../terraphim_automata" }
-terraphim_service = { path = "../terraphim_service" }
-terraphim_middleware = { path = "../terraphim_middleware" }
-terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 
 [dev-dependencies]
 serial_test = "3.0"
