@@ -17,7 +17,7 @@ log = "0.4.14"
 thiserror = "1.0.56"
 twelf = { version = "0.15.0", features = ["json", "toml", "env", "clap"] }
 serde = { version = "1.0.182", features = ["derive"] }
-terraphim_onepassword_cli = { path = "../terraphim_onepassword_cli", optional = true }
+terraphim_onepassword_cli = { path = "../terraphim_onepassword_cli", version = "1.0.0", optional = true }
 tokio = { version = "1.35.1", features = ["rt"], optional = true }
 
 [features]
