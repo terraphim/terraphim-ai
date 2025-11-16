@@ -7,7 +7,7 @@ description = "Terraphim AI Agent CLI - Command-line interface with interactive 
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
-keywords = ["cli", "ai", "agent", "search", "repl", "terminal"]
+keywords = ["cli", "ai", "agent", "search", "repl"]
 license = "Apache-2.0"
 readme = "../../README.md"
 
