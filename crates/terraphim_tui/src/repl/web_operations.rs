@@ -4,6 +4,8 @@
 //! allowing safe web scraping, API interactions, and browser automation without exposing
 //! the host system to potential security risks.
 
+#![allow(dead_code)]
+
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

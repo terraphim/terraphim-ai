@@ -1,0 +1,54 @@
+    Finished `bench` profile [optimized] target(s) in 0.16s
+     Running benches/agent_operations.rs (/home/alex/projects/terraphim/terraphim-ai/target/release/deps/agent_operations-5fea8c83c4fcd271)
+Gnuplot not found, using plotters backend
+Benchmarking agent_creation
+Benchmarking agent_creation: Warming up for 3.0000 s
+Benchmarking agent_creation: Collecting 100 samples in estimated 5.4679 s (900 iterations)
+Benchmarking agent_creation: Analyzing
+agent_creation          time:   [6.0766 ms 6.0863 ms 6.0959 ms]
+                        change: [-0.3276% -0.1098% +0.1272%] (p = 0.35 > 0.05)
+                        No change in performance detected.
+
+Benchmarking agent_initialization
+Benchmarking agent_initialization: Warming up for 3.0000 s
+Benchmarking agent_initialization: Collecting 100 samples in estimated 5.4834 s (900 iterations)
+Benchmarking agent_initialization: Analyzing
+agent_initialization    time:   [6.0800 ms 6.0907 ms 6.1014 ms]
+
+Benchmarking command_processing_Generate/standard
+Benchmarking command_processing_Generate/standard: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 74.6s, or reduce sample count to 10.
+Benchmarking command_processing_Generate/standard: Collecting 100 samples in estimated 74.598 s (100 iterations)
+Benchmarking command_processing_Generate/standard: Analyzing
+command_processing_Generate/standard
+                        time:   [606.39 ms 633.37 ms 663.33 ms]
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking command_processing_Answer/standard
+Benchmarking command_processing_Answer/standard: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 37.3s, or reduce sample count to 10.
+Benchmarking command_processing_Answer/standard: Collecting 100 samples in estimated 37.314 s (100 iterations)
+Benchmarking command_processing_Answer/standard: Analyzing
+command_processing_Answer/standard
+                        time:   [336.54 ms 368.34 ms 406.34 ms]
+Found 6 outliers among 100 measurements (6.00%)
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking command_processing_Analyze/standard
+Benchmarking command_processing_Analyze/standard: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 526.0s, or reduce sample count to 10.
+Benchmarking command_processing_Analyze/standard: Collecting 100 samples in estimated 526.02 s (100 iterations)
+Benchmarking command_processing_Analyze/standard: Analyzing
+command_processing_Analyze/standard
+                        time:   [1.1375 s 1.5168 s 1.9493 s]
+Found 11 outliers among 100 measurements (11.00%)
+  11 (11.00%) high severe
+
+Benchmarking command_processing_Create/standard
+Benchmarking command_processing_Create/standard: Warming up for 3.0000 s

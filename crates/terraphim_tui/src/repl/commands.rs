@@ -10,6 +10,8 @@ pub enum ReplCommand {
         query: String,
         role: Option<String>,
         limit: Option<usize>,
+        semantic: bool,
+        concepts: bool,
     },
     Config {
         subcommand: ConfigSubcommand,
@@ -61,6 +63,23 @@ pub enum ReplCommand {
         role: Option<String>,
     },
 
+    // File commands (requires 'repl-file' feature)
+    #[cfg(feature = "repl-file")]
+    File {
+        subcommand: FileSubcommand,
+    },
+
+    // Web commands (requires 'repl-web' feature)
+    #[cfg(feature = "repl-web")]
+    Web {
+        subcommand: WebSubcommand,
+    },
+
+    // VM commands
+    Vm {
+        subcommand: VmSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -80,6 +99,107 @@ pub enum ConfigSubcommand {
 pub enum RoleSubcommand {
     List,
     Select { name: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-file")]
+pub enum FileSubcommand {
+    Search { query: String },
+    List,
+    Info { path: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum VmSubcommand {
+    List,
+    Pool,
+    Status {
+        vm_id: Option<String>,
+    },
+    Metrics {
+        vm_id: Option<String>,
+    },
+    Execute {
+        code: String,
+        language: String,
+        vm_id: Option<String>,
+    },
+    Agent {
+        agent_id: String,
+        task: String,
+        vm_id: Option<String>,
+    },
+    Tasks {
+        vm_id: String,
+    },
+    Allocate {
+        vm_id: String,
+    },
+    Release {
+        vm_id: String,
+    },
+    Monitor {
+        vm_id: String,
+        refresh: Option<u32>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-web")]
+pub enum WebSubcommand {
+    Get {
+        url: String,
+        headers: Option<std::collections::HashMap<String, String>>,
+    },
+    Post {
+        url: String,
+        body: String,
+        headers: Option<std::collections::HashMap<String, String>>,
+    },
+    Scrape {
+        url: String,
+        selector: Option<String>,
+        wait_for_element: Option<String>,
+    },
+    Screenshot {
+        url: String,
+        width: Option<u32>,
+        height: Option<u32>,
+        full_page: Option<bool>,
+    },
+    Pdf {
+        url: String,
+        page_size: Option<String>,
+    },
+    Form {
+        url: String,
+        form_data: std::collections::HashMap<String, String>,
+    },
+    Api {
+        endpoint: String,
+        method: String,
+        data: Option<serde_json::Value>,
+    },
+    Status {
+        operation_id: String,
+    },
+    Cancel {
+        operation_id: String,
+    },
+    History {
+        limit: Option<usize>,
+    },
+    Config {
+        subcommand: WebConfigSubcommand,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-web")]
+pub enum WebConfigSubcommand {
+    Show,
+    Set { key: String, value: String },
+    Reset,
 }
 
 impl FromStr for ReplCommand {
@@ -112,6 +232,8 @@ impl FromStr for ReplCommand {
                 let mut query = String::new();
                 let mut role = None;
                 let mut limit = None;
+                let _semantic = false;
+                let _concepts = false;
                 let mut i = 1;
 
                 while i < parts.len() {
@@ -146,11 +268,33 @@ impl FromStr for ReplCommand {
                     }
                 }
 
+                // Handle --semantic and --concepts flags that might be in the query
+                let mut semantic = false;
+                let mut concepts = false;
+                let query_parts: Vec<&str> = query.split_whitespace().collect();
+                let mut filtered_query_parts = Vec::new();
+
+                for part in query_parts {
+                    match part {
+                        "--semantic" => semantic = true,
+                        "--concepts" => concepts = true,
+                        _ => filtered_query_parts.push(part),
+                    }
+                }
+
+                query = filtered_query_parts.join(" ");
+
                 if query.is_empty() {
                     return Err(anyhow!("Search query cannot be empty"));
                 }
 
-                Ok(ReplCommand::Search { query, role, limit })
+                Ok(ReplCommand::Search {
+                    query,
+                    role,
+                    limit,
+                    semantic,
+                    concepts,
+                })
             }
 
             "config" => {
@@ -433,6 +577,354 @@ impl FromStr for ReplCommand {
                 "MCP tools not enabled. Rebuild with --features repl-mcp"
             )),
 
+            #[cfg(feature = "repl-file")]
+            "file" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("File command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "search" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("File search requires a query"));
+                        }
+                        let query = parts[2..].join(" ");
+                        Ok(ReplCommand::File {
+                            subcommand: FileSubcommand::Search { query },
+                        })
+                    }
+                    "list" => Ok(ReplCommand::File {
+                        subcommand: FileSubcommand::List,
+                    }),
+                    "info" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("File info requires a path"));
+                        }
+                        let path = parts[2].to_string();
+                        Ok(ReplCommand::File {
+                            subcommand: FileSubcommand::Info { path },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown file subcommand: {}. Use: search, list, info",
+                        parts[1]
+                    )),
+                }
+            }
+
+            #[cfg(not(feature = "repl-file"))]
+            "file" => Err(anyhow!(
+                "File operations not enabled. Rebuild with --features repl-file"
+            )),
+
+            #[cfg(feature = "repl-web")]
+            "web" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Web command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "get" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web GET requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Get { url, headers: None },
+                        })
+                    }
+                    "post" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web POST requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Post { url, body: String::new(), headers: None },
+                        })
+                    }
+                    "scrape" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web scrape requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Scrape { url, selector: None, wait_for_element: None },
+                        })
+                    }
+                    "screenshot" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web screenshot requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Screenshot { url, width: None, height: None, full_page: None },
+                        })
+                    }
+                    "pdf" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web PDF requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Pdf { url, page_size: None },
+                        })
+                    }
+                    "form" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web form requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Form { url, form_data: std::collections::HashMap::new() },
+                        })
+                    }
+                    "api" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web API requires an endpoint"));
+                        }
+                        let endpoint = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Api { endpoint, method: "GET".to_string(), data: None },
+                        })
+                    }
+                    "status" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web status requires an operation ID"));
+                        }
+                        let operation_id = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Status { operation_id },
+                        })
+                    }
+                    "cancel" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web cancel requires an operation ID"));
+                        }
+                        let operation_id = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Cancel { operation_id },
+                        })
+                    }
+                    "history" => {
+                        let limit = if parts.len() > 2 {
+                            Some(parts[2].parse::<usize>().map_err(|_| anyhow!("Invalid limit"))?)
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::History { limit },
+                        })
+                    }
+                    "config" => {
+                        if parts.len() < 2 {
+                            return Err(anyhow!("Web config requires a subcommand"));
+                        }
+                        let subcommand = if parts.len() > 2 {
+                            match parts[2] {
+                                "show" => WebConfigSubcommand::Show,
+                                "set" => {
+                                    if parts.len() < 5 {
+                                        return Err(anyhow!("Web config set requires key and value"));
+                                    }
+                                    WebConfigSubcommand::Set {
+                                        key: parts[3].to_string(),
+                                        value: parts[4].to_string(),
+                                    }
+                                }
+                                "reset" => WebConfigSubcommand::Reset,
+                                _ => return Err(anyhow!("Unknown web config subcommand")),
+                            }
+                        } else {
+                            WebConfigSubcommand::Show
+                        };
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Config { subcommand },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown web subcommand: {}. Use: get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config",
+                        parts[1]
+                    )),
+                }
+            }
+
+            #[cfg(not(feature = "repl-web"))]
+            "web" => Err(anyhow!(
+                "Web operations not enabled. Rebuild with --features repl-web"
+            )),
+
+            "vm" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("VM command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "list" => Ok(ReplCommand::Vm {
+                        subcommand: VmSubcommand::List,
+                    }),
+                    "pool" => Ok(ReplCommand::Vm {
+                        subcommand: VmSubcommand::Pool,
+                    }),
+                    "status" => {
+                        let vm_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Status { vm_id },
+                        })
+                    }
+                    "metrics" => {
+                        let vm_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Metrics { vm_id },
+                        })
+                    }
+                    "execute" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM execute requires a language"));
+                        }
+                        let language = parts[2].to_string();
+                        if parts.len() < 4 {
+                            return Err(anyhow!("VM execute requires code to execute"));
+                        }
+
+                        let mut code = String::new();
+                        let mut vm_id = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--vm-id" => {
+                                    if i + 1 < parts.len() {
+                                        vm_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--vm-id requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    if !code.is_empty() {
+                                        code.push(' ');
+                                    }
+                                    code.push_str(parts[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Execute { code, language, vm_id },
+                        })
+                    }
+                    "agent" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM agent requires an agent ID"));
+                        }
+                        let agent_id = parts[2].to_string();
+                        if parts.len() < 4 {
+                            return Err(anyhow!("VM agent requires a task"));
+                        }
+
+                        let mut task = String::new();
+                        let mut vm_id = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--vm-id" => {
+                                    if i + 1 < parts.len() {
+                                        vm_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--vm-id requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    if !task.is_empty() {
+                                        task.push(' ');
+                                    }
+                                    task.push_str(parts[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Agent { agent_id, task, vm_id },
+                        })
+                    }
+                    "tasks" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM tasks requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Tasks { vm_id },
+                        })
+                    }
+                    "allocate" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM allocate requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Allocate { vm_id },
+                        })
+                    }
+                    "release" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM release requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Release { vm_id },
+                        })
+                    }
+                    "monitor" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM monitor requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        let mut refresh = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--refresh" => {
+                                    if i + 1 < parts.len() {
+                                        if let Ok(refresh_val) = parts[i + 1].parse::<u32>() {
+                                            refresh = Some(refresh_val);
+                                        } else {
+                                            return Err(anyhow!("--refresh must be a positive integer"));
+                                        }
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--refresh requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    return Err(anyhow!("Unknown monitor option: {}", parts[i]));
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Monitor { vm_id, refresh },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown VM subcommand: {}. Use: list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor",
+                        parts[1]
+                    )),
+                }
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -455,7 +947,7 @@ impl ReplCommand {
     /// Get available commands based on compiled features
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "vm", "help", "quit", "exit", "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
@@ -474,13 +966,23 @@ impl ReplCommand {
             ]);
         }
 
+        #[cfg(feature = "repl-file")]
+        {
+            commands.extend_from_slice(&["file"]);
+        }
+
+        #[cfg(feature = "repl-web")]
+        {
+            commands.extend_from_slice(&["web"]);
+        }
+
         commands
     }
 
     /// Get command description for help system
     pub fn get_command_help(command: &str) -> Option<&'static str> {
         match command {
-            "search" => Some("/search <query> [--role <role>] [--limit <n>] - Search documents"),
+            "search" => Some("/search <query> [--role <role>] [--limit <n>] [--semantic] [--concepts] - Search documents"),
             "config" => Some("/config show | set <key> <value> - Manage configuration"),
             "role" => Some("/role list | select <name> - Manage roles"),
             "graph" => Some("/graph [--top-k <n>] - Show knowledge graph"),
@@ -488,6 +990,13 @@ impl ReplCommand {
             "quit" | "q" => Some("/quit, /q - Exit REPL"),
             "exit" => Some("/exit - Exit REPL"),
             "clear" => Some("/clear - Clear screen"),
+            "vm" => Some("/vm <subcommand> [args] - VM management (list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor)"),
+
+            #[cfg(feature = "repl-file")]
+            "file" => Some("/file <subcommand> [args] - File operations (search, list, info)"),
+
+            #[cfg(feature = "repl-web")]
+            "web" => Some("/web <subcommand> [args] - Web operations (get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config)"),
 
             #[cfg(feature = "repl-chat")]
             "chat" => Some("/chat [message] - Interactive chat with AI"),
@@ -522,7 +1031,9 @@ mod tests {
             ReplCommand::Search {
                 query: "hello world".to_string(),
                 role: None,
-                limit: None
+                limit: None,
+                semantic: false,
+                concepts: false,
             }
         );
 
@@ -534,7 +1045,9 @@ mod tests {
             ReplCommand::Search {
                 query: "test".to_string(),
                 role: Some("Engineer".to_string()),
-                limit: Some(5)
+                limit: Some(5),
+                semantic: false,
+                concepts: false,
             }
         );
     }

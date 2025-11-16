@@ -1,4 +1,4 @@
-import { spawn, ChildProcess } from 'child_process';
+import { spawn, ChildProcess } from 'node:child_process';
 
 let tauriDriverProcess: ChildProcess | null = null;
 

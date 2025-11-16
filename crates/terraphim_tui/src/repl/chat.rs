@@ -3,6 +3,7 @@
 
 #[cfg(feature = "repl-chat")]
 #[allow(dead_code)]
+#[derive(Default)]
 pub struct ChatHandler {
     // Chat implementation will go here
 }
@@ -11,7 +12,7 @@ pub struct ChatHandler {
 #[allow(dead_code)]
 impl ChatHandler {
     pub fn new() -> Self {
-        Self {}
+        Self::default()
     }
 
     pub async fn send_message(&self, message: &str) -> anyhow::Result<String> {

@@ -104,7 +104,12 @@ impl AutomataPath {
     pub fn local_example() -> Self {
         log::debug!("Current folder {:?}", std::env::current_dir());
         let cwd = std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
-        let simple_path = if cwd.ends_with("terraphim_automata") {
+        let simple_path = if cwd.ends_with("terraphim_automata")
+            || cwd.ends_with("terraphim_kg_orchestration")
+            || cwd.ends_with("terraphim_task_decomposition")
+            || cwd.ends_with("terraphim_kg_agents")
+            || cwd.ends_with("terraphim_agent_registry")
+        {
             "../../test-fixtures/term_to_id_simple.json"
         } else if cwd.file_name().is_some_and(|name| name == "terraphim-ai") {
             "test-fixtures/term_to_id_simple.json"

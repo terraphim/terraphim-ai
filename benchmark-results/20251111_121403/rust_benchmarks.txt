@@ -1,0 +1,26 @@
+    Finished `bench` profile [optimized] target(s) in 0.16s
+     Running benches/agent_operations.rs (/home/alex/projects/terraphim/terraphim-ai/target/release/deps/agent_operations-5fea8c83c4fcd271)
+Gnuplot not found, using plotters backend
+Benchmarking agent_creation
+Benchmarking agent_creation: Warming up for 3.0000 s
+Benchmarking agent_creation: Collecting 100 samples in estimated 5.5136 s (900 iterations)
+Benchmarking agent_creation: Analyzing
+agent_creation          time:   [6.0518 ms 6.0614 ms 6.0719 ms]
+                        change: [-0.6330% -0.4086% -0.1808%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking agent_initialization
+Benchmarking agent_initialization: Warming up for 3.0000 s
+Benchmarking agent_initialization: Collecting 100 samples in estimated 5.4764 s (900 iterations)
+Benchmarking agent_initialization: Analyzing
+agent_initialization    time:   [6.0825 ms 6.0915 ms 6.1008 ms]
+                        change: [-0.2097% +0.0134% +0.2447%] (p = 0.91 > 0.05)
+                        No change in performance detected.
+
+Benchmarking command_processing_Generate/standard
+Benchmarking command_processing_Generate/standard: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 76.5s, or reduce sample count to 10.
+Benchmarking command_processing_Generate/standard: Collecting 100 samples in estimated 76.505 s (100 iterations)
