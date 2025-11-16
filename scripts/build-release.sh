@@ -173,8 +173,8 @@ create_package() {
         "terraphim_mcp_server")
             binary_name="terraphim_mcp_server"
             ;;
-        "terraphim_tui")
-            binary_name="terraphim-tui"
+        "terraphim_agent")
+            binary_name="terraphim-agent"
             ;;
     esac
 
@@ -271,7 +271,7 @@ create_deb_package() {
     case "$package" in
         "terraphim_server") binary_name="terraphim_server" ;;
         "terraphim_mcp_server") binary_name="terraphim_mcp_server" ;;
-        "terraphim_tui") binary_name="terraphim-tui" ;;
+        "terraphim_agent") binary_name="terraphim-agent" ;;
     esac
 
     local deb_dir="$OUTPUT_DIR/deb-build"
@@ -374,8 +374,8 @@ sudo dpkg -i terraphim-*.deb
 ### TUI Installation
 \`\`\`bash
 # After extraction
-chmod +x terraphim-tui
-./terraphim-tui --help
+chmod +x terraphim-agent
+./terraphim-agent --help
 \`\`\`
 
 ## Features

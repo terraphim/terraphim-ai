@@ -4,7 +4,7 @@
 //! with proper isolation and security validation.
 
 use std::collections::HashMap;
-use terraphim_tui::commands::{CommandDefinition, CommandParameter, ExecutionMode, RiskLevel};
+use terraphim_agent::commands::{CommandDefinition, CommandParameter, ExecutionMode, RiskLevel};
 
 /// Creates a test command definition
 fn create_test_command(
@@ -25,7 +25,7 @@ fn create_test_command(
         namespace: None,
         aliases: vec![],
         timeout: Some(30),
-        resource_limits: Some(terraphim_tui::commands::ResourceLimits {
+        resource_limits: Some(terraphim_agent::commands::ResourceLimits {
             max_memory_mb: Some(512),
             max_cpu_time: Some(60),
             max_disk_mb: Some(100),
