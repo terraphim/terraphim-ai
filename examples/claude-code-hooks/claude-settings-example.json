@@ -1,0 +1,13 @@
+{
+  "$schema": "https://code.claude.com/schemas/settings.schema.json",
+  "hooks": {
+    "user-prompt-submit": {
+      "command": "bash",
+      "args": [
+        "/path/to/terraphim-ai/examples/claude-code-hooks/terraphim-package-manager-hook.sh"
+      ],
+      "enabled": true,
+      "description": "Replace package manager commands (npm/yarn/pnpm) with bun using Terraphim knowledge graph"
+    }
+  }
+}
