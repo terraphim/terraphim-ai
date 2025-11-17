@@ -2,6 +2,14 @@
 name = "terraphim_agent"
 version = "1.0.0"
 edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Terraphim AI Agent CLI - Command-line interface with interactive REPL and ASCII graph visualization"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["cli", "ai", "agent", "search", "repl"]
+license = "Apache-2.0"
+readme = "../../README.md"
 
 [features]
 default = []
@@ -46,14 +54,14 @@ comfy-table = { version = "7.0", optional = true }
 indicatif = { version = "0.18", optional = true }
 dirs = { version = "5.0", optional = true }
 
-terraphim_types = { path = "../terraphim_types" }
-terraphim_settings = { path = "../terraphim_settings" }
-terraphim_persistence = { path = "../terraphim_persistence" }
-terraphim_config = { path = "../terraphim_config" }
-terraphim_automata = { path = "../terraphim_automata" }
-terraphim_service = { path = "../terraphim_service" }
-terraphim_middleware = { path = "../terraphim_middleware" }
-terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 
 [dev-dependencies]
 serial_test = "3.0"
@@ -65,9 +73,13 @@ tempfile = "3.0"
 
 # Enable REPL features for testing
 terraphim_agent = { path = ".", features = ["repl-full"] }
+<<<<<<< HEAD:crates/terraphim_agent/Cargo.toml
+=======
+
+>>>>>>> fixes_sunday:crates/terraphim_tui/Cargo.toml
 
 [[bin]]
-name = "terraphim-tui"
+name = "terraphim-agent"
 path = "src/main.rs"
 
 [package.metadata.deb]
@@ -75,13 +87,13 @@ maintainer = "Terraphim Contributors <team@terraphim.ai>"
 copyright = "2024, Terraphim Contributors"
 license-file = ["../../LICENSE-Apache-2.0", "4"]
 extended-description = """
-Terraphim TUI - Terminal User Interface for Terraphim AI.
+Terraphim Agent - AI Agent CLI Interface for Terraphim.
 Command-line interface with interactive REPL and ASCII graph visualization.
 Supports search, configuration management, and data exploration."""
 depends = "$auto"
 section = "utility"
 priority = "optional"
 assets = [
-    ["target/release/terraphim-tui", "usr/bin/", "755"],
-    ["../../README.md", "usr/share/doc/terraphim-tui/README", "644"],
+    ["target/release/terraphim-agent", "usr/bin/", "755"],
+    ["../../README.md", "usr/share/doc/terraphim-agent/README", "644"],
 ]
