@@ -1,5 +1,8 @@
 # Terraphim AI Assistant
 
+[![Crates.io](https://img.shields.io/crates/v/terraphim_agent.svg)](https://crates.io/crates/terraphim_agent)
+[![npm](https://img.shields.io/npm/v/@terraphim/autocomplete.svg)](https://www.npmjs.com/package/@terraphim/autocomplete)
+[![PyPI](https://img.shields.io/pypi/v/terraphim-automata.svg)](https://pypi.org/project/terraphim-automata/)
 [![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
 [![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group)
 
@@ -8,6 +11,27 @@ Terraphim is a privacy-first AI assistant that works for you under your complete
 You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
 
 Terraphim operates on local infrastructure and works exclusively for the owner's benefit.
+
+## 🎉 v1.0.0 Major Release
+
+We're excited to announce Terraphim AI v1.0.0 with comprehensive multi-language support:
+
+### ✨ New Packages Available
+- **🦀 Rust**: `terraphim_agent` - Complete CLI and TUI interface via crates.io
+- **📦 Node.js**: `@terraphim/autocomplete` - Native npm package with autocomplete and knowledge graph
+- **🐍 Python**: `terraphim-automata` - High-performance text processing library via PyPI
+
+### 🚀 Quick Installation
+```bash
+# Rust CLI (recommended)
+cargo install terraphim_agent
+
+# Node.js package
+npm install @terraphim/autocomplete
+
+# Python library
+pip install terraphim-automata
+```
 
 https://github.com/terraphim/terraphim-ai/assets/175809/59c74652-bab4-45b2-99aa-1c0c9b90196b
 
@@ -29,26 +53,29 @@ Terraphim aims to bridge this gap by providing a privacy-first AI assistant that
 [3]: https://www.forbes.com/sites/forbestechcouncil/2019/12/17/reality-check-still-spending-more-time-gathering-instead-of-analyzing/
 [4]: https://www.theatlantic.com/technology/archive/2021/06/the-internet-is-a-collective-hallucination/619320/
 
-## Getting Started
+## 🚀 Getting Started
 
-### 🚀 Quick Install (Recommended)
+### Option 1: Install from Package Managers (Recommended)
 
-#### Option 1: Docker (Easiest)
+#### 🦀 Rust CLI/TUI (Most Features)
 ```bash
-# Automated Docker installation
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/v0.2.3/docker-run.sh | bash
+cargo install terraphim_agent
+terraphim-agent --help
 ```
 
-#### Option 2: Binary Installation
+#### 📦 Node.js Package (Autocomplete + Knowledge Graph)
 ```bash
-# Automated source installation
-curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/v0.2.3/install.sh | bash
+npm install @terraphim/autocomplete
+# or with Bun
+bun add @terraphim/autocomplete
 ```
 
-### 📚 Detailed Installation
-For detailed installation instructions, see our [Installation Guide](https://github.com/terraphim/terraphim-ai/blob/main/release/v0.2.3/README.md).
+#### 🐍 Python Library (Text Processing)
+```bash
+pip install terraphim-automata
+```
 
-### 🛠️ Development Setup
+### Option 2: Development Setup
 
 1. **Clone the repository**:
    ```bash
@@ -96,6 +123,104 @@ For detailed installation instructions, see our [Installation Guide](https://git
 
 (See the [desktop README](desktop/README.md), [TUI documentation](docs/tui-usage.md), and [development setup guide](docs/src/development-setup.md) for more details.)
 
+## 📚 Usage Examples
+
+### 🦀 Rust CLI/TUI
+```bash
+# Interactive mode with full features
+terraphim-agent
+
+# Search commands
+terraphim-agent search "Rust async programming"
+terraphim-agent search --role engineer "microservices"
+
+# Chat with AI
+terraphim-agent chat "Explain knowledge graphs"
+
+# Commands list
+terraphim-agent commands list
+terraphim-agent commands search "Rust"
+
+# Auto-update management
+terraphim-agent check-update    # Check for updates without installing
+terraphim-agent update          # Update to latest version if available
+```
+
+### 📦 Node.js Package
+```javascript
+// Import the package
+import * as autocomplete from '@terraphim/autocomplete';
+
+// Build autocomplete index from JSON thesaurus
+const thesaurus = {
+  "name": "Engineering",
+  "data": {
+    "machine learning": {
+      "id": 1,
+      "nterm": "machine learning",
+      "url": "https://example.com/ml"
+    }
+  }
+};
+
+const indexBytes = autocomplete.buildAutocompleteIndexFromJson(JSON.stringify(thesaurus));
+
+// Search for terms
+const results = autocomplete.autocomplete(indexBytes, "machine", 10);
+console.log('Autocomplete results:', results);
+
+// Knowledge graph operations
+const graphBytes = autocomplete.buildRoleGraphFromJson("Engineer", JSON.stringify(thesaurus));
+const isConnected = autocomplete.areTermsConnected(graphBytes, "machine learning");
+console.log('Terms connected:', isConnected);
+```
+
+### 🐍 Python Library
+```python
+import terraphim_automata as ta
+
+# Create thesaurus
+thesaurus = ta.Thesaurus(name="Engineering")
+thesaurus.add_term("machine learning", url="https://example.com/ml")
+thesaurus.add_term("deep learning", url="https://example.com/dl")
+
+# Build autocomplete index
+index = ta.build_autocomplete_index(thesaurus)
+print(f"Index size: {len(index)} bytes")
+
+# Search for terms
+results = ta.autocomplete(index, "machine", limit=10)
+for result in results:
+    print(f"Found: {result.term} (score: {result.score})")
+
+# Fuzzy search
+fuzzy_results = ta.fuzzy_autocomplete_search(index, "machin", min_distance=0.8)
+print(f"Fuzzy results: {len(fuzzy_results)}")
+```
+
+## 🆕 v1.0.0 Features
+
+### 🔍 Enhanced Search Capabilities
+- **Grep.app Integration**: Search across 500,000+ GitHub repositories
+- **Advanced Filtering**: Language, repository, and path-based filtering
+- **Semantic Search**: Knowledge graph-powered semantic understanding
+
+### 📊 Multi-Language Support
+- **Rust**: Native performance with complete CLI/TUI interface
+- **Node.js**: High-performance autocomplete with native bindings
+- **Python**: Fast text processing and autocomplete algorithms
+
+### 🤖 AI Integration
+- **MCP Server**: Model Context Protocol for AI tool integration
+- **Claude Code Hooks**: Automated development workflows
+- **Knowledge Graphs**: Semantic relationship analysis and discovery
+
+### 🔄 Auto-Update System
+- **Seamless Updates**: Self-updating CLI using GitHub Releases
+- **Cross-Platform**: Works on Linux, macOS, and Windows
+- **Smart Versioning**: Intelligent version comparison and update detection
+- **Progress Tracking**: Real-time download progress and status indicators
+
 ## Terminal Agent Interface
 
 Terraphim includes a comprehensive terminal agent that provides both interactive REPL functionality and CLI commands for advanced operations:
@@ -111,6 +236,59 @@ Terraphim includes a comprehensive terminal agent that provides both interactive
 - **📁 File Operations**: Semantic file analysis and intelligent content management
 - **🔍 Knowledge Graph**: Interactive rolegraph visualization and navigation
 - **⚙️ Configuration**: Real-time role and configuration management
+- **🔄 Auto-Update**: Seamless self-updating mechanism using GitHub Releases
+
+### 🔄 Auto-Update System
+
+Terraphim-agent includes a built-in auto-update system that keeps your installation current with the latest releases from GitHub.
+
+#### Features
+- **🚀 Seamless Updates**: Automatic binary replacement without manual intervention
+- **📊 Progress Tracking**: Real-time download progress and status indicators
+- **🔒 Secure Verification**: GitHub Releases integration ensures authenticated updates
+- **🌐 Cross-Platform**: Works on Linux, macOS, and Windows
+- **📋 Version Intelligence**: Smart version comparison and update availability detection
+
+#### Usage
+
+```bash
+# Check for updates without installing
+terraphim-agent check-update
+
+# Update to latest version if available
+terraphim-agent update
+
+# Get help for update commands
+terraphim-agent check-update --help
+terraphim-agent update --help
+```
+
+#### Update Status Messages
+
+- **🔍 Checking**: "🔍 Checking for terraphim-agent updates..."
+- **✅ Up-to-date**: "✅ Already running latest version: X.Y.Z"
+- **📦 Update Available**: "📦 Update available: X.Y.Z → A.B.C"
+- **🚀 Updated**: "🚀 Updated from X.Y.Z to A.B.C"
+- **❌ Failed**: "❌ Update failed: [error details]"
+
+#### Technical Details
+
+- **Source**: GitHub Releases from `terraphim/terraphim-ai` repository
+- **Mechanism**: Rust `self_update` crate with secure binary verification
+- **Architecture**: Async-safe implementation using `tokio::task::spawn_blocking`
+- **Compatibility**: Requires internet connectivity for update checks
+
+#### Example Workflow
+
+```bash
+$ terraphim-agent check-update
+🔍 Checking for terraphim-agent updates...
+📦 Update available: 1.0.0 → 1.0.1
+
+$ terraphim-agent update
+🚀 Updating terraphim-agent...
+✅ Already running latest version: 1.0.1
+```
 
 ### Quick Start
 
@@ -119,7 +297,7 @@ Terraphim includes a comprehensive terminal agent that provides both interactive
 cargo build -p terraphim_tui --features repl-full --release
 
 # Launch interactive REPL
-./target/release/terraphim-tui
+./target/release/terraphim-agent
 
 # Available REPL commands:
 /help           # Show all commands
@@ -133,7 +311,7 @@ cargo build -p terraphim_tui --features repl-full --release
 /file search    # Semantic file operations
 ```
 
-For detailed documentation, see [TUI Usage Guide](docs/tui-usage.md).
+For detailed documentation, see [TUI Usage Guide](docs/tui-usage.md) and [Auto-Update System](docs/autoupdate.md).
 
 ## Terminology
 
@@ -222,7 +400,7 @@ This installs the server, terminal agent, and desktop app (macOS only).
 ```bash
 # Download from GitHub releases
 sudo dpkg -i terraphim-server_*.deb
-sudo dpkg -i terraphim-tui_*.deb
+sudo dpkg -i terraphim-agent_*.deb
 sudo dpkg -i terraphim-ai-desktop_*.deb
 ```
 
