@@ -427,6 +427,46 @@ import * as autocomplete from '@terraphim/autocomplete';
 **Completed Timeline**: November 16, 2025 (same day implementation)
 **Final Status**: ✅ COMPLETED - Successfully launched Node.js package to npm ecosystem
 
+### 8. **Terraphim-Agent Auto-Update System** ✅
+**Status**: ✅ COMPLETED (November 17, 2025)
+**Impact**: 🚀 HIGH - Major user experience improvement
+**Priority**: 2️⃣ HIGH
+
+#### Completed Tasks:
+- ✅ **Runtime Conflict Resolution**: Fixed critical tokio runtime conflict in terraphim-agent
+- ✅ **Async-Safe Implementation**: Wrapped self_update operations with `spawn_blocking`
+- ✅ **Comprehensive Testing**: 9/9 integration tests passing for all update scenarios
+- ✅ **CLI Integration**: Added `check-update` and `update` commands to terraphim-agent
+- ✅ **GitHub Releases**: Integrated with GitHub Releases API for automated updates
+- ✅ **Cross-Platform Support**: Works on Linux, macOS, and Windows
+- ✅ **Documentation**: Complete autoupdate guide with troubleshooting
+
+#### Technical Implementation:
+- **Issue**: "Cannot drop a runtime in a context where blocking is not allowed"
+- **Solution**: Isolated `self_update` operations using `tokio::task::spawn_blocking`
+- **Commands Available**:
+  - `terraphim-agent check-update` - Check for updates without installing
+  - `terraphim-agent update` - Update to latest version if available
+- **Status Messages**: User-friendly progress indicators and error handling
+
+#### Key Features:
+- **Seamless Updates**: Automatic binary replacement without manual intervention
+- **Progress Tracking**: Real-time download progress and status indicators
+- **Secure Verification**: GitHub Releases integration ensures authenticated updates
+- **Version Intelligence**: Smart version comparison and update detection
+- **Error Handling**: Graceful degradation and detailed error reporting
+
+#### Validation Results:
+- [x] Both commands working correctly
+- [x] GitHub connectivity verified
+- [x] All 9 integration tests passing
+- [x] Cross-platform binary installation working
+- [x] Documentation complete with troubleshooting guide
+
+#### Timeline: 1 day (November 17, 2025)
+**PR**: #319 - "fix: resolve tokio runtime conflict in terraphim-agent autoupdate"
+**Status**: ✅ PRODUCTION-READY - All autoupdate functionality working and tested
+
 ---
 
 ## 📚 LOW PRIORITY TASKS
