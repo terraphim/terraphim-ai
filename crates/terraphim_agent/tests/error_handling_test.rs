@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use serial_test::serial;
-use terraphim_tui::client::ApiClient;
+use terraphim_agent::client::ApiClient;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
 use tokio::time::timeout;
 

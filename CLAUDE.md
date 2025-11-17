@@ -257,10 +257,10 @@ yarn run tauri build --debug
 cargo build -p terraphim_tui --features repl-full --release
 
 # Run minimal version
-cargo run --bin terraphim-tui
+cargo run --bin terraphim-agent
 
 # Launch interactive REPL
-./target/release/terraphim-tui
+./target/release/terraphim-agent
 
 # Available REPL commands:
 # /help           - Show all commands
@@ -867,7 +867,7 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
 7. **Run TUI Interface**
    ```bash
    cargo build -p terraphim_tui --features repl-full --release
-   ./target/release/terraphim-tui
+   ./target/release/terraphim-agent
    ```
 
 ## Frontend Technology Guidelines

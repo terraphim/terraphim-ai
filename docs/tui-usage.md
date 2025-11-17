@@ -27,7 +27,7 @@ cargo build -p terraphim_tui --features repl,repl-chat,repl-file,repl-mcp --rele
 cargo build -p terraphim_tui --release
 
 # The binary will be available at
-# ./target/release/terraphim-tui
+# ./target/release/terraphim-agent
 ```
 
 ### Feature Flags
@@ -62,7 +62,7 @@ This environment variable is **required** for the TUI to connect to the server. 
 The TUI features a comprehensive REPL (Read-Eval-Print Loop) that provides access to all advanced functionality:
 
 ```bash
-terraphim-tui
+terraphim-agent
 ```
 
 In interactive mode, you have access to:
@@ -133,7 +133,7 @@ In interactive mode, you have access to:
 Search for documents using the CLI:
 
 ```bash
-terraphim-tui search --query "terraphim-graph" --role "Default" --limit 10
+terraphim-agent search --query "terraphim-graph" --role "Default" --limit 10
 ```
 
 Parameters:
@@ -153,13 +153,13 @@ Example output:
 List available roles:
 
 ```bash
-terraphim-tui roles list
+terraphim-agent roles list
 ```
 
 Select a role for future queries:
 
 ```bash
-terraphim-tui roles select "Engineer"
+terraphim-agent roles select "Engineer"
 ```
 
 ### Configuration Commands
@@ -167,20 +167,20 @@ terraphim-tui roles select "Engineer"
 Display current configuration:
 
 ```bash
-terraphim-tui config show
+terraphim-agent config show
 ```
 
 Update configuration settings:
 
 ```bash
 # Change selected role
-terraphim-tui config set selected_role=Engineer
+terraphim-agent config set selected_role=Engineer
 
 # Update global shortcut
-terraphim-tui config set global_shortcut=Ctrl+X
+terraphim-agent config set global_shortcut=Ctrl+X
 
 # Change theme for a specific role
-terraphim-tui config set role.Default.theme=spacelab
+terraphim-agent config set role.Default.theme=spacelab
 ```
 
 ### Rolegraph Visualization
@@ -188,7 +188,7 @@ terraphim-tui config set role.Default.theme=spacelab
 Display ASCII representation of the rolegraph:
 
 ```bash
-terraphim-tui graph --role "Default" --top-k 10
+terraphim-agent graph --role "Default" --top-k 10
 ```
 
 Parameters:
@@ -212,7 +212,7 @@ Interact with AI models through OpenRouter or Ollama:
 /chat "Explain async patterns in Rust" --role Developer
 
 # CLI mode
-terraphim-tui chat --role "Default" --prompt "Summarize terraphim graph" --model anthropic/claude-3-sonnet
+terraphim-agent chat --role "Default" --prompt "Summarize terraphim graph" --model anthropic/claude-3-sonnet
 ```
 
 Parameters:
@@ -498,7 +498,7 @@ The TUI can be integrated into existing workflows:
 export TERRAPHIM_SERVER="http://knowledge.internal.example.com:8000"
 
 # Run search and capture results
-SEARCH_RESULTS=$(terraphim-tui search --query "deployment best practices" --role "DevOps" --limit 5)
+SEARCH_RESULTS=$(terraphim-agent search --query "deployment best practices" --role "DevOps" --limit 5)
 
 # Process results
 if echo "$SEARCH_RESULTS" | grep -q "deployment automation"; then
@@ -513,13 +513,13 @@ fi
 # Automated code analysis using TUI file operations
 
 # Classify files in the repository
-terraphim-tui file classify ./src --recursive --update-metadata
+terraphim-agent file classify ./src --recursive --update-metadata
 
 # Find potential issues
-terraphim-tui file search "TODO" "FIXME" --path ./src --semantic
+terraphim-agent file search "TODO" "FIXME" --path ./src --semantic
 
 # Generate summary of changes
-terraphim-tui file summarize ./CHANGELOG.md --detailed
+terraphim-agent file summarize ./CHANGELOG.md --detailed
 ```
 
 **Security Analysis:**
@@ -528,11 +528,11 @@ terraphim-tui file summarize ./CHANGELOG.md --detailed
 # Security analysis using VM-sandboxed web operations
 
 # Check dependencies for known vulnerabilities
-terraphim-tui web get "https://api.github.com/advisories?ecosystem=npm" --auth "$GITHUB_TOKEN"
+terraphim-agent web get "https://api.github.com/advisories?ecosystem=npm" --auth "$GITHUB_TOKEN"
 
 # Scan web application securely
-terraphim-tui web screenshot "https://app.example.com" --full-page
-terraphim-tui web scrape "https://app.example.com" '.security-info'
+terraphim-agent web screenshot "https://app.example.com" --full-page
+terraphim-agent web scrape "https://app.example.com" '.security-info'
 ```
 
 ## Roadmap

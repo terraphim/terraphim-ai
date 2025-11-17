@@ -26,7 +26,7 @@ This is the first major release of Terraphim AI, featuring complete command-line
 ### Command Line Binaries
 
 - `terraphim_server` - Standalone server binary
-- `terraphim-tui` - Standalone TUI binary
+- `terraphim-agent` - Standalone TUI binary
 
 ## ✅ Completed Tasks (9/11)
 

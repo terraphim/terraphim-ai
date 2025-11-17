@@ -11,7 +11,7 @@ permissions:
 
 jobs:
   release:
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, Linux, terraphim]
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -95,36 +95,36 @@ jobs:
           EOF
 
           # Create TUI package structure
-          mkdir -p arch-packages/terraphim-tui/usr/bin
-          mkdir -p arch-packages/terraphim-tui/usr/share/doc/terraphim-tui
-          mkdir -p arch-packages/terraphim-tui/usr/share/licenses/terraphim-tui
+          mkdir -p arch-packages/terraphim-agent/usr/bin
+          mkdir -p arch-packages/terraphim-agent/usr/share/doc/terraphim-agent
+          mkdir -p arch-packages/terraphim-agent/usr/share/licenses/terraphim-agent
 
           # Copy TUI files
-          cp target/release/terraphim-tui arch-packages/terraphim-tui/usr/bin/
-          cp README.md arch-packages/terraphim-tui/usr/share/doc/terraphim-tui/
-          cp LICENSE-Apache-2.0 arch-packages/terraphim-tui/usr/share/licenses/terraphim-tui/
+          cp target/release/terraphim-agent arch-packages/terraphim-agent/usr/bin/
+          cp README.md arch-packages/terraphim-agent/usr/share/doc/terraphim-agent/
+          cp LICENSE-Apache-2.0 arch-packages/terraphim-agent/usr/share/licenses/terraphim-agent/
 
           # Create TUI PKGINFO
-          cat > arch-packages/terraphim-tui/.PKGINFO << EOF
-          pkgname = terraphim-tui
-          pkgbase = terraphim-tui
+          cat > arch-packages/terraphim-agent/.PKGINFO << EOF
+          pkgname = terraphim-agent
+          pkgbase = terraphim-agent
           pkgver = $VERSION-1
-          pkgdesc = Terraphim TUI - Terminal User Interface for Terraphim AI
+          pkgdesc = Terraphim Agent - AI Agent CLI Interface for Terraphim
           url = https://terraphim.ai
           builddate = $(date +%s)
           packager = Terraphim Contributors <team@terraphim.ai>
-          size = $(stat -c%s target/release/terraphim-tui)
+          size = $(stat -c%s target/release/terraphim-agent)
           arch = x86_64
           license = Apache-2.0
           depend = glibc
           depend = openssl
-          provides = terraphim-tui
+          provides = terraphim-agent
           EOF
 
           # Create Arch packages
           cd arch-packages
           tar -I 'zstd -19' -cf terraphim-server-$VERSION-1-x86_64.pkg.tar.zst terraphim-server/
-          tar -I 'zstd -19' -cf terraphim-tui-$VERSION-1-x86_64.pkg.tar.zst terraphim-tui/
+          tar -I 'zstd -19' -cf terraphim-agent-$VERSION-1-x86_64.pkg.tar.zst terraphim-agent/
           cd ..
 
       - name: Create release directory
@@ -202,7 +202,7 @@ jobs:
 
             ### 📦 Available Packages
             - **terraphim-server**: Main HTTP API server with semantic search
-            - **terraphim-tui**: Terminal User Interface with interactive REPL
+            - **terraphim-agent**: Terminal User Interface with interactive REPL
 
             ### 🔧 Features
             - Privacy-first AI assistant that operates locally

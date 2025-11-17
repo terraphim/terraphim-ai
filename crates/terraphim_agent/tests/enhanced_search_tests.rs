@@ -1,6 +1,6 @@
 use std::str::FromStr;
 #[cfg(feature = "repl")]
-use terraphim_tui::repl::commands::*;
+use terraphim_agent::repl::commands::*;
 
 /// Test basic search command parsing
 #[cfg(feature = "repl")]

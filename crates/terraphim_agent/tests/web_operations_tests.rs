@@ -1,12 +1,12 @@
 use std::str::FromStr;
 
 #[cfg(feature = "repl")]
-use terraphim_tui::repl::web_operations::*;
+use terraphim_agent::repl::web_operations::*;
 
 #[cfg(all(test, feature = "repl"))]
 mod tests {
     use super::*;
-    use terraphim_tui::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
+    use terraphim_agent::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
 
     #[test]
     fn test_web_get_command_parsing() {
@@ -583,7 +583,7 @@ mod tests {
 
     #[test]
     fn test_web_operation_complexity_estimation() {
-        use terraphim_tui::repl::web_operations::utils::*;
+        use terraphim_agent::repl::web_operations::utils::*;
 
         // Test different operation complexities
         let get_op = WebOperationType::http_get("https://example.com");
@@ -767,7 +767,7 @@ mod tests {
 
     #[test]
     fn test_web_url_validation() {
-        use terraphim_tui::repl::web_operations::utils::*;
+        use terraphim_agent::repl::web_operations::utils::*;
 
         // Test valid URLs
         assert!(validate_url("https://example.com").is_ok());

@@ -7,18 +7,20 @@ mod file_operations_tests {
     fn test_file_search_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result =
-                terraphim_tui::repl::commands::ReplCommand::from_str("/file search \"async rust\"");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
+                "/file search \"async rust\"",
+            );
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_tui::repl::commands::FileSubcommand::Search { query } => {
-                        assert_eq!(query, "\"async rust\"");
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Search { query } => {
+                            assert_eq!(query, "\"async rust\"");
+                        }
+                        _ => panic!("Expected Search subcommand"),
                     }
-                    _ => panic!("Expected Search subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -28,17 +30,18 @@ mod file_operations_tests {
     fn test_file_list_command_parsing() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str("/file list");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str("/file list");
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_tui::repl::commands::FileSubcommand::List => {
-                        // List command has no fields
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::List => {
+                            // List command has no fields
+                        }
+                        _ => panic!("Expected List subcommand"),
                     }
-                    _ => panic!("Expected List subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -49,17 +52,18 @@ mod file_operations_tests {
         #[cfg(feature = "repl-file")]
         {
             let result =
-                terraphim_tui::repl::commands::ReplCommand::from_str("/file info ./src/main.rs");
+                terraphim_agent::repl::commands::ReplCommand::from_str("/file info ./src/main.rs");
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_tui::repl::commands::FileSubcommand::Info { path } => {
-                        assert_eq!(path, "./src/main.rs");
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Info { path } => {
+                            assert_eq!(path, "./src/main.rs");
+                        }
+                        _ => panic!("Expected Info subcommand"),
                     }
-                    _ => panic!("Expected Info subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }
@@ -69,7 +73,7 @@ mod file_operations_tests {
     fn test_file_command_help_available() {
         #[cfg(feature = "repl-file")]
         {
-            let commands = terraphim_tui::repl::commands::ReplCommand::available_commands();
+            let commands = terraphim_agent::repl::commands::ReplCommand::available_commands();
             assert!(
                 commands.iter().any(|cmd| cmd.contains("file")),
                 "File command should be in available commands"
@@ -82,7 +86,7 @@ mod file_operations_tests {
         #[cfg(feature = "repl-file")]
         {
             let result =
-                terraphim_tui::repl::commands::ReplCommand::from_str("/file invalid_subcommand");
+                terraphim_agent::repl::commands::ReplCommand::from_str("/file invalid_subcommand");
             assert!(result.is_err(), "Expected error for invalid subcommand");
         }
     }
@@ -91,7 +95,7 @@ mod file_operations_tests {
     fn test_file_command_no_args() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str("/file");
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str("/file");
             assert!(result.is_err(), "Expected error for no subcommand");
         }
     }
@@ -101,20 +105,21 @@ mod file_operations_tests {
     fn test_file_search_complex_query() {
         #[cfg(feature = "repl-file")]
         {
-            let result = terraphim_tui::repl::commands::ReplCommand::from_str(
+            let result = terraphim_agent::repl::commands::ReplCommand::from_str(
                 "/file search \"async rust patterns\" --recursive",
             );
             // This should parse successfully, though we only extract the basic query
             assert!(result.is_ok());
 
             match result.unwrap() {
-                terraphim_tui::repl::commands::ReplCommand::File { subcommand } => match subcommand
-                {
-                    terraphim_tui::repl::commands::FileSubcommand::Search { query } => {
-                        assert_eq!(query, "\"async rust patterns\" --recursive");
+                terraphim_agent::repl::commands::ReplCommand::File { subcommand } => {
+                    match subcommand {
+                        terraphim_agent::repl::commands::FileSubcommand::Search { query } => {
+                            assert_eq!(query, "\"async rust patterns\" --recursive");
+                        }
+                        _ => panic!("Expected Search subcommand"),
                     }
-                    _ => panic!("Expected Search subcommand"),
-                },
+                }
                 _ => panic!("Expected File command"),
             }
         }

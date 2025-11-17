@@ -4,7 +4,7 @@ use std::time::Duration;
 
 use anyhow::Result;
 use serial_test::serial;
-use terraphim_tui::client::{ApiClient, ChatResponse, ConfigResponse, SearchResponse};
+use terraphim_agent::client::{ApiClient, ChatResponse, ConfigResponse, SearchResponse};
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";
