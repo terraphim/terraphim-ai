@@ -1,7 +1,5 @@
 <script lang="ts">
-export let term: string;
-export const isFromKG: boolean = false;
-export const onRemove: (() => void) | null = null;
+let { term, isFromKG = false, onRemove = null }: { term: string; isFromKG?: boolean; onRemove?: (() => void) | null } = $props();
 </script>
 
 <span class="term-chip" class:from-kg={isFromKG}>

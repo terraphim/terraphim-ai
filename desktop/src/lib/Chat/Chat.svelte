@@ -26,7 +26,6 @@ export type ContextItem = {
 
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { onMount } from 'svelte';
 import { get } from 'svelte/store';
 import { CONFIG } from '../../config';
 import {
@@ -45,8 +44,8 @@ import ArticleModal from '../Search/ArticleModal.svelte';
 import Markdown from 'svelte-markdown';
 
 // Tauri APIs for saving files (only used in desktop)
-let tauriDialog: any = null;
-let tauriFs: any = null;
+let tauriDialog: any = $state(null);
+let tauriFs: any = $state(null);
 
 type ChatMessage = { role: 'system' | 'user' | 'assistant'; content: string };
 type ChatResponse = { status: string; message?: string; model_used?: string; error?: string };
@@ -77,48 +76,49 @@ type Conversation = {
 	updated_at: string;
 };
 
-let messages: ChatMessage[] = [];
-let input: string = '';
-let sending = false;
-let error: string | null = null;
-let modelUsed: string | null = null;
-let _providerHint: string = '';
-let renderMarkdown: boolean = false;
+// Svelte 5: Use $state rune for reactive local state
+let messages: ChatMessage[] = $state([]);
+let input: string = $state('');
+let sending = $state(false);
+let error: string | null = $state(null);
+let modelUsed: string | null = $state(null);
+let _providerHint: string = $state('');
+let renderMarkdown: boolean = $state(false);
 
 // Debug state
-let _debugMode: boolean = false;
-let _lastRequest: any = null;
-let _lastResponse: any = null;
-let _showDebugRequest: boolean = false;
-let _showDebugResponse: boolean = false;
+let _debugMode: boolean = $state(false);
+let _lastRequest: any = $state(null);
+let _lastResponse: any = $state(null);
+let _showDebugRequest: boolean = $state(false);
+let _showDebugResponse: boolean = $state(false);
 
 // Conversation and context management
-let conversationId: string | null = null;
-let contextItems: ContextItem[] = [];
-let _loadingContext = false;
+let conversationId: string | null = $state(null);
+let contextItems: ContextItem[] = $state([]);
+let _loadingContext = $state(false);
 const _showContextPanel = false;
 
 // Manual context addition
-let showAddContextForm = false;
-let newContextTitle = '';
-let newContextContent = '';
-let newContextType = 'document';
-let _savingContext = false;
+let showAddContextForm = $state(false);
+let newContextTitle = $state('');
+let newContextContent = $state('');
+let newContextType = $state('document');
+let _savingContext = $state(false);
 
 // Context editing
-let _showContextEditModal = false;
-let _editingContext: ContextItem | null = null;
-let _contextEditMode: 'create' | 'edit' = 'edit';
-let deletingContextId: string | null = null;
+let _showContextEditModal = $state(false);
+let _editingContext: ContextItem | null = $state(null);
+let _contextEditMode: 'create' | 'edit' = $state('edit' as 'create' | 'edit');
+let deletingContextId: string | null = $state(null);
 
 // KG search modal
-let _showKGSearchModal = false;
+let _showKGSearchModal = $state(false);
 
 // KG document modal (for viewing KG term documents)
-let _showKgModal = false;
-let kgDocument: any = null;
-let _kgTerm: string | null = null;
-let _kgRank: number | null = null;
+let _showKgModal = $state(false);
+let kgDocument: any = $state(null);
+let _kgTerm: string | null = $state(null);
+let _kgRank: number | null = $state(null);
 
 // --- Persistence helpers ---
 function chatStateKey(): string {
@@ -711,7 +711,8 @@ function _handleKGIndexAdded(event: CustomEvent) {
 	loadConversationContext();
 }
 
-onMount(() => {
+// Svelte 5: Replace onMount with $effect for initialization and cleanup
+$effect(() => {
 	// Load markdown preference
 	loadMdPref();
 
@@ -747,15 +748,16 @@ onMount(() => {
 
 		window.addEventListener('focus', handleFocus);
 
-		// Cleanup
+		// Cleanup function
 		return () => {
 			window.removeEventListener('focus', handleFocus);
 		};
 	}
 });
 
+// Svelte 5: Replace reactive statement with $effect
 // Compute provider/model hint from actual chat response or role settings
-$: {
+$effect(() => {
 	try {
 		// If we have a model_used from the actual chat response, analyze it
 		if (modelUsed) {
@@ -821,7 +823,7 @@ $: {
 	} catch (_e) {
 		_providerHint = modelUsed ? `Model: ${modelUsed}` : '';
 	}
-}
+});
 
 // Copy/save helpers
 async function _copyAsMarkdown(content: string) {
