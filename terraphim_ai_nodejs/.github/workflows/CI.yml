@@ -241,16 +241,26 @@ jobs:
       - name: Publish
         run: |
           npm config set provenance true
-          if git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+$";
-          then
+
+          # Check if this is a version commit
+          COMMIT_MSG=$(git log -1 --pretty=%B)
+          echo "Commit message: $COMMIT_MSG"
+
+          # Parse version from commit message
+          if echo "$COMMIT_MSG" | grep -q "^[0-9]\+\.[0-9]\+\.[0-9]\+$"; then
+            VERSION=$(echo "$COMMIT_MSG" | head -n1)
+            echo "🚀 Publishing version $VERSION to npm"
             echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
             npm publish --access public
-          elif git log -1 --pretty=%B | grep "^[0-9]\+\.[0-9]\+\.[0-9]\+";
-          then
+          elif echo "$COMMIT_MSG" | grep -q "^[0-9]\+\.[0-9]\+\.[0-9]\+"; then
+            VERSION=$(echo "$COMMIT_MSG" | head -n1)
+            echo "🚀 Publishing version $VERSION to npm (next tag)"
             echo "//registry.npmjs.org/:_authToken=$NPM_TOKEN" >> ~/.npmrc
             npm publish --tag next --access public
           else
-            echo "Not a release, skipping publish"
+            echo "ℹ️  Not a version commit, skipping publish"
+            echo "💡 To publish, commit with semantic version (e.g., '1.0.0')"
+            echo "💡 Or use the publish-npm.yml workflow for more control"
           fi
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

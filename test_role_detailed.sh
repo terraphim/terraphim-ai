@@ -5,7 +5,7 @@ echo "DETAILED ROLE SWITCHING DEMONSTRATION"
 echo "==================================================================="
 echo ""
 
-BINARY="./target/release/terraphim-tui"
+BINARY="./target/release/terraphim-agent"
 
 # Show full role list with indicators
 echo "1. SHOWING ALL AVAILABLE ROLES (with current role indicator ▶)"

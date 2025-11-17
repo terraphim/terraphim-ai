@@ -5,7 +5,7 @@ echo "PROVING SEARCH RESULTS CHANGE BASED ON ROLE"
 echo "=================================================================="
 echo ""
 
-BINARY="./target/release/terraphim-tui"
+BINARY="./target/release/terraphim-agent"
 
 echo "KEY DIFFERENCES IN ROLE CONFIGURATIONS:"
 echo "----------------------------------------"

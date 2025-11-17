@@ -42,6 +42,28 @@ Captures critical technical insights, development patterns, and lessons from Ter
 - **Categories**: Prompt injection, command injection, memory safety, network validation
 - **Coverage**: 99 comprehensive tests across multiple attack vectors
 
+**Pattern 6: Multi-Language Package Publishing Strategy**
+- **Context**: v1.0.0 release with Rust, Node.js, Python packages
+- **Learning**: Platform-specific bindings require different approaches but unified API design
+- **Rust (crates.io)**: Native publishing with comprehensive documentation
+- **Node.js (npm)**: NAPI bindings for zero-overhead native performance
+- **Python (PyPI)**: PyO3 bindings for maximum speed with universal wheels
+- **Key Success**: Consistent API design across all languages while leveraging platform strengths
+
+**Pattern 7: Comprehensive Multi-Package-Manager Support**
+- **Context**: Node.js ecosystem evolution beyond npm
+- **Learning**: Support multiple package managers for maximum reach
+- **Implementation**: npm + Bun optimization with performance benchmarking
+- **Benefits**: Faster installation (Bun), broader compatibility (npm), developer choice
+- **Testing**: Automated testing across all supported package managers
+
+**Pattern 8: CI/CD Infrastructure Migration**
+- **Context**: Earthly to GitHub Actions migration for self-hosted runners
+- **Learning**: Gradual migration with parallel systems reduces risk
+- **Approach**: Maintain Earthly while building GitHub Actions, then switch
+- **Key Benefits**: Self-hosted runners, 1Password integration, faster builds
+- **Security**: OIDC authentication for package publishing with secure token management
+
 ## Technical Insights
 
 **UI Development**:
