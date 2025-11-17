@@ -48,8 +48,8 @@ This release includes signed updates. The desktop app will automatically check f
 ### Environment Variables
 ```bash
 # For signed releases (maintainers only)
-export TAURI_PRIVATE_KEY="your_private_key"
-export TAURI_KEY_PASSWORD="optional_password"
+export TAURI_PRIVATE_KEY="your_private_key"  # pragma: allowlist secret
+export TAURI_KEY_PASSWORD="optional_password"  # pragma: allowlist secret
 ```
 
 ### Docker Environment
