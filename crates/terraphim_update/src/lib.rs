@@ -27,6 +27,40 @@ pub enum UpdateStatus {
     Failed(String),
 }
 
+/// Compare two version strings to determine if the first is newer than the second
+/// Static version that can be called from blocking contexts
+fn is_newer_version_static(version1: &str, version2: &str) -> bool {
+    // Simple version comparison - in production you might want to use semver crate
+    let v1_parts: Vec<u32> = version1
+        .trim_start_matches('v')
+        .split('.')
+        .take(3)
+        .map(|s| s.parse().unwrap_or(0))
+        .collect();
+
+    let v2_parts: Vec<u32> = version2
+        .trim_start_matches('v')
+        .split('.')
+        .take(3)
+        .map(|s| s.parse().unwrap_or(0))
+        .collect();
+
+    // Pad with zeros if needed
+    let v1 = [
+        v1_parts.first().copied().unwrap_or(0),
+        v1_parts.get(1).copied().unwrap_or(0),
+        v1_parts.get(2).copied().unwrap_or(0),
+    ];
+
+    let v2 = [
+        v2_parts.first().copied().unwrap_or(0),
+        v2_parts.get(1).copied().unwrap_or(0),
+        v2_parts.get(2).copied().unwrap_or(0),
+    ];
+
+    v1 > v2
+}
+
 impl fmt::Display for UpdateStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
@@ -114,41 +148,92 @@ impl TerraphimUpdater {
             self.config.bin_name, self.config.current_version
         );
 
-        // Check if update is available
-        match self_update::backends::github::Update::configure()
-            .repo_owner(&self.config.repo_owner)
-            .repo_name(&self.config.repo_name)
-            .bin_name(&self.config.bin_name)
-            .current_version(&self.config.current_version)
-            .show_download_progress(self.config.show_progress)
-            .build()
-        {
-            Ok(updater) => {
-                let current_version = self.config.current_version.clone();
+        // Clone data for the blocking task
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
+        let bin_name = self.config.bin_name.clone();
+        let current_version = self.config.current_version.clone();
+        let show_progress = self.config.show_progress;
 
-                // This will check without updating
-                match updater.get_latest_release() {
-                    Ok(release) => {
-                        let latest_version = release.version.clone();
+        // Move self_update operations to a blocking task to avoid runtime conflicts
+        let result = tokio::task::spawn_blocking(move || {
+            // Check if update is available
+            match self_update::backends::github::Update::configure()
+                .repo_owner(&repo_owner)
+                .repo_name(&repo_name)
+                .bin_name(&bin_name)
+                .current_version(&current_version)
+                .show_download_progress(show_progress)
+                .build()
+            {
+                Ok(updater) => {
+                    // This will check without updating
+                    match updater.get_latest_release() {
+                        Ok(release) => {
+                            let latest_version = release.version.clone();
 
-                        if self.is_newer_version(&latest_version, &current_version)? {
-                            Ok(UpdateStatus::Available {
+                            // Simple version comparison
+                            if is_newer_version_static(&latest_version, &current_version) {
+                                Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
+                                    current_version,
+                                    latest_version,
+                                })
+                            } else {
+                                Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(
+                                    current_version,
+                                ))
+                            }
+                        }
+                        Err(e) => Ok(UpdateStatus::Failed(format!("Check failed: {}", e))),
+                    }
+                }
+                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(update_result) => {
+                match update_result {
+                    Ok(status) => {
+                        // Log the result for debugging
+                        match &status {
+                            UpdateStatus::Available {
                                 current_version,
                                 latest_version,
-                            })
-                        } else {
-                            Ok(UpdateStatus::UpToDate(current_version))
+                            } => {
+                                info!(
+                                    "Update available: {} -> {}",
+                                    current_version, latest_version
+                                );
+                            }
+                            UpdateStatus::UpToDate(version) => {
+                                info!("Already up to date: {}", version);
+                            }
+                            UpdateStatus::Updated {
+                                from_version,
+                                to_version,
+                            } => {
+                                info!(
+                                    "Successfully updated from {} to {}",
+                                    from_version, to_version
+                                );
+                            }
+                            UpdateStatus::Failed(error) => {
+                                error!("Update check failed: {}", error);
+                            }
                         }
+                        Ok(status)
                     }
                     Err(e) => {
-                        error!("Failed to check for updates: {}", e);
-                        Ok(UpdateStatus::Failed(format!("Check failed: {}", e)))
+                        error!("Blocking task failed: {}", e);
+                        Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
                     }
                 }
             }
             Err(e) => {
-                error!("Failed to configure updater: {}", e);
-                Ok(UpdateStatus::Failed(format!("Configuration error: {}", e)))
+                error!("Failed to spawn blocking task: {}", e);
+                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
             }
         }
     }
@@ -160,40 +245,84 @@ impl TerraphimUpdater {
             self.config.bin_name, self.config.current_version
         );
 
-        match self_update::backends::github::Update::configure()
-            .repo_owner(&self.config.repo_owner)
-            .repo_name(&self.config.repo_name)
-            .bin_name(&self.config.bin_name)
-            .current_version(&self.config.current_version)
-            .show_download_progress(self.config.show_progress)
-            .build()
-        {
-            Ok(updater) => {
-                let current_version = self.config.current_version.clone();
+        // Clone data for the blocking task
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
+        let bin_name = self.config.bin_name.clone();
+        let current_version = self.config.current_version.clone();
+        let show_progress = self.config.show_progress;
 
-                match updater.update() {
+        // Move self_update operations to a blocking task to avoid runtime conflicts
+        let result = tokio::task::spawn_blocking(move || {
+            match self_update::backends::github::Update::configure()
+                .repo_owner(&repo_owner)
+                .repo_name(&repo_name)
+                .bin_name(&bin_name)
+                .current_version(&current_version)
+                .show_download_progress(show_progress)
+                .build()
+            {
+                Ok(updater) => match updater.update() {
                     Ok(status) => match status {
                         self_update::Status::UpToDate(version) => {
-                            info!("Already up to date: {}", version);
-                            Ok(UpdateStatus::UpToDate(version))
+                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(version))
                         }
                         self_update::Status::Updated(version) => {
-                            info!("Successfully updated to version: {}", version);
-                            Ok(UpdateStatus::Updated {
+                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Updated {
                                 from_version: current_version,
                                 to_version: version,
                             })
                         }
                     },
+                    Err(e) => Ok(UpdateStatus::Failed(format!("Update failed: {}", e))),
+                },
+                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
+            }
+        })
+        .await;
+
+        match result {
+            Ok(update_result) => {
+                match update_result {
+                    Ok(status) => {
+                        // Log the result for debugging
+                        match &status {
+                            UpdateStatus::Updated {
+                                from_version,
+                                to_version,
+                            } => {
+                                info!(
+                                    "Successfully updated from {} to {}",
+                                    from_version, to_version
+                                );
+                            }
+                            UpdateStatus::UpToDate(version) => {
+                                info!("Already up to date: {}", version);
+                            }
+                            UpdateStatus::Available {
+                                current_version,
+                                latest_version,
+                            } => {
+                                info!(
+                                    "Update available: {} -> {}",
+                                    current_version, latest_version
+                                );
+                            }
+                            UpdateStatus::Failed(error) => {
+                                error!("Update failed: {}", error);
+                            }
+                        }
+                        Ok(status)
+                    }
                     Err(e) => {
-                        error!("Update failed: {}", e);
-                        Ok(UpdateStatus::Failed(format!("Update failed: {}", e)))
+                        error!("Blocking task failed: {}", e);
+                        Ok(UpdateStatus::Failed(format!("Blocking task error: {}", e)))
                     }
                 }
             }
             Err(e) => {
-                error!("Failed to configure updater: {}", e);
-                Ok(UpdateStatus::Failed(format!("Configuration error: {}", e)))
+                error!("Failed to spawn blocking task: {}", e);
+                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
             }
         }
     }

@@ -321,13 +321,13 @@
 **✅ COMPREHENSIVE VALIDATION RESULTS**:
 
 #### **1. Fully Working Commands - 7 Commands (✅ 100% SUCCESS)**
-- **`terraphim-tui search <query>`**: Full search functionality with ranked results and proper output formatting ✅
-- **`terraphim-tui roles list`**: Complete role listing with configurations, themes, and descriptions ✅
-- **`terraphim-tui roles select <role>`**: Role switching with configuration updates and validation ✅
-- **`terraphim-tui config show`**: Configuration display with structured output and formatting ✅
-- **`terraphim-tui config set <key> <value>`**: Configuration updates for selected_role, global_shortcut, role themes ✅
-- **`terraphim-tui graph`**: ASCII rolegraph adjacency listing with top-k nodes and neighbors ✅
-- **`terraphim-tui chat <message>`**: OpenRouter-backed chat functionality with streaming responses (feature-gated) ✅
+- **`terraphim-agent search <query>`**: Full search functionality with ranked results and proper output formatting ✅
+- **`terraphim-agent roles list`**: Complete role listing with configurations, themes, and descriptions ✅
+- **`terraphim-agent roles select <role>`**: Role switching with configuration updates and validation ✅
+- **`terraphim-agent config show`**: Configuration display with structured output and formatting ✅
+- **`terraphim-agent config set <key> <value>`**: Configuration updates for selected_role, global_shortcut, role themes ✅
+- **`terraphim-agent graph`**: ASCII rolegraph adjacency listing with top-k nodes and neighbors ✅
+- **`terraphim-agent chat <message>`**: OpenRouter-backed chat functionality with streaming responses (feature-gated) ✅
 
 #### **2. Partially Working Commands - 3 Commands (✅ EXPECTED BEHAVIOR)**
 - **Interactive TUI Mode**: Basic ratatui shell interface with input/results/status panes - framework implemented, full feature parity planned for future releases
@@ -734,7 +734,7 @@ The build argument management has been implemented for the Terraphim AI project:
 
 ## TUI Interface Plan and Progress (2025-08-11)
 
-- Created new crate `crates/terraphim_tui` (bin `terraphim-tui`) and added it to workspace members.
+- Created new crate `crates/terraphim_tui` (bin `terraphim-agent`) and added it to workspace members.
 - MVP includes: interactive ratatui shell (input/results/status) with in-pane results and rolegraph-based suggestions; non-interactive subcommands: `search`, `roles list|select`, `config show|set`, `graph` (ASCII adjacency), `chat`.
 - Goals: parity with desktop for search/typeahead, roles, basic config editing, textual rolegraph; optional OpenRouter chat/summaries.
 - Architecture: tokio event loops with bounded channels, provider abstraction for LLM (OpenRouter default), plan/approve/execute mode inspired by Claude Code and Goose CLI.
@@ -3622,13 +3622,13 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **✅ COMPREHENSIVE VALIDATION RESULTS**:
 
 #### **1. Fully Working Commands - 7 Commands (✅ 100% SUCCESS)**
-- **`terraphim-tui search <query>`**: Full search functionality with ranked results and proper output formatting ✅
-- **`terraphim-tui roles list`**: Complete role listing with configurations, themes, and descriptions ✅
-- **`terraphim-tui roles select <role>`**: Role switching with configuration updates and validation ✅
-- **`terraphim-tui config show`**: Configuration display with structured output and formatting ✅
-- **`terraphim-tui config set <key> <value>`**: Configuration updates for selected_role, global_shortcut, role themes ✅
-- **`terraphim-tui graph`**: ASCII rolegraph adjacency listing with top-k nodes and neighbors ✅
-- **`terraphim-tui chat <message>`**: OpenRouter-backed chat functionality with streaming responses (feature-gated) ✅
+- **`terraphim-agent search <query>`**: Full search functionality with ranked results and proper output formatting ✅
+- **`terraphim-agent roles list`**: Complete role listing with configurations, themes, and descriptions ✅
+- **`terraphim-agent roles select <role>`**: Role switching with configuration updates and validation ✅
+- **`terraphim-agent config show`**: Configuration display with structured output and formatting ✅
+- **`terraphim-agent config set <key> <value>`**: Configuration updates for selected_role, global_shortcut, role themes ✅
+- **`terraphim-agent graph`**: ASCII rolegraph adjacency listing with top-k nodes and neighbors ✅
+- **`terraphim-agent chat <message>`**: OpenRouter-backed chat functionality with streaming responses (feature-gated) ✅
 
 #### **2. Partially Working Commands - 3 Commands (✅ EXPECTED BEHAVIOR)**
 - **Interactive TUI Mode**: Basic ratatui shell interface with input/results/status panes - framework implemented, full feature parity planned for future releases
@@ -3694,13 +3694,13 @@ echo '{"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVe
 **✅ COMPREHENSIVE VALIDATION RESULTS**:
 
 #### **1. Fully Working Commands - 7 Commands (✅ 100% SUCCESS)**
-- **`terraphim-tui search <query>`**: Full search functionality with ranked results and proper output formatting ✅
-- **`terraphim-tui roles list`**: Complete role listing with configurations, themes, and descriptions ✅
-- **`terraphim-tui roles select <role>`**: Role switching with configuration updates and validation ✅
-- **`terraphim-tui config show`**: Configuration display with structured output and formatting ✅
-- **`terraphim-tui config set <key> <value>`**: Configuration updates for selected_role, global_shortcut, role themes ✅
-- **`terraphim-tui graph`**: ASCII rolegraph adjacency listing with top-k nodes and neighbors ✅
-- **`terraphim-tui chat <message>`**: OpenRouter-backed chat functionality with streaming responses (feature-gated) ✅
+- **`terraphim-agent search <query>`**: Full search functionality with ranked results and proper output formatting ✅
+- **`terraphim-agent roles list`**: Complete role listing with configurations, themes, and descriptions ✅
+- **`terraphim-agent roles select <role>`**: Role switching with configuration updates and validation ✅
+- **`terraphim-agent config show`**: Configuration display with structured output and formatting ✅
+- **`terraphim-agent config set <key> <value>`**: Configuration updates for selected_role, global_shortcut, role themes ✅
+- **`terraphim-agent graph`**: ASCII rolegraph adjacency listing with top-k nodes and neighbors ✅
+- **`terraphim-agent chat <message>`**: OpenRouter-backed chat functionality with streaming responses (feature-gated) ✅
 
 #### **2. Partially Working Commands - 3 Commands (✅ EXPECTED BEHAVIOR)**
 - **Interactive TUI Mode**: Basic ratatui shell interface with input/results/status panes - framework implemented, full feature parity planned for future releases
