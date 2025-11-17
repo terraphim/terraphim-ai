@@ -3,14 +3,20 @@ import { Modal } from 'svelma';
 import { createEventDispatcher } from 'svelte';
 import type { ContextItem } from './Chat.svelte';
 
-export let active: boolean = false;
-export let context: ContextItem | null = null;
-export let mode: 'create' | 'edit' = 'edit';
+let {
+	active = $bindable(false),
+	context = null,
+	mode = 'edit',
+}: {
+	active?: boolean;
+	context?: ContextItem | null;
+	mode?: 'create' | 'edit';
+} = $props();
 
 const dispatch = createEventDispatcher();
 
 // Form data
-let editingContext: ContextItem | null = null;
+let editingContext = $state<ContextItem | null>(null);
 const _contextTypeOptions = [
 	{ value: 'Document', label: 'Document' },
 	{ value: 'SearchResult', label: 'Search Result' },
@@ -20,29 +26,32 @@ const _contextTypeOptions = [
 ];
 
 // Initialize form data when modal becomes active
-$: if (active && context) {
-	editingContext = {
-		...context,
-		// Ensure we have a proper copy
-		metadata: { ...context.metadata },
-	};
-} else if (active && mode === 'create') {
-	// Initialize new context item
-	editingContext = {
-		id: '',
-		context_type: 'UserInput',
-		title: '',
-		summary: '',
-		content: '',
-		metadata: {},
-		created_at: new Date().toISOString(),
-		relevance_score: undefined,
-	};
-}
+$effect(() => {
+	if (active && context) {
+		editingContext = {
+			...context,
+			// Ensure we have a proper copy
+			metadata: { ...context.metadata },
+		};
+	} else if (active && mode === 'create') {
+		// Initialize new context item
+		editingContext = {
+			id: '',
+			context_type: 'UserInput',
+			title: '',
+			summary: '',
+			content: '',
+			metadata: {},
+			created_at: new Date().toISOString(),
+			relevance_score: undefined,
+		};
+	}
+});
 
 // Validation
-$: isValid =
-	editingContext && editingContext.title.trim() !== '' && editingContext.content.trim() !== '';
+let isValid = $derived(
+	editingContext && editingContext.title.trim() !== '' && editingContext.content.trim() !== ''
+);
 
 function handleClose() {
 	active = false;

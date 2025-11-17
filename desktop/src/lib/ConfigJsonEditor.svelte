@@ -1,15 +1,14 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { onMount } from 'svelte';
 import { get } from 'svelte/store';
 // import { JSONEditor } from 'svelte-jsoneditor'; // Removed - using textarea instead
 // @ts-expect-error local store defined elsewhere
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../config';
 
-let _content = {
+let _content = $state({
 	json: $configStore,
-};
+});
 
 function _handleChange(updatedContent) {
 	console.log('contents changed:', updatedContent);
@@ -40,7 +39,7 @@ function _handleChange(updatedContent) {
 	_content;
 }
 
-onMount(() => {
+$effect(() => {
 	// Initialize content with current config
 	_content = { json: $configStore };
 });
