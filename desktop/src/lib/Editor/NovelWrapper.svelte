@@ -1,12 +1,12 @@
 <script lang="ts">
-import { onDestroy, onMount } from 'svelte';
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import { onDestroy, onMount } from 'svelte';
 import { Markdown } from 'tiptap-markdown';
 import { is_tauri, role } from '$lib/stores';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
-import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
 import { SlashCommand, slashCommandStyles } from './SlashCommand';
+import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
 
 export let html: string = ''; // initial content in HTML/JSON
 export const readOnly: boolean = false;

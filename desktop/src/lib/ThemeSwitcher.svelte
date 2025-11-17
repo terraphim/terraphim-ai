@@ -179,8 +179,7 @@ function updateRole(event: Event) {
 	try {
 		const kg = (roleSettings as any)?.kg;
 		const hasLocal =
-			Boolean(kg?.knowledge_graph_local?.path) &&
-			String(kg.knowledge_graph_local.path).length > 0;
+			Boolean(kg?.knowledge_graph_local?.path) && String(kg.knowledge_graph_local.path).length > 0;
 		const ap = kg?.automata_path as any | undefined;
 		const hasAutomata =
 			Boolean(ap?.Local && String(ap.Local).length > 0) ||

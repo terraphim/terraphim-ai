@@ -7,292 +7,296 @@
  */
 
 import { exec } from 'child_process';
-import { promisify } from 'util';
-import path from 'path';
 import fs from 'fs/promises';
+import path from 'path';
+import { promisify } from 'util';
 
 const execAsync = promisify(exec);
 
 interface TestSuite {
-  name: string;
-  description: string;
-  command: string;
-  workingDirectory: string;
-  timeout: number;
-  required: boolean;
-  tags?: string[];
+	name: string;
+	description: string;
+	command: string;
+	workingDirectory: string;
+	timeout: number;
+	required: boolean;
+	tags?: string[];
 }
 
 interface TestResult {
-  suite: string;
-  status: 'passed' | 'failed' | 'skipped';
-  duration: number;
-  output: string;
-  error?: string;
-  coverage?: {
-    statements: number;
-    branches: number;
-    functions: number;
-    lines: number;
-  };
+	suite: string;
+	status: 'passed' | 'failed' | 'skipped';
+	duration: number;
+	output: string;
+	error?: string;
+	coverage?: {
+		statements: number;
+		branches: number;
+		functions: number;
+		lines: number;
+	};
 }
 
 interface TestRunConfig {
-  parallel: boolean;
-  continueOnFailure: boolean;
-  generateReport: boolean;
-  includeCoverage: boolean;
-  tags: string[];
-  outputDir: string;
+	parallel: boolean;
+	continueOnFailure: boolean;
+	generateReport: boolean;
+	includeCoverage: boolean;
+	tags: string[];
+	outputDir: string;
 }
 
 // Test suite definitions
 const TEST_SUITES: TestSuite[] = [
-  // Backend unit tests
-  {
-    name: 'backend-unit-context',
-    description: 'Backend unit tests for ContextManager service',
-    command: 'cargo test context_tests --lib -p terraphim_service',
-    workingDirectory: path.resolve(__dirname, '../../..'),
-    timeout: 120000,
-    required: true,
-    tags: ['backend', 'unit', 'context']
-  },
+	// Backend unit tests
+	{
+		name: 'backend-unit-context',
+		description: 'Backend unit tests for ContextManager service',
+		command: 'cargo test context_tests --lib -p terraphim_service',
+		workingDirectory: path.resolve(__dirname, '../../..'),
+		timeout: 120000,
+		required: true,
+		tags: ['backend', 'unit', 'context'],
+	},
 
-  // API integration tests
-  {
-    name: 'api-integration-context',
-    description: 'API integration tests for context endpoints',
-    command: 'cargo test api_context_tests --test "*"',
-    workingDirectory: path.resolve(__dirname, '../../../terraphim_server'),
-    timeout: 180000,
-    required: true,
-    tags: ['api', 'integration', 'context']
-  },
+	// API integration tests
+	{
+		name: 'api-integration-context',
+		description: 'API integration tests for context endpoints',
+		command: 'cargo test api_context_tests --test "*"',
+		workingDirectory: path.resolve(__dirname, '../../../terraphim_server'),
+		timeout: 180000,
+		required: true,
+		tags: ['api', 'integration', 'context'],
+	},
 
-  // Tauri command tests
-  {
-    name: 'tauri-command-context',
-    description: 'Tauri command tests for desktop integration',
-    command: 'cargo test tauri_context_tests --test "*"',
-    workingDirectory: path.resolve(__dirname, '../src-tauri'),
-    timeout: 120000,
-    required: true,
-    tags: ['tauri', 'desktop', 'commands']
-  },
+	// Tauri command tests
+	{
+		name: 'tauri-command-context',
+		description: 'Tauri command tests for desktop integration',
+		command: 'cargo test tauri_context_tests --test "*"',
+		workingDirectory: path.resolve(__dirname, '../src-tauri'),
+		timeout: 120000,
+		required: true,
+		tags: ['tauri', 'desktop', 'commands'],
+	},
 
-  // Frontend unit tests
-  {
-    name: 'frontend-unit',
-    description: 'Frontend unit tests for Svelte components',
-    command: 'yarn test:unit',
-    workingDirectory: path.resolve(__dirname, '..'),
-    timeout: 90000,
-    required: false,
-    tags: ['frontend', 'unit', 'svelte']
-  },
+	// Frontend unit tests
+	{
+		name: 'frontend-unit',
+		description: 'Frontend unit tests for Svelte components',
+		command: 'yarn test:unit',
+		workingDirectory: path.resolve(__dirname, '..'),
+		timeout: 90000,
+		required: false,
+		tags: ['frontend', 'unit', 'svelte'],
+	},
 
-  // E2E context management tests
-  {
-    name: 'e2e-context-management',
-    description: 'End-to-end tests for context management UI',
-    command: 'npx playwright test --config playwright-context.config.ts context-management.spec.ts',
-    workingDirectory: path.resolve(__dirname, '..'),
-    timeout: 300000,
-    required: true,
-    tags: ['e2e', 'context', 'ui']
-  },
+	// E2E context management tests
+	{
+		name: 'e2e-context-management',
+		description: 'End-to-end tests for context management UI',
+		command: 'npx playwright test --config playwright-context.config.ts context-management.spec.ts',
+		workingDirectory: path.resolve(__dirname, '..'),
+		timeout: 300000,
+		required: true,
+		tags: ['e2e', 'context', 'ui'],
+	},
 
-  // E2E workflow integration tests
-  {
-    name: 'e2e-workflow-integration',
-    description: 'End-to-end workflow integration tests',
-    command: 'npx playwright test --config playwright-context.config.ts workflow-integration.spec.ts',
-    workingDirectory: path.resolve(__dirname, '..'),
-    timeout: 360000,
-    required: true,
-    tags: ['e2e', 'workflow', 'integration']
-  },
+	// E2E workflow integration tests
+	{
+		name: 'e2e-workflow-integration',
+		description: 'End-to-end workflow integration tests',
+		command:
+			'npx playwright test --config playwright-context.config.ts workflow-integration.spec.ts',
+		workingDirectory: path.resolve(__dirname, '..'),
+		timeout: 360000,
+		required: true,
+		tags: ['e2e', 'workflow', 'integration'],
+	},
 
-  // Performance tests
-  {
-    name: 'performance-stress',
-    description: 'Performance and stress tests',
-    command: 'npx playwright test --config playwright-context.config.ts performance-stress.spec.ts --grep @performance',
-    workingDirectory: path.resolve(__dirname, '..'),
-    timeout: 600000,
-    required: false,
-    tags: ['performance', 'stress', 'benchmark']
-  },
+	// Performance tests
+	{
+		name: 'performance-stress',
+		description: 'Performance and stress tests',
+		command:
+			'npx playwright test --config playwright-context.config.ts performance-stress.spec.ts --grep @performance',
+		workingDirectory: path.resolve(__dirname, '..'),
+		timeout: 600000,
+		required: false,
+		tags: ['performance', 'stress', 'benchmark'],
+	},
 
-  // Accessibility tests
-  {
-    name: 'accessibility',
-    description: 'Accessibility compliance tests',
-    command: 'npx playwright test --config playwright-context.config.ts --grep @accessibility',
-    workingDirectory: path.resolve(__dirname, '..'),
-    timeout: 180000,
-    required: false,
-    tags: ['accessibility', 'a11y', 'compliance']
-  },
+	// Accessibility tests
+	{
+		name: 'accessibility',
+		description: 'Accessibility compliance tests',
+		command: 'npx playwright test --config playwright-context.config.ts --grep @accessibility',
+		workingDirectory: path.resolve(__dirname, '..'),
+		timeout: 180000,
+		required: false,
+		tags: ['accessibility', 'a11y', 'compliance'],
+	},
 
-  // Visual regression tests
-  {
-    name: 'visual-regression',
-    description: 'Visual regression tests',
-    command: 'npx playwright test --config playwright-context.config.ts --grep @visual',
-    workingDirectory: path.resolve(__dirname, '..'),
-    timeout: 240000,
-    required: false,
-    tags: ['visual', 'regression', 'screenshots']
-  }
+	// Visual regression tests
+	{
+		name: 'visual-regression',
+		description: 'Visual regression tests',
+		command: 'npx playwright test --config playwright-context.config.ts --grep @visual',
+		workingDirectory: path.resolve(__dirname, '..'),
+		timeout: 240000,
+		required: false,
+		tags: ['visual', 'regression', 'screenshots'],
+	},
 ];
 
 // Default configuration
 const DEFAULT_CONFIG: TestRunConfig = {
-  parallel: false,
-  continueOnFailure: true,
-  generateReport: true,
-  includeCoverage: false,
-  tags: [],
-  outputDir: 'test-results/comprehensive'
+	parallel: false,
+	continueOnFailure: true,
+	generateReport: true,
+	includeCoverage: false,
+	tags: [],
+	outputDir: 'test-results/comprehensive',
 };
 
 /**
  * Filter test suites based on configuration
  */
 function filterTestSuites(suites: TestSuite[], config: TestRunConfig): TestSuite[] {
-  if (config.tags.length === 0) {
-    return suites;
-  }
+	if (config.tags.length === 0) {
+		return suites;
+	}
 
-  return suites.filter(suite => {
-    if (!suite.tags) return false;
-    return config.tags.some(tag => suite.tags?.includes(tag));
-  });
+	return suites.filter((suite) => {
+		if (!suite.tags) return false;
+		return config.tags.some((tag) => suite.tags?.includes(tag));
+	});
 }
 
 /**
  * Run a single test suite
  */
 async function runTestSuite(suite: TestSuite): Promise<TestResult> {
-  console.log(`🚀 Running ${suite.name}: ${suite.description}`);
+	console.log(`🚀 Running ${suite.name}: ${suite.description}`);
 
-  const startTime = Date.now();
+	const startTime = Date.now();
 
-  try {
-    const { stdout, stderr } = await execAsync(suite.command, {
-      cwd: suite.workingDirectory,
-      timeout: suite.timeout,
-      env: {
-        ...process.env,
-        RUST_LOG: 'warn',
-        NODE_ENV: 'test'
-      }
-    });
+	try {
+		const { stdout, stderr } = await execAsync(suite.command, {
+			cwd: suite.workingDirectory,
+			timeout: suite.timeout,
+			env: {
+				...process.env,
+				RUST_LOG: 'warn',
+				NODE_ENV: 'test',
+			},
+		});
 
-    const endTime = Date.now();
-    const duration = endTime - startTime;
+		const endTime = Date.now();
+		const duration = endTime - startTime;
 
-    console.log(`✅ ${suite.name} passed (${duration}ms)`);
+		console.log(`✅ ${suite.name} passed (${duration}ms)`);
 
-    return {
-      suite: suite.name,
-      status: 'passed',
-      duration,
-      output: stdout
-    };
+		return {
+			suite: suite.name,
+			status: 'passed',
+			duration,
+			output: stdout,
+		};
+	} catch (error: any) {
+		const endTime = Date.now();
+		const duration = endTime - startTime;
 
-  } catch (error: any) {
-    const endTime = Date.now();
-    const duration = endTime - startTime;
+		console.log(`❌ ${suite.name} failed (${duration}ms)`);
+		console.log(`Error: ${error.message}`);
 
-    console.log(`❌ ${suite.name} failed (${duration}ms)`);
-    console.log(`Error: ${error.message}`);
-
-    return {
-      suite: suite.name,
-      status: 'failed',
-      duration,
-      output: error.stdout || '',
-      error: error.message
-    };
-  }
+		return {
+			suite: suite.name,
+			status: 'failed',
+			duration,
+			output: error.stdout || '',
+			error: error.message,
+		};
+	}
 }
 
 /**
  * Run multiple test suites in parallel
  */
 async function runTestSuitesParallel(suites: TestSuite[]): Promise<TestResult[]> {
-  console.log(`🔄 Running ${suites.length} test suites in parallel...`);
+	console.log(`🔄 Running ${suites.length} test suites in parallel...`);
 
-  const promises = suites.map(suite => runTestSuite(suite));
-  return Promise.all(promises);
+	const promises = suites.map((suite) => runTestSuite(suite));
+	return Promise.all(promises);
 }
 
 /**
  * Run test suites sequentially
  */
-async function runTestSuitesSequential(suites: TestSuite[], config: TestRunConfig): Promise<TestResult[]> {
-  console.log(`🔄 Running ${suites.length} test suites sequentially...`);
+async function runTestSuitesSequential(
+	suites: TestSuite[],
+	config: TestRunConfig
+): Promise<TestResult[]> {
+	console.log(`🔄 Running ${suites.length} test suites sequentially...`);
 
-  const results: TestResult[] = [];
+	const results: TestResult[] = [];
 
-  for (const suite of suites) {
-    const result = await runTestSuite(suite);
-    results.push(result);
+	for (const suite of suites) {
+		const result = await runTestSuite(suite);
+		results.push(result);
 
-    // Stop on first failure if not continuing on failure
-    if (!config.continueOnFailure && result.status === 'failed' && suite.required) {
-      console.log(`🛑 Stopping test execution due to required test failure: ${suite.name}`);
-      break;
-    }
-  }
+		// Stop on first failure if not continuing on failure
+		if (!config.continueOnFailure && result.status === 'failed' && suite.required) {
+			console.log(`🛑 Stopping test execution due to required test failure: ${suite.name}`);
+			break;
+		}
+	}
 
-  return results;
+	return results;
 }
 
 /**
  * Generate comprehensive test report
  */
 async function generateTestReport(results: TestResult[], config: TestRunConfig): Promise<void> {
-  console.log('📊 Generating comprehensive test report...');
+	console.log('📊 Generating comprehensive test report...');
 
-  // Create output directory
-  await fs.mkdir(config.outputDir, { recursive: true });
+	// Create output directory
+	await fs.mkdir(config.outputDir, { recursive: true });
 
-  // Calculate summary statistics
-  const totalTests = results.length;
-  const passedTests = results.filter(r => r.status === 'passed').length;
-  const failedTests = results.filter(r => r.status === 'failed').length;
-  const skippedTests = results.filter(r => r.status === 'skipped').length;
+	// Calculate summary statistics
+	const totalTests = results.length;
+	const passedTests = results.filter((r) => r.status === 'passed').length;
+	const failedTests = results.filter((r) => r.status === 'failed').length;
+	const skippedTests = results.filter((r) => r.status === 'skipped').length;
 
-  const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
-  const averageDuration = totalDuration / totalTests;
+	const totalDuration = results.reduce((sum, r) => sum + r.duration, 0);
+	const averageDuration = totalDuration / totalTests;
 
-  // Generate JSON report
-  const jsonReport = {
-    timestamp: new Date().toISOString(),
-    config,
-    summary: {
-      total: totalTests,
-      passed: passedTests,
-      failed: failedTests,
-      skipped: skippedTests,
-      successRate: (passedTests / totalTests) * 100,
-      totalDuration,
-      averageDuration
-    },
-    results
-  };
+	// Generate JSON report
+	const jsonReport = {
+		timestamp: new Date().toISOString(),
+		config,
+		summary: {
+			total: totalTests,
+			passed: passedTests,
+			failed: failedTests,
+			skipped: skippedTests,
+			successRate: (passedTests / totalTests) * 100,
+			totalDuration,
+			averageDuration,
+		},
+		results,
+	};
 
-  await fs.writeFile(
-    path.join(config.outputDir, 'comprehensive-test-report.json'),
-    JSON.stringify(jsonReport, null, 2)
-  );
+	await fs.writeFile(
+		path.join(config.outputDir, 'comprehensive-test-report.json'),
+		JSON.stringify(jsonReport, null, 2)
+	);
 
-  // Generate HTML report
-  const htmlReport = `
+	// Generate HTML report
+	const htmlReport = `
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -358,7 +362,9 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
 
         <div class="results">
             <h2>Detailed Results</h2>
-            ${results.map(result => `
+            ${results
+							.map(
+								(result) => `
                 <div class="suite-result">
                     <div class="suite-header">
                         <h3>${result.suite}
@@ -367,33 +373,40 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
                         <p><strong>Duration:</strong> ${(result.duration / 1000).toFixed(2)}s</p>
                     </div>
                     <div class="suite-content">
-                        ${result.error ? `
+                        ${
+													result.error
+														? `
                             <div class="error-output">
                                 <strong>Error:</strong>
                                 <pre>${result.error}</pre>
                             </div>
-                        ` : ''}
-                        ${result.output ? `
+                        `
+														: ''
+												}
+                        ${
+													result.output
+														? `
                             <div class="output">
                                 <strong>Output:</strong>
                                 <pre>${result.output.substring(0, 2000)}${result.output.length > 2000 ? '...' : ''}</pre>
                             </div>
-                        ` : ''}
+                        `
+														: ''
+												}
                     </div>
                 </div>
-            `).join('')}
+            `
+							)
+							.join('')}
         </div>
     </div>
 </body>
 </html>`;
 
-  await fs.writeFile(
-    path.join(config.outputDir, 'comprehensive-test-report.html'),
-    htmlReport
-  );
+	await fs.writeFile(path.join(config.outputDir, 'comprehensive-test-report.html'), htmlReport);
 
-  // Generate summary report
-  const summaryReport = `
+	// Generate summary report
+	const summaryReport = `
 # Context Management System - Test Summary
 
 **Generated:** ${new Date().toLocaleString()}
@@ -408,12 +421,16 @@ async function generateTestReport(results: TestResult[], config: TestRunConfig):
 
 ## Test Results by Suite
 
-${results.map(result => `
+${results
+	.map(
+		(result) => `
 ### ${result.suite}
 - **Status:** ${result.status === 'passed' ? '✅ PASSED' : result.status === 'failed' ? '❌ FAILED' : '⏭️ SKIPPED'}
 - **Duration:** ${(result.duration / 1000).toFixed(2)}s
 ${result.error ? `- **Error:** ${result.error}` : ''}
-`).join('')}
+`
+	)
+	.join('')}
 
 ## Overall Status
 ${failedTests === 0 ? '🎉 **ALL TESTS PASSED!**' : `⚠️ **${failedTests} TEST(S) FAILED**`}
@@ -422,121 +439,119 @@ ${failedTests === 0 ? '🎉 **ALL TESTS PASSED!**' : `⚠️ **${failedTests} TE
 *Generated by Context Management Test Runner*
 `;
 
-  await fs.writeFile(
-    path.join(config.outputDir, 'test-summary.md'),
-    summaryReport
-  );
+	await fs.writeFile(path.join(config.outputDir, 'test-summary.md'), summaryReport);
 
-  console.log(`✅ Test reports generated in ${config.outputDir}/`);
+	console.log(`✅ Test reports generated in ${config.outputDir}/`);
 }
 
 /**
  * Main test runner function
  */
 async function runComprehensiveTests(userConfig: Partial<TestRunConfig> = {}): Promise<void> {
-  const config: TestRunConfig = { ...DEFAULT_CONFIG, ...userConfig };
+	const config: TestRunConfig = { ...DEFAULT_CONFIG, ...userConfig };
 
-  console.log('🚀 Starting Comprehensive Context Management Test Suite');
-  console.log(`📋 Configuration:`, config);
+	console.log('🚀 Starting Comprehensive Context Management Test Suite');
+	console.log(`📋 Configuration:`, config);
 
-  // Filter test suites based on configuration
-  const filteredSuites = filterTestSuites(TEST_SUITES, config);
+	// Filter test suites based on configuration
+	const filteredSuites = filterTestSuites(TEST_SUITES, config);
 
-  console.log(`📝 Running ${filteredSuites.length} test suites:`);
-  filteredSuites.forEach(suite => {
-    console.log(`  - ${suite.name}: ${suite.description} ${suite.required ? '(required)' : '(optional)'}`);
-  });
+	console.log(`📝 Running ${filteredSuites.length} test suites:`);
+	filteredSuites.forEach((suite) => {
+		console.log(
+			`  - ${suite.name}: ${suite.description} ${suite.required ? '(required)' : '(optional)'}`
+		);
+	});
 
-  // Run tests
-  const startTime = Date.now();
-  let results: TestResult[];
+	// Run tests
+	const startTime = Date.now();
+	let results: TestResult[];
 
-  if (config.parallel && filteredSuites.length > 1) {
-    results = await runTestSuitesParallel(filteredSuites);
-  } else {
-    results = await runTestSuitesSequential(filteredSuites, config);
-  }
+	if (config.parallel && filteredSuites.length > 1) {
+		results = await runTestSuitesParallel(filteredSuites);
+	} else {
+		results = await runTestSuitesSequential(filteredSuites, config);
+	}
 
-  const endTime = Date.now();
-  const totalDuration = endTime - startTime;
+	const endTime = Date.now();
+	const totalDuration = endTime - startTime;
 
-  // Generate reports
-  if (config.generateReport) {
-    await generateTestReport(results, config);
-  }
+	// Generate reports
+	if (config.generateReport) {
+		await generateTestReport(results, config);
+	}
 
-  // Print summary
-  const passedCount = results.filter(r => r.status === 'passed').length;
-  const failedCount = results.filter(r => r.status === 'failed').length;
-  const skippedCount = results.filter(r => r.status === 'skipped').length;
+	// Print summary
+	const passedCount = results.filter((r) => r.status === 'passed').length;
+	const failedCount = results.filter((r) => r.status === 'failed').length;
+	const skippedCount = results.filter((r) => r.status === 'skipped').length;
 
-  console.log('\n📊 Test Execution Summary:');
-  console.log(`⏱️  Total Duration: ${(totalDuration / 1000).toFixed(1)}s`);
-  console.log(`✅ Passed: ${passedCount}/${results.length}`);
-  console.log(`❌ Failed: ${failedCount}/${results.length}`);
-  console.log(`⏭️  Skipped: ${skippedCount}/${results.length}`);
-  console.log(`📈 Success Rate: ${((passedCount / results.length) * 100).toFixed(1)}%`);
+	console.log('\n📊 Test Execution Summary:');
+	console.log(`⏱️  Total Duration: ${(totalDuration / 1000).toFixed(1)}s`);
+	console.log(`✅ Passed: ${passedCount}/${results.length}`);
+	console.log(`❌ Failed: ${failedCount}/${results.length}`);
+	console.log(`⏭️  Skipped: ${skippedCount}/${results.length}`);
+	console.log(`📈 Success Rate: ${((passedCount / results.length) * 100).toFixed(1)}%`);
 
-  // Check for required test failures
-  const requiredFailures = results.filter(r =>
-    r.status === 'failed' &&
-    filteredSuites.find(s => s.name === r.suite)?.required
-  );
+	// Check for required test failures
+	const requiredFailures = results.filter(
+		(r) => r.status === 'failed' && filteredSuites.find((s) => s.name === r.suite)?.required
+	);
 
-  if (requiredFailures.length > 0) {
-    console.log(`\n❌ CRITICAL: ${requiredFailures.length} required test(s) failed:`);
-    requiredFailures.forEach(failure => {
-      console.log(`  - ${failure.suite}`);
-    });
-    process.exit(1);
-  } else if (failedCount > 0) {
-    console.log(`\n⚠️  ${failedCount} optional test(s) failed, but all required tests passed.`);
-  } else {
-    console.log('\n🎉 ALL TESTS PASSED!');
-  }
+	if (requiredFailures.length > 0) {
+		console.log(`\n❌ CRITICAL: ${requiredFailures.length} required test(s) failed:`);
+		requiredFailures.forEach((failure) => {
+			console.log(`  - ${failure.suite}`);
+		});
+		process.exit(1);
+	} else if (failedCount > 0) {
+		console.log(`\n⚠️  ${failedCount} optional test(s) failed, but all required tests passed.`);
+	} else {
+		console.log('\n🎉 ALL TESTS PASSED!');
+	}
 }
 
 // CLI interface
 if (require.main === module) {
-  const args = process.argv.slice(2);
+	const args = process.argv.slice(2);
 
-  const config: Partial<TestRunConfig> = {};
+	const config: Partial<TestRunConfig> = {};
 
-  // Parse command line arguments
-  for (let i = 0; i < args.length; i++) {
-    switch (args[i]) {
-      case '--parallel':
-        config.parallel = true;
-        break;
-      case '--sequential':
-        config.parallel = false;
-        break;
-      case '--stop-on-failure':
-        config.continueOnFailure = false;
-        break;
-      case '--continue-on-failure':
-        config.continueOnFailure = true;
-        break;
-      case '--no-report':
-        config.generateReport = false;
-        break;
-      case '--coverage':
-        config.includeCoverage = true;
-        break;
-      case '--tags':
-        if (i + 1 < args.length) {
-          config.tags = args[i + 1].split(',');
-          i++;
-        }
-        break;
-      case '--output-dir':
-        if (i + 1 < args.length) {
-          config.outputDir = args[i + 1];
-          i++;
-        }
-        break;
-      case '--help':
-        console.log(`
+	// Parse command line arguments
+	for (let i = 0; i < args.length; i++) {
+		switch (args[i]) {
+			case '--parallel':
+				config.parallel = true;
+				break;
+			case '--sequential':
+				config.parallel = false;
+				break;
+			case '--stop-on-failure':
+				config.continueOnFailure = false;
+				break;
+			case '--continue-on-failure':
+				config.continueOnFailure = true;
+				break;
+			case '--no-report':
+				config.generateReport = false;
+				break;
+			case '--coverage':
+				config.includeCoverage = true;
+				break;
+			case '--tags':
+				if (i + 1 < args.length) {
+					config.tags = args[i + 1].split(',');
+					i++;
+				}
+				break;
+			case '--output-dir':
+				if (i + 1 < args.length) {
+					config.outputDir = args[i + 1];
+					i++;
+				}
+				break;
+			case '--help':
+				console.log(`
 Usage: node test-runner-config.js [options]
 
 Options:
@@ -557,15 +572,15 @@ Examples:
   node test-runner-config.js --sequential --stop-on-failure --coverage
   node test-runner-config.js --tags e2e,performance --output-dir custom-results
 `);
-        process.exit(0);
-    }
-  }
+				process.exit(0);
+		}
+	}
 
-  // Run tests
-  runComprehensiveTests(config).catch(error => {
-    console.error('❌ Test runner failed:', error);
-    process.exit(1);
-  });
+	// Run tests
+	runComprehensiveTests(config).catch((error) => {
+		console.error('❌ Test runner failed:', error);
+		process.exit(1);
+	});
 }
 
-export { runComprehensiveTests, TEST_SUITES, TestRunConfig, TestResult };
+export { runComprehensiveTests, TEST_SUITES, type TestRunConfig, type TestResult };
