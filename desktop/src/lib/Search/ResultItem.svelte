@@ -60,36 +60,36 @@ interface MenuItem {
 	href?: string;
 }
 
-export let item: Document;
-let _showModal = false;
-let _showKgModal = false;
-let _showAtomicSaveModal = false;
-let kgDocument: Document | null = null;
-let _kgTerm: string | null = null;
-let kgRank: number | null = null;
-let _loadingKg = false;
+let { item }: { item: Document } = $props();
+let _showModal = $state(false);
+let _showKgModal = $state(false);
+let _showAtomicSaveModal = $state(false);
+let kgDocument = $state<Document | null>(null);
+let _kgTerm = $state<string | null>(null);
+let kgRank = $state<number | null>(null);
+let _loadingKg = $state(false);
 
 // Summarization state
-let aiSummary: string | null = null;
-let summaryLoading = false;
-let summaryError: string | null = null;
-let _showAiSummary = false;
-let summaryFromCache = false;
+let aiSummary = $state<string | null>(null);
+let summaryLoading = $state(false);
+let summaryError = $state<string | null>(null);
+let _showAiSummary = $state(false);
+let summaryFromCache = $state(false);
 
 // Context addition state
-let addingToContext = false;
-let contextAdded = false;
-let contextError: string | null = null;
+let addingToContext = $state(false);
+let contextAdded = $state(false);
+let contextError = $state<string | null>(null);
 
 // Chat with document state
-let chattingWithDocument = false;
-let chatStarted = false;
+let chattingWithDocument = $state(false);
+let chatStarted = $state(false);
 
 // Check if current role has atomic server configuration
-$: hasAtomicServer = checkAtomicServerAvailable();
+let hasAtomicServer = $derived(checkAtomicServerAvailable());
 
 // Data-driven menu configuration
-$: menuItems = generateMenuItems();
+let menuItems = $derived(generateMenuItems());
 
 function generateMenuItems(): MenuItem[] {
 	const items: MenuItem[] = [];
