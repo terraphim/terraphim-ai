@@ -3,6 +3,8 @@
 ## Purpose
 Comprehensive documentation for testing scripts used in Novel editor autocomplete integration with Terraphim's knowledge graph system. Provides automated testing workflows and service management.
 
+**Updated for v1.0.0**: Now includes testing for multi-language packages (Rust, Node.js, Python) and comprehensive validation of autocomplete functionality across all platforms.
+
 ## Key Scripts
 - **quick-start-autocomplete.sh**: Interactive menu with preset configurations (full, mcp, dev, test, status, stop)
 - **start-autocomplete-test.sh**: Main testing script with full control over services and configuration

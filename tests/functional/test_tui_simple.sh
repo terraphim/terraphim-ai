@@ -3,7 +3,7 @@
 
 set -euo pipefail
 
-BINARY="./target/debug/terraphim-tui"
+BINARY="./target/debug/terraphim-agent"
 TEST_LOG="tui_simple_test_$(date +%Y%m%d_%H%M%S).log"
 PASS_COUNT=0
 FAIL_COUNT=0

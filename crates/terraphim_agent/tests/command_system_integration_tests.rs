@@ -7,8 +7,8 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 
 use tempfile::TempDir;
-use terraphim_tui::commands::validator::{SecurityAction, SecurityResult};
-use terraphim_tui::commands::{
+use terraphim_agent::commands::validator::{SecurityAction, SecurityResult};
+use terraphim_agent::commands::{
     hooks, CommandHook, CommandRegistry, CommandValidator, ExecutionMode, HookContext, HookManager,
 };
 use tokio::fs;
@@ -354,7 +354,7 @@ async fn test_hook_system_integration() {
     assert!(pre_result.is_ok(), "Pre-hooks should execute successfully");
 
     // Mock command execution result
-    let execution_result = terraphim_tui::commands::CommandExecutionResult {
+    let execution_result = terraphim_agent::commands::CommandExecutionResult {
         command: hello_cmd.definition.name.clone(),
         execution_mode: ExecutionMode::Local,
         exit_code: 0,

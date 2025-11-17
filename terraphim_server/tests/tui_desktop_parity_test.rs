@@ -4,7 +4,7 @@ use std::time::Duration;
 use reqwest::Client;
 use serde_json::Value;
 use serial_test::serial;
-use terraphim_tui::client::ApiClient;
+use terraphim_agent::client::ApiClient;
 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";

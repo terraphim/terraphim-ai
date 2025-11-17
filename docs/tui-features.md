@@ -20,7 +20,7 @@ The Terraphim TUI provides a powerful REPL (Read-Eval-Print Loop) that gives you
 ### Starting the REPL
 
 ```bash
-terraphim-tui
+terraphim-agent
 ```
 
 ### REPL Features
@@ -415,15 +415,15 @@ Model Context Protocol integration for extended tool capabilities.
 export TERRAPHIM_SERVER="http://knowledge.internal.company.com"
 
 # Analyze changes
-terraphim-tui file classify ./src --recursive --update-metadata
-terraphim-tui file search "BREAKING CHANGE" --path ./CHANGELOG.md
+terraphim-agent file classify ./src --recursive --update-metadata
+terraphim-agent file search "BREAKING CHANGE" --path ./CHANGELOG.md
 
 # Generate release notes
-terraphim-tui file summarize ./CHANGELOG.md --detailed --key-points
-terraphim-tui chat "Generate release notes for version 1.2.0" --context ./CHANGELOG.md
+terraphim-agent file summarize ./CHANGELOG.md --detailed --key-points
+terraphim-agent chat "Generate release notes for version 1.2.0" --context ./CHANGELOG.md
 
 # Security scan
-terraphim-tui file search "hardcoded.*password|secret.*key" --path ./src --semantic
+terraphim-agent file search "hardcoded.*password|secret.*key" --path ./src --semantic
 ```
 
 ### Development Workflow Integration
@@ -433,16 +433,16 @@ terraphim-tui file search "hardcoded.*password|secret.*key" --path ./src --seman
 # Development helper script
 
 # Code analysis
-terraphim-tui file analyze ./src/main.rs --all-analysis-types
-terraphim-tui file suggest --context "improve performance" --path ./src
+terraphim-agent file analyze ./src/main.rs --all-analysis-types
+terraphim-agent file suggest --context "improve performance" --path ./src
 
 # Documentation
-terraphim-tui file summarize ./README.md --brief
-terraphim-tui chat "Generate API examples" --context ./src/api/
+terraphim-agent file summarize ./README.md --brief
+terraphim-agent chat "Generate API examples" --context ./src/api/
 
 # Testing
-terraphim-tui file search "unittest|test" --path ./src --semantic
-terraphim-tui vm create test-env --image testing-tools
+terraphim-agent file search "unittest|test" --path ./src --semantic
+terraphim-agent vm create test-env --image testing-tools
 ```
 
 ## Performance Considerations
@@ -467,10 +467,10 @@ terraphim-tui vm create test-env --image testing-tools
 ```bash
 # Enable debug logging
 export LOG_LEVEL=debug
-terraphim-tui
+terraphim-agent
 
 # Check feature availability
-terraphim-tui /help
+terraphim-agent /help
 ```
 
 For more detailed troubleshooting, see the [main TUI documentation](docs/tui-usage.md).

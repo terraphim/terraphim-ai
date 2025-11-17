@@ -1,4 +1,4 @@
-use terraphim_tui::client::*;
+use terraphim_agent::client::*;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Test ApiClient construction and basic properties

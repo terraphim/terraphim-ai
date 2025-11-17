@@ -44,6 +44,6 @@ PLIST
 
 # Create app bundles
 create_bundle "terraphim_server" "TerraphimServer"
-create_bundle "terraphim-tui" "TerraphimTUI"
+create_bundle "terraphim-agent" "TerraphimTUI"
 
 echo "App bundles created successfully!"
