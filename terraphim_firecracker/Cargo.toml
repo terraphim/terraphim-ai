@@ -24,7 +24,7 @@ parking_lot = "0.12"
 dashmap = "5.5"
 futures = "0.3"
 fastrand = "2.0"
-toml = "0.8"
+toml = "0.9"
 
 [dev-dependencies]
 tempfile = "3.0"
