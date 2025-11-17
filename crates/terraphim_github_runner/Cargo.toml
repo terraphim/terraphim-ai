@@ -1,0 +1,72 @@
+[package]
+name = "terraphim_github_runner"
+version = "1.0.0"
+edition = "2021"
+authors = ["Terraphim Contributors"]
+description = "Intelligent GitHub self-hosted runner with knowledge graph-powered action interpretation"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["github-actions", "ci-cd", "knowledge-graph", "ai", "firecracker"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+# Internal crates
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "1.0.0" }
+terraphim_agent_messaging = { path = "../terraphim_agent_messaging", version = "1.0.0" }
+terraphim_agent_registry = { path = "../terraphim_agent_registry", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
+
+# Core async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures-util = "0.3"
+
+# HTTP client for GitHub API
+reqwest = { workspace = true }
+
+# Error handling and serialization
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# YAML parsing for workflows
+serde_yaml = "0.9"
+
+# Unique identifiers and time
+uuid = { workspace = true }
+chrono = { workspace = true }
+
+# Logging
+log = { workspace = true }
+tracing = "0.1"
+
+# Collections
+ahash = { version = "0.8.8", features = ["serde"] }
+
+# JWT for runner authentication
+jsonwebtoken = "9"
+
+# Base64 encoding
+base64 = "0.22"
+
+# URL handling
+url = "2.5"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+env_logger = "0.11"
+serial_test = "3.0"
+wiremock = "0.6.4"
+
+[features]
+default = []
+# Enable LLM-powered action interpretation
+llm-interpreter = []
