@@ -139,7 +139,7 @@ RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     ./target/$RUST_TARGET/release/terraphim_server --version && \
     ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
-    ./target/$RUST_TARGET/release/terraphim-tui --version
+    ./target/$RUST_TARGET/release/terraphim-agent --version
 
 # Move binaries to predictable location
 RUN . /root/.profile && \
@@ -147,7 +147,7 @@ RUN . /root/.profile && \
     mkdir -p /usr/local/bin && \
     cp target/$RUST_TARGET/release/terraphim_server /usr/local/bin/ && \
     cp target/$RUST_TARGET/release/terraphim_mcp_server /usr/local/bin/ && \
-    cp target/$RUST_TARGET/release/terraphim-tui /usr/local/bin/
+    cp target/$RUST_TARGET/release/terraphim-agent /usr/local/bin/
 
 # ================================
 # Runtime Stage
@@ -186,12 +186,12 @@ RUN useradd --create-home --shell /bin/bash terraphim
 # Copy binaries from builder
 COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim_server /usr/local/bin/
 COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim_mcp_server /usr/local/bin/
-COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim-tui /usr/local/bin/
+COPY --from=rust-builder --chown=terraphim:terraphim /usr/local/bin/terraphim-agent /usr/local/bin/
 
 # Set executable permissions
 RUN chmod +x /usr/local/bin/terraphim_server \
     /usr/local/bin/terraphim_mcp_server \
-    /usr/local/bin/terraphim-tui
+    /usr/local/bin/terraphim-agent
 
 # Create application directories
 RUN mkdir -p /home/terraphim/.config/terraphim && \

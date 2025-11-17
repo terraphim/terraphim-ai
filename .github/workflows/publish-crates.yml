@@ -177,7 +177,7 @@ jobs:
 
           ## Key Changes
 
-          - **🔄 Breaking**: Package renamed from \`terraphim-tui\` to \`terraphim-agent\`
+          - **🔄 Breaking**: Package renamed from \`terraphim-agent\` to \`terraphim-agent\`
           - **✨ New**: Enhanced CLI with comprehensive subcommands
           - **✨ New**: Full REPL functionality with interactive commands
           - **✨ New**: Integrated AI chat capabilities

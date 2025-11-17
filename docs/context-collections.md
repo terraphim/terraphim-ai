@@ -271,7 +271,7 @@ curl -X POST http://localhost:PORT/config \
   -d '{"selected_role": "Web Backend Engineer"}'
 
 # Via TUI
-terraphim-tui roles select "Web Backend Engineer"
+terraphim-agent roles select "Web Backend Engineer"
 
 # Via desktop UI
 # Settings → Roles → Select "Web Backend Engineer"

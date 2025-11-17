@@ -202,7 +202,7 @@ jobs:
 
             ### 📦 Available Packages
             - **terraphim-server**: Main HTTP API server with semantic search
-            - **terraphim-tui**: Terminal User Interface with interactive REPL
+            - **terraphim-agent**: Terminal User Interface with interactive REPL
 
             ### 🔧 Features
             - Privacy-first AI assistant that operates locally

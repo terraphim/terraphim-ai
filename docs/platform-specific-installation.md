@@ -14,8 +14,8 @@ wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphi
 sudo dpkg -i terraphim-server_0.2.3-1_amd64.deb
 
 # Download and install TUI (optional)
-wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphim-tui_0.2.3-1_amd64.deb
-sudo dpkg -i terraphim-tui_0.2.3-1_amd64.deb
+wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphim-agent_0.2.3-1_amd64.deb
+sudo dpkg -i terraphim-agent_0.2.3-1_amd64.deb
 
 # Start the server
 sudo systemctl start terraphim-server
@@ -38,8 +38,8 @@ wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphi
 sudo yum localinstall terraphim-server-0.2.3-2.x86_64.rpm
 
 # Download and install TUI (optional)
-wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphim-tui-0.2.3-2.x86_64.rpm
-sudo yum localinstall terraphim-tui-0.2.3-2.x86_64.rpm
+wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphim-agent-0.2.3-2.x86_64.rpm
+sudo yum localinstall terraphim-agent-0.2.3-2.x86_64.rpm
 
 # Start the server
 sudo systemctl start terraphim-server
@@ -50,7 +50,7 @@ sudo systemctl enable terraphim-server
 
 ```bash
 sudo dnf install terraphim-server-0.2.3-2.x86_64.rpm
-sudo dnf install terraphim-tui-0.2.3-2.x86_64.rpm
+sudo dnf install terraphim-agent-0.2.3-2.x86_64.rpm
 ```
 
 #### Method 3: Build from Source
@@ -69,7 +69,7 @@ cargo build --release
 
 # Install binaries
 sudo cp target/release/terraphim_server /usr/local/bin/
-sudo cp target/release/terraphim-tui /usr/local/bin/
+sudo cp target/release/terraphim-agent /usr/local/bin/
 ```
 
 ### Arch Linux/Manjaro
@@ -82,8 +82,8 @@ wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphi
 sudo pacman -U terraphim-server-0.2.3-1-x86_64.pkg.tar.zst
 
 # Download and install TUI (optional)
-wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphim-tui-0.2.3-1-x86_64.pkg.tar.zst
-sudo pacman -U terraphim-tui-0.2.3-1-x86_64.pkg.tar.zst
+wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.4/terraphim-agent-0.2.3-1-x86_64.pkg.tar.zst
+sudo pacman -U terraphim-agent-0.2.3-1-x86_64.pkg.tar.zst
 ```
 
 #### Method 2: AUR (Arch User Repository)
@@ -175,7 +175,7 @@ cargo build --release
 
 # Create symbolic links
 ln -s $(pwd)/target/release/terraphim_server /usr/local/bin/
-ln -s $(pwd)/target/release/terraphim-tui /usr/local/bin/
+ln -s $(pwd)/target/release/terraphim-agent /usr/local/bin/
 ```
 
 ### First Launch Configuration
@@ -431,8 +431,8 @@ curl -X POST http://localhost:8000/api/documents/search \
   -d '{"search_term": "test", "limit": 5}'
 
 # Test TUI
-terraphim-tui --help
-terraphim-tui search "test" --limit 5
+terraphim-agent --help
+terraphim-agent search "test" --limit 5
 ```
 
 ## 🛠️ Troubleshooting

@@ -142,7 +142,7 @@ mod tests {
                 "-p",
                 "terraphim_tui",
                 "--bin",
-                "terraphim-tui",
+                "terraphim-agent",
                 "--",
                 "replace",
                 "--help",
