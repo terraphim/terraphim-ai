@@ -2,7 +2,11 @@
 import { Button, Tag } from 'svelma';
 import { createEventDispatcher } from 'svelte';
 
-let { contextItem, removable = true, compact = false }: {
+let {
+	contextItem,
+	removable = true,
+	compact = false,
+}: {
 	contextItem: KGContextItem;
 	removable?: boolean;
 	compact?: boolean;
@@ -81,7 +85,9 @@ function _handleViewDetails() {
 let displayIcon = $derived(contextItem.context_type === 'KGTermDefinition' ? '🏷️' : '🗺️');
 
 // Get display color based on context type
-let displayColor = $derived(contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 'is-primary');
+let displayColor = $derived(
+	contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 'is-primary'
+);
 </script>
 
 <style>

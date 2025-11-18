@@ -1,5 +1,10 @@
 <script lang="ts">
-let { fallbackPath = '/', showText = true, customClass = '', hideOnPaths = ['/'] }: {
+let {
+	fallbackPath = '/',
+	showText = true,
+	customClass = '',
+	hideOnPaths = ['/'],
+}: {
 	fallbackPath?: string;
 	showText?: boolean;
 	customClass?: string;
