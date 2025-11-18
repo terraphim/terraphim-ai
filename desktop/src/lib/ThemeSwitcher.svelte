@@ -1,7 +1,6 @@
 <script lang="ts">
 import { listen } from '@tauri-apps/api/event';
 import { invoke } from '@tauri-apps/api/tauri';
-import { onMount } from 'svelte';
 import { CONFIG } from '../config';
 import type { Role as RoleInterface } from './generated/types';
 import { configStore, is_tauri, role, roles, theme, typeahead } from './stores';
@@ -132,7 +131,7 @@ export function switchTheme(newTheme: string) {
 }
 
 // Listen for theme changes from Tauri backend
-onMount(() => {
+$effect(() => {
 	if ($is_tauri) {
 		// Listen for theme changes
 		listen('theme-changed', (event: any) => {

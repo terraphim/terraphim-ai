@@ -1,7 +1,6 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input, Tag, Taglist } from 'svelma';
-import { onDestroy, onMount } from 'svelte';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
 import logo from '/assets/terraphim_gray.png';
 import KGSearchInput from './KGSearchInput.svelte';
@@ -9,13 +8,14 @@ import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
 
-let results: Document[] = [];
-let _error: string | null = null;
-let suggestions: string[] = [];
-let suggestionIndex = -1;
+// Svelte 5: Use $state rune for reactive local state
+let results: Document[] = $state([]);
+let _error: string | null = $state(null);
+let suggestions: string[] = $state([]);
+let suggestionIndex = $state(-1);
 
 // SSE streaming for summarization updates
-let sseConnection: EventSource | null = null;
+let sseConnection: EventSource | null = $state(null);
 const _summarizationTaskIds: string[] = [];
 const _taskStatuses: Map<string, any> = new Map();
 
@@ -24,13 +24,14 @@ interface SelectedTerm {
 	value: string;
 	isFromKG: boolean;
 }
-let selectedTerms: SelectedTerm[] = [];
-let currentLogicalOperator: 'AND' | 'OR' | null = null;
+let selectedTerms: SelectedTerm[] = $state([]);
+let currentLogicalOperator: 'AND' | 'OR' | null = $state(null);
 
-$: thesaurusEntries = Object.entries($thesaurus);
+// Svelte 5: Replace reactive statement with $derived
+let thesaurusEntries = $derived(Object.entries($thesaurus));
 
 // State to prevent circular updates
-let isUpdatingFromChips = false;
+let isUpdatingFromChips = $state(false);
 
 // --- Persistence helpers ---
 function searchStateKey(): string {
@@ -76,42 +77,45 @@ function saveSearchState() {
 	}
 }
 
-// Reactive statement to parse input and update chips when user types
-// Only parse when input contains operators to avoid constant parsing
-// Add a small delay to prevent aggressive parsing during autocomplete
-let parseTimeout: ReturnType<typeof setTimeout> | null = null;
-$: if (
-	$input &&
-	!isUpdatingFromChips &&
-	($input.includes(' AND ') ||
-		$input.includes(' OR ') ||
-		$input.includes(' and ') ||
-		$input.includes(' or '))
-) {
-	if (parseTimeout) {
-		clearTimeout(parseTimeout);
-	}
-	parseTimeout = setTimeout(() => {
-		parseAndUpdateChips($input);
-		parseTimeout = null;
-	}, 300); // 300ms delay to allow for multiple autocomplete selections
-}
+// Svelte 5: Replace reactive statement and lifecycle hooks with $effect
+let parseTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
-// Hydrate previous state on mount
-onMount(() => {
-	loadSearchState();
+// Effect for parsing input and updating chips
+$effect(() => {
+	if (
+		$input &&
+		!isUpdatingFromChips &&
+		($input.includes(' AND ') ||
+			$input.includes(' OR ') ||
+			$input.includes(' and ') ||
+			$input.includes(' or '))
+	) {
+		if (parseTimeout) {
+			clearTimeout(parseTimeout);
+		}
+		parseTimeout = setTimeout(() => {
+			parseAndUpdateChips($input);
+			parseTimeout = null;
+		}, 300); // 300ms delay to allow for multiple autocomplete selections
+	}
 });
 
-// Clean up timeout, SSE connection, and polling on component destruction
-onDestroy(() => {
-	if (parseTimeout) {
-		clearTimeout(parseTimeout);
-	}
-	if (sseConnection) {
-		sseConnection.close();
-		sseConnection = null;
-	}
-	stopPollingForSummaries();
+// Effect for initialization and cleanup (replaces onMount/onDestroy)
+$effect(() => {
+	// Hydrate previous state on mount
+	loadSearchState();
+
+	// Cleanup function
+	return () => {
+		if (parseTimeout) {
+			clearTimeout(parseTimeout);
+		}
+		if (sseConnection) {
+			sseConnection.close();
+			sseConnection = null;
+		}
+		stopPollingForSummaries();
+	};
 });
 
 // SSE connection management
@@ -173,7 +177,7 @@ function startSummarizationStreaming() {
 }
 
 // Polling fallback for Tauri (since EventSource isn't supported)
-let pollingInterval: ReturnType<typeof setInterval> | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = $state(null);
 
 function startPollingForSummaries() {
 	console.log('Starting polling for summary updates (Tauri mode)');

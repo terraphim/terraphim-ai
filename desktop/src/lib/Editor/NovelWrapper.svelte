@@ -8,42 +8,47 @@ import { novelAutocompleteService } from '../services/novelAutocompleteService';
 import { SlashCommand, slashCommandStyles } from './SlashCommand';
 import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
 
-export let html: string = ''; // initial content in HTML/JSON
-export const readOnly: boolean = false;
-export let outputFormat: 'html' | 'markdown' = 'html'; // New prop to control output format
-export const enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
-export const showSnippets: boolean = true; // New prop to show snippets in autocomplete
-export const suggestionTrigger: string = '++'; // Character that triggers autocomplete
-export const maxSuggestions: number = 8; // Maximum number of suggestions to show
-export const minQueryLength: number = 1; // Minimum query length before showing suggestions
-export const debounceDelay: number = 300; // Debounce delay in milliseconds
+// Svelte 5: Migrate props using $props() rune
+let {
+	html = $bindable(''), // $bindable allows parent to bind to this prop
+	readOnly = false,
+	outputFormat = 'html' as 'html' | 'markdown',
+	enableAutocomplete = true,
+	showSnippets = true,
+	suggestionTrigger = '++',
+	maxSuggestions = 8,
+	minQueryLength = 1,
+	debounceDelay = 300,
+} = $props();
 
-let editor: unknown = null;
-let _autocompleteStatus = '⏳ Initializing...';
-let autocompleteReady = false;
-let connectionTested = false;
-let styleElement: HTMLStyleElement | null = null;
-let editorInstance: Editor | null = null;
-let editorElement: HTMLDivElement | null = null;
-let isInitializing = false;
+// Svelte 5: Use $state rune for reactive local state
+let editor: unknown = $state(null);
+let _autocompleteStatus = $state('⏳ Initializing...');
+let autocompleteReady = $state(false);
+let connectionTested = $state(false);
+let styleElement: HTMLStyleElement | null = $state(null);
+let editorInstance: Editor | null = $state(null);
+let editorElement: HTMLDivElement | null = $state(null);
+let isInitializing = $state(false);
 
-// Markdown plugin removed - not available in svelte-jsoneditor
-
-onMount(async () => {
+// Svelte 5: Replace onMount/onDestroy with $effect for initialization and cleanup
+$effect(() => {
+	// Initialize autocomplete if enabled
 	if (enableAutocomplete) {
-		await initializeAutocomplete();
+		initializeAutocomplete();
 	}
 
 	// Inject CSS styles for suggestions
 	if (typeof document !== 'undefined') {
-		styleElement = document.createElement('style');
-		styleElement.textContent = `${terraphimSuggestionStyles}\n${slashCommandStyles}`;
-		document.head.appendChild(styleElement);
+		const style = document.createElement('style');
+		style.textContent = `${terraphimSuggestionStyles}\n${slashCommandStyles}`;
+		document.head.appendChild(style);
+		styleElement = style;
 	}
 
 	// Initialize TipTap editor
 	if (typeof document !== 'undefined' && editorElement) {
-		editorInstance = new Editor({
+		const instance = new Editor({
 			element: editorElement as HTMLElement,
 			extensions: [
 				StarterKit,
@@ -69,27 +74,29 @@ onMount(async () => {
 				_handleUpdate(editor as any);
 			},
 		});
-		// Keep reference for other handlers
-		editor = editorInstance as unknown;
+		editorInstance = instance;
+		editor = instance as unknown;
 	}
+
+	// Cleanup function (replaces onDestroy)
+	return () => {
+		if (styleElement?.parentNode) {
+			styleElement.parentNode.removeChild(styleElement);
+		}
+		if (editorInstance) {
+			editorInstance.destroy();
+			editorInstance = null;
+		}
+	};
 });
 
-onDestroy(() => {
-	// Cleanup styles
-	if (styleElement?.parentNode) {
-		styleElement.parentNode.removeChild(styleElement);
-	}
-	if (editorInstance) {
-		editorInstance.destroy();
-		editorInstance = null;
+// Svelte 5: Replace reactive statement with $effect for role changes
+$effect(() => {
+	if ($role && enableAutocomplete) {
+		// Only update the role on change; avoid re-triggering full initialization here
+		novelAutocompleteService.setRole($role);
 	}
 });
-
-// Watch for role changes and reinitialize
-$: if ($role && enableAutocomplete) {
-	// Only update the role on change; avoid re-triggering full initialization here
-	novelAutocompleteService.setRole($role);
-}
 
 async function initializeAutocomplete() {
 	if (isInitializing) {

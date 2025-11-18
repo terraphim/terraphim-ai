@@ -1,13 +1,12 @@
 <script lang="ts">
-import { onMount } from 'svelte';
+let { fallbackPath = '/', showText = true, customClass = '', hideOnPaths = ['/'] }: {
+	fallbackPath?: string;
+	showText?: boolean;
+	customClass?: string;
+	hideOnPaths?: string[];
+} = $props();
 
-export let fallbackPath: string = '/';
-export let showText: boolean = true;
-export let customClass: string = '';
-// Hide button on these paths (home by default)
-export let hideOnPaths: string[] = ['/'];
-
-let isVisible = true;
+let isVisible = $state(true);
 
 function updateVisibility() {
 	try {
@@ -27,14 +26,11 @@ function goBack() {
 	}
 }
 
-onMount(() => {
+$effect(() => {
 	updateVisibility();
 
 	const handleVisibilityUpdate = () => {
 		updateVisibility();
-		// Force Svelte to re-render by updating a reactive variable
-		// biome-ignore lint/correctness/noSelfAssign: Intentional for Svelte reactivity
-		isVisible = isVisible; // This triggers reactivity
 	};
 
 	window.addEventListener('popstate', handleVisibilityUpdate);

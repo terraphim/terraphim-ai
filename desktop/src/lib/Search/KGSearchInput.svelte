@@ -1,31 +1,41 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input } from 'svelma';
-import { onDestroy } from 'svelte';
 import { is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
 
-export let roleName: string;
-export let placeholder: string = 'Search over Knowledge graph...';
-export let autofocus: boolean = false;
-export let onSelect: (term: string) => void;
-export let initialValue: string = '';
-export let onInputChange: ((value: string) => void) | null = null;
+let {
+	roleName,
+	placeholder = 'Search over Knowledge graph...',
+	autofocus = false,
+	onSelect,
+	initialValue = '',
+	onInputChange = null,
+}: {
+	roleName: string;
+	placeholder?: string;
+	autofocus?: boolean;
+	onSelect: (term: string) => void;
+	initialValue?: string;
+	onInputChange?: ((value: string) => void) | null;
+} = $props();
 
 // Input value - sync with parent
-let query: string = initialValue;
-let searchInput: HTMLInputElement;
+let query = $state(initialValue);
+let searchInput = $state<HTMLInputElement>();
 
 // Sync initialValue when it changes externally (e.g., role change)
-$: if (initialValue !== undefined && initialValue !== query) {
-	query = initialValue;
-}
+$effect(() => {
+	if (initialValue !== undefined && initialValue !== query) {
+		query = initialValue;
+	}
+});
 
 // Autocomplete state
-let autocompleteSuggestions: string[] = [];
-let suggestionIndex: number = -1;
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-let _autocompleteError: string | null = null;
+let autocompleteSuggestions = $state<string[]>([]);
+let suggestionIndex = $state(-1);
+let searchTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
+let _autocompleteError = $state<string | null>(null);
 
 // Get KG term suggestions (autocomplete)
 async function getTermSuggestions(q: string): Promise<string[]> {
@@ -136,10 +146,12 @@ function _handleKeydown(event: KeyboardEvent) {
 }
 
 // Clean up timeout on component destruction
-onDestroy(() => {
-	if (searchTimeout) {
-		clearTimeout(searchTimeout);
-	}
+$effect(() => {
+	return () => {
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+	};
 });
 </script>
 
