@@ -809,10 +809,15 @@
   resolved "https://registry.yarnpkg.com/@testing-library/user-event/-/user-event-14.6.1.tgz#13e09a32d7a8b7060fe38304788ebf4197cd2149"
   integrity sha512-vq7fv0rnt+QTXgPxr5Hjc210p6YKq2kmdziLgnsZGgLJ9e6VAShx1pACLuRjd/AS/sr7phAR58OIIpf0LlmQNw==
 
-"@tiptap/core@^2.1.7", "@tiptap/core@^2.22.1", "@tiptap/core@^2.27.1":
+"@tiptap/core@^2.1.7", "@tiptap/core@^2.27.1":
   version "2.27.1"
   resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-2.27.1.tgz#0a91346952b8314cd6bbe5cda0c32a6e7e24f432"
   integrity sha512-nkerkl8syHj44ZzAB7oA2GPmmZINKBKCa79FuNvmGJrJ4qyZwlkDzszud23YteFZEytbc87kVd/fP76ROS6sLg==
+
+"@tiptap/core@^3.9.0":
+  version "3.10.7"
+  resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-3.10.7.tgz#3e56d68d2a8f7e686b31261c720052a580d1d5c0"
+  integrity sha512-4rD3oHkXNOS6Fxm0mr+ECyq35iMFnnAXheIO+UsQbOexwTxn2yZ5Q1rQiFKcCf+p+rrg1yt8TtxQPM8VLWS+1g==
 
 "@tiptap/extension-blockquote@^2.27.1":
   version "2.27.1"
@@ -4584,10 +4589,10 @@ svelma@^0.4.5:
   resolved "https://registry.yarnpkg.com/svelma/-/svelma-0.4.5.tgz#7138cffb079f94fe1c75df47e4b875c6157fe815"
   integrity sha512-9FadKnZf7j7E/IL7HYpIiRKr76Dt9FVdmeOQvFU89E8ivwhBgibD8aGqjlKMcKkKrh1L2ed2qOnolz951u1dwg==
 
-svelte-check@^4.0.0:
-  version "4.3.3"
-  resolved "https://registry.yarnpkg.com/svelte-check/-/svelte-check-4.3.3.tgz#64338a3da6be3f07967ce3c27a2566c136cb5d37"
-  integrity sha512-RYP0bEwenDXzfv0P1sKAwjZSlaRyqBn0Fz1TVni58lqyEiqgwztTpmodJrGzP6ZT2aHl4MbTvWP6gbmQ3FOnBg==
+svelte-check@^4.3.4:
+  version "4.3.4"
+  resolved "https://registry.yarnpkg.com/svelte-check/-/svelte-check-4.3.4.tgz#8e739bedef830f5a39879f8fed9e9fa38d6e99a6"
+  integrity sha512-DVWvxhBrDsd+0hHWKfjP99lsSXASeOhHJYyuKOFYJcP7ThfSCKgjVarE8XfuMWpS5JV3AlDf+iK1YGGo2TACdw==
   dependencies:
     "@jridgewell/trace-mapping" "^0.3.25"
     chokidar "^4.0.1"
