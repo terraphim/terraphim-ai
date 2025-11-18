@@ -6,7 +6,7 @@ let { onMessage } = $props();
 let unlisten = $state();
 
 $effect(() => {
-	listen('rust-event', onMessage).then(fn => unlisten = fn);
+	listen('rust-event', onMessage).then((fn) => (unlisten = fn));
 	return () => {
 		if (unlisten) {
 			unlisten();

@@ -53,10 +53,10 @@ let isHtml = $derived(
 	item?.body
 		? // Check for common HTML document patterns, not just any < tag
 			/<html/i.test(item.body) ||
-			/<body/i.test(item.body) ||
-			/<head/i.test(item.body) ||
-			// Or if it starts with HTML-like structure (not markdown)
-			/^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
+				/<body/i.test(item.body) ||
+				/<head/i.test(item.body) ||
+				// Or if it starts with HTML-like structure (not markdown)
+				/^\s*<(!DOCTYPE|html|head|body|div|p|span)/i.test(item.body.trim())
 		: false
 );
 
