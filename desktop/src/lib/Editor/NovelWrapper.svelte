@@ -1,56 +1,107 @@
 <script lang="ts">
-import { onDestroy, onMount } from 'svelte';
-// @ts-expect-error
-import { JSONEditor } from 'svelte-jsoneditor';
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
+import { Markdown } from 'tiptap-markdown';
 import { is_tauri, role } from '$lib/stores';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
 import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
+import { SlashCommand, slashCommandStyles } from './SlashCommand';
 
-export let html: string = ''; // initial content in HTML/JSON
-export const readOnly: boolean = false;
-export let outputFormat: 'html' | 'markdown' = 'html'; // New prop to control output format
-export const enableAutocomplete: boolean = true; // New prop to enable/disable autocomplete
-export const showSnippets: boolean = true; // New prop to show snippets in autocomplete
-export const suggestionTrigger: string = '++'; // Character that triggers autocomplete
-export const maxSuggestions: number = 8; // Maximum number of suggestions to show
-export const minQueryLength: number = 1; // Minimum query length before showing suggestions
-export const debounceDelay: number = 300; // Debounce delay in milliseconds
+// Svelte 5: Migrate props using $props() rune
+let {
+	html = $bindable(''), // $bindable allows parent to bind to this prop
+	readOnly = false,
+	outputFormat = 'html' as 'html' | 'markdown',
+	enableAutocomplete = true,
+	showSnippets = true,
+	suggestionTrigger = '++',
+	maxSuggestions = 8,
+	minQueryLength = 1,
+	debounceDelay = 300,
+} = $props();
 
-let editor: unknown = null;
-let _autocompleteStatus = '⏳ Initializing...';
-let autocompleteReady = false;
-let connectionTested = false;
-let styleElement: HTMLStyleElement | null = null;
+// Svelte 5: Use $state rune for reactive local state
+let editor: unknown = $state(null);
+let _autocompleteStatus = $state('⏳ Initializing...');
+let autocompleteReady = $state(false);
+let connectionTested = $state(false);
+let styleElement: HTMLStyleElement | null = $state(null);
+let editorInstance: Editor | null = $state(null);
+let editorElement: HTMLDivElement | null = $state(null);
+let isInitializing = $state(false);
 
-// Markdown plugin removed - not available in svelte-jsoneditor
-
-onMount(async () => {
+// Svelte 5: Replace onMount/onDestroy with $effect for initialization and cleanup
+$effect(() => {
+	// Initialize autocomplete if enabled
 	if (enableAutocomplete) {
-		await initializeAutocomplete();
+		initializeAutocomplete();
 	}
 
 	// Inject CSS styles for suggestions
 	if (typeof document !== 'undefined') {
-		styleElement = document.createElement('style');
-		styleElement.textContent = terraphimSuggestionStyles;
-		document.head.appendChild(styleElement);
+		const style = document.createElement('style');
+		style.textContent = `${terraphimSuggestionStyles}\n${slashCommandStyles}`;
+		document.head.appendChild(style);
+		styleElement = style;
 	}
+
+	// Initialize TipTap editor
+	if (typeof document !== 'undefined' && editorElement) {
+		const instance = new Editor({
+			element: editorElement as HTMLElement,
+			extensions: [
+				StarterKit,
+				Markdown.configure({ html: true }),
+				SlashCommand.configure({
+					trigger: '/',
+				}),
+				...(enableAutocomplete
+					? [
+							TerraphimSuggestion.configure({
+								trigger: suggestionTrigger,
+								allowSpaces: false,
+								limit: maxSuggestions,
+								minLength: minQueryLength,
+								debounce: debounceDelay,
+							}),
+						]
+					: []),
+			],
+			content: html,
+			editable: !readOnly,
+			onUpdate: ({ editor }) => {
+				_handleUpdate(editor as any);
+			},
+		});
+		editorInstance = instance;
+		editor = instance as unknown;
+	}
+
+	// Cleanup function (replaces onDestroy)
+	return () => {
+		if (styleElement?.parentNode) {
+			styleElement.parentNode.removeChild(styleElement);
+		}
+		if (editorInstance) {
+			editorInstance.destroy();
+			editorInstance = null;
+		}
+	};
 });
 
-onDestroy(() => {
-	// Cleanup styles
-	if (styleElement?.parentNode) {
-		styleElement.parentNode.removeChild(styleElement);
+// Svelte 5: Replace reactive statement with $effect for role changes
+$effect(() => {
+	if ($role && enableAutocomplete) {
+		// Only update the role on change; avoid re-triggering full initialization here
+		novelAutocompleteService.setRole($role);
 	}
 });
-
-// Watch for role changes and reinitialize
-$: if ($role && enableAutocomplete && autocompleteReady) {
-	novelAutocompleteService.setRole($role);
-	initializeAutocomplete();
-}
 
 async function initializeAutocomplete() {
+	if (isInitializing) {
+		return;
+	}
+	isInitializing = true;
 	_autocompleteStatus = '⏳ Initializing autocomplete...';
 	autocompleteReady = false;
 	connectionTested = false;
@@ -65,20 +116,13 @@ async function initializeAutocomplete() {
 		connectionTested = true;
 
 		if (connectionOk) {
-			// Build the autocomplete index
-			_autocompleteStatus = '🔨 Building autocomplete index...';
-			const success = await novelAutocompleteService.buildAutocompleteIndex();
-
-			if (success) {
-				if ($is_tauri) {
-					_autocompleteStatus = '✅ Ready - Using Tauri backend';
-				} else {
-					_autocompleteStatus = '✅ Ready - Using MCP server backend';
-				}
-				autocompleteReady = true;
+			// Defer heavy index building until first suggestion request to avoid race loops.
+			if ($is_tauri) {
+				_autocompleteStatus = '✅ Ready - Using Tauri backend';
 			} else {
-				_autocompleteStatus = '❌ Failed to build autocomplete index';
+				_autocompleteStatus = '✅ Ready - Using MCP server backend';
 			}
+			autocompleteReady = true;
 		} else {
 			if ($is_tauri) {
 				_autocompleteStatus = '❌ Tauri backend not available';
@@ -89,6 +133,8 @@ async function initializeAutocomplete() {
 	} catch (error) {
 		console.error('Error initializing autocomplete:', error);
 		_autocompleteStatus = '❌ Autocomplete initialization error';
+	} finally {
+		isInitializing = false;
 	}
 }
 
@@ -220,23 +266,7 @@ Start typing below:`;
 };
 </script>
 
-<JSONEditor
-  defaultValue={html}
-  isEditable={!readOnly}
-  disableLocalStorage={true}
-  onUpdate={_handleUpdate}
-  extensions={[
-    ...(enableAutocomplete ? [
-      TerraphimSuggestion.configure({
-        trigger: suggestionTrigger,
-        allowSpaces: false,
-        limit: maxSuggestions,
-        minLength: minQueryLength,
-        debounce: debounceDelay,
-      })
-    ] : [])
-  ]}
-/>
+<div class="novel-editor" bind:this={editorElement}></div>
 
 <!-- Autocomplete Status and Controls -->
 {#if enableAutocomplete}

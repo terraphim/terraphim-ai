@@ -2,9 +2,11 @@
 import { Button, Tag } from 'svelma';
 import { createEventDispatcher } from 'svelte';
 
-export let contextItem: KGContextItem;
-export const removable: boolean = true;
-export const compact: boolean = false;
+let { contextItem, removable = true, compact = false }: {
+	contextItem: KGContextItem;
+	removable?: boolean;
+	compact?: boolean;
+} = $props();
 
 const dispatch = createEventDispatcher();
 
@@ -76,10 +78,10 @@ function _handleViewDetails() {
 }
 
 // Get display icon based on context type
-$: displayIcon = contextItem.context_type === 'KGTermDefinition' ? '🏷️' : '🗺️';
+let displayIcon = $derived(contextItem.context_type === 'KGTermDefinition' ? '🏷️' : '🗺️');
 
 // Get display color based on context type
-$: displayColor = contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 'is-primary';
+let displayColor = $derived(contextItem.context_type === 'KGTermDefinition' ? 'is-info' : 'is-primary');
 </script>
 
 <style>

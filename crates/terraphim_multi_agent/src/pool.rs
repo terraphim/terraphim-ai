@@ -592,8 +592,8 @@ mod tests {
         let _handle1 = pool.get_agent().await.unwrap();
         let _handle2 = pool.get_agent().await.unwrap();
 
-        // Next acquisition should create a new agent (up to max)
+        // Next acquisition should succeed - pool creates agents on demand
         let result = pool.get_agent().await;
-        assert!(result.is_err());
+        assert!(result.is_ok());
     }
 }

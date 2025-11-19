@@ -110,6 +110,22 @@ impl LlmProxyClient {
         Ok(proxy)
     }
 
+    /// Create a new LLM proxy client without auto-configuration (for testing)
+    #[cfg(test)]
+    pub fn new_no_auto_configure(default_provider: String) -> Result<Self> {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30))
+            .user_agent(concat!("Terraphim/", env!("CARGO_PKG_VERSION")))
+            .build()
+            .map_err(|e| LlmProxyError::NetworkError(e.to_string()))?;
+
+        Ok(Self {
+            client,
+            configs: HashMap::new(),
+            default_provider,
+        })
+    }
+
     /// Auto-configure proxy settings from environment variables
     fn auto_configure_from_env(&mut self) -> Result<()> {
         // Configure Anthropic with z.ai proxy
@@ -346,17 +362,17 @@ mod tests {
 
     #[test]
     fn test_proxy_client_creation() {
-        let client = LlmProxyClient::new("anthropic".to_string());
+        let client = LlmProxyClient::new_no_auto_configure("anthropic".to_string());
         assert!(client.is_ok());
 
         let client = client.unwrap();
         assert_eq!(client.default_provider, "anthropic");
-        assert!(client.configured_providers().is_empty()); // No env vars in test
+        assert!(client.configured_providers().is_empty()); // No auto-config in test
     }
 
     #[tokio::test]
     async fn test_effective_url_resolution() {
-        let mut client = LlmProxyClient::new("anthropic".to_string()).unwrap();
+        let mut client = LlmProxyClient::new_no_auto_configure("anthropic".to_string()).unwrap();
 
         // Test direct URL (no proxy)
         assert_eq!(
@@ -377,7 +393,7 @@ mod tests {
 
     #[test]
     fn test_proxy_detection() {
-        let mut client = LlmProxyClient::new("anthropic".to_string()).unwrap();
+        let mut client = LlmProxyClient::new_no_auto_configure("anthropic".to_string()).unwrap();
 
         // Initially no proxy
         assert!(!client.is_using_proxy("anthropic"));

@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 /// Extract clean output without log messages
 fn extract_clean_output(output: &str) -> String {
     output

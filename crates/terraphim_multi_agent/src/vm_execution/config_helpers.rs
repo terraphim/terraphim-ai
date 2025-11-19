@@ -100,7 +100,10 @@ pub fn extract_vm_config_from_role(role: &Role) -> Option<VmExecutionConfig> {
             }
             Value::Bool(true) => {
                 // Simple boolean true = enable with defaults
-                Some(VmExecutionConfig::default())
+                Some(VmExecutionConfig {
+                    enabled: true,
+                    ..VmExecutionConfig::default()
+                })
             }
             _ => None,
         }

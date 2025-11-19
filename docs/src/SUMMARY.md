@@ -19,6 +19,7 @@
 - [Terraphim Service](./components/terraphim-service.md)
 - [Terraphim Automata](./components/terraphim-automata.md)
 - [Terraphim Atomic Client](./components/terraphim-atomic-client.md)
+- [Code Assistant Implementation](./code-assistant-implementation.md)
 
 ## Integrations
 
@@ -52,3 +53,7 @@
 - [Bug Reporting Enhancement](./knowledge-graph-bug-reporting-enhancement.md)
 - [Bug Reporting Terminology](./kg/bug-reporting.md)
 - [Issue Tracking Terminology](./kg/issue-tracking.md)
+
+## Deployment
+
+- [Cloudflare Pages Deployment](../CLOUDFLARE_DEPLOYMENT.md)

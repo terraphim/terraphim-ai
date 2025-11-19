@@ -3,15 +3,15 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
 import { store } from '@tomic/svelte';
 import { Button, Field, Input, Select, Switch } from 'svelma';
-import { JSONEditor } from 'svelte-jsoneditor';
+// import { JSONEditor } from 'svelte-jsoneditor'; // Removed - using textarea instead
 import { Route } from 'tinro';
 import { configStore, is_tauri } from '$lib/stores';
 import { CONFIG } from '../../config';
 import FetchRole from './FetchRole.svelte';
 
-let _content = {
+let _content = $state({
 	json: $configStore,
-};
+});
 function _handleChange(updatedContent) {
 	console.log('contents changed:', updatedContent);
 	console.log('is tauri', $is_tauri);
@@ -40,12 +40,13 @@ function _handleChange(updatedContent) {
 	_content = updatedContent;
 	_content;
 }
-let isWiki = false;
-let fetchUrl =
-	'https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json';
-let postUrl = 'http://localhost:8000/documents/';
-let atomicServerUrl = 'http://localhost:9883/';
-let agentSecret: string | undefined;
+let isWiki = $state(false);
+let fetchUrl = $state(
+	'https://raw.githubusercontent.com/terraphim/terraphim-cloud-fastapi/main/data/ref_arch.json'
+);
+let postUrl = $state('http://localhost:8000/documents/');
+let atomicServerUrl = $state('http://localhost:9883/');
+let agentSecret = $state<string | undefined>();
 const _setAtomicServer = async () => {
 	console.log('Updating atomic server configuration');
 	const agent = Agent.fromSecret(agentSecret);
@@ -73,7 +74,7 @@ const onWorkerMessage = ({
 	console.log(msg, data);
 };
 
-let syncWorker: Worker | undefined;
+let syncWorker = $state<Worker | undefined>();
 
 const loadWorker = async () => {
 	const SyncWorker = await import('$workers/fetcher.worker?worker');
@@ -102,8 +103,10 @@ const resource1 = getResource('http://localhost:9883/config/y3zx5wtm0bq');
 const _name = getValue<string>(resource1, urls.properties.name);
 const _roles = getValue<string[]>(resource1, 'http://localhost:9883/property/role');
 // FIXME: update roles to configStore
-$: console.log('Print name', $_name);
-$: console.log('Print roles', $_roles);
+$effect(() => {
+	console.log('Print name', $_name);
+	console.log('Print roles', $_roles);
+});
 </script>
 
 <div class="box">
@@ -168,7 +171,7 @@ $: console.log('Print roles', $_roles);
       >
     </p>
     <div class="editor">
-      <JSONEditor content={_content} onChange={_handleChange} />
+      <textarea class="textarea" rows="20" bind:value={_content.json} on:change={() => _handleChange(_content)} style="font-family: monospace;"></textarea>
     </div>
   </Route>
 </div>

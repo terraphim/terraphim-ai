@@ -1,30 +1,36 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { Button, Field, Input, Message, Modal } from 'svelma';
-import { createEventDispatcher, onDestroy } from 'svelte';
+import { createEventDispatcher } from 'svelte';
 import { is_tauri, is_tauri as isTauriStore, role, role as roleStore } from '$lib/stores';
 import { CONFIG } from '../../config';
 
-export let active: boolean = false;
-export let initialQuery: string = '';
-export let conversationId: string | null = null;
+let {
+	active = $bindable(false),
+	initialQuery = '',
+	conversationId = null,
+}: {
+	active?: boolean;
+	initialQuery?: string;
+	conversationId?: string | null;
+} = $props();
 
 const dispatch = createEventDispatcher();
 
 // Search state
-let query: string = '';
-let suggestions: KGSuggestion[] = [];
-let _isSearching = false;
-let _searchError: string | null = null;
-let selectedSuggestion: KGSuggestion | null = null;
-let searchTimeout: ReturnType<typeof setTimeout> | null = null;
+let query = $state('');
+let suggestions = $state<KGSuggestion[]>([]);
+let _isSearching = $state(false);
+let _searchError = $state<string | null>(null);
+let selectedSuggestion = $state<KGSuggestion | null>(null);
+let searchTimeout = $state<ReturnType<typeof setTimeout> | null>(null);
 
 // Autocomplete state (matches Search.svelte pattern)
-let autocompleteSuggestions: string[] = [];
-let suggestionIndex: number = -1;
+let autocompleteSuggestions = $state<string[]>([]);
+let suggestionIndex = $state(-1);
 
 // Input element reference for focus management
-let searchInput: HTMLInputElement;
+let searchInput = $state<HTMLInputElement>();
 
 interface KGSuggestion {
 	term: string;
@@ -44,27 +50,33 @@ interface KGSearchResponse {
 }
 
 // Initialize query when modal opens (only once)
-let modalInitialized = false;
-$: if (active && !modalInitialized) {
-	query = initialQuery;
-	modalInitialized = true;
-	if (query.trim()) {
-		searchKGTerms();
+let modalInitialized = $state(false);
+$effect(() => {
+	if (active && !modalInitialized) {
+		query = initialQuery;
+		modalInitialized = true;
+		if (query.trim()) {
+			searchKGTerms();
+		}
 	}
-}
+});
 
 // Reset when modal closes
-$: if (!active) {
-	modalInitialized = false;
-}
+$effect(() => {
+	if (!active) {
+		modalInitialized = false;
+	}
+});
 
 // Focus input when modal opens and clear any errors
-$: if (active && searchInput) {
-	setTimeout(() => {
-		searchInput?.focus();
-		_searchError = null; // Clear any previous errors when modal opens
-	}, 100);
-}
+$effect(() => {
+	if (active && searchInput) {
+		setTimeout(() => {
+			searchInput?.focus();
+			_searchError = null; // Clear any previous errors when modal opens
+		}, 100);
+	}
+});
 
 // Debounced search function
 function handleQueryChange() {
@@ -388,15 +400,17 @@ function handleClose() {
 }
 
 // Clean up timeout on component destruction
-onDestroy(() => {
-	if (searchTimeout) {
-		clearTimeout(searchTimeout);
-	}
+$effect(() => {
+	return () => {
+		if (searchTimeout) {
+			clearTimeout(searchTimeout);
+		}
+	};
 });
 
 // Create aliases without underscores for template usage
-$: searchError = _searchError;
-$: isSearching = _isSearching;
+let searchError = $derived(_searchError);
+let isSearching = $derived(_isSearching);
 const handleInput = _handleInput;
 const handleKeydown = _handleKeydown;
 const selectSuggestion = _selectSuggestion;
@@ -705,7 +719,7 @@ const addKGIndexToContext = _addKGIndexToContext;
 
 <Modal bind:active on:close={handleClose}>
   <div class="box wrapper" data-testid="kg-search-modal">
-      <div class="kg-search-container" on:keydown={_handleKeydown}>
+      <div class="kg-search-container" on:keydown={_handleKeydown} role="textbox" tabindex="0">
       <!-- Close button following Bulma styling -->
       <button class="delete is-large modal-close-btn" on:click={handleClose} aria-label="close"></button>
 

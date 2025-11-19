@@ -1,0 +1,46 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+F",
+  "roles": {
+    "Front End Engineer": {
+      "shortname": "frontend",
+      "name": "Front End Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "flatly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://grep.app",
+          "service": "GrepApp",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "language": "JavaScript",
+            "repo": "",
+            "path": ""
+          }
+        },
+        {
+          "location": "https://grep.app",
+          "service": "GrepApp",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "language": "TypeScript",
+            "repo": "",
+            "path": ""
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Front End Engineer specializing in JavaScript, TypeScript, React, Vue, Svelte, and modern web development. Focus on UI/UX patterns, component architecture, state management, and frontend best practices.",
+      "extra": {}
+    }
+  },
+  "default_role": "Front End Engineer",
+  "selected_role": "Front End Engineer"
+}
