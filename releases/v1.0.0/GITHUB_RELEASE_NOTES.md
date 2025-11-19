@@ -18,7 +18,7 @@ First major release of Terraphim AI featuring a complete desktop application wit
 
 ### Command Line Tools
 - **terraphim_server**: HTTP API server with multiple search algorithms
-- **terraphim-tui**: Terminal interface with REPL support
+- **terraphim-agent**: Terminal interface with REPL support
 
 ### Core Features
 - ✅ 162/162 unit tests passing
@@ -36,7 +36,7 @@ First major release of Terraphim AI featuring a complete desktop application wit
 |------------|------|-------------|
 | **[TerraphimDesktop_v1.0.0_aarch64.dmg](https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/TerraphimDesktop_v1.0.0_aarch64.dmg)** | 30MB | Complete desktop app installer |
 | **[terraphim_server_macos_aarch64](https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/terraphim_server_macos_aarch64)** | 15MB | Standalone server binary |
-| **[terraphim-tui_macos_aarch64](https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/terraphim-tui_macos_aarch64)** | 10MB | Terminal interface binary |
+| **[terraphim-agent_macos_aarch64](https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/terraphim-agent_macos_aarch64)** | 10MB | Terminal interface binary |
 
 ### Installation
 
@@ -53,8 +53,8 @@ chmod +x terraphim_server_macos_aarch64
 ./terraphim_server_macos_aarch64 --help
 
 # TUI
-chmod +x terraphim-tui_macos_aarch64
-./terraphim-tui_macos_aarch64 --help
+chmod +x terraphim-agent_macos_aarch64
+./terraphim-agent_macos_aarch64 --help
 ```
 
 ## 🔧 System Requirements

@@ -1,0 +1,54 @@
+name: Test Tauri
+
+on: [pull_request]
+
+env:
+  WORKING_DIRECTORY: ./desktop
+
+jobs:
+  test-tauri:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            webkit-package: ""
+            javascriptcore-package: ""
+          - platform: ubuntu-22.04
+            webkit-package: "libwebkit2gtk-4.1-dev"
+            javascriptcore-package: "libjavascriptcoregtk-4.1-dev"
+          - platform: ubuntu-24.04
+            webkit-package: "libwebkit2gtk-4.1-dev"
+            javascriptcore-package: "libjavascriptcoregtk-4.1-dev"
+          - platform: windows-latest
+            webkit-package: ""
+            javascriptcore-package: ""
+
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: '20'
+
+      - name: Install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+
+      - name: Install dependencies (Ubuntu only)
+        if: startsWith(matrix.platform, 'ubuntu-')
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} ${{ matrix.javascriptcore-package }} libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+
+      - name: Install and Build Application
+        run: yarn install && yarn build
+        working-directory: ${{ env.WORKING_DIRECTORY }}
+
+      - uses: tauri-apps/tauri-action@v0.5
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

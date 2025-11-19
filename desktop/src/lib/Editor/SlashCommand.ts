@@ -4,244 +4,242 @@ import { PluginKey } from 'prosemirror-state';
 import tippy, { type Instance, type Props } from 'tippy.js';
 
 type CommandItem = {
-  title: string;
-  subtitle?: string;
-  icon?: string;
-  run: (ctx: { editor: any }) => void;
+	title: string;
+	subtitle?: string;
+	icon?: string;
+	run: (ctx: { editor: any }) => void;
 };
 
 const DEFAULT_ITEMS: CommandItem[] = [
-  {
-    title: 'Paragraph',
-    icon: '¶',
-    run: ({ editor }) => editor.chain().focus().setParagraph().run(),
-  },
-  {
-    title: 'Heading 1',
-    icon: 'H1',
-    run: ({ editor }) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
-  },
-  {
-    title: 'Heading 2',
-    icon: 'H2',
-    run: ({ editor }) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
-  },
-  {
-    title: 'Heading 3',
-    icon: 'H3',
-    run: ({ editor }) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
-  },
-  {
-    title: 'Bullet List',
-    icon: '•',
-    run: ({ editor }) => editor.chain().focus().toggleBulletList().run(),
-  },
-  {
-    title: 'Ordered List',
-    icon: '1.',
-    run: ({ editor }) => editor.chain().focus().toggleOrderedList().run(),
-  },
-  {
-    title: 'Blockquote',
-    icon: '❝',
-    run: ({ editor }) => editor.chain().focus().toggleBlockquote().run(),
-  },
-  {
-    title: 'Code Block',
-    icon: '</>',
-    run: ({ editor }) => editor.chain().focus().toggleCodeBlock().run(),
-  },
-  {
-    title: 'Horizontal Rule',
-    icon: '—',
-    run: ({ editor }) => editor.chain().focus().setHorizontalRule().run(),
-  },
+	{
+		title: 'Paragraph',
+		icon: '¶',
+		run: ({ editor }) => editor.chain().focus().setParagraph().run(),
+	},
+	{
+		title: 'Heading 1',
+		icon: 'H1',
+		run: ({ editor }) => editor.chain().focus().toggleHeading({ level: 1 }).run(),
+	},
+	{
+		title: 'Heading 2',
+		icon: 'H2',
+		run: ({ editor }) => editor.chain().focus().toggleHeading({ level: 2 }).run(),
+	},
+	{
+		title: 'Heading 3',
+		icon: 'H3',
+		run: ({ editor }) => editor.chain().focus().toggleHeading({ level: 3 }).run(),
+	},
+	{
+		title: 'Bullet List',
+		icon: '•',
+		run: ({ editor }) => editor.chain().focus().toggleBulletList().run(),
+	},
+	{
+		title: 'Ordered List',
+		icon: '1.',
+		run: ({ editor }) => editor.chain().focus().toggleOrderedList().run(),
+	},
+	{
+		title: 'Blockquote',
+		icon: '❝',
+		run: ({ editor }) => editor.chain().focus().toggleBlockquote().run(),
+	},
+	{
+		title: 'Code Block',
+		icon: '</>',
+		run: ({ editor }) => editor.chain().focus().toggleCodeBlock().run(),
+	},
+	{
+		title: 'Horizontal Rule',
+		icon: '—',
+		run: ({ editor }) => editor.chain().focus().setHorizontalRule().run(),
+	},
 ];
 
 export interface SlashCommandOptions {
-  trigger: string;
-  pluginKey: PluginKey;
-  items: CommandItem[];
+	trigger: string;
+	pluginKey: PluginKey;
+	items: CommandItem[];
 }
 
 export const SlashCommand = Extension.create<SlashCommandOptions>({
-  name: 'slashCommand',
+	name: 'slashCommand',
 
-  addOptions() {
-    return {
-      trigger: '/',
-      pluginKey: new PluginKey('slashCommand'),
-      items: DEFAULT_ITEMS,
-    };
-  },
+	addOptions() {
+		return {
+			trigger: '/',
+			pluginKey: new PluginKey('slashCommand'),
+			items: DEFAULT_ITEMS,
+		};
+	},
 
-  addProseMirrorPlugins() {
-    const suggestion: Partial<SuggestionOptions> = {
-      editor: this.editor,
-      char: this.options.trigger,
-      pluginKey: this.options.pluginKey,
-      allowSpaces: true,
-      startOfLine: true,
+	addProseMirrorPlugins() {
+		const suggestion: Partial<SuggestionOptions> = {
+			editor: this.editor,
+			char: this.options.trigger,
+			pluginKey: this.options.pluginKey,
+			allowSpaces: true,
+			startOfLine: true,
 
-      command: ({ editor, range, props }) => {
-        const item = props as CommandItem;
-        // Remove the typed "/..." text first
-        editor.chain().focus().deleteRange(range).run();
-        // Execute the command
-        item.run({ editor });
-      },
+			command: ({ editor, range, props }) => {
+				const item = props as CommandItem;
+				// Remove the typed "/..." text first
+				editor.chain().focus().deleteRange(range).run();
+				// Execute the command
+				item.run({ editor });
+			},
 
-      items: ({ query }) => {
-        const q = query.toLowerCase();
-        return this.options.items.filter((i) =>
-          i.title.toLowerCase().includes(q)
-        );
-      },
+			items: ({ query }) => {
+				const q = query.toLowerCase();
+				return this.options.items.filter((i) => i.title.toLowerCase().includes(q));
+			},
 
-      render: () => {
-        let component: SlashRenderer;
-        let popup: Instance<Props>;
+			render: () => {
+				let component: SlashRenderer;
+				let popup: Instance<Props>;
 
-        return {
-          onStart: (props) => {
-            component = new SlashRenderer({
-              items: props.items as CommandItem[],
-              onSelect: (item) => props.command(item),
-            });
+				return {
+					onStart: (props) => {
+						component = new SlashRenderer({
+							items: props.items as CommandItem[],
+							onSelect: (item) => props.command(item),
+						});
 
-            if (!props.clientRect) return;
+						if (!props.clientRect) return;
 
-            popup = tippy('body', {
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-              appendTo: () => document.body,
-              content: component.element,
-              showOnCreate: true,
-              interactive: true,
-              trigger: 'manual',
-              placement: 'bottom-start',
-              theme: 'slash-command',
-              maxWidth: 'none',
-            })[0];
-          },
+						popup = tippy('body', {
+							getReferenceClientRect: props.clientRect as () => DOMRect,
+							appendTo: () => document.body,
+							content: component.element,
+							showOnCreate: true,
+							interactive: true,
+							trigger: 'manual',
+							placement: 'bottom-start',
+							theme: 'slash-command',
+							maxWidth: 'none',
+						})[0];
+					},
 
-          onUpdate(props) {
-            component?.updateItems(props.items as CommandItem[]);
+					onUpdate(props) {
+						component?.updateItems(props.items as CommandItem[]);
 
-            if (!props.clientRect) return;
-            popup?.setProps({
-              getReferenceClientRect: props.clientRect as () => DOMRect,
-            });
-          },
+						if (!props.clientRect) return;
+						popup?.setProps({
+							getReferenceClientRect: props.clientRect as () => DOMRect,
+						});
+					},
 
-          onKeyDown(props) {
-            if (props.event.key === 'Escape') {
-              popup?.hide();
-              return true;
-            }
-            return component?.onKeyDown(props) ?? false;
-          },
+					onKeyDown(props) {
+						if (props.event.key === 'Escape') {
+							popup?.hide();
+							return true;
+						}
+						return component?.onKeyDown(props) ?? false;
+					},
 
-          onExit() {
-            popup?.destroy();
-            component?.destroy();
-          },
-        };
-      },
-    };
+					onExit() {
+						popup?.destroy();
+						component?.destroy();
+					},
+				};
+			},
+		};
 
-    return [Suggestion(suggestion)];
-  },
+		return [Suggestion(suggestion)];
+	},
 });
 
 class SlashRenderer {
-  public element: HTMLElement;
-  private items: CommandItem[] = [];
-  private selectedIndex = 0;
-  private onSelect: (item: CommandItem) => void;
+	public element: HTMLElement;
+	private items: CommandItem[] = [];
+	private selectedIndex = 0;
+	private onSelect: (item: CommandItem) => void;
 
-  constructor(options: { items: CommandItem[]; onSelect: (item: CommandItem) => void }) {
-    this.items = options.items;
-    this.onSelect = options.onSelect;
-    this.element = document.createElement('div');
-    this.element.className = 'slash-dropdown';
-    this.render();
-  }
+	constructor(options: { items: CommandItem[]; onSelect: (item: CommandItem) => void }) {
+		this.items = options.items;
+		this.onSelect = options.onSelect;
+		this.element = document.createElement('div');
+		this.element.className = 'slash-dropdown';
+		this.render();
+	}
 
-  updateItems(items: CommandItem[]) {
-    this.items = items;
-    this.selectedIndex = 0;
-    this.render();
-  }
+	updateItems(items: CommandItem[]) {
+		this.items = items;
+		this.selectedIndex = 0;
+		this.render();
+	}
 
-  onKeyDown({ event }: { event: KeyboardEvent }): boolean {
-    if (event.key === 'ArrowUp') {
-      this.selectPrevious();
-      return true;
-    }
-    if (event.key === 'ArrowDown') {
-      this.selectNext();
-      return true;
-    }
-    if (event.key === 'Enter' || event.key === 'Tab') {
-      this.selectItem(this.selectedIndex);
-      return true;
-    }
-    return false;
-  }
+	onKeyDown({ event }: { event: KeyboardEvent }): boolean {
+		if (event.key === 'ArrowUp') {
+			this.selectPrevious();
+			return true;
+		}
+		if (event.key === 'ArrowDown') {
+			this.selectNext();
+			return true;
+		}
+		if (event.key === 'Enter' || event.key === 'Tab') {
+			this.selectItem(this.selectedIndex);
+			return true;
+		}
+		return false;
+	}
 
-  private selectPrevious() {
-    this.selectedIndex = Math.max(0, this.selectedIndex - 1);
-    this.render();
-  }
+	private selectPrevious() {
+		this.selectedIndex = Math.max(0, this.selectedIndex - 1);
+		this.render();
+	}
 
-  private selectNext() {
-    this.selectedIndex = Math.min(this.items.length - 1, this.selectedIndex + 1);
-    this.render();
-  }
+	private selectNext() {
+		this.selectedIndex = Math.min(this.items.length - 1, this.selectedIndex + 1);
+		this.render();
+	}
 
-  private selectItem(index: number) {
-    const item = this.items[index];
-    if (item) this.onSelect(item);
-  }
+	private selectItem(index: number) {
+		const item = this.items[index];
+		if (item) this.onSelect(item);
+	}
 
-  private render() {
-    this.element.innerHTML = '';
+	private render() {
+		this.element.innerHTML = '';
 
-    if (this.items.length === 0) {
-      this.element.innerHTML = `
+		if (this.items.length === 0) {
+			this.element.innerHTML = `
         <div class="slash-item slash-empty">No commands</div>
       `;
-      return;
-    }
+			return;
+		}
 
-    this.items.forEach((item, index) => {
-      const el = document.createElement('div');
-      el.className = `slash-item ${index === this.selectedIndex ? 'slash-selected' : ''}`;
-      el.innerHTML = `
+		this.items.forEach((item, index) => {
+			const el = document.createElement('div');
+			el.className = `slash-item ${index === this.selectedIndex ? 'slash-selected' : ''}`;
+			el.innerHTML = `
         <div class="slash-icon">${item.icon ?? ''}</div>
         <div class="slash-text">
           <div class="slash-title">${this.escape(item.title)}</div>
           ${item.subtitle ? `<div class="slash-subtitle">${this.escape(item.subtitle)}</div>` : ''}
         </div>
       `;
-      el.addEventListener('click', () => this.selectItem(index));
-      el.addEventListener('mouseenter', () => {
-        this.selectedIndex = index;
-        this.render();
-      });
-      this.element.appendChild(el);
-    });
-  }
+			el.addEventListener('click', () => this.selectItem(index));
+			el.addEventListener('mouseenter', () => {
+				this.selectedIndex = index;
+				this.render();
+			});
+			this.element.appendChild(el);
+		});
+	}
 
-  private escape(text: string): string {
-    const div = document.createElement('div');
-    div.textContent = text;
-    return div.innerHTML;
-  }
+	private escape(text: string): string {
+		const div = document.createElement('div');
+		div.textContent = text;
+		return div.innerHTML;
+	}
 
-  destroy() {
-    this.element.remove();
-  }
+	destroy() {
+		this.element.remove();
+	}
 }
 
 export const slashCommandStyles = `
