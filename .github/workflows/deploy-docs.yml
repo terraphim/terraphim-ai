@@ -35,7 +35,7 @@ env:
 jobs:
   build:
     name: Build Documentation
-    runs-on: [self-hosted, Linux, terraphim]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
     name: Deploy Preview
     needs: build
     if: github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'preview')
-    runs-on: [self-hosted, Linux, terraphim]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       deployments: write
@@ -126,7 +126,7 @@ jobs:
     name: Deploy Production
     needs: build
     if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production')
-    runs-on: [self-hosted, Linux, terraphim]
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       deployments: write
@@ -178,7 +178,7 @@ jobs:
   purge-cache:
     name: Purge CDN Cache
     needs: deploy-production
-    runs-on: [self-hosted, Linux, terraphim]
+    runs-on: ubuntu-latest
     permissions:
       id-token: write
     steps:
