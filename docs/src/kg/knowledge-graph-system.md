@@ -41,7 +41,7 @@ Markdown files use the `synonyms::` syntax to define concept relationships:
 
 Terraphim Graph (scorer) is using unique graph embeddings.
 
-synonyms:: graph embeddings, graph, knowledge graph based embeddings
+[example] synonyms:: graph embeddings, graph, knowledge graph based embeddings
 
 Now we will have a concept "Terraphim Graph Scorer" with synonyms.
 ```
@@ -257,7 +257,7 @@ let new_kg_content = r#"
 
 Graph Analysis provides deep insights into data relationships.
 
-synonyms:: data analysis, network analysis, graph processing,
+[example] synonyms:: data analysis, network analysis, graph processing,
           relationship mapping, connectivity analysis,
           terraphim-graph, graph embeddings
 

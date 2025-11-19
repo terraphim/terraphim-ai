@@ -241,6 +241,80 @@ For development, see our comprehensive [Development Setup Guide](docs/src/develo
 - Multiple installation options (no Python required!)
 - IDE integration and troubleshooting
 
+## Claude Code Integration
+
+Terraphim provides seamless integration with Claude Code through multiple approaches, enabling intelligent text replacement and codebase quality evaluation.
+
+### 🔄 Text Replacement (Hooks & Skills)
+
+Use Terraphim's knowledge graph capabilities to automatically replace text patterns in your development workflow:
+
+**Claude Code Hooks** - Automatic, transparent replacements:
+```bash
+# Example: Automatically replace npm with bun
+echo "npm install" | terraphim-tui replace
+# Output: bun_install
+```
+
+**Claude Skills** - Context-aware, conversational assistance:
+- Works across all Claude platforms
+- Provides explanations and reasoning
+- Progressive disclosure of functionality
+
+**Examples:**
+- Package manager enforcement (npm/yarn/pnpm → bun)
+- Attribution replacement (Claude Code → Terraphim AI)
+- Custom domain-specific replacements
+
+📖 **Complete Guide**: [examples/TERRAPHIM_CLAUDE_INTEGRATION.md](examples/TERRAPHIM_CLAUDE_INTEGRATION.md)
+
+### 📊 Codebase Quality Evaluation
+
+Evaluate whether AI agents (Claude Code, GitHub Copilot, autonomous agents) improve or deteriorate your codebase using deterministic, knowledge graph-based assessment:
+
+**Key Features:**
+- **Deterministic**: Aho-Corasick automata for consistent scoring
+- **Privacy-First**: All evaluation runs locally
+- **Multi-Dimensional**: Security, performance, quality perspectives
+- **CI/CD Ready**: Automated quality gates with exit codes
+
+**Quick Start:**
+```bash
+cd examples/codebase-evaluation
+./scripts/evaluate-ai-agent.sh /path/to/codebase
+
+# Generates verdict:
+# ✅ IMPROVEMENT: The AI agent improved the codebase quality.
+# - Improved metrics: 3
+# - Deteriorated metrics: 0
+```
+
+**Evaluation Metrics:**
+- Clippy warnings, anti-patterns, TODO counts
+- Knowledge graph density and semantic matches
+- Test pass rates and code coverage
+- Custom domain-specific patterns
+
+**Use Cases:**
+1. Evaluate PRs from AI agents before merge
+2. Continuous quality monitoring in CI/CD pipelines
+3. Historical trend analysis across evaluations
+4. Multi-role evaluation (security + performance + quality)
+
+📖 **Complete Documentation**: [examples/codebase-evaluation/](examples/codebase-evaluation/)
+
+**Example GitHub Actions Integration:**
+```yaml
+- name: Baseline evaluation
+  run: ./scripts/baseline-evaluation.sh ${{ github.workspace }}
+- name: Apply AI changes
+  run: # Your AI agent step
+- name: Post-change evaluation
+  run: ./scripts/post-evaluation.sh ${{ github.workspace }}
+- name: Generate verdict (fails on deterioration)
+  run: ./scripts/compare-evaluations.sh
+```
+
 ## Contributing
 
 We welcome contributions! Here's how to get started:

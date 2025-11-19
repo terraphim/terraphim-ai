@@ -375,7 +375,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             cmd::select_role,
             cmd::get_rolegraph,
             cmd::find_documents_for_kg_term,
-            cmd::save_article_to_atomic,
+            // cmd::save_article_to_atomic, // Requires 'atomic' feature
             cmd::get_autocomplete_suggestions,
             // Conversation management commands (in-memory)
             cmd::create_conversation,

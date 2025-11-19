@@ -1,0 +1,12 @@
+{
+  "version": "1.0.0",
+  "notes": "Initial release of Terraphim Desktop with system tray support and auto-updater",
+  "pub_date": "2025-11-05T16:00:00Z",
+  "platforms": {
+    "darwin-aarch64": {
+      "signature": "",
+      "url": "https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/Terraphim.Desktop_1.0.0_aarch64.app.tar.gz",
+      "with_elevated_permissions": false
+    }
+  }
+}

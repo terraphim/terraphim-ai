@@ -23,4 +23,18 @@ anyhow = "1.0"
 log = "0.4"
 
 [patch.crates-io]
-genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "main" }
+genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+
+[profile.release]
+panic = "unwind"
+lto = false
+codegen-units = 1
+opt-level = 3
+
+# Optimized release profile for production builds (like ripgrep)
+[profile.release-lto]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = 3
+panic = "abort"

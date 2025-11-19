@@ -1,0 +1,35 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+P",
+  "roles": {
+    "Python Engineer": {
+      "shortname": "python",
+      "name": "Python Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "sandstone",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://grep.app",
+          "service": "GrepApp",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "language": "Python",
+            "repo": "",
+            "path": ""
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Python Engineer specializing in data science, machine learning, web development, and automation. Focus on Pythonic patterns, popular frameworks (Django, FastAPI, Flask), data analysis libraries (pandas, numpy, scikit-learn), and best practices.",
+      "extra": {}
+    }
+  },
+  "default_role": "Python Engineer",
+  "selected_role": "Python Engineer"
+}

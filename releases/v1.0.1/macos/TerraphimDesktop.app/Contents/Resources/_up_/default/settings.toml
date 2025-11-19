@@ -1,0 +1,11 @@
+server_hostname = "127.0.0.1:8000"
+api_endpoint="http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+
+[profiles.rocksdb]
+type = "rocksdb"
+datadir= "/tmp/terraphim_rocksdb"
+
+[profiles.dash]
+type = "dashmap"
+root = "/tmp/dashmaptest"

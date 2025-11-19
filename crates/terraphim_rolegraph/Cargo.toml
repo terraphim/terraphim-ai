@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_rolegraph"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim rolegraph module, which provides role handling for Terraphim AI."
@@ -12,12 +12,12 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-terraphim_automata = { path = "../terraphim_automata", version = "0.2.0", features = ["tokio-runtime", "remote-loading"] }
-terraphim_types = { path = "../terraphim_types", version = "0.2.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["tokio-runtime", "remote-loading"] }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 
 ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"
-itertools = "0.13.0"
+itertools = "0.14.0"
 lazy_static = "1.4.0"
 log = "0.4.20"
 memoize = "0.5.1"

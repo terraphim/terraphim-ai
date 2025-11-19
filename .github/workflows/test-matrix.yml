@@ -95,7 +95,7 @@ jobs:
           echo "Test artifact for ubuntu-${{ matrix.ubuntu-version }}" > test-output/test-file.txt
 
       - name: Upload test artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: test-artifact-${{ matrix.ubuntu-version }}
           path: test-output/

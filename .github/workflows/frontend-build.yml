@@ -32,19 +32,19 @@ jobs:
         uses: actions/setup-node@v5
         with:
           node-version: ${{ inputs.node-version }}
-          cache: 'npm'
-          cache-dependency-path: desktop/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
 
-      - name: Cache node modules and npm cache
+      - name: Cache node modules and yarn cache
         uses: actions/cache@v4
         with:
           path: |
             desktop/node_modules
-            ~/.npm
-          key: ${{ inputs.cache-key }}-npm-${{ inputs.node-version }}-${{ hashFiles('desktop/package-lock.json') }}
+            ~/.yarn
+          key: ${{ inputs.cache-key }}-yarn-${{ inputs.node-version }}-${{ hashFiles('desktop/yarn.lock') }}
           restore-keys: |
-            ${{ inputs.cache-key }}-npm-${{ inputs.node-version }}-
-            ${{ inputs.cache-key }}-npm-
+            ${{ inputs.cache-key }}-yarn-${{ inputs.node-version }}-
+            ${{ inputs.cache-key }}-yarn-
 
       - name: Set environment variables for CI
         env:
@@ -94,7 +94,7 @@ jobs:
           fi
 
       - name: Upload frontend artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: frontend-dist
           path: desktop/dist

@@ -1,25 +1,7 @@
 //! Command definitions for REPL interface
 
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
 use std::str::FromStr;
-
-// Define ExecutionMode locally to avoid conditional compilation issues
-#[cfg(feature = "repl-custom")]
-#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[serde(rename_all = "lowercase")]
-pub enum ExecutionMode {
-    Local,
-    Firecracker,
-    Hybrid,
-}
-
-#[cfg(feature = "repl-custom")]
-impl Default for ExecutionMode {
-    fn default() -> Self {
-        ExecutionMode::Local
-    }
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ReplCommand {
@@ -81,34 +63,21 @@ pub enum ReplCommand {
         role: Option<String>,
     },
 
-    // VM commands
-    Vm {
-        subcommand: VmSubcommand,
-    },
-
-    // Web operations commands
-    Web {
-        subcommand: WebSubcommand,
-    },
-
-    // File operations commands (requires 'repl-file' feature)
+    // File commands (requires 'repl-file' feature)
     #[cfg(feature = "repl-file")]
     File {
         subcommand: FileSubcommand,
     },
 
-    // Custom markdown-defined commands
-    #[cfg(feature = "repl-custom")]
-    Custom {
-        name: String,
-        parameters: HashMap<String, String>,
-        execution_mode: ExecutionMode,
+    // Web commands (requires 'repl-web' feature)
+    #[cfg(feature = "repl-web")]
+    Web {
+        subcommand: WebSubcommand,
     },
 
-    // Command management
-    #[cfg(feature = "repl-custom")]
-    Commands {
-        subcommand: CommandsSubcommand,
+    // VM commands
+    Vm {
+        subcommand: VmSubcommand,
     },
 
     // Utility commands
@@ -130,6 +99,14 @@ pub enum ConfigSubcommand {
 pub enum RoleSubcommand {
     List,
     Select { name: String },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-file")]
+pub enum FileSubcommand {
+    Search { query: String },
+    List,
+    Info { path: String },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -163,11 +140,12 @@ pub enum VmSubcommand {
     },
     Monitor {
         vm_id: String,
-        refresh: Option<u64>,
+        refresh: Option<u32>,
     },
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-web")]
 pub enum WebSubcommand {
     Get {
         url: String,
@@ -175,13 +153,13 @@ pub enum WebSubcommand {
     },
     Post {
         url: String,
-        headers: Option<std::collections::HashMap<String, String>>,
         body: String,
+        headers: Option<std::collections::HashMap<String, String>>,
     },
     Scrape {
         url: String,
-        selector: String,
-        wait: Option<String>,
+        selector: Option<String>,
+        wait_for_element: Option<String>,
     },
     Screenshot {
         url: String,
@@ -198,18 +176,18 @@ pub enum WebSubcommand {
         form_data: std::collections::HashMap<String, String>,
     },
     Api {
-        base_url: String,
-        endpoints: Vec<String>,
-        rate_limit: Option<u64>,
+        endpoint: String,
+        method: String,
+        data: Option<serde_json::Value>,
     },
     Status {
-        operation_id: Option<String>,
+        operation_id: String,
     },
     Cancel {
         operation_id: String,
     },
     History {
-        limit: Option<u32>,
+        limit: Option<usize>,
     },
     Config {
         subcommand: WebConfigSubcommand,
@@ -217,113 +195,11 @@ pub enum WebSubcommand {
 }
 
 #[derive(Debug, Clone, PartialEq)]
+#[cfg(feature = "repl-web")]
 pub enum WebConfigSubcommand {
     Show,
     Set { key: String, value: String },
     Reset,
-}
-
-/// Commands subcommand enum for command management
-#[derive(Debug, Clone, PartialEq)]
-pub enum CommandsSubcommand {
-    /// Initialize command system
-    Init,
-    /// List all available commands
-    List,
-    /// List commands in a specific category
-    Category { category: String },
-    /// Show detailed help for a command
-    Help { command: String },
-    /// Search commands by name or description
-    Search { query: String },
-    /// Reload commands from markdown files
-    Reload,
-    /// Validate command definitions
-    Validate { command: Option<String> },
-    /// Show registry statistics
-    Stats,
-    /// Suggest commands based on partial input
-    Suggest {
-        partial: String,
-        limit: Option<usize>,
-    },
-}
-
-#[derive(Debug, Clone, PartialEq)]
-#[cfg(feature = "repl-file")]
-pub enum FileSubcommand {
-    /// Search files with semantic understanding
-    Search {
-        query: String,
-        path: Option<String>,
-        file_types: Option<Vec<String>>,
-        semantic: bool,
-        limit: Option<usize>,
-    },
-    /// Classify files by content type and purpose
-    Classify {
-        path: String,
-        recursive: bool,
-        update_metadata: bool,
-    },
-    /// Get intelligent file suggestions based on context
-    Suggest {
-        context: Option<String>,
-        limit: Option<usize>,
-        path: Option<String>,
-    },
-    /// Analyze file relationships and similarity
-    Analyze {
-        file_path: String,
-        find_similar: bool,
-        find_related: bool,
-        threshold: Option<f64>,
-    },
-    /// Summarize file contents with semantic understanding
-    Summarize {
-        file_path: String,
-        detail_level: Option<String>, // "brief", "detailed", "comprehensive"
-        include_key_points: bool,
-    },
-    /// Extract semantic metadata from files
-    Metadata {
-        file_path: String,
-        extract_concepts: bool,
-        extract_entities: bool,
-        extract_keywords: bool,
-        update_index: bool,
-    },
-    /// Index files for semantic search
-    Index {
-        path: String,
-        recursive: bool,
-        force_reindex: bool,
-    },
-    /// Search within file contents with context awareness
-    Find {
-        pattern: String,
-        path: Option<String>,
-        context_lines: Option<usize>,
-        case_sensitive: bool,
-        whole_word: bool,
-    },
-    /// List files with semantic annotations
-    List {
-        path: String,
-        show_metadata: bool,
-        show_tags: bool,
-        sort_by: Option<String>, // "name", "size", "modified", "relevance"
-    },
-    /// Tag files with semantic labels
-    Tag {
-        file_path: String,
-        tags: Vec<String>,
-        auto_suggest: bool,
-    },
-    /// Show file operation status and statistics
-    Status {
-        operation: Option<String>, // "indexing", "classification", "analysis"
-    },
 }
 
 impl FromStr for ReplCommand {
@@ -356,8 +232,8 @@ impl FromStr for ReplCommand {
                 let mut query = String::new();
                 let mut role = None;
                 let mut limit = None;
-                let mut semantic = false;
-                let mut concepts = false;
+                let _semantic = false;
+                let _concepts = false;
                 let mut i = 1;
 
                 while i < parts.len() {
@@ -382,14 +258,6 @@ impl FromStr for ReplCommand {
                                 return Err(anyhow!("--limit requires a value"));
                             }
                         }
-                        "--semantic" => {
-                            semantic = true;
-                            i += 1;
-                        }
-                        "--concepts" => {
-                            concepts = true;
-                            i += 1;
-                        }
                         _ => {
                             if !query.is_empty() {
                                 query.push(' ');
@@ -399,6 +267,22 @@ impl FromStr for ReplCommand {
                         }
                     }
                 }
+
+                // Handle --semantic and --concepts flags that might be in the query
+                let mut semantic = false;
+                let mut concepts = false;
+                let query_parts: Vec<&str> = query.split_whitespace().collect();
+                let mut filtered_query_parts = Vec::new();
+
+                for part in query_parts {
+                    match part {
+                        "--semantic" => semantic = true,
+                        "--concepts" => concepts = true,
+                        _ => filtered_query_parts.push(part),
+                    }
+                }
+
+                query = filtered_query_parts.join(" ");
 
                 if query.is_empty() {
                     return Err(anyhow!("Search query cannot be empty"));
@@ -489,194 +373,6 @@ impl FromStr for ReplCommand {
                 }
 
                 Ok(ReplCommand::Graph { top_k })
-            }
-
-            "vm" => {
-                if parts.len() < 2 {
-                    return Err(anyhow!(
-                        "VM command requires a subcommand (list | pool | status | metrics | execute | agent | tasks | allocate | release | monitor)"
-                    ));
-                }
-
-                match parts[1] {
-                    "list" => Ok(ReplCommand::Vm {
-                        subcommand: VmSubcommand::List,
-                    }),
-                    "pool" => Ok(ReplCommand::Vm {
-                        subcommand: VmSubcommand::Pool,
-                    }),
-                    "status" => {
-                        let vm_id = if parts.len() > 2 {
-                            Some(parts[2].to_string())
-                        } else {
-                            None
-                        };
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Status { vm_id },
-                        })
-                    }
-                    "metrics" => {
-                        let vm_id = if parts.len() > 2 {
-                            Some(parts[2].to_string())
-                        } else {
-                            None
-                        };
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Metrics { vm_id },
-                        })
-                    }
-                    "execute" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!(
-                                "VM execute requires: <language> <code> [--vm-id <vm_id>]"
-                            ));
-                        }
-
-                        let language = parts[2].to_string();
-                        let mut code = String::new();
-                        let mut vm_id = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--vm-id" => {
-                                    if i + 1 < parts.len() {
-                                        vm_id = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--vm-id requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    if !code.is_empty() {
-                                        code.push(' ');
-                                    }
-                                    code.push_str(parts[i]);
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        if code.is_empty() {
-                            return Err(anyhow!("Code cannot be empty"));
-                        }
-
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Execute {
-                                code,
-                                language,
-                                vm_id,
-                            },
-                        })
-                    }
-                    "agent" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!(
-                                "VM agent requires: <agent_id> <task> [--vm-id <vm_id>]"
-                            ));
-                        }
-
-                        let agent_id = parts[2].to_string();
-                        let mut task = String::new();
-                        let mut vm_id = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--vm-id" => {
-                                    if i + 1 < parts.len() {
-                                        vm_id = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--vm-id requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    if !task.is_empty() {
-                                        task.push(' ');
-                                    }
-                                    task.push_str(parts[i]);
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        if task.is_empty() {
-                            return Err(anyhow!("Task cannot be empty"));
-                        }
-
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Agent {
-                                agent_id,
-                                task,
-                                vm_id,
-                            },
-                        })
-                    }
-                    "tasks" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM tasks requires a VM ID"));
-                        }
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Tasks {
-                                vm_id: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "allocate" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM allocate requires a VM ID"));
-                        }
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Allocate {
-                                vm_id: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "release" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM release requires a VM ID"));
-                        }
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Release {
-                                vm_id: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "monitor" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("VM monitor requires a VM ID"));
-                        }
-                        let vm_id = parts[2].to_string();
-                        let mut refresh = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--refresh" => {
-                                    if i + 1 < parts.len() {
-                                        refresh = Some(
-                                            parts[i + 1]
-                                                .parse::<u64>()
-                                                .map_err(|_| anyhow!("Invalid refresh rate"))?,
-                                        );
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--refresh requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    return Err(anyhow!("Unknown monitor option: {}", parts[i]));
-                                }
-                            }
-                        }
-
-                        Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Monitor { vm_id, refresh },
-                        })
-                    }
-                    _ => Err(anyhow!("Invalid VM subcommand: {}", parts[1])),
-                }
             }
 
             #[cfg(feature = "repl-chat")]
@@ -881,6 +577,354 @@ impl FromStr for ReplCommand {
                 "MCP tools not enabled. Rebuild with --features repl-mcp"
             )),
 
+            #[cfg(feature = "repl-file")]
+            "file" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("File command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "search" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("File search requires a query"));
+                        }
+                        let query = parts[2..].join(" ");
+                        Ok(ReplCommand::File {
+                            subcommand: FileSubcommand::Search { query },
+                        })
+                    }
+                    "list" => Ok(ReplCommand::File {
+                        subcommand: FileSubcommand::List,
+                    }),
+                    "info" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("File info requires a path"));
+                        }
+                        let path = parts[2].to_string();
+                        Ok(ReplCommand::File {
+                            subcommand: FileSubcommand::Info { path },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown file subcommand: {}. Use: search, list, info",
+                        parts[1]
+                    )),
+                }
+            }
+
+            #[cfg(not(feature = "repl-file"))]
+            "file" => Err(anyhow!(
+                "File operations not enabled. Rebuild with --features repl-file"
+            )),
+
+            #[cfg(feature = "repl-web")]
+            "web" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Web command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "get" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web GET requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Get { url, headers: None },
+                        })
+                    }
+                    "post" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web POST requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Post { url, body: String::new(), headers: None },
+                        })
+                    }
+                    "scrape" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web scrape requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Scrape { url, selector: None, wait_for_element: None },
+                        })
+                    }
+                    "screenshot" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web screenshot requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Screenshot { url, width: None, height: None, full_page: None },
+                        })
+                    }
+                    "pdf" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web PDF requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Pdf { url, page_size: None },
+                        })
+                    }
+                    "form" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web form requires a URL"));
+                        }
+                        let url = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Form { url, form_data: std::collections::HashMap::new() },
+                        })
+                    }
+                    "api" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web API requires an endpoint"));
+                        }
+                        let endpoint = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Api { endpoint, method: "GET".to_string(), data: None },
+                        })
+                    }
+                    "status" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web status requires an operation ID"));
+                        }
+                        let operation_id = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Status { operation_id },
+                        })
+                    }
+                    "cancel" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Web cancel requires an operation ID"));
+                        }
+                        let operation_id = parts[2].to_string();
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Cancel { operation_id },
+                        })
+                    }
+                    "history" => {
+                        let limit = if parts.len() > 2 {
+                            Some(parts[2].parse::<usize>().map_err(|_| anyhow!("Invalid limit"))?)
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::History { limit },
+                        })
+                    }
+                    "config" => {
+                        if parts.len() < 2 {
+                            return Err(anyhow!("Web config requires a subcommand"));
+                        }
+                        let subcommand = if parts.len() > 2 {
+                            match parts[2] {
+                                "show" => WebConfigSubcommand::Show,
+                                "set" => {
+                                    if parts.len() < 5 {
+                                        return Err(anyhow!("Web config set requires key and value"));
+                                    }
+                                    WebConfigSubcommand::Set {
+                                        key: parts[3].to_string(),
+                                        value: parts[4].to_string(),
+                                    }
+                                }
+                                "reset" => WebConfigSubcommand::Reset,
+                                _ => return Err(anyhow!("Unknown web config subcommand")),
+                            }
+                        } else {
+                            WebConfigSubcommand::Show
+                        };
+                        Ok(ReplCommand::Web {
+                            subcommand: WebSubcommand::Config { subcommand },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown web subcommand: {}. Use: get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config",
+                        parts[1]
+                    )),
+                }
+            }
+
+            #[cfg(not(feature = "repl-web"))]
+            "web" => Err(anyhow!(
+                "Web operations not enabled. Rebuild with --features repl-web"
+            )),
+
+            "vm" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("VM command requires a subcommand"));
+                }
+
+                match parts[1] {
+                    "list" => Ok(ReplCommand::Vm {
+                        subcommand: VmSubcommand::List,
+                    }),
+                    "pool" => Ok(ReplCommand::Vm {
+                        subcommand: VmSubcommand::Pool,
+                    }),
+                    "status" => {
+                        let vm_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Status { vm_id },
+                        })
+                    }
+                    "metrics" => {
+                        let vm_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Metrics { vm_id },
+                        })
+                    }
+                    "execute" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM execute requires a language"));
+                        }
+                        let language = parts[2].to_string();
+                        if parts.len() < 4 {
+                            return Err(anyhow!("VM execute requires code to execute"));
+                        }
+
+                        let mut code = String::new();
+                        let mut vm_id = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--vm-id" => {
+                                    if i + 1 < parts.len() {
+                                        vm_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--vm-id requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    if !code.is_empty() {
+                                        code.push(' ');
+                                    }
+                                    code.push_str(parts[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Execute { code, language, vm_id },
+                        })
+                    }
+                    "agent" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM agent requires an agent ID"));
+                        }
+                        let agent_id = parts[2].to_string();
+                        if parts.len() < 4 {
+                            return Err(anyhow!("VM agent requires a task"));
+                        }
+
+                        let mut task = String::new();
+                        let mut vm_id = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--vm-id" => {
+                                    if i + 1 < parts.len() {
+                                        vm_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--vm-id requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    if !task.is_empty() {
+                                        task.push(' ');
+                                    }
+                                    task.push_str(parts[i]);
+                                    i += 1;
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Agent { agent_id, task, vm_id },
+                        })
+                    }
+                    "tasks" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM tasks requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Tasks { vm_id },
+                        })
+                    }
+                    "allocate" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM allocate requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Allocate { vm_id },
+                        })
+                    }
+                    "release" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM release requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Release { vm_id },
+                        })
+                    }
+                    "monitor" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("VM monitor requires a VM ID"));
+                        }
+                        let vm_id = parts[2].to_string();
+                        let mut refresh = None;
+                        let mut i = 3;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--refresh" => {
+                                    if i + 1 < parts.len() {
+                                        if let Ok(refresh_val) = parts[i + 1].parse::<u32>() {
+                                            refresh = Some(refresh_val);
+                                        } else {
+                                            return Err(anyhow!("--refresh must be a positive integer"));
+                                        }
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--refresh requires a value"));
+                                    }
+                                }
+                                _ => {
+                                    return Err(anyhow!("Unknown monitor option: {}", parts[i]));
+                                }
+                            }
+                        }
+
+                        Ok(ReplCommand::Vm {
+                            subcommand: VmSubcommand::Monitor { vm_id, refresh },
+                        })
+                    }
+                    _ => Err(anyhow!(
+                        "Unknown VM subcommand: {}. Use: list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor",
+                        parts[1]
+                    )),
+                }
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -894,695 +938,6 @@ impl FromStr for ReplCommand {
             "exit" => Ok(ReplCommand::Exit),
             "clear" => Ok(ReplCommand::Clear),
 
-            "web" => {
-                if parts.len() < 2 {
-                    return Err(anyhow!("Web command requires a subcommand. Use: /web <get|post|scrape|screenshot|pdf|form|api|status|cancel|history|config>"));
-                }
-
-                match parts[1] {
-                    "get" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web GET requires URL. Use: /web get <url> [--headers <json>]"));
-                        }
-                        let url = parts[2].to_string();
-                        let mut headers = None;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--headers" => {
-                                    if i + 1 < parts.len() {
-                                        headers = Some(serde_json::from_str(parts[i + 1])?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--headers requires JSON argument"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Get { url, headers } })
-                    }
-                    "post" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!("Web POST requires URL and body. Use: /web post <url> <body> [--headers <json>]"));
-                        }
-                        let url = parts[2].to_string();
-                        let body = parts[3].to_string();
-                        let mut headers = None;
-                        let mut i = 4;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--headers" => {
-                                    if i + 1 < parts.len() {
-                                        headers = Some(serde_json::from_str(parts[i + 1])?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--headers requires JSON argument"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Post { url, body, headers } })
-                    }
-                    "scrape" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!("Web scrape requires URL and selector. Use: /web scrape <url> <selector> [--wait <element>]"));
-                        }
-                        let url = parts[2].to_string();
-                        let selector = parts[3].to_string();
-                        let mut wait_for_element = None;
-                        let mut i = 4;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--wait" => {
-                                    if i + 1 < parts.len() {
-                                        wait_for_element = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--wait requires element argument"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Scrape { url, selector, wait: wait_for_element } })
-                    }
-                    "screenshot" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web screenshot requires URL. Use: /web screenshot <url> [--width <px>] [--height <px>] [--full-page]"));
-                        }
-                        let url = parts[2].to_string();
-                        let mut width = None;
-                        let mut height = None;
-                        let mut full_page = None;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--width" => {
-                                    if i + 1 < parts.len() {
-                                        width = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--width requires pixel value"));
-                                    }
-                                }
-                                "--height" => {
-                                    if i + 1 < parts.len() {
-                                        height = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--height requires pixel value"));
-                                    }
-                                }
-                                "--full-page" => {
-                                    full_page = Some(true);
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Screenshot { url, width, height, full_page } })
-                    }
-                    "pdf" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web PDF requires URL. Use: /web pdf <url> [--page-size <size>]"));
-                        }
-                        let url = parts[2].to_string();
-                        let mut page_size = None;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--page-size" => {
-                                    if i + 1 < parts.len() {
-                                        page_size = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--page-size requires size argument"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Pdf { url, page_size } })
-                    }
-                    "form" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web form requires URL and form data JSON. Use: /web form <url> <json_data>"));
-                        }
-                        let url = parts[2].to_string();
-                        let form_data: std::collections::HashMap<String, String> = serde_json::from_str(parts[3])?;
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Form { url, form_data } })
-                    }
-                    "api" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!("Web API requires base URL and endpoints. Use: /web api <base_url> <endpoint1,endpoint2,...> [--rate-limit <ms>]"));
-                        }
-                        let base_url = parts[2].to_string();
-                        let endpoints: Vec<String> = parts[3].split(',').map(|s| s.trim().to_string()).collect();
-                        let mut rate_limit_ms = None;
-                        let mut i = 4;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--rate-limit" => {
-                                    if i + 1 < parts.len() {
-                                        rate_limit_ms = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--rate-limit requires millisecond value"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Api { base_url, endpoints, rate_limit: rate_limit_ms } })
-                    }
-                    "status" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web status requires operation ID. Use: /web status <operation_id>"));
-                        }
-                        let operation_id = parts[2].to_string();
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Status { operation_id: Some(operation_id) } })
-                    }
-                    "cancel" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web cancel requires operation ID. Use: /web cancel <operation_id>"));
-                        }
-                        let operation_id = parts[2].to_string();
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::Cancel { operation_id } })
-                    }
-                    "history" => {
-                        let mut limit = None;
-                        let mut i = 2;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--limit" => {
-                                    if i + 1 < parts.len() {
-                                        limit = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--limit requires numeric value"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::Web { subcommand: WebSubcommand::History { limit } })
-                    }
-                    "config" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Web config requires subcommand. Use: /web config <show|set|reset> [args...]"));
-                        }
-                        match parts[2] {
-                            "show" => Ok(ReplCommand::Web { subcommand: WebSubcommand::Config { subcommand: WebConfigSubcommand::Show } }),
-                            "set" => {
-                                if parts.len() < 5 {
-                                    return Err(anyhow!("Web config set requires key and value. Use: /web config set <key> <value>"));
-                                }
-                                let key = parts[3].to_string();
-                                let value = parts[4].to_string();
-                                Ok(ReplCommand::Web { subcommand: WebSubcommand::Config { subcommand: WebConfigSubcommand::Set { key, value } } })
-                            }
-                            "reset" => Ok(ReplCommand::Web { subcommand: WebSubcommand::Config { subcommand: WebConfigSubcommand::Reset } }),
-                            _ => Err(anyhow!("Unknown web config subcommand: {}", parts[2])),
-                        }
-                    }
-                    _ => Err(anyhow!("Unknown web subcommand: {}. Use: get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config", parts[1])),
-                }
-            }
-
-            #[cfg(feature = "repl-file")]
-            "file" => {
-                if parts.len() < 2 {
-                    return Err(anyhow!("File command requires a subcommand. Use: /file <search|classify|suggest|analyze|summarize|metadata|index|find|list|tag|status>"));
-                }
-
-                match parts[1] {
-                    "search" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File search requires query. Use: /file search <query> [--path <path>] [--types <ext1,ext2>] [--semantic] [--limit <n>]"));
-                        }
-                        let query = parts[2].to_string();
-                        let mut path = None;
-                        let mut file_types = None;
-                        let mut semantic = false;
-                        let mut limit = None;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--path" => {
-                                    if i + 1 < parts.len() {
-                                        path = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--path requires directory path"));
-                                    }
-                                }
-                                "--types" => {
-                                    if i + 1 < parts.len() {
-                                        file_types = Some(parts[i + 1].split(',').map(|s| s.trim().to_string()).collect());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--types requires comma-separated file extensions"));
-                                    }
-                                }
-                                "--semantic" => {
-                                    semantic = true;
-                                    i += 1;
-                                }
-                                "--limit" => {
-                                    if i + 1 < parts.len() {
-                                        limit = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--limit requires numeric value"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Search { query, path, file_types, semantic, limit } })
-                    }
-                    "classify" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File classify requires path. Use: /file classify <path> [--recursive] [--update]"));
-                        }
-                        let path = parts[2].to_string();
-                        let mut recursive = false;
-                        let mut update_metadata = false;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--recursive" => {
-                                    recursive = true;
-                                    i += 1;
-                                }
-                                "--update" => {
-                                    update_metadata = true;
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Classify { path, recursive, update_metadata } })
-                    }
-                    "suggest" => {
-                        let mut context = None;
-                        let mut limit = None;
-                        let mut path = None;
-                        let mut i = 2;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--context" => {
-                                    if i + 1 < parts.len() {
-                                        context = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--context requires description"));
-                                    }
-                                }
-                                "--limit" => {
-                                    if i + 1 < parts.len() {
-                                        limit = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--limit requires numeric value"));
-                                    }
-                                }
-                                "--path" => {
-                                    if i + 1 < parts.len() {
-                                        path = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--path requires directory path"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Suggest { context, limit, path } })
-                    }
-                    "analyze" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File analyze requires file path. Use: /file analyze <file> [--similar] [--related] [--threshold <value>]"));
-                        }
-                        let file_path = parts[2].to_string();
-                        let mut find_similar = false;
-                        let mut find_related = false;
-                        let mut threshold = None;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--similar" => {
-                                    find_similar = true;
-                                    i += 1;
-                                }
-                                "--related" => {
-                                    find_related = true;
-                                    i += 1;
-                                }
-                                "--threshold" => {
-                                    if i + 1 < parts.len() {
-                                        threshold = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--threshold requires numeric value"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Analyze { file_path, find_similar, find_related, threshold } })
-                    }
-                    "summarize" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File summarize requires file path. Use: /file summarize <file> [--level <brief|detailed|comprehensive>] [--key-points]"));
-                        }
-                        let file_path = parts[2].to_string();
-                        let mut detail_level = None;
-                        let mut include_key_points = false;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--level" => {
-                                    if i + 1 < parts.len() {
-                                        let level = parts[i + 1].to_string();
-                                        if matches!(level.as_str(), "brief" | "detailed" | "comprehensive") {
-                                            detail_level = Some(level);
-                                        } else {
-                                            return Err(anyhow!("Level must be one of: brief, detailed, comprehensive"));
-                                        }
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--level requires level specification"));
-                                    }
-                                }
-                                "--key-points" => {
-                                    include_key_points = true;
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Summarize { file_path, detail_level, include_key_points } })
-                    }
-                    "metadata" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File metadata requires file path. Use: /file metadata <file> [--concepts] [--entities] [--keywords] [--update]"));
-                        }
-                        let file_path = parts[2].to_string();
-                        let mut extract_concepts = false;
-                        let mut extract_entities = false;
-                        let mut extract_keywords = false;
-                        let mut update_index = false;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--concepts" => {
-                                    extract_concepts = true;
-                                    i += 1;
-                                }
-                                "--entities" => {
-                                    extract_entities = true;
-                                    i += 1;
-                                }
-                                "--keywords" => {
-                                    extract_keywords = true;
-                                    i += 1;
-                                }
-                                "--update" => {
-                                    update_index = true;
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Metadata { file_path, extract_concepts, extract_entities, extract_keywords, update_index } })
-                    }
-                    "index" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File index requires path. Use: /file index <path> [--recursive] [--force]"));
-                        }
-                        let path = parts[2].to_string();
-                        let mut recursive = false;
-                        let mut force_reindex = false;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--recursive" => {
-                                    recursive = true;
-                                    i += 1;
-                                }
-                                "--force" => {
-                                    force_reindex = true;
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Index { path, recursive, force_reindex } })
-                    }
-                    "find" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File find requires pattern. Use: /file find <pattern> [--path <path>] [--context <n>] [--case-sensitive] [--whole-word]"));
-                        }
-                        let pattern = parts[2].to_string();
-                        let mut path = None;
-                        let mut context_lines = None;
-                        let mut case_sensitive = false;
-                        let mut whole_word = false;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--path" => {
-                                    if i + 1 < parts.len() {
-                                        path = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--path requires directory path"));
-                                    }
-                                }
-                                "--context" => {
-                                    if i + 1 < parts.len() {
-                                        context_lines = Some(parts[i + 1].parse()?);
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--context requires numeric value"));
-                                    }
-                                }
-                                "--case-sensitive" => {
-                                    case_sensitive = true;
-                                    i += 1;
-                                }
-                                "--whole-word" => {
-                                    whole_word = true;
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Find { pattern, path, context_lines, case_sensitive, whole_word } })
-                    }
-                    "list" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("File list requires path. Use: /file list <path> [--metadata] [--tags] [--sort <field>]"));
-                        }
-                        let path = parts[2].to_string();
-                        let mut show_metadata = false;
-                        let mut show_tags = false;
-                        let mut sort_by = None;
-                        let mut i = 3;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--metadata" => {
-                                    show_metadata = true;
-                                    i += 1;
-                                }
-                                "--tags" => {
-                                    show_tags = true;
-                                    i += 1;
-                                }
-                                "--sort" => {
-                                    if i + 1 < parts.len() {
-                                        let field = parts[i + 1].to_string();
-                                        if matches!(field.as_str(), "name" | "size" | "modified" | "relevance") {
-                                            sort_by = Some(field);
-                                        } else {
-                                            return Err(anyhow!("Sort field must be one of: name, size, modified, relevance"));
-                                        }
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--sort requires field name"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::List { path, show_metadata, show_tags, sort_by } })
-                    }
-                    "tag" => {
-                        if parts.len() < 4 {
-                            return Err(anyhow!("File tag requires file path and tags. Use: /file tag <file> <tag1,tag2,...> [--suggest]"));
-                        }
-                        let file_path = parts[2].to_string();
-                        let tags: Vec<String> = parts[3].split(',').map(|s| s.trim().to_string()).collect();
-                        let mut auto_suggest = false;
-                        let mut i = 4;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--suggest" => {
-                                    auto_suggest = true;
-                                    i += 1;
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Tag { file_path, tags, auto_suggest } })
-                    }
-                    "status" => {
-                        let mut operation = None;
-                        let mut i = 2;
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--operation" => {
-                                    if i + 1 < parts.len() {
-                                        let op = parts[i + 1].to_string();
-                                        if matches!(op.as_str(), "indexing" | "classification" | "analysis") {
-                                            operation = Some(op);
-                                        } else {
-                                            return Err(anyhow!("Operation must be one of: indexing, classification, analysis"));
-                                        }
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--operation requires operation name"));
-                                    }
-                                }
-                                _ => return Err(anyhow!("Unknown option: {}", parts[i])),
-                            }
-                            i += 1;
-                        }
-                        Ok(ReplCommand::File { subcommand: FileSubcommand::Status { operation } })
-                    }
-                    _ => Err(anyhow!("Unknown file subcommand: {}. Use: search, classify, suggest, analyze, summarize, metadata, index, find, list, tag, status", parts[1])),
-                }
-            }
-
-            #[cfg(feature = "repl-custom")]
-            "commands" => {
-                if parts.len() < 2 {
-                    return Err(anyhow!("Commands command requires a subcommand. Use: init | list | category <name> | help <command> | search <query> | reload | validate [command] | stats | suggest <partial> [--limit <n>]"));
-                }
-
-                match parts[1] {
-                    "init" => Ok(ReplCommand::Commands {
-                        subcommand: CommandsSubcommand::Init,
-                    }),
-                    "list" => Ok(ReplCommand::Commands {
-                        subcommand: CommandsSubcommand::List,
-                    }),
-                    "category" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Commands category requires a category name"));
-                        }
-                        Ok(ReplCommand::Commands {
-                            subcommand: CommandsSubcommand::Category {
-                                category: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "help" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Commands help requires a command name"));
-                        }
-                        Ok(ReplCommand::Commands {
-                            subcommand: CommandsSubcommand::Help {
-                                command: parts[2].to_string(),
-                            },
-                        })
-                    }
-                    "search" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Commands search requires a query"));
-                        }
-                        Ok(ReplCommand::Commands {
-                            subcommand: CommandsSubcommand::Search {
-                                query: parts[2..].join(" "),
-                            },
-                        })
-                    }
-                    "reload" => Ok(ReplCommand::Commands {
-                        subcommand: CommandsSubcommand::Reload,
-                    }),
-                    "validate" => {
-                        let command = if parts.len() > 2 {
-                            Some(parts[2].to_string())
-                        } else {
-                            None
-                        };
-                        Ok(ReplCommand::Commands {
-                            subcommand: CommandsSubcommand::Validate { command },
-                        })
-                    }
-                    "stats" => Ok(ReplCommand::Commands {
-                        subcommand: CommandsSubcommand::Stats,
-                    }),
-                    "suggest" => {
-                        if parts.len() < 3 {
-                            return Err(anyhow!("Commands suggest requires a partial command name"));
-                        }
-                        let mut partial = parts[2].to_string();
-                        let mut limit = None;
-                        let mut i = 3;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--limit" => {
-                                    if i + 1 < parts.len() {
-                                        limit = Some(
-                                            parts[i + 1]
-                                                .parse::<usize>()
-                                                .map_err(|_| anyhow!("Invalid limit value"))?,
-                                        );
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--limit requires a numeric value"));
-                                    }
-                                }
-                                _ => {
-                                    if !partial.is_empty() {
-                                        partial.push(' ');
-                                    }
-                                    partial.push_str(parts[i]);
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        Ok(ReplCommand::Commands {
-                            subcommand: CommandsSubcommand::Suggest { partial, limit },
-                        })
-                    }
-                    _ => Err(anyhow!("Unknown commands subcommand: {}. Use: init, list, category, help, search, reload, validate, stats, suggest", parts[1])),
-                }
-            }
-
             _ => Err(anyhow!("Unknown command: {}", parts[0])),
         }
     }
@@ -1592,7 +947,7 @@ impl ReplCommand {
     /// Get available commands based on compiled features
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "vm", "web", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "vm", "help", "quit", "exit", "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
@@ -1616,9 +971,9 @@ impl ReplCommand {
             commands.extend_from_slice(&["file"]);
         }
 
-        #[cfg(feature = "repl-custom")]
+        #[cfg(feature = "repl-web")]
         {
-            commands.extend_from_slice(&["commands"]);
+            commands.extend_from_slice(&["web"]);
         }
 
         commands
@@ -1627,17 +982,21 @@ impl ReplCommand {
     /// Get command description for help system
     pub fn get_command_help(command: &str) -> Option<&'static str> {
         match command {
-            "search" => Some("/search <query> [--role <role>] [--limit <n>] [--semantic] [--concepts] - Search documents with semantic options"),
+            "search" => Some("/search <query> [--role <role>] [--limit <n>] [--semantic] [--concepts] - Search documents"),
             "config" => Some("/config show | set <key> <value> - Manage configuration"),
             "role" => Some("/role list | select <name> - Manage roles"),
             "graph" => Some("/graph [--top-k <n>] - Show knowledge graph"),
-            "vm" => Some("/vm list | pool | status [vm_id] | metrics [vm_id] | execute <lang> <code> [--vm-id <id>] | agent <agent_id> <task> [--vm-id <id>] | tasks <vm_id> | allocate <vm_id> | release <vm_id> | monitor <vm_id> [--refresh <secs>] - Manage VMs"),
-            "web" => Some("/web get <url> | post <url> <body> | scrape <url> <selector> | screenshot <url> | pdf <url> | form <url> <json> | api <base_url> <endpoints> | status <id> | cancel <id> | history | config <show|set|reset> - Web operations through VM sandboxing"),
-            "file" => Some("/file search <query> | classify <path> | suggest [--context <desc>] | analyze <file> | summarize <file> | metadata <file> | index <path> | find <pattern> | list <path> | tag <file> <tags> | status - Enhanced file operations with semantic awareness"),
             "help" => Some("/help [command] - Show help information"),
             "quit" | "q" => Some("/quit, /q - Exit REPL"),
             "exit" => Some("/exit - Exit REPL"),
             "clear" => Some("/clear - Clear screen"),
+            "vm" => Some("/vm <subcommand> [args] - VM management (list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor)"),
+
+            #[cfg(feature = "repl-file")]
+            "file" => Some("/file <subcommand> [args] - File operations (search, list, info)"),
+
+            #[cfg(feature = "repl-web")]
+            "web" => Some("/web <subcommand> [args] - Web operations (get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config)"),
 
             #[cfg(feature = "repl-chat")]
             "chat" => Some("/chat [message] - Interactive chat with AI"),
@@ -1654,9 +1013,6 @@ impl ReplCommand {
             "replace" => Some("/replace <text> [--format <format>] - Replace matches"),
             #[cfg(feature = "repl-mcp")]
             "thesaurus" => Some("/thesaurus [--role <role>] - Show thesaurus entries"),
-
-            #[cfg(feature = "repl-custom")]
-            "commands" => Some("/commands list | category <name> | help <cmd> | search <query> | reload | validate [cmd] | stats | suggest <partial> [--limit <n>] - Manage custom markdown-defined commands"),
 
             _ => None,
         }
@@ -1676,8 +1032,8 @@ mod tests {
                 query: "hello world".to_string(),
                 role: None,
                 limit: None,
+                semantic: false,
                 concepts: false,
-                semantic: false
             }
         );
 
@@ -1690,8 +1046,8 @@ mod tests {
                 query: "test".to_string(),
                 role: Some("Engineer".to_string()),
                 limit: Some(5),
+                semantic: false,
                 concepts: false,
-                semantic: false
             }
         );
     }

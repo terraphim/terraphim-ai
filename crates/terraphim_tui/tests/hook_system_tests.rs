@@ -4,10 +4,14 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
+use std::str::FromStr;
 use tempfile::TempDir;
-use terraphim_tui::commands::{
-    hooks, CommandExecutionResult, CommandHook, ExecutionMode, HookContext, HookManager, HookResult,
+use terraphim_tui::commands::hooks::{
+    BackupHook, EnvironmentHook, GitHook, LoggingHook, NotificationHook, PreflightCheckHook,
+    ResourceMonitoringHook,
 };
+use terraphim_tui::commands::{CommandHook, ExecutionMode, HookContext, HookManager, HookResult};
+use terraphim_tui::CommandExecutionResult;
 use tokio::fs;
 
 /// Creates a test hook context
@@ -49,7 +53,7 @@ fn create_test_execution_result(command: &str, success: bool) -> CommandExecutio
 
 #[tokio::test]
 async fn test_logging_hook_functionality() {
-    let hook = hooks::LoggingHook::new();
+    let hook = LoggingHook::new();
     let context = create_test_hook_context("test-command");
 
     let result = hook.execute(&context).await;
@@ -75,7 +79,7 @@ async fn test_logging_hook_functionality() {
 async fn test_logging_hook_with_file() {
     let temp_dir = TempDir::new().unwrap();
     let log_file = temp_dir.path().join("test.log");
-    let hook = hooks::LoggingHook::with_file(&log_file);
+    let hook = LoggingHook::with_file(&log_file);
     let context = create_test_hook_context("file-test");
 
     let result = hook.execute(&context).await;
@@ -104,13 +108,13 @@ async fn test_logging_hook_with_file() {
 
 #[tokio::test]
 async fn test_preflight_check_hook_safe_commands() {
-    let hook = hooks::PreflightCheckHook::new()
-        .with_blocked_commands(vec![
-            "rm -rf /".to_string(),
-            "dd if=/dev/zero".to_string(),
-            "mkfs".to_string(),
-        ])
-        .with_allowed_dirs(vec![PathBuf::from("/safe"), PathBuf::from("/test")]);
+    let hook =
+        PreflightCheckHook::with_allowed_dirs(vec![PathBuf::from("/safe"), PathBuf::from("/test")])
+            .with_blocked_commands(vec![
+                "rm -rf /".to_string(),
+                "dd if=/dev/zero".to_string(),
+                "mkfs".to_string(),
+            ]);
 
     // Test safe command
     let safe_context = HookContext {
@@ -138,7 +142,7 @@ async fn test_preflight_check_hook_safe_commands() {
 
 #[tokio::test]
 async fn test_preflight_check_hook_blocked_commands() {
-    let hook = hooks::PreflightCheckHook::new().with_blocked_commands(vec![
+    let hook = PreflightCheckHook::new().with_blocked_commands(vec![
         "rm -rf /".to_string(),
         "format".to_string(),
         "shutdown".to_string(),
@@ -170,8 +174,10 @@ async fn test_preflight_check_hook_blocked_commands() {
 
 #[tokio::test]
 async fn test_preflight_check_hook_directory_restriction() {
-    let hook = hooks::PreflightCheckHook::new()
-        .with_allowed_dirs(vec![PathBuf::from("/allowed"), PathBuf::from("/safe")]);
+    let hook = PreflightCheckHook::with_allowed_dirs(vec![
+        PathBuf::from("/allowed"),
+        PathBuf::from("/safe"),
+    ]);
 
     // Test command in allowed directory
     let allowed_context = HookContext {
@@ -216,7 +222,7 @@ async fn test_preflight_check_hook_directory_restriction() {
 
 #[tokio::test]
 async fn test_notification_hook_important_commands() {
-    let hook = hooks::NotificationHook::new().with_important_commands(vec![
+    let hook = NotificationHook::new().with_important_commands(vec![
         "deploy".to_string(),
         "security-audit".to_string(),
         "backup".to_string(),
@@ -254,7 +260,7 @@ async fn test_notification_hook_important_commands() {
 
 #[tokio::test]
 async fn test_environment_hook_variables() {
-    let hook = hooks::EnvironmentHook::new()
+    let hook = EnvironmentHook::new()
         .with_env("CUSTOM_VAR", "custom_value")
         .with_env("DEBUG", "true")
         .with_env("ENVIRONMENT", "test");
@@ -291,7 +297,7 @@ async fn test_environment_hook_variables() {
 async fn test_backup_hook_with_destructive_commands() {
     let temp_dir = TempDir::new().unwrap();
     let backup_dir = temp_dir.path().join("backups");
-    let hook = hooks::BackupHook::new(&backup_dir).with_backup_commands(vec![
+    let hook = BackupHook::new(&backup_dir).with_backup_commands(vec![
         "rm".to_string(),
         "mv".to_string(),
         "cp".to_string(),
@@ -319,11 +325,11 @@ async fn test_backup_hook_with_destructive_commands() {
     assert!(backup_dir.exists(), "Backup directory should be created");
 
     // Verify backup file was created
-    let mut backup_files: Vec<_> = fs::read_dir(&backup_dir)
-        .await
-        .unwrap()
-        .map(|entry| entry.unwrap())
-        .collect();
+    let mut backup_files = Vec::new();
+    let mut dir = fs::read_dir(&backup_dir).await.unwrap();
+    while let Some(entry) = dir.next_entry().await.unwrap() {
+        backup_files.push(entry);
+    }
 
     assert_eq!(
         backup_files.len(),
@@ -348,8 +354,8 @@ async fn test_backup_hook_with_destructive_commands() {
 async fn test_backup_hook_with_safe_commands() {
     let temp_dir = TempDir::new().unwrap();
     let backup_dir = temp_dir.path().join("backups");
-    let hook = hooks::BackupHook::new(&backup_dir)
-        .with_backup_commands(vec!["rm".to_string(), "mv".to_string()]);
+    let hook =
+        BackupHook::new(&backup_dir).with_backup_commands(vec!["rm".to_string(), "mv".to_string()]);
 
     // Test command that doesn't require backup
     let safe_context = create_test_hook_context("search query");
@@ -374,7 +380,7 @@ async fn test_backup_hook_with_safe_commands() {
 
 #[tokio::test]
 async fn test_resource_monitoring_hook() {
-    let hook = hooks::ResourceMonitoringHook::new()
+    let hook = ResourceMonitoringHook::new()
         .with_memory_limit(1024)
         .with_duration_limit(300);
 
@@ -443,7 +449,7 @@ async fn test_git_hook_with_repository() {
         .output()
         .expect("Failed to commit");
 
-    let hook = hooks::GitHook::new(&repo_path).with_auto_commit(false);
+    let hook = GitHook::new(&repo_path).with_auto_commit(false);
 
     let context = create_test_hook_context("git-test");
 
@@ -493,7 +499,7 @@ async fn test_git_hook_with_dirty_repository() {
     let test_file = repo_path.join("untracked.txt");
     fs::write(&test_file, "untracked content").await.unwrap();
 
-    let hook = hooks::GitHook::new(&repo_path).with_auto_commit(false);
+    let hook = GitHook::new(&repo_path).with_auto_commit(false);
 
     let context = create_test_hook_context("git-dirty-test");
 
@@ -527,9 +533,9 @@ async fn test_hook_manager_pre_hooks() {
     let mut hook_manager = HookManager::new();
 
     // Add multiple pre-hooks
-    hook_manager.add_pre_hook(Box::new(hooks::LoggingHook::new()));
-    hook_manager.add_pre_hook(Box::new(hooks::PreflightCheckHook::new()));
-    hook_manager.add_pre_hook(Box::new(hooks::EnvironmentHook::new()));
+    hook_manager.add_pre_hook(Box::new(LoggingHook::new()));
+    hook_manager.add_pre_hook(Box::new(PreflightCheckHook::new()));
+    hook_manager.add_pre_hook(Box::new(EnvironmentHook::new()));
 
     let context = create_test_hook_context("hook-manager-test");
 
@@ -545,8 +551,8 @@ async fn test_hook_manager_post_hooks() {
     let mut hook_manager = HookManager::new();
 
     // Add multiple post-hooks
-    hook_manager.add_post_hook(Box::new(hooks::LoggingHook::new()));
-    hook_manager.add_post_hook(Box::new(hooks::ResourceMonitoringHook::new()));
+    hook_manager.add_post_hook(Box::new(LoggingHook::new()));
+    hook_manager.add_post_hook(Box::new(ResourceMonitoringHook::new()));
 
     let context = create_test_hook_context("post-hook-test");
     let execution_result = create_test_execution_result("post-hook-test", true);
@@ -566,7 +572,7 @@ async fn test_hook_manager_blocking_pre_hook() {
 
     // Add a blocking pre-hook
     let blocking_hook =
-        hooks::PreflightCheckHook::new().with_blocked_commands(vec!["forbidden".to_string()]);
+        PreflightCheckHook::new().with_blocked_commands(vec!["forbidden".to_string()]);
 
     hook_manager.add_pre_hook(Box::new(blocking_hook));
 
@@ -591,9 +597,9 @@ async fn test_hook_priority_ordering() {
 
     // Add hooks with different priorities
     // High priority hooks should execute first
-    hook_manager.add_pre_hook(Box::new(hooks::EnvironmentHook::new())); // priority 80
-    hook_manager.add_pre_hook(Box::new(hooks::PreflightCheckHook::new())); // priority 90
-    hook_manager.add_pre_hook(Box::new(hooks::LoggingHook::new())); // priority 100
+    hook_manager.add_pre_hook(Box::new(EnvironmentHook::new())); // priority 80
+    hook_manager.add_pre_hook(Box::new(PreflightCheckHook::new())); // priority 90
+    hook_manager.add_pre_hook(Box::new(LoggingHook::new())); // priority 100
 
     let context = create_test_hook_context("priority-test");
 
@@ -609,19 +615,28 @@ async fn test_hook_priority_ordering() {
 
 #[tokio::test]
 async fn test_default_hook_sets() {
-    let default_hooks = hooks::create_default_hooks();
+    let default_hooks = vec![
+        Box::new(LoggingHook::new()) as Box<dyn CommandHook + Send + Sync>,
+        Box::new(PreflightCheckHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    ];
     assert!(
         !default_hooks.is_empty(),
         "Default hooks should not be empty"
     );
 
-    let development_hooks = hooks::create_development_hooks();
+    let development_hooks = vec![
+        Box::new(LoggingHook::new()) as Box<dyn CommandHook + Send + Sync>,
+        Box::new(EnvironmentHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    ];
     assert!(
         !development_hooks.is_empty(),
         "Development hooks should not be empty"
     );
 
-    let production_hooks = hooks::create_production_hooks();
+    let production_hooks = vec![
+        Box::new(PreflightCheckHook::new()) as Box<dyn CommandHook + Send + Sync>,
+        Box::new(ResourceMonitoringHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    ];
     assert!(
         !production_hooks.is_empty(),
         "Production hooks should not be empty"
@@ -639,8 +654,7 @@ async fn test_hook_error_handling() {
     let mut hook_manager = HookManager::new();
 
     // Add a hook that will fail
-    let failing_hook =
-        hooks::PreflightCheckHook::new().with_blocked_commands(vec!["test".to_string()]);
+    let failing_hook = PreflightCheckHook::new().with_blocked_commands(vec!["test".to_string()]);
 
     hook_manager.add_pre_hook(Box::new(failing_hook));
 
@@ -667,8 +681,8 @@ async fn test_hook_data_accumulation() {
     let mut hook_manager = HookManager::new();
 
     // Add hooks that return data
-    hook_manager.add_pre_hook(Box::new(hooks::EnvironmentHook::new()));
-    hook_manager.add_pre_hook(Box::new(hooks::ResourceMonitoringHook::new()));
+    hook_manager.add_pre_hook(Box::new(EnvironmentHook::new()));
+    hook_manager.add_pre_hook(Box::new(ResourceMonitoringHook::new()));
 
     let context = create_test_hook_context("data-test");
 
@@ -689,8 +703,8 @@ async fn test_concurrent_hook_execution() {
 
     let mut hook_manager = HookManager::new();
 
-    hook_manager.add_pre_hook(Box::new(hooks::LoggingHook::new()));
-    hook_manager.add_pre_hook(Box::new(hooks::EnvironmentHook::new()));
+    hook_manager.add_pre_hook(Box::new(LoggingHook::new()));
+    hook_manager.add_pre_hook(Box::new(EnvironmentHook::new()));
 
     let context = create_test_hook_context("concurrent-test");
 

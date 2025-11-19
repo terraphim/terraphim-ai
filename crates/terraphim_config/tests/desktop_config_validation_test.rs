@@ -120,12 +120,16 @@ async fn test_desktop_config_roles_consistency() {
         config.roles.contains_key(&"Terraphim Engineer".into()),
         "Terraphim Engineer role should exist"
     );
+    assert!(
+        config.roles.contains_key(&"Rust Engineer".into()),
+        "Rust Engineer role should exist"
+    );
 
-    // Verify we have exactly 2 roles in desktop configuration
+    // Verify we have exactly 3 roles in desktop configuration
     assert_eq!(
         config.roles.len(),
-        2,
-        "Desktop config should have exactly 2 roles"
+        3,
+        "Desktop config should have exactly 3 roles"
     );
 
     // Verify default role is set correctly
