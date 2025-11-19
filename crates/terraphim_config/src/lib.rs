@@ -176,6 +176,8 @@ pub enum ServiceType {
     Mcp,
     /// Use Perplexity AI-powered web search for indexing
     Perplexity,
+    /// Use grep.app for searching code across GitHub repositories
+    GrepApp,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched

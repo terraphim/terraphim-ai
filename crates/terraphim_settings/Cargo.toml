@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_settings"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim settings handling library"
@@ -12,7 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-directories = "5.0.1"
+directories = "6.0.0"
 log = "0.4.14"
 thiserror = "1.0.56"
 twelf = { version = "0.15.0", features = ["json", "toml", "env", "clap"] }

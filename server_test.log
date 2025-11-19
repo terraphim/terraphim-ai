@@ -1,0 +1,8 @@
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fb0510 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fb0750 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fb0690 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fb05d0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fb0510 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fbc3d0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T14:52:46Z WARN  opendal::services] service=memory name=0x600000fb0510 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+listening on http://127.0.0.1:8000

@@ -1,6 +1,5 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
-import { onMount } from 'svelte';
 import { role } from '../stores';
 
 // Types
@@ -27,31 +26,39 @@ type DeletePersistentConversationResponse = {
 };
 
 // Props
-export const currentConversationId: string | null = null;
-export const onSelectConversation: (conversationId: string) => void = () => {};
-export const onNewConversation: () => void = () => {};
+let {
+	currentConversationId = null,
+	onSelectConversation = () => {},
+	onNewConversation = () => {},
+}: {
+	currentConversationId?: string | null;
+	onSelectConversation?: (conversationId: string) => void;
+	onNewConversation?: () => void;
+} = $props();
 
 // State
-let conversations: ConversationSummary[] = [];
-let _loading = false;
-let _error: string | null = null;
-let searchQuery = '';
-let filterRole: string | null = null;
-let _showDeleteConfirm: string | null = null;
-let _deleting = false;
+let conversations = $state<ConversationSummary[]>([]);
+let _loading = $state(false);
+let _error = $state<string | null>(null);
+let searchQuery = $state('');
+let filterRole = $state<string | null>(null);
+let _showDeleteConfirm = $state<string | null>(null);
+let _deleting = $state(false);
 
 // Computed
-$: filteredConversations = conversations.filter((conv) => {
-	const matchesSearch =
-		!searchQuery ||
-		conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-		conv.preview?.toLowerCase().includes(searchQuery.toLowerCase());
-	const matchesRole = !filterRole || conv.role === filterRole;
-	return matchesSearch && matchesRole;
-});
+let filteredConversations = $derived(
+	conversations.filter((conv) => {
+		const matchesSearch =
+			!searchQuery ||
+			conv.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+			conv.preview?.toLowerCase().includes(searchQuery.toLowerCase());
+		const matchesRole = !filterRole || conv.role === filterRole;
+		return matchesSearch && matchesRole;
+	})
+);
 
 // Load conversations on mount
-onMount(() => {
+$effect(() => {
 	loadConversations();
 });
 

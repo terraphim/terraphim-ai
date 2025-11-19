@@ -1,5 +1,5 @@
 <script lang="ts">
-export let subject: string;
+let { subject }: { subject: string } = $props();
 
 import { urls } from '@tomic/lib';
 import { getResource, getValue } from '@tomic/svelte';

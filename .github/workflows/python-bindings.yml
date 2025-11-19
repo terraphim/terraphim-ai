@@ -1,0 +1,238 @@
+name: Python Bindings CI/CD
+
+on:
+  push:
+    branches: [main, develop, "claude/**"]
+    paths:
+      - "crates/terraphim_automata_py/**"
+      - "crates/terraphim_automata/**"
+      - "crates/terraphim_types/**"
+      - ".github/workflows/python-bindings.yml"
+  pull_request:
+    branches: [main, develop]
+    paths:
+      - "crates/terraphim_automata_py/**"
+      - "crates/terraphim_automata/**"
+      - "crates/terraphim_types/**"
+      - ".github/workflows/python-bindings.yml"
+  release:
+    types: [published]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  lint:
+    name: Lint Python Code
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv pip install --system black ruff mypy
+
+      - name: Check formatting with Black
+        working-directory: crates/terraphim_automata_py
+        run: black --check python/
+
+      - name: Lint with Ruff
+        working-directory: crates/terraphim_automata_py
+        run: ruff check python/
+
+      - name: Type check with mypy
+        working-directory: crates/terraphim_automata_py
+        run: mypy python/terraphim_automata/ --ignore-missing-imports
+        continue-on-error: true
+
+  test:
+    name: Test on ${{ matrix.os }} - Python ${{ matrix.python-version }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        python-version: ["3.9", "3.10", "3.11", "3.12"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/terraphim_automata_py -> target"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python ${{ matrix.python-version }}
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install maturin
+        run: uv pip install --system maturin
+
+      - name: Build Python package
+        working-directory: crates/terraphim_automata_py
+        run: maturin develop
+
+      - name: Install test dependencies
+        run: uv pip install --system pytest pytest-cov
+
+      - name: Run tests
+        working-directory: crates/terraphim_automata_py
+        run: pytest python/tests/ -v --cov=terraphim_automata --cov-report=xml --cov-report=term
+
+      - name: Upload coverage to Codecov
+        if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
+        uses: codecov/codecov-action@v4
+        with:
+          files: crates/terraphim_automata_py/coverage.xml
+          flags: python-bindings
+          name: python-${{ matrix.python-version }}
+          fail_ci_if_error: false
+        continue-on-error: true
+
+  benchmark:
+    name: Benchmark Performance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: "crates/terraphim_automata_py -> target"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install maturin
+        run: uv pip install --system maturin
+
+      - name: Build Python package (release mode)
+        working-directory: crates/terraphim_automata_py
+        run: maturin develop --release
+
+      - name: Install benchmark dependencies
+        run: uv pip install --system pytest pytest-benchmark
+
+      - name: Run benchmarks
+        working-directory: crates/terraphim_automata_py
+        run: |
+          pytest python/benchmarks/ -v --benchmark-only \
+            --benchmark-json=benchmark-results.json \
+            --benchmark-columns=min,max,mean,stddev,median,ops
+
+      - name: Store benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: crates/terraphim_automata_py/benchmark-results.json
+
+  build-wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    if: github.event_name == 'release'
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build wheels
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/terraphim_automata_py
+          args: --release --out dist --find-interpreter
+          sccache: "true"
+          manylinux: auto
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}
+          path: crates/terraphim_automata_py/dist
+
+  build-sdist:
+    name: Build source distribution
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build sdist
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/terraphim_automata_py
+          command: sdist
+          args: --out dist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: crates/terraphim_automata_py/dist
+
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    if: github.event_name == 'release'
+    needs: [lint, test, build-wheels, build-sdist]
+    environment:
+      name: pypi
+      url: https://pypi.org/p/terraphim-automata
+    permissions:
+      id-token: write
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: wheels-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: sdist
+          path: dist
+
+      - name: Publish to PyPI
+        uses: PyO3/maturin-action@v1
+        with:
+          command: upload
+          args: --non-interactive --skip-existing dist/*

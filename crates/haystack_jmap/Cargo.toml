@@ -1,12 +1,12 @@
 [package]
 name = "jmap_client"
-version = "0.2.0"
+version = "1.0.0"
 edition = "2021"
 
 [dependencies]
 haystack_core = { path = "../haystack_core" }
 terraphim_types = { path = "../terraphim_types" }
-reqwest = { version = "0.11", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

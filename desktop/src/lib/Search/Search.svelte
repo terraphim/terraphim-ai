@@ -1,20 +1,21 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input, Tag, Taglist } from 'svelma';
-import { onDestroy, onMount } from 'svelte';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
-import logo from '/assets/terraphim.png';
+import logo from '/assets/terraphim_gray.png';
 import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
+import KGSearchInput from './KGSearchInput.svelte';
 
-let results: Document[] = [];
-let _error: string | null = null;
-let suggestions: string[] = [];
-let suggestionIndex = -1;
+// Svelte 5: Use $state rune for reactive local state
+let results: Document[] = $state([]);
+let _error: string | null = $state(null);
+let suggestions: string[] = $state([]);
+let suggestionIndex = $state(-1);
 
 // SSE streaming for summarization updates
-let sseConnection: EventSource | null = null;
+let sseConnection: EventSource | null = $state(null);
 const _summarizationTaskIds: string[] = [];
 const _taskStatuses: Map<string, any> = new Map();
 
@@ -23,13 +24,14 @@ interface SelectedTerm {
 	value: string;
 	isFromKG: boolean;
 }
-let selectedTerms: SelectedTerm[] = [];
-let currentLogicalOperator: 'AND' | 'OR' | null = null;
+let selectedTerms: SelectedTerm[] = $state([]);
+let currentLogicalOperator: 'AND' | 'OR' | null = $state(null);
 
-$: thesaurusEntries = Object.entries($thesaurus);
+// Svelte 5: Replace reactive statement with $derived
+let thesaurusEntries = $derived(Object.entries($thesaurus));
 
 // State to prevent circular updates
-let isUpdatingFromChips = false;
+let isUpdatingFromChips = $state(false);
 
 // --- Persistence helpers ---
 function searchStateKey(): string {
@@ -59,46 +61,61 @@ function saveSearchState() {
 		const data = { input: $input, results };
 		localStorage.setItem(searchStateKey(), JSON.stringify(data));
 	} catch (e) {
-		console.warn('Failed to save search state:', e);
+		// Handle quota exceeded error
+		if (e instanceof DOMException && (e.name === 'QuotaExceededError' || e.code === 22)) {
+			console.warn('localStorage quota exceeded, clearing old search state');
+			try {
+				// Try to clear old state and save again
+				localStorage.removeItem(searchStateKey());
+				localStorage.setItem(searchStateKey(), JSON.stringify(data));
+			} catch (retryError) {
+				console.warn('Failed to save search state after quota cleanup:', retryError);
+			}
+		} else {
+			console.warn('Failed to save search state:', e);
+		}
 	}
 }
 
-// Reactive statement to parse input and update chips when user types
-// Only parse when input contains operators to avoid constant parsing
-// Add a small delay to prevent aggressive parsing during autocomplete
-let parseTimeout: ReturnType<typeof setTimeout> | null = null;
-$: if (
-	$input &&
-	!isUpdatingFromChips &&
-	($input.includes(' AND ') ||
-		$input.includes(' OR ') ||
-		$input.includes(' and ') ||
-		$input.includes(' or '))
-) {
-	if (parseTimeout) {
-		clearTimeout(parseTimeout);
-	}
-	parseTimeout = setTimeout(() => {
-		parseAndUpdateChips($input);
-		parseTimeout = null;
-	}, 300); // 300ms delay to allow for multiple autocomplete selections
-}
+// Svelte 5: Replace reactive statement and lifecycle hooks with $effect
+let parseTimeout: ReturnType<typeof setTimeout> | null = $state(null);
 
-// Hydrate previous state on mount
-onMount(() => {
-	loadSearchState();
+// Effect for parsing input and updating chips
+$effect(() => {
+	if (
+		$input &&
+		!isUpdatingFromChips &&
+		($input.includes(' AND ') ||
+			$input.includes(' OR ') ||
+			$input.includes(' and ') ||
+			$input.includes(' or '))
+	) {
+		if (parseTimeout) {
+			clearTimeout(parseTimeout);
+		}
+		parseTimeout = setTimeout(() => {
+			parseAndUpdateChips($input);
+			parseTimeout = null;
+		}, 300); // 300ms delay to allow for multiple autocomplete selections
+	}
 });
 
-// Clean up timeout, SSE connection, and polling on component destruction
-onDestroy(() => {
-	if (parseTimeout) {
-		clearTimeout(parseTimeout);
-	}
-	if (sseConnection) {
-		sseConnection.close();
-		sseConnection = null;
-	}
-	stopPollingForSummaries();
+// Effect for initialization and cleanup (replaces onMount/onDestroy)
+$effect(() => {
+	// Hydrate previous state on mount
+	loadSearchState();
+
+	// Cleanup function
+	return () => {
+		if (parseTimeout) {
+			clearTimeout(parseTimeout);
+		}
+		if (sseConnection) {
+			sseConnection.close();
+			sseConnection = null;
+		}
+		stopPollingForSummaries();
+	};
 });
 
 // SSE connection management
@@ -109,6 +126,13 @@ function startSummarizationStreaming() {
 		return;
 	}
 
+	// SSE endpoint not implemented on server, use polling instead
+	// The /summarization/stream endpoint doesn't exist, so we fall back to polling
+	startPollingForSummaries();
+	return;
+
+	// Legacy SSE code (disabled - endpoint not implemented)
+	/*
 	if (sseConnection) {
 		sseConnection.close();
 	}
@@ -149,10 +173,11 @@ function startSummarizationStreaming() {
 	} catch (error) {
 		console.error('Failed to create SSE connection:', error);
 	}
+	*/
 }
 
 // Polling fallback for Tauri (since EventSource isn't supported)
-let pollingInterval: ReturnType<typeof setInterval> | null = null;
+let pollingInterval: ReturnType<typeof setInterval> | null = $state(null);
 
 function startPollingForSummaries() {
 	console.log('Starting polling for summary updates (Tauri mode)');
@@ -276,7 +301,7 @@ async function getTermSuggestions(query: string): Promise<string[]> {
 		if ($is_tauri) {
 			const response: any = await invoke('get_autocomplete_suggestions', {
 				query: query,
-				roleName: $role,
+				role_name: $role,
 				limit: 8,
 			});
 
@@ -615,40 +640,56 @@ async function handleSearchInputEvent() {
   <Field>
     <div class="search-row">
       <div class="input-wrapper">
-        <Input
-          type="search"
-          bind:value={$input}
-          placeholder={$typeahead ? `Search over Knowledge graph for ${$role}` : "Search"}
-          icon="search"
-          expanded
-          autofocus
-          on:click={handleSearchInputEvent}
-          on:submit={handleSearchInputEvent}
-          on:keydown={_handleKeydown}
-          on:input={() => {}}
-        />
-      {#if suggestions.length > 0}
-        <ul class="suggestions">
-          {#each suggestions as suggestion, index}
-            <li
-              class:active={index === suggestionIndex}
-              on:click={() => applySuggestion(suggestion)}
-              on:keydown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  applySuggestion(suggestion);
-                }
-              }}
-              tabindex="0"
-              role="option"
-              aria-selected={index === suggestionIndex}
-              aria-label={`Apply suggestion: ${suggestion}`}
-            >
-              {suggestion}
-            </li>
-          {/each}
-        </ul>
-      {/if}
+        {#if $typeahead}
+          <KGSearchInput
+            roleName={$role}
+            placeholder={`Search knowledge graph items`}
+            autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
+            initialValue={$input}
+            onInputChange={(value) => {
+              $input = value;
+            }}
+            onSelect={(term) => {
+              $input = term;
+              handleSearchInputEvent();
+            }}
+          />
+        {:else}
+          <Input
+            type="search"
+            bind:value={$input}
+            placeholder="Search"
+            icon="search"
+            expanded
+            autofocus={typeof document !== 'undefined' && !document.querySelector(':focus')}
+            on:click={handleSearchInputEvent}
+            on:submit={handleSearchInputEvent}
+            on:keydown={_handleKeydown}
+            on:input={_updateSuggestions}
+          />
+          {#if suggestions.length > 0}
+            <ul class="suggestions">
+              {#each suggestions as suggestion, index}
+                <li
+                  class:active={index === suggestionIndex}
+                  on:click={() => applySuggestion(suggestion)}
+                  on:keydown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      applySuggestion(suggestion);
+                    }
+                  }}
+                  tabindex="0"
+                  role="option"
+                  aria-selected={index === suggestionIndex}
+                  aria-label={`Apply suggestion: ${suggestion}`}
+                >
+                  {suggestion}
+                </li>
+              {/each}
+            </ul>
+          {/if}
+        {/if}
       </div>
 
       <!-- Selected terms display -->

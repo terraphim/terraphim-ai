@@ -1,0 +1,42 @@
+=== Terraphim Server API Functional Test ===
+Started at: Wed  5 Nov 2025 22:10:55 GMT
+
+Starting server...
+=== API Endpoint Tests ===
+[1;33mTesting:[0m Health check endpoint
+Endpoint: GET /health
+[0;32m✓ PASS[0m (Status: 200)
+---
+[1;33mTesting:[0m Get configuration
+Endpoint: GET /config
+[0;32m✓ PASS[0m (Status: 200)
+---
+[1;33mTesting:[0m Update configuration
+Endpoint: POST /config
+[0;31m✗ FAIL[0m - HTTP Status: 422
+Response: Failed to deserialize the JSON body into the target type: missing field `id` at line 1 column 27
+---
+[1;33mTesting:[0m Search documents
+Endpoint: POST /search
+[0;32m✓ PASS[0m (Status: 200)
+---
+[1;33mTesting:[0m Send chat message
+Endpoint: POST /chat
+[0;31m✗ FAIL[0m - HTTP Status: 422
+Response: Failed to deserialize the JSON body into the target type: missing field `role` at line 1 column 47
+---
+[1;33mTesting:[0m Get available roles
+Endpoint: GET /roles
+[0;32m✓ PASS[0m (Status: 200)
+---
+[1;33mTesting:[0m Get thesaurus for role
+Endpoint: GET /thesaurus/Default
+[0;32m✓ PASS[0m (Status: 200)
+---
+[1;33mTesting:[0m Get autocomplete suggestions
+Endpoint: POST /autocomplete
+[0;32m✓ PASS[0m (Status: 200)
+---
+
+=== Error Handling Tests ===
+[0;31m✗ FAIL[0m - Invalid endpoint returned 200 instead of 404

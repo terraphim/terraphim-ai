@@ -1,5 +1,5 @@
 {
-	"$schema": "https://biomejs.dev/schemas/2.3.0/schema.json",
+	"$schema": "https://biomejs.dev/schemas/2.3.5/schema.json",
 	"linter": {
 		"enabled": true,
 		"rules": {
@@ -63,6 +63,8 @@
 			"src/**/*.svelte",
 			"src/**/*.json",
 			"src/**/*.jsonc",
+			"tests/**/*.ts",
+			"tests/**/*.js",
 			"*.json",
 			"*.jsonc"
 		],

@@ -1,0 +1,18 @@
+=== Terraphim Server API Functional Test ===
+Started at: Wed  5 Nov 2025 22:10:23 GMT
+
+Starting server...
+[2025-11-05T22:10:23Z WARN  terraphim_server] Failed to parse TerraphimEngineer role config: Error("missing field `terraphim_it`", line: 57, column: 5)
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024e0410 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024e04d0 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024e0590 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024e0410 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024e0350 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024f0210 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+[2025-11-05T22:10:23Z WARN  opendal::services] service=memory name=0x6000024e0410 path=server_config.json: read failed NotFound (permanent) at read, context: { service: memory, path: server_config.json, range: 0- } => memory doesn't have this path
+listening on http://127.0.0.1:8000
+=== API Endpoint Tests ===
+[1;33mTesting:[0m Health check endpoint
+Endpoint: GET /health
+head: illegal line count -- -1
+Cleaning up...

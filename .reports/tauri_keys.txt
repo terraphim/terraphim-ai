@@ -1,0 +1,29 @@
+# Tauri Signing Keys - Stored in 1Password
+# =========================================
+# Keys have been securely moved to 1Password TerraphimPlatform vault
+# Item ID: 3k2d5ycxeagdazexivgomi2gpy
+# Vault ID: 6fsizn2h5rrs5mp3e4phudjab4
+
+# To retrieve keys using 1Password CLI:
+TAURI_PRIVATE_KEY: op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY
+TAURI_PUBLIC_KEY: op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PUBLIC_KEY
+TAURI_KEY_PASSWORD: op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD
+
+# Alternative references using vault name (requires unique vault name):
+# TAURI_PRIVATE_KEY: op://TerraphimPlatform/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY
+# TAURI_PUBLIC_KEY: op://TerraphimPlatform/3k2d5ycxeagdazexivgomi2gpy/TAURI_PUBLIC_KEY
+# TAURI_KEY_PASSWORD: op://TerraphimPlatform/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD
+
+# Usage examples:
+# ===============
+
+# Load as environment variables:
+# export TAURI_PRIVATE_KEY=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY")
+# export TAURI_PUBLIC_KEY=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PUBLIC_KEY")
+# export TAURI_KEY_PASSWORD=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD")
+
+# Or use with op run:
+# op run --env-file=.env.tauri-release -- npm run build
+
+# Public key for tauri.conf.json (already configured):
+# dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDU5Qzc1Q0VGOTM5RDdFNDEKUldSQmZwMlQ3MXpIV1R2ampjWVo0Z2ZCanBXclVMZnB6R1pSMDFqTUhBOTUrNE9BSTg3cW13WlIK

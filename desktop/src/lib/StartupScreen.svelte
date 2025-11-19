@@ -4,13 +4,12 @@ import { register as registerShortcut } from '@tauri-apps/api/globalShortcut';
 import { appDataDir } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/tauri';
 import { appWindow } from '@tauri-apps/api/window';
-import { onMount } from 'svelte';
 import { isInitialSetupComplete } from '$lib/stores';
 
-let dataFolder = '';
-let globalShortcut = 'CmdOrControl+X';
-let _error = '';
-let isCapturingShortcut = false;
+let dataFolder = $state('');
+let globalShortcut = $state('CmdOrControl+X');
+let _error = $state('');
+let isCapturingShortcut = $state(false);
 
 async function _selectFolder() {
 	try {
@@ -93,7 +92,7 @@ async function _saveSettings() {
 	}
 }
 
-onMount(() => {
+$effect(() => {
 	// unregisterAllShortcuts();
 	document.addEventListener('keydown', handleKeyDown);
 	return () => {
@@ -119,7 +118,7 @@ onMount(() => {
       <label class="label" for="data-folder">Data Folder Path:</label>
       <div class="control">
         <!-- <button class="button is-link" id="open-dialog" on:click={selectFolder}>Select path for your data</button> -->
-        <input class="input" id="data-folder" type="text" readonly placeholder="Click to set path" bind:value={dataFolder} on:click={selectFolder}/>
+        <input class="input" id="data-folder" type="text" readonly placeholder="Click to set path" bind:value={dataFolder} on:click={_selectFolder}/>
       </div>
     </div>
     <div class="field">
@@ -132,16 +131,16 @@ onMount(() => {
           bind:value={globalShortcut}
           readonly
           placeholder="Click to set shortcut"
-          on:click={startCapturingShortcut}
+          on:click={_startCapturingShortcut}
         />
       </div>
     </div>
-    {#if error}
-      <p class="help is-danger">{error}</p>
+    {#if _error}
+      <p class="help is-danger">{_error}</p>
     {/if}
     <div class="field">
       <div class="control">
-        <button class="button is-success" on:click={saveSettings}>Save Settings</button>
+        <button class="button is-success" on:click={_saveSettings}>Save Settings</button>
       </div>
     </div>
   </div>

@@ -30,6 +30,7 @@ pub struct RiskAssessmentSettings {
     /// Keywords that indicate high risk
     high_risk_keywords: Vec<String>,
     /// Always use VM for commands from unknown sources
+    #[allow(dead_code)]
     vm_for_unknown: bool,
     /// Maximum risk level for local execution
     max_local_risk_level: RiskLevel,
@@ -520,8 +521,9 @@ mod tests {
 
     #[test]
     fn test_high_risk_keywords() {
-        let hybrid = HybridExecutor::new();
+        let _hybrid = HybridExecutor::new();
 
+        let command_str = "rm -rf /important/data";
         let settings = RiskAssessmentSettings::default();
         assert!(settings
             .high_risk_keywords
