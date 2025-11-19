@@ -88,16 +88,21 @@ jobs:
       - name: Install maturin
         run: uv pip install --system maturin
 
+      - name: Create virtual environment
+        working-directory: crates/terraphim_automata_py
+        run: uv venv
+
       - name: Build Python package
         working-directory: crates/terraphim_automata_py
-        run: maturin develop
+        run: uv run maturin develop
 
       - name: Install test dependencies
-        run: uv pip install --system pytest pytest-cov
+        working-directory: crates/terraphim_automata_py
+        run: uv add pytest pytest-cov
 
       - name: Run tests
         working-directory: crates/terraphim_automata_py
-        run: pytest python/tests/ -v --cov=terraphim_automata --cov-report=xml --cov-report=term
+        run: uv run pytest python/tests/ -v --cov=terraphim_automata --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -118,6 +123,9 @@ jobs:
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
 
+      - name: Install Rust target for benchmarks
+        run: rustup target add x86_64-unknown-linux-gnu
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
@@ -136,17 +144,22 @@ jobs:
       - name: Install maturin
         run: uv pip install --system maturin
 
+      - name: Create virtual environment
+        working-directory: crates/terraphim_automata_py
+        run: uv venv
+
       - name: Build Python package (release mode)
         working-directory: crates/terraphim_automata_py
-        run: maturin develop --release
+        run: uv run maturin develop --release
 
       - name: Install benchmark dependencies
-        run: uv pip install --system pytest pytest-benchmark
+        working-directory: crates/terraphim_automata_py
+        run: uv add pytest pytest-benchmark
 
       - name: Run benchmarks
         working-directory: crates/terraphim_automata_py
         run: |
-          pytest python/benchmarks/ -v --benchmark-only \
+          uv run pytest python/benchmarks/ -v --benchmark-only \
             --benchmark-json=benchmark-results.json \
             --benchmark-columns=min,max,mean,stddev,median,ops
 
