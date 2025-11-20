@@ -3,10 +3,10 @@ import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input, Tag, Taglist } from 'svelma';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';
 import logo from '/assets/terraphim_gray.png';
+import KGSearchInput from './KGSearchInput.svelte';
 import ResultItem from './ResultItem.svelte';
 import type { Document, SearchResponse } from './SearchResult';
 import { buildSearchQuery, parseSearchInput } from './searchUtils';
-import KGSearchInput from './KGSearchInput.svelte';
 
 // Svelte 5: Use $state rune for reactive local state
 let results: Document[] = $state([]);

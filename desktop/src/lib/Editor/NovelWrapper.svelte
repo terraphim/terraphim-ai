@@ -1,11 +1,12 @@
 <script lang="ts">
 import { Editor } from '@tiptap/core';
 import StarterKit from '@tiptap/starter-kit';
+import { onDestroy, onMount } from 'svelte';
 import { Markdown } from 'tiptap-markdown';
 import { is_tauri, role } from '$lib/stores';
 import { novelAutocompleteService } from '../services/novelAutocompleteService';
-import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
 import { SlashCommand, slashCommandStyles } from './SlashCommand';
+import { TerraphimSuggestion, terraphimSuggestionStyles } from './TerraphimSuggestion';
 
 // Svelte 5: Migrate props using $props() rune
 let {
