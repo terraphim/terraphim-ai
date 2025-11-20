@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
@@ -55,7 +55,7 @@ jobs:
           fi
 
   lint-and-format:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [setup]
     timeout-minutes: 15  # Reduced timeout with faster runner
 
@@ -103,7 +103,7 @@ jobs:
 
   build-rust:
     needs: [setup, build-frontend]
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     strategy:
       fail-fast: false
       matrix:
@@ -257,7 +257,7 @@ jobs:
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   test-suite:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [setup, build-rust]
 
     steps:
@@ -311,7 +311,7 @@ jobs:
         run: ./scripts/ci-check-tests.sh
 
   test-desktop:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [setup, build-frontend]
     if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'desktop')
 
@@ -369,7 +369,7 @@ jobs:
     secrets: inherit  # pragma: allowlist secret
 
   package-repository:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [setup, build-rust]
     if: github.event_name != 'pull_request'
     strategy:
@@ -404,7 +404,7 @@ jobs:
           retention-days: 90
 
   security-scan:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: build-docker
     if: github.event_name != 'pull_request'
 
@@ -423,7 +423,7 @@ jobs:
           sarif_file: 'trivy-results.sarif'
 
   release:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [build-rust, build-docker, build-tauri, test-suite, security-scan]
     if: startsWith(github.ref, 'refs/tags/')
 
@@ -497,7 +497,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   cleanup:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [build-rust, build-docker, build-tauri, test-suite]
     if: always() && github.event_name == 'pull_request'
 
@@ -513,7 +513,7 @@ jobs:
         continue-on-error: true
 
   summary:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [setup, build-frontend, build-rust, build-docker, build-tauri, test-suite]
     if: always()
 
