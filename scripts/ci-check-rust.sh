@@ -307,7 +307,7 @@ if [[ "$BUILD_SUCCESS" == "true" ]]; then
     local test_binaries=(
         "terraphim_server:--version"
         "terraphim_mcp_server:--version"
-        "terraphim-tui:--help"
+        "terraphim-agent:--help"
     )
 
     for binary_test in "${test_binaries[@]}"; do

@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use terraphim_tui::repl::commands::*;
+use terraphim_agent::repl::commands::*;
 
 /// Test VM management command parsing
 #[test]

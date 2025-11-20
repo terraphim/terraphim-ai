@@ -92,19 +92,19 @@ We've successfully completed a comprehensive enhancement of the Terraphim system
 ### **CLI Enhancement Example**
 ```bash
 # New --config parameter support
-terraphim-tui --config /path/to/config.json search "test query"
+terraphim-agent --config /path/to/config.json search "test query"
 
 # Comprehensive help text
-terraphim-tui --help  # Shows detailed configuration guidance
+terraphim-agent --help  # Shows detailed configuration guidance
 ```
 
 ### **Robust Error Handling**
 ```bash
 # User-friendly error messages
-$ terraphim-tui --config nonexistent.json search test
+$ terraphim-agent --config nonexistent.json search test
 Error: Configuration file not found: 'nonexistent.json'
 Please ensure the file exists and the path is correct.
-Example: terraphim-tui --config /path/to/config.json search query
+Example: terraphim-agent --config /path/to/config.json search query
 ```
 
 ### **Automated Testing**

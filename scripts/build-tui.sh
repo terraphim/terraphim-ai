@@ -103,7 +103,7 @@ build_tui() {
             target_dir="target/${TARGET:-$(rustc -vV | grep host | cut -d' ' -f2)}/release-lto"
         fi
 
-        local binary_path="$target_dir/terraphim-tui"
+        local binary_path="$target_dir/terraphim-agent"
         if [[ -f "$binary_path" ]]; then
             local size=$(stat -f%z "$binary_path" 2>/dev/null || stat -c%s "$binary_path" 2>/dev/null || echo "unknown")
             echo -e "${GREEN}📦 Binary: $binary_path (${size} bytes)${NC}"
@@ -123,7 +123,7 @@ run_tui() {
         target_dir="target/${TARGET:-$(rustc -vV | grep host | cut -d' ' -f2)}/release-lto"
     fi
 
-    local binary_path="$target_dir/terraphim-tui"
+    local binary_path="$target_dir/terraphim-agent"
 
     if [[ -f "$binary_path" ]]; then
         echo -e "${BLUE}🚀 Running TUI...${NC}"
