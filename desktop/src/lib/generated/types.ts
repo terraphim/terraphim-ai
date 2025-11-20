@@ -4,12 +4,13 @@
 // === Helper Types ===
 export type Value = unknown;
 
-export type AHashMap<K = string | number, V = unknown> = Record<string, V> & Partial<Record<number, V>>;
+export type AHashMap<K = string | number, V = unknown> = Record<string, V> &
+	Partial<Record<number, V>>;
 
 // === Core Types ===
 export interface RoleName {
-    original: string;
-    lowercase: string;
+	original: string;
+	lowercase: string;
 }
 /**
  * The value of a normalized term
@@ -24,84 +25,84 @@ export type NormalizedTermValue = string;
  * The `id` is a unique identifier for the document.
  */
 export interface Document {
-    /**
-     * Unique identifier for the document
-     */
-    id: string;
-    /**
-     * URL to the document
-     */
-    url: string;
-    /**
-     * Title of the document
-     */
-    title: string;
-    /**
-     * The document body
-     */
-    body: string;
-    /**
-     * A short description of the document (extracted from content)
-     */
-    description: string | undefined;
-    /**
-     * AI-generated summarization of the document content
-     */
-    summarization: string | undefined;
-    /**
-     * A short excerpt of the document
-     */
-    stub: string | undefined;
-    /**
-     * Tags for the document
-     */
-    tags: string[] | undefined;
-    /**
-     * Rank of the document in the search results
-     */
-    rank: number | undefined;
-    /**
-     * Source haystack location that this document came from
-     */
-    source_haystack: string | undefined;
+	/**
+	 * Unique identifier for the document
+	 */
+	id: string;
+	/**
+	 * URL to the document
+	 */
+	url: string;
+	/**
+	 * Title of the document
+	 */
+	title: string;
+	/**
+	 * The document body
+	 */
+	body: string;
+	/**
+	 * A short description of the document (extracted from content)
+	 */
+	description: string | undefined;
+	/**
+	 * AI-generated summarization of the document content
+	 */
+	summarization: string | undefined;
+	/**
+	 * A short excerpt of the document
+	 */
+	stub: string | undefined;
+	/**
+	 * Tags for the document
+	 */
+	tags: string[] | undefined;
+	/**
+	 * Rank of the document in the search results
+	 */
+	rank: number | undefined;
+	/**
+	 * Source haystack location that this document came from
+	 */
+	source_haystack: string | undefined;
 }
 /**
  * Logical operators for combining multiple search terms
  */
-export type LogicalOperator = "and" | "or";
+export type LogicalOperator = 'and' | 'or';
 /**
  * Query type for searching documents in the `RoleGraph`.
  * It contains the search term(s), logical operators, skip and limit parameters.
  */
 export interface SearchQuery {
-    /**
-     * Primary search term for backward compatibility
-     */
-    search_term: NormalizedTermValue;
-    /**
-     * Multiple search terms for logical operations
-     */
-    search_terms: NormalizedTermValue[] | undefined;
-    /**
-     * Logical operator for combining multiple terms (defaults to OR if not specified)
-     */
-    operator: LogicalOperator | undefined;
-    skip: number | undefined;
-    limit: number | undefined;
-    role: RoleName | undefined;
+	/**
+	 * Primary search term for backward compatibility
+	 */
+	search_term: NormalizedTermValue;
+	/**
+	 * Multiple search terms for logical operations
+	 */
+	search_terms: NormalizedTermValue[] | undefined;
+	/**
+	 * Logical operator for combining multiple terms (defaults to OR if not specified)
+	 */
+	operator: LogicalOperator | undefined;
+	skip: number | undefined;
+	limit: number | undefined;
+	role: RoleName | undefined;
 }
 /**
  * Defines the relevance function (scorer) to be used for ranking search
  * results for the `Role`.
  */
-export type RelevanceFunction = "terraphim-graph" | "title-scorer" | "bm25" | "bm25f" | "bm25plus";
+export type RelevanceFunction = 'terraphim-graph' | 'title-scorer' | 'bm25' | 'bm25f' | 'bm25plus';
 /**
  * Defines all supported inputs for the knowledge graph.
  *
  * Every knowledge graph is built from a specific input, such as Markdown files
  * or JSON files.
  */
-export type KnowledgeGraphInputType = "markdown" | "json";
+export type KnowledgeGraphInputType = 'markdown' | 'json';
 // === Automata Types ===
 /**
  * AutomataPath is a path to the automata file
@@ -116,7 +117,7 @@ export type AutomataPath = { Local: string } | { Remote: string };
  * Each service assumes documents to be stored in a specific format
  * and uses a specific indexing algorithm
  */
-export type ServiceType = "Ripgrep" | "Atomic" | "QueryRs" | "ClickUp" | "Mcp" | "Perplexity";
+export type ServiceType = 'Ripgrep' | 'Atomic' | 'QueryRs' | 'ClickUp' | 'Mcp' | 'Perplexity';
 /**
  * A haystack is a collection of documents that can be indexed and searched
  *
@@ -124,57 +125,57 @@ export type ServiceType = "Ripgrep" | "Atomic" | "QueryRs" | "ClickUp" | "Mcp" |
  * Each haystack is indexed using a specific service
  */
 export interface Haystack {
-    /**
-     * The location of the haystack - can be a filesystem path or URL
-     */
-    location: string;
-    /**
-     * The service used for indexing documents in the haystack
-     */
-    service: ServiceType;
-    /**
-     * When set to `true` the haystack is treated as read-only; documents found
-     * inside will not be modified on disk by Terraphim (e.g. via the Novel
-     * editor). Defaults to `false` for backwards-compatibility.
-     */
-    read_only?: boolean;
-    /**
-     * When set to `true`, fetch the actual content of documents from URLs
-     * instead of just indexing metadata. Useful for web-based haystacks.
-     * Defaults to `false` for backwards-compatibility.
-     */
-    fetch_content?: boolean;
-    /**
-     * The secret for connecting to an Atomic Server.
-     * This field is only serialized for Atomic service haystacks.
-     */
-    atomic_server_secret?: string | undefined;
-    /**
-     * Extra parameters specific to the service type.
-     * For Ripgrep: can include additional command-line arguments like filtering by tags.
-     * For Atomic: can include additional API parameters.
-     */
-    extra_parameters?: Map<string, string>;
+	/**
+	 * The location of the haystack - can be a filesystem path or URL
+	 */
+	location: string;
+	/**
+	 * The service used for indexing documents in the haystack
+	 */
+	service: ServiceType;
+	/**
+	 * When set to `true` the haystack is treated as read-only; documents found
+	 * inside will not be modified on disk by Terraphim (e.g. via the Novel
+	 * editor). Defaults to `false` for backwards-compatibility.
+	 */
+	read_only?: boolean;
+	/**
+	 * When set to `true`, fetch the actual content of documents from URLs
+	 * instead of just indexing metadata. Useful for web-based haystacks.
+	 * Defaults to `false` for backwards-compatibility.
+	 */
+	fetch_content?: boolean;
+	/**
+	 * The secret for connecting to an Atomic Server.
+	 * This field is only serialized for Atomic service haystacks.
+	 */
+	atomic_server_secret?: string | undefined;
+	/**
+	 * Extra parameters specific to the service type.
+	 * For Ripgrep: can include additional command-line arguments like filtering by tags.
+	 * For Atomic: can include additional API parameters.
+	 */
+	extra_parameters?: Map<string, string>;
 }
 export interface KnowledgeGraphLocal {
-    input_type: KnowledgeGraphInputType;
-    path: string;
+	input_type: KnowledgeGraphInputType;
+	path: string;
 }
 /**
  * A knowledge graph is the collection of documents which were indexed
  * using a specific service
  */
 export interface KnowledgeGraph {
-    /**
-     * automata path refering to the published automata and can be online url or local file with pre-build automata
-     */
-    automata_path: AutomataPath | undefined;
-    /**
-     * Knowlege graph can be re-build from local files, for example Markdown files
-     */
-    knowledge_graph_local: KnowledgeGraphLocal | undefined;
-    public: boolean;
-    publish: boolean;
+	/**
+	 * automata path refering to the published automata and can be online url or local file with pre-build automata
+	 */
+	automata_path: AutomataPath | undefined;
+	/**
+	 * Knowlege graph can be re-build from local files, for example Markdown files
+	 */
+	knowledge_graph_local: KnowledgeGraphLocal | undefined;
+	public: boolean;
+	publish: boolean;
 }
 /**
  * A role is a collection of settings for a specific user
@@ -182,48 +183,64 @@ export interface KnowledgeGraph {
  * It contains a user\'s knowledge graph, a list of haystacks, as
  * well as preferences for the relevance function and theme
  */
-export type Role = { shortname: string | undefined; name: RoleName; relevance_function: RelevanceFunction; terraphim_it: boolean; theme: string; kg: KnowledgeGraph | undefined; haystacks: Haystack[]; llm_enabled?: boolean; llm_api_key?: string | undefined; llm_model?: string | undefined; llm_auto_summarize?: boolean; llm_chat_enabled?: boolean; llm_chat_system_prompt?: string | undefined; llm_chat_model?: string | undefined; llm_context_window?: number | undefined } & Record<string, unknown>;
-export type ConfigId = "Server" | "Desktop" | "Embedded";
+export type Role = {
+	shortname: string | undefined;
+	name: RoleName;
+	relevance_function: RelevanceFunction;
+	terraphim_it: boolean;
+	theme: string;
+	kg: KnowledgeGraph | undefined;
+	haystacks: Haystack[];
+	llm_enabled?: boolean;
+	llm_api_key?: string | undefined;
+	llm_model?: string | undefined;
+	llm_auto_summarize?: boolean;
+	llm_chat_enabled?: boolean;
+	llm_chat_system_prompt?: string | undefined;
+	llm_chat_model?: string | undefined;
+	llm_context_window?: number | undefined;
+} & Record<string, unknown>;
+export type ConfigId = 'Server' | 'Desktop' | 'Embedded';
 /**
  * The Terraphim config is the main configuration for terraphim
  *
  * It contains the global shortcut, roles, and the default role
  */
 export interface Config {
-    /**
-     * Identifier for the config
-     */
-    id: ConfigId;
-    /**
-     * Global shortcut for activating terraphim desktop
-     */
-    global_shortcut: string;
-    /**
-     * User roles with their respective settings
-     */
-    roles: AHashMap<RoleName, Role>;
-    /**
-     * The default role to use if no role is specified
-     */
-    default_role: RoleName;
-    selected_role: RoleName;
+	/**
+	 * Identifier for the config
+	 */
+	id: ConfigId;
+	/**
+	 * Global shortcut for activating terraphim desktop
+	 */
+	global_shortcut: string;
+	/**
+	 * User roles with their respective settings
+	 */
+	roles: AHashMap<RoleName, Role>;
+	/**
+	 * The default role to use if no role is specified
+	 */
+	default_role: RoleName;
+	selected_role: RoleName;
 }
 // === Command Response Types ===
-export type Status = "success" | "error";
+export type Status = 'success' | 'error';
 /**
  * Response type for showing the config
  *
  * This is also used when updating the config
  */
 export interface ConfigResponse {
-    /**
-     * Status of the config fetch
-     */
-    status: Status;
-    /**
-     * The config
-     */
-    config: Config;
+	/**
+	 * Status of the config fetch
+	 */
+	status: Status;
+	/**
+	 * The config
+	 */
+	config: Config;
 }
 /**
  * Response type for showing the search results
@@ -232,53 +249,53 @@ export interface ConfigResponse {
  * and returning the results
  */
 export interface SearchResponse {
-    /**
-     * Status of the search
-     */
-    status: Status;
-    /**
-     * The search results
-     */
-    results: Document[];
+	/**
+	 * Status of the search
+	 */
+	status: Status;
+	/**
+	 * The search results
+	 */
+	results: Document[];
 }
 export interface DocumentListResponse {
-    /**
-     * Status of the search
-     */
-    status: Status;
-    /**
-     * The document results
-     */
-    results: Document[];
-    /**
-     * The total number of documents found
-     */
-    total: number;
+	/**
+	 * Status of the search
+	 */
+	status: Status;
+	/**
+	 * The document results
+	 */
+	results: Document[];
+	/**
+	 * The total number of documents found
+	 */
+	total: number;
 }
 /**
  * Response type for a single document
  */
 export interface DocumentResponse {
-    status: Status;
-    document: Document | undefined;
+	status: Status;
+	document: Document | undefined;
 }
 export interface InitialSettings {
-    data_folder: string;
-    global_shortcut: string;
+	data_folder: string;
+	global_shortcut: string;
 }
 // === Role Graph Visualization Types ===
 export interface GraphNodeDto {
-    id: number;
-    label: string;
-    rank: number;
+	id: number;
+	label: string;
+	rank: number;
 }
 export interface GraphEdgeDto {
-    source: number;
-    target: number;
-    weight: number;
+	source: number;
+	target: number;
+	weight: number;
 }
 export interface RoleGraphResponse {
-    status: Status;
-    nodes: GraphNodeDto[];
-    edges: GraphEdgeDto[];
+	status: Status;
+	nodes: GraphNodeDto[];
+	edges: GraphEdgeDto[];
 }
