@@ -59,7 +59,7 @@ def test_query_rs_endpoints():
                 results[f"{name} - {query}"] = "Timeout"
             except requests.exceptions.RequestException as e:
                 print(f"❌ Network error: {e}")
-                results[f"{name} - {query}"] = f"Network error"
+                results[f"{name} - {query}"] = "Network error"
             except json.JSONDecodeError:
                 print("❌ Invalid JSON response")
                 results[f"{name} - {query}"] = "Invalid JSON"
