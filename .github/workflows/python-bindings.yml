@@ -85,19 +85,35 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Setup virtual environment
+        working-directory: crates/terraphim_automata_py
+        run: |
+          uv venv
+          source .venv/bin/activate
+
       - name: Install maturin
-        run: uv pip install --system maturin
+        working-directory: crates/terraphim_automata_py
+        run: |
+          source .venv/bin/activate
+          uv pip install maturin
 
       - name: Build Python package
         working-directory: crates/terraphim_automata_py
-        run: maturin develop
+        run: |
+          source .venv/bin/activate
+          maturin develop
 
       - name: Install test dependencies
-        run: uv pip install --system pytest pytest-cov
+        working-directory: crates/terraphim_automata_py
+        run: |
+          source .venv/bin/activate
+          uv pip install pytest pytest-cov
 
       - name: Run tests
         working-directory: crates/terraphim_automata_py
-        run: pytest python/tests/ -v --cov=terraphim_automata --cov-report=xml --cov-report=term
+        run: |
+          source .venv/bin/activate
+          pytest python/tests/ -v --cov=terraphim_automata --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
         if: matrix.os == 'ubuntu-latest' && matrix.python-version == '3.12'
@@ -133,19 +149,38 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Setup virtual environment
+        working-directory: crates/terraphim_automata_py
+        run: |
+          uv venv
+          source .venv/bin/activate
+
       - name: Install maturin
-        run: uv pip install --system maturin
+        working-directory: crates/terraphim_automata_py
+        run: |
+          source .venv/bin/activate
+          uv pip install maturin
 
       - name: Build Python package (release mode)
         working-directory: crates/terraphim_automata_py
-        run: maturin develop --release
+        run: |
+          source .venv/bin/activate
+          maturin develop --release
 
       - name: Install benchmark dependencies
-        run: uv pip install --system pytest pytest-benchmark
+        working-directory: crates/terraphim_automata_py
+        run: |
+          source .venv/bin/activate
+          uv pip install pytest pytest-benchmark
+
+      - name: Install Rust target for benchmarks
+        if: matrix.os == 'ubuntu-latest'
+        run: rustup target add x86_64-unknown-linux-gnu
 
       - name: Run benchmarks
         working-directory: crates/terraphim_automata_py
         run: |
+          source .venv/bin/activate
           pytest python/benchmarks/ -v --benchmark-only \
             --benchmark-json=benchmark-results.json \
             --benchmark-columns=min,max,mean,stddev,median,ops
