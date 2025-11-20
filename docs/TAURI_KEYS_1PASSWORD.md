@@ -38,9 +38,9 @@ op signin
 Export the keys as environment variables for use in build scripts:
 
 ```bash
-export TAURI_PRIVATE_KEY=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY")
-export TAURI_PUBLIC_KEY=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PUBLIC_KEY")
-export TAURI_KEY_PASSWORD=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD")
+export TAURI_PRIVATE_KEY=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY")  # pragma: allowlist secret
+export TAURI_PUBLIC_KEY=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PUBLIC_KEY")  # pragma: allowlist secret
+export TAURI_KEY_PASSWORD=$(op read "op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD")  # pragma: allowlist secret
 ```
 
 ### Method 2: Using op run with Environment File
@@ -81,8 +81,8 @@ For CI/CD pipelines, configure a 1Password service account:
 This file contains 1Password references for the Tauri signing keys:
 
 ```bash
-TAURI_PRIVATE_KEY="op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY"
-TAURI_KEY_PASSWORD="op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD"
+TAURI_PRIVATE_KEY="op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_PRIVATE_KEY"  # pragma: allowlist secret
+TAURI_KEY_PASSWORD="op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD"  # pragma: allowlist secret
 ```
 
 ### .reports/tauri_keys.txt
