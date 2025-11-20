@@ -66,7 +66,7 @@ enum ViewMode {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "terraphim-tui", version, about = "Terraphim TUI interface")]
+#[command(name = "terraphim-agent", version, about = "Terraphim TUI interface")]
 struct Cli {
     /// Use server API mode instead of self-contained offline mode
     #[arg(long, default_value_t = false)]
@@ -387,8 +387,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
             Ok(())
         }
         Command::CheckUpdate => {
-            println!("🔍 Checking for terraphim-tui updates...");
-            match check_for_updates("terraphim-tui").await {
+            println!("🔍 Checking for terraphim-agent updates...");
+            match check_for_updates("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
@@ -400,8 +400,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
             }
         }
         Command::Update => {
-            println!("🚀 Updating terraphim-tui...");
-            match update_binary("terraphim-tui").await {
+            println!("🚀 Updating terraphim-agent...");
+            match update_binary("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
@@ -618,8 +618,8 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             Ok(())
         }
         Command::CheckUpdate => {
-            println!("🔍 Checking for terraphim-tui updates...");
-            match check_for_updates("terraphim-tui").await {
+            println!("🔍 Checking for terraphim-agent updates...");
+            match check_for_updates("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
@@ -631,8 +631,8 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             }
         }
         Command::Update => {
-            println!("🚀 Updating terraphim-tui...");
-            match update_binary("terraphim-tui").await {
+            println!("🚀 Updating terraphim-agent...");
+            match update_binary("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
