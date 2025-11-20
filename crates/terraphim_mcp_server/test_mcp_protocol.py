@@ -6,7 +6,6 @@ Test MCP autocomplete functionality via stdio transport with proper protocol han
 import json
 import subprocess
 import time
-import sys
 
 def send_mcp_message(message):
     """Send a message to the MCP server and return the response"""
