@@ -1,7 +1,6 @@
 """Tests for text matching and replacement functionality"""
 
 import pytest
-
 from terraphim_automata import extract_paragraphs, find_all_matches, replace_with_links
 
 # Sample thesaurus for testing
