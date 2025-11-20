@@ -3,7 +3,6 @@
 import asyncio
 import json
 import subprocess
-import sys
 
 async def test_raw_jsonrpc():
     """Test raw JSON-RPC communication with MCP server"""

@@ -25,7 +25,7 @@ env:
 jobs:
   lint:
     name: Lint Python Code
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
 
@@ -153,7 +153,7 @@ jobs:
 
   benchmark:
     name: Benchmark Performance
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     steps:
       - uses: actions/checkout@v4
 
@@ -277,7 +277,7 @@ jobs:
 
   build-sdist:
     name: Build source distribution
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'release'
     steps:
       - uses: actions/checkout@v4
@@ -297,7 +297,7 @@ jobs:
 
   publish:
     name: Publish to PyPI
-    runs-on: ubuntu-latest
+    runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'release'
     needs: [lint, test, build-wheels, build-sdist]
     environment:

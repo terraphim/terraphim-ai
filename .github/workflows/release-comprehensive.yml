@@ -32,10 +32,10 @@ jobs:
             target: armv7-unknown-linux-musleabihf
             use_cross: true
           # macOS builds
-          - os: macos-latest
+          - os: [self-hosted, macOS, X64]
             target: x86_64-apple-darwin
             use_cross: false
-          - os: macos-latest
+          - os: [self-hosted, macOS, X64]
             target: aarch64-apple-darwin
             use_cross: false
           # Windows builds

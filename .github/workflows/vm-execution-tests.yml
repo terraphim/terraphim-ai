@@ -29,7 +29,7 @@ env:
 jobs:
   unit-tests:
     name: Unit Tests
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
@@ -91,7 +91,7 @@ jobs:
 
   integration-tests:
     name: Integration Tests
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
 
     services:
@@ -199,7 +199,7 @@ jobs:
 
   websocket-tests:
     name: WebSocket Tests
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
     needs: integration-tests
 
@@ -274,7 +274,7 @@ jobs:
 
   e2e-tests:
     name: End-to-End Tests
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 20
     needs: [unit-tests, integration-tests]
 
@@ -365,7 +365,7 @@ jobs:
 
   security-tests:
     name: Security Tests
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
 
     steps:
@@ -455,7 +455,7 @@ jobs:
 
   performance-tests:
     name: Performance Tests
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 10
 
     steps:
@@ -547,7 +547,7 @@ jobs:
 
   test-script:
     name: Test Runner Script
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
 
     steps:
@@ -591,7 +591,7 @@ jobs:
 
   coverage:
     name: Test Coverage
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 30
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -700,7 +700,7 @@ jobs:
 
   summary:
     name: Test Summary
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: [unit-tests, integration-tests, websocket-tests, e2e-tests, security-tests, performance-tests]
     if: always()
 
