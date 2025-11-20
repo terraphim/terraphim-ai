@@ -8,11 +8,9 @@ This test proves that:
 """
 
 import requests
-import json
 import time
 import subprocess
 import sys
-import os
 
 def print_success(message):
     print(f"✅ {message}")
