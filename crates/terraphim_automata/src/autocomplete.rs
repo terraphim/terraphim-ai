@@ -116,7 +116,11 @@ pub fn build_autocomplete_index(
                 id: normalized_term.id,
                 normalized_term: normalized_term.value.clone(),
                 url: normalized_term.url.clone(),
-                original_term: key.to_string(),
+                original_term: if config.case_sensitive {
+                    key.to_string()
+                } else {
+                    key.as_str().to_lowercase()
+                },
             },
         );
     }

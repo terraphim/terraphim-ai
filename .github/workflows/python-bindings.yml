@@ -117,7 +117,7 @@ jobs:
           else
             source .venv/bin/activate
           fi
-          maturin develop --target native
+          maturin develop
 
       - name: Install test dependencies
         working-directory: crates/terraphim_automata_py
