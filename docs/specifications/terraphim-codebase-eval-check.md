@@ -149,4 +149,3 @@ graph TD
 - How to calibrate score thresholds across heterogeneous repositories?
 - Should certain file types (generated assets) be excluded from haystack indexing by default?
 - What governance model determines acceptance criteria for high-risk domains (security, compliance)?
-
