@@ -3,7 +3,6 @@
 import asyncio
 import json
 import subprocess
-import sys
 
 async def test_server_methods():
     """Test what methods the server supports"""

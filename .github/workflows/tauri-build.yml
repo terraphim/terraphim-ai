@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
+        platform: [[self-hosted, macOS, X64], ubuntu-20.04, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     outputs:
@@ -123,7 +123,7 @@ jobs:
           retention-days: 7
 
   summary:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: build-tauri
     if: always()
 
