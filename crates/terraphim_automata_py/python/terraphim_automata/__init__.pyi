@@ -158,9 +158,7 @@ def build_index(json_str: str, case_sensitive: bool = False) -> AutocompleteInde
     """
     ...
 
-def find_all_matches(
-    text: str, json_str: str, return_positions: bool = True
-) -> List[Matched]:
+def find_all_matches(text: str, json_str: str, return_positions: bool = True) -> List[Matched]:
     """
     Find all matches of thesaurus terms in text
 
