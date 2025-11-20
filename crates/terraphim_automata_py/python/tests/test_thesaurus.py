@@ -1,7 +1,6 @@
 """Tests for thesaurus loading functionality"""
 
 import pytest
-
 from terraphim_automata import build_index, load_thesaurus
 
 

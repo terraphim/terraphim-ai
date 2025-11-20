@@ -87,32 +87,58 @@ jobs:
 
       - name: Setup virtual environment
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
+          unset CONDA_PREFIX
           uv venv
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
 
       - name: Install maturin
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           uv pip install maturin
 
       - name: Build Python package
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
-          maturin develop
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          maturin develop --target native
 
       - name: Install test dependencies
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           uv pip install pytest pytest-cov
 
       - name: Run tests
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           pytest python/tests/ -v --cov=terraphim_automata --cov-report=xml --cov-report=term
 
       - name: Upload coverage to Codecov
@@ -151,26 +177,47 @@ jobs:
 
       - name: Setup virtual environment
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
+          unset CONDA_PREFIX
           uv venv
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
 
       - name: Install maturin
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           uv pip install maturin
 
       - name: Build Python package (release mode)
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
-          maturin develop --release
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          maturin develop --release --target native
 
       - name: Install benchmark dependencies
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           uv pip install pytest pytest-benchmark
 
       - name: Install Rust target for benchmarks
@@ -179,8 +226,13 @@ jobs:
 
       - name: Run benchmarks
         working-directory: crates/terraphim_automata_py
+        shell: bash
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           pytest python/benchmarks/ -v --benchmark-only \
             --benchmark-json=benchmark-results.json \
             --benchmark-columns=min,max,mean,stddev,median,ops

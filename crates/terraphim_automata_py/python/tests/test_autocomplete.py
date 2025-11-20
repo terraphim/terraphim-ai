@@ -1,7 +1,6 @@
 """Tests for autocomplete functionality"""
 
 import pytest
-
 from terraphim_automata import build_index
 
 # Sample thesaurus for testing
