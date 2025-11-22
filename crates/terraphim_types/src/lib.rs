@@ -1,3 +1,79 @@
+//! Core type definitions for the Terraphim AI system.
+//!
+//! This crate provides the fundamental data structures used throughout the Terraphim ecosystem:
+//!
+//! - **Knowledge Graph Types**: [`Concept`], [`Node`], [`Edge`], [`Thesaurus`]
+//! - **Document Management**: [`Document`], [`Index`], [`IndexedDocument`]
+//! - **Search Operations**: [`SearchQuery`], [`LogicalOperator`], [`RelevanceFunction`]
+//! - **Conversation Context**: [`Conversation`], [`ChatMessage`], [`ContextItem`]
+//! - **LLM Routing**: [`RoutingRule`], [`RoutingDecision`], [`Priority`]
+//! - **Multi-Agent Coordination**: [`MultiAgentContext`], [`AgentInfo`]
+//!
+//! # Features
+//!
+//! - `typescript`: Enable TypeScript type generation via tsify for WASM compatibility
+//!
+//! # Examples
+//!
+//! ## Creating a Search Query
+//!
+//! ```
+//! use terraphim_types::{SearchQuery, NormalizedTermValue, LogicalOperator, RoleName};
+//!
+//! // Simple single-term query
+//! let query = SearchQuery {
+//!     search_term: NormalizedTermValue::from("rust"),
+//!     search_terms: None,
+//!     operator: None,
+//!     skip: None,
+//!     limit: Some(10),
+//!     role: Some(RoleName::new("engineer")),
+//! };
+//!
+//! // Multi-term AND query
+//! let multi_query = SearchQuery::with_terms_and_operator(
+//!     NormalizedTermValue::from("async"),
+//!     vec![NormalizedTermValue::from("programming")],
+//!     LogicalOperator::And,
+//!     Some(RoleName::new("engineer")),
+//! );
+//! ```
+//!
+//! ## Working with Documents
+//!
+//! ```
+//! use terraphim_types::Document;
+//!
+//! let document = Document {
+//!     id: "doc-1".to_string(),
+//!     url: "https://example.com/article".to_string(),
+//!     title: "Introduction to Rust".to_string(),
+//!     body: "Rust is a systems programming language...".to_string(),
+//!     description: Some("A guide to Rust".to_string()),
+//!     summarization: None,
+//!     stub: None,
+//!     tags: Some(vec!["rust".to_string(), "programming".to_string()]),
+//!     rank: None,
+//!     source_haystack: None,
+//! };
+//! ```
+//!
+//! ## Building a Knowledge Graph
+//!
+//! ```
+//! use terraphim_types::{Thesaurus, NormalizedTermValue, NormalizedTerm};
+//!
+//! let mut thesaurus = Thesaurus::new("programming".to_string());
+//! thesaurus.insert(
+//!     NormalizedTermValue::from("rust"),
+//!     NormalizedTerm {
+//!         id: 1,
+//!         value: NormalizedTermValue::from("rust programming language"),
+//!         url: Some("https://rust-lang.org".to_string()),
+//!     }
+//! );
+//! ```
+
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::Iter;
@@ -11,15 +87,53 @@ use std::str::FromStr;
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
+/// A role name with case-insensitive lookup support.
+///
+/// Stores both the original casing and a lowercase version for efficient
+/// case-insensitive operations. Roles represent different user profiles or
+/// personas in the Terraphim system, each with specific knowledge domains
+/// and search preferences.
+///
+/// Note: Equality is based on both fields, so two instances with different
+/// original casing are not equal. Use `as_lowercase()` for case-insensitive comparisons.
+///
+/// # Examples
+///
+/// ```
+/// use terraphim_types::RoleName;
+///
+/// let role = RoleName::new("DataScientist");
+/// assert_eq!(role.as_str(), "DataScientist");
+/// assert_eq!(role.as_lowercase(), "datascientist");
+///
+/// // Compare using lowercase for case-insensitive matching
+/// let role2 = RoleName::new("datascientist");
+/// assert_eq!(role.as_lowercase(), role2.as_lowercase());
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, JsonSchema)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub struct RoleName {
+    /// The original role name preserving the original casing
     pub original: String,
+    /// Lowercase version for case-insensitive comparisons
     pub lowercase: String,
 }
 
 impl RoleName {
+    /// Creates a new role name from a string.
+    ///
+    /// # Arguments
+    ///
+    /// * `name` - The role name with any casing
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use terraphim_types::RoleName;
+    ///
+    /// let role = RoleName::new("SoftwareEngineer");
+    /// ```
     pub fn new(name: &str) -> Self {
         RoleName {
             original: name.to_string(),
@@ -27,10 +141,14 @@ impl RoleName {
         }
     }
 
+    /// Returns the lowercase version of the role name.
+    ///
+    /// Use this for case-insensitive comparisons.
     pub fn as_lowercase(&self) -> &str {
         &self.lowercase
     }
 
+    /// Returns the original role name with preserved casing.
     pub fn as_str(&self) -> &str {
         &self.original
     }
@@ -191,10 +309,43 @@ impl Display for Concept {
     }
 }
 
-/// A document is the central a piece of content that gets indexed and searched.
+/// The central document type representing indexed and searchable content.
 ///
-/// It holds the title, body, description, tags, and rank.
-/// The `id` is a unique identifier for the document.
+/// Documents are the primary unit of content in Terraphim. They can come from
+/// various sources (local files, web pages, API responses) and are indexed for
+/// semantic search using knowledge graphs.
+///
+/// # Fields
+///
+/// * `id` - Unique identifier (typically a UUID or URL-based ID)
+/// * `url` - Source URL or file path
+/// * `title` - Document title (used for display and basic search)
+/// * `body` - Full text content
+/// * `description` - Optional short description (extracted or provided)
+/// * `summarization` - Optional AI-generated summary
+/// * `stub` - Optional brief excerpt
+/// * `tags` - Optional categorization tags (often from knowledge graph)
+/// * `rank` - Optional relevance score from search results
+/// * `source_haystack` - Optional identifier of the data source that provided this document
+///
+/// # Examples
+///
+/// ```
+/// use terraphim_types::Document;
+///
+/// let doc = Document {
+///     id: "rust-book-ch1".to_string(),
+///     url: "https://doc.rust-lang.org/book/ch01-00-getting-started.html".to_string(),
+///     title: "Getting Started".to_string(),
+///     body: "Let's start your Rust journey...".to_string(),
+///     description: Some("Introduction to Rust programming".to_string()),
+///     summarization: None,
+///     stub: None,
+///     tags: Some(vec!["rust".to_string(), "tutorial".to_string()]),
+///     rank: Some(95),
+///     source_haystack: Some("rust-docs".to_string()),
+///};
+/// ```
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -508,8 +659,42 @@ pub enum LogicalOperator {
     Or,
 }
 
-/// Query type for searching documents in the `RoleGraph`.
-/// It contains the search term(s), logical operators, skip and limit parameters.
+/// A search query for finding documents in the knowledge graph.
+///
+/// Supports both single-term and multi-term queries with logical operators (AND/OR).
+/// Results can be paginated using `skip` and `limit`, and scoped to specific roles.
+///
+/// # Examples
+///
+/// ## Single-term query
+///
+/// ```
+/// use terraphim_types::{SearchQuery, NormalizedTermValue, RoleName};
+///
+/// let query = SearchQuery {
+///     search_term: NormalizedTermValue::from("machine learning"),
+///     search_terms: None,
+///     operator: None,
+///     skip: None,
+///     limit: Some(10),
+///     role: Some(RoleName::new("data_scientist")),
+/// };
+/// ```
+///
+/// ## Multi-term AND query
+///
+/// ```
+/// use terraphim_types::{SearchQuery, NormalizedTermValue, LogicalOperator, RoleName};
+///
+/// let query = SearchQuery::with_terms_and_operator(
+///     NormalizedTermValue::from("rust"),
+///     vec![NormalizedTermValue::from("async"), NormalizedTermValue::from("tokio")],
+///     LogicalOperator::And,
+///     Some(RoleName::new("engineer")),
+/// );
+/// assert!(query.is_multi_term_query());
+/// assert_eq!(query.get_all_terms().len(), 3);
+/// ```
 #[derive(Debug, Serialize, Deserialize, Clone, Default)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
@@ -521,8 +706,11 @@ pub struct SearchQuery {
     pub search_terms: Option<Vec<NormalizedTermValue>>,
     /// Logical operator for combining multiple terms (defaults to OR if not specified)
     pub operator: Option<LogicalOperator>,
+    /// Number of results to skip (for pagination)
     pub skip: Option<usize>,
+    /// Maximum number of results to return
     pub limit: Option<usize>,
+    /// Role context for this search
     pub role: Option<RoleName>,
 }
 
