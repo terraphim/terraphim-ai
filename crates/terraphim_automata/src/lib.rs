@@ -1,3 +1,110 @@
+//! Fast text matching and autocomplete engine for knowledge graphs.
+//!
+//! `terraphim_automata` provides high-performance text processing using Aho-Corasick
+//! automata and finite state transducers (FST). It powers Terraphim's autocomplete
+//! and knowledge graph linking features.
+//!
+//! # Features
+//!
+//! - **Fast Autocomplete**: Prefix-based search with fuzzy matching (Levenshtein/Jaro-Winkler)
+//! - **Text Matching**: Find and replace terms using Aho-Corasick automata
+//! - **Link Generation**: Convert matched terms to Markdown, HTML, or Wiki links
+//! - **Paragraph Extraction**: Extract context around matched terms
+//! - **WASM Support**: Browser-compatible autocomplete with TypeScript bindings
+//! - **Remote Loading**: Async loading of thesaurus files from HTTP (feature-gated)
+//!
+//! # Architecture
+//!
+//! - **Autocomplete Index**: FST-based prefix search with metadata
+//! - **Aho-Corasick Matcher**: Multi-pattern matching for link generation
+//! - **Thesaurus Builder**: Parse knowledge graphs from JSON/Markdown
+//!
+//! # Cargo Features
+//!
+//! - `remote-loading`: Enable async HTTP loading of thesaurus files (requires tokio)
+//! - `tokio-runtime`: Add tokio runtime support
+//! - `typescript`: Generate TypeScript definitions via tsify
+//! - `wasm`: Enable WebAssembly compilation
+//!
+//! # Examples
+//!
+//! ## Autocomplete with Fuzzy Matching
+//!
+//! ```rust
+//! use terraphim_automata::{build_autocomplete_index, fuzzy_autocomplete_search};
+//! use terraphim_types::{Thesaurus, NormalizedTermValue, NormalizedTerm};
+//!
+//! // Create a simple thesaurus
+//! let mut thesaurus = Thesaurus::new("programming".to_string());
+//! thesaurus.insert(
+//!     NormalizedTermValue::from("rust"),
+//!     NormalizedTerm { id: 1, value: NormalizedTermValue::from("rust"), url: None }
+//! );
+//! thesaurus.insert(
+//!     NormalizedTermValue::from("rust async"),
+//!     NormalizedTerm { id: 2, value: NormalizedTermValue::from("rust async"), url: None }
+//! );
+//!
+//! // Build autocomplete index
+//! let index = build_autocomplete_index(thesaurus, None).unwrap();
+//!
+//! // Fuzzy search (returns Result)
+//! let results = fuzzy_autocomplete_search(&index, "rast", 0.8, Some(5)).unwrap();
+//! assert!(!results.is_empty());
+//! ```
+//!
+//! ## Text Matching and Link Generation
+//!
+//! ```rust
+//! use terraphim_automata::{load_thesaurus_from_json, replace_matches, LinkType};
+//!
+//! let json = r#"{
+//!   "name": "test",
+//!   "data": {
+//!     "rust": {
+//!       "id": 1,
+//!       "nterm": "rust programming",
+//!       "url": "https://rust-lang.org"
+//!     }
+//!   }
+//! }"#;
+//!
+//! let thesaurus = load_thesaurus_from_json(json).unwrap();
+//! let text = "I love rust!";
+//!
+//! // Replace matches with Markdown links
+//! let linked = replace_matches(text, thesaurus, LinkType::MarkdownLinks).unwrap();
+//! let result = String::from_utf8(linked).unwrap();
+//! println!("{}", result); // "I love [rust](https://rust-lang.org)!"
+//! ```
+//!
+//! ## Loading Thesaurus Files
+//!
+//! ```no_run
+//! use terraphim_automata::{AutomataPath, load_thesaurus};
+//!
+//! # #[cfg(feature = "remote-loading")]
+//! # async fn example() {
+//! // Load from local file
+//! let local_path = AutomataPath::from_local("thesaurus.json");
+//! let thesaurus = load_thesaurus(&local_path).await.unwrap();
+//!
+//! // Load from remote URL (requires 'remote-loading' feature)
+//! let remote_path = AutomataPath::from_remote("https://example.com/thesaurus.json").unwrap();
+//! let thesaurus = load_thesaurus(&remote_path).await.unwrap();
+//! # }
+//! ```
+//!
+//! # WASM Support
+//!
+//! Build for WebAssembly:
+//!
+//! ```bash
+//! wasm-pack build --target web --features wasm
+//! ```
+//!
+//! See the [WASM example](wasm-test/) for browser usage.
+
 pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
@@ -39,37 +146,60 @@ use tsify::Tsify;
 
 use terraphim_types::Thesaurus;
 
+/// Errors that can occur when working with automata and thesaurus operations.
 #[derive(thiserror::Error, Debug)]
 pub enum TerraphimAutomataError {
+    /// Invalid thesaurus format or structure
     #[error("Invalid thesaurus: {0}")]
     InvalidThesaurus(String),
 
+    /// JSON serialization/deserialization error
     #[error("Serde deserialization error: {0}")]
     Serde(#[from] serde_json::Error),
 
+    /// Dictionary-related error
     #[error("Dict error: {0}")]
     Dict(String),
 
+    /// File I/O error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
+    /// Aho-Corasick automata construction error
     #[error("Aho-Corasick build error: {0}")]
     AhoCorasick(#[from] aho_corasick::BuildError),
 
+    /// Finite state transducer (FST) error
     #[error("FST error: {0}")]
     Fst(#[from] fst::Error),
 }
 
+/// Result type alias using `TerraphimAutomataError`.
 pub type Result<T> = std::result::Result<T, TerraphimAutomataError>;
 
-/// AutomataPath is a path to the automata file
+/// Path to a thesaurus/automata file, either local or remote.
 ///
-/// It can either be a local file path or a URL.
+/// Supports loading thesaurus files from local filesystem or HTTP URLs.
+/// Remote loading requires the `remote-loading` feature to be enabled.
+///
+/// # Examples
+///
+/// ```
+/// use terraphim_automata::AutomataPath;
+///
+/// // Local file path
+/// let local = AutomataPath::from_local("thesaurus.json");
+///
+/// // Remote URL (requires 'remote-loading' feature)
+/// let remote = AutomataPath::from_remote("https://example.com/thesaurus.json").unwrap();
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "typescript", derive(Tsify))]
 #[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
 pub enum AutomataPath {
+    /// Local filesystem path
     Local(PathBuf),
+    /// Remote HTTP/HTTPS URL
     Remote(String),
 }
 
