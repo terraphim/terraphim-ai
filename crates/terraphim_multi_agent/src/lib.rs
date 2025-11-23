@@ -35,6 +35,7 @@ pub mod genai_llm_client;
 pub mod history;
 pub mod llm_types;
 pub mod prompt_sanitizer;
+pub mod prompts;
 pub mod vm_execution;
 // pub mod llm_client;      // Disabled - uses rig-core
 // pub mod simple_llm_client; // Disabled - uses rig-core
