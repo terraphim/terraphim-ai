@@ -3,7 +3,6 @@
 import asyncio
 import json
 import subprocess
-import sys
 
 async def test_complete_mcp():
     """Test complete MCP protocol communication"""

@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from terraphim_automata import build_index
 
 

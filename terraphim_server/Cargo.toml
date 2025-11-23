@@ -66,12 +66,10 @@ serial_test = "3.0.0"
 tempfile = "3.23.0"
 urlencoding = "2.1.3"
 tokio = { version = "1.35.1", features = ["full"] }
-<<<<<<< HEAD
 terraphim_agent = { path = "../crates/terraphim_agent", version = "1.0.0" }
-=======
-terraphim_agent = { path = "../crates/terraphim_tui", version = "1.0.0" }
->>>>>>> fixes_sunday
-axum-test = "17"
+axum-test = "18"
+terraphim_agent = { path = "../crates/terraphim_agent", version = "1.0.0" }
+axum-test = "18"
 futures-util = "0.3"
 
 [build-dependencies]
