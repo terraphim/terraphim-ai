@@ -1,7 +1,7 @@
 <script>
 import { getMatches } from '@tauri-apps/api/cli';
 
-export let onMessage;
+let { onMessage } = $props();
 
 function _cliMatches() {
 	getMatches().then(onMessage).catch(onMessage);

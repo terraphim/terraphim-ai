@@ -1,7 +1,6 @@
 """Tests for thesaurus loading functionality"""
 
 import pytest
-
 from terraphim_automata import build_index, load_thesaurus
 
 
@@ -41,8 +40,10 @@ class TestLoadThesaurus:
     def test_load_large_thesaurus(self):
         """Test loading a larger thesaurus"""
         # Generate a thesaurus with many terms
-        data = {f"term{i}": {"id": i, "nterm": f"normalized{i}", "url": f"https://example.com/{i}"}
-                for i in range(1, 101)}
+        data = {
+            f"term{i}": {"id": i, "nterm": f"normalized{i}", "url": f"https://example.com/{i}"}
+            for i in range(1, 101)
+        }
         import json
 
         json_str = json.dumps({"name": "Large", "data": data})

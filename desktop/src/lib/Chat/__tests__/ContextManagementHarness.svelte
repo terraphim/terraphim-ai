@@ -1,11 +1,10 @@
 <!-- A simple component for testing context management without complex UI -->
 <script lang="ts">
-import { onMount } from 'svelte';
 import { createContext, getConversations } from '../../services/chatService';
 import { contexts, currentPersistentConversationId, persistentConversations } from '../../stores';
 
-onMount(async () => {
-	await getConversations();
+$effect(() => {
+	getConversations();
 });
 
 async function handleAddContext() {

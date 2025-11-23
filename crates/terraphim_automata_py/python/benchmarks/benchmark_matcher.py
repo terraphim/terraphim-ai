@@ -3,7 +3,6 @@
 import json
 
 import pytest
-
 from terraphim_automata import extract_paragraphs, find_all_matches, replace_with_links
 
 

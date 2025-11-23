@@ -14,7 +14,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest
+          - platform: [self-hosted, macOS, X64]
             webkit-package: ""
           - platform: ubuntu-22.04
             webkit-package: "libwebkit2gtk-4.0-dev"
