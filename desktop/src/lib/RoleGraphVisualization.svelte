@@ -1,28 +1,26 @@
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import * as d3 from 'd3';
-import { onMount } from 'svelte';
 import type { RoleGraphResponse } from './generated/types';
 import ArticleModal from './Search/ArticleModal.svelte';
 import type { Document } from './Search/SearchResult';
 import { is_tauri, role } from './stores';
 
-export const apiUrl: string = '/rolegraph';
-export const fullscreen: boolean = true;
+let { apiUrl = '/rolegraph', fullscreen = true }: { apiUrl?: string; fullscreen?: boolean } = $props();
 
-let container: HTMLDivElement;
-let loading = true;
-let error: string | null = null;
-let nodes: any[] = [];
-let edges: any[] = [];
-let selectedNode: Document | null = null;
-let _showModal = false;
-let _startInEditMode = false;
-let debugMessage = '';
+let container = $state<HTMLDivElement>();
+let loading = $state(true);
+let error = $state<string | null>(null);
+let nodes = $state<any[]>([]);
+let edges = $state<any[]>([]);
+let selectedNode = $state<Document | null>(null);
+let _showModal = $state(false);
+let _startInEditMode = $state(false);
+let debugMessage = $state('');
 
 // Dimensions
-let width = window.innerWidth;
-let height = window.innerHeight;
+let width = $state(window.innerWidth);
+let height = $state(window.innerHeight);
 
 function updateDimensions() {
 	width = window.innerWidth;
@@ -276,7 +274,7 @@ function renderGraph() {
 	}
 }
 
-onMount(() => {
+$effect(() => {
 	fetchGraph().then(() => {
 		if (!error) renderGraph();
 	});

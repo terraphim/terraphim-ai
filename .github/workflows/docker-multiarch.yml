@@ -39,7 +39,7 @@ env:
 
 jobs:
   build-and-push:
-    runs-on: [self-hosted, Linux, terraphim, docker]
+    runs-on: [self-hosted, linux, x64]
     strategy:
       matrix:
         ubuntu-version: ${{ fromJSON(inputs.ubuntu-versions) }}
@@ -138,7 +138,7 @@ jobs:
 
   build-summary:
     needs: build-and-push
-    runs-on: [self-hosted, Linux, terraphim]
+    runs-on: [self-hosted, linux, x64]
     if: always()
 
     steps:

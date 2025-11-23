@@ -6,22 +6,21 @@ import { CONFIG } from '../../config';
 import type { Haystack, Role } from '../generated/types';
 import type { Document } from './SearchResult';
 
-export let active: boolean = false;
-export let document: Document;
+let { active = $bindable(false), document }: { active?: boolean; document: Document } = $props();
 
 // State for the save process
-let saving = false;
-let _error: string | null = null;
-let _success = false;
-let selectedParent = '';
-let customParent = '';
-let useCustomParent = false;
-let articleTitle = '';
-let articleDescription = '';
+let saving = $state(false);
+let _error = $state<string | null>(null);
+let _success = $state(false);
+let selectedParent = $state('');
+let customParent = $state('');
+let useCustomParent = $state(false);
+let articleTitle = $state('');
+let articleDescription = $state('');
 
 // Available atomic servers from current role
-let atomicHaystacks: Haystack[] = [];
-let selectedAtomicServer = '';
+let atomicHaystacks = $state<Haystack[]>([]);
+let selectedAtomicServer = $state('');
 
 // Predefined parent options
 const _predefinedParents = [
@@ -34,10 +33,12 @@ const _predefinedParents = [
 ];
 
 // Watch for active changes to reset state and load atomic servers
-$: if (active && document) {
-	resetModal();
-	loadAtomicServers();
-}
+$effect(() => {
+	if (active && document) {
+		resetModal();
+		loadAtomicServers();
+	}
+});
 
 function resetModal() {
 	saving = false;

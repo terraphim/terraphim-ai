@@ -97,7 +97,7 @@
 		"@fortawesome/fontawesome-free": "^7.0.1",
 		"@paralect/novel-svelte": "0.0.7",
 		"@tauri-apps/api": "^1.2.0",
-		"@tiptap/core": "^2.22.1",
+		"@tiptap/core": "^3.9.0",
 		"@tiptap/extension-mention": "^2.22.1",
 		"@tiptap/starter-kit": "^2.22.1",
 		"@tiptap/suggestion": "^2.22.1",
@@ -114,11 +114,11 @@
 		"svelte-routing": "^2.13.0",
 		"tinro": "^0.6.12",
 		"tippy.js": "^6.3.7",
-		"tiptap-markdown": "^0.8.10"
+		"tiptap-markdown": "^0.9.0"
 	},
 	"peerDependencies": {
 		"@fortawesome/fontawesome-free": "^7.0.1",
-		"@tiptap/core": "^2.22.1",
+		"@tiptap/core": "^3.9.0",
 		"@tiptap/extension-mention": "^2.22.1",
 		"@tiptap/starter-kit": "^2.22.1",
 		"@tiptap/suggestion": "^2.22.1",

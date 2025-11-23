@@ -21,7 +21,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [macos-latest, ubuntu-20.04, windows-latest]
+        platform: [[self-hosted, macOS, X64], ubuntu-20.04, windows-latest]
 
     runs-on: ${{ matrix.platform }}
     outputs:
@@ -55,16 +55,16 @@ jobs:
             ${{ inputs.cache-key }}-tauri-${{ matrix.platform }}-
 
       - name: Install system dependencies (Ubuntu)
-        if: matrix.platform == 'ubuntu-20.04'
+        if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libgtk-3-dev \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libsoup2.4-dev \
-            libjavascriptcoregtk-4.0-dev \
+            libjavascriptcoregtk-4.1-dev \
             pkg-config
 
       - name: Install frontend dependencies
@@ -123,7 +123,7 @@ jobs:
           retention-days: 7
 
   summary:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     needs: build-tauri
     if: always()
 

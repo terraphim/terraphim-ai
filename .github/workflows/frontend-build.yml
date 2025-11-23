@@ -19,7 +19,7 @@ on:
 
 jobs:
   build:
-    runs-on: [self-hosted, linux, bigbox]
+    runs-on: [self-hosted, linux, x64]
     timeout-minutes: 20  # Reduced timeout with faster runner
     outputs:
       dist-path: ${{ steps.build.outputs.dist-path }}
