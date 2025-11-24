@@ -1,18 +1,17 @@
 use gpui::*;
-use gpui::prelude::FluentBuilder;
 use gpui_component::StyledExt;
 use terraphim_types::Document;
 
-/// Search results list component
+use crate::state::search::SearchState;
+
+/// Search results list component showing real search results
 pub struct SearchResults {
-    results: Vec<Document>,
+    search_state: Entity<SearchState>,
 }
 
 impl SearchResults {
-    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
-        Self {
-            results: vec![],
-        }
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>, search_state: Entity<SearchState>) -> Self {
+        Self { search_state }
     }
 
     fn render_result_item(&self, doc: &Document, _cx: &Context<Self>) -> impl IntoElement {
@@ -83,14 +82,57 @@ impl SearchResults {
 
 impl Render for SearchResults {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-        if self.results.is_empty() {
+        let state = self.search_state.read(cx);
+        let is_loading = state.is_loading();
+        let has_error = state.has_error();
+        let results = state.get_results();
+
+        if is_loading {
+            div()
+                .flex()
+                .items_center()
+                .justify_center()
+                .py_12()
+                .child(
+                    div()
+                        .text_lg()
+                        .text_color(rgb(0x7a7a7a))
+                        .child("Searching...")
+                )
+                .into_any_element()
+        } else if has_error {
+            div()
+                .px_4()
+                .py_3()
+                .bg(rgb(0xfef5e7))
+                .border_1()
+                .border_color(rgb(0xf1c40f))
+                .rounded_md()
+                .child("Search error - please try again")
+                .into_any_element()
+        } else if results.is_empty() {
             self.render_empty_state(cx).into_any_element()
         } else {
             div()
                 .flex()
                 .flex_col()
-                .gap_2()
-                .children(self.results.iter().map(|doc| self.render_result_item(doc, cx)))
+                .gap_3()
+                .child(
+                    div()
+                        .pb_2()
+                        .border_b_1()
+                        .border_color(rgb(0xf0f0f0))
+                        .child(
+                            div()
+                                .text_sm()
+                                .text_color(rgb(0x7a7a7a))
+                                .child(format!("Found {} results", results.len()))
+                        )
+                )
+                .children(results.iter().map(|result| {
+                    // Render using the document from ResultItemViewModel
+                    self.render_result_item(&result.document, cx)
+                }))
                 .into_any_element()
         }
     }

@@ -7,6 +7,15 @@ use terraphim_types::SearchQuery;
 use crate::models::{ResultItemViewModel, TermChipSet};
 use crate::search_service::SearchService;
 
+/// Autocomplete suggestion from KG search
+#[derive(Clone, Debug)]
+pub struct AutocompleteSuggestion {
+    pub term: String,
+    pub normalized_term: String,
+    pub url: Option<String>,
+    pub score: f64,
+}
+
 /// Search state management with real backend integration
 pub struct SearchState {
     config_state: Option<ConfigState>,
@@ -17,6 +26,11 @@ pub struct SearchState {
     loading: bool,
     error: Option<String>,
     current_role: String,
+    // Autocomplete state
+    autocomplete_suggestions: Vec<AutocompleteSuggestion>,
+    autocomplete_loading: bool,
+    show_autocomplete: bool,
+    selected_suggestion_index: usize,
 }
 
 impl SearchState {
@@ -32,6 +46,10 @@ impl SearchState {
             loading: false,
             error: None,
             current_role: "Terraphim Engineer".to_string(),
+            autocomplete_suggestions: vec![],
+            autocomplete_loading: false,
+            show_autocomplete: false,
+            selected_suggestion_index: 0,
         }
     }
 
@@ -144,6 +162,120 @@ impl SearchState {
         .detach();
     }
 
+    /// Get autocomplete suggestions from KG (pattern from Tauri search_kg_terms)
+    pub fn get_autocomplete(&mut self, query: String, cx: &mut Context<Self>) {
+        if query.trim().is_empty() || query.len() < 2 {
+            self.autocomplete_suggestions.clear();
+            self.show_autocomplete = false;
+            cx.notify();
+            return;
+        }
+
+        let config_state = match &self.config_state {
+            Some(state) => state.clone(),
+            None => {
+                log::warn!("Cannot get autocomplete: config not initialized");
+                return;
+            }
+        };
+
+        self.autocomplete_loading = true;
+        cx.notify();
+
+        let role_name = self.current_role.clone();
+
+        cx.spawn(async move |this, cx| {
+            // Use terraphim_automata for KG autocomplete (from Tauri cmd.rs pattern)
+            use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search};
+            use terraphim_types::RoleName;
+
+            let role = RoleName::from(role_name.as_str());
+
+            // Get the rolegraph for autocomplete
+            let autocomplete_index = if let Some(rolegraph_sync) = config_state.roles.get(&role) {
+                let rolegraph = rolegraph_sync.lock().await;
+
+                match build_autocomplete_index(rolegraph.thesaurus.clone(), None) {
+                    Ok(index) => Some(index),
+                    Err(e) => {
+                        log::error!("Failed to build autocomplete index: {}", e);
+                        None
+                    }
+                }
+            } else {
+                log::warn!("Role '{}' not found for autocomplete", role);
+                None
+            };
+
+            let suggestions = if let Some(index) = autocomplete_index {
+                // Use fuzzy search for queries >= 3 chars, exact for shorter
+                let results = if query.len() >= 3 {
+                    fuzzy_autocomplete_search(&index, &query, 0.7, Some(8))
+                        .unwrap_or_else(|_| autocomplete_search(&index, &query, Some(8)).unwrap_or_default())
+                } else {
+                    autocomplete_search(&index, &query, Some(8)).unwrap_or_default()
+                };
+
+                results.into_iter()
+                    .map(|r| AutocompleteSuggestion {
+                        term: r.term,
+                        normalized_term: r.normalized_term.to_string(),
+                        url: r.url,
+                        score: r.score,
+                    })
+                    .collect()
+            } else {
+                vec![]
+            };
+
+            this.update(cx, |this, cx| {
+                this.autocomplete_suggestions = suggestions;
+                this.autocomplete_loading = false;
+                this.show_autocomplete = !this.autocomplete_suggestions.is_empty();
+                this.selected_suggestion_index = 0;
+                cx.notify();
+            }).ok();
+        }).detach();
+    }
+
+    /// Select next autocomplete suggestion
+    pub fn autocomplete_next(&mut self, cx: &mut Context<Self>) {
+        if !self.autocomplete_suggestions.is_empty() {
+            self.selected_suggestion_index =
+                (self.selected_suggestion_index + 1).min(self.autocomplete_suggestions.len() - 1);
+            cx.notify();
+        }
+    }
+
+    /// Select previous autocomplete suggestion
+    pub fn autocomplete_previous(&mut self, cx: &mut Context<Self>) {
+        self.selected_suggestion_index = self.selected_suggestion_index.saturating_sub(1);
+        cx.notify();
+    }
+
+    /// Accept selected autocomplete suggestion
+    pub fn accept_autocomplete(&mut self, cx: &mut Context<Self>) -> Option<String> {
+        if let Some(suggestion) = self.autocomplete_suggestions.get(self.selected_suggestion_index) {
+            let term = suggestion.term.clone();
+            self.autocomplete_suggestions.clear();
+            self.show_autocomplete = false;
+            cx.notify();
+            Some(term)
+        } else {
+            None
+        }
+    }
+
+    /// Get current autocomplete suggestions
+    pub fn get_suggestions(&self) -> &[AutocompleteSuggestion] {
+        &self.autocomplete_suggestions
+    }
+
+    /// Check if autocomplete is showing
+    pub fn is_autocomplete_visible(&self) -> bool {
+        self.show_autocomplete && !self.autocomplete_suggestions.is_empty()
+    }
+
     fn update_term_chips(&mut self, query: &str) {
         // Parse query to extract term chips
         let parsed = SearchService::parse_query(query);
@@ -177,6 +309,11 @@ impl SearchState {
 
     pub fn result_count(&self) -> usize {
         self.results.len()
+    }
+
+    /// Get search results for display
+    pub fn get_results(&self) -> &[ResultItemViewModel] {
+        &self.results
     }
 }
 

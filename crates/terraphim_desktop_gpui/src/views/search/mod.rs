@@ -20,8 +20,8 @@ pub struct SearchView {
 impl SearchView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState) -> Self {
         let search_state = cx.new(|cx| SearchState::new(cx).with_config(config_state));
-        let search_input = cx.new(|cx| SearchInput::new(window, cx));
-        let search_results = cx.new(|cx| SearchResults::new(window, cx));
+        let search_input = cx.new(|cx| SearchInput::new(window, cx, search_state.clone()));
+        let search_results = cx.new(|cx| SearchResults::new(window, cx, search_state.clone()));
 
         log::info!("SearchView initialized with backend services");
 
