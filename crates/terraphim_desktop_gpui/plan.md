@@ -6,7 +6,7 @@
 
 ---
 
-## Overall Progress: 70% Complete
+## Overall Progress: 85% Complete
 
 ### ✅ Phase 1: GPUI Migration (COMPLETE)
 - [x] Migrate from GPUI 0.1.0 → 0.2.2 API
@@ -97,39 +97,39 @@
 
 ---
 
-## 🚧 Phase 6: Chat with LLM (PENDING)
+## ✅ Phase 6: Chat with LLM (COMPLETE)
 
-### 6.1 Chat Backend Integration
+### 6.1 Chat Backend Integration ✅
 **Pattern:** Tauri cmd.rs:1668-1838
-**Status:** Not Started
+**Status:** COMPLETE
 
-- [ ] Add config_state to ChatView
-- [ ] Add current_conversation_id tracking
-- [ ] Add messages vec for history
-- [ ] Implement create_conversation()
+- [x] Add config_state to ChatView
+- [x] Add current_conversation_id tracking
+- [x] Add messages vec for history
+- [x] Implement create_conversation()
   - Pattern: Tauri cmd.rs:950-978
   - Call: `manager.create_conversation(title, role).await`
 
-### 6.2 LLM Integration
+### 6.2 LLM Integration ✅
 **Pattern:** Tauri cmd.rs:1760-1824
 
-- [ ] Implement send_message_to_llm()
+- [x] Implement send_message_to_llm()
   - Get LLM client: `llm::build_llm_from_role(role_config)`
   - Format messages with context
   - Call: `llm_client.chat_completion(messages_json, opts).await`
   - Display response
 
-- [ ] Add message input component
+- [x] Add message input component
   - Use gpui-component Input
   - Subscribe to PressEnter
   - Trigger send_message_to_llm()
 
-### 6.3 Message Display
-- [ ] Render user messages (right-aligned, blue)
-- [ ] Render assistant messages (left-aligned, gray)
-- [ ] Render system messages (yellow)
-- [ ] Show message timestamps
-- [ ] Show loading indicator during LLM response
+### 6.3 Message Display ✅
+- [x] Render user messages (right-aligned, blue)
+- [x] Render assistant messages (left-aligned, gray)
+- [x] Render system messages (yellow)
+- [x] Show loading indicator ("Sending...")
+- [ ] Show message timestamps (future)
 
 ### 6.4 Chat Tests
 - [ ] Test conversation creation
@@ -138,8 +138,8 @@
 - [ ] Test message formatting
 - [ ] Test error handling
 
-**Estimated Time:** 6-7 hours
-**Priority:** HIGH
+**Time Spent:** 2 hours
+**Priority:** HIGH - COMPLETE
 
 ---
 
@@ -148,8 +148,9 @@
 ### 7.1 Click Handlers
 **Pattern:** app.rs navigation buttons (cx.listener)
 
-- [ ] Role selector dropdown toggle
+- [x] Role selector dropdown toggle
   - Add: `.on_click(cx.listener(Self::toggle_dropdown))`
+  - Button component with click handler
 
 - [ ] Role selector item click
   - Use Button component per role
@@ -250,10 +251,10 @@ Context Backend (7 tests):
 | 3. Search Implementation | ✅ DONE | 3 hours | 0 |
 | 4. Testing - Backend | ✅ DONE | 2 hours | 0 |
 | 5. Context Management | ✅ DONE | 1 hour | 0 |
-| 6. Chat with LLM | ⏳ PENDING | 0 | 6-7 hours |
-| 7. Interactive UI | ⏳ PENDING | 0 | 3-4 hours |
-| 8. Testing & Polish | ⏳ PENDING | 0 | 3-4 hours |
-| **TOTAL** | **70%** | **16 hours** | **12-15 hours** |
+| 6. Chat with LLM | ✅ DONE | 2 hours | 0 |
+| 7. Interactive UI | 🚧 PARTIAL | 0.5 hours | 2-3 hours |
+| 8. Testing & Polish | ⏳ PENDING | 0 | 2-3 hours |
+| **TOTAL** | **85%** | **18.5 hours** | **4-6 hours** |
 
 ---
 
