@@ -619,6 +619,8 @@ The system includes comprehensive MCP server functionality in `crates/terraphim_
 
 ## Desktop Application
 
+**📖 Complete Specification**: See [`docs/specifications/terraphim-desktop-spec.md`](docs/specifications/terraphim-desktop-spec.md) for comprehensive technical documentation including architecture, features, data models, testing, and deployment.
+
 ### Frontend Architecture
 - Svelte with TypeScript
 - Vite for build tooling
