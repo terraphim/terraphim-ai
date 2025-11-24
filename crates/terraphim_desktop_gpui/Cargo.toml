@@ -1,0 +1,68 @@
+[package]
+name = "terraphim_desktop_gpui"
+version = "1.0.0"
+description = "GPUI-based desktop application for Terraphim AI"
+authors = ["Terraphim Contributors"]
+license = "Apache-2.0"
+edition = "2024"
+rust-version = "1.87"
+
+[[bin]]
+name = "terraphim-gpui"
+path = "src/main.rs"
+
+[dependencies]
+# GPUI framework and components
+gpui = "0.1"
+gpui-component = "0.3"
+
+# Direct integration with terraphim crates
+terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
+
+# Async runtime
+tokio = { version = "1.36", features = ["full"] }
+
+# Error handling
+anyhow = "1.0.81"
+thiserror = "1.0.58"
+
+# Serialization
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.104"
+
+# Logging
+log = "0.4.21"
+env_logger = "0.11.8"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# Utilities
+ulid = "1.1.2"
+chrono = { version = "0.4.38", features = ["serde"] }
+ahash = "0.8.11"
+
+# Markdown rendering
+pulldown-cmark = "0.12"
+
+# Syntax highlighting
+tree-sitter = "0.24"
+tree-sitter-highlight = "0.24"
+tree-sitter-markdown = "0.3"
+
+[dev-dependencies]
+tokio-test = "0.4.4"
+tempfile = "3.23.0"
+
+[features]
+default = []
+# OpenRouter AI integration
+openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+# Database backends
+sqlite = ["terraphim_persistence/services-sqlite"]
