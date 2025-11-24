@@ -1,6 +1,8 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
 use gpui_component::{button::*, StyledExt};
+use terraphim_config::ConfigState;
+use terraphim_service::TerraphimService;
 
 use crate::theme::TerraphimTheme;
 use crate::views::chat::ChatView;
@@ -8,7 +10,7 @@ use crate::views::editor::EditorView;
 use crate::views::search::SearchView;
 use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
 
-/// Main application state
+/// Main application state with integrated backend services
 pub struct TerraphimApp {
     current_view: AppView,
     search_view: Entity<SearchView>,
@@ -18,6 +20,8 @@ pub struct TerraphimApp {
     tray_menu: Entity<TrayMenu>,
     theme: Entity<TerraphimTheme>,
     show_tray_menu: bool,
+    // Backend services
+    config_state: ConfigState,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -28,11 +32,13 @@ pub enum AppView {
 }
 
 impl TerraphimApp {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState) -> Self {
+        log::info!("TerraphimApp initializing with backend services...");
+
         // Initialize theme
         let theme = cx.new(|cx| TerraphimTheme::new(cx));
 
-        // Initialize views
+        // Initialize views with service access
         let search_view = cx.new(|cx| SearchView::new(window, cx));
         let chat_view = cx.new(|cx| ChatView::new(window, cx));
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
@@ -42,20 +48,6 @@ impl TerraphimApp {
 
         // Initialize tray menu
         let tray_menu = cx.new(|cx| TrayMenu::new(window, cx));
-
-        // TODO: GPUI 0.2.2 - on_action API has changed
-        // Subscribe to navigation actions
-        // cx.on_action(|this: &mut Self, _: &NavigateToSearch, cx| {
-        //     this.navigate_to(AppView::Search, cx);
-        // });
-
-        // cx.on_action(|this: &mut Self, _: &NavigateToChat, cx| {
-        //     this.navigate_to(AppView::Chat, cx);
-        // });
-
-        // cx.on_action(|this: &mut Self, _: &NavigateToEditor, cx| {
-        //     this.navigate_to(AppView::Editor, cx);
-        // });
 
         log::info!("TerraphimApp initialized with view: {:?}", AppView::Search);
 
@@ -68,7 +60,18 @@ impl TerraphimApp {
             tray_menu,
             theme,
             show_tray_menu: false,
+            config_state,
         }
+    }
+
+    /// Get a new TerraphimService instance for operations
+    pub fn create_service(&self) -> TerraphimService {
+        TerraphimService::new(self.config_state.clone())
+    }
+
+    /// Get reference to config state
+    pub fn config_state(&self) -> &ConfigState {
+        &self.config_state
     }
 
     pub fn navigate_to(&mut self, view: AppView, cx: &mut Context<Self>) {

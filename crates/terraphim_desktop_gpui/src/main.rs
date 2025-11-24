@@ -1,5 +1,7 @@
 use gpui::*;
 use gpui_component::Root;
+use terraphim_config::{ConfigBuilder, ConfigId};
+use terraphim_persistence::Persistable;
 
 mod actions;
 mod app;
@@ -20,6 +22,51 @@ fn main() {
 
     log::info!("Starting Terraphim Desktop GPUI");
 
+    // Initialize configuration BEFORE GPUI (requires tokio runtime)
+    log::info!("Pre-loading configuration with tokio runtime...");
+
+    let config_state = tokio::runtime::Runtime::new()
+        .expect("Failed to create tokio runtime")
+        .block_on(async {
+            // Load configuration using pattern from Tauri main.rs
+            let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
+                Ok(mut config) => match config.load().await {
+                    Ok(config) => {
+                        log::info!("Successfully loaded config from persistence");
+                        config
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to load config: {:?}, using default", e);
+                        match ConfigBuilder::new().build_default_desktop().build() {
+                            Ok(config) => config,
+                            Err(build_err) => {
+                                log::error!("Failed to build default desktop config: {:?}", build_err);
+                                panic!("Configuration initialization failed: {:?}", build_err);
+                            }
+                        }
+                    }
+                },
+                Err(e) => {
+                    log::error!("Failed to build config: {:?}", e);
+                    panic!("Configuration build failed: {:?}", e);
+                }
+            };
+
+            // Initialize config state with role graphs
+            match terraphim_config::ConfigState::new(&mut config).await {
+                Ok(state) => {
+                    log::info!("ConfigState initialized successfully with {} roles", state.roles.len());
+                    state
+                }
+                Err(e) => {
+                    log::error!("Failed to create ConfigState: {:?}", e);
+                    panic!("Failed to create ConfigState: {:?}", e);
+                }
+            }
+        });
+
+    log::info!("Configuration loaded successfully, starting GPUI...");
+
     // Initialize GPUI application
     let app = Application::new();
 
@@ -33,8 +80,13 @@ fn main() {
         // Configure theme
         theme::configure_theme(cx);
 
+        // Clone config_state for async block
+        let config_state_for_window = config_state.clone();
+
         // Spawn window creation asynchronously
         cx.spawn(async move |cx| {
+            log::info!("Opening window with initialized services...");
+
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(Bounds {
@@ -61,7 +113,7 @@ fn main() {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let view = cx.new(|cx| TerraphimApp::new(window, cx));
+                    let view = cx.new(|cx| TerraphimApp::new(window, cx, config_state_for_window));
                     // Wrap in Root component as required by gpui-component
                     cx.new(|cx| Root::new(view, window, cx))
                 },
