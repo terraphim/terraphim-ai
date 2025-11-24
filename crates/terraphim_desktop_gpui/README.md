@@ -17,18 +17,32 @@ This crate implements the core user journey for Terraphim Desktop using the GPUI
 ```
 terraphim_desktop_gpui/
 ├── src/
-│   ├── main.rs           # App entry point
-│   ├── app.rs            # Main app state and navigation
-│   ├── actions.rs        # Global actions and key bindings
-│   ├── theme.rs          # Theme system (light/dark mode)
-│   ├── views/            # UI components
-│   │   ├── search/       # Search interface
-│   │   ├── chat/         # Chat interface
-│   │   └── editor/       # Markdown editor
-│   └── state/            # Application state management
-│       └── search.rs     # Search state
+│   ├── lib.rs                    # Public API exports
+│   ├── main.rs                   # App entry point
+│   ├── app.rs                    # Main app state and navigation
+│   ├── actions.rs                # Global actions and key bindings
+│   ├── theme.rs                  # Theme system (light/dark mode)
+│   ├── autocomplete.rs           # ✨ Autocomplete engine integration
+│   ├── search_service.rs         # ✨ Search service integration
+│   ├── models.rs                 # ✨ Data models (chips, results)
+│   ├── views/                    # UI components
+│   │   ├── search/               # Search interface
+│   │   │   ├── mod.rs            # Search view coordinator
+│   │   │   ├── input.rs          # Search input
+│   │   │   ├── results.rs        # Results list
+│   │   │   └── autocomplete.rs   # ✨ UI autocomplete state
+│   │   ├── chat/                 # Chat interface
+│   │   └── editor/               # Markdown editor
+│   └── state/                    # Application state management
+│       └── search.rs             # ✨ Enhanced search state
+├── tests/                        # ✨ Unit tests
+│   ├── autocomplete_tests.rs
+│   ├── search_service_tests.rs
+│   └── models_tests.rs
 └── Cargo.toml
 ```
+
+✨ = **New in Phase 1, Week 2** (Business Logic Layer)
 
 ## Features
 
@@ -40,13 +54,19 @@ terraphim_desktop_gpui/
 - [x] Keyboard shortcuts (cmd-1/2/3 for navigation)
 - [x] Search view placeholder
 - [x] Direct integration with terraphim_* crates
+- [x] **Autocomplete engine** with terraphim_automata integration
+- [x] **Search service** with full terraphim_service integration
+- [x] **Term chip management** for AND/OR queries
+- [x] **Result view models** with highlighting
+- [x] **Query parsing** for complex multi-term searches
+- [x] **Unit tests** for business logic
 
 ### In Progress 🚧
 
-- [ ] Search input with autocomplete
-- [ ] KG-powered term suggestions
-- [ ] Search results rendering
-- [ ] Result detail modals
+- [ ] GPUI UI components for autocomplete popover
+- [ ] Result list rendering with VirtualList
+- [ ] Result detail modals with dialogs
+- [ ] State synchronization between UI and business logic
 
 ### Planned 📋
 

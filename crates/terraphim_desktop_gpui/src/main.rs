@@ -2,6 +2,9 @@ use gpui::*;
 
 mod actions;
 mod app;
+mod autocomplete;
+mod models;
+mod search_service;
 mod state;
 mod theme;
 mod views;

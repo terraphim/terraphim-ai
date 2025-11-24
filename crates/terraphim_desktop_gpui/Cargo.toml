@@ -11,6 +11,10 @@ rust-version = "1.87"
 name = "terraphim-gpui"
 path = "src/main.rs"
 
+[lib]
+name = "terraphim_desktop_gpui"
+path = "src/lib.rs"
+
 [dependencies]
 # GPUI framework and components
 gpui = "0.1"
