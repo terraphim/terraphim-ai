@@ -7,7 +7,11 @@ use std::sync::Arc;
 // Import terraphim modules
 use terraphim_config::ConfigState;
 use terraphim_settings::DeviceSettings;
-use terraphim_types::{Document, NormalizedTermValue, SearchQuery};
+use terraphim_types::{ChatMessage as TerraphimChatMessage, ContextItem as TerraphimContextItem, Conversation, Document, NormalizedTermValue, SearchQuery};
+use terraphim_service::conversation_service::ConversationService;
+
+#[cfg(feature = "openrouter")]
+use terraphim_service::openrouter::OpenRouterClient;
 
 fn main() -> iced::Result {
     // Initialize logging
@@ -21,7 +25,6 @@ fn main() -> iced::Result {
 }
 
 // Main application state
-#[derive(Debug)]
 struct TerraphimApp {
     // Current view
     current_view: View,
@@ -29,6 +32,10 @@ struct TerraphimApp {
     // Configuration state
     config_state: Option<Arc<ConfigState>>,
     device_settings: Option<DeviceSettings>,
+
+    // Conversation service (not Debug, so wrapped carefully)
+    #[allow(dead_code)]
+    conversation_service: Arc<ConversationService>,
 
     // Search state
     search_input: String,
@@ -39,7 +46,7 @@ struct TerraphimApp {
     // Chat state
     chat_input: String,
     chat_messages: Vec<ChatMessage>,
-    conversation_id: Option<String>,
+    conversation: Option<Conversation>,
     context_items: Vec<ContextItem>,
     show_context_form: bool,
     new_context_title: String,
@@ -79,6 +86,17 @@ struct ContextItem {
     context_type: String,
 }
 
+impl From<&TerraphimContextItem> for ContextItem {
+    fn from(item: &TerraphimContextItem) -> Self {
+        Self {
+            id: item.id.clone(),
+            title: item.title.clone(),
+            content: item.content.clone(),
+            context_type: format!("{:?}", item.context_type),
+        }
+    }
+}
+
 #[derive(Debug, Clone)]
 struct KgTerm {
     term: String,
@@ -102,17 +120,17 @@ enum Message {
     // Chat
     ChatInputChanged(String),
     ChatMessageSent,
-    ChatResponseReceived(Result<String, String>),
-    ConversationInitialized(Result<String, String>),
+    ChatResponseReceived(Result<(String, Conversation), String>),
+    ConversationInitialized(Result<Conversation, String>),
 
     // Context Management
     ToggleContextForm,
     ContextTitleChanged(String),
     ContextContentChanged(String),
     AddContext,
-    ContextAdded(Result<(), String>),
+    ContextAdded(Result<(Conversation, TerraphimContextItem), String>),
     RemoveContext(String),
-    ContextRemoved(Result<String, String>),
+    ContextRemoved(Result<Conversation, String>),
     LoadContext,
     ContextLoaded(Result<Vec<ContextItem>, String>),
 
@@ -136,10 +154,13 @@ enum Message {
 
 impl TerraphimApp {
     fn new() -> (Self, Task<Message>) {
+        let conversation_service = Arc::new(ConversationService::new());
+
         let app = TerraphimApp {
             current_view: View::Search,
             config_state: None,
             device_settings: None,
+            conversation_service: conversation_service.clone(),
             search_input: String::new(),
             search_results: Vec::new(),
             search_suggestions: Vec::new(),
@@ -149,7 +170,7 @@ impl TerraphimApp {
                 role: "assistant".to_string(),
                 content: "Hi! How can I help you? Ask me anything about your search results or documents.".to_string(),
             }],
-            conversation_id: None,
+            conversation: None,
             context_items: Vec::new(),
             show_context_form: false,
             new_context_title: String::new(),
@@ -162,10 +183,13 @@ impl TerraphimApp {
             error_message: None,
         };
 
-        // Initialize configuration asynchronously
+        // Initialize configuration and conversation asynchronously
         let init_task = Task::batch(vec![
             Task::perform(Self::initialize_config(), Message::ConfigLoaded),
-            Task::perform(Self::initialize_conversation(), Message::ConversationInitialized),
+            Task::perform(
+                Self::initialize_conversation(conversation_service),
+                Message::ConversationInitialized,
+            ),
         ]);
 
         (app, init_task)
@@ -268,15 +292,15 @@ impl TerraphimApp {
                 });
 
                 let message = self.chat_input.clone();
-                let conversation_id = self.conversation_id.clone();
+                let conversation = self.conversation.clone();
                 let config_state = self.config_state.clone();
-                let context = self.context_items.clone();
+                let conversation_service = self.conversation_service.clone();
 
                 self.chat_input.clear();
                 self.is_loading = true;
 
                 Task::perform(
-                    Self::send_chat_message(message, conversation_id, config_state, context),
+                    Self::send_chat_message(message, conversation, config_state, conversation_service),
                     Message::ChatResponseReceived,
                 )
             }
@@ -284,11 +308,12 @@ impl TerraphimApp {
             Message::ChatResponseReceived(result) => {
                 self.is_loading = false;
                 match result {
-                    Ok(response) => {
+                    Ok((response, updated_conv)) => {
                         self.chat_messages.push(ChatMessage {
                             role: "assistant".to_string(),
                             content: response,
                         });
+                        self.conversation = Some(updated_conv);
                         self.error_message = None;
                     }
                     Err(e) => {
@@ -300,19 +325,23 @@ impl TerraphimApp {
 
             Message::ConversationInitialized(result) => {
                 match result {
-                    Ok(conv_id) => {
-                        self.conversation_id = Some(conv_id);
+                    Ok(conv) => {
+                        log::info!("Conversation initialized: {}", conv.id.as_str());
+                        self.conversation = Some(conv.clone());
                         // Load context for this conversation
-                        Task::perform(
-                            Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
-                            Message::ContextLoaded,
-                        )
+                        let context_items: Vec<ContextItem> = conv
+                            .global_context
+                            .iter()
+                            .map(|item| item.into())
+                            .collect();
+                        self.context_items = context_items;
                     }
                     Err(e) => {
                         log::warn!("Failed to initialize conversation: {}", e);
-                        Task::none()
+                        self.error_message = Some(format!("Failed to initialize conversation: {}", e));
                     }
                 }
+                Task::none()
             }
 
             // Context Management
@@ -342,65 +371,74 @@ impl TerraphimApp {
 
                 let title = self.new_context_title.clone();
                 let content = self.new_context_content.clone();
-                let conversation_id = self.conversation_id.clone();
-                let config_state = self.config_state.clone();
+                let conversation = self.conversation.clone();
+                let conversation_service = self.conversation_service.clone();
 
                 Task::perform(
-                    Self::add_context(conversation_id, config_state, title, content),
+                    Self::add_context(conversation, conversation_service, title, content),
                     Message::ContextAdded,
                 )
             }
 
             Message::ContextAdded(result) => {
                 match result {
-                    Ok(()) => {
+                    Ok((updated_conv, new_context)) => {
                         self.new_context_title.clear();
                         self.new_context_content.clear();
                         self.show_context_form = false;
-                        // Reload context
-                        Task::perform(
-                            Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
-                            Message::ContextLoaded,
-                        )
+                        self.conversation = Some(updated_conv.clone());
+                        // Update context items from conversation
+                        self.context_items = updated_conv
+                            .global_context
+                            .iter()
+                            .map(|item| item.into())
+                            .collect();
                     }
                     Err(e) => {
                         self.error_message = Some(format!("Failed to add context: {}", e));
-                        Task::none()
                     }
                 }
+                Task::none()
             }
 
             Message::RemoveContext(context_id) => {
-                let conversation_id = self.conversation_id.clone();
-                let config_state = self.config_state.clone();
+                let conversation = self.conversation.clone();
+                let conversation_service = self.conversation_service.clone();
 
                 Task::perform(
-                    Self::remove_context(conversation_id, config_state, context_id),
+                    Self::remove_context(conversation, conversation_service, context_id),
                     Message::ContextRemoved,
                 )
             }
 
             Message::ContextRemoved(result) => {
                 match result {
-                    Ok(_) => {
-                        // Reload context
-                        Task::perform(
-                            Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
-                            Message::ContextLoaded,
-                        )
+                    Ok(updated_conv) => {
+                        self.conversation = Some(updated_conv.clone());
+                        // Update context items from conversation
+                        self.context_items = updated_conv
+                            .global_context
+                            .iter()
+                            .map(|item| item.into())
+                            .collect();
                     }
                     Err(e) => {
                         self.error_message = Some(format!("Failed to remove context: {}", e));
-                        Task::none()
                     }
                 }
+                Task::none()
             }
 
             Message::LoadContext => {
-                Task::perform(
-                    Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
-                    Message::ContextLoaded,
-                )
+                if let Some(conv) = &self.conversation {
+                    let context_items: Vec<ContextItem> = conv
+                        .global_context
+                        .iter()
+                        .map(|item| item.into())
+                        .collect();
+                    self.context_items = context_items;
+                }
+                Task::none()
             }
 
             Message::ContextLoaded(result) => {
@@ -454,11 +492,11 @@ impl TerraphimApp {
             }
 
             Message::AddKgTermContext(term) => {
-                let conversation_id = self.conversation_id.clone();
-                let config_state = self.config_state.clone();
+                let conversation = self.conversation.clone();
+                let conversation_service = self.conversation_service.clone();
 
                 Task::perform(
-                    Self::add_kg_term_context(conversation_id, config_state, term),
+                    Self::add_kg_term_context(conversation, conversation_service, term),
                     Message::ContextAdded,
                 )
             }
@@ -540,11 +578,22 @@ impl TerraphimApp {
     }
 
     // Initialize conversation
-    async fn initialize_conversation() -> Result<String, String> {
-        // Generate a simple conversation ID
-        let conv_id = format!("conv_{}", ulid::Ulid::new());
-        log::info!("Initialized conversation: {}", conv_id);
-        Ok(conv_id)
+    async fn initialize_conversation(
+        conversation_service: Arc<ConversationService>,
+    ) -> Result<Conversation, String> {
+        use terraphim_types::RoleName;
+
+        // Create a new conversation
+        let conversation = conversation_service
+            .create_conversation(
+                "New Chat".to_string(),
+                RoleName::new("Default"),
+            )
+            .await
+            .map_err(|e| format!("Failed to create conversation: {:?}", e))?;
+
+        log::info!("Initialized conversation: {}", conversation.id.as_str());
+        Ok(conversation)
     }
 
     // Fetch autocomplete suggestions
@@ -628,46 +677,172 @@ impl TerraphimApp {
         Ok(results)
     }
 
-    // Send chat message
+    // Send chat message with LLM integration
     async fn send_chat_message(
         message: String,
-        _conversation_id: Option<String>,
-        _config_state: Option<Arc<ConfigState>>,
-        _context: Vec<ContextItem>,
+        conversation: Option<Conversation>,
+        config_state: Option<Arc<ConfigState>>,
+        conversation_service: Arc<ConversationService>,
+    ) -> Result<(String, Conversation), String> {
+        let mut conversation = conversation.ok_or("No conversation initialized")?;
+
+        // Add user message to conversation
+        let user_message = TerraphimChatMessage::user(message.clone());
+        conversation.add_message(user_message.clone());
+
+        // Try to use OpenRouter if available
+        #[cfg(feature = "openrouter")]
+        {
+            if let Some(config_state) = config_state {
+                if let Ok(response) = Self::call_openrouter(&conversation, &config_state).await {
+                    // Add assistant response to conversation
+                    let assistant_message = TerraphimChatMessage::assistant(response.clone(), None);
+                    conversation.add_message(assistant_message);
+
+                    // Save conversation
+                    let _ = conversation_service.update_conversation(conversation.clone()).await;
+
+                    return Ok((response, conversation));
+                }
+            }
+        }
+
+        // Fallback: Echo response
+        let response = format!("Echo: {}", message);
+        let assistant_message = TerraphimChatMessage::assistant(response.clone(), None);
+        conversation.add_message(assistant_message);
+
+        // Save conversation
+        let _ = conversation_service.update_conversation(conversation.clone()).await;
+
+        Ok((response, conversation))
+    }
+
+    #[cfg(feature = "openrouter")]
+    async fn call_openrouter(
+        conversation: &Conversation,
+        config_state: &ConfigState,
     ) -> Result<String, String> {
-        // TODO: Implement actual chat API call with context
-        tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-        Ok(format!("Echo: {}", message))
+        use std::env;
+
+        // Get API key from environment
+        let api_key = env::var("OPENROUTER_API_KEY")
+            .map_err(|_| "OPENROUTER_API_KEY not set".to_string())?;
+
+        // Create OpenRouter client
+        let client = OpenRouterClient::new(api_key, None, None);
+
+        // Convert conversation messages to OpenRouter format
+        let messages: Vec<serde_json::Value> = conversation
+            .messages
+            .iter()
+            .map(|msg| {
+                let mut message_obj = serde_json::json!({
+                    "role": msg.role,
+                    "content": msg.content,
+                });
+
+                // Add context if available
+                if !msg.context_items.is_empty() {
+                    let context_text: String = msg
+                        .context_items
+                        .iter()
+                        .map(|c| format!("[{}]\n{}\n", c.title, c.content))
+                        .collect::<Vec<_>>()
+                        .join("\n");
+
+                    message_obj["content"] = serde_json::json!(format!(
+                        "Context:\n{}\n\nUser message: {}",
+                        context_text,
+                        msg.content
+                    ));
+                }
+
+                message_obj
+            })
+            .collect();
+
+        // Add global context to the first message if available
+        if !conversation.global_context.is_empty() && !messages.is_empty() {
+            let context_text: String = conversation
+                .global_context
+                .iter()
+                .map(|c| format!("[{}]\n{}\n", c.title, c.content))
+                .collect::<Vec<_>>()
+                .join("\n");
+
+            let mut messages_with_context = vec![serde_json::json!({
+                "role": "system",
+                "content": format!("Global Context:\n{}", context_text),
+            })];
+            messages_with_context.extend(messages);
+
+            client
+                .chat_completion(messages_with_context, Some(512), Some(0.7))
+                .await
+                .map_err(|e| format!("OpenRouter error: {:?}", e))
+        } else {
+            client
+                .chat_completion(messages, Some(512), Some(0.7))
+                .await
+                .map_err(|e| format!("OpenRouter error: {:?}", e))
+        }
     }
 
     // Context management
-    async fn load_context(
-        _conversation_id: Option<String>,
-        _config_state: Option<Arc<ConfigState>>,
-    ) -> Result<Vec<ContextItem>, String> {
-        // TODO: Load actual context from backend
-        Ok(Vec::new())
-    }
-
     async fn add_context(
-        _conversation_id: Option<String>,
-        _config_state: Option<Arc<ConfigState>>,
+        conversation: Option<Conversation>,
+        conversation_service: Arc<ConversationService>,
         title: String,
         content: String,
-    ) -> Result<(), String> {
-        // TODO: Add context via backend
-        log::info!("Added context: {} - {}", title, content);
-        Ok(())
+    ) -> Result<(Conversation, TerraphimContextItem), String> {
+        use terraphim_types::ContextType;
+
+        let mut conversation = conversation.ok_or("No conversation initialized")?;
+
+        // Create context item
+        let context_item = TerraphimContextItem {
+            id: ulid::Ulid::new().to_string(),
+            title,
+            summary: None,
+            content,
+            context_type: ContextType::UserInput,
+            metadata: ahash::AHashMap::new(),
+            created_at: chrono::Utc::now(),
+            relevance_score: None,
+        };
+
+        // Add to conversation
+        conversation.add_global_context(context_item.clone());
+
+        // Save conversation
+        conversation_service
+            .update_conversation(conversation.clone())
+            .await
+            .map_err(|e| format!("Failed to save conversation: {:?}", e))?;
+
+        log::info!("Added context: {} to conversation {}", context_item.title, conversation.id.as_str());
+        Ok((conversation, context_item))
     }
 
     async fn remove_context(
-        _conversation_id: Option<String>,
-        _config_state: Option<Arc<ConfigState>>,
+        conversation: Option<Conversation>,
+        conversation_service: Arc<ConversationService>,
         context_id: String,
-    ) -> Result<String, String> {
-        // TODO: Remove context via backend
-        log::info!("Removed context: {}", context_id);
-        Ok(context_id)
+    ) -> Result<Conversation, String> {
+        let mut conversation = conversation.ok_or("No conversation initialized")?;
+
+        // Remove context by ID
+        conversation.global_context.retain(|c| c.id != context_id);
+
+        // Save conversation
+        conversation_service
+            .update_conversation(conversation.clone())
+            .await
+            .map_err(|e| format!("Failed to save conversation: {:?}", e))?;
+
+        log::info!("Removed context: {} from conversation {}", context_id, conversation.id.as_str());
+        Ok(conversation)
     }
 
     async fn search_kg_terms(
@@ -711,13 +886,42 @@ impl TerraphimApp {
     }
 
     async fn add_kg_term_context(
-        _conversation_id: Option<String>,
-        _config_state: Option<Arc<ConfigState>>,
+        conversation: Option<Conversation>,
+        conversation_service: Arc<ConversationService>,
         term: String,
-    ) -> Result<(), String> {
-        // TODO: Add KG term as context via backend
-        log::info!("Added KG term context: {}", term);
-        Ok(())
+    ) -> Result<(Conversation, TerraphimContextItem), String> {
+        use terraphim_types::ContextType;
+
+        let mut conversation = conversation.ok_or("No conversation initialized")?;
+
+        // Create context item from KG term
+        let context_item = TerraphimContextItem {
+            id: ulid::Ulid::new().to_string(),
+            title: format!("KG: {}", term),
+            summary: Some(format!("Knowledge Graph term: {}", term)),
+            content: format!("Knowledge Graph term: {}", term),
+            context_type: ContextType::KGTermDefinition,
+            metadata: {
+                let mut map = ahash::AHashMap::new();
+                map.insert("term".to_string(), term.clone());
+                map.insert("source_type".to_string(), "kg_term".to_string());
+                map
+            },
+            created_at: chrono::Utc::now(),
+            relevance_score: None,
+        };
+
+        // Add to conversation
+        conversation.add_global_context(context_item.clone());
+
+        // Save conversation
+        conversation_service
+            .update_conversation(conversation.clone())
+            .await
+            .map_err(|e| format!("Failed to save conversation: {:?}", e))?;
+
+        log::info!("Added KG term context: {} to conversation {}", context_item.title, conversation.id.as_str());
+        Ok((conversation, context_item))
     }
 
     // View: Header with navigation
