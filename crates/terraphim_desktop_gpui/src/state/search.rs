@@ -96,7 +96,7 @@ impl SearchState {
             ..Default::default()
         };
 
-        cx.spawn(async move |this, mut cx| {
+        cx.spawn(async move |this, cx| {
             match service.search(&query, options).await {
                 Ok(results) => {
                     log::info!(

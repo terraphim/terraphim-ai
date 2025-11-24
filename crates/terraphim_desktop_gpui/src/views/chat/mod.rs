@@ -1,6 +1,5 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::scroll::ScrollbarAxis;
 use gpui_component::StyledExt;
 use std::sync::Arc;
 use terraphim_types::{ChatMessage, ContextItem, Conversation, RoleName};
@@ -103,7 +102,7 @@ impl ChatView {
             let _user_message = ChatMessage::user(content.clone());
 
             // Simulate assistant response
-            cx.spawn(async move |this, mut cx| {
+            cx.spawn(async move |this, cx| {
                 // Simulate network delay
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 

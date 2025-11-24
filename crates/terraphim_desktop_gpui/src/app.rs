@@ -1,8 +1,7 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::StyledExt;
+use gpui_component::{button::*, StyledExt};
 
-use crate::actions::{NavigateToChat, NavigateToEditor, NavigateToSearch};
 use crate::theme::TerraphimTheme;
 use crate::views::chat::ChatView;
 use crate::views::editor::EditorView;
@@ -78,6 +77,21 @@ impl TerraphimApp {
             self.current_view = view;
             cx.notify();
         }
+    }
+
+    /// Navigate to search view handler
+    fn navigate_to_search(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        self.navigate_to(AppView::Search, cx);
+    }
+
+    /// Navigate to chat view handler
+    fn navigate_to_chat(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        self.navigate_to(AppView::Chat, cx);
+    }
+
+    /// Navigate to editor view handler
+    fn navigate_to_editor(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        self.navigate_to(AppView::Editor, cx);
     }
 
     /// Toggle tray menu visibility
@@ -159,9 +173,9 @@ impl TerraphimApp {
                         div()
                             .flex()
                             .gap_2()
-                            .child(self.render_nav_button("Search", AppView::Search, cx))
-                            .child(self.render_nav_button("Chat", AppView::Chat, cx))
-                            .child(self.render_nav_button("Editor", AppView::Editor, cx)),
+                            .child(self.render_search_button(cx))
+                            .child(self.render_chat_button(cx))
+                            .child(self.render_editor_button(cx)),
                     ),
             )
             .child(
@@ -195,29 +209,43 @@ impl TerraphimApp {
             )
     }
 
-    fn render_nav_button(
-        &self,
-        label: &str,
-        view: AppView,
-        _cx: &mut Context<Self>,
-    ) -> impl IntoElement {
-        let is_active = self.current_view == view;
-        let label = label.to_string();
+    fn render_search_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_active = self.current_view == AppView::Search;
 
-        div()
-            .px_4()
-            .py_2()
-            .rounded_md()
-            .when(is_active, |this| {
-                this.bg(rgb(0x3273dc)).text_color(rgb(0xffffff))
-            })
-            .when(!is_active, |this| {
-                this.bg(rgb(0xffffff))
-                    .text_color(rgb(0x363636))
-                    .hover(|style| style.bg(rgb(0xf0f0f0)))
-                    .cursor_pointer()
-            })
-            .child(label)
+        let btn = Button::new("nav-search")
+            .label("Search");
+
+        if is_active {
+            btn.primary()
+        } else {
+            btn.outline().on_click(cx.listener(Self::navigate_to_search))
+        }
+    }
+
+    fn render_chat_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_active = self.current_view == AppView::Chat;
+
+        let btn = Button::new("nav-chat")
+            .label("Chat");
+
+        if is_active {
+            btn.primary()
+        } else {
+            btn.outline().on_click(cx.listener(Self::navigate_to_chat))
+        }
+    }
+
+    fn render_editor_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let is_active = self.current_view == AppView::Editor;
+
+        let btn = Button::new("nav-editor")
+            .label("Editor");
+
+        if is_active {
+            btn.primary()
+        } else {
+            btn.outline().on_click(cx.listener(Self::navigate_to_editor))
+        }
     }
 }
 

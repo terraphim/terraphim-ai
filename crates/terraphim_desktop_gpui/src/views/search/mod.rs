@@ -1,5 +1,4 @@
 use gpui::*;
-use gpui::prelude::FluentBuilder;
 use gpui_component::StyledExt;
 
 mod autocomplete;

@@ -26,7 +26,7 @@ impl AutocompleteState {
     pub fn initialize_engine(&mut self, role: &str, cx: &mut Context<Self>) {
         let role = role.to_string();
 
-        cx.spawn(async move |this, mut cx| {
+        cx.spawn(async move |this, cx| {
             match AutocompleteEngine::from_role(&role, None).await {
                 Ok(engine) => {
                     log::info!(

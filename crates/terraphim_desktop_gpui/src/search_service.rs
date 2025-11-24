@@ -2,7 +2,7 @@ use anyhow::Result;
 use std::sync::{Arc, Mutex};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
+use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Search service integration layer
 pub struct SearchService {

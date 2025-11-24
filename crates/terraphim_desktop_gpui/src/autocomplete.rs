@@ -1,7 +1,6 @@
 use anyhow::Result;
 use terraphim_automata::{
-    autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search,
-    load_thesaurus, AutocompleteConfig, AutocompleteIndex, AutocompleteResult,
+    autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search, AutocompleteConfig, AutocompleteIndex,
 };
 use terraphim_types::Thesaurus;
 
@@ -44,8 +43,8 @@ impl AutocompleteEngine {
 
     /// Create engine from role configuration
     pub async fn from_role(role_name: &str, config_path: Option<&str>) -> Result<Self> {
-        use terraphim_automata::AutomataPath;
-        use terraphim_config::{Config, ConfigState};
+        
+        
 
         // Load config
         let mut config = if let Some(path) = config_path {

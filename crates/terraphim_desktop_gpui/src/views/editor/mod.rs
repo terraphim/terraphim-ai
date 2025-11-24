@@ -79,7 +79,7 @@ impl EditorView {
         let command = command.to_string();
         let args = args.to_string();
 
-        cx.spawn(async move |this, mut cx| {
+        cx.spawn(async move |this, cx| {
             match slash_manager.execute_command(&command, &args).await {
                 Ok(result) => {
                     this.update(cx, |this, cx| {
