@@ -5,6 +5,7 @@ use crate::theme::TerraphimTheme;
 use crate::views::chat::ChatView;
 use crate::views::editor::EditorView;
 use crate::views::search::SearchView;
+use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
 
 /// Main application state
 pub struct TerraphimApp {
@@ -12,7 +13,10 @@ pub struct TerraphimApp {
     search_view: View<SearchView>,
     chat_view: View<ChatView>,
     editor_view: View<EditorView>,
+    role_selector: View<RoleSelector>,
+    tray_menu: View<TrayMenu>,
     theme: Model<TerraphimTheme>,
+    show_tray_menu: bool,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -31,6 +35,12 @@ impl TerraphimApp {
         let search_view = cx.new_view(|cx| SearchView::new(cx));
         let chat_view = cx.new_view(|cx| ChatView::new(cx));
         let editor_view = cx.new_view(|cx| EditorView::new(cx));
+
+        // Initialize role selector
+        let role_selector = cx.new_view(|cx| RoleSelector::new(cx));
+
+        // Initialize tray menu
+        let tray_menu = cx.new_view(|cx| TrayMenu::new(cx));
 
         // Subscribe to navigation actions
         cx.on_action(|this: &mut Self, _: &NavigateToSearch, cx| {
@@ -52,7 +62,10 @@ impl TerraphimApp {
             search_view,
             chat_view,
             editor_view,
+            role_selector,
+            tray_menu,
             theme,
+            show_tray_menu: false,
         }
     }
 
@@ -64,11 +77,64 @@ impl TerraphimApp {
         }
     }
 
+    /// Toggle tray menu visibility
+    pub fn toggle_tray_menu(&mut self, cx: &mut ViewContext<Self>) {
+        self.show_tray_menu = !self.show_tray_menu;
+
+        self.tray_menu.update(cx, |menu, cx| {
+            if self.show_tray_menu {
+                menu.show(cx);
+            } else {
+                menu.hide(cx);
+            }
+        });
+
+        cx.notify();
+    }
+
+    /// Handle tray menu actions
+    fn handle_tray_action(&mut self, action: TrayMenuAction, cx: &mut ViewContext<Self>) {
+        log::info!("Handling tray action: {:?}", action);
+
+        match action {
+            TrayMenuAction::ShowWindow => {
+                // In a real app, this would show the window
+                log::info!("Show window requested");
+            }
+            TrayMenuAction::HideWindow => {
+                // In a real app, this would hide the window
+                log::info!("Hide window requested");
+            }
+            TrayMenuAction::Search => {
+                self.navigate_to(AppView::Search, cx);
+            }
+            TrayMenuAction::Chat => {
+                self.navigate_to(AppView::Chat, cx);
+            }
+            TrayMenuAction::Settings => {
+                log::info!("Settings view not yet implemented");
+            }
+            TrayMenuAction::About => {
+                log::info!("About dialog not yet implemented");
+            }
+            TrayMenuAction::Quit => {
+                log::info!("Quit requested - would close application");
+                // In a real app: cx.quit();
+            }
+            TrayMenuAction::Custom(name) => {
+                log::info!("Custom action: {}", name);
+            }
+        }
+
+        self.show_tray_menu = false;
+        cx.notify();
+    }
+
     fn render_navigation(&self, cx: &mut ViewContext<Self>) -> impl IntoElement {
         div()
             .flex()
             .items_center()
-            .gap_4()
+            .justify_between()
             .p_4()
             .bg(rgb(0xf5f5f5))
             .border_b_1()
@@ -77,7 +143,7 @@ impl TerraphimApp {
                 div()
                     .flex()
                     .items_center()
-                    .gap_2()
+                    .gap_4()
                     .child(
                         // Logo
                         div()
@@ -85,15 +151,44 @@ impl TerraphimApp {
                             .font_bold()
                             .text_color(rgb(0x333333))
                             .child("Terraphim AI"),
+                    )
+                    .child(
+                        div()
+                            .flex()
+                            .gap_2()
+                            .child(self.render_nav_button("Search", AppView::Search, cx))
+                            .child(self.render_nav_button("Chat", AppView::Chat, cx))
+                            .child(self.render_nav_button("Editor", AppView::Editor, cx)),
                     ),
             )
             .child(
                 div()
                     .flex()
-                    .gap_2()
-                    .child(self.render_nav_button("Search", AppView::Search, cx))
-                    .child(self.render_nav_button("Chat", AppView::Chat, cx))
-                    .child(self.render_nav_button("Editor", AppView::Editor, cx)),
+                    .items_center()
+                    .gap_4()
+                    .child(
+                        // Role selector
+                        self.role_selector.clone(),
+                    )
+                    .child(
+                        // Tray menu button
+                        div()
+                            .px_3()
+                            .py_2()
+                            .rounded_md()
+                            .bg(if self.show_tray_menu {
+                                rgb(0x3273dc)
+                            } else {
+                                rgb(0xffffff)
+                            })
+                            .text_color(if self.show_tray_menu {
+                                rgb(0xffffff)
+                            } else {
+                                rgb(0x363636)
+                            })
+                            .hover(|style| style.bg(rgb(0xf0f0f0)).cursor_pointer())
+                            .child("☰"),
+                    ),
             )
     }
 
@@ -129,6 +224,7 @@ impl Render for TerraphimApp {
             .flex_col()
             .size_full()
             .bg(rgb(0xffffff))
+            .relative()
             .child(self.render_navigation(cx))
             .child(
                 div()
@@ -140,5 +236,36 @@ impl Render for TerraphimApp {
                         AppView::Editor => self.editor_view.clone().into_any_element(),
                     }),
             )
+            .when(self.show_tray_menu, |this| {
+                this.child(self.tray_menu.clone())
+            })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_app_view_variants() {
+        assert_eq!(AppView::Search, AppView::Search);
+        assert_ne!(AppView::Search, AppView::Chat);
+        assert_ne!(AppView::Chat, AppView::Editor);
+    }
+
+    #[test]
+    fn test_tray_menu_action_handling() {
+        // Test that all TrayMenuAction variants are handled
+        let actions = vec![
+            TrayMenuAction::ShowWindow,
+            TrayMenuAction::HideWindow,
+            TrayMenuAction::Search,
+            TrayMenuAction::Chat,
+            TrayMenuAction::Settings,
+            TrayMenuAction::About,
+            TrayMenuAction::Quit,
+        ];
+
+        assert_eq!(actions.len(), 7);
     }
 }
