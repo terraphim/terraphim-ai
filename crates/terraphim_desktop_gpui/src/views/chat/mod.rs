@@ -2,84 +2,125 @@ use gpui::*;
 use gpui::prelude::FluentBuilder;
 use gpui_component::StyledExt;
 use std::sync::Arc;
-use terraphim_types::{ChatMessage, ContextItem, Conversation, RoleName};
+use terraphim_service::context::{ContextConfig, ContextManager as TerraphimContextManager};
+use terraphim_types::{ChatMessage, ContextItem, Conversation, ConversationId, RoleName};
+use tokio::sync::Mutex as TokioMutex;
 
-// Import from library crate
-mod context {
-    pub use gpui::*;
-    pub struct ContextManager {
-        items: Vec<std::sync::Arc<terraphim_types::ContextItem>>,
-    }
-    impl ContextManager {
-        pub fn new(_cx: &mut Context<Self>) -> Self {
-            Self { items: Vec::new() }
-        }
-        pub fn count(&self) -> usize {
-            self.items.len()
-        }
-        pub fn clear_all(&mut self, _cx: &mut Context<Self>) {
-            self.items.clear();
-        }
-        pub fn add_item(&mut self, item: terraphim_types::ContextItem, _cx: &mut Context<Self>) -> Result<(), String> {
-            self.items.push(std::sync::Arc::new(item));
-            Ok(())
-        }
-    }
-}
-use context::ContextManager;
-
-/// Chat view with full context integration
+/// Chat view with real ContextManager backend integration
 pub struct ChatView {
-    conversation: Option<Arc<Conversation>>,
-    context_manager: Entity<ContextManager>,
+    context_manager: Arc<TokioMutex<TerraphimContextManager>>,
+    current_conversation_id: Option<ConversationId>,
+    messages: Vec<ChatMessage>,
     message_input: SharedString,
     is_sending: bool,
     show_context_panel: bool,
+    context_items: Vec<ContextItem>,
 }
 
 impl ChatView {
-    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
-        log::info!("ChatView initialized");
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
+        log::info!("ChatView initialized with backend ContextManager");
 
-        let context_manager = cx.new(|cx| ContextManager::new(cx));
+        // Initialize ContextManager using Tauri pattern (cmd.rs:937-947)
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(ContextConfig::default())
+        ));
 
         Self {
-            conversation: None,
             context_manager,
+            current_conversation_id: None,
+            messages: Vec::new(),
             message_input: "".into(),
             is_sending: false,
             show_context_panel: true,
+            context_items: Vec::new(),
         }
     }
 
-    /// Initialize with a conversation
-    pub fn with_conversation(mut self, conversation: Conversation) -> Self {
-        self.conversation = Some(Arc::new(conversation));
-        self
-    }
+    /// Create a new conversation (pattern from Tauri cmd.rs:950-978)
+    pub fn create_conversation(&mut self, title: String, role: RoleName, cx: &mut Context<Self>) {
+        log::info!("Creating conversation: {} (role: {})", title, role);
 
-    /// Create a new conversation
-    pub fn new_conversation(&mut self, title: String, role: RoleName, cx: &mut Context<Self>) {
-        log::info!("Creating new conversation: {} (role: {})", title, role);
+        let manager = self.context_manager.clone();
 
-        let conversation = Conversation::new(title, role);
-        self.conversation = Some(Arc::new(conversation));
+        cx.spawn(async move |this, cx| {
+            let mut mgr = manager.lock().await;
 
-        // Clear context for new conversation
-        self.context_manager.update(cx, |mgr, cx| {
-            mgr.clear_all(cx);
-        });
+            match mgr.create_conversation(title, role).await {
+                Ok(conversation_id) => {
+                    log::info!("✅ Created conversation: {}", conversation_id.as_str());
 
-        cx.notify();
-    }
-
-    /// Add context item to conversation
-    pub fn add_context(&mut self, item: ContextItem, cx: &mut Context<Self>) {
-        self.context_manager.update(cx, |mgr, cx| {
-            if let Err(e) = mgr.add_item(item, cx) {
-                log::error!("Failed to add context item: {}", e);
+                    this.update(cx, |this, cx| {
+                        this.current_conversation_id = Some(conversation_id);
+                        this.messages.clear();
+                        this.context_items.clear();
+                        cx.notify();
+                    }).ok();
+                }
+                Err(e) => {
+                    log::error!("❌ Failed to create conversation: {}", e);
+                }
             }
-        });
+        }).detach();
+    }
+
+    /// Add context to current conversation (pattern from Tauri cmd.rs:1078-1140)
+    pub fn add_context(&mut self, context_item: ContextItem, cx: &mut Context<Self>) {
+        let conv_id = match &self.current_conversation_id {
+            Some(id) => id.clone(),
+            None => {
+                log::warn!("Cannot add context: no active conversation");
+                return;
+            }
+        };
+
+        let manager = self.context_manager.clone();
+
+        cx.spawn(async move |this, cx| {
+            let mut mgr = manager.lock().await;
+
+            match mgr.add_context(&conv_id, context_item.clone()) {
+                Ok(()) => {
+                    log::info!("✅ Added context to conversation");
+
+                    this.update(cx, |this, cx| {
+                        this.context_items.push(context_item);
+                        cx.notify();
+                    }).ok();
+                }
+                Err(e) => {
+                    log::error!("❌ Failed to add context: {}", e);
+                }
+            }
+        }).detach();
+    }
+
+    /// Delete context from conversation (pattern from Tauri cmd.rs:1180-1211)
+    pub fn delete_context(&mut self, context_id: String, cx: &mut Context<Self>) {
+        let conv_id = match &self.current_conversation_id {
+            Some(id) => id.clone(),
+            None => return,
+        };
+
+        let manager = self.context_manager.clone();
+
+        cx.spawn(async move |this, cx| {
+            let mut mgr = manager.lock().await;
+
+            match mgr.delete_context(&conv_id, &context_id) {
+                Ok(()) => {
+                    log::info!("✅ Deleted context: {}", context_id);
+
+                    this.update(cx, |this, cx| {
+                        this.context_items.retain(|item| item.id != context_id);
+                        cx.notify();
+                    }).ok();
+                }
+                Err(e) => {
+                    log::error!("❌ Failed to delete context: {}", e);
+                }
+            }
+        }).detach();
     }
 
     /// Send a message
@@ -97,25 +138,21 @@ impl ChatView {
         // In a real implementation, this would call the LLM service
         // For now, just add a user message and simulate a response
 
-        if let Some(ref mut _conversation) = self.conversation {
-            // Add user message
-            let _user_message = ChatMessage::user(content.clone());
+        // Add user message to local history
+        self.messages.push(ChatMessage::user(content.clone()));
 
-            // Simulate assistant response
-            cx.spawn(async move |this, cx| {
-                // Simulate network delay
-                tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
+        // Simulate assistant response (will be replaced with real LLM in next phase)
+        cx.spawn(async move |this, cx| {
+            // Simulate network delay
+            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-                this.update(cx, |this, cx| {
-                    // Add simulated response
-                    let _response = format!("This is a simulated response to: '{}'", content);
-                    let _assistant_message = ChatMessage::assistant(_response, Some("claude-sonnet-4-5".to_string()));
-
-                    this.is_sending = false;
-                    cx.notify();
-                }).ok();
-            }).detach();
-        }
+            this.update(cx, |this, cx| {
+                let response = format!("Simulated response to: '{}'", content);
+                this.messages.push(ChatMessage::assistant(response, Some("claude-sonnet-4-5".to_string())));
+                this.is_sending = false;
+                cx.notify();
+            }).ok();
+        }).detach();
     }
 
     /// Toggle context panel visibility
@@ -127,9 +164,9 @@ impl ChatView {
 
     /// Render chat header
     fn render_header(&self, _cx: &Context<Self>) -> impl IntoElement {
-        let title = self.conversation
+        let title = self.current_conversation_id
             .as_ref()
-            .map(|conv| conv.title.clone())
+            .map(|id| format!("Conversation {}", id.as_str().chars().take(8).collect::<String>()))
             .unwrap_or_else(|| "No Conversation".to_string());
 
         div()
@@ -161,13 +198,11 @@ impl ChatView {
                                     .text_color(rgb(0x363636))
                                     .child(title),
                             )
-                            .children(
-                                self.conversation.as_ref().map(|conv| {
-                                    div()
-                                        .text_xs()
-                                        .text_color(rgb(0x7a7a7a))
-                                        .child(format!("Role: {}", conv.role))
-                                })
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb(0x7a7a7a))
+                                    .child(format!("{} messages", self.messages.len()))
                             ),
                     ),
             )
@@ -251,24 +286,20 @@ impl ChatView {
 
     /// Render messages area
     fn render_messages(&self, _cx: &Context<Self>) -> impl IntoElement {
-        if let Some(conversation) = &self.conversation {
-            if conversation.messages.is_empty() {
-                return self.render_empty_state().into_any_element();
-            }
-
-            div()
-                .flex()
-                .flex_col()
-                .gap_4()
-                .px_6()
-                .py_4()
-                .children(
-                    conversation.messages.iter().map(|msg| self.render_message(msg))
-                )
-                .into_any_element()
-        } else {
-            self.render_no_conversation().into_any_element()
+        if self.messages.is_empty() {
+            return self.render_empty_state().into_any_element();
         }
+
+        div()
+            .flex()
+            .flex_col()
+            .gap_4()
+            .px_6()
+            .py_4()
+            .children(
+                self.messages.iter().map(|msg| self.render_message(msg))
+            )
+            .into_any_element()
     }
 
     /// Render a single message
@@ -433,8 +464,33 @@ impl Render for ChatView {
                                                 .text_color(rgb(0x7a7a7a))
                                                 .child(format!(
                                                     "{} items",
-                                                    self.context_manager.read(cx).count()
+                                                    self.context_items.len()
                                                 )),
+                                        )
+                                        .children(
+                                            self.context_items.iter().map(|item| {
+                                                div()
+                                                    .px_3()
+                                                    .py_2()
+                                                    .mb_2()
+                                                    .bg(rgb(0xffffff))
+                                                    .border_1()
+                                                    .border_color(rgb(0xdbdbdb))
+                                                    .rounded_md()
+                                                    .child(
+                                                        div()
+                                                            .text_sm()
+                                                            .font_medium()
+                                                            .text_color(rgb(0x363636))
+                                                            .child(item.title.clone())
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_xs()
+                                                            .text_color(rgb(0x7a7a7a))
+                                                            .child(format!("{} chars", item.content.len()))
+                                                    )
+                                            })
                                         ),
                                 ),
                         )
