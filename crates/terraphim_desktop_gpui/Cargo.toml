@@ -17,10 +17,8 @@ path = "src/lib.rs"
 
 [dependencies]
 # GPUI framework and components
-# NOTE: Temporarily commented out until GPUI 1.0 is released
-# See BUILDING.md for details on GPUI availability
-# gpui = "0.1"
-# gpui-component = "0.3"
+gpui = { version = "*" }
+gpui-component = { version = "*" }
 
 # Direct integration with terraphim crates
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
