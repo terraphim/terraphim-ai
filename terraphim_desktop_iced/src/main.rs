@@ -7,6 +7,7 @@ use std::sync::Arc;
 // Import terraphim modules
 use terraphim_config::ConfigState;
 use terraphim_settings::DeviceSettings;
+use terraphim_types::{Document, NormalizedTermValue, SearchQuery};
 
 fn main() -> iced::Result {
     // Initialize logging
@@ -31,11 +32,23 @@ struct TerraphimApp {
 
     // Search state
     search_input: String,
-    search_results: Vec<terraphim_types::Document>,
+    search_results: Vec<Document>,
+    search_suggestions: Vec<String>,
+    show_suggestions: bool,
 
     // Chat state
     chat_input: String,
     chat_messages: Vec<ChatMessage>,
+    conversation_id: Option<String>,
+    context_items: Vec<ContextItem>,
+    show_context_form: bool,
+    new_context_title: String,
+    new_context_content: String,
+
+    // KG Search state
+    show_kg_search: bool,
+    kg_search_input: String,
+    kg_search_results: Vec<KgTerm>,
 
     // Theme
     theme: Theme,
@@ -49,7 +62,6 @@ struct TerraphimApp {
 enum View {
     Search,
     Chat,
-    Graph,
     Config,
 }
 
@@ -59,21 +71,57 @@ struct ChatMessage {
     content: String,
 }
 
+#[derive(Debug, Clone)]
+struct ContextItem {
+    id: String,
+    title: String,
+    content: String,
+    context_type: String,
+}
+
+#[derive(Debug, Clone)]
+struct KgTerm {
+    term: String,
+    definition: Option<String>,
+}
+
 // Messages (events) that can be sent to update the application
 #[derive(Debug, Clone)]
 enum Message {
     // Navigation
     SwitchView(View),
 
-    // Search
+    // Search & Autocomplete
     SearchInputChanged(String),
     SearchSubmitted,
-    SearchCompleted(Result<Vec<terraphim_types::Document>, String>),
+    SearchCompleted(Result<Vec<Document>, String>),
+    AutocompleteRequested,
+    AutocompleteReceived(Result<Vec<String>, String>),
+    SuggestionSelected(String),
 
     // Chat
     ChatInputChanged(String),
     ChatMessageSent,
     ChatResponseReceived(Result<String, String>),
+    ConversationInitialized(Result<String, String>),
+
+    // Context Management
+    ToggleContextForm,
+    ContextTitleChanged(String),
+    ContextContentChanged(String),
+    AddContext,
+    ContextAdded(Result<(), String>),
+    RemoveContext(String),
+    ContextRemoved(Result<String, String>),
+    LoadContext,
+    ContextLoaded(Result<Vec<ContextItem>, String>),
+
+    // KG Search
+    ToggleKgSearch,
+    KgSearchInputChanged(String),
+    KgSearchSubmitted,
+    KgSearchCompleted(Result<Vec<KgTerm>, String>),
+    AddKgTermContext(String),
 
     // Configuration
     ConfigLoaded(Result<Arc<ConfigState>, String>),
@@ -94,32 +142,33 @@ impl TerraphimApp {
             device_settings: None,
             search_input: String::new(),
             search_results: Vec::new(),
+            search_suggestions: Vec::new(),
+            show_suggestions: false,
             chat_input: String::new(),
             chat_messages: vec![ChatMessage {
                 role: "assistant".to_string(),
                 content: "Hi! How can I help you? Ask me anything about your search results or documents.".to_string(),
             }],
+            conversation_id: None,
+            context_items: Vec::new(),
+            show_context_form: false,
+            new_context_title: String::new(),
+            new_context_content: String::new(),
+            show_kg_search: false,
+            kg_search_input: String::new(),
+            kg_search_results: Vec::new(),
             theme: Theme::Light,
             is_loading: false,
             error_message: None,
         };
 
         // Initialize configuration asynchronously
-        let init_task = Task::perform(
-            Self::initialize_config(),
-            Message::ConfigLoaded,
-        );
+        let init_task = Task::batch(vec![
+            Task::perform(Self::initialize_config(), Message::ConfigLoaded),
+            Task::perform(Self::initialize_conversation(), Message::ConversationInitialized),
+        ]);
 
         (app, init_task)
-    }
-
-    fn title(&self) -> String {
-        match self.current_view {
-            View::Search => "Terraphim - Search".to_string(),
-            View::Chat => "Terraphim - Chat".to_string(),
-            View::Graph => "Terraphim - Knowledge Graph".to_string(),
-            View::Config => "Terraphim - Configuration".to_string(),
-        }
     }
 
     fn update(&mut self, message: Message) -> Task<Message> {
@@ -129,9 +178,49 @@ impl TerraphimApp {
                 Task::none()
             }
 
+            // Search & Autocomplete
             Message::SearchInputChanged(value) => {
                 self.search_input = value;
+                // Trigger autocomplete if input is long enough
+                if self.search_input.len() >= 2 {
+                    Task::perform(
+                        Self::fetch_autocomplete(
+                            self.search_input.clone(),
+                            self.config_state.clone(),
+                        ),
+                        Message::AutocompleteReceived,
+                    )
+                } else {
+                    self.search_suggestions.clear();
+                    self.show_suggestions = false;
+                    Task::none()
+                }
+            }
+
+            Message::AutocompleteReceived(result) => {
+                match result {
+                    Ok(suggestions) => {
+                        self.search_suggestions = suggestions;
+                        self.show_suggestions = !self.search_suggestions.is_empty();
+                    }
+                    Err(e) => {
+                        log::warn!("Autocomplete error: {}", e);
+                        self.search_suggestions.clear();
+                        self.show_suggestions = false;
+                    }
+                }
                 Task::none()
+            }
+
+            Message::SuggestionSelected(suggestion) => {
+                self.search_input = suggestion;
+                self.show_suggestions = false;
+                self.search_suggestions.clear();
+                // Automatically trigger search
+                Task::perform(
+                    Self::perform_search(self.search_input.clone(), self.config_state.clone()),
+                    Message::SearchCompleted,
+                )
             }
 
             Message::SearchSubmitted => {
@@ -140,13 +229,11 @@ impl TerraphimApp {
                 }
 
                 self.is_loading = true;
+                self.show_suggestions = false;
                 let query = self.search_input.clone();
                 let config_state = self.config_state.clone();
 
-                Task::perform(
-                    Self::perform_search(query, config_state),
-                    Message::SearchCompleted,
-                )
+                Task::perform(Self::perform_search(query, config_state), Message::SearchCompleted)
             }
 
             Message::SearchCompleted(result) => {
@@ -163,6 +250,7 @@ impl TerraphimApp {
                 Task::none()
             }
 
+            // Chat
             Message::ChatInputChanged(value) => {
                 self.chat_input = value;
                 Task::none()
@@ -180,11 +268,15 @@ impl TerraphimApp {
                 });
 
                 let message = self.chat_input.clone();
+                let conversation_id = self.conversation_id.clone();
+                let config_state = self.config_state.clone();
+                let context = self.context_items.clone();
+
                 self.chat_input.clear();
                 self.is_loading = true;
 
                 Task::perform(
-                    Self::send_chat_message(message),
+                    Self::send_chat_message(message, conversation_id, config_state, context),
                     Message::ChatResponseReceived,
                 )
             }
@@ -204,6 +296,171 @@ impl TerraphimApp {
                     }
                 }
                 Task::none()
+            }
+
+            Message::ConversationInitialized(result) => {
+                match result {
+                    Ok(conv_id) => {
+                        self.conversation_id = Some(conv_id);
+                        // Load context for this conversation
+                        Task::perform(
+                            Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
+                            Message::ContextLoaded,
+                        )
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to initialize conversation: {}", e);
+                        Task::none()
+                    }
+                }
+            }
+
+            // Context Management
+            Message::ToggleContextForm => {
+                self.show_context_form = !self.show_context_form;
+                if !self.show_context_form {
+                    self.new_context_title.clear();
+                    self.new_context_content.clear();
+                }
+                Task::none()
+            }
+
+            Message::ContextTitleChanged(value) => {
+                self.new_context_title = value;
+                Task::none()
+            }
+
+            Message::ContextContentChanged(value) => {
+                self.new_context_content = value;
+                Task::none()
+            }
+
+            Message::AddContext => {
+                if self.new_context_title.is_empty() || self.new_context_content.is_empty() {
+                    return Task::none();
+                }
+
+                let title = self.new_context_title.clone();
+                let content = self.new_context_content.clone();
+                let conversation_id = self.conversation_id.clone();
+                let config_state = self.config_state.clone();
+
+                Task::perform(
+                    Self::add_context(conversation_id, config_state, title, content),
+                    Message::ContextAdded,
+                )
+            }
+
+            Message::ContextAdded(result) => {
+                match result {
+                    Ok(()) => {
+                        self.new_context_title.clear();
+                        self.new_context_content.clear();
+                        self.show_context_form = false;
+                        // Reload context
+                        Task::perform(
+                            Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
+                            Message::ContextLoaded,
+                        )
+                    }
+                    Err(e) => {
+                        self.error_message = Some(format!("Failed to add context: {}", e));
+                        Task::none()
+                    }
+                }
+            }
+
+            Message::RemoveContext(context_id) => {
+                let conversation_id = self.conversation_id.clone();
+                let config_state = self.config_state.clone();
+
+                Task::perform(
+                    Self::remove_context(conversation_id, config_state, context_id),
+                    Message::ContextRemoved,
+                )
+            }
+
+            Message::ContextRemoved(result) => {
+                match result {
+                    Ok(_) => {
+                        // Reload context
+                        Task::perform(
+                            Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
+                            Message::ContextLoaded,
+                        )
+                    }
+                    Err(e) => {
+                        self.error_message = Some(format!("Failed to remove context: {}", e));
+                        Task::none()
+                    }
+                }
+            }
+
+            Message::LoadContext => {
+                Task::perform(
+                    Self::load_context(self.conversation_id.clone(), self.config_state.clone()),
+                    Message::ContextLoaded,
+                )
+            }
+
+            Message::ContextLoaded(result) => {
+                match result {
+                    Ok(items) => {
+                        self.context_items = items;
+                    }
+                    Err(e) => {
+                        log::warn!("Failed to load context: {}", e);
+                    }
+                }
+                Task::none()
+            }
+
+            // KG Search
+            Message::ToggleKgSearch => {
+                self.show_kg_search = !self.show_kg_search;
+                if !self.show_kg_search {
+                    self.kg_search_input.clear();
+                    self.kg_search_results.clear();
+                }
+                Task::none()
+            }
+
+            Message::KgSearchInputChanged(value) => {
+                self.kg_search_input = value;
+                Task::none()
+            }
+
+            Message::KgSearchSubmitted => {
+                if self.kg_search_input.is_empty() {
+                    return Task::none();
+                }
+
+                let query = self.kg_search_input.clone();
+                let config_state = self.config_state.clone();
+
+                Task::perform(Self::search_kg_terms(query, config_state), Message::KgSearchCompleted)
+            }
+
+            Message::KgSearchCompleted(result) => {
+                match result {
+                    Ok(terms) => {
+                        self.kg_search_results = terms;
+                    }
+                    Err(e) => {
+                        self.error_message = Some(format!("KG search error: {}", e));
+                    }
+                }
+                Task::none()
+            }
+
+            Message::AddKgTermContext(term) => {
+                let conversation_id = self.conversation_id.clone();
+                let config_state = self.config_state.clone();
+
+                Task::perform(
+                    Self::add_kg_term_context(conversation_id, config_state, term),
+                    Message::ContextAdded,
+                )
             }
 
             Message::ConfigLoaded(result) => {
@@ -233,7 +490,7 @@ impl TerraphimApp {
                 Task::none()
             }
 
-            Message::None => Task::none(),
+            Message::AutocompleteRequested | Message::None => Task::none(),
         }
     }
 
@@ -241,16 +498,12 @@ impl TerraphimApp {
         let content = match self.current_view {
             View::Search => self.view_search(),
             View::Chat => self.view_chat(),
-            View::Graph => self.view_graph(),
             View::Config => self.view_config(),
         };
 
-        let main_content = column![
-            self.view_header(),
-            content,
-        ]
-        .spacing(20)
-        .padding(20);
+        let main_content = column![self.view_header(), content,]
+            .spacing(20)
+            .padding(20);
 
         container(main_content)
             .width(Length::Fill)
@@ -263,27 +516,21 @@ impl TerraphimApp {
         use terraphim_config::{ConfigBuilder, ConfigId};
         use terraphim_persistence::Persistable;
 
-        // Load device settings
         let _device_settings = DeviceSettings::load_from_env_and_file(None)
             .unwrap_or_else(|_| DeviceSettings::new());
 
-        // Build configuration
         let mut config = ConfigBuilder::new_with_id(ConfigId::Desktop)
             .build()
             .map_err(|e| format!("Failed to build config: {:?}", e))?;
 
-        // Try to load existing config, fallback to default
         let config = match config.load().await {
             Ok(c) => c,
-            Err(_) => {
-                ConfigBuilder::new()
-                    .build_default_desktop()
-                    .build()
-                    .map_err(|e| format!("Failed to build default config: {:?}", e))?
-            }
+            Err(_) => ConfigBuilder::new()
+                .build_default_desktop()
+                .build()
+                .map_err(|e| format!("Failed to build default config: {:?}", e))?,
         };
 
-        // Create config state
         let mut tmp_config = config.clone();
         let config_state = ConfigState::new(&mut tmp_config)
             .await
@@ -292,22 +539,77 @@ impl TerraphimApp {
         Ok(Arc::new(config_state))
     }
 
-    // Async search
-    async fn perform_search(
+    // Initialize conversation
+    async fn initialize_conversation() -> Result<String, String> {
+        // Generate a simple conversation ID
+        let conv_id = format!("conv_{}", ulid::Ulid::new());
+        log::info!("Initialized conversation: {}", conv_id);
+        Ok(conv_id)
+    }
+
+    // Fetch autocomplete suggestions
+    async fn fetch_autocomplete(
         query: String,
         config_state: Option<Arc<ConfigState>>,
-    ) -> Result<Vec<terraphim_types::Document>, String> {
-        use terraphim_types::NormalizedTermValue;
+    ) -> Result<Vec<String>, String> {
+        use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search};
 
         let config_state = config_state.ok_or("Configuration not loaded")?;
 
         // Get current role
         let config = config_state.config.lock().await;
+        let role = config.selected_role.clone();
+        drop(config);
+
+        // Get the rolegraph for the specified role
+        let rolegraph_sync = config_state.roles.get(&role)
+            .ok_or_else(|| format!("Role '{}' not found", role.as_str()))?;
+
+        let rolegraph = rolegraph_sync.lock().await;
+
+        // Build FST autocomplete index from the thesaurus
+        let autocomplete_index = build_autocomplete_index(rolegraph.thesaurus.clone(), None)
+            .map_err(|e| format!("Failed to build autocomplete index: {}", e))?;
+
+        drop(rolegraph);
+
+        let limit = 8;
+
+        // Get autocomplete suggestions based on query length
+        let results = if query.len() >= 3 {
+            // For longer queries, try fuzzy search for better UX (0.7 = 70% similarity threshold)
+            match fuzzy_autocomplete_search(&autocomplete_index, &query, 0.7, Some(limit)) {
+                Ok(results) => results,
+                Err(_) => {
+                    // Fall back to exact search
+                    autocomplete_search(&autocomplete_index, &query, Some(limit))
+                        .map_err(|e| format!("Autocomplete failed: {}", e))?
+                }
+            }
+        } else {
+            // For shorter queries, use exact prefix match
+            autocomplete_search(&autocomplete_index, &query, Some(limit))
+                .map_err(|e| format!("Autocomplete failed: {}", e))?
+        };
+
+        // Extract just the terms from the results
+        let suggestions: Vec<String> = results.into_iter().map(|r| r.term).collect();
+
+        Ok(suggestions)
+    }
+
+    // Async search
+    async fn perform_search(
+        query: String,
+        config_state: Option<Arc<ConfigState>>,
+    ) -> Result<Vec<Document>, String> {
+        let config_state = config_state.ok_or("Configuration not loaded")?;
+
+        let config = config_state.config.lock().await;
         let role_name = config.selected_role.clone();
         drop(config);
 
-        // Build search query with correct structure
-        let search_query = terraphim_types::SearchQuery {
+        let search_query = SearchQuery {
             search_term: NormalizedTermValue::new(query),
             search_terms: None,
             operator: None,
@@ -316,59 +618,127 @@ impl TerraphimApp {
             role: Some(role_name),
         };
 
-        // Perform search using service layer
-        // Clone the Arc and extract the ConfigState reference
         let config_state_ref = &*config_state;
         let mut search_service = terraphim_service::TerraphimService::new(config_state_ref.clone());
-        let results = search_service.search(&search_query)
+        let results = search_service
+            .search(&search_query)
             .await
             .map_err(|e| format!("Search failed: {:?}", e))?;
 
         Ok(results)
     }
 
-    // Async chat
-    async fn send_chat_message(message: String) -> Result<String, String> {
-        // TODO: Implement actual chat API call
-        // For now, return a mock response
+    // Send chat message
+    async fn send_chat_message(
+        message: String,
+        _conversation_id: Option<String>,
+        _config_state: Option<Arc<ConfigState>>,
+        _context: Vec<ContextItem>,
+    ) -> Result<String, String> {
+        // TODO: Implement actual chat API call with context
         tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
         Ok(format!("Echo: {}", message))
     }
 
-    // View: Header with navigation
-    fn view_header(&self) -> Element<Message> {
-        let title = text("Terraphim")
-            .size(24);
-
-        let search_btn = button(text("Search"))
-            .on_press(Message::SwitchView(View::Search));
-
-        let chat_btn = button(text("Chat"))
-            .on_press(Message::SwitchView(View::Chat));
-
-        let graph_btn = button(text("Graph"))
-            .on_press(Message::SwitchView(View::Graph));
-
-        let config_btn = button(text("Config"))
-            .on_press(Message::SwitchView(View::Config));
-
-        let theme_btn = button(text("🌓"))
-            .on_press(Message::ToggleTheme);
-
-        row![
-            title,
-            search_btn,
-            chat_btn,
-            graph_btn,
-            config_btn,
-            theme_btn,
-        ]
-        .spacing(10)
-        .align_y(Alignment::Center)
-        .into()
+    // Context management
+    async fn load_context(
+        _conversation_id: Option<String>,
+        _config_state: Option<Arc<ConfigState>>,
+    ) -> Result<Vec<ContextItem>, String> {
+        // TODO: Load actual context from backend
+        Ok(Vec::new())
     }
 
-    // View: Search
+    async fn add_context(
+        _conversation_id: Option<String>,
+        _config_state: Option<Arc<ConfigState>>,
+        title: String,
+        content: String,
+    ) -> Result<(), String> {
+        // TODO: Add context via backend
+        log::info!("Added context: {} - {}", title, content);
+        Ok(())
+    }
+
+    async fn remove_context(
+        _conversation_id: Option<String>,
+        _config_state: Option<Arc<ConfigState>>,
+        context_id: String,
+    ) -> Result<String, String> {
+        // TODO: Remove context via backend
+        log::info!("Removed context: {}", context_id);
+        Ok(context_id)
+    }
+
+    async fn search_kg_terms(
+        query: String,
+        config_state: Option<Arc<ConfigState>>,
+    ) -> Result<Vec<KgTerm>, String> {
+        use terraphim_automata::{build_autocomplete_index, fuzzy_autocomplete_search};
+
+        let config_state = config_state.ok_or("Configuration not loaded")?;
+
+        let config = config_state.config.lock().await;
+        let role = config.selected_role.clone();
+        drop(config);
+
+        // Get the rolegraph for the specified role
+        let rolegraph_sync = config_state.roles.get(&role)
+            .ok_or_else(|| format!("Role '{}' not found", role.as_str()))?;
+
+        let rolegraph = rolegraph_sync.lock().await;
+
+        // Build FST autocomplete index from the thesaurus
+        let autocomplete_index = build_autocomplete_index(rolegraph.thesaurus.clone(), None)
+            .map_err(|e| format!("Failed to build autocomplete index: {}", e))?;
+
+        drop(rolegraph);
+
+        // Use fuzzy search for KG terms
+        let results = fuzzy_autocomplete_search(&autocomplete_index, &query, 0.7, Some(10))
+            .map_err(|e| format!("KG search failed: {}", e))?;
+
+        // Convert results to KgTerms
+        let kg_terms: Vec<KgTerm> = results
+            .into_iter()
+            .map(|r| KgTerm {
+                term: r.term,
+                definition: r.url,
+            })
+            .collect();
+
+        Ok(kg_terms)
+    }
+
+    async fn add_kg_term_context(
+        _conversation_id: Option<String>,
+        _config_state: Option<Arc<ConfigState>>,
+        term: String,
+    ) -> Result<(), String> {
+        // TODO: Add KG term as context via backend
+        log::info!("Added KG term context: {}", term);
+        Ok(())
+    }
+
+    // View: Header with navigation
+    fn view_header(&self) -> Element<Message> {
+        let title = text("Terraphim").size(24);
+
+        let search_btn = button(text("Search")).on_press(Message::SwitchView(View::Search));
+
+        let chat_btn = button(text("Chat")).on_press(Message::SwitchView(View::Chat));
+
+        let config_btn = button(text("Config")).on_press(Message::SwitchView(View::Config));
+
+        let theme_btn = button(text("🌓")).on_press(Message::ToggleTheme);
+
+        row![title, search_btn, chat_btn, config_btn, theme_btn,]
+            .spacing(10)
+            .align_y(Alignment::Center)
+            .into()
+    }
+
+    // View: Search with autocomplete
     fn view_search(&self) -> Element<Message> {
         let search_input = text_input("Search...", &self.search_input)
             .on_input(Message::SearchInputChanged)
@@ -380,11 +750,28 @@ impl TerraphimApp {
             .on_press(Message::SearchSubmitted)
             .padding(10);
 
-        let search_row = row![search_input, search_button]
+        let mut search_col = column![row![search_input, search_button]
             .spacing(10)
-            .align_y(Alignment::Center);
+            .align_y(Alignment::Center)]
+        .spacing(5);
 
-        let mut content = column![search_row].spacing(20);
+        // Show autocomplete suggestions
+        if self.show_suggestions && !self.search_suggestions.is_empty() {
+            let mut suggestions_col = column![].spacing(2);
+            for suggestion in &self.search_suggestions {
+                let suggestion_btn = button(text(suggestion))
+                    .on_press(Message::SuggestionSelected(suggestion.clone()))
+                    .width(Length::Fill);
+                suggestions_col = suggestions_col.push(suggestion_btn);
+            }
+            search_col = search_col.push(
+                container(suggestions_col)
+                    .padding(5)
+                    .width(Length::Fill),
+            );
+        }
+
+        let mut content = column![search_col].spacing(20);
 
         // Show error if any
         if let Some(error) = &self.error_message {
@@ -398,7 +785,8 @@ impl TerraphimApp {
 
         // Show results
         if !self.search_results.is_empty() {
-            content = content.push(text(format!("Found {} results:", self.search_results.len())));
+            content = content
+                .push(text(format!("Found {} results:", self.search_results.len())));
 
             let mut results_col = column![].spacing(10);
 
@@ -422,23 +810,25 @@ impl TerraphimApp {
                     text("Enter a search query above to get started").size(14),
                 ]
                 .spacing(10)
-                .align_x(Alignment::Center)
+                .align_x(Alignment::Center),
             );
         }
 
         content.into()
     }
 
-    // View: Chat
+    // View: Chat with context management
     fn view_chat(&self) -> Element<Message> {
+        // Left: Chat messages and input
         let mut messages_col = column![].spacing(10);
 
         for msg in &self.chat_messages {
             let msg_text = text(&msg.content).size(14);
-            let msg_container = container(msg_text)
-                .padding(10);
+            let msg_container = container(msg_text).padding(10);
             messages_col = messages_col.push(msg_container);
         }
+
+        let chat_scroll = scrollable(messages_col).height(Length::FillPortion(6));
 
         let chat_input = text_input("Type your message...", &self.chat_input)
             .on_input(Message::ChatInputChanged)
@@ -454,23 +844,109 @@ impl TerraphimApp {
             .spacing(10)
             .align_y(Alignment::Center);
 
-        column![
-            scrollable(messages_col)
-                .height(Length::FillPortion(8)),
-            input_row,
-        ]
-        .spacing(20)
-        .into()
-    }
+        let chat_main = column![chat_scroll, input_row,].spacing(10);
 
-    // View: Graph (placeholder)
-    fn view_graph(&self) -> Element<Message> {
-        column![
-            text("Knowledge Graph Visualization").size(24),
-            text("Graph view coming soon...").size(16),
+        // Right: Context panel
+        let mut context_col = column![
+            text("Context").size(20),
+            row![
+                button(text("Add Context")).on_press(Message::ToggleContextForm),
+                button(text("KG Search")).on_press(Message::ToggleKgSearch),
+            ]
+            .spacing(10),
         ]
-        .spacing(20)
-        .align_x(Alignment::Center)
+        .spacing(10);
+
+        // Context form
+        if self.show_context_form {
+            context_col = context_col.push(
+                column![
+                    text("Add Context").size(16),
+                    text_input("Title", &self.new_context_title)
+                        .on_input(Message::ContextTitleChanged)
+                        .padding(5),
+                    text_input("Content", &self.new_context_content)
+                        .on_input(Message::ContextContentChanged)
+                        .padding(5),
+                    row![
+                        button(text("Add")).on_press(Message::AddContext),
+                        button(text("Cancel")).on_press(Message::ToggleContextForm),
+                    ]
+                    .spacing(10),
+                ]
+                .spacing(5)
+                .padding(10),
+            );
+        }
+
+        // KG Search modal
+        if self.show_kg_search {
+            context_col = context_col.push(
+                column![
+                    text("KG Search").size(16),
+                    text_input("Search terms...", &self.kg_search_input)
+                        .on_input(Message::KgSearchInputChanged)
+                        .on_submit(Message::KgSearchSubmitted)
+                        .padding(5),
+                    button(text("Search")).on_press(Message::KgSearchSubmitted),
+                ]
+                .spacing(5)
+                .padding(10),
+            );
+
+            // Show KG search results
+            if !self.kg_search_results.is_empty() {
+                let mut kg_results_col = column![].spacing(5);
+                for kg_term in &self.kg_search_results {
+                    kg_results_col = kg_results_col.push(
+                        row![
+                            text(&kg_term.term).size(14),
+                            button(text("+")).on_press(Message::AddKgTermContext(kg_term.term.clone())),
+                        ]
+                        .spacing(10)
+                        .align_y(Alignment::Center),
+                    );
+                }
+                context_col = context_col.push(scrollable(kg_results_col).height(Length::Fill));
+            }
+
+            context_col = context_col.push(button(text("Close")).on_press(Message::ToggleKgSearch));
+        }
+
+        // Context items
+        if !self.context_items.is_empty() {
+            context_col = context_col.push(text(format!("{} items", self.context_items.len())).size(14));
+
+            let mut items_col = column![].spacing(5);
+            for item in &self.context_items {
+                items_col = items_col.push(
+                    row![
+                        column![
+                            text(&item.title).size(14),
+                            text(&item.context_type).size(12),
+                        ]
+                        .spacing(2),
+                        button(text("×")).on_press(Message::RemoveContext(item.id.clone())),
+                    ]
+                    .spacing(10)
+                    .align_y(Alignment::Center)
+                    .padding(5),
+                );
+            }
+            context_col = context_col.push(scrollable(items_col).height(Length::Fill));
+        }
+
+        let context_panel = container(context_col)
+            .padding(10)
+            .width(Length::FillPortion(2));
+
+        row![
+            container(chat_main)
+                .padding(10)
+                .width(Length::FillPortion(3)),
+            context_panel,
+        ]
+        .spacing(10)
         .into()
     }
 
