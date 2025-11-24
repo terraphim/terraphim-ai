@@ -1,6 +1,6 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::StyledExt;
+use gpui_component::{button::*, StyledExt};
 use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
 
@@ -77,14 +77,14 @@ impl RoleSelector {
     /// Toggle dropdown open/closed
     fn toggle_dropdown(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
         self.is_open = !self.is_open;
+        log::info!("Role dropdown {}", if self.is_open { "opened" } else { "closed" });
         cx.notify();
     }
 
-    /// Select a role from dropdown (click handler)
-    fn select_role_handler(&mut self, role: RoleName) -> impl Fn(&ClickEvent, &mut Window, &mut Context<Self>) {
-        move |_event, _window, cx| {
-            // Note: This won't work due to closure capture issues
-            // We'll need a different approach for click handlers
+    /// Handle role selection from dropdown
+    fn handle_role_select(&mut self, role_index: usize, cx: &mut Context<Self>) {
+        if let Some(role) = self.available_roles.get(role_index).cloned() {
+            self.change_role(role, cx);
         }
     }
 
@@ -174,49 +174,16 @@ impl RoleSelector {
 impl Render for RoleSelector {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let current_role_display = self.current_role.to_string();
-        let current_role_icon = self.role_icon(&self.current_role).to_string();
         let is_open = self.is_open;
 
         div()
             .relative()
             .child(
-                // Main button - simplified without click for now
-                div()
-                    .flex()
-                    .items_center()
-                    .justify_between()
-                    .px_4()
-                    .py_2()
-                    .min_w(px(200.0))
-                    .bg(rgb(0xffffff))
-                    .border_1()
-                    .border_color(if is_open {
-                        rgb(0x3273dc)
-                    } else {
-                        rgb(0xdbdbdb)
-                    })
-                    .rounded_md()
-                    .hover(|style| style.border_color(rgb(0xb5b5b5)).cursor_pointer())
-                    .child(
-                        div()
-                            .flex()
-                            .items_center()
-                            .gap_2()
-                            .child(div().text_xl().child(current_role_icon))
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .font_medium()
-                                    .text_color(rgb(0x363636))
-                                    .child(current_role_display)
-                            )
-                    )
-                    .child(
-                        div()
-                            .text_color(rgb(0x7a7a7a))
-                            .text_sm()
-                            .child(if is_open { "▲" } else { "▼" }),
-                    ),
+                // Main button with click handler
+                Button::new("role-selector-toggle")
+                    .label(&format!("Role: {}", current_role_display))
+                    .outline()
+                    .on_click(cx.listener(Self::toggle_dropdown))
             )
             .when(is_open, |this| {
                 this.child(self.render_dropdown(cx))
