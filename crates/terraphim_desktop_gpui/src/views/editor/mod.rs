@@ -1,6 +1,6 @@
 use gpui::*;
 
-use crate::editor::{EditorState, SlashCommand, SlashCommandManager};
+use terraphim_desktop_gpui::{EditorState, SlashCommand, SlashCommandManager};
 
 /// Editor view with markdown editing and slash commands
 pub struct EditorView {

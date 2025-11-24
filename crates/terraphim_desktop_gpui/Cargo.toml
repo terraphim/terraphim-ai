@@ -16,9 +16,9 @@ name = "terraphim_desktop_gpui"
 path = "src/lib.rs"
 
 [dependencies]
-# GPUI framework and components
-gpui = { version = "*" }
-gpui-component = { version = "*" }
+# GPUI framework and components (using git to get compatible versions)
+gpui = "0.2.2"
+gpui-component = { git = "https://github.com/longbridge/gpui-component.git", version = "0.4.1" }
 
 # Direct integration with terraphim crates
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
@@ -55,10 +55,11 @@ ahash = "0.8.11"
 # Markdown rendering
 pulldown-cmark = "0.12"
 
-# Syntax highlighting
-tree-sitter = "0.24"
-tree-sitter-highlight = "0.24"
-tree-sitter-markdown = "0.7"
+# Syntax highlighting removed temporarily to avoid conflicts with gpui-component
+# Can be re-added later when needed
+# tree-sitter = "0.25"
+# tree-sitter-highlight = "0.25"
+# tree-sitter-markdown = "0.7"
 
 [dev-dependencies]
 tokio-test = "0.4.4"

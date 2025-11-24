@@ -5,11 +5,19 @@
 //! This library provides framework-agnostic business logic that can be used
 //! with GPUI or adapted to other UI frameworks.
 
+// Business logic modules (framework-agnostic)
 pub mod autocomplete;
 pub mod editor;
 pub mod kg_search;
 pub mod models;
 pub mod search_service;
+
+// UI layer modules (GPUI-specific)
+pub mod actions;
+pub mod app;
+pub mod state;
+pub mod theme;
+pub mod views;
 
 // Re-exports for convenience
 pub use autocomplete::{AutocompleteEngine, AutocompleteSuggestion};

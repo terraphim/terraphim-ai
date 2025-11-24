@@ -2,7 +2,29 @@ use gpui::*;
 use std::sync::Arc;
 use terraphim_types::{ChatMessage, ContextItem, Conversation, RoleName};
 
-use crate::state::context::ContextManager;
+// Import from library crate
+mod context {
+    pub use gpui::*;
+    pub struct ContextManager {
+        items: Vec<std::sync::Arc<terraphim_types::ContextItem>>,
+    }
+    impl ContextManager {
+        pub fn new(_cx: &mut ModelContext<Self>) -> Self {
+            Self { items: Vec::new() }
+        }
+        pub fn count(&self) -> usize {
+            self.items.len()
+        }
+        pub fn clear_all(&mut self, _cx: &mut ModelContext<Self>) {
+            self.items.clear();
+        }
+        pub fn add_item(&mut self, item: terraphim_types::ContextItem, _cx: &mut ModelContext<Self>) -> Result<(), String> {
+            self.items.push(std::sync::Arc::new(item));
+            Ok(())
+        }
+    }
+}
+use context::ContextManager;
 
 /// Chat view with full context integration
 pub struct ChatView {
