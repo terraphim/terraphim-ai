@@ -17,8 +17,10 @@ path = "src/lib.rs"
 
 [dependencies]
 # GPUI framework and components
-gpui = "0.1"
-gpui-component = "0.3"
+# NOTE: Temporarily commented out until GPUI 1.0 is released
+# See BUILDING.md for details on GPUI availability
+# gpui = "0.1"
+# gpui-component = "0.3"
 
 # Direct integration with terraphim crates
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
@@ -58,7 +60,7 @@ pulldown-cmark = "0.12"
 # Syntax highlighting
 tree-sitter = "0.24"
 tree-sitter-highlight = "0.24"
-tree-sitter-markdown = "0.3"
+tree-sitter-markdown = "0.7"
 
 [dev-dependencies]
 tokio-test = "0.4.4"

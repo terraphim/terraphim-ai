@@ -1,7 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use terraphim_config::Config;
-use terraphim_middleware::Indexer;
+use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, RelevanceFunction, SearchQuery};
 
@@ -40,107 +39,85 @@ pub struct SearchResults {
 
 impl SearchService {
     /// Create search service from config
-    pub fn new(config: Config) -> Result<Self> {
-        let service = Arc::new(TerraphimService::new(config.clone())?);
+    pub async fn new(mut config: Config) -> Result<Self> {
+        let config_state = ConfigState::new(&mut config).await?;
+        let service = Arc::new(TerraphimService::new(config_state));
 
         log::info!("SearchService initialized with {} roles", config.roles.len());
 
         Ok(Self { service, config })
     }
 
-    /// Create from config file
-    pub fn from_config_file(path: &str) -> Result<Self> {
+    /// Create search service from config file path
+    pub async fn from_config_file(path: &str) -> Result<Self> {
         let config = Config::from_file(path)?;
-        Self::new(config)
+        Self::new(config).await
     }
 
-    /// Search across knowledge sources
-    pub async fn search(
-        &self,
-        query: &str,
-        options: SearchOptions,
-    ) -> Result<SearchResults> {
-        if query.trim().is_empty() {
-            return Ok(SearchResults {
-                documents: vec![],
-                total: 0,
-                query: query.to_string(),
-                relevance_function: options.relevance_function,
-            });
-        }
-
-        log::info!("Searching for: '{}' (role: {})", query, options.role);
+    /// Perform search
+    pub async fn search(&self, query: &str, options: SearchOptions) -> Result<SearchResults> {
+        log::info!(
+            "Searching for '{}' with role '{}' (limit: {})",
+            query,
+            options.role,
+            options.limit
+        );
 
         let search_query = SearchQuery {
             query: query.to_string(),
             role: options.role.clone(),
-            limit: options.limit,
-            skip: options.skip,
-            relevance_function: Some(options.relevance_function),
-            ..Default::default()
+            relevance_function: options.relevance_function.clone(),
+            limit: Some(options.limit),
+            skip: Some(options.skip),
+            smart_search: Some(false),
         };
 
-        let results = self.service.search(search_query).await?;
+        let documents = self.service.search(&search_query).await?;
+        let total = documents.len();
 
-        log::info!(
-            "Search completed: {} results (total: {})",
-            results.documents.len(),
-            results.total
-        );
+        log::info!("Found {} documents for query '{}'", total, query);
 
         Ok(SearchResults {
-            documents: results.documents,
-            total: results.total,
+            documents,
+            total,
             query: query.to_string(),
             relevance_function: options.relevance_function,
         })
     }
 
-    /// Parse query with operators (AND/OR)
+    /// Parse query string into structured query
     pub fn parse_query(query: &str) -> ParsedQuery {
-        let query_lower = query.to_lowercase();
+        let mut terms = Vec::new();
+        let mut operator = None;
 
-        if query_lower.contains(" and ") {
-            let terms: Vec<String> = query_lower
-                .split(" and ")
+        // Simple parsing: split by AND/OR operators
+        if query.contains(" AND ") {
+            operator = Some(LogicalOperator::And);
+            terms = query
+                .split(" AND ")
                 .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
                 .collect();
-
-            ParsedQuery {
-                terms,
-                operator: Some(LogicalOperator::And),
-                original: query.to_string(),
-            }
-        } else if query_lower.contains(" or ") {
-            let terms: Vec<String> = query_lower
-                .split(" or ")
+        } else if query.contains(" OR ") {
+            operator = Some(LogicalOperator::Or);
+            terms = query
+                .split(" OR ")
                 .map(|s| s.trim().to_string())
-                .filter(|s| !s.is_empty())
                 .collect();
-
-            ParsedQuery {
-                terms,
-                operator: Some(LogicalOperator::Or),
-                original: query.to_string(),
-            }
         } else {
-            ParsedQuery {
-                terms: vec![query.to_string()],
-                operator: None,
-                original: query.to_string(),
-            }
+            terms = vec![query.to_string()];
         }
+
+        ParsedQuery { terms, operator }
     }
 
     /// Get available roles
-    pub fn available_roles(&self) -> Vec<String> {
+    pub fn list_roles(&self) -> Vec<String> {
         self.config.roles.keys().cloned().collect()
     }
 
-    /// Get role configuration
-    pub fn get_role_config(&self, role: &str) -> Option<&terraphim_config::Role> {
-        self.config.roles.get(role)
+    /// Get current config
+    pub fn get_config(&self) -> &Config {
+        &self.config
     }
 }
 
@@ -148,7 +125,6 @@ impl SearchService {
 pub struct ParsedQuery {
     pub terms: Vec<String>,
     pub operator: Option<LogicalOperator>,
-    pub original: String,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -157,44 +133,56 @@ pub enum LogicalOperator {
     Or,
 }
 
-impl ParsedQuery {
-    pub fn is_complex(&self) -> bool {
-        self.terms.len() > 1 && self.operator.is_some()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
-    fn test_parse_simple_query() {
-        let query = SearchService::parse_query("rust");
-        assert_eq!(query.terms.len(), 1);
-        assert_eq!(query.terms[0], "rust");
-        assert!(query.operator.is_none());
+    fn test_parse_query_single_term() {
+        let parsed = SearchService::parse_query("rust");
+        assert_eq!(parsed.terms.len(), 1);
+        assert_eq!(parsed.terms[0], "rust");
+        assert!(parsed.operator.is_none());
     }
 
     #[test]
-    fn test_parse_and_query() {
-        let query = SearchService::parse_query("rust AND tokio");
-        assert_eq!(query.terms.len(), 2);
-        assert_eq!(query.terms[0], "rust");
-        assert_eq!(query.terms[1], "tokio");
-        assert_eq!(query.operator, Some(LogicalOperator::And));
+    fn test_parse_query_and_operator() {
+        let parsed = SearchService::parse_query("rust AND tokio");
+        assert_eq!(parsed.terms.len(), 2);
+        assert_eq!(parsed.terms[0], "rust");
+        assert_eq!(parsed.terms[1], "tokio");
+        assert_eq!(parsed.operator, Some(LogicalOperator::And));
     }
 
     #[test]
-    fn test_parse_or_query() {
-        let query = SearchService::parse_query("rust OR async");
-        assert_eq!(query.terms.len(), 2);
-        assert_eq!(query.operator, Some(LogicalOperator::Or));
+    fn test_parse_query_or_operator() {
+        let parsed = SearchService::parse_query("rust OR python");
+        assert_eq!(parsed.terms.len(), 2);
+        assert_eq!(parsed.terms[0], "rust");
+        assert_eq!(parsed.terms[1], "python");
+        assert_eq!(parsed.operator, Some(LogicalOperator::Or));
     }
 
     #[test]
-    fn test_parse_case_insensitive() {
-        let query = SearchService::parse_query("Rust and Tokio");
-        assert_eq!(query.terms.len(), 2);
-        assert_eq!(query.operator, Some(LogicalOperator::And));
+    fn test_parse_query_multiple_and() {
+        let parsed = SearchService::parse_query("rust AND tokio AND async");
+        assert_eq!(parsed.terms.len(), 3);
+        assert_eq!(parsed.operator, Some(LogicalOperator::And));
+    }
+
+    #[test]
+    fn test_parse_query_with_whitespace() {
+        let parsed = SearchService::parse_query("rust  AND  tokio");
+        assert_eq!(parsed.terms[0], "rust");
+        assert_eq!(parsed.terms[1], "tokio");
+    }
+
+    #[test]
+    fn test_search_options_default() {
+        let options = SearchOptions::default();
+        assert_eq!(options.role, "default");
+        assert_eq!(options.limit, 10);
+        assert_eq!(options.skip, 0);
+        assert_eq!(options.relevance_function, RelevanceFunction::TerraphimGraph);
     }
 }
