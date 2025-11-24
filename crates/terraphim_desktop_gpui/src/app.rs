@@ -38,8 +38,8 @@ impl TerraphimApp {
         // Initialize theme
         let theme = cx.new(|cx| TerraphimTheme::new(cx));
 
-        // Initialize views with service access
-        let search_view = cx.new(|cx| SearchView::new(window, cx));
+        // Initialize views with service access (pass cloned config_state)
+        let search_view = cx.new(|cx| SearchView::new(window, cx, config_state.clone()));
         let chat_view = cx.new(|cx| ChatView::new(window, cx));
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
 

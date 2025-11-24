@@ -1,5 +1,7 @@
 use gpui::*;
 use gpui_component::StyledExt;
+use terraphim_config::ConfigState;
+use crate::state::search::SearchState;
 
 mod autocomplete;
 mod input;
@@ -10,21 +12,29 @@ pub use results::SearchResults;
 
 /// Main search view
 pub struct SearchView {
+    search_state: Entity<SearchState>,
     search_input: Entity<SearchInput>,
     search_results: Entity<SearchResults>,
 }
 
 impl SearchView {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState) -> Self {
+        let search_state = cx.new(|cx| SearchState::new(cx).with_config(config_state));
         let search_input = cx.new(|cx| SearchInput::new(window, cx));
         let search_results = cx.new(|cx| SearchResults::new(window, cx));
 
-        log::info!("SearchView initialized");
+        log::info!("SearchView initialized with backend services");
 
         Self {
+            search_state,
             search_input,
             search_results,
         }
+    }
+
+    /// Get search state for external access
+    pub fn search_state(&self) -> &Entity<SearchState> {
+        &self.search_state
     }
 }
 

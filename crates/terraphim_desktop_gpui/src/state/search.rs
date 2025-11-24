@@ -1,12 +1,15 @@
 use gpui::*;
 use std::sync::Arc;
+use terraphim_config::ConfigState;
+use terraphim_service::TerraphimService;
+use terraphim_types::SearchQuery;
 
 use crate::models::{ResultItemViewModel, TermChipSet};
-use crate::search_service::{SearchOptions, SearchService};
+use crate::search_service::SearchService;
 
-/// Search state management with real integration
+/// Search state management with real backend integration
 pub struct SearchState {
-    service: Option<Arc<SearchService>>,
+    config_state: Option<ConfigState>,
     query: String,
     parsed_query: String,
     results: Vec<ResultItemViewModel>,
@@ -21,15 +24,21 @@ impl SearchState {
         log::info!("SearchState initialized");
 
         Self {
-            service: None,
+            config_state: None,
             query: String::new(),
             parsed_query: String::new(),
             results: vec![],
             term_chips: TermChipSet::new(),
             loading: false,
             error: None,
-            current_role: "default".to_string(),
+            current_role: "Terraphim Engineer".to_string(),
         }
+    }
+
+    /// Initialize with config state for backend access
+    pub fn with_config(mut self, config_state: ConfigState) -> Self {
+        self.config_state = Some(config_state);
+        self
     }
 
     /// Initialize search service from config
@@ -63,7 +72,7 @@ impl SearchState {
         cx.notify();
     }
 
-    /// Execute search
+    /// Execute search using real TerraphimService
     pub fn search(&mut self, query: String, cx: &mut Context<Self>) {
         if query.trim().is_empty() {
             self.clear_results(cx);
@@ -80,34 +89,36 @@ impl SearchState {
         // Parse query for term chips
         self.update_term_chips(&query);
 
-        let service = match &self.service {
-            Some(svc) => Arc::clone(svc),
+        let config_state = match &self.config_state {
+            Some(state) => state.clone(),
             None => {
-                self.error = Some("Search service not initialized".to_string());
+                self.error = Some("Config not initialized".to_string());
                 self.loading = false;
                 cx.notify();
                 return;
             }
         };
 
-        let options = SearchOptions {
-            role: terraphim_types::RoleName::from(self.current_role.as_str()),
-            limit: 20,
-            ..Default::default()
+        // Create search query from pattern in Tauri cmd.rs
+        let search_query = SearchQuery {
+            search_term: query.clone().into(),
+            search_terms: None,
+            operator: None,
+            role: Some(terraphim_types::RoleName::from(self.current_role.as_str())),
+            limit: Some(20),
+            skip: Some(0),
         };
 
         cx.spawn(async move |this, cx| {
-            match service.search(&query, options).await {
-                Ok(results) => {
-                    log::info!(
-                        "Search completed: {} results (total: {})",
-                        results.documents.len(),
-                        results.total
-                    );
+            // Create service instance (pattern from Tauri cmd.rs)
+            let mut terraphim_service = TerraphimService::new(config_state);
+
+            match terraphim_service.search(&search_query).await {
+                Ok(documents) => {
+                    log::info!("Search completed: {} results found", documents.len());
 
                     this.update(cx, |this, cx| {
-                        this.results = results
-                            .documents
+                        this.results = documents
                             .into_iter()
                             .map(|doc| ResultItemViewModel::new(doc).with_highlights(&query))
                             .collect();
