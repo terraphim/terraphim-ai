@@ -1,0 +1,70 @@
+[package]
+name = "terraphim-desktop-iced"
+version = "1.0.0"
+description = "Iced-based desktop app for Terraphim, a privacy preserving AI assistant"
+authors = ["Terraphim Contributors"]
+license = "Apache-2.0"
+homepage = "https://terraphim.ai"
+documentation = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["personal-assistant", "ai", "privacy", "iced", "desktop"]
+readme = "../README.md"
+edition = "2024"
+rust-version = "1.87"
+
+[[bin]]
+name = "terraphim-desktop-iced"
+path = "src/main.rs"
+
+[dependencies]
+# Iced GUI framework
+iced = { version = "0.13", features = ["tokio", "debug", "svg", "image"] }
+
+# Terraphim crates (reuse existing backend)
+terraphim_config = { path = "../crates/terraphim_config", version = "1.0.0" }
+terraphim_middleware = { path = "../crates/terraphim_middleware", version = "1.0.0" }
+terraphim_rolegraph = { path = "../crates/terraphim_rolegraph", version = "1.0.0" }
+terraphim_settings = { path = "../crates/terraphim_settings", version = "1.0.0", features = ["onepassword"] }
+terraphim_types = { path = "../crates/terraphim_types", version = "1.0.0" }
+terraphim_persistence = { path = "../crates/terraphim_persistence", version = "1.0.0" }
+terraphim_service = { path = "../crates/terraphim_service", version = "1.0.0" }
+terraphim_automata = { path = "../crates/terraphim_automata", version = "1.0.0" }
+
+# Async runtime
+tokio = { version = "1.36.0", features = ["full"] }
+
+# Serialization
+serde = { version = "1.0.197", features = ["derive"] }
+serde_json = "1.0.104"
+
+# Error handling
+anyhow = "1.0.81"
+thiserror = "1.0.58"
+
+# Logging
+log = "0.4.21"
+env_logger = "0.11.8"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+
+# System tray and global shortcuts (platform specific)
+# Note: tray-icon conflicts with Tauri's webkit2gtk dependency in the same workspace
+# Uncomment when Tauri desktop is fully removed:
+# tray-icon = { version = "0.19", optional = true, features = ["serde"] }
+# global-hotkey = { version = "0.6", optional = true }
+
+# Utilities
+ulid = "1.1.2"
+chrono = { version = "0.4.38", features = ["serde"] }
+ahash = "0.8.11"
+
+[features]
+default = []
+# system-tray = ["tray-icon"]  # Disabled due to workspace conflict with Tauri
+# global-shortcuts = ["global-hotkey"]  # Disabled due to workspace conflict with Tauri
+openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
+# Optional database backends
+sqlite = ["terraphim_persistence/services-sqlite"]
+rocksdb = ["terraphim_persistence/services-rocksdb"]
+redis = ["terraphim_persistence/services-redis"]
+full-db = ["sqlite", "rocksdb", "redis"]
