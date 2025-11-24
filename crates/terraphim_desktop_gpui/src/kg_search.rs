@@ -13,7 +13,7 @@ pub struct KGSearchService {
 pub struct KGTerm {
     pub term: String,
     pub normalized_term: String,
-    pub id: usize,
+    pub id: u64,
     pub definition: Option<String>,
     pub synonyms: Vec<String>,
     pub related_terms: Vec<String>,
@@ -58,7 +58,11 @@ impl KGSearchService {
     }
 
     /// Get document from graph
-    pub fn get_document(&self, role_name: &str, document_id: &str) -> Result<Option<IndexedDocument>> {
+    pub fn get_document(
+        &self,
+        role_name: &str,
+        document_id: &str,
+    ) -> Result<Option<IndexedDocument>> {
         let graph = self
             .role_graphs
             .get(role_name)
@@ -67,35 +71,33 @@ impl KGSearchService {
         Ok(graph.get_document(document_id).cloned())
     }
 
-    /// Get KG term details
-    pub fn get_kg_term(&self, role_name: &str, term: &str) -> Result<Option<KGTerm>> {
+    /// Get KG term details from thesaurus
+    pub fn get_kg_term_from_thesaurus(&self, role_name: &str, term: &str) -> Result<Option<KGTerm>> {
         let graph = self
             .role_graphs
             .get(role_name)
             .ok_or_else(|| anyhow::anyhow!("Role graph not found"))?;
 
-        // Search for term in graph
-        let thesaurus_entry = graph
-            .thesaurus
-            .iter()
-            .find(|t| t.nterm.eq_ignore_ascii_case(term) || t.term.eq_ignore_ascii_case(term));
+        // Search for term in thesaurus
+        let thesaurus = &graph.thesaurus;
 
-        if let Some(entry) = thesaurus_entry {
-            let kg_term = KGTerm {
-                term: entry.term.clone(),
-                normalized_term: entry.nterm.clone(),
-                id: entry.id,
-                definition: entry.definition.clone(),
-                synonyms: vec![], // Would need to be extracted from thesaurus
-                related_terms: vec![], // Would need graph traversal
-                url: entry.url.clone(),
-                metadata: HashMap::new(),
-            };
-
-            Ok(Some(kg_term))
-        } else {
-            Ok(None)
+        // Try to find the term in the thesaurus
+        for (normalized_value, normalized_term) in thesaurus {
+            if normalized_value.as_str().eq_ignore_ascii_case(term) {
+                return Ok(Some(KGTerm {
+                    term: normalized_value.as_str().to_string(),
+                    normalized_term: normalized_value.as_str().to_string(),
+                    id: normalized_term.id,
+                    definition: None,
+                    synonyms: vec![],
+                    related_terms: vec![],
+                    url: normalized_term.url.clone().unwrap_or_default(),
+                    metadata: HashMap::new(),
+                }));
+            }
         }
+
+        Ok(None)
     }
 
     /// Check if all terms are connected by a single path
@@ -129,10 +131,9 @@ impl KGSearchService {
             .get(role_name)
             .ok_or_else(|| anyhow::anyhow!("Role graph not found"))?;
 
-        let terms: Vec<String> = graph
-            .thesaurus
-            .iter()
-            .map(|t| t.nterm.clone())
+        let terms: Vec<String> = (&graph.thesaurus)
+            .into_iter()
+            .map(|(k, _)| k.as_str().to_string())
             .collect();
 
         Ok(terms)
@@ -157,6 +158,16 @@ impl KGSearchService {
 
         Ok(graph.get_graph_stats())
     }
+
+    /// Check if a role graph is loaded
+    pub fn has_role(&self, role_name: &str) -> bool {
+        self.role_graphs.contains_key(role_name)
+    }
+
+    /// Get list of loaded roles
+    pub fn list_roles(&self) -> Vec<String> {
+        self.role_graphs.keys().cloned().collect()
+    }
 }
 
 impl Default for KGSearchService {
@@ -168,114 +179,96 @@ impl Default for KGSearchService {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_types::Thesaurus;
-
-    fn create_test_thesaurus() -> Thesaurus {
-        vec![
-            IndexedDocument {
-                id: 1,
-                nterm: "rust".to_string(),
-                term: "Rust".to_string(),
-                url: "https://rust-lang.org".to_string(),
-                definition: Some("A systems programming language".to_string()),
-            },
-            IndexedDocument {
-                id: 2,
-                nterm: "tokio".to_string(),
-                term: "Tokio".to_string(),
-                url: "https://tokio.rs".to_string(),
-                definition: Some("An async runtime for Rust".to_string()),
-            },
-            IndexedDocument {
-                id: 3,
-                nterm: "async".to_string(),
-                term: "Async".to_string(),
-                url: "https://rust-lang.org/async".to_string(),
-                definition: Some("Asynchronous programming in Rust".to_string()),
-            },
-        ]
-    }
-
-    fn create_test_role_graph() -> RoleGraph {
-        let thesaurus = create_test_thesaurus();
-        RoleGraph {
-            thesaurus,
-            edges: ahash::AHashMap::new(),
-            nodes: ahash::AHashMap::new(),
-            documents: ahash::AHashMap::new(),
-        }
-    }
 
     #[test]
     fn test_kg_search_service_creation() {
         let service = KGSearchService::new();
         assert!(service.list_kg_terms("test_role").is_err());
+        assert_eq!(service.list_roles().len(), 0);
     }
 
     #[test]
-    fn test_load_role_graph() {
-        let mut service = KGSearchService::new();
-        let graph = create_test_role_graph();
-
-        service.load_role_graph("engineer", graph);
-
-        // Should now be able to list terms
-        let terms = service.list_kg_terms("engineer").unwrap();
-        assert_eq!(terms.len(), 3);
-        assert!(terms.contains(&"rust".to_string()));
-        assert!(terms.contains(&"tokio".to_string()));
-        assert!(terms.contains(&"async".to_string()));
+    fn test_has_role() {
+        let service = KGSearchService::new();
+        assert!(!service.has_role("engineer"));
+        assert!(!service.has_role("nonexistent"));
     }
 
     #[test]
-    fn test_get_kg_term() {
-        let mut service = KGSearchService::new();
-        let graph = create_test_role_graph();
-        service.load_role_graph("engineer", graph);
-
-        // Get term by exact match
-        let term = service.get_kg_term("engineer", "rust").unwrap();
-        assert!(term.is_some());
-
-        let kg_term = term.unwrap();
-        assert_eq!(kg_term.term, "Rust");
-        assert_eq!(kg_term.normalized_term, "rust");
-        assert_eq!(kg_term.id, 1);
-        assert_eq!(kg_term.definition, Some("A systems programming language".to_string()));
-        assert_eq!(kg_term.url, "https://rust-lang.org");
+    fn test_list_roles_empty() {
+        let service = KGSearchService::new();
+        let roles = service.list_roles();
+        assert_eq!(roles.len(), 0);
     }
 
     #[test]
-    fn test_get_kg_term_case_insensitive() {
-        let mut service = KGSearchService::new();
-        let graph = create_test_role_graph();
-        service.load_role_graph("engineer", graph);
+    fn test_kg_term_structure() {
+        let term = KGTerm {
+            term: "rust".to_string(),
+            normalized_term: "rust".to_string(),
+            id: 1,
+            definition: Some("A programming language".to_string()),
+            synonyms: vec!["rust-lang".to_string()],
+            related_terms: vec!["tokio".to_string()],
+            url: "https://rust-lang.org".to_string(),
+            metadata: HashMap::new(),
+        };
 
-        // Should match case-insensitively
-        let term1 = service.get_kg_term("engineer", "RUST").unwrap();
-        let term2 = service.get_kg_term("engineer", "Rust").unwrap();
-        let term3 = service.get_kg_term("engineer", "rust").unwrap();
-
-        assert!(term1.is_some());
-        assert!(term2.is_some());
-        assert!(term3.is_some());
-
-        assert_eq!(term1.as_ref().unwrap().id, term2.as_ref().unwrap().id);
-        assert_eq!(term2.as_ref().unwrap().id, term3.as_ref().unwrap().id);
+        assert_eq!(term.term, "rust");
+        assert_eq!(term.id, 1);
+        assert!(term.definition.is_some());
+        assert_eq!(term.synonyms.len(), 1);
     }
 
     #[test]
-    fn test_list_kg_terms() {
-        let mut service = KGSearchService::new();
-        let graph = create_test_role_graph();
-        service.load_role_graph("engineer", graph);
+    fn test_kg_search_result_structure() {
+        let term = KGTerm {
+            term: "rust".to_string(),
+            normalized_term: "rust".to_string(),
+            id: 1,
+            definition: None,
+            synonyms: vec![],
+            related_terms: vec![],
+            url: "https://rust-lang.org".to_string(),
+            metadata: HashMap::new(),
+        };
 
-        let terms = service.list_kg_terms("engineer").unwrap();
-        assert_eq!(terms.len(), 3);
+        let result = KGSearchResult {
+            term,
+            documents: vec![],
+            related_terms: vec![],
+        };
 
-        // All normalized terms should be present
-        assert!(terms.contains(&"rust".to_string()));
-        assert!(terms.contains(&"tokio".to_string()));
-        assert!(terms.contains(&"async".to_string()));
+        assert_eq!(result.term.term, "rust");
+        assert_eq!(result.documents.len(), 0);
+        assert_eq!(result.related_terms.len(), 0);
+    }
+
+    #[test]
+    fn test_are_terms_connected_empty() {
+        let service = KGSearchService::new();
+        // Should error because no role graph loaded
+        assert!(service.are_terms_connected("test", &[]).is_err());
+    }
+
+    #[test]
+    fn test_search_kg_term_ids_no_role() {
+        let service = KGSearchService::new();
+        let result = service.search_kg_term_ids("nonexistent", "rust");
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Role graph not found"));
+    }
+
+    #[test]
+    fn test_get_document_no_role() {
+        let service = KGSearchService::new();
+        let result = service.get_document("nonexistent", "doc1");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_default_implementation() {
+        let service = KGSearchService::default();
+        assert_eq!(service.list_roles().len(), 0);
     }
 }

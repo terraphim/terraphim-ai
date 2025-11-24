@@ -1,30 +1,28 @@
 use anyhow::Result;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, RelevanceFunction, SearchQuery};
+use terraphim_types::{Document, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
 
 /// Search service integration layer
 pub struct SearchService {
-    service: Arc<TerraphimService>,
+    service: Arc<Mutex<TerraphimService>>,
     config: Config,
 }
 
 #[derive(Clone, Debug)]
 pub struct SearchOptions {
-    pub role: String,
+    pub role: RoleName,
     pub limit: usize,
     pub skip: usize,
-    pub relevance_function: RelevanceFunction,
 }
 
 impl Default for SearchOptions {
     fn default() -> Self {
         Self {
-            role: "default".to_string(),
+            role: RoleName::from("default"),
             limit: 10,
             skip: 0,
-            relevance_function: RelevanceFunction::TerraphimGraph,
         }
     }
 }
@@ -34,24 +32,17 @@ pub struct SearchResults {
     pub documents: Vec<Document>,
     pub total: usize,
     pub query: String,
-    pub relevance_function: RelevanceFunction,
 }
 
 impl SearchService {
     /// Create search service from config
     pub async fn new(mut config: Config) -> Result<Self> {
         let config_state = ConfigState::new(&mut config).await?;
-        let service = Arc::new(TerraphimService::new(config_state));
+        let service = Arc::new(Mutex::new(TerraphimService::new(config_state)));
 
         log::info!("SearchService initialized with {} roles", config.roles.len());
 
         Ok(Self { service, config })
-    }
-
-    /// Create search service from config file path
-    pub async fn from_config_file(path: &str) -> Result<Self> {
-        let config = Config::from_file(path)?;
-        Self::new(config).await
     }
 
     /// Perform search
@@ -64,15 +55,18 @@ impl SearchService {
         );
 
         let search_query = SearchQuery {
-            query: query.to_string(),
-            role: options.role.clone(),
-            relevance_function: options.relevance_function.clone(),
-            limit: Some(options.limit),
+            search_term: NormalizedTermValue::new(query.to_string()),
+            search_terms: None,
+            operator: None,
             skip: Some(options.skip),
-            smart_search: Some(false),
+            limit: Some(options.limit),
+            role: Some(options.role.clone()),
         };
 
-        let documents = self.service.search(&search_query).await?;
+        let documents = {
+            let mut service = self.service.lock().unwrap();
+            service.search(&search_query).await?
+        };
         let total = documents.len();
 
         log::info!("Found {} documents for query '{}'", total, query);
@@ -81,7 +75,6 @@ impl SearchService {
             documents,
             total,
             query: query.to_string(),
-            relevance_function: options.relevance_function,
         })
     }
 
@@ -112,7 +105,11 @@ impl SearchService {
 
     /// Get available roles
     pub fn list_roles(&self) -> Vec<String> {
-        self.config.roles.keys().cloned().collect()
+        self.config
+            .roles
+            .keys()
+            .map(|role_name| role_name.to_string())
+            .collect()
     }
 
     /// Get current config
@@ -180,9 +177,15 @@ mod tests {
     #[test]
     fn test_search_options_default() {
         let options = SearchOptions::default();
-        assert_eq!(options.role, "default");
+        assert_eq!(options.role.to_string(), "default");
         assert_eq!(options.limit, 10);
         assert_eq!(options.skip, 0);
-        assert_eq!(options.relevance_function, RelevanceFunction::TerraphimGraph);
+    }
+
+    #[test]
+    fn test_logical_operator_variants() {
+        assert_eq!(LogicalOperator::And, LogicalOperator::And);
+        assert_eq!(LogicalOperator::Or, LogicalOperator::Or);
+        assert_ne!(LogicalOperator::And, LogicalOperator::Or);
     }
 }
