@@ -40,7 +40,7 @@ impl TerraphimApp {
 
         // Initialize views with service access (pass cloned config_state)
         let search_view = cx.new(|cx| SearchView::new(window, cx, config_state.clone()));
-        let chat_view = cx.new(|cx| ChatView::new(window, cx));
+        let chat_view = cx.new(|cx| ChatView::new(window, cx).with_config(config_state.clone()));
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
 
         // Initialize role selector with backend

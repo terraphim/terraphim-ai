@@ -1,24 +1,30 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
+use gpui_component::input::{Input, InputEvent as GpuiInputEvent, InputState};
 use gpui_component::StyledExt;
 use std::sync::Arc;
+use terraphim_config::ConfigState;
 use terraphim_service::context::{ContextConfig, ContextManager as TerraphimContextManager};
+use terraphim_service::llm;
 use terraphim_types::{ChatMessage, ContextItem, Conversation, ConversationId, RoleName};
 use tokio::sync::Mutex as TokioMutex;
 
-/// Chat view with real ContextManager backend integration
+/// Chat view with real ContextManager and LLM backend
 pub struct ChatView {
     context_manager: Arc<TokioMutex<TerraphimContextManager>>,
+    config_state: Option<ConfigState>,
     current_conversation_id: Option<ConversationId>,
+    current_role: RoleName,
     messages: Vec<ChatMessage>,
-    message_input: SharedString,
+    input_state: Option<Entity<InputState>>,
     is_sending: bool,
     show_context_panel: bool,
     context_items: Vec<ContextItem>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl ChatView {
-    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         log::info!("ChatView initialized with backend ContextManager");
 
         // Initialize ContextManager using Tauri pattern (cmd.rs:937-947)
@@ -26,15 +32,42 @@ impl ChatView {
             TerraphimContextManager::new(ContextConfig::default())
         ));
 
+        // Initialize input for message composition
+        let input_state = cx.new(|cx| InputState::new(window, cx).placeholder("Type your message..."));
+
+        // Subscribe to input events for message sending
+        let input_clone = input_state.clone();
+        let input_sub = cx.subscribe_in(&input_state, window, move |this, _, ev: &GpuiInputEvent, _window, cx| {
+            match ev {
+                GpuiInputEvent::PressEnter { .. } => {
+                    let value = input_clone.read(cx).value();
+                    if !value.is_empty() {
+                        this.send_message(value.to_string(), cx);
+                        // Input will keep text (clearing not critical for now)
+                    }
+                }
+                _ => {}
+            }
+        });
+
         Self {
             context_manager,
+            config_state: None,
             current_conversation_id: None,
+            current_role: RoleName::from("Terraphim Engineer"),
             messages: Vec::new(),
-            message_input: "".into(),
+            input_state: Some(input_state),
             is_sending: false,
             show_context_panel: true,
             context_items: Vec::new(),
+            _subscriptions: vec![input_sub],
         }
+    }
+
+    /// Initialize with config for LLM access
+    pub fn with_config(mut self, config_state: ConfigState) -> Self {
+        self.config_state = Some(config_state);
+        self
     }
 
     /// Create a new conversation (pattern from Tauri cmd.rs:950-978)
@@ -123,7 +156,7 @@ impl ChatView {
         }).detach();
     }
 
-    /// Send a message
+    /// Send message with LLM (pattern from Tauri cmd.rs:1668-1838)
     pub fn send_message(&mut self, content: String, cx: &mut Context<Self>) {
         if content.trim().is_empty() {
             return;
@@ -131,27 +164,101 @@ impl ChatView {
 
         log::info!("Sending message: {}", content);
 
-        self.is_sending = true;
-        self.message_input = "".into();
-        cx.notify();
-
-        // In a real implementation, this would call the LLM service
-        // For now, just add a user message and simulate a response
-
         // Add user message to local history
         self.messages.push(ChatMessage::user(content.clone()));
+        self.is_sending = true;
+        cx.notify();
 
-        // Simulate assistant response (will be replaced with real LLM in next phase)
-        cx.spawn(async move |this, cx| {
-            // Simulate network delay
-            tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
-
-            this.update(cx, |this, cx| {
-                let response = format!("Simulated response to: '{}'", content);
-                this.messages.push(ChatMessage::assistant(response, Some("claude-sonnet-4-5".to_string())));
-                this.is_sending = false;
+        let config_state = match &self.config_state {
+            Some(state) => state.clone(),
+            None => {
+                log::error!("Cannot send message: config not initialized");
+                self.is_sending = false;
                 cx.notify();
-            }).ok();
+                return;
+            }
+        };
+
+        let role = self.current_role.clone();
+        let context_manager = self.context_manager.clone();
+        let conv_id = self.current_conversation_id.clone();
+
+        cx.spawn(async move |this, cx| {
+            // Get role config (Tauri pattern cmd.rs:1679-1694)
+            let config = config_state.config.lock().await;
+            let role_config = match config.roles.get(&role) {
+                Some(rc) => rc.clone(),
+                None => {
+                    log::error!("Role '{}' not found", role);
+                    this.update(cx, |this, cx| {
+                        this.is_sending = false;
+                        cx.notify();
+                    }).ok();
+                    return;
+                }
+            };
+            drop(config);
+
+            // Build LLM client (Tauri pattern cmd.rs:1760)
+            let llm_client = match llm::build_llm_from_role(&role_config) {
+                Some(client) => client,
+                None => {
+                    log::warn!("No LLM configured for role, using simulated response");
+                    this.update(cx, |this, cx| {
+                        let response = format!("Simulated response (no LLM configured): {}", content);
+                        this.messages.push(ChatMessage::assistant(response, Some("simulated".to_string())));
+                        this.is_sending = false;
+                        cx.notify();
+                    }).ok();
+                    return;
+                }
+            };
+
+            // Build messages with context (Tauri pattern cmd.rs:1769-1816)
+            let mut messages_json: Vec<serde_json::Value> = Vec::new();
+
+            // Inject context if conversation exists
+            if let Some(conv_id) = &conv_id {
+                let manager = context_manager.lock().await;
+                if let Some(conversation) = manager.get_conversation(conv_id) {
+                    if !conversation.global_context.is_empty() {
+                        let mut context_content = String::from("=== CONTEXT ===\n");
+                        for (idx, item) in conversation.global_context.iter().enumerate() {
+                            context_content.push_str(&format!("{}. {}\n{}\n\n", idx + 1, item.title, item.content));
+                        }
+                        context_content.push_str("=== END CONTEXT ===\n");
+                        messages_json.push(serde_json::json!({"role": "system", "content": context_content}));
+                    }
+                }
+            }
+
+            // Add user message
+            messages_json.push(serde_json::json!({"role": "user", "content": content}));
+
+            // Call LLM (Tauri pattern cmd.rs:1824)
+            let opts = llm::ChatOptions {
+                max_tokens: Some(1024),
+                temperature: Some(0.7),
+            };
+
+            match llm_client.chat_completion(messages_json, opts).await {
+                Ok(reply) => {
+                    log::info!("✅ LLM response received ({} chars)", reply.len());
+                    this.update(cx, |this, cx| {
+                        this.messages.push(ChatMessage::assistant(reply, Some(llm_client.name().to_string())));
+                        this.is_sending = false;
+                        cx.notify();
+                    }).ok();
+                }
+                Err(e) => {
+                    log::error!("❌ LLM call failed: {}", e);
+                    this.update(cx, |this, cx| {
+                        this.messages.push(ChatMessage::system(format!("Error: {}", e)));
+                        this.is_sending = false;
+                        cx.notify();
+                    }).ok();
+                }
+            }
         }).detach();
     }
 
@@ -232,7 +339,7 @@ impl ChatView {
             )
     }
 
-    /// Render message input
+    /// Render message input with real Input component
     fn render_input(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .flex()
@@ -241,39 +348,25 @@ impl ChatView {
             .py_4()
             .border_t_1()
             .border_color(rgb(0xdbdbdb))
-            .child(
-                div()
-                    .flex_1()
-                    .px_4()
-                    .py_3()
-                    .bg(rgb(0xffffff))
-                    .border_1()
-                    .border_color(rgb(0xdbdbdb))
-                    .rounded_md()
-                    .child(
-                        if self.message_input.is_empty() {
-                            div()
-                                .text_color(rgb(0xb5b5b5))
-                                .child("Type your message...")
-                        } else {
-                            div()
-                                .text_color(rgb(0x363636))
-                                .child(self.message_input.clone())
-                        }
-                    ),
+            .children(
+                self.input_state.as_ref().map(|input| {
+                    div()
+                        .flex_1()
+                        .child(Input::new(input))
+                })
             )
             .child(
                 div()
                     .px_6()
                     .py_3()
                     .rounded_md()
-                    .bg(if self.is_sending || self.message_input.is_empty() {
+                    .bg(if self.is_sending {
                         rgb(0xdbdbdb)
                     } else {
                         rgb(0x3273dc)
                     })
                     .text_color(rgb(0xffffff))
-                    .when(!self.is_sending && !self.message_input.is_empty(), |this| {
+                    .when(!self.is_sending, |this| {
                         this.hover(|style| style.bg(rgb(0x2366d1)).cursor_pointer())
                     })
                     .child(if self.is_sending {
