@@ -41,14 +41,14 @@ pub struct ThemeColors {
 }
 
 impl TerraphimTheme {
-    pub fn new(_cx: &mut ModelContext<Self>) -> Self {
+    pub fn new(_cx: &mut Context<Self>) -> Self {
         Self {
             mode: ThemeMode::Light,
             colors: Self::light_colors(),
         }
     }
 
-    pub fn toggle_mode(&mut self, cx: &mut ModelContext<Self>) {
+    pub fn toggle_mode(&mut self, cx: &mut Context<Self>) {
         self.mode = match self.mode {
             ThemeMode::Light => ThemeMode::Dark,
             ThemeMode::Dark => ThemeMode::Light,
@@ -65,54 +65,54 @@ impl TerraphimTheme {
 
     fn light_colors() -> ThemeColors {
         ThemeColors {
-            background: rgb(0xffffff),
-            surface: rgb(0xf5f5f5),
-            surface_hover: rgb(0xf0f0f0),
+            background: rgb(0xffffff).into(),
+            surface: rgb(0xf5f5f5).into(),
+            surface_hover: rgb(0xf0f0f0).into(),
 
-            text_primary: rgb(0x363636),
-            text_secondary: rgb(0x7a7a7a),
-            text_disabled: rgb(0xb5b5b5),
+            text_primary: rgb(0x363636).into(),
+            text_secondary: rgb(0x7a7a7a).into(),
+            text_disabled: rgb(0xb5b5b5).into(),
 
-            primary: rgb(0x3273dc),
-            primary_hover: rgb(0x2366d1),
-            primary_text: rgb(0xffffff),
+            primary: rgb(0x3273dc).into(),
+            primary_hover: rgb(0x2366d1).into(),
+            primary_text: rgb(0xffffff).into(),
 
-            success: rgb(0x48c774),
-            warning: rgb(0xffdd57),
-            danger: rgb(0xf14668),
-            info: rgb(0x3298dc),
+            success: rgb(0x48c774).into(),
+            warning: rgb(0xffdd57).into(),
+            danger: rgb(0xf14668).into(),
+            info: rgb(0x3298dc).into(),
 
-            border: rgb(0xdbdbdb),
-            border_light: rgb(0xededed),
+            border: rgb(0xdbdbdb).into(),
+            border_light: rgb(0xededed).into(),
         }
     }
 
     fn dark_colors() -> ThemeColors {
         ThemeColors {
-            background: rgb(0x1a1a1a),
-            surface: rgb(0x2a2a2a),
-            surface_hover: rgb(0x363636),
+            background: rgb(0x1a1a1a).into(),
+            surface: rgb(0x2a2a2a).into(),
+            surface_hover: rgb(0x363636).into(),
 
-            text_primary: rgb(0xf5f5f5),
-            text_secondary: rgb(0xb5b5b5),
-            text_disabled: rgb(0x7a7a7a),
+            text_primary: rgb(0xf5f5f5).into(),
+            text_secondary: rgb(0xb5b5b5).into(),
+            text_disabled: rgb(0x7a7a7a).into(),
 
-            primary: rgb(0x3273dc),
-            primary_hover: rgb(0x2366d1),
-            primary_text: rgb(0xffffff),
+            primary: rgb(0x3273dc).into(),
+            primary_hover: rgb(0x2366d1).into(),
+            primary_text: rgb(0xffffff).into(),
 
-            success: rgb(0x48c774),
-            warning: rgb(0xffdd57),
-            danger: rgb(0xf14668),
-            info: rgb(0x3298dc),
+            success: rgb(0x48c774).into(),
+            warning: rgb(0xffdd57).into(),
+            danger: rgb(0xf14668).into(),
+            info: rgb(0x3298dc).into(),
 
-            border: rgb(0x4a4a4a),
-            border_light: rgb(0x363636),
+            border: rgb(0x4a4a4a).into(),
+            border_light: rgb(0x363636).into(),
         }
     }
 }
 
-pub fn configure_theme(_cx: &mut AppContext) {
+pub fn configure_theme(_cx: &mut impl AppContext) {
     log::info!("Theme system configured");
     // Theme configuration will be applied per-window via TerraphimTheme model
 }

@@ -1,4 +1,6 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::StyledExt;
 use terraphim_types::Document;
 
 /// Search results list component
@@ -7,13 +9,13 @@ pub struct SearchResults {
 }
 
 impl SearchResults {
-    pub fn new(_cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         Self {
             results: vec![],
         }
     }
 
-    fn render_result_item(&self, doc: &Document, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_result_item(&self, doc: &Document, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .p_4()
             .mb_2()
@@ -50,7 +52,7 @@ impl SearchResults {
             )
     }
 
-    fn render_empty_state(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_empty_state(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -59,7 +61,7 @@ impl SearchResults {
             .py_12()
             .child(
                 div()
-                    .text_6xl()
+                    .text_2xl()
                     .mb_4()
                     .child("🔍"),
             )
@@ -80,7 +82,7 @@ impl SearchResults {
 }
 
 impl Render for SearchResults {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if self.results.is_empty() {
             self.render_empty_state(cx).into_any_element()
         } else {

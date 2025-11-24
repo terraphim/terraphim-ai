@@ -1,8 +1,11 @@
 use gpui::*;
+use gpui_component::Root;
 
 mod actions;
 mod app;
 mod autocomplete;
+mod editor;
+mod kg_search;
 mod models;
 mod search_service;
 mod state;
@@ -17,43 +20,56 @@ fn main() {
 
     log::info!("Starting Terraphim Desktop GPUI");
 
-    // Initialize GPUI app
-    App::new().run(|cx: &mut AppContext| {
+    // Initialize GPUI application
+    let app = Application::new();
+
+    app.run(move |cx| {
+        // Initialize gpui-component features
+        gpui_component::init(cx);
+
         // Register app-wide actions
         actions::register_app_actions(cx);
 
         // Configure theme
         theme::configure_theme(cx);
 
-        // Open main window
-        cx.open_window(
-            WindowOptions {
-                window_bounds: Some(WindowBounds::Windowed(Bounds {
-                    origin: Point::new(px(100.0), px(100.0)),
-                    size: Size {
-                        width: px(1200.0),
-                        height: px(800.0),
-                    },
-                })),
-                titlebar: Some(TitlebarOptions {
-                    title: Some("Terraphim AI".into()),
-                    appears_transparent: false,
-                    traffic_light_position: None,
-                }),
-                window_min_size: Some(Size {
-                    width: px(800.0),
-                    height: px(600.0),
-                }),
-                kind: WindowKind::Normal,
-                is_movable: true,
-                display_id: None,
-                window_background: WindowBackgroundAppearance::Opaque,
-                app_id: Some("ai.terraphim.desktop".into()),
-            },
-            |cx| cx.new_view(|cx| TerraphimApp::new(cx)),
-        )
-        .expect("Failed to open main window");
+        // Spawn window creation asynchronously
+        cx.spawn(async move |cx| {
+            cx.open_window(
+                WindowOptions {
+                    window_bounds: Some(WindowBounds::Windowed(Bounds {
+                        origin: Point::new(px(100.0), px(100.0)),
+                        size: Size {
+                            width: px(1200.0),
+                            height: px(800.0),
+                        },
+                    })),
+                    titlebar: Some(TitlebarOptions {
+                        title: Some("Terraphim AI".into()),
+                        appears_transparent: false,
+                        traffic_light_position: None,
+                    }),
+                    window_min_size: Some(Size {
+                        width: px(800.0),
+                        height: px(600.0),
+                    }),
+                    kind: WindowKind::Normal,
+                    is_movable: true,
+                    display_id: None,
+                    window_background: WindowBackgroundAppearance::Opaque,
+                    app_id: Some("ai.terraphim.desktop".into()),
+                    ..Default::default()
+                },
+                |window, cx| {
+                    let view = cx.new(|cx| TerraphimApp::new(window, cx));
+                    // Wrap in Root component as required by gpui-component
+                    cx.new(|cx| Root::new(view, window, cx))
+                },
+            )?;
 
-        log::info!("Terraphim Desktop window opened successfully");
+            log::info!("Terraphim Desktop window opened successfully");
+            Ok::<_, anyhow::Error>(())
+        })
+        .detach();
     });
 }

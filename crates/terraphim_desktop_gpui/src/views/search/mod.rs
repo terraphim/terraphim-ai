@@ -1,4 +1,6 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::StyledExt;
 
 mod autocomplete;
 mod input;
@@ -9,14 +11,14 @@ pub use results::SearchResults;
 
 /// Main search view
 pub struct SearchView {
-    search_input: View<SearchInput>,
-    search_results: View<SearchResults>,
+    search_input: Entity<SearchInput>,
+    search_results: Entity<SearchResults>,
 }
 
 impl SearchView {
-    pub fn new(cx: &mut ViewContext<Self>) -> Self {
-        let search_input = cx.new_view(|cx| SearchInput::new(cx));
-        let search_results = cx.new_view(|cx| SearchResults::new(cx));
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let search_input = cx.new(|cx| SearchInput::new(window, cx));
+        let search_results = cx.new(|cx| SearchResults::new(window, cx));
 
         log::info!("SearchView initialized");
 
@@ -28,7 +30,7 @@ impl SearchView {
 }
 
 impl Render for SearchView {
-    fn render(&mut self, _cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -46,7 +48,6 @@ impl Render for SearchView {
             .child(
                 div()
                     .flex_1()
-                    .overflow_y_scroll()
                     .child(self.search_results.clone()),
             )
     }

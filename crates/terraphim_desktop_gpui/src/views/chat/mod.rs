@@ -1,4 +1,7 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::scroll::ScrollbarAxis;
+use gpui_component::StyledExt;
 use std::sync::Arc;
 use terraphim_types::{ChatMessage, ContextItem, Conversation, RoleName};
 
@@ -9,16 +12,16 @@ mod context {
         items: Vec<std::sync::Arc<terraphim_types::ContextItem>>,
     }
     impl ContextManager {
-        pub fn new(_cx: &mut ModelContext<Self>) -> Self {
+        pub fn new(_cx: &mut Context<Self>) -> Self {
             Self { items: Vec::new() }
         }
         pub fn count(&self) -> usize {
             self.items.len()
         }
-        pub fn clear_all(&mut self, _cx: &mut ModelContext<Self>) {
+        pub fn clear_all(&mut self, _cx: &mut Context<Self>) {
             self.items.clear();
         }
-        pub fn add_item(&mut self, item: terraphim_types::ContextItem, _cx: &mut ModelContext<Self>) -> Result<(), String> {
+        pub fn add_item(&mut self, item: terraphim_types::ContextItem, _cx: &mut Context<Self>) -> Result<(), String> {
             self.items.push(std::sync::Arc::new(item));
             Ok(())
         }
@@ -29,17 +32,17 @@ use context::ContextManager;
 /// Chat view with full context integration
 pub struct ChatView {
     conversation: Option<Arc<Conversation>>,
-    context_manager: Model<ContextManager>,
+    context_manager: Entity<ContextManager>,
     message_input: SharedString,
     is_sending: bool,
     show_context_panel: bool,
 }
 
 impl ChatView {
-    pub fn new(cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
         log::info!("ChatView initialized");
 
-        let context_manager = cx.new_model(|cx| ContextManager::new(cx));
+        let context_manager = cx.new(|cx| ContextManager::new(cx));
 
         Self {
             conversation: None,
@@ -57,7 +60,7 @@ impl ChatView {
     }
 
     /// Create a new conversation
-    pub fn new_conversation(&mut self, title: String, role: RoleName, cx: &mut ViewContext<Self>) {
+    pub fn new_conversation(&mut self, title: String, role: RoleName, cx: &mut Context<Self>) {
         log::info!("Creating new conversation: {} (role: {})", title, role);
 
         let conversation = Conversation::new(title, role);
@@ -72,7 +75,7 @@ impl ChatView {
     }
 
     /// Add context item to conversation
-    pub fn add_context(&mut self, item: ContextItem, cx: &mut ViewContext<Self>) {
+    pub fn add_context(&mut self, item: ContextItem, cx: &mut Context<Self>) {
         self.context_manager.update(cx, |mgr, cx| {
             if let Err(e) = mgr.add_item(item, cx) {
                 log::error!("Failed to add context item: {}", e);
@@ -81,7 +84,7 @@ impl ChatView {
     }
 
     /// Send a message
-    pub fn send_message(&mut self, content: String, cx: &mut ViewContext<Self>) {
+    pub fn send_message(&mut self, content: String, cx: &mut Context<Self>) {
         if content.trim().is_empty() {
             return;
         }
@@ -95,16 +98,16 @@ impl ChatView {
         // In a real implementation, this would call the LLM service
         // For now, just add a user message and simulate a response
 
-        if let Some(ref mut conversation) = self.conversation {
+        if let Some(ref mut _conversation) = self.conversation {
             // Add user message
             let _user_message = ChatMessage::user(content.clone());
 
             // Simulate assistant response
-            cx.spawn(|this, mut cx| async move {
+            cx.spawn(async move |this, mut cx| {
                 // Simulate network delay
                 tokio::time::sleep(tokio::time::Duration::from_millis(500)).await;
 
-                this.update(&mut cx, |this, cx| {
+                this.update(cx, |this, cx| {
                     // Add simulated response
                     let _response = format!("This is a simulated response to: '{}'", content);
                     let _assistant_message = ChatMessage::assistant(_response, Some("claude-sonnet-4-5".to_string()));
@@ -117,14 +120,14 @@ impl ChatView {
     }
 
     /// Toggle context panel visibility
-    pub fn toggle_context_panel(&mut self, cx: &mut ViewContext<Self>) {
+    pub fn toggle_context_panel(&mut self, cx: &mut Context<Self>) {
         self.show_context_panel = !self.show_context_panel;
         log::info!("Context panel {}", if self.show_context_panel { "shown" } else { "hidden" });
         cx.notify();
     }
 
     /// Render chat header
-    fn render_header(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_header(&self, _cx: &Context<Self>) -> impl IntoElement {
         let title = self.conversation
             .as_ref()
             .map(|conv| conv.title.clone())
@@ -159,16 +162,13 @@ impl ChatView {
                                     .text_color(rgb(0x363636))
                                     .child(title),
                             )
-                            .child(
-                                when(self.conversation.is_some(), || {
+                            .children(
+                                self.conversation.as_ref().map(|conv| {
                                     div()
                                         .text_xs()
                                         .text_color(rgb(0x7a7a7a))
-                                        .child(format!(
-                                            "Role: {}",
-                                            self.conversation.as_ref().unwrap().role
-                                        ))
-                                }),
+                                        .child(format!("Role: {}", conv.role))
+                                })
                             ),
                     ),
             )
@@ -199,7 +199,7 @@ impl ChatView {
     }
 
     /// Render message input
-    fn render_input(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_input(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .gap_2()
@@ -251,7 +251,7 @@ impl ChatView {
     }
 
     /// Render messages area
-    fn render_messages(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_messages(&self, _cx: &Context<Self>) -> impl IntoElement {
         if let Some(conversation) = &self.conversation {
             if conversation.messages.is_empty() {
                 return self.render_empty_state().into_any_element();
@@ -276,6 +276,13 @@ impl ChatView {
     fn render_message(&self, message: &ChatMessage) -> impl IntoElement {
         let is_user = message.role == "user";
         let is_system = message.role == "system";
+        let role_label = match message.role.as_str() {
+            "user" => "You".to_string(),
+            "system" => "System".to_string(),
+            "assistant" => message.model.as_deref().unwrap_or("Assistant").to_string(),
+            _ => "Unknown".to_string(),
+        };
+        let content = message.content.clone();
 
         div()
             .flex()
@@ -307,17 +314,12 @@ impl ChatView {
                                 div()
                                     .text_xs()
                                     .opacity(0.8)
-                                    .child(match message.role.as_str() {
-                                        "user" => "You",
-                                        "system" => "System",
-                                        "assistant" => message.model.as_deref().unwrap_or("Assistant"),
-                                        _ => "Unknown",
-                                    }),
+                                    .child(role_label),
                             )
                             .child(
                                 div()
                                     .text_sm()
-                                    .child(message.content.clone()),
+                                    .child(content),
                             ),
                     ),
             )
@@ -333,7 +335,7 @@ impl ChatView {
             .flex_1()
             .child(
                 div()
-                    .text_6xl()
+                    .text_2xl()
                     .mb_4()
                     .child("💬"),
             )
@@ -362,7 +364,7 @@ impl ChatView {
             .flex_1()
             .child(
                 div()
-                    .text_6xl()
+                    .text_2xl()
                     .mb_4()
                     .child("📝"),
             )
@@ -383,7 +385,7 @@ impl ChatView {
 }
 
 impl Render for ChatView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()
@@ -403,7 +405,6 @@ impl Render for ChatView {
                             .child(
                                 div()
                                     .flex_1()
-                                    .overflow_y_scroll()
                                     .child(self.render_messages(cx)),
                             )
                             .child(self.render_input(cx)),
@@ -416,7 +417,6 @@ impl Render for ChatView {
                                 .border_l_1()
                                 .border_color(rgb(0xdbdbdb))
                                 .bg(rgb(0xf9f9f9))
-                                .overflow_y_scroll()
                                 .child(
                                     div()
                                         .p_4()

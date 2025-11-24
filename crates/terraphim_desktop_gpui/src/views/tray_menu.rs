@@ -1,4 +1,6 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::StyledExt;
 
 /// Tray menu item definition
 #[derive(Clone, Debug)]
@@ -27,11 +29,11 @@ pub enum TrayMenuAction {
 pub struct TrayMenu {
     items: Vec<TrayMenuItem>,
     is_visible: bool,
-    on_action: Option<Box<dyn Fn(TrayMenuAction, &mut WindowContext) + 'static>>,
+    on_action: Option<Box<dyn Fn(TrayMenuAction, &mut Context<Self>) + 'static>>,
 }
 
 impl TrayMenu {
-    pub fn new(_cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         log::info!("TrayMenu initialized");
 
         let items = vec![
@@ -96,26 +98,26 @@ impl TrayMenu {
     /// Set the callback for menu actions
     pub fn on_action<F>(mut self, callback: F) -> Self
     where
-        F: Fn(TrayMenuAction, &mut WindowContext) + 'static,
+        F: Fn(TrayMenuAction, &mut Context<Self>) + 'static,
     {
         self.on_action = Some(Box::new(callback));
         self
     }
 
     /// Add custom menu item
-    pub fn add_item(&mut self, item: TrayMenuItem, cx: &mut ViewContext<Self>) {
+    pub fn add_item(&mut self, item: TrayMenuItem, cx: &mut Context<Self>) {
         self.items.push(item);
         cx.notify();
     }
 
     /// Remove menu item by id
-    pub fn remove_item(&mut self, id: &str, cx: &mut ViewContext<Self>) {
+    pub fn remove_item(&mut self, id: &str, cx: &mut Context<Self>) {
         self.items.retain(|item| item.id != id);
         cx.notify();
     }
 
     /// Enable/disable menu item
-    pub fn set_item_enabled(&mut self, id: &str, enabled: bool, cx: &mut ViewContext<Self>) {
+    pub fn set_item_enabled(&mut self, id: &str, enabled: bool, cx: &mut Context<Self>) {
         if let Some(item) = self.items.iter_mut().find(|item| item.id == id) {
             item.enabled = enabled;
             cx.notify();
@@ -123,25 +125,25 @@ impl TrayMenu {
     }
 
     /// Show the tray menu
-    pub fn show(&mut self, cx: &mut ViewContext<Self>) {
+    pub fn show(&mut self, cx: &mut Context<Self>) {
         self.is_visible = true;
         cx.notify();
     }
 
     /// Hide the tray menu
-    pub fn hide(&mut self, cx: &mut ViewContext<Self>) {
+    pub fn hide(&mut self, cx: &mut Context<Self>) {
         self.is_visible = false;
         cx.notify();
     }
 
     /// Toggle visibility
-    pub fn toggle(&mut self, cx: &mut ViewContext<Self>) {
+    pub fn toggle(&mut self, cx: &mut Context<Self>) {
         self.is_visible = !self.is_visible;
         cx.notify();
     }
 
     /// Handle menu item click
-    fn handle_item_click(&mut self, action: TrayMenuAction, cx: &mut ViewContext<Self>) {
+    fn handle_item_click(&mut self, action: TrayMenuAction, cx: &mut Context<Self>) {
         log::info!("Tray menu action triggered: {:?}", action);
 
         // Hide menu after action
@@ -155,7 +157,7 @@ impl TrayMenu {
     }
 
     /// Render a single menu item
-    fn render_menu_item(&self, item: &TrayMenuItem, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_menu_item(&self, item: &TrayMenuItem, _cx: &Context<Self>) -> impl IntoElement {
         let action = item.action.clone();
 
         div()
@@ -172,11 +174,11 @@ impl TrayMenu {
             })
             .border_b_1()
             .border_color(rgb(0xf0f0f0))
-            .child(
-                when(item.icon.is_some(), || {
+            .children(
+                item.icon.as_ref().map(|icon| {
                     div()
                         .text_lg()
-                        .child(item.icon.as_ref().unwrap().clone())
+                        .child(icon.clone())
                 }),
             )
             .child(
@@ -193,7 +195,7 @@ impl TrayMenu {
 }
 
 impl Render for TrayMenu {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         if !self.is_visible {
             return div().into_any_element();
         }
@@ -208,7 +210,6 @@ impl Render for TrayMenu {
             .border_color(rgb(0xdbdbdb))
             .rounded_md()
             .shadow_xl()
-            .z_index(1000)
             .overflow_hidden()
             .child(
                 // Header

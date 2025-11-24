@@ -17,7 +17,7 @@ pub struct SearchState {
 }
 
 impl SearchState {
-    pub fn new(_cx: &mut ModelContext<Self>) -> Self {
+    pub fn new(_cx: &mut Context<Self>) -> Self {
         log::info!("SearchState initialized");
 
         Self {
@@ -33,34 +33,38 @@ impl SearchState {
     }
 
     /// Initialize search service from config
-    pub fn initialize_service(&mut self, config_path: Option<&str>, cx: &mut ModelContext<Self>) {
-        match if let Some(path) = config_path {
-            SearchService::from_config_file(path)
-        } else {
-            SearchService::new(terraphim_config::Config::load().unwrap())
-        } {
-            Ok(service) => {
-                log::info!("Search service initialized successfully");
-                self.service = Some(Arc::new(service));
-                cx.notify();
-            }
-            Err(e) => {
-                log::error!("Failed to initialize search service: {}", e);
-                self.error = Some(format!("Failed to load search service: {}", e));
-                cx.notify();
-            }
-        }
+    pub fn initialize_service(&mut self, _config_path: Option<&str>, cx: &mut Context<Self>) {
+        // TODO: GPUI 0.2.2 migration - SearchService initialization needs update
+        // These methods don't exist in current API:
+        // - SearchService::from_config_file()
+        // - Config::load()
+
+        log::warn!("Search service initialization temporarily disabled during GPUI migration");
+        self.error = Some("Search service initialization not yet implemented".to_string());
+        cx.notify();
+
+        // Placeholder for future implementation:
+        // match SearchService::from_config(...) {
+        //     Ok(service) => {
+        //         self.service = Some(Arc::new(service));
+        //         cx.notify();
+        //     }
+        //     Err(e) => {
+        //         self.error = Some(format!("Failed to load search service: {}", e));
+        //         cx.notify();
+        //     }
+        // }
     }
 
     /// Set current role
-    pub fn set_role(&mut self, role: String, cx: &mut ModelContext<Self>) {
+    pub fn set_role(&mut self, role: String, cx: &mut Context<Self>) {
         self.current_role = role;
         log::info!("Role changed to: {}", self.current_role);
         cx.notify();
     }
 
     /// Execute search
-    pub fn search(&mut self, query: String, cx: &mut ModelContext<Self>) {
+    pub fn search(&mut self, query: String, cx: &mut Context<Self>) {
         if query.trim().is_empty() {
             self.clear_results(cx);
             return;
@@ -87,12 +91,12 @@ impl SearchState {
         };
 
         let options = SearchOptions {
-            role: self.current_role.clone(),
+            role: terraphim_types::RoleName::from(self.current_role.as_str()),
             limit: 20,
             ..Default::default()
         };
 
-        cx.spawn(|this, mut cx| async move {
+        cx.spawn(async move |this, mut cx| {
             match service.search(&query, options).await {
                 Ok(results) => {
                     log::info!(
@@ -101,7 +105,7 @@ impl SearchState {
                         results.total
                     );
 
-                    this.update(&mut cx, |this, cx| {
+                    this.update(cx, |this, cx| {
                         this.results = results
                             .documents
                             .into_iter()
@@ -116,7 +120,7 @@ impl SearchState {
                 Err(e) => {
                     log::error!("Search failed: {}", e);
 
-                    this.update(&mut cx, |this, cx| {
+                    this.update(cx, |this, cx| {
                         this.error = Some(format!("Search failed: {}", e));
                         this.loading = false;
                         this.results = vec![];
@@ -133,15 +137,17 @@ impl SearchState {
         // Parse query to extract term chips
         let parsed = SearchService::parse_query(query);
 
-        if parsed.is_complex() {
-            // TODO: Check which terms are from KG using autocomplete engine
+        // Check if query is complex (multiple terms or has operator)
+        let is_complex = parsed.terms.len() > 1 || parsed.operator.is_some();
+
+        if is_complex {
             self.term_chips = TermChipSet::from_query_string(query, |_term| false);
         } else {
             self.term_chips.clear();
         }
     }
 
-    fn clear_results(&mut self, cx: &mut ModelContext<Self>) {
+    fn clear_results(&mut self, cx: &mut Context<Self>) {
         self.results.clear();
         self.query.clear();
         self.parsed_query.clear();

@@ -5,13 +5,13 @@ use crate::state::search::SearchState;
 /// Search input component with autocomplete
 pub struct SearchInput {
     query: SharedString,
-    search_state: Model<SearchState>,
+    search_state: Entity<SearchState>,
     is_focused: bool,
 }
 
 impl SearchInput {
-    pub fn new(cx: &mut ViewContext<Self>) -> Self {
-        let search_state = cx.new_model(|cx| SearchState::new(cx));
+    pub fn new(_window: &mut Window, cx: &mut Context<Self>) -> Self {
+        let search_state = cx.new(|cx| SearchState::new(cx));
 
         Self {
             query: "".into(),
@@ -20,7 +20,7 @@ impl SearchInput {
         }
     }
 
-    fn handle_input(&mut self, text: String, cx: &mut ViewContext<Self>) {
+    fn handle_input(&mut self, text: String, cx: &mut Context<Self>) {
         self.query = text.clone().into();
 
         // Trigger search
@@ -31,8 +31,9 @@ impl SearchInput {
 }
 
 impl Render for SearchInput {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let query = self.query.clone();
+        let is_empty = query.is_empty();
 
         div()
             .flex()
@@ -57,12 +58,12 @@ impl Render for SearchInput {
                 // Input field (simplified for now)
                 div()
                     .flex_1()
-                    .child(if query.is_empty() {
+                    .child(if is_empty {
                         "Search knowledge graph...".into()
                     } else {
                         query
                     })
-                    .text_color(if query.is_empty() {
+                    .text_color(if is_empty {
                         rgb(0xb5b5b5)
                     } else {
                         rgb(0x363636)

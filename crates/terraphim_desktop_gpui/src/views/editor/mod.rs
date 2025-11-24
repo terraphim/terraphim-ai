@@ -1,6 +1,8 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::StyledExt;
 
-use terraphim_desktop_gpui::{EditorState, SlashCommand, SlashCommandManager};
+use crate::editor::{EditorState, SlashCommand, SlashCommandManager};
 
 /// Editor view with markdown editing and slash commands
 pub struct EditorView {
@@ -12,7 +14,7 @@ pub struct EditorView {
 }
 
 impl EditorView {
-    pub fn new(_cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         log::info!("EditorView initialized");
 
         Self {
@@ -25,7 +27,7 @@ impl EditorView {
     }
 
     /// Insert text at cursor
-    pub fn insert_text(&mut self, text: &str, cx: &mut ViewContext<Self>) {
+    pub fn insert_text(&mut self, text: &str, cx: &mut Context<Self>) {
         self.editor_state.insert_text(text);
         cx.notify();
     }
@@ -36,13 +38,13 @@ impl EditorView {
     }
 
     /// Clear editor content
-    pub fn clear(&mut self, cx: &mut ViewContext<Self>) {
+    pub fn clear(&mut self, cx: &mut Context<Self>) {
         self.editor_state.clear();
         cx.notify();
     }
 
     /// Show command palette
-    fn show_command_palette(&mut self, cx: &mut ViewContext<Self>) {
+    fn show_command_palette(&mut self, cx: &mut Context<Self>) {
         self.show_command_palette = true;
         self.command_input = "/".into();
         self.update_command_suggestions();
@@ -50,7 +52,7 @@ impl EditorView {
     }
 
     /// Hide command palette
-    fn hide_command_palette(&mut self, cx: &mut ViewContext<Self>) {
+    fn hide_command_palette(&mut self, cx: &mut Context<Self>) {
         self.show_command_palette = false;
         self.command_input = "".into();
         self.filtered_commands.clear();
@@ -63,24 +65,24 @@ impl EditorView {
         let prefix = input.trim_start_matches('/');
 
         if prefix.is_empty() {
-            self.filtered_commands = self.slash_manager.list_commands().to_vec();
+            self.filtered_commands = self.slash_manager.list_commands().iter().map(|c| (*c).clone()).collect();
         } else {
-            self.filtered_commands = self.slash_manager.suggest_commands(prefix);
+            self.filtered_commands = self.slash_manager.suggest_commands(prefix).iter().map(|c| (*c).clone()).collect();
         }
     }
 
     /// Execute a slash command
-    fn execute_command(&mut self, command: &str, args: &str, cx: &mut ViewContext<Self>) {
+    fn execute_command(&mut self, command: &str, args: &str, cx: &mut Context<Self>) {
         log::info!("Executing command: /{} {}", command, args);
 
         let slash_manager = self.slash_manager.clone();
         let command = command.to_string();
         let args = args.to_string();
 
-        cx.spawn(|this, mut cx| async move {
+        cx.spawn(async move |this, mut cx| {
             match slash_manager.execute_command(&command, &args).await {
                 Ok(result) => {
-                    this.update(&mut cx, |this, cx| {
+                    this.update(cx, |this, cx| {
                         this.editor_state.insert_text(&result);
                         this.editor_state.insert_text("\n\n");
                         cx.notify();
@@ -88,7 +90,7 @@ impl EditorView {
                 }
                 Err(e) => {
                     log::error!("Command execution failed: {}", e);
-                    this.update(&mut cx, |this, cx| {
+                    this.update(cx, |this, cx| {
                         this.editor_state.insert_text(&format!("Error: {}\n\n", e));
                         cx.notify();
                     }).ok();
@@ -100,7 +102,7 @@ impl EditorView {
     }
 
     /// Render editor header with toolbar
-    fn render_header(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_header(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .items_center()
@@ -139,6 +141,7 @@ impl EditorView {
 
     /// Render toolbar button
     fn render_toolbar_button(&self, icon: &str, _label: &str) -> impl IntoElement {
+        let icon = icon.to_string();
         div()
             .px_3()
             .py_2()
@@ -149,7 +152,7 @@ impl EditorView {
     }
 
     /// Render editor statistics
-    fn render_stats(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_stats(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .items_center()
@@ -173,7 +176,7 @@ impl EditorView {
     }
 
     /// Render command palette
-    fn render_command_palette(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_command_palette(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .absolute()
             .top(px(100.0))
@@ -184,7 +187,6 @@ impl EditorView {
             .border_color(rgb(0xdbdbdb))
             .rounded_lg()
             .shadow_xl()
-            .z_index(100)
             .overflow_hidden()
             .child(
                 // Input
@@ -214,17 +216,16 @@ impl EditorView {
                     .flex()
                     .flex_col()
                     .max_h(px(400.0))
-                    .overflow_y_scroll()
-                    .children(
+                    .children({
                         if self.filtered_commands.is_empty() {
-                            vec![self.render_no_commands()]
+                            vec![self.render_no_commands().into_any_element()]
                         } else {
                             self.filtered_commands
                                 .iter()
-                                .map(|cmd| self.render_command_item(cmd))
-                                .collect()
-                        },
-                    ),
+                                .map(|cmd| self.render_command_item(cmd).into_any_element())
+                                .collect::<Vec<_>>()
+                        }
+                    }),
             )
     }
 
@@ -282,13 +283,12 @@ impl EditorView {
     }
 
     /// Render the main editor area
-    fn render_editor_area(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_editor_area(&self, _cx: &Context<Self>) -> impl IntoElement {
         let content = self.editor_state.get_content();
 
         div()
             .flex_1()
             .p_6()
-            .overflow_y_scroll()
             .child(
                 if content.is_empty() {
                     div()
@@ -300,7 +300,7 @@ impl EditorView {
                         .gap_4()
                         .child(
                             div()
-                                .text_6xl()
+                                .text_2xl()
                                 .child("📝"),
                         )
                         .child(
@@ -321,7 +321,6 @@ impl EditorView {
                         .text_sm()
                         .line_height(px(24.0))
                         .text_color(rgb(0x363636))
-                        .whitespace_pre_wrap()
                         .child(content)
                 }
             )
@@ -329,7 +328,7 @@ impl EditorView {
 }
 
 impl Render for EditorView {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()

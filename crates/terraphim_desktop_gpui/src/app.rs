@@ -1,4 +1,6 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::StyledExt;
 
 use crate::actions::{NavigateToChat, NavigateToEditor, NavigateToSearch};
 use crate::theme::TerraphimTheme;
@@ -10,12 +12,12 @@ use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
 /// Main application state
 pub struct TerraphimApp {
     current_view: AppView,
-    search_view: View<SearchView>,
-    chat_view: View<ChatView>,
-    editor_view: View<EditorView>,
-    role_selector: View<RoleSelector>,
-    tray_menu: View<TrayMenu>,
-    theme: Model<TerraphimTheme>,
+    search_view: Entity<SearchView>,
+    chat_view: Entity<ChatView>,
+    editor_view: Entity<EditorView>,
+    role_selector: Entity<RoleSelector>,
+    tray_menu: Entity<TrayMenu>,
+    theme: Entity<TerraphimTheme>,
     show_tray_menu: bool,
 }
 
@@ -27,33 +29,34 @@ pub enum AppView {
 }
 
 impl TerraphimApp {
-    pub fn new(cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(window: &mut Window, cx: &mut Context<Self>) -> Self {
         // Initialize theme
-        let theme = cx.new_model(|cx| TerraphimTheme::new(cx));
+        let theme = cx.new(|cx| TerraphimTheme::new(cx));
 
         // Initialize views
-        let search_view = cx.new_view(|cx| SearchView::new(cx));
-        let chat_view = cx.new_view(|cx| ChatView::new(cx));
-        let editor_view = cx.new_view(|cx| EditorView::new(cx));
+        let search_view = cx.new(|cx| SearchView::new(window, cx));
+        let chat_view = cx.new(|cx| ChatView::new(window, cx));
+        let editor_view = cx.new(|cx| EditorView::new(window, cx));
 
         // Initialize role selector
-        let role_selector = cx.new_view(|cx| RoleSelector::new(cx));
+        let role_selector = cx.new(|cx| RoleSelector::new(window, cx));
 
         // Initialize tray menu
-        let tray_menu = cx.new_view(|cx| TrayMenu::new(cx));
+        let tray_menu = cx.new(|cx| TrayMenu::new(window, cx));
 
+        // TODO: GPUI 0.2.2 - on_action API has changed
         // Subscribe to navigation actions
-        cx.on_action(|this: &mut Self, _: &NavigateToSearch, cx| {
-            this.navigate_to(AppView::Search, cx);
-        });
+        // cx.on_action(|this: &mut Self, _: &NavigateToSearch, cx| {
+        //     this.navigate_to(AppView::Search, cx);
+        // });
 
-        cx.on_action(|this: &mut Self, _: &NavigateToChat, cx| {
-            this.navigate_to(AppView::Chat, cx);
-        });
+        // cx.on_action(|this: &mut Self, _: &NavigateToChat, cx| {
+        //     this.navigate_to(AppView::Chat, cx);
+        // });
 
-        cx.on_action(|this: &mut Self, _: &NavigateToEditor, cx| {
-            this.navigate_to(AppView::Editor, cx);
-        });
+        // cx.on_action(|this: &mut Self, _: &NavigateToEditor, cx| {
+        //     this.navigate_to(AppView::Editor, cx);
+        // });
 
         log::info!("TerraphimApp initialized with view: {:?}", AppView::Search);
 
@@ -69,7 +72,7 @@ impl TerraphimApp {
         }
     }
 
-    pub fn navigate_to(&mut self, view: AppView, cx: &mut ViewContext<Self>) {
+    pub fn navigate_to(&mut self, view: AppView, cx: &mut Context<Self>) {
         if self.current_view != view {
             log::info!("Navigating from {:?} to {:?}", self.current_view, view);
             self.current_view = view;
@@ -78,7 +81,7 @@ impl TerraphimApp {
     }
 
     /// Toggle tray menu visibility
-    pub fn toggle_tray_menu(&mut self, cx: &mut ViewContext<Self>) {
+    pub fn toggle_tray_menu(&mut self, cx: &mut Context<Self>) {
         self.show_tray_menu = !self.show_tray_menu;
 
         self.tray_menu.update(cx, |menu, cx| {
@@ -93,7 +96,7 @@ impl TerraphimApp {
     }
 
     /// Handle tray menu actions
-    fn handle_tray_action(&mut self, action: TrayMenuAction, cx: &mut ViewContext<Self>) {
+    fn handle_tray_action(&mut self, action: TrayMenuAction, cx: &mut Context<Self>) {
         log::info!("Handling tray action: {:?}", action);
 
         match action {
@@ -130,7 +133,7 @@ impl TerraphimApp {
         cx.notify();
     }
 
-    fn render_navigation(&self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render_navigation(&self, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .items_center()
@@ -196,9 +199,10 @@ impl TerraphimApp {
         &self,
         label: &str,
         view: AppView,
-        _cx: &mut ViewContext<Self>,
+        _cx: &mut Context<Self>,
     ) -> impl IntoElement {
         let is_active = self.current_view == view;
+        let label = label.to_string();
 
         div()
             .px_4()
@@ -218,7 +222,7 @@ impl TerraphimApp {
 }
 
 impl Render for TerraphimApp {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .flex_col()

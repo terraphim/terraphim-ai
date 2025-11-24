@@ -1,4 +1,6 @@
 use gpui::*;
+use gpui::prelude::FluentBuilder;
+use gpui_component::StyledExt;
 use terraphim_types::RoleName;
 
 /// Role selector dropdown component
@@ -6,11 +8,11 @@ pub struct RoleSelector {
     current_role: RoleName,
     available_roles: Vec<RoleName>,
     is_open: bool,
-    on_role_change: Option<Box<dyn Fn(RoleName, &mut WindowContext) + 'static>>,
+    on_role_change: Option<Box<dyn Fn(RoleName, &mut Context<Self>) + 'static>>,
 }
 
 impl RoleSelector {
-    pub fn new(cx: &mut ViewContext<Self>) -> Self {
+    pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         log::info!("RoleSelector initialized");
 
         // Default roles - in production, these would come from config
@@ -33,7 +35,7 @@ impl RoleSelector {
     /// Set the callback for role changes
     pub fn on_change<F>(mut self, callback: F) -> Self
     where
-        F: Fn(RoleName, &mut WindowContext) + 'static,
+        F: Fn(RoleName, &mut Context<Self>) + 'static,
     {
         self.on_role_change = Some(Box::new(callback));
         self
@@ -51,7 +53,7 @@ impl RoleSelector {
     }
 
     /// Set current role
-    pub fn set_role(&mut self, role: RoleName, cx: &mut ViewContext<Self>) {
+    pub fn set_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
         if self.current_role != role {
             log::info!("Role changed from {} to {}", self.current_role, role);
             self.current_role = role.clone();
@@ -65,13 +67,13 @@ impl RoleSelector {
     }
 
     /// Toggle dropdown open/closed
-    fn toggle_dropdown(&mut self, cx: &mut ViewContext<Self>) {
+    fn toggle_dropdown(&mut self, cx: &mut Context<Self>) {
         self.is_open = !self.is_open;
         cx.notify();
     }
 
     /// Select a role from dropdown
-    fn select_role(&mut self, role: RoleName, cx: &mut ViewContext<Self>) {
+    fn select_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
         self.set_role(role, cx);
         self.is_open = false;
         cx.notify();
@@ -90,7 +92,7 @@ impl RoleSelector {
     }
 
     /// Render a role display with icon
-    fn render_role_display(&self, role: &RoleName, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_role_display(&self, role: &RoleName, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .flex()
             .items_center()
@@ -110,7 +112,7 @@ impl RoleSelector {
     }
 
     /// Render dropdown menu
-    fn render_dropdown(&self, _cx: &ViewContext<Self>) -> impl IntoElement {
+    fn render_dropdown(&self, _cx: &Context<Self>) -> impl IntoElement {
         div()
             .absolute()
             .top(px(48.0))
@@ -121,7 +123,6 @@ impl RoleSelector {
             .border_color(rgb(0xdbdbdb))
             .rounded_md()
             .shadow_lg()
-            .z_index(100)
             .overflow_hidden()
             .children(
                 self.available_roles
@@ -145,13 +146,15 @@ impl RoleSelector {
                             .border_b_1()
                             .border_color(rgb(0xf0f0f0))
                             .child(self.render_role_display(role, _cx))
-                            .child(
-                                when(is_current, || {
-                                    div()
+                            .children(
+                                if is_current {
+                                    Some(div()
                                         .text_color(rgb(0x48c774))
                                         .text_sm()
-                                        .child("✓")
-                                }),
+                                        .child("✓"))
+                                } else {
+                                    None
+                                },
                             )
                     })
                     .collect::<Vec<_>>(),
@@ -160,7 +163,7 @@ impl RoleSelector {
 }
 
 impl Render for RoleSelector {
-    fn render(&mut self, cx: &mut ViewContext<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         div()
             .relative()
             .child(

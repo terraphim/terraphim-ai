@@ -29,6 +29,7 @@ pub enum SlashCommandHandler {
 }
 
 /// Slash command manager
+#[derive(Clone)]
 pub struct SlashCommandManager {
     commands: HashMap<String, SlashCommand>,
 }
@@ -223,6 +224,21 @@ impl EditorState {
 
     pub fn char_count(&self) -> usize {
         self.content.chars().count()
+    }
+
+    pub fn get_content(&self) -> String {
+        self.content.clone()
+    }
+
+    pub fn clear(&mut self) {
+        self.content.clear();
+        self.cursor_position = 0;
+        self.selection = None;
+        self.modified = true;
+    }
+
+    pub fn is_modified(&self) -> bool {
+        self.modified
     }
 }
 

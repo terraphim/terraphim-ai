@@ -11,7 +11,7 @@ pub struct ContextManager {
 }
 
 impl ContextManager {
-    pub fn new(_cx: &mut ModelContext<Self>) -> Self {
+    pub fn new(_cx: &mut Context<Self>) -> Self {
         log::info!("ContextManager initialized");
 
         Self {
@@ -22,7 +22,7 @@ impl ContextManager {
     }
 
     /// Add a context item
-    pub fn add_item(&mut self, item: ContextItem, cx: &mut ModelContext<Self>) -> Result<(), String> {
+    pub fn add_item(&mut self, item: ContextItem, cx: &mut Context<Self>) -> Result<(), String> {
         // Check if we've reached the limit
         if self.items.len() >= self.max_items {
             return Err(format!("Maximum context items ({}) reached", self.max_items));
@@ -40,7 +40,7 @@ impl ContextManager {
     }
 
     /// Update an existing context item
-    pub fn update_item(&mut self, id: &str, item: ContextItem, cx: &mut ModelContext<Self>) -> Result<(), String> {
+    pub fn update_item(&mut self, id: &str, item: ContextItem, cx: &mut Context<Self>) -> Result<(), String> {
         let index = self
             .items
             .iter()
@@ -54,7 +54,7 @@ impl ContextManager {
     }
 
     /// Remove a context item
-    pub fn remove_item(&mut self, id: &str, cx: &mut ModelContext<Self>) -> Result<(), String> {
+    pub fn remove_item(&mut self, id: &str, cx: &mut Context<Self>) -> Result<(), String> {
         let initial_len = self.items.len();
         self.items.retain(|item| item.id.as_str() != id);
 
@@ -93,7 +93,7 @@ impl ContextManager {
     }
 
     /// Select a context item
-    pub fn select_item(&mut self, id: &str, cx: &mut ModelContext<Self>) -> Result<(), String> {
+    pub fn select_item(&mut self, id: &str, cx: &mut Context<Self>) -> Result<(), String> {
         if !self.items.iter().any(|item| item.id.as_str() == id) {
             return Err(format!("Context item with ID '{}' not found", id));
         }
@@ -107,15 +107,18 @@ impl ContextManager {
     }
 
     /// Deselect a context item
-    pub fn deselect_item(&mut self, id: &str, cx: &mut ModelContext<Self>) {
-        if self.selected_items.retain(|selected_id| selected_id != id) {
+    pub fn deselect_item(&mut self, id: &str, cx: &mut Context<Self>) {
+        let initial_len = self.selected_items.len();
+        self.selected_items.retain(|selected_id| selected_id != id);
+
+        if self.selected_items.len() < initial_len {
             log::info!("Deselected context item: {}", id);
             cx.notify();
         }
     }
 
     /// Toggle selection of a context item
-    pub fn toggle_selection(&mut self, id: &str, cx: &mut ModelContext<Self>) -> Result<(), String> {
+    pub fn toggle_selection(&mut self, id: &str, cx: &mut Context<Self>) -> Result<(), String> {
         if self.selected_items.contains(&id.to_string()) {
             self.deselect_item(id, cx);
         } else {
@@ -125,21 +128,21 @@ impl ContextManager {
     }
 
     /// Select all context items
-    pub fn select_all(&mut self, cx: &mut ModelContext<Self>) {
+    pub fn select_all(&mut self, cx: &mut Context<Self>) {
         self.selected_items = self.items.iter().map(|item| item.id.to_string()).collect();
         log::info!("Selected all {} context items", self.selected_items.len());
         cx.notify();
     }
 
     /// Deselect all context items
-    pub fn deselect_all(&mut self, cx: &mut ModelContext<Self>) {
+    pub fn deselect_all(&mut self, cx: &mut Context<Self>) {
         self.selected_items.clear();
         log::info!("Deselected all context items");
         cx.notify();
     }
 
     /// Clear all context items
-    pub fn clear_all(&mut self, cx: &mut ModelContext<Self>) {
+    pub fn clear_all(&mut self, cx: &mut Context<Self>) {
         let count = self.items.len();
         self.items.clear();
         self.selected_items.clear();
@@ -174,7 +177,7 @@ impl ContextManager {
     }
 
     /// Sort items by relevance score (descending)
-    pub fn sort_by_relevance(&mut self, cx: &mut ModelContext<Self>) {
+    pub fn sort_by_relevance(&mut self, cx: &mut Context<Self>) {
         self.items.sort_by(|a, b| {
             let score_a = a.relevance_score.unwrap_or(0.0);
             let score_b = b.relevance_score.unwrap_or(0.0);
@@ -184,7 +187,7 @@ impl ContextManager {
     }
 
     /// Sort items by creation date (newest first)
-    pub fn sort_by_date(&mut self, cx: &mut ModelContext<Self>) {
+    pub fn sort_by_date(&mut self, cx: &mut Context<Self>) {
         self.items.sort_by(|a, b| b.created_at.cmp(&a.created_at));
         cx.notify();
     }
@@ -215,7 +218,9 @@ impl ContextManager {
         };
 
         for item in &self.items {
-            *stats.by_type.entry(item.context_type).or_insert(0) += 1;
+            // Convert ContextType to string for HashMap key
+            let type_str = format!("{:?}", item.context_type);
+            *stats.by_type.entry(type_str).or_insert(0) += 1;
             if let Some(score) = item.relevance_score {
                 stats.total_relevance += score;
             }
@@ -234,7 +239,7 @@ impl ContextManager {
 pub struct ContextStats {
     pub total: usize,
     pub selected: usize,
-    pub by_type: std::collections::HashMap<ContextType, usize>,
+    pub by_type: std::collections::HashMap<String, usize>, // Changed from ContextType to String
     pub total_relevance: f64,
     pub avg_relevance: f64,
 }
