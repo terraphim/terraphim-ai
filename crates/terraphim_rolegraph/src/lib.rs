@@ -1,3 +1,129 @@
+//! Knowledge graph implementation for semantic document search.
+//!
+//! `terraphim_rolegraph` provides a role-specific knowledge graph that connects
+//! concepts (nodes), their relationships (edges), and documents. It enables
+//! graph-based semantic search where query results are ranked by traversing
+//! relationships between matched concepts.
+//!
+//! # Architecture
+//!
+//! - **Nodes**: Concepts from the thesaurus with associated rank
+//! - **Edges**: Relationships between concepts with weighted connections
+//! - **Documents**: Indexed content linked to concepts via edges
+//! - **Thesaurus**: Synonym-to-concept mappings with Aho-Corasick matching
+//!
+//! # Core Concepts
+//!
+//! ## Graph Structure
+//!
+//! The knowledge graph uses a bipartite structure:
+//! - **Nodes** represent concepts (e.g., "rust programming")
+//! - **Edges** connect concepts that co-occur in documents
+//! - **Documents** are associated with edges via the concepts they contain
+//!
+//! ## Ranking System
+//!
+//! Search results are ranked by summing:
+//! - **Node rank**: Frequency/importance of the concept
+//! - **Edge rank**: Strength of concept relationships
+//! - **Document rank**: Document-specific relevance
+//!
+//! # Examples
+//!
+//! ## Creating and Querying a Graph
+//!
+//! ```rust
+//! use terraphim_rolegraph::RoleGraph;
+//! use terraphim_types::{RoleName, Thesaurus, NormalizedTermValue, NormalizedTerm, Document};
+//!
+//! # async fn example() -> Result<(), terraphim_rolegraph::Error> {
+//! // Create thesaurus
+//! let mut thesaurus = Thesaurus::new("engineering".to_string());
+//! thesaurus.insert(
+//!     NormalizedTermValue::from("rust"),
+//!     NormalizedTerm {
+//!         id: 1,
+//!         value: NormalizedTermValue::from("rust programming"),
+//!         url: Some("https://rust-lang.org".to_string()),
+//!     }
+//! );
+//!
+//! // Create role graph
+//! let mut graph = RoleGraph::new(
+//!     RoleName::new("engineer"),
+//!     thesaurus
+//! ).await?;
+//!
+//! // Index a document
+//! let doc = Document {
+//!     id: "doc1".to_string(),
+//!     title: "Rust Guide".to_string(),
+//!     body: "Learn rust programming with examples".to_string(),
+//!     url: "https://example.com/rust-guide".to_string(),
+//!     description: Some("Rust tutorial".to_string()),
+//!     summarization: None,
+//!     stub: None,
+//!     tags: Some(vec!["rust".to_string()]),
+//!     rank: None,
+//!     source_haystack: None,
+//! };
+//! let doc_id = doc.id.clone();
+//! graph.insert_document(&doc_id, doc);
+//!
+//! // Query the graph
+//! let results = graph.query_graph("rust", None, Some(10))?;
+//! println!("Found {} documents", results.len());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Path Connectivity Check
+//!
+//! ```rust
+//! use terraphim_rolegraph::RoleGraph;
+//! use terraphim_types::{RoleName, Thesaurus};
+//!
+//! # async fn example() -> Result<(), terraphim_rolegraph::Error> {
+//! # let thesaurus = Thesaurus::new("test".to_string());
+//! let graph = RoleGraph::new(RoleName::new("engineer"), thesaurus).await?;
+//!
+//! // Check if all matched terms are connected by a path
+//! let text = "rust async tokio programming";
+//! let connected = graph.is_all_terms_connected_by_path(text);
+//! println!("Terms connected: {}", connected);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! ## Multi-term Queries with Operators
+//!
+//! ```rust
+//! use terraphim_rolegraph::RoleGraph;
+//! use terraphim_types::{RoleName, Thesaurus, LogicalOperator};
+//!
+//! # async fn example() -> Result<(), terraphim_rolegraph::Error> {
+//! # let thesaurus = Thesaurus::new("test".to_string());
+//! let graph = RoleGraph::new(RoleName::new("engineer"), thesaurus).await?;
+//!
+//! // AND query - documents must contain ALL terms
+//! let results = graph.query_graph_with_operators(
+//!     &["rust", "async"],
+//!     &LogicalOperator::And,
+//!     None,
+//!     Some(10)
+//! )?;
+//!
+//! // OR query - documents may contain ANY term
+//! let results = graph.query_graph_with_operators(
+//!     &["rust", "python", "go"],
+//!     &LogicalOperator::Or,
+//!     None,
+//!     Some(10)
+//! )?;
+//! # Ok(())
+//! # }
+//! ```
+
 use ahash::AHashMap;
 use itertools::Itertools;
 use memoize::memoize;
@@ -12,37 +138,65 @@ pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
 use unicode_segmentation::UnicodeSegmentation;
 
+/// Errors that can occur when working with knowledge graphs.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
+    /// The requested node ID was not found in the graph
     #[error("The given node ID was not found")]
     NodeIdNotFound,
+    /// The requested edge ID was not found in the graph
     #[error("The given Edge ID was not found")]
     EdgeIdNotFound,
+    /// Failed to serialize IndexedDocument to JSON
     #[error("Cannot convert IndexedDocument to JSON: {0}")]
     JsonConversionError(#[from] serde_json::Error),
+    /// Error from terraphim_automata operations
     #[error("Error while driving terraphim automata: {0}")]
     TerraphimAutomataError(#[from] terraphim_automata::TerraphimAutomataError),
+    /// Error building Aho-Corasick automata
     #[error("Indexing error: {0}")]
     AhoCorasickError(#[from] aho_corasick::BuildError),
 }
 
+/// Result type alias using terraphim_rolegraph::Error.
 type Result<T> = std::result::Result<T, Error>;
 
-/// Statistics about the graph structure for debugging
+/// Statistics about the graph structure for debugging and monitoring.
+///
+/// Provides counts of nodes, edges, documents, and thesaurus size.
 #[derive(Debug, Clone)]
 pub struct GraphStats {
+    /// Total number of nodes (concepts) in the graph
     pub node_count: usize,
+    /// Total number of edges (concept relationships) in the graph
     pub edge_count: usize,
+    /// Total number of indexed documents
     pub document_count: usize,
+    /// Number of terms in the thesaurus
     pub thesaurus_size: usize,
+    /// Whether the graph has any indexed content
     pub is_populated: bool,
 }
 
-/// A `RoleGraph` is a graph of concepts and their relationships.
+/// A role-specific knowledge graph for semantic document search.
 ///
-/// It is used to index documents and search for them.
-/// Currently it maps from synonyms to concepts, so only the normalized term
-/// gets returned when a reverse lookup is performed.
+/// RoleGraph connects concepts from a thesaurus with documents through a graph
+/// structure. It uses Aho-Corasick for fast multi-pattern matching and maintains
+/// bidirectional mappings between:
+/// - Synonyms → Concepts (via thesaurus)
+/// - Concepts → Nodes (graph vertices)
+/// - Nodes ↔ Edges (concept relationships)
+/// - Edges → Documents (content associations)
+///
+/// # Performance
+///
+/// - **Matching**: O(n) text scanning with Aho-Corasick
+/// - **Querying**: O(k*e*d) where k=matched terms, e=edges per node, d=docs per edge
+/// - **Memory**: ~100 bytes per node + 200 bytes per edge
+///
+/// # Examples
+///
+/// See module-level documentation for usage examples.
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     /// The role of the graph
