@@ -24,6 +24,13 @@ Terraphim AI is a privacy-first, locally-running AI assistant featuring multi-ag
 
 **Frontend Applications**:
 - **Desktop App** (Svelte + TypeScript + Tauri): Full-featured search and configuration UI
+  - **📖 Complete Specification**: [`docs/specifications/terraphim-desktop-spec.md`](../docs/specifications/terraphim-desktop-spec.md)
+  - 16 major sections covering architecture, features, data models, testing, deployment
+  - Technology: Svelte 5.2.8, Tauri 2.9.4, Bulma CSS, D3.js, Novel editor
+  - Features: Semantic search, knowledge graph visualization, AI chat, role-based config
+  - Integration: 9+ haystacks (Ripgrep, MCP, Atomic, ClickUp, Logseq, QueryRs, Atlassian, Discourse, JMAP)
+  - Testing: 50+ E2E tests, visual regression, performance benchmarks
+  - Deployment: Windows/macOS/Linux installers, auto-update, MCP server mode
 - **Agent Workflows** (Vanilla JavaScript): Five workflow pattern examples (prompt-chaining, routing, parallel, orchestration, optimization)
 - **TruthForge UI** (Vanilla JavaScript): Narrative analysis with real-time progress visualization
 
@@ -390,6 +397,7 @@ cd desktop && yarn run check
 - **README.md** (290 lines): Project overview, installation, key features, terminology
 - **CONTRIBUTING.md**: Setup, code quality standards, development workflow
 - **TESTING_SCRIPTS_README.md** (363 lines): Comprehensive testing script documentation
+- **docs/specifications/terraphim-desktop-spec.md** (12,000 words): Complete technical specification for Terraphim Desktop application
 - **memories.md** (1867 lines): Development history and session-based progress tracking
 - **lessons-learned.md**: Critical technical insights and development patterns
 - **scratchpad.md**: Active task management and current work tracking
@@ -410,6 +418,8 @@ cd desktop && yarn run check
 - `examples/truthforge-ui/`: TruthForge narrative analysis UI (vanilla JS)
 - `scripts/`: Deployment and automation scripts
 - `docs/`: Project documentation and guides
+  - `docs/specifications/`: Technical specification documents
+    - `terraphim-desktop-spec.md`: Complete desktop application specification (~12,000 words)
 
 ## Summary Statistics
 
