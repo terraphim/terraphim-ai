@@ -161,25 +161,30 @@ This ensures feature parity with the Tauri application while using native Rust U
 
 ## Migration Status
 
-### Completed
+### Completed ✅
 - [x] Basic Iced application setup
 - [x] Navigation and routing
-- [x] Search view (basic)
-- [x] Chat view (basic)
-- [x] Theme switching
+- [x] **Search view with autocomplete** (FST-based, fuzzy fallback)
+- [x] **Chat view with context management** (add/remove context, context panel)
+- [x] **KG search modal** (search and add KG terms to context)
+- [x] Theme switching (Light/Dark)
 - [x] Configuration loading
-- [x] Backend integration
+- [x] Backend integration (automata, service, config)
+- [x] Real-time autocomplete suggestions
+- [x] Split-pane chat layout
+- [x] Context item management UI
 
-### In Progress
-- [ ] Advanced search features
-- [ ] Configuration UI
-- [ ] Graph visualization
+### In Progress 🚧
+- [ ] **LLM backend integration** (currently uses echo mock)
+- [ ] **Conversation persistence** (backend integration needed)
+- [ ] Configuration UI (wizard and JSON editor)
 
-### Planned
+### Planned 📅
 - [ ] System tray (after Tauri removal)
 - [ ] Global shortcuts (after Tauri removal)
+- [ ] Graph visualization
 - [ ] Window management
-- [ ] State persistence
+- [ ] Role switching UI
 - [ ] Keyboard shortcuts
 - [ ] Accessibility features
 
