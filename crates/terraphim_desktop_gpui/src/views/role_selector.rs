@@ -1,49 +1,37 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
 use gpui_component::StyledExt;
+use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
 
-/// Role selector dropdown component
+/// Role selector dropdown with real backend integration
 pub struct RoleSelector {
+    config_state: Option<ConfigState>,
     current_role: RoleName,
     available_roles: Vec<RoleName>,
     is_open: bool,
-    on_role_change: Option<Box<dyn Fn(RoleName, &mut Context<Self>) + 'static>>,
 }
 
 impl RoleSelector {
     pub fn new(_window: &mut Window, _cx: &mut Context<Self>) -> Self {
         log::info!("RoleSelector initialized");
 
-        // Default roles - in production, these would come from config
-        let available_roles = vec![
-            RoleName::from("default"),
-            RoleName::from("engineer"),
-            RoleName::from("researcher"),
-            RoleName::from("writer"),
-            RoleName::from("data_scientist"),
-        ];
-
         Self {
-            current_role: RoleName::from("default"),
-            available_roles,
+            config_state: None,
+            current_role: RoleName::from("Terraphim Engineer"),
+            available_roles: vec![],
             is_open: false,
-            on_role_change: None,
         }
     }
 
-    /// Set the callback for role changes
-    pub fn on_change<F>(mut self, callback: F) -> Self
-    where
-        F: Fn(RoleName, &mut Context<Self>) + 'static,
-    {
-        self.on_role_change = Some(Box::new(callback));
-        self
-    }
+    /// Initialize with config state to load roles
+    pub fn with_config(mut self, config_state: ConfigState) -> Self {
+        // Load available roles from config
+        let roles: Vec<RoleName> = config_state.roles.keys().cloned().collect();
+        log::info!("RoleSelector loaded {} roles from config", roles.len());
 
-    /// Set available roles from config
-    pub fn with_roles(mut self, roles: Vec<RoleName>) -> Self {
         self.available_roles = roles;
+        self.config_state = Some(config_state);
         self
     }
 
@@ -52,31 +40,52 @@ impl RoleSelector {
         &self.current_role
     }
 
-    /// Set current role
-    pub fn set_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
-        if self.current_role != role {
-            log::info!("Role changed from {} to {}", self.current_role, role);
-            self.current_role = role.clone();
-            cx.notify();
-
-            // Trigger callback if set
-            if let Some(callback) = &self.on_role_change {
-                callback(role, cx);
-            }
+    /// Change role using backend (pattern from Tauri select_role cmd.rs:392-462)
+    pub fn change_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
+        if self.current_role == role {
+            return;
         }
+
+        log::info!("Changing role from {} to {}", self.current_role, role);
+
+        let config_state = match &self.config_state {
+            Some(state) => state.clone(),
+            None => {
+                log::warn!("Cannot change role: config not initialized");
+                return;
+            }
+        };
+
+        let role_clone = role.clone();
+
+        cx.spawn(async move |this, cx| {
+            // Update selected_role in config (from Tauri select_role pattern)
+            let mut config = config_state.config.lock().await;
+            config.selected_role = role_clone.clone();
+            drop(config);
+
+            log::info!("✅ Role changed to: {}", role_clone);
+
+            this.update(cx, |this, cx| {
+                this.current_role = role_clone;
+                this.is_open = false;
+                cx.notify();
+            }).ok();
+        }).detach();
     }
 
     /// Toggle dropdown open/closed
-    fn toggle_dropdown(&mut self, cx: &mut Context<Self>) {
+    fn toggle_dropdown(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
         self.is_open = !self.is_open;
         cx.notify();
     }
 
-    /// Select a role from dropdown
-    fn select_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
-        self.set_role(role, cx);
-        self.is_open = false;
-        cx.notify();
+    /// Select a role from dropdown (click handler)
+    fn select_role_handler(&mut self, role: RoleName) -> impl Fn(&ClickEvent, &mut Window, &mut Context<Self>) {
+        move |_event, _window, cx| {
+            // Note: This won't work due to closure capture issues
+            // We'll need a different approach for click handlers
+        }
     }
 
     /// Render the role icon based on role name
@@ -164,10 +173,14 @@ impl RoleSelector {
 
 impl Render for RoleSelector {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        let current_role_display = self.current_role.to_string();
+        let current_role_icon = self.role_icon(&self.current_role).to_string();
+        let is_open = self.is_open;
+
         div()
             .relative()
             .child(
-                // Main button
+                // Main button - simplified without click for now
                 div()
                     .flex()
                     .items_center()
@@ -177,22 +190,35 @@ impl Render for RoleSelector {
                     .min_w(px(200.0))
                     .bg(rgb(0xffffff))
                     .border_1()
-                    .border_color(if self.is_open {
+                    .border_color(if is_open {
                         rgb(0x3273dc)
                     } else {
                         rgb(0xdbdbdb)
                     })
                     .rounded_md()
                     .hover(|style| style.border_color(rgb(0xb5b5b5)).cursor_pointer())
-                    .child(self.render_role_display(&self.current_role, cx))
+                    .child(
+                        div()
+                            .flex()
+                            .items_center()
+                            .gap_2()
+                            .child(div().text_xl().child(current_role_icon))
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .font_medium()
+                                    .text_color(rgb(0x363636))
+                                    .child(current_role_display)
+                            )
+                    )
                     .child(
                         div()
                             .text_color(rgb(0x7a7a7a))
                             .text_sm()
-                            .child(if self.is_open { "▲" } else { "▼" }),
+                            .child(if is_open { "▲" } else { "▼" }),
                     ),
             )
-            .when(self.is_open, |this| {
+            .when(is_open, |this| {
                 this.child(self.render_dropdown(cx))
             })
     }

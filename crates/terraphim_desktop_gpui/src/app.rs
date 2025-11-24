@@ -43,8 +43,8 @@ impl TerraphimApp {
         let chat_view = cx.new(|cx| ChatView::new(window, cx));
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
 
-        // Initialize role selector
-        let role_selector = cx.new(|cx| RoleSelector::new(window, cx));
+        // Initialize role selector with backend
+        let role_selector = cx.new(|cx| RoleSelector::new(window, cx).with_config(config_state.clone()));
 
         // Initialize tray menu
         let tray_menu = cx.new(|cx| TrayMenu::new(window, cx));
