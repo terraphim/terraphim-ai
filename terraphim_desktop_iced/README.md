@@ -174,9 +174,12 @@ This ensures feature parity with the Tauri application while using native Rust U
 - [x] Split-pane chat layout
 - [x] Context item management UI
 
+### Completed (Phase 2) ✅✅
+- [x] **LLM backend integration** (OpenRouter with context-aware prompts)
+- [x] **Conversation persistence** (ConversationService with OpenDAL)
+- [x] **Full context management** (add/remove/persist context items)
+
 ### In Progress 🚧
-- [ ] **LLM backend integration** (currently uses echo mock)
-- [ ] **Conversation persistence** (backend integration needed)
 - [ ] Configuration UI (wizard and JSON editor)
 
 ### Planned 📅
