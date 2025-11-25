@@ -836,6 +836,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_complete"
+version = "4.5.61"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "39615915e2ece2550c0149addac32fb5bd312c657f43845bb9088cb9c8a7c992"
+dependencies = [
+ "clap",
+]
+
+[[package]]
 name = "clap_derive"
 version = "4.5.49"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8056,6 +8065,27 @@ dependencies = [
  "tsify",
  "ulid",
  "wasm-bindgen",
+]
+
+[[package]]
+name = "terraphim-cli"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "clap",
+ "clap_complete",
+ "colored 2.2.0",
+ "log",
+ "serde",
+ "serde_json",
+ "terraphim_automata",
+ "terraphim_config",
+ "terraphim_persistence",
+ "terraphim_rolegraph",
+ "terraphim_service",
+ "terraphim_settings",
+ "terraphim_types",
+ "tokio",
 ]
 
 [[package]]
