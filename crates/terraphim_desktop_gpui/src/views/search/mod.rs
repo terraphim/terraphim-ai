@@ -2,6 +2,7 @@ use gpui::*;
 use gpui_component::StyledExt;
 use terraphim_config::ConfigState;
 use crate::state::search::SearchState;
+use crate::views::ArticleModal;
 
 mod autocomplete;
 mod input;
@@ -12,11 +13,12 @@ pub use results::{AddToContextEvent, SearchResults};
 
 impl EventEmitter<AddToContextEvent> for SearchView {}
 
-/// Main search view
+/// Main search view with article modal
 pub struct SearchView {
     search_state: Entity<SearchState>,
     search_input: Entity<SearchInput>,
     search_results: Entity<SearchResults>,
+    article_modal: Entity<ArticleModal>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -25,9 +27,10 @@ impl SearchView {
         let search_state = cx.new(|cx| SearchState::new(cx).with_config(config_state));
         let search_input = cx.new(|cx| SearchInput::new(window, cx, search_state.clone()));
         let search_results = cx.new(|cx| SearchResults::new(window, cx, search_state.clone()));
+        let article_modal = cx.new(|cx| ArticleModal::new(window, cx));
 
         // Forward AddToContextEvent from SearchResults to App
-        let results_sub = cx.subscribe(&search_results, |this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
+        let results_sub = cx.subscribe(&search_results, |_this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
             log::info!("SearchView forwarding AddToContext event");
             cx.emit(AddToContextEvent { document: event.document.clone() });
         });
@@ -38,8 +41,16 @@ impl SearchView {
             search_state,
             search_input,
             search_results,
+            article_modal,
             _subscriptions: vec![results_sub],
         }
+    }
+
+    /// Open article modal with document
+    pub fn open_article(&self, document: terraphim_types::Document, cx: &mut Context<Self>) {
+        self.article_modal.update(cx, |modal, modal_cx| {
+            modal.open(document, modal_cx);
+        });
     }
 
     /// Get search state for external access
@@ -58,6 +69,7 @@ impl SearchView {
 impl Render for SearchView {
     fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
         div()
+            .relative()
             .flex()
             .flex_col()
             .size_full()
@@ -76,5 +88,6 @@ impl Render for SearchView {
                     .flex_1()
                     .child(self.search_results.clone()),
             )
+            .child(self.article_modal.clone())  // Modal renders on top
     }
 }
