@@ -27,6 +27,18 @@ pub enum ReplCommand {
         top_k: Option<usize>,
     },
 
+    // Knowledge graph operations
+    Replace {
+        text: String,
+        format: Option<String>,
+    },
+    Find {
+        text: String,
+    },
+    Thesaurus {
+        role: Option<String>,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -185,6 +197,74 @@ impl FromStr for ReplCommand {
                 Ok(ReplCommand::Graph { top_k })
             }
 
+            "replace" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Replace command requires text"));
+                }
+
+                let mut text = String::new();
+                let mut format = None;
+                let mut i = 1;
+
+                while i < parts.len() {
+                    match parts[i] {
+                        "--format" => {
+                            if i + 1 < parts.len() {
+                                format = Some(parts[i + 1].to_string());
+                                i += 2;
+                            } else {
+                                return Err(anyhow!("--format requires a value"));
+                            }
+                        }
+                        _ => {
+                            if !text.is_empty() {
+                                text.push(' ');
+                            }
+                            text.push_str(parts[i]);
+                            i += 1;
+                        }
+                    }
+                }
+
+                if text.is_empty() {
+                    return Err(anyhow!("Replace text cannot be empty"));
+                }
+
+                Ok(ReplCommand::Replace { text, format })
+            }
+
+            "find" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!("Find command requires text"));
+                }
+                Ok(ReplCommand::Find {
+                    text: parts[1..].join(" "),
+                })
+            }
+
+            "thesaurus" => {
+                let mut role = None;
+                let mut i = 1;
+
+                while i < parts.len() {
+                    match parts[i] {
+                        "--role" => {
+                            if i + 1 < parts.len() {
+                                role = Some(parts[i + 1].to_string());
+                                i += 2;
+                            } else {
+                                return Err(anyhow!("--role requires a value"));
+                            }
+                        }
+                        _ => {
+                            return Err(anyhow!("Unknown thesaurus option: {}", parts[i]));
+                        }
+                    }
+                }
+
+                Ok(ReplCommand::Thesaurus { role })
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -209,7 +289,10 @@ impl FromStr for ReplCommand {
 impl ReplCommand {
     /// Get available commands for the minimal release
     pub fn available_commands() -> Vec<&'static str> {
-        vec!["search", "config", "role", "graph", "help", "quit", "exit", "clear"]
+        vec![
+            "search", "config", "role", "graph", "replace", "find", "thesaurus", "help", "quit",
+            "exit", "clear",
+        ]
     }
 
     /// Get command description for help system
@@ -245,6 +328,34 @@ impl ReplCommand {
                  Examples:\n\
                    /graph\n\
                    /graph --top-k 20",
+            ),
+            "replace" => Some(
+                "/replace <text> [--format <format>]\n\
+                 Replace matched terms in text with links using the knowledge graph.\n\
+                 Formats: markdown (default), html, wiki, plain\n\
+                 \n\
+                 Examples:\n\
+                   /replace rust is a programming language\n\
+                   /replace async programming with tokio --format markdown\n\
+                   /replace check out rust --format html",
+            ),
+            "find" => Some(
+                "/find <text>\n\
+                 Find all terms in text that match the knowledge graph.\n\
+                 Shows matched terms with their positions.\n\
+                 \n\
+                 Examples:\n\
+                   /find rust async programming\n\
+                   /find this is about tokio and async",
+            ),
+            "thesaurus" => Some(
+                "/thesaurus [--role <role>]\n\
+                 Display the thesaurus (knowledge graph terms) for current or specified role.\n\
+                 Shows term mappings with IDs and URLs.\n\
+                 \n\
+                 Examples:\n\
+                   /thesaurus\n\
+                   /thesaurus --role Engineer",
             ),
             "help" => Some(
                 "/help [command]\n\
