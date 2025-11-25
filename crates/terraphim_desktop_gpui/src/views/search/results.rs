@@ -9,7 +9,13 @@ pub struct AddToContextEvent {
     pub document: Document,
 }
 
+/// Event emitted when user wants to view full document
+pub struct OpenArticleEvent {
+    pub document: Document,
+}
+
 impl EventEmitter<AddToContextEvent> for SearchResults {}
+impl EventEmitter<OpenArticleEvent> for SearchResults {}
 
 /// Search results with action buttons matching Tauri desktop
 pub struct SearchResults {
@@ -39,10 +45,16 @@ impl SearchResults {
         cx.emit(AddToContextEvent { document });
     }
 
+    fn handle_open_article(&mut self, document: Document, cx: &mut Context<Self>) {
+        log::info!("Opening article modal for: {}", document.title);
+        cx.emit(OpenArticleEvent { document });
+    }
+
     fn render_result_item(&self, doc: &Document, idx: usize, cx: &Context<Self>) -> impl IntoElement {
         let doc_url = doc.url.clone();
         let doc_clone_for_context = doc.clone();
         let doc_clone_for_chat = doc.clone();
+        let doc_clone_for_modal = doc.clone();
 
         div()
             .p_4()
@@ -53,12 +65,22 @@ impl SearchResults {
             .rounded_md()
             .hover(|style| style.bg(rgb(0xf5f5f5)))
             .child(
+                // Clickable title to open modal
                 div()
                     .text_lg()
                     .font_semibold()
                     .text_color(rgb(0x3273dc))
                     .mb_2()
-                    .child(doc.title.clone()),
+                    .cursor_pointer()
+                    .hover(|style| style.text_color(rgb(0x2366d1)))
+                    .child(
+                        Button::new(("open-modal", idx))
+                            .label(doc.title.clone())
+                            .ghost()
+                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                this.handle_open_article(doc_clone_for_modal.clone(), cx);
+                            }))
+                    ),
             )
             .child(
                 div()

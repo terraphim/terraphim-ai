@@ -9,9 +9,10 @@ mod input;
 mod results;
 
 pub use input::SearchInput;
-pub use results::{AddToContextEvent, SearchResults};
+pub use results::{AddToContextEvent, OpenArticleEvent, SearchResults};
 
 impl EventEmitter<AddToContextEvent> for SearchView {}
+impl EventEmitter<OpenArticleEvent> for SearchView {}
 
 /// Main search view with article modal
 pub struct SearchView {
@@ -30,9 +31,18 @@ impl SearchView {
         let article_modal = cx.new(|cx| ArticleModal::new(window, cx));
 
         // Forward AddToContextEvent from SearchResults to App
-        let results_sub = cx.subscribe(&search_results, |_this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
+        let results_sub1 = cx.subscribe(&search_results, |_this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
             log::info!("SearchView forwarding AddToContext event");
             cx.emit(AddToContextEvent { document: event.document.clone() });
+        });
+
+        // Handle OpenArticleEvent to show modal
+        let modal_clone = article_modal.clone();
+        let results_sub2 = cx.subscribe(&search_results, move |_this: &mut SearchView, _results, event: &OpenArticleEvent, cx| {
+            log::info!("Opening article modal for: {}", event.document.title);
+            modal_clone.update(cx, |modal, modal_cx| {
+                modal.open(event.document.clone(), modal_cx);
+            });
         });
 
         log::info!("SearchView initialized with backend services");
@@ -42,7 +52,7 @@ impl SearchView {
             search_input,
             search_results,
             article_modal,
-            _subscriptions: vec![results_sub],
+            _subscriptions: vec![results_sub1, results_sub2],
         }
     }
 
