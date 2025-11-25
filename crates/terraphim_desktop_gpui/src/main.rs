@@ -68,9 +68,10 @@ fn main() {
 
     log::info!("Configuration loaded successfully, starting GPUI...");
 
-    // Keep runtime alive for the entire application lifetime
-    // terraphim_service needs tokio reactor for async operations
-    let _runtime_guard = runtime;
+    // Leak runtime to make it 'static and always available
+    // terraphim_service needs tokio reactor for spawning processes (ripgrep)
+    let runtime = Box::leak(Box::new(runtime));
+    let _guard = runtime.enter();
 
     // Initialize GPUI application
     let app = Application::new();
