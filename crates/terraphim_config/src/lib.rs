@@ -600,28 +600,48 @@ impl ConfigBuilder {
                 let mut python_engineer_role = Role::new("Python Engineer");
                 python_engineer_role.shortname = Some("python-eng".to_string());
                 python_engineer_role.theme = "flatly".to_string();
-                python_engineer_role.haystacks = vec![Haystack {
-                    location: default_data_path.to_string_lossy().to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: false,
-                    fetch_content: false,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                }];
+                python_engineer_role.haystacks = vec![
+                    Haystack {
+                        location: default_data_path.to_string_lossy().to_string(),
+                        service: ServiceType::Ripgrep,
+                        read_only: false,
+                        fetch_content: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                    Haystack {
+                        location: "https://grep.app".to_string(),
+                        service: ServiceType::GrepApp,
+                        read_only: true,
+                        fetch_content: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                ];
                 python_engineer_role
             })
             .add_role("Front-End Engineer", {
                 let mut frontend_engineer_role = Role::new("Front-End Engineer");
                 frontend_engineer_role.shortname = Some("frontend-eng".to_string());
                 frontend_engineer_role.theme = "materia".to_string();
-                frontend_engineer_role.haystacks = vec![Haystack {
-                    location: default_data_path.to_string_lossy().to_string(),
-                    service: ServiceType::Ripgrep,
-                    read_only: false,
-                    fetch_content: false,
-                    atomic_server_secret: None,
-                    extra_parameters: std::collections::HashMap::new(),
-                }];
+                frontend_engineer_role.haystacks = vec![
+                    Haystack {
+                        location: default_data_path.to_string_lossy().to_string(),
+                        service: ServiceType::Ripgrep,
+                        read_only: false,
+                        fetch_content: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                    Haystack {
+                        location: "https://grep.app".to_string(),
+                        service: ServiceType::GrepApp,
+                        read_only: true,
+                        fetch_content: false,
+                        atomic_server_secret: None,
+                        extra_parameters: std::collections::HashMap::new(),
+                    },
+                ];
                 frontend_engineer_role
             })
             .default_role("Terraphim Engineer")

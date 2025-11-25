@@ -43,8 +43,19 @@ impl TerraphimApp {
         let chat_view = cx.new(|cx| ChatView::new(window, cx).with_config(config_state.clone()));
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
 
-        // Initialize role selector with backend
-        let role_selector = cx.new(|cx| RoleSelector::new(window, cx).with_config(config_state.clone()));
+        // Initialize role selector with ALL roles from config
+        let all_roles = {
+            let runtime_handle = tokio::runtime::Handle::current();
+            runtime_handle.block_on(async {
+                let config = config_state.config.lock().await;
+                config.roles.keys().cloned().collect::<Vec<_>>()
+            })
+        };
+        let role_selector = cx.new(|cx| {
+            RoleSelector::new(window, cx)
+                .with_config(config_state.clone())
+                .with_roles(all_roles)
+        });
 
         // Initialize tray menu
         let tray_menu = cx.new(|cx| TrayMenu::new(window, cx));

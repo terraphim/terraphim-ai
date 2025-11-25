@@ -24,14 +24,16 @@ impl RoleSelector {
         }
     }
 
-    /// Initialize with config state to load roles
+    /// Initialize with config state
     pub fn with_config(mut self, config_state: ConfigState) -> Self {
-        // Load available roles from config
-        let roles: Vec<RoleName> = config_state.roles.keys().cloned().collect();
-        log::info!("RoleSelector loaded {} roles from config", roles.len());
-
-        self.available_roles = roles;
         self.config_state = Some(config_state);
+        self
+    }
+
+    /// Set available roles (loaded from config in App)
+    pub fn with_roles(mut self, roles: Vec<RoleName>) -> Self {
+        log::info!("RoleSelector loaded {} roles from config (Tauri pattern)", roles.len());
+        self.available_roles = roles;
         self
     }
 
