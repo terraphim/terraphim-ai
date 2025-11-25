@@ -22,12 +22,13 @@ fn main() {
 
     log::info!("Starting Terraphim Desktop GPUI");
 
-    // Initialize configuration BEFORE GPUI (requires tokio runtime)
-    log::info!("Pre-loading configuration with tokio runtime...");
+    // Create tokio runtime that stays alive for the entire app
+    // This is needed because terraphim_service uses tokio for async operations
+    let runtime = tokio::runtime::Runtime::new().expect("Failed to create tokio runtime");
 
-    let config_state = tokio::runtime::Runtime::new()
-        .expect("Failed to create tokio runtime")
-        .block_on(async {
+    log::info!("Loading configuration with tokio runtime...");
+
+    let config_state = runtime.block_on(async {
             // Load configuration using pattern from Tauri main.rs
             let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
                 Ok(mut config) => match config.load().await {
@@ -66,6 +67,10 @@ fn main() {
         });
 
     log::info!("Configuration loaded successfully, starting GPUI...");
+
+    // Keep runtime alive for the entire application lifetime
+    // terraphim_service needs tokio reactor for async operations
+    let _runtime_guard = runtime;
 
     // Initialize GPUI application
     let app = Application::new();
