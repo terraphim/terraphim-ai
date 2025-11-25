@@ -15,7 +15,7 @@ wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.42", optional = true }
 dotenvy = "0.15.7"
 url = { version = "2.5.4", features = ["serde"] }
-ed25519-dalek = "1.0"
+ed25519-dalek = "2.2"
 thiserror = "2.0.12"
 rand_core = "0.5"
 serde_jcs = "0.1.0"
