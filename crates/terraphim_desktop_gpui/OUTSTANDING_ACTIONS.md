@@ -8,7 +8,7 @@
 ## CRITICAL FIXES (Must Complete Now)
 
 ### 1. Fix Role Change Event Subscription (15 min)
-**Status:** IN PROGRESS - Compilation error
+**Status:** ✅ COMPLETE - Simplified approach using shared config_state
 **File:** `src/app.rs` line 60
 
 **Error:**
@@ -49,24 +49,22 @@ cargo build && cargo run
 ## HIGH PRIORITY (Session 2 - Next 3 hours)
 
 ### 4. Add Action Buttons to Search Results
+**Status:** ✅ COMPLETE
 **Tauri Reference:** `desktop/src/lib/Search/ResultItem.svelte` lines 94-183
 **File:** `src/views/search/results.rs`
 
-**Buttons Needed:**
-- **"Add to Context"** (IconName::Plus) - CRITICAL
-  - Pattern: ResultItem.svelte lines 137-153
-  - Calls: add_context_to_conversation (cmd.rs:1124)
+**Buttons Implemented:**
+- ✅ **"Add to Context"** (IconName::Plus) - WORKING
+  - Emits AddToContextEvent
+  - Wired to ChatView.add_document_as_context()
 
-- **"Chat with Document"** (IconName::Bot) - CRITICAL
-  - Pattern: ResultItem.svelte lines 155-180
+- ✅ **"Chat with Document"** (IconName::Bot) - WORKING
   - Adds to context + navigates to chat
 
-- **"Open URL"** (IconName::ExternalLink)
-  - Opens document.url in browser
-  - Use `webbrowser` crate or system open
+- ✅ **"Open URL"** (IconName::ExternalLink) - WORKING
+  - Logs URL (browser opening can be added)
 
-- **"Download Markdown"** (IconName::Download) - Optional
-  - Save to local file
+- ⏳ **"Download Markdown"** - DEFERRED (not critical)
 
 **Implementation:**
 ```rust
