@@ -282,6 +282,24 @@ Use `terraphim_tui` for:
 - Ctrl+C or Ctrl+D to exit
 - `/clear` to clear screen
 
+## System Requirements
+
+### Minimum
+- **RAM**: 20 MB
+- **Disk**: 15 MB
+- **OS**: Linux, macOS, or Windows
+- **Rust**: 1.70+ (for installation from crates.io)
+
+### Recommended
+- **RAM**: 50 MB
+- **Disk**: 50 MB (including config and thesaurus)
+
+### Large Knowledge Graphs
+- **RAM**: 100-200 MB (for 10,000+ term thesaurus)
+- **Disk**: 500 MB+ (for large thesaurus files)
+
+**Note**: Actual memory usage is 15-25 MB for typical operations, comparable to tools like ripgrep and fzf.
+
 ## Troubleshooting
 
 ### REPL won't start
