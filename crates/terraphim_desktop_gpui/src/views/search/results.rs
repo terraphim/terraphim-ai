@@ -29,8 +29,25 @@ impl SearchResults {
 
     fn handle_open_url(&self, url: String) {
         if !url.is_empty() {
-            log::info!("Opening URL: {}", url);
-            // TODO: Open in browser (use webbrowser crate)
+            // Ensure URL has a scheme
+            let url = if !url.starts_with("http://") && !url.starts_with("https://") {
+                format!("https://{}", url)
+            } else {
+                url
+            };
+
+            log::info!("Opening URL in browser: {}", url);
+
+            // Open URL using the webbrowser crate
+            match webbrowser::open(&url) {
+                Ok(()) => {
+                    log::info!("Successfully opened URL in browser");
+                }
+                Err(e) => {
+                    log::error!("Failed to open URL in browser: {}", e);
+                    // TODO: Show error notification to user
+                }
+            }
         }
     }
 

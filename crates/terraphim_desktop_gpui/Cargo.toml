@@ -55,6 +55,9 @@ ahash = "0.8.11"
 # Markdown rendering
 pulldown-cmark = "0.12"
 
+# Platform-specific features
+webbrowser = "1.0"
+
 # Syntax highlighting removed temporarily to avoid conflicts with gpui-component
 # Can be re-added later when needed
 # tree-sitter = "0.25"
