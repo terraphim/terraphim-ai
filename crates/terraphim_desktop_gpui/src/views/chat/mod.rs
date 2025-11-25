@@ -7,7 +7,7 @@ use std::sync::Arc;
 use terraphim_config::ConfigState;
 use terraphim_service::context::{ContextConfig, ContextManager as TerraphimContextManager};
 use terraphim_service::llm;
-use terraphim_types::{ChatMessage, ContextItem, Conversation, ConversationId, RoleName};
+use terraphim_types::{ChatMessage, ContextItem, ContextType, Conversation, ConversationId, RoleName};
 use tokio::sync::Mutex as TokioMutex;
 
 /// Chat view with real ContextManager and LLM backend
@@ -96,6 +96,38 @@ impl ChatView {
                 }
             }
         }).detach();
+    }
+
+    /// Add document as context (pattern from Tauri ResultItem.svelte:624)
+    pub fn add_document_as_context(&mut self, document: terraphim_types::Document, cx: &mut Context<Self>) {
+        log::info!("Adding document to context: {}", document.title);
+
+        // Create ContextItem from Document (Tauri pattern)
+        let context_item = ContextItem {
+            id: ulid::Ulid::new().to_string(),
+            context_type: ContextType::Document,
+            title: document.title.clone(),
+            summary: document.description.clone(),
+            content: document.body.clone(),
+            metadata: {
+                let mut meta = ahash::AHashMap::new();
+                meta.insert("document_id".to_string(), document.id.clone());
+                if !document.url.is_empty() {
+                    meta.insert("url".to_string(), document.url.clone());
+                }
+                if let Some(tags) = &document.tags {
+                    meta.insert("tags".to_string(), tags.join(", "));
+                }
+                if let Some(rank) = document.rank {
+                    meta.insert("rank".to_string(), rank.to_string());
+                }
+                meta
+            },
+            created_at: chrono::Utc::now(),
+            relevance_score: document.rank.map(|r| r as f64),
+        };
+
+        self.add_context(context_item, cx);
     }
 
     /// Add context to current conversation (pattern from Tauri cmd.rs:1078-1140)

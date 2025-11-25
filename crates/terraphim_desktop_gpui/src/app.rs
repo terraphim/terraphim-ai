@@ -8,7 +8,7 @@ use terraphim_types::RoleName;
 use crate::theme::TerraphimTheme;
 use crate::views::chat::ChatView;
 use crate::views::editor::EditorView;
-use crate::views::search::SearchView;
+use crate::views::search::{AddToContextEvent, SearchView};
 use crate::views::role_selector::RoleChangeEvent;
 use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
 
@@ -24,6 +24,7 @@ pub struct TerraphimApp {
     show_tray_menu: bool,
     // Backend services
     config_state: ConfigState,
+    _subscriptions: Vec<Subscription>,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -57,6 +58,17 @@ impl TerraphimApp {
 
         // Role changes will update search state via shared config_state.selected_role
 
+        // Subscribe to AddToContextEvent from SearchView
+        let chat_view_clone = chat_view.clone();
+        let search_sub = cx.subscribe(&search_view, move |this: &mut TerraphimApp, _search, event: &AddToContextEvent, cx| {
+            log::info!("App received AddToContext for: {}", event.document.title);
+            chat_view_clone.update(cx, |chat, chat_cx| {
+                chat.add_document_as_context(event.document.clone(), chat_cx);
+            });
+            // Navigate to chat to show the context
+            this.navigate_to(AppView::Chat, cx);
+        });
+
         log::info!("TerraphimApp initialized with view: {:?}", AppView::Search);
 
         Self {
@@ -69,6 +81,7 @@ impl TerraphimApp {
             theme,
             show_tray_menu: false,
             config_state,
+            _subscriptions: vec![search_sub],
         }
     }
 

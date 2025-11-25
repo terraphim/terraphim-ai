@@ -8,13 +8,16 @@ mod input;
 mod results;
 
 pub use input::SearchInput;
-pub use results::SearchResults;
+pub use results::{AddToContextEvent, SearchResults};
+
+impl EventEmitter<AddToContextEvent> for SearchView {}
 
 /// Main search view
 pub struct SearchView {
     search_state: Entity<SearchState>,
     search_input: Entity<SearchInput>,
     search_results: Entity<SearchResults>,
+    _subscriptions: Vec<Subscription>,
 }
 
 impl SearchView {
@@ -23,12 +26,19 @@ impl SearchView {
         let search_input = cx.new(|cx| SearchInput::new(window, cx, search_state.clone()));
         let search_results = cx.new(|cx| SearchResults::new(window, cx, search_state.clone()));
 
+        // Forward AddToContextEvent from SearchResults to App
+        let results_sub = cx.subscribe(&search_results, |this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
+            log::info!("SearchView forwarding AddToContext event");
+            cx.emit(AddToContextEvent { document: event.document.clone() });
+        });
+
         log::info!("SearchView initialized with backend services");
 
         Self {
             search_state,
             search_input,
             search_results,
+            _subscriptions: vec![results_sub],
         }
     }
 
