@@ -1,6 +1,7 @@
 //! REPL handler implementation (minimal release)
 
 use super::commands::{ConfigSubcommand, ReplCommand, RoleSubcommand};
+use crate::service::TuiService;
 use anyhow::Result;
 use colored::Colorize;
 use comfy_table::modifiers::UTF8_ROUND_CORNERS;
@@ -13,7 +14,6 @@ use rustyline::validate::Validator;
 use rustyline::{Context, Editor, Helper};
 use std::io::{self, Write};
 use std::str::FromStr;
-use crate::service::TuiService;
 
 pub struct ReplHandler {
     service: TuiService,
@@ -164,7 +164,10 @@ impl ReplHandler {
         println!("  {} - Display configuration", "/config show".yellow());
         println!("  {} - Manage roles", "/role [list|select]".yellow());
         println!("  {} - Show knowledge graph", "/graph".yellow());
-        println!("  {} - Replace terms with links", "/replace <text>".yellow());
+        println!(
+            "  {} - Replace terms with links",
+            "/replace <text>".yellow()
+        );
         println!("  {} - Find matched terms", "/find <text>".yellow());
         println!("  {} - View thesaurus", "/thesaurus".yellow());
         println!("  {} - Show help", "/help [command]".yellow());
@@ -246,11 +249,7 @@ impl ReplHandler {
                 table.add_row(vec![
                     Cell::new(doc.rank.unwrap_or_default().to_string()),
                     Cell::new(&doc.title),
-                    Cell::new(if doc.url.is_empty() {
-                        "N/A"
-                    } else {
-                        &doc.url
-                    }),
+                    Cell::new(if doc.url.is_empty() { "N/A" } else { &doc.url }),
                 ]);
             }
 
@@ -282,7 +281,11 @@ impl ReplHandler {
                 let roles = self.service.list_roles().await;
                 println!("{}", "Available roles:".bold());
                 for role in roles {
-                    let marker = if role == self.current_role { "▶" } else { " " };
+                    let marker = if role == self.current_role {
+                        "▶"
+                    } else {
+                        " "
+                    };
                     println!("  {} {}", marker.green(), role);
                 }
             }
@@ -348,7 +351,10 @@ impl ReplHandler {
             }
         };
 
-        let result = self.service.replace_matches(&role_name, &text, link_type).await?;
+        let result = self
+            .service
+            .replace_matches(&role_name, &text, link_type)
+            .await?;
 
         println!("{} Replaced text:", "✨".bold());
         println!("{}", result);
@@ -443,12 +449,7 @@ impl ReplHandler {
                 Cell::new(term.id.to_string()),
                 Cell::new(key.to_string()),
                 Cell::new(&term.value),
-                Cell::new(
-                    term.url
-                        .as_ref()
-                        .map(|u| u.as_str())
-                        .unwrap_or("N/A"),
-                ),
+                Cell::new(term.url.as_ref().map(|u| u.as_str()).unwrap_or("N/A")),
             ]);
         }
 
