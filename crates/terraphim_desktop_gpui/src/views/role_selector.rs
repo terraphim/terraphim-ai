@@ -1,6 +1,6 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::{button::*, StyledExt};
+use gpui_component::{button::*, IconName, StyledExt};
 use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
 
@@ -88,15 +88,29 @@ impl RoleSelector {
         }
     }
 
-    /// Render the role icon based on role name
-    fn role_icon(&self, role: &RoleName) -> &'static str {
-        match role.as_str() {
-            "engineer" => "👨‍💻",
-            "researcher" => "🔬",
-            "writer" => "✍️",
-            "data_scientist" => "📊",
-            "default" => "👤",
-            _ => "🎭",
+    /// Get lucide icon for role
+    fn role_icon(&self, role: &RoleName) -> IconName {
+        let role_lower = role.as_str().to_lowercase();
+        if role_lower.contains("rust") {
+            IconName::GitHub // Rust (open source/code)
+        } else if role_lower.contains("python") {
+            IconName::SquareTerminal // Python (terminal/scripting)
+        } else if role_lower.contains("frontend") || role_lower.contains("front-end") {
+            IconName::Palette // Frontend (design/colors)
+        } else if role_lower.contains("terraphim") {
+            IconName::Settings2 // Terraphim (system/config)
+        } else if role_lower.contains("engineer") {
+            IconName::SquareTerminal // Generic engineer
+        } else if role_lower.contains("researcher") {
+            IconName::BookOpen // Researcher
+        } else if role_lower.contains("writer") {
+            IconName::File // Writer
+        } else if role_lower.contains("data") {
+            IconName::ChartPie // Data scientist
+        } else if role_lower.contains("default") {
+            IconName::CircleUser // Default user
+        } else {
+            IconName::User // Fallback
         }
     }
 
@@ -142,36 +156,33 @@ impl RoleSelector {
             .children(
                 roles_to_render.iter().map(|(idx, role, is_current)| {
                     let role_name = role.to_string();
-                    let icon = self.role_icon(role).to_string();
+                    let icon = self.role_icon(role);
                     let current = *is_current;
                     let index = *idx;
 
-                    {
-                        let button_label = format!("{} {}", icon, role_name);
-
-                        div()
-                            .flex()
-                            .items_center()
-                            .justify_between()
-                            .px_2()
-                            .py_2()
-                            .border_b_1()
-                            .border_color(rgb(0xf0f0f0))
-                            .when(current, |this| this.bg(rgb(0xf5f5f5)))
-                            .child(
-                                Button::new(("role-item", index))
-                                    .label(button_label)
-                                    .ghost()
-                                    .on_click(cx.listener(move |this, _ev, _window, cx| {
-                                        this.handle_role_select(index, cx);
-                                    }))
-                            )
-                            .children(if current {
-                                Some(div().text_color(rgb(0x48c774)).text_sm().child("✓"))
-                            } else {
-                                None
-                            })
-                    }
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .px_2()
+                        .py_2()
+                        .border_b_1()
+                        .border_color(rgb(0xf0f0f0))
+                        .when(current, |this| this.bg(rgb(0xf5f5f5)))
+                        .child(
+                            Button::new(("role-item", index))
+                                .label(role_name)
+                                .icon(icon)
+                                .ghost()
+                                .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                    this.handle_role_select(index, cx);
+                                }))
+                        )
+                        .children(if current {
+                            Some(div().text_color(rgb(0x48c774)).text_sm().child("✓"))
+                        } else {
+                            None
+                        })
                 })
             )
     }
@@ -180,14 +191,16 @@ impl RoleSelector {
 impl Render for RoleSelector {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let current_role_display = self.current_role.to_string();
+        let current_icon = self.role_icon(&self.current_role);
         let is_open = self.is_open;
 
         div()
             .relative()
             .child(
-                // Main button with click handler
+                // Main button with lucide icon
                 Button::new("role-selector-toggle")
                     .label(&format!("Role: {}", current_role_display))
+                    .icon(current_icon)
                     .outline()
                     .on_click(cx.listener(Self::toggle_dropdown))
             )
