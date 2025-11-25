@@ -164,6 +164,9 @@ impl ReplHandler {
         println!("  {} - Display configuration", "/config show".yellow());
         println!("  {} - Manage roles", "/role [list|select]".yellow());
         println!("  {} - Show knowledge graph", "/graph".yellow());
+        println!("  {} - Replace terms with links", "/replace <text>".yellow());
+        println!("  {} - Find matched terms", "/find <text>".yellow());
+        println!("  {} - View thesaurus", "/thesaurus".yellow());
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
     }
@@ -183,6 +186,15 @@ impl ReplHandler {
             }
             ReplCommand::Graph { top_k } => {
                 self.handle_graph(top_k).await?;
+            }
+            ReplCommand::Replace { text, format } => {
+                self.handle_replace(text, format).await?;
+            }
+            ReplCommand::Find { text } => {
+                self.handle_find(text).await?;
+            }
+            ReplCommand::Thesaurus { role } => {
+                self.handle_thesaurus(role).await?;
             }
             ReplCommand::Help { command } => {
                 self.handle_help(command).await?;
@@ -310,6 +322,146 @@ impl ReplHandler {
         } else {
             self.show_available_commands();
         }
+        Ok(())
+    }
+
+    async fn handle_replace(&self, text: String, format: Option<String>) -> Result<()> {
+        let role_name = self.service.get_selected_role().await;
+
+        // Parse format string to LinkType
+        let link_type = match format.as_deref() {
+            Some("markdown") | None => terraphim_automata::LinkType::MarkdownLinks,
+            Some("html") => terraphim_automata::LinkType::HTMLLinks,
+            Some("wiki") => terraphim_automata::LinkType::WikiLinks,
+            Some("plain") => {
+                // For plain, just show the text without links
+                println!("{}", text);
+                return Ok(());
+            }
+            Some(other) => {
+                println!(
+                    "{} Unknown format '{}', using markdown",
+                    "⚠".yellow().bold(),
+                    other
+                );
+                terraphim_automata::LinkType::MarkdownLinks
+            }
+        };
+
+        let result = self.service.replace_matches(&role_name, &text, link_type).await?;
+
+        println!("{} Replaced text:", "✨".bold());
+        println!("{}", result);
+
+        Ok(())
+    }
+
+    async fn handle_find(&self, text: String) -> Result<()> {
+        let role_name = self.service.get_selected_role().await;
+        let matches = self.service.find_matches(&role_name, &text).await?;
+
+        if matches.is_empty() {
+            println!("{} No matches found", "ℹ".blue().bold());
+        } else {
+            println!(
+                "{} Found {} match(es):",
+                "🔍".bold(),
+                matches.len().to_string().green()
+            );
+
+            let mut table = Table::new();
+            table
+                .load_preset(UTF8_FULL)
+                .apply_modifier(UTF8_ROUND_CORNERS)
+                .set_header(vec![
+                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                    Cell::new("Position").add_attribute(comfy_table::Attribute::Bold),
+                    Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
+                ]);
+
+            for matched in &matches {
+                let position = match matched.pos {
+                    Some((start, end)) => format!("{}-{}", start, end),
+                    None => "N/A".to_string(),
+                };
+                table.add_row(vec![
+                    Cell::new(&matched.term),
+                    Cell::new(position),
+                    Cell::new(&matched.normalized_term.value),
+                ]);
+            }
+
+            println!("{}", table);
+        }
+
+        Ok(())
+    }
+
+    async fn handle_thesaurus(&self, role: Option<String>) -> Result<()> {
+        let role_name = if let Some(role) = role {
+            terraphim_types::RoleName::new(&role)
+        } else {
+            self.service.get_selected_role().await
+        };
+
+        println!(
+            "{} Loading thesaurus for role: {}",
+            "📚".bold(),
+            role_name.to_string().green()
+        );
+
+        let thesaurus = self.service.get_thesaurus(&role_name).await?;
+
+        // Collect entries for counting and sorting
+        let mut entries: Vec<_> = thesaurus.into_iter().collect();
+        let total_count = entries.len();
+
+        println!(
+            "{} Thesaurus '{}' contains {} terms:",
+            "✅".bold(),
+            thesaurus.name(),
+            total_count.to_string().cyan()
+        );
+
+        let mut table = Table::new();
+        table
+            .load_preset(UTF8_FULL)
+            .apply_modifier(UTF8_ROUND_CORNERS)
+            .set_header(vec![
+                Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
+                Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
+                Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
+            ]);
+
+        // Sort by ID for consistent display
+        entries.sort_by_key(|(_, term)| term.id);
+
+        for (key, term) in entries.iter().take(50) {
+            // Show first 50
+            table.add_row(vec![
+                Cell::new(term.id.to_string()),
+                Cell::new(key.to_string()),
+                Cell::new(&term.value),
+                Cell::new(
+                    term.url
+                        .as_ref()
+                        .map(|u| u.as_str())
+                        .unwrap_or("N/A"),
+                ),
+            ]);
+        }
+
+        println!("{}", table);
+
+        if total_count > 50 {
+            println!(
+                "{} Showing first 50 of {} terms",
+                "ℹ".blue().bold(),
+                total_count
+            );
+        }
+
         Ok(())
     }
 
