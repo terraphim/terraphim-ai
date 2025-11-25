@@ -24,8 +24,7 @@ fn get_config_dir() -> Result<PathBuf> {
         .join(".terraphim");
 
     if !config_dir.exists() {
-        std::fs::create_dir_all(&config_dir)
-            .context("Failed to create config directory")?;
+        std::fs::create_dir_all(&config_dir).context("Failed to create config directory")?;
     }
 
     Ok(config_dir)
@@ -41,7 +40,10 @@ fn init_default_config() -> Result<()> {
         if let Some(default_config) = Assets::get("default_config.json") {
             std::fs::write(&config_path, default_config.data.as_ref())
                 .context("Failed to write default config")?;
-            println!("✓ Created default configuration at {}", config_path.display());
+            println!(
+                "✓ Created default configuration at {}",
+                config_path.display()
+            );
         }
     }
 
@@ -58,7 +60,10 @@ fn init_default_thesaurus() -> Result<()> {
         if let Some(default_thesaurus) = Assets::get("default_thesaurus.json") {
             std::fs::write(&thesaurus_path, default_thesaurus.data.as_ref())
                 .context("Failed to write default thesaurus")?;
-            println!("✓ Created default thesaurus at {}", thesaurus_path.display());
+            println!(
+                "✓ Created default thesaurus at {}",
+                thesaurus_path.display()
+            );
         }
     }
 

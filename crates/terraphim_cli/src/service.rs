@@ -108,7 +108,11 @@ impl CliService {
     }
 
     /// Get the role graph top-k concepts for a specific role
-    pub async fn get_top_concepts(&self, role_name: &RoleName, top_k: usize) -> Result<Vec<String>> {
+    pub async fn get_top_concepts(
+        &self,
+        role_name: &RoleName,
+        top_k: usize,
+    ) -> Result<Vec<String>> {
         // For now, return placeholder data since role graph access needs proper implementation
         // TODO: Implement actual role graph integration
         log::info!("Getting top {} concepts for role {}", top_k, role_name);
