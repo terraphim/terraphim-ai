@@ -120,8 +120,14 @@ impl RoleSelector {
             )
     }
 
-    /// Render dropdown menu
-    fn render_dropdown(&self, _cx: &Context<Self>) -> impl IntoElement {
+    /// Render dropdown menu with clickable role items
+    fn render_dropdown(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let roles_to_render: Vec<(usize, RoleName, bool)> = self.available_roles
+            .iter()
+            .enumerate()
+            .map(|(idx, role)| (idx, role.clone(), role == &self.current_role))
+            .collect();
+
         div()
             .absolute()
             .top(px(48.0))
@@ -134,39 +140,39 @@ impl RoleSelector {
             .shadow_lg()
             .overflow_hidden()
             .children(
-                self.available_roles
-                    .iter()
-                    .map(|role| {
-                        let is_current = role == &self.current_role;
-                        let role_clone = role.clone();
+                roles_to_render.iter().map(|(idx, role, is_current)| {
+                    let role_name = role.to_string();
+                    let icon = self.role_icon(role).to_string();
+                    let current = *is_current;
+                    let index = *idx;
+
+                    {
+                        let button_label = format!("{} {}", icon, role_name);
 
                         div()
                             .flex()
                             .items_center()
                             .justify_between()
-                            .px_4()
-                            .py_3()
-                            .when(is_current, |this| {
-                                this.bg(rgb(0xf5f5f5))
-                            })
-                            .when(!is_current, |this| {
-                                this.hover(|style| style.bg(rgb(0xf9f9f9)).cursor_pointer())
-                            })
+                            .px_2()
+                            .py_2()
                             .border_b_1()
                             .border_color(rgb(0xf0f0f0))
-                            .child(self.render_role_display(role, _cx))
-                            .children(
-                                if is_current {
-                                    Some(div()
-                                        .text_color(rgb(0x48c774))
-                                        .text_sm()
-                                        .child("✓"))
-                                } else {
-                                    None
-                                },
+                            .when(current, |this| this.bg(rgb(0xf5f5f5)))
+                            .child(
+                                Button::new(("role-item", index))
+                                    .label(button_label)
+                                    .ghost()
+                                    .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                        this.handle_role_select(index, cx);
+                                    }))
                             )
-                    })
-                    .collect::<Vec<_>>(),
+                            .children(if current {
+                                Some(div().text_color(rgb(0x48c774)).text_sm().child("✓"))
+                            } else {
+                                None
+                            })
+                    }
+                })
             )
     }
 }
