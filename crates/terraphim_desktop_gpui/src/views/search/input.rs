@@ -81,55 +81,55 @@ impl SearchInput {
                 .overflow_hidden()
                 .children(
                     suggestions.iter().enumerate().map(|(idx, suggestion)| {
-                        self.render_suggestion_item(idx, suggestion)
+                        self.render_suggestion_item(idx, suggestion, cx)
                     })
                 )
         )
     }
 
-    fn render_suggestion_item(&self, index: usize, suggestion: &AutocompleteSuggestion) -> impl IntoElement {
+    fn render_suggestion_item(&self, index: usize, suggestion: &AutocompleteSuggestion, cx: &Context<Self>) -> impl IntoElement {
         let is_selected = index == 0; // Simplified: first item is always selected
         let term = suggestion.term.clone();
         let url = suggestion.url.clone();
         let score = suggestion.score;
 
-        let mut item = div()
-            .px_4()
-            .py_2()
-            .flex()
-            .items_center()
-            .justify_between();
+        use gpui_component::button::*;
+
+        // Use Button for clickable suggestions
+        let mut button = Button::new(("autocomplete-item", index))
+            .label(term.clone())
+            .ghost();
 
         if is_selected {
-            item = item.bg(rgb(0x3273dc)).text_color(rgb(0xffffff));
-        } else {
-            item = item.hover(|style| style.bg(rgb(0xf5f5f5)).cursor_pointer());
+            button = button.primary();
         }
 
-        item.child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .gap_1()
-                    .child(
-                        div()
-                            .text_sm()
-                            .font_medium()
-                            .child(term)
-                    )
-                    .children(url.map(|u| {
-                        div()
-                            .text_xs()
-                            .opacity(0.7)
-                            .child(u)
-                    }))
-            )
-            .child(
+        button = button.on_click(cx.listener(move |this, _ev, _window, cx| {
+            // Accept the selected suggestion
+            this.search_state.update(cx, |state, cx| {
+                if let Some(selected_term) = state.accept_autocomplete(cx) {
+                    // Update input with selected term and trigger search
+                    log::info!("Autocomplete accepted: {}", selected_term);
+                    // Search will be triggered by Enter or input change
+                }
+            });
+            this.show_autocomplete_dropdown = false;
+            cx.notify();
+        }));
+
+        div()
+            .flex()
+            .items_center()
+            .justify_between()
+            .px_2()
+            .py_1()
+            .child(button)
+            .children(url.map(|u| {
                 div()
                     .text_xs()
                     .opacity(0.6)
                     .child(format!("{:.0}%", score * 100.0))
-            )
+            }))
     }
 }
 

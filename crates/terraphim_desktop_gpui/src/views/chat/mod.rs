@@ -1,7 +1,8 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
+use gpui_component::button::*;
 use gpui_component::input::{Input, InputEvent as GpuiInputEvent, InputState};
-use gpui_component::StyledExt;
+use gpui_component::{IconName, StyledExt};
 use std::sync::Arc;
 use terraphim_config::ConfigState;
 use terraphim_service::context::{ContextConfig, ContextManager as TerraphimContextManager};
@@ -263,14 +264,26 @@ impl ChatView {
     }
 
     /// Toggle context panel visibility
-    pub fn toggle_context_panel(&mut self, cx: &mut Context<Self>) {
+    pub fn toggle_context_panel(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
         self.show_context_panel = !self.show_context_panel;
         log::info!("Context panel {}", if self.show_context_panel { "shown" } else { "hidden" });
         cx.notify();
     }
 
+    /// Handle delete context button click
+    fn handle_delete_context(&mut self, context_id: String, cx: &mut Context<Self>) {
+        log::info!("Deleting context: {}", context_id);
+        self.delete_context(context_id, cx);
+    }
+
+    /// Handle create new conversation button
+    fn handle_create_conversation(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+        log::info!("Creating new conversation");
+        self.create_conversation("New Conversation".to_string(), self.current_role.clone(), cx);
+    }
+
     /// Render chat header
-    fn render_header(&self, _cx: &Context<Self>) -> impl IntoElement {
+    fn render_header(&self, cx: &Context<Self>) -> impl IntoElement {
         let title = self.current_conversation_id
             .as_ref()
             .map(|id| format!("Conversation {}", id.as_str().chars().take(8).collect::<String>()))
@@ -318,23 +331,21 @@ impl ChatView {
                     .flex()
                     .gap_2()
                     .child(
-                        // Toggle context panel button
-                        div()
-                            .px_3()
-                            .py_2()
-                            .rounded_md()
-                            .bg(if self.show_context_panel {
-                                rgb(0x3273dc)
-                            } else {
-                                rgb(0xf5f5f5)
-                            })
-                            .text_color(if self.show_context_panel {
-                                rgb(0xffffff)
-                            } else {
-                                rgb(0x363636)
-                            })
-                            .hover(|style| style.opacity(0.9).cursor_pointer())
-                            .child("📚 Context"),
+                        // Toggle context panel button with icon
+                        Button::new("toggle-context-panel")
+                            .label("Context")
+                            .icon(IconName::BookOpen)
+                            .when(self.show_context_panel, |btn| btn.primary())
+                            .when(!self.show_context_panel, |btn| btn.outline())
+                            .on_click(cx.listener(Self::toggle_context_panel))
+                    )
+                    .child(
+                        // New conversation button
+                        Button::new("new-conversation")
+                            .label("New")
+                            .icon(IconName::Plus)
+                            .outline()
+                            .on_click(cx.listener(Self::handle_create_conversation))
                     ),
             )
     }
@@ -561,8 +572,15 @@ impl Render for ChatView {
                                                 )),
                                         )
                                         .children(
-                                            self.context_items.iter().map(|item| {
+                                            self.context_items.iter().enumerate().map(|(idx, item)| {
+                                                let item_id = item.id.clone();
+                                                let item_title = item.title.clone();
+                                                let item_content_len = item.content.len();
+
                                                 div()
+                                                    .flex()
+                                                    .items_start()
+                                                    .justify_between()
                                                     .px_3()
                                                     .py_2()
                                                     .mb_2()
@@ -572,16 +590,31 @@ impl Render for ChatView {
                                                     .rounded_md()
                                                     .child(
                                                         div()
-                                                            .text_sm()
-                                                            .font_medium()
-                                                            .text_color(rgb(0x363636))
-                                                            .child(item.title.clone())
+                                                            .flex_1()
+                                                            .flex()
+                                                            .flex_col()
+                                                            .gap_1()
+                                                            .child(
+                                                                div()
+                                                                    .text_sm()
+                                                                    .font_medium()
+                                                                    .text_color(rgb(0x363636))
+                                                                    .child(item_title)
+                                                            )
+                                                            .child(
+                                                                div()
+                                                                    .text_xs()
+                                                                    .text_color(rgb(0x7a7a7a))
+                                                                    .child(format!("{} chars", item_content_len))
+                                                            )
                                                     )
                                                     .child(
-                                                        div()
-                                                            .text_xs()
-                                                            .text_color(rgb(0x7a7a7a))
-                                                            .child(format!("{} chars", item.content.len()))
+                                                        Button::new(("delete-ctx", idx))
+                                                            .icon(IconName::Delete)
+                                                            .ghost()
+                                                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                                                this.handle_delete_context(item_id.clone(), cx);
+                                                            }))
                                                     )
                                             })
                                         ),
