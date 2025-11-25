@@ -9,9 +9,11 @@ mod autocomplete;
 mod editor;
 mod kg_search;
 mod models;
+mod platform;
 mod search_service;
 mod state;
 mod theme;
+mod utils;
 mod views;
 
 use app::TerraphimApp;

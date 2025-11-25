@@ -58,6 +58,14 @@ pulldown-cmark = "0.12"
 # Platform-specific features
 webbrowser = "1.0"
 
+# System tray support
+tray-icon = "0.19"
+image = "0.25"  # For tray icon images
+
+# Global hotkeys
+global-hotkey = "0.6"
+keyboard-types = "0.7"  # For key definitions
+
 # Syntax highlighting removed temporarily to avoid conflicts with gpui-component
 # Can be re-added later when needed
 # tree-sitter = "0.25"

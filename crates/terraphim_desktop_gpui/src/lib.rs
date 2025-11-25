@@ -22,6 +22,9 @@ pub mod views;
 // Utility modules
 pub mod utils;
 
+// Platform-specific modules
+pub mod platform;
+
 // Re-exports for convenience
 pub use autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
 pub use editor::{EditorState, SlashCommand, SlashCommandHandler, SlashCommandManager};

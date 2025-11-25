@@ -11,6 +11,9 @@ use crate::views::editor::EditorView;
 use crate::views::search::{AddToContextEvent, SearchView};
 use crate::views::role_selector::RoleChangeEvent;
 use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
+use crate::platform::{SystemTray, GlobalHotkeys};
+use crate::platform::tray::SystemTrayEvent;
+use crate::platform::hotkeys::HotkeyAction;
 
 /// Main application state with integrated backend services
 pub struct TerraphimApp {
@@ -24,6 +27,9 @@ pub struct TerraphimApp {
     show_tray_menu: bool,
     // Backend services
     config_state: ConfigState,
+    // Platform features
+    system_tray: Option<SystemTray>,
+    global_hotkeys: Option<GlobalHotkeys>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -69,6 +75,57 @@ impl TerraphimApp {
             this.navigate_to(AppView::Chat, cx);
         });
 
+        // Initialize platform features
+        let mut system_tray = None;
+        let mut global_hotkeys = None;
+
+        // Initialize system tray if supported
+        if SystemTray::is_supported() {
+            log::info!("Initializing system tray");
+            let mut tray = SystemTray::new();
+            match tray.initialize() {
+                Ok(()) => {
+                    tray.on_event(|event| {
+                        log::info!("System tray event: {:?}", event);
+                        // Events will be handled via cx in the future
+                    });
+                    system_tray = Some(tray);
+                    log::info!("System tray initialized successfully");
+                }
+                Err(e) => {
+                    log::error!("Failed to initialize system tray: {}", e);
+                }
+            }
+        }
+
+        // Initialize global hotkeys if supported
+        if GlobalHotkeys::is_supported() {
+            log::info!("Initializing global hotkeys");
+
+            #[cfg(target_os = "macos")]
+            if GlobalHotkeys::needs_accessibility_permission() {
+                log::warn!("Global hotkeys require accessibility permissions on macOS");
+            }
+
+            match GlobalHotkeys::new() {
+                Ok(mut hotkeys) => {
+                    if let Err(e) = hotkeys.register_defaults() {
+                        log::error!("Failed to register default hotkeys: {}", e);
+                    } else {
+                        hotkeys.on_event(|event| {
+                            log::info!("Global hotkey pressed: {:?}", event.action);
+                            // Events will be handled via cx in the future
+                        });
+                        global_hotkeys = Some(hotkeys);
+                        log::info!("Global hotkeys initialized successfully");
+                    }
+                }
+                Err(e) => {
+                    log::error!("Failed to initialize global hotkeys: {}", e);
+                }
+            }
+        }
+
         log::info!("TerraphimApp initialized with view: {:?}", AppView::Search);
 
         Self {
@@ -81,6 +138,8 @@ impl TerraphimApp {
             theme,
             show_tray_menu: false,
             config_state,
+            system_tray,
+            global_hotkeys,
             _subscriptions: vec![search_sub],
         }
     }

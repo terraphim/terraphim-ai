@@ -29,22 +29,41 @@ impl SearchResults {
 
     fn handle_open_url(&self, url: String) {
         if !url.is_empty() {
-            // Ensure URL has a scheme
-            let url = if !url.starts_with("http://") && !url.starts_with("https://") {
-                format!("https://{}", url)
-            } else {
+            // Determine the appropriate scheme for the URL
+            let url = if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("file://") {
+                // URL already has a valid scheme
                 url
+            } else if url.starts_with('/') || url.starts_with("~/") {
+                // This is a local file path - use file:// scheme
+                let expanded = if url.starts_with("~/") {
+                    // Expand home directory
+                    if let Some(home) = std::env::var_os("HOME") {
+                        url.replacen("~", &home.to_string_lossy(), 1)
+                    } else {
+                        url
+                    }
+                } else {
+                    url
+                };
+                format!("file://{}", expanded)
+            } else if url.contains('/') && !url.contains('.') {
+                // Likely a relative file path
+                let cwd = std::env::current_dir().unwrap_or_default();
+                format!("file://{}/{}", cwd.display(), url)
+            } else {
+                // Assume it's a web URL without scheme
+                format!("https://{}", url)
             };
 
-            log::info!("Opening URL in browser: {}", url);
+            log::info!("Opening URL/file: {}", url);
 
-            // Open URL using the webbrowser crate
+            // Open URL or file using the webbrowser crate (handles both file:// and http(s)://)
             match webbrowser::open(&url) {
                 Ok(()) => {
-                    log::info!("Successfully opened URL in browser");
+                    log::info!("Successfully opened URL/file");
                 }
                 Err(e) => {
-                    log::error!("Failed to open URL in browser: {}", e);
+                    log::error!("Failed to open URL/file: {}", e);
                     // TODO: Show error notification to user
                 }
             }
