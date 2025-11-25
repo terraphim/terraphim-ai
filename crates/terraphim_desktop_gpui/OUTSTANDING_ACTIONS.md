@@ -157,26 +157,40 @@ impl Render for ArticleModal {
 
 ---
 
-## MEDIUM PRIORITY (Session 3 - Optional)
+## MEDIUM PRIORITY (Session 3 - Completed ✅)
 
-### 7. System Tray Icon
-**Tauri Reference:** `desktop/src-tauri/src/main.rs` lines 109-131
+### 7. System Tray Icon ✅ COMPLETE
+**Implementation:** `src/platform/tray.rs`
+**Status:** Production-grade implementation with HashMap-based menu ID mapping
 
-**Requires:**
-- Platform-specific code (macOS NSStatusBar)
-- tauri-plugin-tray or manual implementation
-- Not critical for core functionality
+**Features Implemented:**
+- Native system tray icon with cross-platform support
+- All menu actions (Show/Hide/Search/Chat/Settings/About/Quit)
+- Thread-safe event handling
+- Dynamic menu state management
+- Platform detection and graceful fallback
 
-**Defer:** Can use existing desktop app for now
+### 8. Global Keyboard Shortcuts ✅ COMPLETE
+**Implementation:** `src/platform/hotkeys.rs`
+**Status:** Fully functional with platform-specific modifier handling
 
-### 8. Global Keyboard Shortcuts
-**Tauri Reference:** `desktop/src-tauri/src/main.rs` lines 280-296
+**Features Implemented:**
+- Cmd/Ctrl+Shift+Space: Show/hide window
+- Cmd/Ctrl+Shift+S: Quick search
+- Cmd/Ctrl+Shift+C: Open chat
+- Cmd/Ctrl+Shift+E: Open editor
+- macOS accessibility permission detection
+- Dynamic hotkey registration/unregistration
 
-**Requires:**
-- Platform-specific global hotkey registration
-- Not available in GPUI out of box
+### 9. URL/File Opening ✅ COMPLETE
+**Implementation:** Enhanced `handle_open_url()` in `src/views/search/results.rs`
+**Status:** Supports both web URLs and local file paths
 
-**Defer:** Not critical, use mouse for now
+**Features Implemented:**
+- Automatic scheme detection (http://, https://, file://)
+- Local file path handling with ~ expansion
+- Relative path resolution
+- Cross-platform browser opening via webbrowser crate
 
 ---
 
