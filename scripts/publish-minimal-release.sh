@@ -129,8 +129,10 @@ cargo test --quiet 2>&1 | grep -E "(test result|passed|failed)" || true
 
 # Publish
 print_info "Publishing (this may take a minute)..."
-if cargo publish; then
+if cargo publish 2>&1 | tee /tmp/publish-repl.log; then
     print_status "terraphim-repl v1.0.0 published successfully!"
+elif grep -q "already exists on crates.io" /tmp/publish-repl.log; then
+    print_status "terraphim-repl v1.0.0 already published (skipping)"
 else
     print_error "Failed to publish terraphim-repl"
     cd ../..
@@ -154,8 +156,10 @@ cargo check --quiet 2>&1 | tail -1 || true
 
 # Publish
 print_info "Publishing (this may take a minute)..."
-if cargo publish; then
+if cargo publish 2>&1 | tee /tmp/publish-cli.log; then
     print_status "terraphim-cli v1.0.0 published successfully!"
+elif grep -q "already exists on crates.io" /tmp/publish-cli.log; then
+    print_status "terraphim-cli v1.0.0 already published (skipping)"
 else
     print_error "Failed to publish terraphim-cli"
     cd ../..
