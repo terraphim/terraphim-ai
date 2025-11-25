@@ -1,6 +1,6 @@
 //! Command definitions for REPL interface (minimal release)
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -290,8 +290,17 @@ impl ReplCommand {
     /// Get available commands for the minimal release
     pub fn available_commands() -> Vec<&'static str> {
         vec![
-            "search", "config", "role", "graph", "replace", "find", "thesaurus", "help", "quit",
-            "exit", "clear",
+            "search",
+            "config",
+            "role",
+            "graph",
+            "replace",
+            "find",
+            "thesaurus",
+            "help",
+            "quit",
+            "exit",
+            "clear",
         ]
     }
 

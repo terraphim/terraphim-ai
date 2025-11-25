@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{generate, Shell};
+use clap_complete::{Shell, generate};
 use serde::Serialize;
 use std::io;
 
@@ -196,12 +196,19 @@ async fn main() -> Result<()> {
     // Handle completions command specially (doesn't need service)
     if let Some(Commands::Completions { shell }) = &cli.command {
         let mut cmd = Cli::command();
-        generate(shell.to_owned(), &mut cmd, "terraphim-cli", &mut io::stdout());
+        generate(
+            shell.to_owned(),
+            &mut cmd,
+            "terraphim-cli",
+            &mut io::stdout(),
+        );
         return Ok(());
     }
 
     // Initialize service for all other commands
-    let service = CliService::new().await.context("Failed to initialize service")?;
+    let service = CliService::new()
+        .await
+        .context("Failed to initialize service")?;
 
     // Execute command
     let result = match cli.command {
@@ -215,9 +222,7 @@ async fn main() -> Result<()> {
             handle_replace(&service, text, format, role).await
         }
         Some(Commands::Find { text, role }) => handle_find(&service, text, role).await,
-        Some(Commands::Thesaurus { role, limit }) => {
-            handle_thesaurus(&service, role, limit).await
-        }
+        Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
         Some(Commands::Completions { .. }) => unreachable!(), // Handled above
         None => {
             eprintln!("No command specified. Use --help for usage information.");
@@ -231,9 +236,8 @@ async fn main() -> Result<()> {
             let formatted = match cli.format {
                 OutputFormat::Json => serde_json::to_string(&output)?,
                 OutputFormat::JsonPretty => serde_json::to_string_pretty(&output)?,
-                OutputFormat::Text => {
-                    format_as_text(&output).unwrap_or_else(|_| serde_json::to_string(&output).unwrap())
-                }
+                OutputFormat::Text => format_as_text(&output)
+                    .unwrap_or_else(|_| serde_json::to_string(&output).unwrap()),
             };
             println!("{}", formatted);
             Ok(())
@@ -358,11 +362,16 @@ async fn handle_replace(
             return Ok(serde_json::to_value(result)?);
         }
         _ => {
-            anyhow::bail!("Unknown format: {}. Use: markdown, html, wiki, or plain", format);
+            anyhow::bail!(
+                "Unknown format: {}. Use: markdown, html, wiki, or plain",
+                format
+            );
         }
     };
 
-    let replaced = service.replace_matches(&role_name, &text, link_type).await?;
+    let replaced = service
+        .replace_matches(&role_name, &text, link_type)
+        .await?;
 
     let result = ReplaceResult {
         original: text,
