@@ -36,6 +36,13 @@ impl SearchView {
     pub fn search_state(&self) -> &Entity<SearchState> {
         &self.search_state
     }
+
+    /// Update role (called when role changes)
+    pub fn update_role(&mut self, new_role: String, cx: &mut Context<Self>) {
+        self.search_state.update(cx, |state, cx| {
+            state.set_role(new_role, cx);
+        });
+    }
 }
 
 impl Render for SearchView {

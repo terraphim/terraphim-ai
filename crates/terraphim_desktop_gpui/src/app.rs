@@ -9,6 +9,7 @@ use crate::theme::TerraphimTheme;
 use crate::views::chat::ChatView;
 use crate::views::editor::EditorView;
 use crate::views::search::SearchView;
+use crate::views::role_selector::RoleChangeEvent;
 use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
 
 /// Main application state with integrated backend services
@@ -53,6 +54,8 @@ impl TerraphimApp {
 
         // Initialize tray menu
         let tray_menu = cx.new(|cx| TrayMenu::new(window, cx));
+
+        // Role changes will update search state via shared config_state.selected_role
 
         log::info!("TerraphimApp initialized with view: {:?}", AppView::Search);
 

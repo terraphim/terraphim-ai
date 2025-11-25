@@ -53,8 +53,17 @@ impl SearchState {
         }
     }
 
-    /// Initialize with config state for backend access
+    /// Initialize with config state and get current role
     pub fn with_config(mut self, config_state: ConfigState) -> Self {
+        // Get selected role from config
+        let selected_role = tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                config_state.get_selected_role().await.to_string()
+            })
+        });
+
+        log::info!("SearchState using role: {}", selected_role);
+        self.current_role = selected_role;
         self.config_state = Some(config_state);
         self
     }
@@ -83,11 +92,16 @@ impl SearchState {
         // }
     }
 
-    /// Set current role
+    /// Set current role and clear results
     pub fn set_role(&mut self, role: String, cx: &mut Context<Self>) {
-        self.current_role = role;
-        log::info!("Role changed to: {}", self.current_role);
-        cx.notify();
+        if self.current_role != role {
+            log::info!("SearchState role changed from {} to {}", self.current_role, role);
+            self.current_role = role;
+            // Clear results when role changes
+            self.results.clear();
+            self.autocomplete_suggestions.clear();
+            cx.notify();
+        }
     }
 
     /// Execute search using real TerraphimService

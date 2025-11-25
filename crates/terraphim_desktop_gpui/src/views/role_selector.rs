@@ -4,6 +4,13 @@ use gpui_component::{button::*, IconName, StyledExt};
 use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
 
+/// Event emitted when role changes
+pub struct RoleChangeEvent {
+    pub new_role: String,
+}
+
+impl EventEmitter<RoleChangeEvent> for RoleSelector {}
+
 /// Role selector dropdown with real backend integration
 pub struct RoleSelector {
     config_state: Option<ConfigState>,
@@ -86,7 +93,11 @@ impl RoleSelector {
     /// Handle role selection from dropdown
     fn handle_role_select(&mut self, role_index: usize, cx: &mut Context<Self>) {
         if let Some(role) = self.available_roles.get(role_index).cloned() {
+            let role_name = role.to_string();
             self.change_role(role, cx);
+
+            // Emit event so App can update SearchState
+            cx.emit(RoleChangeEvent { new_role: role_name });
         }
     }
 
