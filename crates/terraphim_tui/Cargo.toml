@@ -40,7 +40,7 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 
 # REPL dependencies - only compiled with features
-rustyline = { version = "14.0", optional = true }
+rustyline = { version = "17.0", optional = true }
 colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
 indicatif = { version = "0.18", optional = true }
