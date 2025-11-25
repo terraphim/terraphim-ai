@@ -1,10 +1,17 @@
 use gpui::*;
-use gpui_component::StyledExt;
+use gpui_component::{button::*, IconName, StyledExt};
 use terraphim_types::Document;
 
 use crate::state::search::SearchState;
 
-/// Search results list component showing real search results
+/// Event emitted when user wants to add document to context
+pub struct AddToContextEvent {
+    pub document: Document,
+}
+
+impl EventEmitter<AddToContextEvent> for SearchResults {}
+
+/// Search results with action buttons matching Tauri desktop
 pub struct SearchResults {
     search_state: Entity<SearchState>,
 }
@@ -14,7 +21,29 @@ impl SearchResults {
         Self { search_state }
     }
 
-    fn render_result_item(&self, doc: &Document, _cx: &Context<Self>) -> impl IntoElement {
+    fn handle_open_url(&self, url: String) {
+        if !url.is_empty() {
+            log::info!("Opening URL: {}", url);
+            // TODO: Open in browser (use webbrowser crate)
+        }
+    }
+
+    fn handle_add_to_context(&mut self, document: Document, cx: &mut Context<Self>) {
+        log::info!("Adding to context: {}", document.title);
+        cx.emit(AddToContextEvent { document });
+    }
+
+    fn handle_chat_with_document(&mut self, document: Document, cx: &mut Context<Self>) {
+        log::info!("Chat with document: {}", document.title);
+        // Add to context and navigate to chat
+        cx.emit(AddToContextEvent { document });
+    }
+
+    fn render_result_item(&self, doc: &Document, idx: usize, cx: &Context<Self>) -> impl IntoElement {
+        let doc_url = doc.url.clone();
+        let doc_clone_for_context = doc.clone();
+        let doc_clone_for_chat = doc.clone();
+
         div()
             .p_4()
             .mb_2()
@@ -22,7 +51,7 @@ impl SearchResults {
             .border_1()
             .border_color(rgb(0xdbdbdb))
             .rounded_md()
-            .hover(|style| style.bg(rgb(0xf5f5f5)).cursor_pointer())
+            .hover(|style| style.bg(rgb(0xf5f5f5)))
             .child(
                 div()
                     .text_lg()
@@ -47,7 +76,42 @@ impl SearchResults {
                 div()
                     .text_xs()
                     .text_color(rgb(0xb5b5b5))
+                    .mb_2()
                     .child(doc.url.clone()),
+            )
+            .child(
+                // Action buttons (Tauri ResultItem.svelte pattern)
+                div()
+                    .flex()
+                    .gap_2()
+                    .mt_2()
+                    .child(
+                        Button::new(("open-url", idx))
+                            .label("Open")
+                            .icon(IconName::ExternalLink)
+                            .ghost()
+                            .on_click(cx.listener(move |this, _ev, _window, _cx| {
+                                this.handle_open_url(doc_url.clone());
+                            }))
+                    )
+                    .child(
+                        Button::new(("add-ctx", idx))
+                            .label("Add to Context")
+                            .icon(IconName::Plus)
+                            .outline()
+                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                this.handle_add_to_context(doc_clone_for_context.clone(), cx);
+                            }))
+                    )
+                    .child(
+                        Button::new(("chat-doc", idx))
+                            .label("Chat")
+                            .icon(IconName::Bot)
+                            .primary()
+                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                this.handle_chat_with_document(doc_clone_for_chat.clone(), cx);
+                            }))
+                    )
             )
     }
 
@@ -129,9 +193,9 @@ impl Render for SearchResults {
                                 .child(format!("Found {} results", results.len()))
                         )
                 )
-                .children(results.iter().map(|result| {
+                .children(results.iter().enumerate().map(|(idx, result)| {
                     // Render using the document from ResultItemViewModel
-                    self.render_result_item(&result.document, cx)
+                    self.render_result_item(&result.document, idx, cx)
                 }))
                 .into_any_element()
         }
