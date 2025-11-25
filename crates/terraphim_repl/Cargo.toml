@@ -1,0 +1,62 @@
+[package]
+name = "terraphim-repl"
+version = "1.0.0"
+edition = "2024"
+authors = ["Terraphim Team"]
+description = "Offline-capable REPL for semantic knowledge graph search"
+repository = "https://github.com/terraphim/terraphim-ai"
+license = "Apache-2.0"
+keywords = ["search", "knowledge-graph", "semantic", "repl", "cli"]
+categories = ["command-line-utilities", "text-processing"]
+
+[[bin]]
+name = "terraphim-repl"
+path = "src/main.rs"
+
+[dependencies]
+# Core terraphim crates
+terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
+terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
+terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+log = "0.4"
+
+# REPL interface
+rustyline = "14.0"
+colored = "2.1"
+comfy-table = "7.1"
+dirs = "5.0"
+
+# Async runtime
+tokio = { version = "1.42", features = ["rt-multi-thread", "macros"] }
+
+# Error handling
+anyhow = "1.0"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Asset embedding
+rust-embed = { version = "8.5", features = ["debug-embed"] }
+
+[features]
+default = ["repl-minimal"]
+
+# Minimal feature set for v1.0.0
+repl-minimal = []
+
+# Future features (v1.1.0+)
+repl-chat = []      # AI chat integration
+repl-mcp = []       # MCP tools (autocomplete, extract, etc.)
+repl-file = []      # File operations
+repl-web = []       # Web operations
+
+[profile.release]
+opt-level = "z"     # Optimize for size
+lto = true          # Enable link-time optimization
+codegen-units = 1   # Better optimization
+strip = true        # Strip symbols for smaller binary
