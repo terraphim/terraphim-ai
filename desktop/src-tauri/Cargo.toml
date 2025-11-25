@@ -68,7 +68,7 @@ lru = "0.16"
 tokio-test = "0.4.4"
 serial_test = "3.1.1"
 tempfile = "3.23.0"
-mockall = "0.13.1"
+mockall = "0.14.0"
 
 [features]
 # by default Tauri runs in production mode
