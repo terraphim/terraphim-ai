@@ -4,21 +4,26 @@ class TerraphimCli < Formula
   version "1.0.0"
   license "Apache-2.0"
 
-  if OS.mac? && Hardware::CPU.intel?
-    url "https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/terraphim-cli-macos-x86_64"
-    sha256 "PLACEHOLDER_MACOS_X86_64"
-  elsif OS.mac? && Hardware::CPU.arm?
-    url "https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/terraphim-cli-macos-aarch64"
-    sha256 "PLACEHOLDER_MACOS_AARCH64"
-  elsif OS.linux?
+  # NOTE: macOS and Windows users should use 'cargo install terraphim-cli'
+  # Pre-built binaries are only available for Linux x86_64 in v1.0.0
+
+  on_linux do
     url "https://github.com/terraphim/terraphim-ai/releases/download/v1.0.0/terraphim-cli-linux-x86_64"
     sha256 "c217d6dbbec60ef691bbb7220b290ee420f25e39c7fd39c62099aead9be98980"
   end
 
+  # macOS and Windows: build from source via cargo
+  on_macos do
+    depends_on "rust" => :build
+  end
+
   def install
-    bin.install "terraphim-cli-linux-x86_64" => "terraphim-cli" if OS.linux?
-    bin.install "terraphim-cli-macos-x86_64" => "terraphim-cli" if OS.mac? && Hardware::CPU.intel?
-    bin.install "terraphim-cli-macos-aarch64" => "terraphim-cli" if OS.mac? && Hardware::CPU.arm?
+    if OS.linux?
+      bin.install "terraphim-cli-linux-x86_64" => "terraphim-cli"
+    else
+      # macOS/other: compile from source
+      system "cargo", "install", "--root", prefix, "--path", ".", "terraphim-cli"
+    end
   end
 
   test do
