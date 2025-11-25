@@ -3,6 +3,7 @@ use gpui::prelude::FluentBuilder;
 use gpui_component::{button::*, StyledExt};
 use terraphim_config::ConfigState;
 use terraphim_service::TerraphimService;
+use terraphim_types::RoleName;
 
 use crate::theme::TerraphimTheme;
 use crate::views::chat::ChatView;
@@ -32,8 +33,8 @@ pub enum AppView {
 }
 
 impl TerraphimApp {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState) -> Self {
-        log::info!("TerraphimApp initializing with backend services...");
+    pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState, all_roles: Vec<RoleName>) -> Self {
+        log::info!("TerraphimApp initializing with backend services and {} roles...", all_roles.len());
 
         // Initialize theme
         let theme = cx.new(|cx| TerraphimTheme::new(cx));
@@ -43,14 +44,7 @@ impl TerraphimApp {
         let chat_view = cx.new(|cx| ChatView::new(window, cx).with_config(config_state.clone()));
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
 
-        // Initialize role selector with ALL roles from config
-        let all_roles = {
-            let runtime_handle = tokio::runtime::Handle::current();
-            runtime_handle.block_on(async {
-                let config = config_state.config.lock().await;
-                config.roles.keys().cloned().collect::<Vec<_>>()
-            })
-        };
+        // Initialize role selector with ALL roles (pre-loaded in main.rs)
         let role_selector = cx.new(|cx| {
             RoleSelector::new(window, cx)
                 .with_config(config_state.clone())

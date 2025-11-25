@@ -92,6 +92,13 @@ fn main() {
         cx.spawn(async move |cx| {
             log::info!("Opening window with initialized services...");
 
+            // Load ALL roles from config (Tauri pattern main.rs:234-235)
+            let all_roles = {
+                let config = config_state.config.lock().await;
+                config.roles.keys().cloned().collect::<Vec<_>>()
+            };
+            log::info!("Loaded {} roles for UI", all_roles.len());
+
             cx.open_window(
                 WindowOptions {
                     window_bounds: Some(WindowBounds::Windowed(Bounds {
@@ -118,7 +125,7 @@ fn main() {
                     ..Default::default()
                 },
                 |window, cx| {
-                    let view = cx.new(|cx| TerraphimApp::new(window, cx, config_state_for_window));
+                    let view = cx.new(|cx| TerraphimApp::new(window, cx, config_state_for_window, all_roles));
                     // Wrap in Root component as required by gpui-component
                     cx.new(|cx| Root::new(view, window, cx))
                 },
