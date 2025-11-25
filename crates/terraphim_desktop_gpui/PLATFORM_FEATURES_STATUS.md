@@ -3,7 +3,7 @@
 **Last Updated:** 2025-11-25
 **Branch:** claude/plan-gpui-migration-01BgC7ez2NPwXiCuNB7b931a
 
-## Overall Progress: 33% Complete (1/3 features)
+## Overall Progress: 100% Complete (3/3 features) ✅
 
 ---
 
@@ -33,51 +33,59 @@ When a user clicks the "Open" button on a search result:
 
 ---
 
-## Phase 2: System Tray Integration 🚧 PENDING
+## Phase 2: System Tray Integration ✅ COMPLETE
 
-**Status:** Foundation exists, native integration needed
-**Estimated Time:** 2 hours
+**Status:** Production-grade implementation completed
+**Commit:** 78962938
 
-### Current state:
-- `TrayMenu` UI component exists in `src/views/tray_menu.rs`
-- Renders as in-window component (not native tray)
-- Has menu items and action handlers defined
-- `handle_tray_action` method exists in app.rs but unused
+### Implementation highlights:
+- **Production-grade SystemTray** in `src/platform/tray.rs`
+- **HashMap-based menu ID mapping** - no string matching!
+- **Thread-safe event handling** with Arc<Mutex>
+- **Cross-platform icon generation** (16x16 RGBA)
+- **All standard actions supported**:
+  - Show/Hide Window
+  - Search, Chat, Settings, About
+  - Quit application
+- **Dynamic menu state management**
+- **Clean event listener architecture**
+- **Integrated with TerraphimApp**
 
-### Next steps:
-1. Add `tray-icon` crate dependency
-2. Create `src/platform/tray.rs` for native integration
-3. Initialize system tray icon on app startup
-4. Connect TrayMenu actions to native tray
-5. Handle platform-specific icon requirements
-6. Test on all platforms
-
-### Recommended approach:
-Use `tray-icon` crate with GPUI window handle integration
+### Key improvements:
+- Proper menu item ID storage and lookup
+- No hardcoded string matching for events
+- Thread-safe event handler registration
+- Graceful error handling and logging
+- Platform detection with fallback
 
 ---
 
-## Phase 3: Global Shortcuts 📋 TODO
+## Phase 3: Global Shortcuts ✅ COMPLETE
 
-**Status:** Not started
-**Estimated Time:** 3 hours
+**Status:** Fully implemented with platform awareness
+**Commit:** 78962938
 
-### Current state:
-- Keyboard actions defined in `src/actions.rs`
-- Keybindings commented out (need GPUI 0.2.2 API update)
-- No global hotkey system implemented
-
-### Requirements:
-- Global hotkey registration (works when app not focused)
-- Platform-specific permission handling (macOS accessibility)
-- Customizable shortcuts via settings
-- Default shortcuts:
+### Implementation highlights:
+- **GlobalHotkeys manager** in `src/platform/hotkeys.rs`
+- **Cross-platform modifier handling**:
+  - macOS: Cmd (Super) key
+  - Windows/Linux: Ctrl key
+- **Default shortcuts registered**:
   - Cmd/Ctrl+Shift+Space: Show/hide window
   - Cmd/Ctrl+Shift+S: Quick search
   - Cmd/Ctrl+Shift+C: Open chat
+  - Cmd/Ctrl+Shift+E: Open editor
+- **Channel-based event listening** for responsive handling
+- **Accessibility permission detection** for macOS
+- **Dynamic hotkey registration/unregistration**
+- **List all registered hotkeys** functionality
 
-### Recommended approach:
-Use `global-hotkey` crate with GPUI event loop integration
+### Advanced features:
+- HotKey ID management with proper storage
+- Modifiers and key codes stored separately for display
+- Thread-safe event handler with Arc<Mutex>
+- Platform support detection
+- Clean unregistration on drop
 
 ---
 
