@@ -104,15 +104,26 @@ impl SearchInput {
             button = button.primary();
         }
 
-        button = button.on_click(cx.listener(move |this, _ev, _window, cx| {
-            // Accept the selected suggestion
-            this.search_state.update(cx, |state, cx| {
-                if let Some(selected_term) = state.accept_autocomplete(cx) {
-                    // Update input with selected term and trigger search
-                    log::info!("Autocomplete accepted: {}", selected_term);
-                    // Search will be triggered by Enter or input change
-                }
+        button = button.on_click(cx.listener(move |this, _ev, window, cx| {
+            // Accept the selected suggestion and trigger search immediately
+            let accepted_term = this.search_state.update(cx, |state, cx| {
+                state.accept_autocomplete(cx)
             });
+
+            if let Some(selected_term) = accepted_term {
+                log::info!("Autocomplete accepted: {} - triggering search", selected_term);
+
+                // Update input field with selected term
+                this.input_state.update(cx, |input, input_cx| {
+                    input.set_value(gpui::SharedString::from(selected_term.clone()), window, input_cx);
+                });
+
+                // Trigger search immediately (matching Tauri pattern)
+                this.search_state.update(cx, |state, cx| {
+                    state.search(selected_term, cx);
+                });
+            }
+
             this.show_autocomplete_dropdown = false;
             cx.notify();
         }));

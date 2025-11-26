@@ -5,6 +5,8 @@
 //! This library provides framework-agnostic business logic that can be used
 //! with GPUI or adapted to other UI frameworks.
 
+#![recursion_limit = "256"]
+
 // Business logic modules (framework-agnostic)
 pub mod autocomplete;
 pub mod editor;

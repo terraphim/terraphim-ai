@@ -10,7 +10,6 @@ pub struct GlobalHotkeys {
     manager: Arc<GlobalHotKeyManager>,
     hotkeys: HashMap<u32, RegisteredHotkey>,
     event_handler: Arc<Mutex<Option<Box<dyn Fn(HotkeyEvent) + Send + 'static>>>>,
-    next_id: u32,
 }
 
 /// A registered global hotkey
@@ -50,7 +49,6 @@ impl GlobalHotkeys {
             manager: Arc::new(manager),
             hotkeys: HashMap::new(),
             event_handler: Arc::new(Mutex::new(None)),
-            next_id: 1,
         })
     }
 
@@ -111,20 +109,21 @@ impl GlobalHotkeys {
         action: HotkeyAction,
         description: &str,
     ) -> Result<()> {
-        let id = self.next_id;
-        self.next_id += 1;
-
         // Create the hotkey using the new constructor
         let hotkey = HotKey::new(Some(modifiers), key_code);
+
+        // Use the library's ID (hash of key combo) - NOT our own sequential counter
+        // This is critical: event.id from GlobalHotKeyEvent uses this same ID
+        let hotkey_id = hotkey.id();
 
         // Register with the system
         self.manager
             .register(hotkey.clone())
             .map_err(|e| anyhow!("Failed to register hotkey: {}", e))?;
 
-        // Store the hotkey info
+        // Store the hotkey info using the library's ID
         self.hotkeys.insert(
-            id,
+            hotkey_id,
             RegisteredHotkey {
                 hotkey,
                 action,
@@ -135,10 +134,11 @@ impl GlobalHotkeys {
         );
 
         log::info!(
-            "Registered hotkey: {} ({:?} + {:?})",
+            "Registered hotkey: {} ({:?} + {:?}) with id: {}",
             description,
             modifiers,
-            key_code
+            key_code,
+            hotkey_id
         );
 
         Ok(())
