@@ -55,8 +55,9 @@ impl SearchState {
 
     /// Initialize with config state and get current role
     /// Uses first role with rolegraph if selected role doesn't have one (for autocomplete)
+    /// Updates ConfigState.selected_role when falling back to ensure consistency across app
     pub fn with_config(mut self, config_state: ConfigState) -> Self {
-        // Get selected role from config
+        // Get selected role from config and potentially update it
         let actual_role = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
                 let selected = config_state.get_selected_role().await;
@@ -71,9 +72,17 @@ impl SearchState {
                     // Use first role that has a rolegraph for autocomplete
                     if let Some(first_role) = config_state.roles.keys().next() {
                         log::warn!(
-                            "Selected role '{}' has no rolegraph - using '{}' for autocomplete",
+                            "Selected role '{}' has no rolegraph - updating config to use '{}'",
                             selected_str, first_role
                         );
+
+                        // Update the ConfigState's selected_role (like Tauri's select_role command)
+                        {
+                            let mut config = config_state.config.lock().await;
+                            config.selected_role = first_role.clone();
+                            log::info!("ConfigState.selected_role updated to '{}'", first_role);
+                        }
+
                         first_role.to_string()
                     } else {
                         log::error!("No roles with rolegraphs available!");
