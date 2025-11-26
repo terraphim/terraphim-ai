@@ -33,6 +33,8 @@ pub struct TerraphimApp {
     global_hotkeys: Option<GlobalHotkeys>,
     // Channel for receiving hotkey events from background thread
     hotkey_receiver: Option<Receiver<HotkeyAction>>,
+    // Channel for receiving tray events from background thread
+    tray_event_receiver: Option<Receiver<SystemTrayEvent>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -83,6 +85,7 @@ impl TerraphimApp {
         let mut system_tray = None;
         let mut global_hotkeys = None;
         let mut hotkey_receiver: Option<Receiver<HotkeyAction>> = None;
+        let mut tray_event_receiver: Option<Receiver<SystemTrayEvent>> = None;
 
         // Initialize system tray if supported (with dynamic role list like Tauri)
         if SystemTray::is_supported() {
@@ -100,9 +103,16 @@ impl TerraphimApp {
             let mut tray = SystemTray::with_roles(all_roles_for_tray, selected_role);
             match tray.initialize() {
                 Ok(()) => {
-                    tray.on_event(|event| {
-                        log::info!("System tray event: {:?}", event);
-                        // Events will be handled via cx in the future
+                    // Create channel for tray events (same pattern as hotkeys)
+                    let (tray_tx, tray_rx) = mpsc::channel::<SystemTrayEvent>();
+                    tray_event_receiver = Some(tray_rx);
+
+                    // Send tray events through the channel to main thread
+                    tray.on_event(move |event| {
+                        log::info!("System tray event received: {:?}", event);
+                        if let Err(e) = tray_tx.send(event) {
+                            log::error!("Failed to send tray event: {}", e);
+                        }
                     });
 
                     // Make the tray icon visible
@@ -111,7 +121,7 @@ impl TerraphimApp {
                     }
 
                     system_tray = Some(tray);
-                    log::info!("System tray initialized and shown successfully");
+                    log::info!("System tray initialized with channel successfully");
                 }
                 Err(e) => {
                     log::error!("Failed to initialize system tray: {}", e);
@@ -170,6 +180,7 @@ impl TerraphimApp {
             system_tray,
             global_hotkeys,
             hotkey_receiver,
+            tray_event_receiver,
             _subscriptions: vec![search_sub],
         }
     }
@@ -231,6 +242,69 @@ impl TerraphimApp {
         }
 
         log::info!("=== HOTKEY ACTION COMPLETE ===");
+    }
+
+    /// Poll tray event channel and dispatch actions (same pattern as poll_hotkeys)
+    fn poll_tray_events(&mut self, cx: &mut Context<Self>) {
+        // Collect all pending events first to avoid borrow conflicts
+        let events: Vec<SystemTrayEvent> = self.tray_event_receiver
+            .as_ref()
+            .map(|rx| {
+                let mut events = Vec::new();
+                while let Ok(event) = rx.try_recv() {
+                    events.push(event);
+                }
+                events
+            })
+            .unwrap_or_default();
+
+        // Now dispatch all collected events
+        for event in events {
+            log::info!("Dispatching tray event: {:?}", event);
+            self.handle_tray_event(event, cx);
+        }
+    }
+
+    /// Handle a system tray event
+    fn handle_tray_event(&mut self, event: SystemTrayEvent, cx: &mut Context<Self>) {
+        log::info!("=== TRAY EVENT HANDLER ===");
+        log::info!("Event: {:?}", event);
+
+        match event {
+            SystemTrayEvent::Quit => {
+                log::info!("Quit requested via tray - exiting application");
+                cx.quit();
+            }
+            SystemTrayEvent::ChangeRole(role) => {
+                log::info!("Role change requested via tray: {:?}", role);
+
+                // Update config_state selected_role
+                let config_state = self.config_state.clone();
+                tokio::task::block_in_place(|| {
+                    tokio::runtime::Handle::current().block_on(async {
+                        let mut config = config_state.config.lock().await;
+                        config.selected_role = role.clone();
+                        log::info!("ConfigState.selected_role updated to '{}'", role);
+                    });
+                });
+
+                // Update role selector UI
+                self.role_selector.update(cx, |selector, selector_cx| {
+                    selector.set_selected_role(role, selector_cx);
+                });
+
+                cx.notify();
+            }
+            SystemTrayEvent::ToggleWindow => {
+                log::info!("Toggle window requested via tray");
+                // Window visibility control would go here
+            }
+            SystemTrayEvent::TrayIconClick => {
+                // Ignore mouse move/click events - these are noisy
+            }
+        }
+
+        log::info!("=== TRAY EVENT COMPLETE ===");
     }
 
     /// Get a new TerraphimService instance for operations
@@ -425,6 +499,8 @@ impl Render for TerraphimApp {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Poll for hotkey events from background thread
         self.poll_hotkeys(cx);
+        // Poll for tray events from background thread
+        self.poll_tray_events(cx);
 
         div()
             .flex()

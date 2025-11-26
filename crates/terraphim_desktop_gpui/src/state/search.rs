@@ -346,9 +346,22 @@ impl SearchState {
         }
     }
 
+    /// Clear autocomplete state completely (called after search is triggered)
+    pub fn clear_autocomplete(&mut self, cx: &mut Context<Self>) {
+        self.autocomplete_suggestions.clear();
+        self.show_autocomplete = false;
+        self.selected_suggestion_index = 0;
+        cx.notify();
+    }
+
     /// Get current autocomplete suggestions
     pub fn get_suggestions(&self) -> &[AutocompleteSuggestion] {
         &self.autocomplete_suggestions
+    }
+
+    /// Get currently selected suggestion index
+    pub fn get_selected_index(&self) -> usize {
+        self.selected_suggestion_index
     }
 
     /// Check if autocomplete is showing

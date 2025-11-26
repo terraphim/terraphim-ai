@@ -49,6 +49,15 @@ impl RoleSelector {
         &self.current_role
     }
 
+    /// Set selected role directly (called from tray menu)
+    /// Unlike change_role, this doesn't update config_state (already done by caller)
+    pub fn set_selected_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
+        log::info!("RoleSelector: setting selected role to {}", role);
+        self.current_role = role;
+        self.is_open = false;
+        cx.notify();
+    }
+
     /// Change role using backend (pattern from Tauri select_role cmd.rs:392-462)
     pub fn change_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
         if self.current_role == role {

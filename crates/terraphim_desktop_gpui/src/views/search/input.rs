@@ -41,6 +41,7 @@ impl SearchInput {
                     let value = input_state_clone.read(cx).value();
                     search_state_clone.update(cx, |state, cx| {
                         state.search(value.to_string(), cx);
+                        state.clear_autocomplete(cx);  // Clear autocomplete after search
                     });
                     this.show_autocomplete_dropdown = false;
                     cx.notify();
@@ -88,7 +89,9 @@ impl SearchInput {
     }
 
     fn render_suggestion_item(&self, index: usize, suggestion: &AutocompleteSuggestion, cx: &Context<Self>) -> impl IntoElement {
-        let is_selected = index == 0; // Simplified: first item is always selected
+        // Use actual selected index from SearchState
+        let selected_idx = self.search_state.read(cx).get_selected_index();
+        let is_selected = index == selected_idx;
         let term = suggestion.term.clone();
         let url = suggestion.url.clone();
         let score = suggestion.score;
@@ -118,9 +121,10 @@ impl SearchInput {
                     input.set_value(gpui::SharedString::from(selected_term.clone()), window, input_cx);
                 });
 
-                // Trigger search immediately (matching Tauri pattern)
+                // Trigger search immediately and clear autocomplete (matching Tauri pattern)
                 this.search_state.update(cx, |state, cx| {
                     state.search(selected_term, cx);
+                    state.clear_autocomplete(cx);  // Ensure dropdown stays hidden
                 });
             }
 
@@ -149,6 +153,62 @@ impl Render for SearchInput {
         div()
             .relative()
             .w_full()
+            .track_focus(&self.input_state.read(cx).focus_handle(cx))
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                // Only handle keys when autocomplete is visible
+                if !this.show_autocomplete_dropdown {
+                    return;
+                }
+
+                match &ev.keystroke.key {
+                    key if key == "down" => {
+                        log::info!("Arrow Down pressed - selecting next suggestion");
+                        this.search_state.update(cx, |state, cx| {
+                            state.autocomplete_next(cx);
+                        });
+                        cx.notify();
+                    }
+                    key if key == "up" => {
+                        log::info!("Arrow Up pressed - selecting previous suggestion");
+                        this.search_state.update(cx, |state, cx| {
+                            state.autocomplete_previous(cx);
+                        });
+                        cx.notify();
+                    }
+                    key if key == "tab" => {
+                        log::info!("Tab pressed - accepting selected suggestion");
+                        // Accept selected suggestion
+                        let accepted_term = this.search_state.update(cx, |state, cx| {
+                            state.accept_autocomplete(cx)
+                        });
+
+                        if let Some(selected_term) = accepted_term {
+                            // Update input field with selected term
+                            this.input_state.update(cx, |input, input_cx| {
+                                input.set_value(gpui::SharedString::from(selected_term.clone()), window, input_cx);
+                            });
+
+                            // Trigger search
+                            this.search_state.update(cx, |state, cx| {
+                                state.search(selected_term, cx);
+                                state.clear_autocomplete(cx);
+                            });
+                        }
+
+                        this.show_autocomplete_dropdown = false;
+                        cx.notify();
+                    }
+                    key if key == "escape" => {
+                        log::info!("Escape pressed - closing autocomplete");
+                        this.search_state.update(cx, |state, cx| {
+                            state.clear_autocomplete(cx);
+                        });
+                        this.show_autocomplete_dropdown = false;
+                        cx.notify();
+                    }
+                    _ => {}
+                }
+            }))
             .child(
                 div()
                     .flex()
