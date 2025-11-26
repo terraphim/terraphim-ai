@@ -6,6 +6,7 @@ use tray_icon::{
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
+use terraphim_types::RoleName;
 
 /// System tray integration for Terraphim
 pub struct SystemTray {
@@ -13,17 +14,15 @@ pub struct SystemTray {
     menu: Option<Menu>,
     menu_items: Arc<Mutex<HashMap<MenuId, SystemTrayEvent>>>,
     event_handler: Arc<Mutex<Option<Box<dyn Fn(SystemTrayEvent) + Send + 'static>>>>,
+    roles: Vec<RoleName>,
+    selected_role: RoleName,
 }
 
 /// Events that can be triggered from the system tray
 #[derive(Clone, Debug)]
 pub enum SystemTrayEvent {
-    ShowWindow,
-    HideWindow,
-    Search,
-    Chat,
-    Settings,
-    About,
+    ToggleWindow,
+    ChangeRole(RoleName),
     Quit,
     TrayIconClick,
 }
@@ -36,6 +35,23 @@ impl SystemTray {
             menu: None,
             menu_items: Arc::new(Mutex::new(HashMap::new())),
             event_handler: Arc::new(Mutex::new(None)),
+            roles: Vec::new(),
+            selected_role: RoleName::default(),
+        }
+    }
+
+    /// Create a new system tray instance with roles (matches Tauri implementation)
+    pub fn with_roles(roles: Vec<RoleName>, selected_role: RoleName) -> Self {
+        log::info!("=== SystemTray CREATING WITH ROLES ===");
+        log::info!("Roles: {:?}", roles);
+        log::info!("Selected role: {:?}", selected_role);
+        Self {
+            tray_icon: None,
+            menu: None,
+            menu_items: Arc::new(Mutex::new(HashMap::new())),
+            event_handler: Arc::new(Mutex::new(None)),
+            roles,
+            selected_role,
         }
     }
 
@@ -98,54 +114,66 @@ impl SystemTray {
         icon_data
     }
 
-    /// Create the tray menu
+    /// Create the tray menu (matches Tauri build_tray_menu implementation)
     fn create_menu(&self) -> Result<Menu> {
+        log::info!("=== Creating Tray Menu (Tauri-style) ===");
         let menu = Menu::new();
 
-        // Add menu items
-        let show_item = MenuItem::new("Show Terraphim", true, None);
-        let hide_item = MenuItem::new("Hide Terraphim", true, None);
-        let search_item = MenuItem::new("Search", true, None);
-        let chat_item = MenuItem::new("Chat", true, None);
-        let settings_item = MenuItem::new("Settings", true, None);
-        let about_item = MenuItem::new("About", true, None);
-        let separator = PredefinedMenuItem::separator();
-        let quit_item = MenuItem::new("Quit", true, None);
+        // 1. Toggle Window item (Show/Hide combined)
+        let toggle_item = MenuItem::new("Show/Hide", true, None);
 
         // Store menu item IDs for event handling
         {
             let mut items = self.menu_items.lock().unwrap();
-            items.insert(show_item.id().clone(), SystemTrayEvent::ShowWindow);
-            items.insert(hide_item.id().clone(), SystemTrayEvent::HideWindow);
-            items.insert(search_item.id().clone(), SystemTrayEvent::Search);
-            items.insert(chat_item.id().clone(), SystemTrayEvent::Chat);
-            items.insert(settings_item.id().clone(), SystemTrayEvent::Settings);
-            items.insert(about_item.id().clone(), SystemTrayEvent::About);
-            items.insert(quit_item.id().clone(), SystemTrayEvent::Quit);
+            items.insert(toggle_item.id().clone(), SystemTrayEvent::ToggleWindow);
         }
 
-        // Build the menu
-        menu.append(&show_item)
-            .map_err(|e| anyhow!("Failed to add show item: {}", e))?;
-        menu.append(&hide_item)
-            .map_err(|e| anyhow!("Failed to add hide item: {}", e))?;
-        menu.append(&separator)
+        menu.append(&toggle_item)
+            .map_err(|e| anyhow!("Failed to add toggle item: {}", e))?;
+
+        // 2. Separator
+        let separator1 = PredefinedMenuItem::separator();
+        menu.append(&separator1)
             .map_err(|e| anyhow!("Failed to add separator: {}", e))?;
-        menu.append(&search_item)
-            .map_err(|e| anyhow!("Failed to add search item: {}", e))?;
-        menu.append(&chat_item)
-            .map_err(|e| anyhow!("Failed to add chat item: {}", e))?;
-        menu.append(&separator)
+
+        // 3. Dynamic role items (with checkmark on selected)
+        log::info!("Adding {} role items to tray menu", self.roles.len());
+        for role in &self.roles {
+            let is_selected = role == &self.selected_role;
+            let label = if is_selected {
+                format!("✓ {}", role)
+            } else {
+                role.to_string()
+            };
+
+            log::info!("  Role: {} (selected: {})", role, is_selected);
+            let role_item = MenuItem::new(&label, true, None);
+
+            // Store role item event
+            {
+                let mut items = self.menu_items.lock().unwrap();
+                items.insert(role_item.id().clone(), SystemTrayEvent::ChangeRole(role.clone()));
+            }
+
+            menu.append(&role_item)
+                .map_err(|e| anyhow!("Failed to add role item: {}", e))?;
+        }
+
+        // 4. Separator before quit
+        let separator2 = PredefinedMenuItem::separator();
+        menu.append(&separator2)
             .map_err(|e| anyhow!("Failed to add separator: {}", e))?;
-        menu.append(&settings_item)
-            .map_err(|e| anyhow!("Failed to add settings item: {}", e))?;
-        menu.append(&about_item)
-            .map_err(|e| anyhow!("Failed to add about item: {}", e))?;
-        menu.append(&separator)
-            .map_err(|e| anyhow!("Failed to add separator: {}", e))?;
+
+        // 5. Quit item
+        let quit_item = MenuItem::new("Quit", true, None);
+        {
+            let mut items = self.menu_items.lock().unwrap();
+            items.insert(quit_item.id().clone(), SystemTrayEvent::Quit);
+        }
         menu.append(&quit_item)
             .map_err(|e| anyhow!("Failed to add quit item: {}", e))?;
 
+        log::info!("=== Tray Menu Created Successfully ===");
         Ok(menu)
     }
 

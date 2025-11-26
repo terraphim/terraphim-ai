@@ -56,6 +56,7 @@ impl TerraphimApp {
         let editor_view = cx.new(|cx| EditorView::new(window, cx));
 
         // Initialize role selector with ALL roles (pre-loaded in main.rs)
+        let all_roles_for_tray = all_roles.clone(); // Clone for tray use later
         let role_selector = cx.new(|cx| {
             RoleSelector::new(window, cx)
                 .with_config(config_state.clone())
@@ -83,10 +84,20 @@ impl TerraphimApp {
         let mut global_hotkeys = None;
         let mut hotkey_receiver: Option<Receiver<HotkeyAction>> = None;
 
-        // Initialize system tray if supported
+        // Initialize system tray if supported (with dynamic role list like Tauri)
         if SystemTray::is_supported() {
-            log::info!("Initializing system tray");
-            let mut tray = SystemTray::new();
+            log::info!("Initializing system tray with roles");
+
+            // Get selected role from config_state
+            let selected_role = tokio::task::block_in_place(|| {
+                tokio::runtime::Handle::current().block_on(async {
+                    config_state.get_selected_role().await
+                })
+            });
+
+            log::info!("System tray: roles count = {}, selected = {:?}", all_roles_for_tray.len(), selected_role);
+
+            let mut tray = SystemTray::with_roles(all_roles_for_tray, selected_role);
             match tray.initialize() {
                 Ok(()) => {
                     tray.on_event(|event| {
@@ -186,6 +197,10 @@ impl TerraphimApp {
 
     /// Handle a hotkey action
     fn handle_hotkey_action(&mut self, action: HotkeyAction, cx: &mut Context<Self>) {
+        log::info!("=== HOTKEY ACTION HANDLER ===");
+        log::info!("Action: {:?}", action);
+        log::info!("Current view BEFORE: {:?}", self.current_view);
+
         match action {
             HotkeyAction::ShowHideWindow => {
                 log::info!("ShowHideWindow hotkey - toggling window visibility");
@@ -193,21 +208,29 @@ impl TerraphimApp {
                 // For now, this is a placeholder
             }
             HotkeyAction::QuickSearch => {
-                log::info!("QuickSearch hotkey - navigating to search");
-                self.navigate_to(AppView::Search, cx);
+                log::info!("QuickSearch hotkey - setting view to Search directly");
+                self.current_view = AppView::Search;
+                cx.notify();
+                log::info!("View AFTER direct assignment: {:?}", self.current_view);
             }
             HotkeyAction::OpenChat => {
-                log::info!("OpenChat hotkey - navigating to chat");
-                self.navigate_to(AppView::Chat, cx);
+                log::info!("OpenChat hotkey - setting view to Chat directly");
+                self.current_view = AppView::Chat;
+                cx.notify();
+                log::info!("View AFTER direct assignment: {:?}", self.current_view);
             }
             HotkeyAction::OpenEditor => {
-                log::info!("OpenEditor hotkey - navigating to editor");
-                self.navigate_to(AppView::Editor, cx);
+                log::info!("OpenEditor hotkey - setting view to Editor directly");
+                self.current_view = AppView::Editor;
+                cx.notify();
+                log::info!("View AFTER direct assignment: {:?}", self.current_view);
             }
             HotkeyAction::Custom(name) => {
                 log::info!("Custom hotkey action: {}", name);
             }
         }
+
+        log::info!("=== HOTKEY ACTION COMPLETE ===");
     }
 
     /// Get a new TerraphimService instance for operations

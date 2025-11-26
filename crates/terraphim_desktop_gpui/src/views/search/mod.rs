@@ -25,7 +25,15 @@ pub struct SearchView {
 
 impl SearchView {
     pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState) -> Self {
-        let search_state = cx.new(|cx| SearchState::new(cx).with_config(config_state));
+        log::info!("=== SearchView INITIALIZATION ===");
+        log::info!("ConfigState roles count: {}", config_state.roles.len());
+        log::info!("ConfigState roles: {:?}", config_state.roles.keys().collect::<Vec<_>>());
+
+        let search_state = cx.new(|cx| {
+            let state = SearchState::new(cx).with_config(config_state);
+            log::info!("SearchState created - has_config: {}", state.has_config());
+            state
+        });
         let search_input = cx.new(|cx| SearchInput::new(window, cx, search_state.clone()));
         let search_results = cx.new(|cx| SearchResults::new(window, cx, search_state.clone()));
         let article_modal = cx.new(|cx| ArticleModal::new(window, cx));

@@ -349,6 +349,11 @@ impl SearchState {
         cx.notify();
     }
 
+    /// Check if config_state is set
+    pub fn has_config(&self) -> bool {
+        self.config_state.is_some()
+    }
+
     pub fn is_loading(&self) -> bool {
         self.loading
     }
