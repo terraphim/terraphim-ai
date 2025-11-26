@@ -1,6 +1,7 @@
 use gpui::*;
 use gpui::prelude::FluentBuilder;
 use gpui_component::{button::*, StyledExt};
+use std::sync::mpsc::{self, Receiver, Sender};
 use terraphim_config::ConfigState;
 use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
@@ -13,7 +14,7 @@ use crate::views::role_selector::RoleChangeEvent;
 use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
 use crate::platform::{SystemTray, GlobalHotkeys};
 use crate::platform::tray::SystemTrayEvent;
-use crate::platform::hotkeys::HotkeyAction;
+use crate::platform::hotkeys::{HotkeyAction, HotkeyEvent};
 
 /// Main application state with integrated backend services
 pub struct TerraphimApp {
@@ -30,6 +31,8 @@ pub struct TerraphimApp {
     // Platform features
     system_tray: Option<SystemTray>,
     global_hotkeys: Option<GlobalHotkeys>,
+    // Channel for receiving hotkey events from background thread
+    hotkey_receiver: Option<Receiver<HotkeyAction>>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -78,6 +81,7 @@ impl TerraphimApp {
         // Initialize platform features
         let mut system_tray = None;
         let mut global_hotkeys = None;
+        let mut hotkey_receiver: Option<Receiver<HotkeyAction>> = None;
 
         // Initialize system tray if supported
         if SystemTray::is_supported() {
@@ -89,8 +93,14 @@ impl TerraphimApp {
                         log::info!("System tray event: {:?}", event);
                         // Events will be handled via cx in the future
                     });
+
+                    // Make the tray icon visible
+                    if let Err(e) = tray.show() {
+                        log::error!("Failed to show system tray icon: {}", e);
+                    }
+
                     system_tray = Some(tray);
-                    log::info!("System tray initialized successfully");
+                    log::info!("System tray initialized and shown successfully");
                 }
                 Err(e) => {
                     log::error!("Failed to initialize system tray: {}", e);
@@ -112,12 +122,20 @@ impl TerraphimApp {
                     if let Err(e) = hotkeys.register_defaults() {
                         log::error!("Failed to register default hotkeys: {}", e);
                     } else {
-                        hotkeys.on_event(|event| {
+                        // Create channel for hotkey events
+                        let (tx, rx) = mpsc::channel::<HotkeyAction>();
+                        hotkey_receiver = Some(rx);
+
+                        // Send hotkey events through the channel
+                        hotkeys.on_event(move |event| {
                             log::info!("Global hotkey pressed: {:?}", event.action);
-                            // Events will be handled via cx in the future
+                            if let Err(e) = tx.send(event.action.clone()) {
+                                log::error!("Failed to send hotkey event: {}", e);
+                            }
                         });
+
                         global_hotkeys = Some(hotkeys);
-                        log::info!("Global hotkeys initialized successfully");
+                        log::info!("Global hotkeys initialized with channel successfully");
                     }
                 }
                 Err(e) => {
@@ -140,7 +158,55 @@ impl TerraphimApp {
             config_state,
             system_tray,
             global_hotkeys,
+            hotkey_receiver,
             _subscriptions: vec![search_sub],
+        }
+    }
+
+    /// Poll hotkey channel and dispatch actions
+    fn poll_hotkeys(&mut self, cx: &mut Context<Self>) {
+        // Collect all pending actions first to avoid borrow conflicts
+        let actions: Vec<HotkeyAction> = self.hotkey_receiver
+            .as_ref()
+            .map(|rx| {
+                let mut actions = Vec::new();
+                while let Ok(action) = rx.try_recv() {
+                    actions.push(action);
+                }
+                actions
+            })
+            .unwrap_or_default();
+
+        // Now dispatch all collected actions
+        for action in actions {
+            log::info!("Dispatching hotkey action: {:?}", action);
+            self.handle_hotkey_action(action, cx);
+        }
+    }
+
+    /// Handle a hotkey action
+    fn handle_hotkey_action(&mut self, action: HotkeyAction, cx: &mut Context<Self>) {
+        match action {
+            HotkeyAction::ShowHideWindow => {
+                log::info!("ShowHideWindow hotkey - toggling window visibility");
+                // In GPUI, we can't directly control window visibility without a window handle
+                // For now, this is a placeholder
+            }
+            HotkeyAction::QuickSearch => {
+                log::info!("QuickSearch hotkey - navigating to search");
+                self.navigate_to(AppView::Search, cx);
+            }
+            HotkeyAction::OpenChat => {
+                log::info!("OpenChat hotkey - navigating to chat");
+                self.navigate_to(AppView::Chat, cx);
+            }
+            HotkeyAction::OpenEditor => {
+                log::info!("OpenEditor hotkey - navigating to editor");
+                self.navigate_to(AppView::Editor, cx);
+            }
+            HotkeyAction::Custom(name) => {
+                log::info!("Custom hotkey action: {}", name);
+            }
         }
     }
 
@@ -334,6 +400,9 @@ impl TerraphimApp {
 
 impl Render for TerraphimApp {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Poll for hotkey events from background thread
+        self.poll_hotkeys(cx);
+
         div()
             .flex()
             .flex_col()

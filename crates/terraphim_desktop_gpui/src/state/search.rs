@@ -178,7 +178,11 @@ impl SearchState {
 
     /// Get autocomplete suggestions from KG (pattern from Tauri search_kg_terms)
     pub fn get_autocomplete(&mut self, query: String, cx: &mut Context<Self>) {
+        log::info!("=== AUTOCOMPLETE DEBUG START ===");
+        log::info!("Query: '{}', length: {}", query, query.len());
+
         if query.trim().is_empty() || query.len() < 2 {
+            log::info!("Query too short (< 2 chars), skipping autocomplete");
             self.autocomplete_suggestions.clear();
             self.show_autocomplete = false;
             cx.notify();
@@ -186,12 +190,18 @@ impl SearchState {
         }
 
         let config_state = match &self.config_state {
-            Some(state) => state.clone(),
+            Some(state) => {
+                log::info!("✓ config_state exists");
+                state.clone()
+            },
             None => {
-                log::warn!("Cannot get autocomplete: config not initialized");
+                log::error!("✗ config_state is None - AUTOCOMPLETE FAILING");
                 return;
             }
         };
+
+        log::info!("Current role: '{}'", self.current_role);
+        log::info!("Available roles in config: {:?}", config_state.roles.keys().collect::<Vec<_>>());
 
         self.autocomplete_loading = true;
         cx.notify();
@@ -204,31 +214,54 @@ impl SearchState {
             use terraphim_types::RoleName;
 
             let role = RoleName::from(role_name.as_str());
+            log::info!("Looking up role: {:?}", role);
 
             // Get the rolegraph for autocomplete
             let autocomplete_index = if let Some(rolegraph_sync) = config_state.roles.get(&role) {
+                log::info!("✓ Role '{}' found in config", role_name);
                 let rolegraph = rolegraph_sync.lock().await;
 
+                let thesaurus_len = rolegraph.thesaurus.len();
+                log::info!("Rolegraph thesaurus has {} entries", thesaurus_len);
+
+                if thesaurus_len == 0 {
+                    log::warn!("✗ Thesaurus is EMPTY - no autocomplete terms available");
+                }
+
                 match build_autocomplete_index(rolegraph.thesaurus.clone(), None) {
-                    Ok(index) => Some(index),
+                    Ok(index) => {
+                        log::info!("✓ Built autocomplete index successfully");
+                        Some(index)
+                    },
                     Err(e) => {
-                        log::error!("Failed to build autocomplete index: {}", e);
+                        log::error!("✗ Failed to build autocomplete index: {}", e);
                         None
                     }
                 }
             } else {
-                log::warn!("Role '{}' not found for autocomplete", role);
+                log::error!("✗ Role '{}' NOT found in config - available: {:?}",
+                    role_name, config_state.roles.keys().collect::<Vec<_>>());
                 None
             };
 
             let suggestions = if let Some(index) = autocomplete_index {
                 // Use fuzzy search for queries >= 3 chars, exact for shorter
                 let results = if query.len() >= 3 {
+                    log::info!("Using fuzzy search for query >= 3 chars");
                     fuzzy_autocomplete_search(&index, &query, 0.7, Some(8))
-                        .unwrap_or_else(|_| autocomplete_search(&index, &query, Some(8)).unwrap_or_default())
+                        .unwrap_or_else(|e| {
+                            log::warn!("Fuzzy search failed: {:?}, falling back to exact", e);
+                            autocomplete_search(&index, &query, Some(8)).unwrap_or_default()
+                        })
                 } else {
+                    log::info!("Using exact prefix search for short query");
                     autocomplete_search(&index, &query, Some(8)).unwrap_or_default()
                 };
+
+                log::info!("Autocomplete found {} results", results.len());
+                for (i, r) in results.iter().take(3).enumerate() {
+                    log::info!("  [{}] term='{}', score={:.2}", i, r.term, r.score);
+                }
 
                 results.into_iter()
                     .map(|r| AutocompleteSuggestion {
@@ -239,8 +272,11 @@ impl SearchState {
                     })
                     .collect()
             } else {
+                log::warn!("No autocomplete index available, returning empty suggestions");
                 vec![]
             };
+
+            log::info!("=== AUTOCOMPLETE DEBUG END: {} suggestions ===", suggestions.len());
 
             this.update(cx, |this, cx| {
                 this.autocomplete_suggestions = suggestions;

@@ -61,9 +61,10 @@ impl Render for ArticleModal {
             .child(
                 div()
                     .relative()
-                    .w(px(1200.0))
-                    .max_w_full()
-                    .max_h(px(800.0))
+                    .w(px(1000.0))      // Reasonable width for most screens
+                    .max_w_full()       // Don't exceed parent width
+                    .h(px(600.0))       // Reasonable height for laptop screens
+                    .max_h(px(700.0))   // Maximum height cap
                     .bg(rgb(0xffffff))
                     .rounded_lg()
                     .shadow_xl()
@@ -96,7 +97,8 @@ impl Render for ArticleModal {
                             )
                     )
                     .child(
-                        // Document content with scroll
+                        // Document content area - truncates overflow for now
+                        // TODO: Add proper scrolling when GPUI supports it better
                         div()
                             .flex_1()
                             .overflow_hidden()

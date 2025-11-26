@@ -69,11 +69,16 @@ impl SystemTray {
 
     /// Create the tray icon
     fn create_icon(&self) -> Result<Icon> {
-        // For now, use a simple 16x16 icon embedded as bytes
-        // In production, you'd load a proper icon file
-        let icon_bytes = self.generate_default_icon();
+        // Try to load icon from embedded bytes (included at compile time)
+        let icon_bytes = include_bytes!("../../assets/tray-icon.png");
 
-        Icon::from_rgba(icon_bytes, 16, 16)
+        // Decode PNG to RGBA
+        let img = image::load_from_memory(icon_bytes)
+            .map_err(|e| anyhow!("Failed to load icon image: {}", e))?;
+        let rgba = img.to_rgba8();
+        let (width, height) = rgba.dimensions();
+
+        Icon::from_rgba(rgba.into_raw(), width, height)
             .map_err(|e| anyhow!("Failed to create icon: {}", e))
     }
 
