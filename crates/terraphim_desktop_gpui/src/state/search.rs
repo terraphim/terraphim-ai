@@ -54,16 +54,37 @@ impl SearchState {
     }
 
     /// Initialize with config state and get current role
+    /// Uses first role with rolegraph if selected role doesn't have one (for autocomplete)
     pub fn with_config(mut self, config_state: ConfigState) -> Self {
         // Get selected role from config
-        let selected_role = tokio::task::block_in_place(|| {
+        let actual_role = tokio::task::block_in_place(|| {
             tokio::runtime::Handle::current().block_on(async {
-                config_state.get_selected_role().await.to_string()
+                let selected = config_state.get_selected_role().await;
+                let selected_str = selected.to_string();
+
+                // Check if selected role has a rolegraph (for autocomplete)
+                let role_key = terraphim_types::RoleName::from(selected_str.as_str());
+                if config_state.roles.contains_key(&role_key) {
+                    log::info!("Selected role '{}' has rolegraph - using it", selected_str);
+                    selected_str
+                } else {
+                    // Use first role that has a rolegraph for autocomplete
+                    if let Some(first_role) = config_state.roles.keys().next() {
+                        log::warn!(
+                            "Selected role '{}' has no rolegraph - using '{}' for autocomplete",
+                            selected_str, first_role
+                        );
+                        first_role.to_string()
+                    } else {
+                        log::error!("No roles with rolegraphs available!");
+                        selected_str
+                    }
+                }
             })
         });
 
-        log::info!("SearchState using role: {}", selected_role);
-        self.current_role = selected_role;
+        log::info!("SearchState: using role='{}' for autocomplete", actual_role);
+        self.current_role = actual_role;
         self.config_state = Some(config_state);
         self
     }
