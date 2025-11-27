@@ -55,6 +55,11 @@ repl-mcp = []       # MCP tools (autocomplete, extract, etc.)
 repl-file = []      # File operations
 repl-web = []       # Web operations
 
+[dev-dependencies]
+tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "test-util"] }
+serial_test = "3.0"
+tempfile = "3.10"
+
 [profile.release]
 opt-level = "z"     # Optimize for size
 lto = true          # Enable link-time optimization

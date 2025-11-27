@@ -75,9 +75,9 @@ enum Commands {
         /// Text to process
         text: String,
 
-        /// Output format: markdown, html, wiki, plain
-        #[arg(long, default_value = "markdown")]
-        format: String,
+        /// Link format: markdown, html, wiki, plain
+        #[arg(long = "link-format", default_value = "markdown")]
+        link_format: String,
 
         /// Role to use
         #[arg(long)]
@@ -218,8 +218,8 @@ async fn main() -> Result<()> {
         Some(Commands::Config) => handle_config(&service).await,
         Some(Commands::Roles) => handle_roles(&service).await,
         Some(Commands::Graph { top_k, role }) => handle_graph(&service, top_k, role).await,
-        Some(Commands::Replace { text, format, role }) => {
-            handle_replace(&service, text, format, role).await
+        Some(Commands::Replace { text, link_format, role }) => {
+            handle_replace(&service, text, link_format, role).await
         }
         Some(Commands::Find { text, role }) => handle_find(&service, text, role).await,
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
