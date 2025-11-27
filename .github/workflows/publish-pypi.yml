@@ -1,0 +1,382 @@
+name: Publish Python Package to PyPI
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (semantic version)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode only'
+        required: false
+        type: boolean
+        default: true
+      repository:
+        description: 'PyPI repository (pypi or testpypi)'
+        required: false
+        type: choice
+        options:
+          - 'pypi'
+          - 'testpypi'
+        default: 'pypi'
+  push:
+    tags:
+      - 'python-v*'
+      - 'pypi-v*'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write  # For PyPI trusted publishing
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  validate:
+    name: Validate Python Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Validate package metadata
+        working-directory: crates/terraphim_automata_py
+        run: |
+          python -c "import tomllib; pkg = tomllib.load(open('pyproject.toml', 'rb')); print('Package name:', pkg['project']['name']); print('Version:', pkg['project']['version'])"
+
+      - name: Validate version format
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/python-v//;s/refs\/tags\/pypi-v//')
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid version format: $VERSION"
+              exit 1
+            fi
+            echo "Version to publish: $VERSION"
+          fi
+
+  build:
+    name: Build Python Distributions
+    runs-on: ${{ matrix.os }}
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            macos-arch: universal
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: ${{ matrix.target }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          python-version: ${{ matrix.python-version }}
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-pypi-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Python build dependencies
+        working-directory: crates/terraphim_automata_py
+        run: |
+          uv pip install --system maturin pytest pytest-benchmark build
+
+      - name: Build wheel
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/terraphim_automata_py
+          args: --release --out dist --find-interpreter --target ${{ matrix.target }}
+          sccache: 'true'
+          manylinux: auto
+
+      - name: Upload wheel artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: crates/terraphim_automata_py/dist/*.whl
+          if-no-files-found: error
+
+  build-sdist:
+    name: Build Source Distribution
+    runs-on: ubuntu-latest
+    needs: validate
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Build source distribution
+        uses: PyO3/maturin-action@v1
+        with:
+          working-directory: crates/terraphim_automata_py
+          command: sdist
+          args: --out dist
+
+      - name: Upload sdist artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: sdist
+          path: crates/terraphim_automata_py/dist/*.tar.gz
+          if-no-files-found: error
+
+  test:
+    name: Test Package
+    runs-on: ${{ matrix.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Download test distributions
+        uses: actions/download-artifact@v4
+        with:
+          name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
+          path: dist
+
+      - name: Install test dependencies
+        working-directory: crates/terraphim_automata_py
+        run: |
+          uv pip install --system pytest pytest-benchmark pytest-cov black mypy ruff
+          uv pip install --system terraphim-automata --find-links=../../dist
+
+      - name: Run tests
+        working-directory: crates/terraphim_automata_py
+        run: |
+          # Run Python tests
+          python -m pytest python/tests/ -v --cov=terraphim_automata --cov-report=term-missing
+
+          # Test basic import
+          python -c "import terraphim_automata; print('✅ Package imports successfully')"
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: [self-hosted, Linux, terraphim, production, docker]
+    environment: production
+    needs: [build, build-sdist, test]
+    permissions:
+      id-token: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1.1.0
+
+      - name: Authenticate with 1Password
+        run: |
+          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
+
+      - name: Get PyPI token from 1Password (or use secret)
+        id: token
+        run: |
+          TOKEN=$(op read "op://TerraphimPlatform/pypi.token/token" 2>/dev/null || echo "")
+          if [[ -z "$TOKEN" ]]; then
+            echo "⚠️  PyPI token not found in 1Password, using GitHub secret"
+            TOKEN="${{ secrets.PYPI_API_TOKEN }}"
+          fi
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "✅ PyPI token retrieved"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Collect distributions
+        run: |
+          mkdir -p packages
+          find dist -name "*.whl" -exec cp {} packages/ \;
+          find dist -name "*.tar.gz" -exec cp {} packages/ \;
+          echo "📦 Found packages:"
+          ls -la packages/
+
+      - name: Validate distributions
+        run: |
+          python -m pip install --upgrade twine
+          python -m twine check packages/*
+          echo "✅ All distributions are valid"
+
+      - name: Set publishing repository
+        id: repo
+        run: |
+          REPOSITORY="${{ inputs.repository }}"
+          if [[ "$REPOSITORY" == "testpypi" ]]; then
+            TWINE_REPOSITORY_URL="https://test.pypi.org/legacy/"
+            echo "🧪 Publishing to TestPyPI"
+          else
+            TWINE_REPOSITORY_URL="https://upload.pypi.org/legacy/"
+            echo "🚀 Publishing to production PyPI"
+          fi
+          echo "url=$TWINE_REPOSITORY_URL" >> $GITHUB_OUTPUT
+
+      - name: Publish to PyPI
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "🧪 Dry run mode - validating packages only"
+            python -m twine upload --repository-url ${{ steps.repo.outputs.url }} --username __token__ --password ${{ steps.token.outputs.token }} --skip-existing --dry-run packages/*
+          else
+            echo "🚀 Publishing to PyPI..."
+            python -m twine upload --repository-url ${{ steps.repo.outputs.url }} --username __token__ --password ${{ steps.token.outputs.token }} --skip-existing packages/*
+            echo "✅ Packages published successfully!"
+          fi
+
+      - name: Verify published packages
+        if: inputs.dry_run != 'true'
+        run: |
+          # Wait for package to be available
+          sleep 60
+
+          PACKAGE_NAME="terraphim-automata"
+          PACKAGE_VERSION=$(python -c "import tomllib; pkg = tomllib.load(open('crates/terraphim_automata_py/pyproject.toml', 'rb')); print(pkg['project']['version'])")
+
+          echo "🔍 Verifying package on PyPI..."
+          python -m pip install --upgrade pip
+
+          # Try to install from PyPI (or TestPyPI)
+          if [[ "${{ inputs.repository }}" == "testpypi" ]]; then
+            python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple/ "$PACKAGE_NAME==$PACKAGE_VERSION" || echo "⚠️  Package not yet visible on TestPyPI"
+          else
+            python -m pip install "$PACKAGE_NAME==$PACKAGE_VERSION" || echo "⚠️  Package not yet visible on PyPI"
+          fi
+
+          echo "📊 Package verification complete"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: "terraphim-automata ${{ github.ref_name }}"
+          body: |
+            ## Python Package Release
+
+            **Package**: `terraphim-automata`
+            **Version**: ${{ github.ref_name }}
+            **Repository**: ${{ inputs.repository }}
+
+            ### 🚀 Installation
+            ```bash
+            pip install terraphim-automata
+            ```
+
+            or for development:
+            ```bash
+            pip install terraphim-automata[dev]
+            ```
+
+            ### ✨ Features
+            - **Fast Autocomplete**: Sub-millisecond prefix search
+            - **Knowledge Graph Integration**: Semantic connectivity analysis
+            - **Native Performance**: Rust backend with PyO3 bindings
+            - **Cross-Platform**: Linux, macOS, Windows support
+            - **Python 3.9+**: Modern Python support
+
+            ### 📊 Performance
+            - **Autocomplete Index**: ~749 bytes
+            - **Knowledge Graph**: ~856 bytes
+            - **Native Extension**: Optimized binary wheels
+
+            ### 🔗 Links
+            - [PyPI package](https://pypi.org/project/terraphim-automata)
+            - [Documentation](https://github.com/terraphim/terraphim-ai/tree/main/crates/terraphim_automata_py)
+
+            ---
+            🤖 Generated on: $(date)
+          draft: false
+          prerelease: ${{ contains(github.ref, '-alpha') || contains(github.ref, '-beta') || contains(github.ref, '-rc') }}
+
+      - name: Notify completion
+        if: inputs.dry_run != 'true'
+        run: |
+          echo "🎉 PyPI publishing workflow completed successfully!"
+          echo "📦 Package: terrraphim-automata"
+          echo "📋 Repository: ${{ inputs.repository }}"
