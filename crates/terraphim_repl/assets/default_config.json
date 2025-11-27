@@ -1,0 +1,16 @@
+{
+  "id": "REPL",
+  "global_shortcut": "",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "dark",
+      "kg": null,
+      "haystacks": [],
+      "extra": {}
+    }
+  },
+  "selected_role": "Default"
+}
