@@ -107,13 +107,17 @@ impl TerraphimApp {
                     let (tray_tx, tray_rx) = mpsc::channel::<SystemTrayEvent>();
                     tray_event_receiver = Some(tray_rx);
 
-                    // Send tray events through the channel to main thread
+                    // Set handler FIRST (before starting listener threads)
                     tray.on_event(move |event| {
                         log::info!("System tray event received: {:?}", event);
                         if let Err(e) = tray_tx.send(event) {
                             log::error!("Failed to send tray event: {}", e);
                         }
                     });
+
+                    // THEN start listener threads (handler is guaranteed to be set now)
+                    // This fixes the race condition where threads would check for handler before it was set
+                    tray.start_listening();
 
                     // Make the tray icon visible
                     if let Err(e) = tray.show() {
@@ -290,8 +294,15 @@ impl TerraphimApp {
 
                 // Update role selector UI
                 self.role_selector.update(cx, |selector, selector_cx| {
-                    selector.set_selected_role(role, selector_cx);
+                    selector.set_selected_role(role.clone(), selector_cx);
                 });
+
+                // Update tray menu to show checkmark on new role
+                if let Some(ref mut tray) = self.system_tray {
+                    if let Err(e) = tray.update_selected_role(role.clone()) {
+                        log::error!("Failed to update tray menu role: {}", e);
+                    }
+                }
 
                 cx.notify();
             }

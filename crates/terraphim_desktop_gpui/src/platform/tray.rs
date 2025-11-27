@@ -76,10 +76,11 @@ impl SystemTray {
         self.tray_icon = Some(tray_icon);
         self.menu = Some(menu);
 
-        // Start listening for events
-        self.start_event_listener();
+        // NOTE: Do NOT start event listener here!
+        // Must call start_listening() AFTER on_event() to avoid race condition
+        // where listener threads check for handler before it's set.
 
-        log::info!("System tray initialized successfully");
+        log::info!("System tray initialized successfully (call start_listening() after on_event())");
         Ok(())
     }
 
@@ -237,6 +238,33 @@ impl SystemTray {
         F: Fn(SystemTrayEvent) + Send + 'static,
     {
         *self.event_handler.lock().unwrap() = Some(Box::new(handler));
+    }
+
+    /// Start listening for tray events.
+    /// IMPORTANT: Must be called AFTER on_event() to ensure handler is set before
+    /// listener threads start checking for it. This prevents a race condition.
+    pub fn start_listening(&self) {
+        log::info!("Starting tray event listeners (handler should already be set)");
+        self.start_event_listener();
+    }
+
+    /// Update the selected role and rebuild the menu to show the checkmark correctly.
+    /// This should be called after a role change to update the visual indicator.
+    pub fn update_selected_role(&mut self, new_role: RoleName) -> Result<()> {
+        log::info!("Updating tray menu selected role to: {}", new_role);
+        self.selected_role = new_role;
+
+        // Rebuild the menu with the new selected role
+        let menu = self.create_menu()?;
+
+        // Update the tray icon's menu
+        if let Some(tray) = &self.tray_icon {
+            tray.set_menu(Some(Box::new(menu.clone())));
+            log::info!("Tray menu updated with new role selection");
+        }
+
+        self.menu = Some(menu);
+        Ok(())
     }
 
     /// Update a menu item's enabled state
