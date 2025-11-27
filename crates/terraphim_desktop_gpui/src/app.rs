@@ -113,6 +113,10 @@ impl TerraphimApp {
                         if let Err(e) = tray_tx.send(event) {
                             log::error!("Failed to send tray event: {}", e);
                         }
+
+                        // Wake up the app event loop to process the event immediately
+                        // This fixes the issue where events are only polled during render()
+                        crate::platform::wake_app_event_loop();
                     });
 
                     // THEN start listener threads (handler is guaranteed to be set now)

@@ -66,6 +66,11 @@ image = "0.25"  # For tray icon images
 global-hotkey = "0.6"
 keyboard-types = "0.7"  # For key definitions
 
+# macOS-specific dependencies for posting events to wake up run loop
+[target.'cfg(target_os = "macos")'.dependencies]
+cocoa = "0.26"
+objc = "0.2"
+
 # Syntax highlighting removed temporarily to avoid conflicts with gpui-component
 # Can be re-added later when needed
 # tree-sitter = "0.25"
