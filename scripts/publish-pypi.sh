@@ -124,6 +124,28 @@ check_prerequisites() {
     python3 -m pip install --user maturin
   fi
 
+  # Check token - try 1Password first if available, then environment
+  if [[ -z "$TOKEN" ]]; then
+    # Try to get token from 1Password if op CLI is available
+    if command -v op &> /dev/null; then
+      TOKEN=$(op read "op://TerraphimPlatform/pypi.token/password" 2>/dev/null || echo "")
+      if [[ -n "$TOKEN" ]]; then
+        log_info "Using PyPI token from 1Password"
+      fi
+    fi
+
+    # If still no token, try environment variable
+    if [[ -z "$TOKEN" ]] && [[ -n "${PYPI_API_TOKEN:-}" ]]; then
+      TOKEN="$PYPI_API_TOKEN"
+      log_info "Using PyPI token from environment"
+    fi
+
+    # If still no token, show warning
+    if [[ -z "$TOKEN" ]]; then
+      log_info "No PyPI token provided. Will use twine configuration or prompt."
+    fi
+  fi
+
   log_success "Prerequisites validated"
 }
 

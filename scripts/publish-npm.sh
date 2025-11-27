@@ -120,6 +120,32 @@ check_prerequisites() {
   fi
 
   log_success "Prerequisites validated"
+
+  # Check token - try 1Password first if available, then environment
+  if [[ -z "$TOKEN" ]]; then
+    # Try to get token from 1Password if op CLI is available
+    if command -v op &> /dev/null; then
+      TOKEN=$(op read "op://TerraphimPlatform/npm.token/password" 2>/dev/null || echo "")
+      if [[ -n "$TOKEN" ]]; then
+        export NPM_TOKEN="$TOKEN"
+        log_info "Using npm token from 1Password"
+      fi
+    fi
+
+    # If still no token, try environment variable
+    if [[ -z "$TOKEN" ]] && [[ -n "${NPM_TOKEN:-}" ]]; then
+      TOKEN="$NPM_TOKEN"
+      log_info "Using npm token from environment"
+    fi
+
+    # If still no token, show warning
+    if [[ -z "$TOKEN" ]]; then
+      log_info "No npm token provided. Will use npm configuration or prompt."
+    fi
+  else
+    export NPM_TOKEN="$TOKEN"
+    log_info "Using provided token for authentication"
+  fi
 }
 
 # Update version in package.json
