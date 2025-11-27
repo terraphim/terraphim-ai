@@ -134,9 +134,27 @@ check_prerequisites() {
     exit 1
   fi
 
-  # Check token
+  # Check token - try 1Password first if available, then environment
   if [[ -z "$TOKEN" ]]; then
-    log_warning "No token provided. Will attempt to use existing credentials."
+    # Try to get token from 1Password if op CLI is available
+    if command -v op &> /dev/null; then
+      TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token" 2>/dev/null || echo "")
+      if [[ -n "$TOKEN" ]]; then
+        export CARGO_REGISTRY_TOKEN="$TOKEN"
+        log_info "Using crates.io token from 1Password"
+      fi
+    fi
+
+    # If still no token, try environment variable
+    if [[ -z "$TOKEN" ]] && [[ -n "${CARGO_REGISTRY_TOKEN:-}" ]]; then
+      TOKEN="$CARGO_REGISTRY_TOKEN"
+      log_info "Using crates.io token from environment"
+    fi
+
+    # If still no token, show warning
+    if [[ -z "$TOKEN" ]]; then
+      log_warning "No token provided. Will attempt to use existing cargo credentials."
+    fi
   else
     export CARGO_REGISTRY_TOKEN="$TOKEN"
     log_info "Using provided token for authentication"
