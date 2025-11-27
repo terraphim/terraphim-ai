@@ -256,7 +256,7 @@ jobs:
       - name: Get PyPI token from 1Password (or use secret)
         id: token
         run: |
-          TOKEN=$(op read "op://TerraphimPlatform/pypi.token/token" 2>/dev/null || echo "")
+          TOKEN=$(op read "op://TerraphimPlatform/pypi.token/password" 2>/dev/null || echo "")
           if [[ -z "$TOKEN" ]]; then
             echo "⚠️  PyPI token not found in 1Password, using GitHub secret"
             TOKEN="${{ secrets.PYPI_API_TOKEN }}"
