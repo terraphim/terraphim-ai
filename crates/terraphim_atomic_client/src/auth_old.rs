@@ -5,7 +5,7 @@
 
 use crate::{error::AtomicError, Result};
 use base64::{engine::general_purpose::STANDARD, Engine};
-use ed25519_dalek::{Signer, SigningKey};
+use ed25519_dalek::{SigningKey, VerifyingKey, Signer, Signature};
 #[cfg(feature = "native")]
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};
 #[cfg(not(feature = "native"))]
@@ -108,12 +108,12 @@ impl Agent {
         // Create a keypair using the rand 0.5 compatible OsRng
         use rand_core::OsRng as RngCore;
         let mut csprng = RngCore;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let public_key_b64 = STANDARD.encode(signing_key.verifying_key().as_bytes());
+        let keypair = Keypair::generate(&mut csprng);
+        let public_key_b64 = STANDARD.encode(keypair.public.as_bytes());
 
         Self {
             subject: format!("http://localhost:9883/agents/{}", public_key_b64),
-            keypair: Arc::new(signing_key),
+            keypair: Arc::new(keypair),
             created_at: crate::time_utils::unix_timestamp_secs(),
             name: None,
         }
@@ -153,14 +153,13 @@ impl Agent {
         };
 
         // Create the keypair from the private key bytes
-        // Create signing key from private key bytes
-        let private_key_array: [u8; 32] = private_key_bytes
-            .try_into()
-            .map_err(|_| AtomicError::Authentication("Invalid private key length".to_string()))?;
-        let signing_key = SigningKey::from_bytes(&private_key_array);
+        // For Ed25519 version 1.0, we need to use from_bytes
+        let mut keypair_bytes = [0u8; 64];
+        // Copy the private key bytes to the first 32 bytes of the keypair
+        keypair_bytes[..32].copy_from_slice(&private_key_bytes);
 
         // Get the public key from the secret or derive it from the private key
-        let _public_key_bytes = match secret["publicKey"].as_str() {
+        let public_key_bytes = match secret["publicKey"].as_str() {
             Some(public_key_str) => {
                 let res = {
                     let mut padded_key = public_key_str.to_string();
@@ -173,21 +172,39 @@ impl Agent {
                     Ok(bytes) => bytes,
                     Err(_) => {
                         // If we can't decode the public key, derive it from the private key
-                        let public_key = signing_key.verifying_key();
+                        let secret_key = ed25519_dalek::SecretKey::from_bytes(&private_key_bytes)
+                            .map_err(|e| {
+                            AtomicError::Authentication(format!(
+                                "Failed to create secret key: {:?}",
+                                e
+                            ))
+                        })?;
+                        let public_key = PublicKey::from(&secret_key);
                         public_key.as_bytes().to_vec()
                     }
                 }
             }
             None => {
                 // If there's no public key in the secret, derive it from the private key
-                let public_key = signing_key.verifying_key();
+                let secret_key =
+                    ed25519_dalek::SecretKey::from_bytes(&private_key_bytes).map_err(|e| {
+                        AtomicError::Authentication(format!("Failed to create secret key: {:?}", e))
+                    })?;
+                let public_key = PublicKey::from(&secret_key);
                 public_key.as_bytes().to_vec()
             }
         };
 
+        // Copy the public key bytes to the last 32 bytes of the keypair
+        keypair_bytes[32..].copy_from_slice(&public_key_bytes);
+
+        let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|e| {
+            AtomicError::Authentication(format!("Failed to create keypair: {:?}", e))
+        })?;
+
         Ok(Self {
             subject: subject.to_string(),
-            keypair: Arc::new(signing_key),
+            keypair: Arc::new(keypair),
             created_at: crate::time_utils::unix_timestamp_secs(),
             name: None,
         })
@@ -213,7 +230,7 @@ impl Agent {
     ///
     /// The public key as a base64-encoded string
     pub fn get_public_key_base64(&self) -> String {
-        STANDARD.encode(self.keypair.verifying_key().as_bytes())
+        STANDARD.encode(self.keypair.public.as_bytes())
     }
 
     /// Creates a new agent with the given name and randomly generated keypair.
@@ -229,8 +246,8 @@ impl Agent {
     pub fn new_with_name(name: String, server_url: String) -> Self {
         use rand_core::OsRng as RngCore;
         let mut csprng = RngCore;
-        let signing_key = SigningKey::generate(&mut csprng);
-        let public_key_b64 = STANDARD.encode(signing_key.verifying_key().as_bytes());
+        let keypair = Keypair::generate(&mut csprng);
+        let public_key_b64 = STANDARD.encode(keypair.public.as_bytes());
 
         Self {
             subject: format!(
@@ -238,7 +255,7 @@ impl Agent {
                 server_url.trim_end_matches('/'),
                 public_key_b64
             ),
-            keypair: Arc::new(signing_key),
+            keypair: Arc::new(keypair),
             created_at: crate::time_utils::unix_timestamp_secs(),
             name: Some(name),
         }
@@ -274,15 +291,18 @@ impl Agent {
         keypair_bytes[..32].copy_from_slice(&private_key_bytes);
 
         // Derive the public key from the private key
-        let private_key_array: [u8; 32] = private_key_bytes
-            .try_into()
-            .map_err(|_| AtomicError::Authentication("Invalid private key length".to_string()))?;
-        let signing_key = SigningKey::from_bytes(&private_key_array);
-        let public_key = signing_key.verifying_key();
+        let secret_key = ed25519_dalek::SecretKey::from_bytes(&private_key_bytes).map_err(|e| {
+            AtomicError::Authentication(format!("Failed to create secret key: {:?}", e))
+        })?;
+        let public_key = PublicKey::from(&secret_key);
         let public_key_bytes = public_key.as_bytes();
 
-        // In ed25519-dalek 2.x, we don't need to create a keypair bytes array
-        // Just use the signing_key directly
+        // Copy the public key bytes to the last 32 bytes of the keypair
+        keypair_bytes[32..].copy_from_slice(public_key_bytes);
+
+        let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|e| {
+            AtomicError::Authentication(format!("Failed to create keypair: {:?}", e))
+        })?;
 
         let public_key_b64 = STANDARD.encode(public_key_bytes);
 
@@ -292,7 +312,7 @@ impl Agent {
                 server_url.trim_end_matches('/'),
                 public_key_b64
             ),
-            keypair: Arc::new(signing_key),
+            keypair: Arc::new(keypair),
             created_at: crate::time_utils::unix_timestamp_secs(),
             name,
         })
@@ -327,11 +347,10 @@ impl Agent {
         let mut keypair_bytes = [0u8; 64];
         keypair_bytes[32..].copy_from_slice(&public_key_bytes);
 
-        // For read-only agents, we need to create a signing key from the public key bytes
-        // This is a workaround since ed25519-dalek 2.x doesn't have Keypair::from_bytes
-        let mut signing_key_bytes = [0u8; 32];
-        signing_key_bytes.copy_from_slice(&public_key_bytes);
-        let signing_key = SigningKey::from_bytes(&signing_key_bytes);
+        // This will fail if used for signing, but that's intended for read-only agents
+        let keypair = Keypair::from_bytes(&keypair_bytes).map_err(|e| {
+            AtomicError::Authentication(format!("Failed to create keypair: {:?}", e))
+        })?;
 
         Ok(Self {
             subject: format!(
@@ -339,7 +358,7 @@ impl Agent {
                 server_url.trim_end_matches('/'),
                 public_key_base64
             ),
-            keypair: Arc::new(signing_key),
+            keypair: Arc::new(keypair),
             created_at: crate::time_utils::unix_timestamp_secs(),
             name: None,
         })

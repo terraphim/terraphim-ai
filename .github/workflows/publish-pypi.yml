@@ -262,62 +262,58 @@ jobs:
             TOKEN="${{ secrets.PYPI_API_TOKEN }}"
           fi
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "✅ PyPI token retrieved"
+
+      - name: Determine version
+        id: version
+        run: |
+          VERSION="${{ inputs.version }}"
+          if [[ -z "$VERSION" ]]; then
+            # Extract version from tag
+            if [[ "${{ github.ref }}" == refs/tags/python-v* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/python-v}
+            elif [[ "${{ github.ref }}" == refs/tags/pypi-v* ]]; then
+              VERSION=${GITHUB_REF#refs/tags/pypi-v}
+            fi
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "📦 Publishing version: $VERSION"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           path: dist
 
+      - name: Make publish script executable
+        run: chmod +x ./scripts/publish-pypi.sh
+
       - name: Collect distributions
         run: |
-          mkdir -p packages
-          find dist -name "*.whl" -exec cp {} packages/ \;
-          find dist -name "*.tar.gz" -exec cp {} packages/ \;
-          echo "📦 Found packages:"
-          ls -la packages/
+          mkdir -p crates/terraphim_automata_py/dist
+          find dist -name "*.whl" -exec cp {} crates/terraphim_automata_py/dist/ \; || true
+          find dist -name "*.tar.gz" -exec cp {} crates/terraphim_automata_py/dist/ \; || true
+          echo "📦 Found distributions:"
+          ls -la crates/terraphim_automata_py/dist/
 
-      - name: Validate distributions
+      - name: Run publish script
+        env:
+          PYPI_TOKEN: ${{ steps.token.outputs.token }}
         run: |
-          python -m pip install --upgrade twine
-          python -m twine check packages/*
-          echo "✅ All distributions are valid"
+          # Prepare script arguments
+          ARGS="--version ${{ steps.version.outputs.version }} --token $PYPI_TOKEN"
 
-      - name: Set publishing repository
-        id: repo
-        run: |
-          REPOSITORY="${{ inputs.repository }}"
-          if [[ "$REPOSITORY" == "testpypi" ]]; then
-            TWINE_REPOSITORY_URL="https://test.pypi.org/legacy/"
-            echo "🧪 Publishing to TestPyPI"
-          else
-            TWINE_REPOSITORY_URL="https://upload.pypi.org/legacy/"
-            echo "🚀 Publishing to production PyPI"
-          fi
-          echo "url=$TWINE_REPOSITORY_URL" >> $GITHUB_OUTPUT
-
-      - name: Publish to PyPI
-        run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            echo "🧪 Dry run mode - validating packages only"
-            python -m twine upload --repository-url ${{ steps.repo.outputs.url }} --username __token__ --password ${{ steps.token.outputs.token }} --skip-existing --dry-run packages/*
-          else
-            echo "🚀 Publishing to PyPI..."
-            python -m twine upload --repository-url ${{ steps.repo.outputs.url }} --username __token__ --password ${{ steps.token.outputs.token }} --skip-existing packages/*
-            echo "✅ Packages published successfully!"
+            ARGS="$ARGS --dry-run"
           fi
+
+          if [[ "${{ inputs.repository }}" == "testpypi" ]]; then
+            ARGS="$ARGS --repository testpypi"
+          fi
+
+          # Run publish script
+          ./scripts/publish-pypi.sh $ARGS
 
       - name: Verify published packages
         if: inputs.dry_run != 'true'
-        run: |
-          # Wait for package to be available
-          sleep 60
-
-          PACKAGE_NAME="terraphim-automata"
-          PACKAGE_VERSION=$(python -c "import tomllib; pkg = tomllib.load(open('crates/terraphim_automata_py/pyproject.toml', 'rb')); print(pkg['project']['version'])")
-
-          echo "🔍 Verifying package on PyPI..."
-          python -m pip install --upgrade pip
 
           # Try to install from PyPI (or TestPyPI)
           if [[ "${{ inputs.repository }}" == "testpypi" ]]; then
