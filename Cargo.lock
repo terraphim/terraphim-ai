@@ -120,7 +120,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -131,7 +131,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1703,7 +1703,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -1916,19 +1916,6 @@ dependencies = [
 
 [[package]]
 name = "env_logger"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
-dependencies = [
- "humantime",
- "is-terminal",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.11.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13c863f0904021b108aa8b2f55046443e6b1ebde8fd4a15c399893aae4fa069f"
@@ -1983,7 +1970,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3067,12 +3054,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
-name = "humantime"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
-
-[[package]]
 name = "hyper"
 version = "0.14.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3511,7 +3492,7 @@ checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
 dependencies = [
  "hermit-abi",
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3594,7 +3575,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4359,7 +4340,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -6220,7 +6201,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.11.0",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7794,7 +7775,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.1.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7806,15 +7787,6 @@ dependencies = [
  "futf",
  "mac",
  "utf-8",
-]
-
-[[package]]
-name = "termcolor"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
-dependencies = [
- "winapi-util",
 ]
 
 [[package]]
@@ -7830,7 +7802,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "chrono",
- "env_logger 0.11.8",
+ "env_logger",
  "log",
  "lru 0.16.2",
  "mockall",
@@ -7877,7 +7849,7 @@ dependencies = [
  "clap",
  "config",
  "dashmap 5.5.3",
- "env_logger 0.10.2",
+ "env_logger",
  "fastrand",
  "futures",
  "log",
@@ -7973,7 +7945,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "log",
  "serde",
@@ -7997,7 +7969,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8024,7 +7996,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "log",
  "serde",
@@ -8110,7 +8082,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "env_logger 0.11.8",
+ "env_logger",
  "indexmap 2.12.1",
  "log",
  "mockall",
@@ -8136,7 +8108,7 @@ dependencies = [
  "async-once-cell",
  "async-trait",
  "dirs 6.0.0",
- "env_logger 0.11.8",
+ "env_logger",
  "log",
  "opendal",
  "schemars 0.8.22",
@@ -8168,7 +8140,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8214,7 +8186,7 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "clap",
- "env_logger 0.11.8",
+ "env_logger",
  "log",
  "regex",
  "serde",
@@ -8235,7 +8207,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8263,7 +8235,7 @@ dependencies = [
  "axum",
  "base64 0.21.7",
  "clap",
- "env_logger 0.11.8",
+ "env_logger",
  "regex",
  "rmcp",
  "serde_json",
@@ -8294,7 +8266,7 @@ dependencies = [
  "async-trait",
  "cached",
  "dotenvy",
- "env_logger 0.11.8",
+ "env_logger",
  "futures",
  "grepapp_haystack",
  "html2md",
@@ -8437,7 +8409,7 @@ dependencies = [
  "chrono",
  "clap",
  "dircpy",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "log",
  "mime_guess",
@@ -8482,7 +8454,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "log",
  "opendal",
@@ -8531,7 +8503,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger 0.11.8",
+ "env_logger",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8598,7 +8570,7 @@ version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e33b98a582ea0be1168eba097538ee8dd4bbe0f2b01b22ac92ea30054e5be7b"
 dependencies = [
- "env_logger 0.11.8",
+ "env_logger",
  "test-log-macros",
  "tracing-subscriber",
 ]
@@ -9733,7 +9705,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
