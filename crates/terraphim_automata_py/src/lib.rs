@@ -1,5 +1,3 @@
-use pyo3::prelude::*;
-use pyo3::exceptions::{PyValueError, PyRuntimeError};
 use ::terraphim_automata::autocomplete::{
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
@@ -9,6 +7,8 @@ use ::terraphim_automata::matcher::{
     extract_paragraphs_from_automata, find_matches, LinkType, Matched,
 };
 use ::terraphim_automata::{load_thesaurus_from_json, load_thesaurus_from_json_and_replace};
+use pyo3::exceptions::{PyRuntimeError, PyValueError};
+use pyo3::prelude::*;
 
 /// Python wrapper for AutocompleteIndex
 #[pyclass(name = "AutocompleteIndex")]
@@ -125,15 +125,14 @@ impl PyAutocompleteIndex {
     /// Note:
     ///     Case sensitivity is determined when the index is built
     #[pyo3(signature = (prefix, max_results=10))]
-    fn search(
-        &self,
-        prefix: &str,
-        max_results: usize,
-    ) -> PyResult<Vec<PyAutocompleteResult>> {
+    fn search(&self, prefix: &str, max_results: usize) -> PyResult<Vec<PyAutocompleteResult>> {
         let results = autocomplete_search(&self.inner, prefix, Some(max_results))
             .map_err(|e| PyValueError::new_err(format!("Search error: {}", e)))?;
 
-        Ok(results.into_iter().map(PyAutocompleteResult::from).collect())
+        Ok(results
+            .into_iter()
+            .map(PyAutocompleteResult::from)
+            .collect())
     }
 
     /// Fuzzy search using Jaro-Winkler similarity
@@ -155,7 +154,10 @@ impl PyAutocompleteIndex {
         let results = fuzzy_autocomplete_search(&self.inner, query, threshold, Some(max_results))
             .map_err(|e| PyValueError::new_err(format!("Fuzzy search error: {}", e)))?;
 
-        Ok(results.into_iter().map(PyAutocompleteResult::from).collect())
+        Ok(results
+            .into_iter()
+            .map(PyAutocompleteResult::from)
+            .collect())
     }
 
     /// Fuzzy search using Levenshtein distance
@@ -182,7 +184,10 @@ impl PyAutocompleteIndex {
         )
         .map_err(|e| PyValueError::new_err(format!("Fuzzy search error: {}", e)))?;
 
-        Ok(results.into_iter().map(PyAutocompleteResult::from).collect())
+        Ok(results
+            .into_iter()
+            .map(PyAutocompleteResult::from)
+            .collect())
     }
 
     /// Serialize the index to bytes for caching
@@ -350,8 +355,7 @@ fn replace_with_links(text: &str, json_str: &str, link_type: &str) -> PyResult<S
     let result = load_thesaurus_from_json_and_replace(json_str, text, link_type_enum)
         .map_err(|e| PyRuntimeError::new_err(format!("Failed to replace matches: {}", e)))?;
 
-    String::from_utf8(result)
-        .map_err(|e| PyRuntimeError::new_err(format!("Invalid UTF-8: {}", e)))
+    String::from_utf8(result).map_err(|e| PyRuntimeError::new_err(format!("Invalid UTF-8: {}", e)))
 }
 
 /// Extract paragraphs starting at matched terms
@@ -370,7 +374,11 @@ fn replace_with_links(text: &str, json_str: &str, link_type: &str) -> PyResult<S
 ///     >>> paragraphs = extract_paragraphs(text, json_str)
 #[pyfunction]
 #[pyo3(signature = (text, json_str, include_term=true))]
-fn extract_paragraphs(text: &str, json_str: &str, include_term: bool) -> PyResult<Vec<(String, String)>> {
+fn extract_paragraphs(
+    text: &str,
+    json_str: &str,
+    include_term: bool,
+) -> PyResult<Vec<(String, String)>> {
     let thesaurus = load_thesaurus_from_json(json_str)
         .map_err(|e| PyValueError::new_err(format!("Failed to load thesaurus: {}", e)))?;
 
