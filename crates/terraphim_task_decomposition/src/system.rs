@@ -194,6 +194,7 @@ impl TerraphimTaskDecompositionSystem {
     }
 
     /// Validate that the workflow meets quality thresholds
+    #[allow(dead_code)]
     fn validate_workflow_quality(&self, workflow: &TaskDecompositionWorkflow) -> bool {
         // Check confidence threshold
         if workflow.metadata.confidence_score < self.config.min_confidence_threshold {
@@ -417,8 +418,10 @@ mod tests {
         let system = TerraphimTaskDecompositionSystem::with_default_config(automata, role_graph);
 
         let task = create_test_task();
-        let mut config = TaskDecompositionSystemConfig::default();
-        config.min_confidence_threshold = 0.1; // Very low threshold for test
+        let config = TaskDecompositionSystemConfig {
+            min_confidence_threshold: 0.1, // Very low threshold for test
+            ..Default::default()
+        };
 
         let result = system.decompose_task_workflow(&task, &config).await;
         assert!(result.is_ok());
@@ -458,8 +461,10 @@ mod tests {
         let automata = create_test_automata();
         let role_graph = create_test_role_graph().await;
 
-        let mut config = TaskDecompositionSystemConfig::default();
-        config.min_confidence_threshold = 0.1; // Very low threshold for test
+        let config = TaskDecompositionSystemConfig {
+            min_confidence_threshold: 0.1, // Very low threshold for test
+            ..Default::default()
+        };
         let system = TerraphimTaskDecompositionSystem::new(automata, role_graph, config.clone());
 
         let task = create_test_task();
@@ -486,8 +491,10 @@ mod tests {
         let automata = create_test_automata();
         let role_graph = create_test_role_graph().await;
 
-        let mut config = TaskDecompositionSystemConfig::default();
-        config.min_confidence_threshold = 0.1; // Very low threshold for test
+        let config = TaskDecompositionSystemConfig {
+            min_confidence_threshold: 0.1, // Very low threshold for test
+            ..Default::default()
+        };
         let system = TerraphimTaskDecompositionSystem::new(automata, role_graph, config.clone());
 
         let task = create_test_task();

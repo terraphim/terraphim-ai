@@ -172,7 +172,7 @@ impl RoleGraph {
             documents: serializable.documents,
             thesaurus: serializable.thesaurus,
             aho_corasick_values: serializable.aho_corasick_values,
-            ac: AhoCorasick::new(&[""])?, // Will be rebuilt
+            ac: AhoCorasick::new([""])?, // Will be rebuilt
             ac_reverse_nterm: serializable.ac_reverse_nterm,
         };
 
@@ -854,9 +854,7 @@ impl RoleGraphSync {
     pub async fn to_json(&self) -> Result<String> {
         let rolegraph = self.inner.lock().await;
         let serializable = rolegraph.to_serializable();
-        serializable
-            .to_json()
-            .map_err(|e| Error::JsonConversionError(e))
+        serializable.to_json().map_err(Error::JsonConversionError)
     }
 
     /// Serialize the RoleGraph to pretty JSON string
@@ -866,13 +864,13 @@ impl RoleGraphSync {
         let serializable = rolegraph.to_serializable();
         serializable
             .to_json_pretty()
-            .map_err(|e| Error::JsonConversionError(e))
+            .map_err(Error::JsonConversionError)
     }
 
     /// Create a new RoleGraphSync from JSON string
     pub async fn from_json(json: &str) -> Result<Self> {
         let serializable =
-            SerializableRoleGraph::from_json(json).map_err(|e| Error::JsonConversionError(e))?;
+            SerializableRoleGraph::from_json(json).map_err(Error::JsonConversionError)?;
         let rolegraph = RoleGraph::from_serializable(serializable).await?;
         Ok(Self {
             inner: Arc::new(Mutex::new(rolegraph)),
@@ -1007,7 +1005,6 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 /// - RoleGraphSync serialization methods acquire internal locks automatically
 /// - The serializable representation includes all data needed to rebuild the automata
 /// - Performance consideration: Large graphs may have significant serialization overhead
-
 #[cfg(test)]
 mod tests {
     use super::*;

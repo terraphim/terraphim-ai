@@ -1354,6 +1354,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "update_config_tool".into(),
@@ -1363,6 +1364,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "build_autocomplete_index".into(),
@@ -1372,6 +1374,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "fuzzy_autocomplete_search".into(),
@@ -1381,6 +1384,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "autocomplete_terms".into(),
@@ -1390,6 +1394,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "autocomplete_with_snippets".into(),
@@ -1399,6 +1404,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "fuzzy_autocomplete_search_levenshtein".into(),
@@ -1408,6 +1414,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "fuzzy_autocomplete_search_jaro_winkler".into(),
@@ -1417,6 +1424,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "serialize_autocomplete_index".into(),
@@ -1430,6 +1438,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "deserialize_autocomplete_index".into(),
@@ -1445,6 +1454,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "find_matches".into(),
@@ -1454,6 +1464,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "replace_matches".into(),
@@ -1463,6 +1474,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "extract_paragraphs_from_automata".into(),
@@ -1472,6 +1484,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "json_decode".into(),
@@ -1481,6 +1494,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "load_thesaurus".into(),
@@ -1490,6 +1504,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "load_thesaurus_from_json".into(),
@@ -1499,6 +1514,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             },
             Tool {
                 name: "is_all_terms_connected_by_path".into(),
@@ -1508,6 +1524,7 @@ impl ServerHandler for McpService {
                 output_schema: None,
                 annotations: None,
                 icons: None,
+                meta: None,
             }
         ];
 
