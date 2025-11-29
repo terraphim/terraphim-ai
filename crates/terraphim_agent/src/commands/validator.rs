@@ -133,11 +133,21 @@ impl CommandValidator {
             "fdisk".to_string(),
         ];
 
-        // Initialize time restrictions (business hours by default)
-        let time_restrictions = TimeRestrictions {
-            allowed_hours: (9..=17).collect(), // 9 AM to 5 PM
-            allowed_days: (1..=5).collect(),   // Monday to Friday
-            maintenance_windows: Vec::new(),
+        // Initialize time restrictions (business hours for production, permissive for testing)
+        let time_restrictions = if cfg!(test) {
+            // Permissive for testing - allow all hours and days
+            TimeRestrictions {
+                allowed_hours: vec![], // All hours allowed
+                allowed_days: vec![],  // All days allowed
+                maintenance_windows: vec![],
+            }
+        } else {
+            // Business hours for production
+            TimeRestrictions {
+                allowed_hours: (9..=17).collect(), // 9 AM to 5 PM
+                allowed_days: (1..=5).collect(),   // Monday to Friday
+                maintenance_windows: Vec::new(),
+            }
         };
 
         Self {

@@ -345,6 +345,7 @@ impl TerraphimUpdater {
     }
 
     /// Compare two version strings to determine if the first is newer than the second
+    #[allow(dead_code)]
     fn is_newer_version(&self, version1: &str, version2: &str) -> Result<bool> {
         // Simple version comparison - in production you might want to use semver crate
         let v1_parts: Vec<u32> = version1
