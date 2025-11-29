@@ -74,6 +74,7 @@ tempfile = "3.0"
 # Enable REPL features for testing
 terraphim_agent = { path = ".", features = ["repl-full"] }
 
+
 [[bin]]
 name = "terraphim-agent"
 path = "src/main.rs"
