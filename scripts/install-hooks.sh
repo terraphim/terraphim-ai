@@ -3,6 +3,16 @@
 # Install script for pre-commit hooks in Terraphim AI
 # Supports multiple hook managers: pre-commit, prek, lefthook, or native Git hooks
 #
+# Hook Strategy:
+# - Native Git hooks (scripts/hooks/) are PRIMARY and most sophisticated
+#   * Superior commit-msg validation with detailed error messages
+#   * Comprehensive pre-commit checks (formatting, linting, security)
+# - Pre-commit/prek/lefthook tools provide ADDITIONAL benefits:
+#   * Automatic whitespace fixing (trailing-whitespace, end-of-file-fixer)
+#   * Caching and parallel execution
+#   * IDE integration
+# - If no hook manager is installed, native hooks work standalone
+#
 set -e
 
 # Colors for output
@@ -314,6 +324,29 @@ if ! command_exists cargo; then
     echo ""
     print_status "WARN" "Cargo not found - Rust checks will be skipped"
     print_status "INFO" "Install Rust: https://rustup.rs/"
+fi
+
+echo ""
+print_status "INFO" "Hook System Overview:"
+echo ""
+print_status "INFO" "Native Git Hooks (ALWAYS active):"
+echo "  ✓ Conventional commit message validation (superior error messages)"
+echo "  ✓ Rust: cargo fmt, cargo clippy, cargo test"
+echo "  ✓ JavaScript/TypeScript: Biome check"
+echo "  ✓ Security: Secret detection, large file blocking"
+echo "  ✓ Syntax: YAML, TOML validation"
+echo ""
+print_status "INFO" "Pre-commit/Prek/Lefthook enhancements (if installed):"
+echo "  ✓ Automatic whitespace fixing (trailing spaces, EOF)"
+echo "  ✓ Caching for faster repeated runs"
+echo "  ✓ Parallel execution"
+echo "  ✓ IDE/editor integration"
+echo ""
+
+if [ "$HOOK_MANAGER_INSTALLED" = true ]; then
+    print_status "INFO" "Both systems are active and work together!"
+else
+    print_status "INFO" "Only native hooks are active (100% functional)"
 fi
 
 echo ""
