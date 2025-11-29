@@ -88,18 +88,18 @@ repos:
         stages: [manual]
         description: "Auto-format JavaScript/TypeScript with Biome (manual stage)"
 
-  # Conventional commits validation
-  - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v4.2.0
-    hooks:
-      - id: conventional-pre-commit
-        name: Conventional commit format
-        stages: [commit-msg]
-        args: [
-          "--strict",
-          "--scopes=feat,fix,docs,style,refactor,perf,test,chore,build,ci,revert"
-        ]
-        description: "Enforce conventional commit message format"
+  # Disabled: Using native commit-msg hook instead (scripts/hooks/commit-msg)
+  # - repo: https://github.com/compilerla/conventional-pre-commit
+  #   rev: v4.2.0
+  #   hooks:
+  #     - id: conventional-pre-commit
+  #       name: Conventional commit format
+  #       stages: [commit-msg]
+  #       args: [
+  #         "--strict",
+  #         "--scopes=feat,fix,docs,style,refactor,perf,test,chore,build,ci,revert"
+  #       ]
+  #       description: "Enforce conventional commit message format"
 
   # Secret detection
   - repo: https://github.com/Yelp/detect-secrets

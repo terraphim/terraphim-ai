@@ -16,8 +16,7 @@ use crate::{
     AnalysisConfig, DecompositionConfig, DecompositionResult, ExecutionPlan, ExecutionPlanner,
     KnowledgeGraphConfig, KnowledgeGraphExecutionPlanner, KnowledgeGraphIntegration,
     KnowledgeGraphTaskAnalyzer, KnowledgeGraphTaskDecomposer, PlanningConfig, Task, TaskAnalysis,
-    TaskAnalyzer, TaskDecomposer, TaskDecompositionResult,
-    TerraphimKnowledgeGraph,
+    TaskAnalyzer, TaskDecomposer, TaskDecompositionResult, TerraphimKnowledgeGraph,
 };
 
 use crate::Automata;
@@ -493,9 +492,7 @@ mod tests {
 
         let task = create_test_task();
 
-        let workflow_result = system
-            .decompose_task_workflow(&task, &config)
-            .await;
+        let workflow_result = system.decompose_task_workflow(&task, &config).await;
 
         // Handle the workflow decomposition result gracefully
         match workflow_result {
