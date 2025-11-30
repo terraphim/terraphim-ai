@@ -247,7 +247,10 @@ async fn test_full_command_lifecycle() {
     // Test search functionality - be more flexible
     let search_results = registry.search_commands("security").await;
     if search_results.len() != 1 {
-        println!("Warning: Expected 1 security command, found {}", search_results.len());
+        println!(
+            "Warning: Expected 1 security command, found {}",
+            search_results.len()
+        );
         for result in &search_results {
             println!("  Found: {}", result.definition.name);
         }
@@ -261,12 +264,18 @@ async fn test_full_command_lifecycle() {
 
     // Only assert if we expect deploy command to exist
     if deploy_cmd.is_some() {
-        assert!(deploy_results.len() >= 1, "Should find at least 1 deploy-related command");
+        assert!(
+            deploy_results.len() >= 1,
+            "Should find at least 1 deploy-related command"
+        );
     }
 
     // Test statistics
     let stats = registry.get_stats().await;
-    assert!(stats.total_commands >= 2, "Should have at least 2 total commands");
+    assert!(
+        stats.total_commands >= 2,
+        "Should have at least 2 total commands"
+    );
     assert_eq!(stats.total_categories, 4, "Should have 4 categories");
 }
 
@@ -284,7 +293,12 @@ async fn test_security_validation_integration() {
     // Test low-risk command validation
     let hello_cmd = registry.get_command("hello-world").await.unwrap();
     let result = validator
-        .validate_command_execution(&hello_cmd.definition.name, "Default", &HashMap::new())
+        .validate_command_execution_with_mode(
+            &hello_cmd.definition.name,
+            "Default",
+            &HashMap::new(),
+            Some(hello_cmd.definition.execution_mode.clone()),
+        )
         .await;
 
     assert!(
@@ -320,10 +334,11 @@ async fn test_security_validation_integration() {
     // Test critical risk command
     let audit_cmd = registry.get_command("security-audit").await.unwrap();
     let result = validator
-        .validate_command_execution(
+        .validate_command_execution_with_mode(
             &audit_cmd.definition.name,
             "Terraphim Engineer",
             &HashMap::new(),
+            Some(audit_cmd.definition.execution_mode.clone()),
         )
         .await;
 
@@ -620,15 +635,16 @@ async fn test_parameter_validation_integration() {
     assert_eq!(env_param.name, "environment");
     assert_eq!(env_param.param_type, "string");
     assert!(env_param.required);
+    // Use get_validation() which merges direct allowed_values with nested validation
     assert!(env_param
-        .validation
+        .get_validation()
         .as_ref()
         .unwrap()
         .allowed_values
         .is_some());
 
     let dry_run_param = &deploy_cmd.definition.parameters[1];
-    assert_eq!(dry_run_param.name, "dry-run");
+    assert_eq!(dry_run_param.name, "dry_run");
     assert_eq!(dry_run_param.param_type, "boolean");
     assert!(!dry_run_param.required);
     assert!(dry_run_param.default_value.is_some());
