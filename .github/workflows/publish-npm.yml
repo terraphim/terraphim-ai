@@ -174,7 +174,7 @@ jobs:
           bun-version: latest
 
       - name: Download artifacts
-        uses: actions/download-artifact@4
+        uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
           path: .

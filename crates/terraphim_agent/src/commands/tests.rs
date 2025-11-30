@@ -411,9 +411,8 @@ parameters:
             "Should not blacklist safe commands by default"
         );
 
-        // Test public interface methods
+        // Test public interface methods - verify role permissions can be added
         validator.add_role_permissions("TestRole".to_string(), vec!["read".to_string()]);
-        assert!(true, "Role permissions can be added");
 
         // Test time restrictions
         let time_result = validator.check_time_restrictions();

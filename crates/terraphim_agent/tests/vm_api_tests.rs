@@ -1,4 +1,3 @@
-use serde_json;
 use terraphim_agent::client::*;
 
 /// Test VM-related API types serialization
