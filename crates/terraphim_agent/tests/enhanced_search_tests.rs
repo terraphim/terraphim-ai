@@ -19,8 +19,8 @@ fn test_basic_search_command_parsing() {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
             assert_eq!(limit, None);
-            assert_eq!(semantic, false);
-            assert_eq!(concepts, false);
+            assert!(!semantic);
+            assert!(!concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -41,8 +41,8 @@ fn test_search_with_role_command_parsing() {
             assert_eq!(query, "rust programming");
             assert_eq!(role, Some("Developer".to_string()));
             assert_eq!(limit, None);
-            assert_eq!(semantic, false);
-            assert_eq!(concepts, false);
+            assert!(!semantic);
+            assert!(!concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -63,8 +63,8 @@ fn test_search_with_limit_command_parsing() {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
             assert_eq!(limit, Some(10));
-            assert_eq!(semantic, false);
-            assert_eq!(concepts, false);
+            assert!(!semantic);
+            assert!(!concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -85,8 +85,8 @@ fn test_search_semantic_flag_parsing() {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
             assert_eq!(limit, None);
-            assert_eq!(semantic, true);
-            assert_eq!(concepts, false);
+            assert!(semantic);
+            assert!(!concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -107,8 +107,8 @@ fn test_search_concepts_flag_parsing() {
             assert_eq!(query, "rust programming");
             assert_eq!(role, None);
             assert_eq!(limit, None);
-            assert_eq!(semantic, false);
-            assert_eq!(concepts, true);
+            assert!(!semantic);
+            assert!(concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -132,8 +132,8 @@ fn test_search_all_flags_parsing() {
             assert_eq!(query, "rust programming");
             assert_eq!(role, Some("Developer".to_string()));
             assert_eq!(limit, Some(15));
-            assert_eq!(semantic, true);
-            assert_eq!(concepts, true);
+            assert!(semantic);
+            assert!(concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -154,8 +154,8 @@ fn test_search_complex_query_parsing() {
             assert_eq!(query, "\"machine learning algorithms\"");
             assert_eq!(role, Some("DataScientist".to_string()));
             assert_eq!(limit, Some(20));
-            assert_eq!(semantic, true);
-            assert_eq!(concepts, true);
+            assert!(semantic);
+            assert!(concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -205,8 +205,8 @@ fn test_search_with_multiple_words_and_spaces() {
             concepts,
         } => {
             assert_eq!(query, "rust async programming");
-            assert_eq!(semantic, true);
-            assert_eq!(concepts, false);
+            assert!(semantic);
+            assert!(!concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -235,8 +235,8 @@ fn test_search_flags_order_independence() {
             } => {
                 assert_eq!(query, "test");
                 assert_eq!(role, Some("Dev".to_string()));
-                assert_eq!(semantic, true);
-                assert_eq!(concepts, false);
+                assert!(semantic);
+                assert!(!concepts);
                 if cmd_str.contains("--limit 5") {
                     assert_eq!(limit, Some(5));
                 } else {
@@ -263,8 +263,8 @@ fn test_search_with_special_characters() {
         } => {
             assert_eq!(query, "\"C++ templates\"");
             assert_eq!(role, Some("CppDeveloper".to_string()));
-            assert_eq!(semantic, false);
-            assert_eq!(concepts, true);
+            assert!(!semantic);
+            assert!(concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -283,8 +283,8 @@ fn test_search_concepts_flag_multiple_times() {
             concepts,
         } => {
             assert_eq!(query, "test");
-            assert_eq!(semantic, false);
-            assert_eq!(concepts, true); // Should still be true even with multiple flags
+            assert!(!semantic);
+            assert!(concepts); // Should still be true even with multiple flags
         }
         _ => panic!("Expected Search command"),
     }
@@ -303,8 +303,8 @@ fn test_search_semantic_flag_multiple_times() {
             concepts,
         } => {
             assert_eq!(query, "test");
-            assert_eq!(semantic, true); // Should still be true even with multiple flags
-            assert_eq!(concepts, false);
+            assert!(semantic); // Should still be true even with multiple flags
+            assert!(!concepts);
         }
         _ => panic!("Expected Search command"),
     }
@@ -343,7 +343,7 @@ fn test_search_with_very_long_query() {
             concepts,
         } => {
             assert_eq!(query.len(), 1000);
-            assert_eq!(semantic, true);
+            assert!(semantic);
         }
         _ => panic!("Expected Search command"),
     }

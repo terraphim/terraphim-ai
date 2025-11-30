@@ -407,7 +407,7 @@ parameters:
 
         // Test that validator can be created and configured
         assert!(
-            validator.is_blacklisted("ls -la") == false,
+            !validator.is_blacklisted("ls -la"),
             "Should not blacklist safe commands by default"
         );
 
