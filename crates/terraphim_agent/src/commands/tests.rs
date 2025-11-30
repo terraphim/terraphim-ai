@@ -17,8 +17,8 @@ use crate::commands::{
     HookContext,
 };
 use crate::commands::{
-    CommandDefinition, CommandHook, CommandParameter, ExecutionMode, HookManager,
-    ParsedCommand, RiskLevel,
+    CommandDefinition, CommandHook, CommandParameter, ExecutionMode, HookManager, ParsedCommand,
+    RiskLevel,
 };
 use crate::CommandExecutionResult;
 
@@ -625,8 +625,8 @@ async fn test_environment_hook() {
 async fn test_backup_hook() {
     let temp_dir = tempfile::tempdir().unwrap();
     let backup_dir = temp_dir.path().join("backups");
-    let hook = BackupHook::new(&backup_dir)
-        .with_backup_commands(vec!["rm".to_string(), "mv".to_string()]);
+    let hook =
+        BackupHook::new(&backup_dir).with_backup_commands(vec!["rm".to_string(), "mv".to_string()]);
 
     // Test command that requires backup
     let backup_context = HookContext {
