@@ -77,7 +77,7 @@ image = "ghcr.io/cross-rs/armv7-unknown-linux-musleabihf:latest"
   run: |
     mkdir -p artifacts
     cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe
-    cp target/${{ matrix.target }}/release/terraphim-tui.exe artifacts/terraphim-tui-${{ matrix.target }}.exe
+    cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe
 ```
 
 ### 6. Update GitHub Actions Dependencies

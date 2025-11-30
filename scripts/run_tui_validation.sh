@@ -5,7 +5,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-BINARY="$PROJECT_ROOT/target/debug/terraphim-tui"
+BINARY="$PROJECT_ROOT/target/release/terraphim-agent"
 REPORT_FILE="$PROJECT_ROOT/tui_validation_report_$(date +%Y%m%d_%H%M%S).md"
 
 # Colors for output
@@ -74,7 +74,7 @@ test_startup() {
     # Test if TUI starts without crashing
     output=$(timeout 10 "$BINARY" --help 2>&1 || echo "TIMEOUT")
 
-    if echo "$output" | grep -q "terraphim-tui\|Usage\|help"; then
+    if echo "$output" | grep -q "terraphim-agent\|Usage\|help"; then
         log_test "TUI Help Command" "PASS" "Help command works"
     else
         log_test "TUI Help Command" "FAIL" "Help command failed"

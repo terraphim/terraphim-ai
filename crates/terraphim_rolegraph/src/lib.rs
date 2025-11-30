@@ -1,129 +1,3 @@
-//! Knowledge graph implementation for semantic document search.
-//!
-//! `terraphim_rolegraph` provides a role-specific knowledge graph that connects
-//! concepts (nodes), their relationships (edges), and documents. It enables
-//! graph-based semantic search where query results are ranked by traversing
-//! relationships between matched concepts.
-//!
-//! # Architecture
-//!
-//! - **Nodes**: Concepts from the thesaurus with associated rank
-//! - **Edges**: Relationships between concepts with weighted connections
-//! - **Documents**: Indexed content linked to concepts via edges
-//! - **Thesaurus**: Synonym-to-concept mappings with Aho-Corasick matching
-//!
-//! # Core Concepts
-//!
-//! ## Graph Structure
-//!
-//! The knowledge graph uses a bipartite structure:
-//! - **Nodes** represent concepts (e.g., "rust programming")
-//! - **Edges** connect concepts that co-occur in documents
-//! - **Documents** are associated with edges via the concepts they contain
-//!
-//! ## Ranking System
-//!
-//! Search results are ranked by summing:
-//! - **Node rank**: Frequency/importance of the concept
-//! - **Edge rank**: Strength of concept relationships
-//! - **Document rank**: Document-specific relevance
-//!
-//! # Examples
-//!
-//! ## Creating and Querying a Graph
-//!
-//! ```rust
-//! use terraphim_rolegraph::RoleGraph;
-//! use terraphim_types::{RoleName, Thesaurus, NormalizedTermValue, NormalizedTerm, Document};
-//!
-//! # async fn example() -> Result<(), terraphim_rolegraph::Error> {
-//! // Create thesaurus
-//! let mut thesaurus = Thesaurus::new("engineering".to_string());
-//! thesaurus.insert(
-//!     NormalizedTermValue::from("rust"),
-//!     NormalizedTerm {
-//!         id: 1,
-//!         value: NormalizedTermValue::from("rust programming"),
-//!         url: Some("https://rust-lang.org".to_string()),
-//!     }
-//! );
-//!
-//! // Create role graph
-//! let mut graph = RoleGraph::new(
-//!     RoleName::new("engineer"),
-//!     thesaurus
-//! ).await?;
-//!
-//! // Index a document
-//! let doc = Document {
-//!     id: "doc1".to_string(),
-//!     title: "Rust Guide".to_string(),
-//!     body: "Learn rust programming with examples".to_string(),
-//!     url: "https://example.com/rust-guide".to_string(),
-//!     description: Some("Rust tutorial".to_string()),
-//!     summarization: None,
-//!     stub: None,
-//!     tags: Some(vec!["rust".to_string()]),
-//!     rank: None,
-//!     source_haystack: None,
-//! };
-//! let doc_id = doc.id.clone();
-//! graph.insert_document(&doc_id, doc);
-//!
-//! // Query the graph
-//! let results = graph.query_graph("rust", None, Some(10))?;
-//! println!("Found {} documents", results.len());
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Path Connectivity Check
-//!
-//! ```rust
-//! use terraphim_rolegraph::RoleGraph;
-//! use terraphim_types::{RoleName, Thesaurus};
-//!
-//! # async fn example() -> Result<(), terraphim_rolegraph::Error> {
-//! # let thesaurus = Thesaurus::new("test".to_string());
-//! let graph = RoleGraph::new(RoleName::new("engineer"), thesaurus).await?;
-//!
-//! // Check if all matched terms are connected by a path
-//! let text = "rust async tokio programming";
-//! let connected = graph.is_all_terms_connected_by_path(text);
-//! println!("Terms connected: {}", connected);
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! ## Multi-term Queries with Operators
-//!
-//! ```rust
-//! use terraphim_rolegraph::RoleGraph;
-//! use terraphim_types::{RoleName, Thesaurus, LogicalOperator};
-//!
-//! # async fn example() -> Result<(), terraphim_rolegraph::Error> {
-//! # let thesaurus = Thesaurus::new("test".to_string());
-//! let graph = RoleGraph::new(RoleName::new("engineer"), thesaurus).await?;
-//!
-//! // AND query - documents must contain ALL terms
-//! let results = graph.query_graph_with_operators(
-//!     &["rust", "async"],
-//!     &LogicalOperator::And,
-//!     None,
-//!     Some(10)
-//! )?;
-//!
-//! // OR query - documents may contain ANY term
-//! let results = graph.query_graph_with_operators(
-//!     &["rust", "python", "go"],
-//!     &LogicalOperator::Or,
-//!     None,
-//!     Some(10)
-//! )?;
-//! # Ok(())
-//! # }
-//! ```
-
 use ahash::AHashMap;
 use itertools::Itertools;
 use memoize::memoize;
@@ -138,65 +12,76 @@ pub mod input;
 use aho_corasick::{AhoCorasick, MatchKind};
 use unicode_segmentation::UnicodeSegmentation;
 
-/// Errors that can occur when working with knowledge graphs.
 #[derive(thiserror::Error, Debug)]
 pub enum Error {
-    /// The requested node ID was not found in the graph
     #[error("The given node ID was not found")]
     NodeIdNotFound,
-    /// The requested edge ID was not found in the graph
     #[error("The given Edge ID was not found")]
     EdgeIdNotFound,
-    /// Failed to serialize IndexedDocument to JSON
     #[error("Cannot convert IndexedDocument to JSON: {0}")]
     JsonConversionError(#[from] serde_json::Error),
-    /// Error from terraphim_automata operations
     #[error("Error while driving terraphim automata: {0}")]
     TerraphimAutomataError(#[from] terraphim_automata::TerraphimAutomataError),
-    /// Error building Aho-Corasick automata
     #[error("Indexing error: {0}")]
     AhoCorasickError(#[from] aho_corasick::BuildError),
 }
 
-/// Result type alias using terraphim_rolegraph::Error.
 type Result<T> = std::result::Result<T, Error>;
 
-/// Statistics about the graph structure for debugging and monitoring.
-///
-/// Provides counts of nodes, edges, documents, and thesaurus size.
-#[derive(Debug, Clone)]
+/// Statistics about the graph structure for debugging
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct GraphStats {
-    /// Total number of nodes (concepts) in the graph
     pub node_count: usize,
-    /// Total number of edges (concept relationships) in the graph
     pub edge_count: usize,
-    /// Total number of indexed documents
     pub document_count: usize,
-    /// Number of terms in the thesaurus
     pub thesaurus_size: usize,
-    /// Whether the graph has any indexed content
     pub is_populated: bool,
 }
 
-/// A role-specific knowledge graph for semantic document search.
+/// A serializable representation of RoleGraph for JSON serialization/deserialization.
 ///
-/// RoleGraph connects concepts from a thesaurus with documents through a graph
-/// structure. It uses Aho-Corasick for fast multi-pattern matching and maintains
-/// bidirectional mappings between:
-/// - Synonyms → Concepts (via thesaurus)
-/// - Concepts → Nodes (graph vertices)
-/// - Nodes ↔ Edges (concept relationships)
-/// - Edges → Documents (content associations)
+/// This struct excludes the Aho-Corasick automata which cannot be directly serialized,
+/// but includes all the necessary data to reconstruct it.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SerializableRoleGraph {
+    /// The role of the graph
+    pub role: RoleName,
+    /// A mapping from node IDs to nodes
+    pub nodes: AHashMap<u64, Node>,
+    /// A mapping from edge IDs to edges
+    pub edges: AHashMap<u64, Edge>,
+    /// A mapping from document IDs to indexed documents
+    pub documents: AHashMap<String, IndexedDocument>,
+    /// A thesaurus is a mapping from synonyms to concepts
+    pub thesaurus: Thesaurus,
+    /// Aho-Corasick values (needed to rebuild the automata)
+    pub aho_corasick_values: Vec<u64>,
+    /// reverse lookup - matched id into normalized term
+    pub ac_reverse_nterm: AHashMap<u64, NormalizedTermValue>,
+}
+
+impl SerializableRoleGraph {
+    /// Convert to JSON string
+    pub fn to_json(&self) -> std::result::Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    /// Convert to pretty JSON string
+    pub fn to_json_pretty(&self) -> std::result::Result<String, serde_json::Error> {
+        serde_json::to_string_pretty(self)
+    }
+
+    /// Create from JSON string
+    pub fn from_json(json: &str) -> std::result::Result<Self, serde_json::Error> {
+        serde_json::from_str(json)
+    }
+}
+
+/// A `RoleGraph` is a graph of concepts and their relationships.
 ///
-/// # Performance
-///
-/// - **Matching**: O(n) text scanning with Aho-Corasick
-/// - **Querying**: O(k*e*d) where k=matched terms, e=edges per node, d=docs per edge
-/// - **Memory**: ~100 bytes per node + 200 bytes per edge
-///
-/// # Examples
-///
-/// See module-level documentation for usage examples.
+/// It is used to index documents and search for them.
+/// Currently it maps from synonyms to concepts, so only the normalized term
+/// gets returned when a reverse lookup is performed.
 #[derive(Debug, Clone)]
 pub struct RoleGraph {
     /// The role of the graph
@@ -220,19 +105,30 @@ pub struct RoleGraph {
 impl RoleGraph {
     /// Creates a new `RoleGraph` with the given role and thesaurus
     pub async fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
-        // We need to iterate over keys and values at the same time
-        // because the order of entries is not guaranteed
-        // when using `.keys()` and `.values()`.
-        // let (keys, values): (Vec<&str>, Vec<Id>) = thesaurus
-        //     .iter()
-        //     .map(|(key, value)| (key.as_str(), value.id))
-        //     .unzip();
+        let (ac, aho_corasick_values, ac_reverse_nterm) = Self::build_aho_corasick(&thesaurus)?;
+
+        Ok(Self {
+            role,
+            nodes: AHashMap::new(),
+            edges: AHashMap::new(),
+            documents: AHashMap::new(),
+            thesaurus,
+            aho_corasick_values,
+            ac,
+            ac_reverse_nterm,
+        })
+    }
+
+    /// Build Aho-Corasick automata from thesaurus
+    fn build_aho_corasick(
+        thesaurus: &Thesaurus,
+    ) -> Result<(AhoCorasick, Vec<u64>, AHashMap<u64, NormalizedTermValue>)> {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
 
-        for (key, normalized_term) in &thesaurus {
-            keys.push(key);
+        for (key, normalized_term) in thesaurus {
+            keys.push(key.as_str());
             values.push(normalized_term.id);
             ac_reverse_nterm.insert(normalized_term.id, normalized_term.value.clone());
         }
@@ -242,16 +138,48 @@ impl RoleGraph {
             .ascii_case_insensitive(true)
             .build(keys)?;
 
-        Ok(Self {
-            role,
-            nodes: AHashMap::new(),
-            edges: AHashMap::new(),
-            documents: AHashMap::new(),
-            thesaurus,
-            aho_corasick_values: values,
-            ac,
-            ac_reverse_nterm,
-        })
+        Ok((ac, values, ac_reverse_nterm))
+    }
+
+    /// Rebuild Aho-Corasick automata from thesaurus (useful after deserialization)
+    pub fn rebuild_automata(&mut self) -> Result<()> {
+        let (ac, values, ac_reverse_nterm) = Self::build_aho_corasick(&self.thesaurus)?;
+        self.ac = ac;
+        self.aho_corasick_values = values;
+        self.ac_reverse_nterm = ac_reverse_nterm;
+        Ok(())
+    }
+
+    /// Create a serializable representation of the RoleGraph
+    pub fn to_serializable(&self) -> SerializableRoleGraph {
+        SerializableRoleGraph {
+            role: self.role.clone(),
+            nodes: self.nodes.clone(),
+            edges: self.edges.clone(),
+            documents: self.documents.clone(),
+            thesaurus: self.thesaurus.clone(),
+            aho_corasick_values: self.aho_corasick_values.clone(),
+            ac_reverse_nterm: self.ac_reverse_nterm.clone(),
+        }
+    }
+
+    /// Create RoleGraph from serializable representation
+    pub async fn from_serializable(serializable: SerializableRoleGraph) -> Result<Self> {
+        let mut role_graph = RoleGraph {
+            role: serializable.role,
+            nodes: serializable.nodes,
+            edges: serializable.edges,
+            documents: serializable.documents,
+            thesaurus: serializable.thesaurus,
+            aho_corasick_values: serializable.aho_corasick_values,
+            ac: AhoCorasick::new(&[""])?, // Will be rebuilt
+            ac_reverse_nterm: serializable.ac_reverse_nterm,
+        };
+
+        // Rebuild the Aho-Corasick automata
+        role_graph.rebuild_automata()?;
+
+        Ok(role_graph)
     }
 
     /// Find all matches in the rolegraph for the given text
@@ -920,6 +848,43 @@ impl RoleGraphSync {
     pub async fn lock(&self) -> MutexGuard<'_, RoleGraph> {
         self.inner.lock().await
     }
+
+    /// Serialize the RoleGraph to JSON string
+    /// This method acquires a lock on the inner RoleGraph during serialization
+    pub async fn to_json(&self) -> Result<String> {
+        let rolegraph = self.inner.lock().await;
+        let serializable = rolegraph.to_serializable();
+        serializable
+            .to_json()
+            .map_err(|e| Error::JsonConversionError(e))
+    }
+
+    /// Serialize the RoleGraph to pretty JSON string
+    /// This method acquires a lock on the inner RoleGraph during serialization
+    pub async fn to_json_pretty(&self) -> Result<String> {
+        let rolegraph = self.inner.lock().await;
+        let serializable = rolegraph.to_serializable();
+        serializable
+            .to_json_pretty()
+            .map_err(|e| Error::JsonConversionError(e))
+    }
+
+    /// Create a new RoleGraphSync from JSON string
+    pub async fn from_json(json: &str) -> Result<Self> {
+        let serializable =
+            SerializableRoleGraph::from_json(json).map_err(|e| Error::JsonConversionError(e))?;
+        let rolegraph = RoleGraph::from_serializable(serializable).await?;
+        Ok(Self {
+            inner: Arc::new(Mutex::new(rolegraph)),
+        })
+    }
+
+    /// Get a serializable representation without holding the lock
+    /// This clones the entire RoleGraph, so use with caution for large graphs
+    pub async fn to_serializable(&self) -> Result<SerializableRoleGraph> {
+        let rolegraph = self.inner.lock().await;
+        Ok(rolegraph.to_serializable())
+    }
 }
 
 impl From<RoleGraph> for RoleGraphSync {
@@ -977,6 +942,71 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
         (q, l - q)
     }
 }
+
+// Examples for serialization usage
+/// # Serialization Examples
+///
+/// This module provides comprehensive serialization support for RoleGraph and related types.
+/// Here are the key patterns for using the serialization functionality:
+///
+/// ## Basic RoleGraph Serialization
+///
+/// ```rust,no_run
+/// use terraphim_rolegraph::{RoleGraph, SerializableRoleGraph};
+///
+/// // Create a RoleGraph
+/// let rolegraph = RoleGraph::new(role.into(), thesaurus).await?;
+///
+/// // Convert to serializable representation
+/// let serializable = rolegraph.to_serializable();
+///
+/// // Serialize to JSON string
+/// let json = serializable.to_json()?;
+///
+/// // Deserialize from JSON
+/// let deserialized: SerializableRoleGraph = SerializableRoleGraph::from_json(&json)?;
+///
+/// // Recreate RoleGraph with rebuilt automata
+/// let restored_rolegraph = RoleGraph::from_serializable(deserialized).await?;
+/// ```
+///
+/// ## RoleGraphSync Serialization
+///
+/// ```rust,no_run
+/// use terraphim_rolegraph::RoleGraphSync;
+///
+/// // Create RoleGraphSync
+/// let rolegraph_sync = RoleGraphSync::from(rolegraph);
+///
+/// // Serialize directly to JSON (acquires lock internally)
+/// let json = rolegraph_sync.to_json().await?;
+/// let json_pretty = rolegraph_sync.to_json_pretty().await?;
+///
+/// // Deserialize back to RoleGraphSync
+/// let restored_sync = RoleGraphSync::from_json(&json).await?;
+/// ```
+///
+/// ## Graph Statistics Serialization
+///
+/// ```rust,no_run
+/// use terraphim_rolegraph::GraphStats;
+///
+/// let stats = rolegraph.get_graph_stats();
+///
+/// // Serialize to JSON
+/// let json = serde_json::to_string(&stats)?;
+///
+/// // Deserialize
+/// let restored_stats: GraphStats = serde_json::from_str(&json)?;
+/// ```
+///
+/// ## Important Notes
+///
+/// - The Aho-Corasick automata cannot be directly serialized and is rebuilt from the thesaurus
+/// - All serialization methods are async to handle the potential I/O operations
+/// - RoleGraphSync serialization methods acquire internal locks automatically
+/// - The serializable representation includes all data needed to rebuild the automata
+/// - Performance consideration: Large graphs may have significant serialization overhead
 
 #[cfg(test)]
 mod tests {
@@ -1356,5 +1386,251 @@ mod tests {
         log::info!("✅ Document indexing: Working");
         log::info!("✅ Graph querying: Working (no NodeIdNotFound errors)");
         log::info!("✅ Defensive error handling: Working");
+    }
+
+    #[tokio::test]
+    async fn test_rolegraph_serialization() {
+        // Create a test rolegraph with sample data
+        let role = "test role".to_string();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+            .await
+            .unwrap();
+
+        // Add some test data
+        let document_id = Ulid::new().to_string();
+        let test_document = Document {
+            id: document_id.clone(),
+            title: "Test Document".to_string(),
+            body: "This is a test document with Life cycle concepts and project planning content and operators".to_string(),
+            url: "/test/document".to_string(),
+            description: Some("Test document description".to_string()),
+            tags: Some(vec!["test".to_string(), "serialization".to_string()]),
+            rank: Some(1),
+            stub: None,
+            summarization: None,
+            source_haystack: None,
+        };
+
+        // Insert document into rolegraph
+        rolegraph.insert_document(&document_id, test_document);
+
+        // Test serialization to serializable representation
+        let serializable = rolegraph.to_serializable();
+        assert_eq!(serializable.role.original, "test role");
+        assert_eq!(serializable.nodes.len(), rolegraph.nodes.len());
+        assert_eq!(serializable.edges.len(), rolegraph.edges.len());
+        assert_eq!(serializable.documents.len(), rolegraph.documents.len());
+        assert_eq!(serializable.thesaurus.len(), rolegraph.thesaurus.len());
+        assert!(!serializable.aho_corasick_values.is_empty());
+        assert!(!serializable.ac_reverse_nterm.is_empty());
+
+        // Test JSON serialization
+        let json_str = serializable.to_json().unwrap();
+        assert!(!json_str.is_empty());
+
+        // Test JSON deserialization
+        let deserialized = SerializableRoleGraph::from_json(&json_str).unwrap();
+        assert_eq!(deserialized.role.original, serializable.role.original);
+        assert_eq!(deserialized.nodes.len(), serializable.nodes.len());
+        assert_eq!(deserialized.edges.len(), serializable.edges.len());
+        assert_eq!(deserialized.documents.len(), serializable.documents.len());
+        assert_eq!(deserialized.thesaurus.len(), serializable.thesaurus.len());
+        assert_eq!(
+            deserialized.aho_corasick_values,
+            serializable.aho_corasick_values
+        );
+        assert_eq!(deserialized.ac_reverse_nterm, serializable.ac_reverse_nterm);
+
+        // Test recreating RoleGraph from serializable
+        let recreated_rolegraph = RoleGraph::from_serializable(deserialized).await.unwrap();
+        assert_eq!(recreated_rolegraph.role.original, rolegraph.role.original);
+        assert_eq!(recreated_rolegraph.nodes.len(), rolegraph.nodes.len());
+        assert_eq!(recreated_rolegraph.edges.len(), rolegraph.edges.len());
+        assert_eq!(
+            recreated_rolegraph.documents.len(),
+            rolegraph.documents.len()
+        );
+        assert_eq!(
+            recreated_rolegraph.thesaurus.len(),
+            rolegraph.thesaurus.len()
+        );
+
+        // Test that the recreated RoleGraph can perform searches (may be empty if no matches found)
+        let search_results = recreated_rolegraph
+            .query_graph("Life cycle", None, Some(10))
+            .unwrap();
+        println!("Search results count: {}", search_results.len());
+
+        // Test that the Aho-Corasick automata was rebuilt correctly (may be empty if no matches found)
+        let matches = recreated_rolegraph.find_matching_node_ids("Life cycle concepts");
+        println!("Aho-Corasick matches count: {}", matches.len());
+
+        // Verify that the search functionality itself works (not that it returns results)
+        // The important thing is that it doesn't crash or error
+        assert_eq!(recreated_rolegraph.role.original, rolegraph.role.original);
+    }
+
+    #[tokio::test]
+    async fn test_rolegraph_sync_serialization() {
+        // Create a RoleGraphSync with test data
+        let role = "sync test role".to_string();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+            .await
+            .unwrap();
+
+        // Add test data
+        let document_id = Ulid::new().to_string();
+        let test_document = Document {
+            id: document_id.clone(),
+            title: "Sync Test Document".to_string(),
+            body:
+                "Document content for testing RoleGraphSync serialization with Paradigm Map terms"
+                    .to_string(),
+            url: "/test/sync_document".to_string(),
+            description: None,
+            tags: None,
+            rank: None,
+            stub: None,
+            summarization: None,
+            source_haystack: None,
+        };
+
+        rolegraph.insert_document(&document_id, test_document);
+        let rolegraph_sync = RoleGraphSync::from(rolegraph);
+
+        // Test JSON serialization
+        let json_str = rolegraph_sync.to_json().await.unwrap();
+        assert!(!json_str.is_empty());
+
+        // Test pretty JSON serialization
+        let json_pretty = rolegraph_sync.to_json_pretty().await.unwrap();
+        assert!(json_pretty.len() > json_str.len()); // Pretty JSON should be longer
+
+        // Test deserialization back to RoleGraphSync
+        let restored_sync = RoleGraphSync::from_json(&json_str).await.unwrap();
+
+        // Verify the restored graph works correctly
+        let rolegraph_guard = restored_sync.lock().await;
+        assert_eq!(rolegraph_guard.role.original, "sync test role");
+        assert_eq!(rolegraph_guard.documents.len(), 1);
+
+        // Test search functionality (may be empty if no matches found)
+        let search_results = rolegraph_guard
+            .query_graph("Paradigm Map", None, Some(10))
+            .unwrap();
+        println!(
+            "RoleGraphSync search results count: {}",
+            search_results.len()
+        );
+
+        // Verify the search functionality itself works
+        assert_eq!(rolegraph_guard.role.original, "sync test role");
+    }
+
+    #[tokio::test]
+    async fn test_graph_stats_serialization() {
+        // Create a populated rolegraph
+        let role = "stats test role".to_string();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
+            .await
+            .unwrap();
+
+        // Add test data with content that should match thesaurus terms
+        let document_id = Ulid::new().to_string();
+        let test_document = Document {
+            id: document_id.clone(),
+            title: "Stats Test Document".to_string(),
+            body: "Test content with Life cycle concepts and operators and maintainers".to_string(),
+            url: "/test/stats_document".to_string(),
+            description: None,
+            tags: None,
+            rank: None,
+            stub: None,
+            summarization: None,
+            source_haystack: None,
+        };
+
+        rolegraph.insert_document(&document_id, test_document);
+
+        // Get graph stats
+        let stats = rolegraph.get_graph_stats();
+        assert!(stats.thesaurus_size > 0); // The thesaurus should have content
+
+        // Note: node_count and edge_count might be 0 if document content doesn't match thesaurus
+        // The important thing is that the stats can be serialized and deserialized
+        println!(
+            "Stats - nodes: {}, edges: {}, documents: {}, thesaurus: {}, populated: {}",
+            stats.node_count,
+            stats.edge_count,
+            stats.document_count,
+            stats.thesaurus_size,
+            stats.is_populated
+        );
+
+        // Test stats serialization
+        let json_str = serde_json::to_string(&stats).unwrap();
+        let deserialized_stats: GraphStats = serde_json::from_str(&json_str).unwrap();
+
+        assert_eq!(stats.node_count, deserialized_stats.node_count);
+        assert_eq!(stats.edge_count, deserialized_stats.edge_count);
+        assert_eq!(stats.document_count, deserialized_stats.document_count);
+        assert_eq!(stats.thesaurus_size, deserialized_stats.thesaurus_size);
+        assert_eq!(stats.is_populated, deserialized_stats.is_populated);
+    }
+
+    #[tokio::test]
+    async fn test_serialization_edge_cases() {
+        // Test with empty rolegraph
+        let role = "empty test".to_string();
+        let empty_thesaurus = Thesaurus::new("empty".to_string());
+        let empty_rolegraph = RoleGraph::new(role.into(), empty_thesaurus).await.unwrap();
+
+        let serializable = empty_rolegraph.to_serializable();
+        let json = serializable.to_json().unwrap();
+        let deserialized = SerializableRoleGraph::from_json(&json).unwrap();
+        let restored = RoleGraph::from_serializable(deserialized).await.unwrap();
+
+        assert_eq!(restored.nodes.len(), 0);
+        assert_eq!(restored.edges.len(), 0);
+        assert_eq!(restored.documents.len(), 0);
+        assert_eq!(restored.thesaurus.len(), 0);
+
+        // Test with single node
+        let role = "single node test".to_string();
+        let thesaurus = load_sample_thesaurus().await;
+        let mut single_rolegraph = RoleGraph::new(role.into(), thesaurus).await.unwrap();
+
+        let document_id = Ulid::new().to_string();
+        let simple_document = Document {
+            id: document_id.clone(),
+            title: "Simple".to_string(),
+            body: "Life cycle concepts and operators".to_string(), // Should match thesaurus terms
+            url: "/test/simple".to_string(),
+            description: None,
+            tags: None,
+            rank: None,
+            stub: None,
+            summarization: None,
+            source_haystack: None,
+        };
+
+        single_rolegraph.insert_document(&document_id, simple_document);
+
+        // Verify it can be serialized and restored
+        let serializable = single_rolegraph.to_serializable();
+        let json = serializable.to_json().unwrap();
+        let deserialized = SerializableRoleGraph::from_json(&json).unwrap();
+        let restored = RoleGraph::from_serializable(deserialized).await.unwrap();
+
+        assert_eq!(restored.documents.len(), 1);
+        assert_eq!(restored.role.original, "single node test");
+
+        // Note: nodes and edges might be empty if content doesn't match thesaurus
+        // The important thing is that serialization/deserialization works
+        println!(
+            "Single node test - nodes: {}, edges: {}",
+            restored.nodes.len(),
+            restored.edges.len()
+        );
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_rolegraph"
-version = "1.0.0"
+version = "1.2.3"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim rolegraph module, which provides role handling for Terraphim AI."

@@ -6,7 +6,7 @@ echo "DEMONSTRATING ROLE SWITCHING AND SEARCH FUNCTIONALITY"
 echo "==================================================================="
 echo ""
 
-BINARY="./target/release/terraphim-tui"
+BINARY="./target/release/terraphim-agent"
 
 # Test 1: Check initial role and search
 echo "TEST 1: Initial state - checking current role and doing a search"

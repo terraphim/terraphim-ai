@@ -1,6 +1,7 @@
 {
-  "name": "terraphim_ai_node",
-  "version": "0.0.0",
+  "name": "@terraphim/autocomplete",
+  "version": "1.0.0",
+  "description": "Fast autocomplete and knowledge graph functionality for Terraphim AI with native Node.js and WASM support",
   "main": "index.js",
   "types": "index.d.ts",
   "napi": {
@@ -8,6 +9,7 @@
     "triples": {
       "defaults": false,
       "additional": [
+        "x86_64-unknown-linux-gnu",
         "aarch64-apple-darwin",
         "aarch64-unknown-linux-gnu",
         "aarch64-pc-windows-msvc",
@@ -16,6 +18,30 @@
       ]
     }
   },
+  "bun": {
+    "main": "index.js",
+    "types": "index.d.ts",
+    "native": "terraphim_ai_nodejs.linux-x64-gnu.node"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/terraphim/terraphim-ai.git",
+    "directory": "terraphim_ai_nodejs"
+  },
+  "keywords": [
+    "autocomplete",
+    "knowledge-graph",
+    "fuzzy-search",
+    "semantic-search",
+    "thesaurus",
+    "wasm",
+    "rust",
+    "napi",
+    "terraphim",
+    "ai",
+    "text-processing"
+  ],
+  "author": "Terraphim Contributors <info@terraphim.ai>",
   "license": "MIT",
   "devDependencies": {
     "@napi-rs/cli": "^2.18.4",
@@ -25,7 +51,7 @@
     "timeout": "3m"
   },
   "engines": {
-    "node": ">= 10"
+    "node": ">= 14"
   },
   "scripts": {
     "artifacts": "napi artifacts",
@@ -33,7 +59,17 @@
     "build:debug": "napi build --platform",
     "prepublishOnly": "napi prepublish -t npm",
     "test": "ava",
+    "test:bun": "bun test_autocomplete.js && bun test_knowledge_graph.js",
+    "test:node": "node test_autocomplete.js && node test_knowledge_graph.js",
+    "test:all": "npm run test:node && npm run test:bun",
     "universal": "napi universal",
-    "version": "napi version"
-  }
+    "version": "napi version",
+    "install:bun": "bun install",
+    "start:bun": "bun run test:all"
+  },
+  "files": [
+    "index.js",
+    "index.d.ts",
+    "README.md"
+  ]
 }

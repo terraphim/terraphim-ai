@@ -157,7 +157,7 @@ test_cross_build() {
         case "$package" in
             "terraphim_server") binary_name="terraphim_server" ;;
             "terraphim_mcp_server") binary_name="terraphim_mcp_server" ;;
-            "terraphim_tui") binary_name="terraphim-tui" ;;
+            "terraphim_tui") binary_name="terraphim-agent" ;;
         esac
 
         local binary_path="target/$target/release/$binary_name"
