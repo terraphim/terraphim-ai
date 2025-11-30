@@ -51,9 +51,37 @@ pub struct CommandParameter {
     /// Default value if not provided
     #[serde(default)]
     pub default_value: Option<serde_json::Value>,
-    /// Validation rules
-    #[serde(default)]
+    /// Validation rules (nested structure)
+    /// Note: Use `get_validation()` to get merged validation including direct `allowed_values`
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub validation: Option<ParameterValidation>,
+    /// Direct allowed_values for backward compatibility with YAML frontmatter
+    /// These are merged into validation by `get_validation()`
+    #[serde(default, skip_serializing)]
+    pub allowed_values: Option<Vec<String>>,
+}
+
+impl CommandParameter {
+    /// Get validation rules, merging direct allowed_values if present
+    /// This is the preferred way to access validation as it handles backward compatibility
+    pub fn get_validation(&self) -> Option<ParameterValidation> {
+        match (&self.validation, &self.allowed_values) {
+            (Some(v), Some(values)) => {
+                // Merge: prefer validation's allowed_values if set, otherwise use direct
+                let mut merged = v.clone();
+                if merged.allowed_values.is_none() {
+                    merged.allowed_values = Some(values.clone());
+                }
+                Some(merged)
+            }
+            (Some(v), None) => Some(v.clone()),
+            (None, Some(values)) => Some(ParameterValidation {
+                allowed_values: Some(values.clone()),
+                ..Default::default()
+            }),
+            (None, None) => None,
+        }
+    }
 }
 
 /// Parameter validation rules
