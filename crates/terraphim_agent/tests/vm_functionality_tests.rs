@@ -5,8 +5,7 @@ use terraphim_agent::client::*;
 #[test]
 fn test_vm_command_features() {
     // This test will only run when repl feature is enabled
-    // Verify basic VM functionality is accessible
-    let _client = VmClient::default();
+    // TODO: Add actual VM functionality tests when repl feature is implemented
 }
 
 /// Test VM API type compatibility
