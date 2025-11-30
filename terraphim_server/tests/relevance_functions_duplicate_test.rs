@@ -37,7 +37,7 @@ async fn test_relevance_functions_with_duplicate_scenarios() {
     let test_query = "tokio spawn";
 
     // All relevance functions to test
-    let relevance_functions = vec![
+    let relevance_functions = [
         RelevanceFunction::TitleScorer,
         RelevanceFunction::BM25,
         RelevanceFunction::BM25F,

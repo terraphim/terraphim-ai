@@ -1,7 +1,7 @@
 use anyhow::{ensure, Result};
 use serial_test::serial;
 use std::process::Command;
-use std::str::{self, FromStr};
+use std::str;
 
 /// Test helper to run TUI commands and parse output
 fn run_command_and_parse(args: &[&str]) -> Result<(String, String, i32)> {

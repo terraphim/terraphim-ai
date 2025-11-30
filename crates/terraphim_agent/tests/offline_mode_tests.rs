@@ -1,5 +1,5 @@
 use std::process::Command;
-use std::str::{self, FromStr};
+use std::str;
 
 use anyhow::Result;
 use serial_test::serial;

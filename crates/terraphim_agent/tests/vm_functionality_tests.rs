@@ -1,4 +1,3 @@
-use serde_json;
 use terraphim_agent::client::*;
 
 /// Test VM command parsing with feature gates
@@ -6,7 +5,8 @@ use terraphim_agent::client::*;
 #[test]
 fn test_vm_command_features() {
     // This test will only run when repl feature is enabled
-    assert!(true, "VM commands are available with repl feature");
+    // Verify basic VM functionality is accessible
+    let _client = VmClient::default();
 }
 
 /// Test VM API type compatibility
