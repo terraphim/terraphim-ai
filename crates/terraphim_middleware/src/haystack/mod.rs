@@ -1,11 +1,11 @@
-#[cfg(feature = "atomic")]
+#[cfg(feature = "terraphim_atomic_client")]
 pub mod atomic;
 pub mod clickup;
 pub mod grep_app;
 pub mod mcp;
 pub mod perplexity;
 pub mod query_rs;
-#[cfg(feature = "atomic")]
+#[cfg(feature = "terraphim_atomic_client")]
 pub use atomic::AtomicHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
 pub use grep_app::GrepAppHaystackIndexer;

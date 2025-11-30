@@ -320,7 +320,7 @@ impl AgentPool {
                 .unwrap_or(0),
             LoadBalancingStrategy::Random => {
                 use rand::Rng;
-                rand::thread_rng().gen_range(0..available.len())
+                rand::rng().random_range(0..available.len())
             }
             LoadBalancingStrategy::WeightedCapabilities => {
                 // For now, use least connections
