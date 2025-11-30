@@ -794,6 +794,14 @@ impl Default for MarkdownCommandParser {
     }
 }
 
+/// Convenience function to parse a markdown command file
+pub async fn parse_markdown_command(
+    file_path: impl AsRef<Path>,
+) -> Result<ParsedCommand, CommandRegistryError> {
+    let parser = MarkdownCommandParser::new()?;
+    parser.parse_file(file_path).await
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1273,12 +1281,4 @@ The service requires proper database configuration and SSL certificates for secu
             .iter()
             .any(|m| m.term == "kubernetes"));
     }
-}
-
-/// Convenience function to parse a markdown command file
-pub async fn parse_markdown_command(
-    file_path: impl AsRef<Path>,
-) -> Result<ParsedCommand, CommandRegistryError> {
-    let parser = MarkdownCommandParser::new()?;
-    parser.parse_file(file_path).await
 }
