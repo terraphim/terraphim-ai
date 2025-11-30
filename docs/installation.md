@@ -34,8 +34,8 @@ wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.3/terraphi
 sudo dpkg -i terraphim-server_0.2.3-1_amd64.deb
 
 # Download and install TUI (optional)
-wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.3/terraphim-tui_0.2.3-1_amd64.deb
-sudo dpkg -i terraphim-tui_0.2.3-1_amd64.deb
+wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.3/terraphim-agent_0.2.3-1_amd64.deb
+sudo dpkg -i terraphim-agent_0.2.3-1_amd64.deb
 
 # Start the server
 sudo systemctl start terraphim-server
@@ -50,8 +50,8 @@ wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.3/terraphi
 sudo pacman -U terraphim-server-0.2.3-1-x86_64.pkg.tar.zst
 
 # Install TUI (optional)
-wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.3/terraphim-tui-0.2.3-1-x86_64.pkg.tar.zst
-sudo pacman -U terraphim-tui-0.2.3-1-x86_64.pkg.tar.zst
+wget https://github.com/terraphim/terraphim-ai/releases/download/v0.2.3/terraphim-agent-0.2.3-1-x86_64.pkg.tar.zst
+sudo pacman -U terraphim-agent-0.2.3-1-x86_64.pkg.tar.zst
 
 # Start the server
 sudo systemctl start terraphim-server
@@ -272,25 +272,25 @@ The TUI provides a command-line interface with advanced features:
 
 ```bash
 # Show help
-terraphim-tui --help
+terraphim-agent --help
 
 # Search with TUI
-terraphim-tui search "rust programming" --limit 20
+terraphim-agent search "rust programming" --limit 20
 
 # Multi-term search
-terraphim-tui search "rust" --terms "async,await" --operator and
+terraphim-agent search "rust" --terms "async,await" --operator and
 
 # List available roles
-terraphim-tui roles list
+terraphim-agent roles list
 
 # Switch role
-terraphim-tui search "web" --role "System Operator"
+terraphim-agent search "web" --role "System Operator"
 
 # Interactive mode
-terraphim-tui interactive
+terraphim-agent interactive
 
 # REPL mode
-terraphim-tui repl
+terraphim-agent repl
 ```
 
 ### API Usage

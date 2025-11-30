@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_middleware"
-version = "1.0.0"
+version = "1.2.3"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim middleware for searching haystacks"
@@ -55,8 +55,8 @@ tempfile = "3.23"
 
 [features]
 default = []
-# Enable atomic server client integration
-atomic = ["terraphim_atomic_client"]
+# Enable atomic server client integration (disabled for publishing)
+# atomic = ["terraphim_atomic_client"]
 # Enable openrouter integration
 openrouter = ["terraphim_config/openrouter"]
 # Enable SSE-based MCP client probing

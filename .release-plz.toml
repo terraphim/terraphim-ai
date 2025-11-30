@@ -37,7 +37,7 @@ changelog_path = "./desktop/CHANGELOG.md"
 changelog_update = true
 
 [[package]]
-name = "terraphim_tui"
+name = "terraphim_agent"
 changelog_path = "./crates/terraphim_tui/CHANGELOG.md"
 changelog_update = true
 
