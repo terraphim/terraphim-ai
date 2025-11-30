@@ -70,14 +70,14 @@ jobs:
       - name: Build TUI binary
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} --bin terraphim-tui
+            --target ${{ matrix.target }} --bin terraphim-agent
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p artifacts
           cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
-          cp target/${{ matrix.target }}/release/terraphim-tui artifacts/terraphim-tui-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/terraphim-agent artifacts/terraphim-agent-${{ matrix.target }}
           chmod +x artifacts/*
 
       - name: Prepare artifacts (Windows)
@@ -86,7 +86,7 @@ jobs:
         run: |
           mkdir -p artifacts
           cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
-          cp target/${{ matrix.target }}/release/terraphim-tui.exe artifacts/terraphim-tui-${{ matrix.target }}.exe || true
+          cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v5
@@ -293,7 +293,7 @@ jobs:
             - `terraphim_server-*`: Server binaries for various platforms
 
             ### TUI Binaries
-            - `terraphim-tui-*`: Terminal UI binaries for various platforms
+            - `terraphim-agent-*`: Terminal UI binaries for various platforms
 
             ### Desktop Applications
             - `*.dmg`: macOS desktop installer

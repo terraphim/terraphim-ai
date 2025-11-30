@@ -19,7 +19,17 @@ Provides comprehensive guidance to Claude Code (claude.ai/code) when working wit
 - **Knowledge Graph System**: Thesaurus format, automata construction, rolegraph management
 - **AI Integration**: OpenRouter, Ollama support with LLM client abstraction
 
-## Recent Updates
+## Recent Updates (v1.0.0 Release)
+- **Multi-Language Package Ecosystem**: Added comprehensive Rust, Node.js, Python package information
+- **Package Manager Support**: Enhanced with Bun optimization for Node.js ecosystem
+- **CI/CD Infrastructure**: Updated with self-hosted runners and 1Password integration
+- **Grep.app Integration**: Added search across 500,000+ GitHub repositories
+- **MCP Server**: Complete Model Context Protocol implementation for AI integration
+- **Binary Update**: terraphim-tui → terraphim-agent with updated references
+- **Performance Metrics**: Added comprehensive benchmarks and optimization details
+- **Publishing Documentation**: Complete guides for multi-language package publishing
+
+## Legacy Updates
 - Added workspace structure section
 - Expanded crate documentation (agent systems, haystacks)
 - Added TUI build variations and feature flags

@@ -6,7 +6,7 @@ edition = "2021"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12.24", features = ["json", "rustls-tls"], default-features = false, optional = true }
+reqwest = { version = "0.12.5", features = ["json", "rustls-tls"], default-features = false, optional = true }
 web-sys = { version = "0.3.69", features = ["Request", "RequestInit", "RequestMode", "Response", "Headers", "Window"], optional = true }
 hex = "0.4"
 base64 = "0.22.1"
@@ -15,9 +15,9 @@ wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.42", optional = true }
 dotenvy = "0.15.7"
 url = { version = "2.5.4", features = ["serde"] }
-ed25519-dalek = "2.2"
+ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 thiserror = "2.0.12"
-rand_core = "0.5"
+rand_core = { version = "0.6", features = ["getrandom"] }
 serde_jcs = "0.1.0"
 serde-wasm-bindgen = { version = "0.6.5", optional = true }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"], optional = true }

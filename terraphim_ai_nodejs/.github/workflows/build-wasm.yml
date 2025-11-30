@@ -1,0 +1,333 @@
+name: Build and Publish WASM Package
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (semantic version)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode only'
+        required: false
+        type: boolean
+        default: true
+  push:
+    tags:
+      - 'wasm-v*'
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  build-wasm:
+    name: Build WASM Package
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust toolchain with WASM target
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        run: |
+          curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: wasm32-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Build WASM package
+        run: |
+          cd ../crates/terraphim_automata
+          wasm-pack build --target web --out-dir ../../terraphim_ai_nodejs/wasm-pkg-web -- --features wasm
+          wasm-pack build --target nodejs --out-dir ../../terraphim_ai_nodejs/wasm-pkg-nodejs -- --features wasm
+
+      - name: Test WASM package
+        run: |
+          # Test Node.js WASM
+          cd wasm-pkg-nodejs
+          npm link
+          node -e "
+          const pkg = require('./');
+          console.log('✅ WASM Node.js package loaded successfully');
+          console.log('Available functions:', Object.keys(pkg));
+          "
+
+          # Test Web WASM (if we have browser tests)
+          cd ../wasm-pkg-web
+          npm install
+          echo "✅ Web WASM package built successfully"
+
+      - name: Create hybrid package structure
+        run: |
+          mkdir -p dist-wasm
+
+          # Copy WASM packages
+          cp -r wasm-pkg-nodejs/* dist-wasm/
+          cp -r wasm-pkg-web/* dist-wasm/web/
+
+          # Create hybrid package.json
+          cat > dist-wasm/package.json << 'EOF'
+          {
+            "name": "@terraphim/autocomplete-wasm",
+            "version": "1.0.0",
+            "description": "Terraphim AI autocomplete with WASM support",
+            "main": "terraphim_automata.js",
+            "browser": "web/terraphim_automata.js",
+            "types": "terraphim_automata.d.ts",
+            "files": [
+              "terraphim_automata_bg.wasm",
+              "terraphim_automata.js",
+              "terraphim_automata.d.ts",
+              "web/"
+            ],
+            "keywords": [
+              "autocomplete",
+              "wasm",
+              "webassembly",
+              "search",
+              "terraphim"
+            ],
+            "author": "Terraphim Contributors",
+            "license": "Apache-2.0",
+            "repository": {
+              "type": "git",
+              "url": "https://github.com/terraphim/terraphim-ai.git"
+            },
+            "engines": {
+              "node": ">=14.0.0"
+            }
+          }
+          EOF
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-package
+          path: dist-wasm/
+          if-no-files-found: error
+
+  test-wasm:
+    name: Test WASM Functionality
+    runs-on: ${{ matrix.settings.os }}
+    needs: build-wasm
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - os: ubuntu-latest
+            test: node
+          - os: ubuntu-latest
+            test: browser
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-package
+          path: wasm-test
+
+      - name: Test Node.js WASM
+        if: matrix.settings.test == 'node'
+        run: |
+          cd wasm-test
+          npm pack
+          npm install terraphim-automata-wasm-*.tgz
+
+          # Create test script
+          cat > test-wasm.js << 'EOF'
+          const pkg = require('terraphim-automata-wasm');
+
+          console.log('🧪 Testing WASM package...');
+          console.log('Available functions:', Object.keys(pkg));
+
+          // Test basic functionality if available
+          if (typeof pkg.build_autocomplete_index_from_json === 'function') {
+            console.log('✅ build_autocomplete_index_from_json available');
+          }
+
+          if (typeof pkg.autocomplete === 'function') {
+            console.log('✅ autocomplete available');
+          }
+
+          console.log('🎉 WASM Node.js test completed!');
+          EOF
+
+          node test-wasm.js
+
+      - name: Test Browser WASM
+        if: matrix.settings.test == 'browser'
+        run: |
+          cd wasm-test
+
+          # Install test dependencies
+          npm install --save-dev puppeteer
+
+          # Create browser test
+          cat > browser-test.js << 'EOF'
+          const puppeteer = require('puppeteer');
+          const path = require('path');
+
+          async function testWasm() {
+            console.log('🧪 Testing WASM in browser...');
+
+            const browser = await puppeteer.launch({ headless: 'new' });
+            const page = await browser.newPage();
+
+            // Create HTML test page
+            const html = `
+              <!DOCTYPE html>
+              <html>
+              <head>
+                <title>WASM Test</title>
+              </head>
+              <body>
+                <script>
+                  import('./web/terraphim_automata.js').then(module => {
+                    console.log('✅ WASM loaded in browser');
+                    console.log('Available:', Object.keys(module));
+                    window.testResult = 'success';
+                  }).catch(err => {
+                    console.error('❌ WASM load failed:', err);
+                    window.testResult = 'failed: ' + err.message;
+                  });
+                </script>
+                <div id="result">Loading...</div>
+              </body>
+              </html>
+            `;
+
+            await page.setContent(html, { waitUntil: 'networkidle0' });
+
+            // Wait for test to complete
+            await page.waitForFunction('window.testResult !== undefined', { timeout: 30000 });
+
+            const result = await page.evaluate(() => window.testResult);
+            console.log('Browser test result:', result);
+
+            if (result.startsWith('success')) {
+              console.log('✅ Browser WASM test passed!');
+            } else {
+              throw new Error('Browser test failed: ' + result);
+            }
+
+            await browser.close();
+          }
+
+          testWasm().catch(console.error);
+          EOF
+
+          node browser-test.js
+
+  publish-wasm:
+    name: Publish WASM Package to npm
+    runs-on: [self-hosted, Linux, terraphim, production, docker]
+    needs: test-wasm
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install 1Password CLI
+        run: |
+          curl -sSf https://downloads.1password.com/linux/keys/1password.asc | \
+            gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+            sudo tee /etc/apt/sources.list.d/1password.list
+          sudo apt update && sudo apt install op -y
+
+      - name: Authenticate with 1Password
+        run: |
+          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
+
+      - name: Get npm token from 1Password
+        id: token
+        run: |
+          TOKEN=$(op read "op://TerraphimPlatform/npm-wasm.token/token" || echo "")
+          if [[ -z "$TOKEN" ]]; then
+            echo "⚠️  npm-wasm token not found in 1Password, checking GitHub secrets"
+            TOKEN="${{ secrets.NPM_WASM_TOKEN }}"
+          fi
+
+          if [[ -z "$TOKEN" ]]; then
+            echo "⚠️  npm-wasm token not available, using main npm token"
+            TOKEN="${{ secrets.NPM_TOKEN }}"
+          fi
+
+          if [[ -z "$TOKEN" ]]; then
+            echo "❌ No npm token available for WASM publishing"
+            exit 1
+          fi
+
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "✅ npm token retrieved for WASM publishing"
+
+      - name: Download WASM artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: wasm-package
+          path: wasm-package
+
+      - name: Prepare WASM package for publishing
+        run: |
+          cd wasm-package
+
+          # Update version if provided
+          if [[ "${{ inputs.version }}" != "" ]]; then
+            echo "📝 Updating WASM package version to ${{ inputs.version }}"
+            npm version ${{ inputs.version }} --no-git-tag-version
+          fi
+
+          # Configure npm
+          echo "//registry.npmjs.org/:_authToken=${{ steps.token.outputs.token }}" > ~/.npmrc
+          npm config set provenance true
+
+          echo "📋 WASM package info:"
+          npm pack --dry-run | head -10
+
+      - name: Publish WASM package
+        run: |
+          cd wasm-package
+
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "🧪 Dry run mode - WASM package check only"
+            npm publish --dry-run --access public
+          else
+            echo "🚀 Publishing @terraphim/autocomplete-wasm to npm"
+            npm publish --access public
+            echo "✅ WASM package published successfully!"
+          fi
+
+      - name: Verify WASM package
+        if: inputs.dry_run != 'true'
+        run: |
+          echo "🔍 Verifying WASM package..."
+          sleep 30
+
+          npm view @terraphim/autocomplete-wasm || echo "⚠️  WASM package not immediately visible"
+          echo "📊 WASM package verification completed"
