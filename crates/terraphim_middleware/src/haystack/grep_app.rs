@@ -107,10 +107,8 @@ impl IndexMiddleware for GrepAppHaystackIndexer {
                 let title = format!("{} - {}", repo, file_name);
 
                 // Create a unique ID from repo, path, and branch
-                let id = format!("grepapp:{}:{}:{}", repo, branch, path)
-                    .replace('/', "_")
-                    .replace('.', "_")
-                    .replace(':', "_");
+                let id =
+                    format!("grepapp:{}:{}:{}", repo, branch, path).replace(['/', '.', ':'], "_");
 
                 let document = terraphim_types::Document {
                     id: id.clone(),
