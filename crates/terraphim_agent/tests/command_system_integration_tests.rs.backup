@@ -1,8 +1,4 @@
-#[tokio::test]
-async fn test_role_based_command_permissions() {
-    let validator = CommandValidator::new();
-
-    // Test different role permissions
+// Test different role permissions
     let test_cases = vec![
         ("Default", "ls -la", true),                          // Read-only command
         ("Default", "rm file.txt", false),                    // Write command
@@ -14,17 +10,14 @@ async fn test_role_based_command_permissions() {
 
     // Add debug output to understand validation flow
     for (role, command, should_succeed) in &test_cases {
-        println!(
-            "DEBUG: Testing role='{}', command='{}', should_succeed={}",
-            role, command, should_succeed
-        );
-
+        println!("DEBUG: Testing role='{}', command='{}', should_succeed={}", role, command, should_succeed);
+        
         let result = validator
             .validate_command_execution(command, role, &HashMap::new())
             .await;
-
+        
         println!("DEBUG: Validation result: {:?}", result);
-
+        
         if should_succeed {
             assert!(
                 result.is_ok(),

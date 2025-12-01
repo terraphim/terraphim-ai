@@ -421,7 +421,10 @@ parameters:
             println!("Time restriction test info: This may fail on weekends. Current time restrictions: Mon-Fri, 9AM-5PM");
         }
         // For now, we'll just ensure the validator doesn't panic
-        assert!(true, "Time restrictions check should complete without panicking");
+        assert!(
+            true,
+            "Time restrictions check should complete without panicking"
+        );
 
         // Test rate limiting
         let rate_result = validator.check_rate_limit("test");
@@ -512,7 +515,7 @@ parameters:
                 return; // Skip assertion - this is expected behavior on weekends
             }
         }
-        
+
         assert!(
             result.is_ok(),
             "Valid command should pass security validation (or fail due to weekend time restrictions). Error: {:?}",
