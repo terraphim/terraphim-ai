@@ -418,7 +418,7 @@ mod tests {
         let system = TerraphimTaskDecompositionSystem::with_default_config(automata, role_graph);
 
         let task = create_test_task();
-let config = TaskDecompositionSystemConfig {
+        let config = TaskDecompositionSystemConfig {
             min_confidence_threshold: 0.1, // Very low threshold for test
             ..Default::default()
         };
