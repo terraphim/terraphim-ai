@@ -3,7 +3,7 @@ use tauri::State;
 
 use serde::{Deserialize, Serialize};
 
-#[cfg(feature = "atomic")]
+#[cfg(feature = "terraphim_atomic_client")]
 use terraphim_atomic_client::{Agent, Config as AtomicConfig, Store};
 use terraphim_config::{Config, ConfigState};
 use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};
@@ -560,7 +560,7 @@ pub struct AutocompleteResponse {
 ///
 /// This command saves a document as an article to the specified atomic server.
 /// It uses the atomic client to create the resource with proper authentication.
-#[cfg(feature = "atomic")]
+#[cfg(feature = "terraphim_atomic_client")]
 #[command]
 pub async fn save_article_to_atomic(
     article: AtomicArticle,

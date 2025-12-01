@@ -6,7 +6,8 @@ import ArticleModal from './Search/ArticleModal.svelte';
 import type { Document } from './Search/SearchResult';
 import { is_tauri, role } from './stores';
 
-let { apiUrl = '/rolegraph', fullscreen = true }: { apiUrl?: string; fullscreen?: boolean } = $props();
+let { apiUrl = '/rolegraph', fullscreen = true }: { apiUrl?: string; fullscreen?: boolean } =
+	$props();
 
 let container = $state<HTMLDivElement>();
 let loading = $state(true);

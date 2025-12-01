@@ -1,5 +1,9 @@
 <script lang="ts">
-let { term, isFromKG = false, onRemove = null }: { term: string; isFromKG?: boolean; onRemove?: (() => void) | null } = $props();
+let {
+	term,
+	isFromKG = false,
+	onRemove = null,
+}: { term: string; isFromKG?: boolean; onRemove?: (() => void) | null } = $props();
 </script>
 
 <span class="term-chip" class:from-kg={isFromKG}>

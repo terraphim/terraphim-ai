@@ -152,54 +152,54 @@ $effect(() => {
 			schema.set(schemaJson);
 			// initialize draft from existing config
 			const current: any = get(configStore);
-		if (current?.id) {
-			draft.update((d) => ({
-				...d,
-				id: current.id,
-				global_shortcut: current.global_shortcut,
-				default_theme: current.roles[current.default_role]?.theme ?? 'spacelab',
-				default_role: current.default_role,
-				roles: Object.values(current.roles).map((r: any) => {
-					const autoPath = r.kg?.automata_path;
-					const url = autoPath?.Remote ?? '';
-					const localPath = r.kg?.knowledge_graph_local?.path ?? '';
-					return {
-						name: r.name,
-						shortname: r.shortname,
-						relevance_function: r.relevance_function,
-						terraphim_it: r.terraphim_it ?? false,
-						theme: r.theme,
-						haystacks: (r.haystacks ?? []).map((h: any) => ({
-							path: h.location || h.path || '', // Handle both old and new field names
-							read_only: h.read_only ?? false,
-							service: h.service || 'Ripgrep',
-							atomic_server_secret: h.atomic_server_secret || '',
-							extra_parameters: h.extra_parameters || {},
-							weight: h.weight ?? 1.0,
-						})),
-						kg: {
-							url,
-							local_path: localPath,
-							local_type: r.kg?.knowledge_graph_local?.input_type ?? 'markdown',
-							public: r.kg?.public ?? false,
-							publish: r.kg?.publish ?? false,
-						},
-						openrouter_enabled: r.openrouter_enabled ?? false,
-						openrouter_api_key: r.openrouter_api_key ?? '',
-						openrouter_model: r.openrouter_model ?? 'openai/gpt-3.5-turbo',
-						openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
-						openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
-						openrouter_chat_model:
-							r.openrouter_chat_model ?? r.openrouter_model ?? 'openai/gpt-3.5-turbo',
-						openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? '',
-						// Pull generic LLM settings from Role.extra if present
-						llm_provider: r.extra?.llm_provider ?? '',
-						llm_model: r.extra?.llm_model ?? '',
-						llm_base_url: r.extra?.llm_base_url ?? '',
-						llm_auto_summarize: r.extra?.llm_auto_summarize ?? false,
-					};
-				}),
-			}));
+			if (current?.id) {
+				draft.update((d) => ({
+					...d,
+					id: current.id,
+					global_shortcut: current.global_shortcut,
+					default_theme: current.roles[current.default_role]?.theme ?? 'spacelab',
+					default_role: current.default_role,
+					roles: Object.values(current.roles).map((r: any) => {
+						const autoPath = r.kg?.automata_path;
+						const url = autoPath?.Remote ?? '';
+						const localPath = r.kg?.knowledge_graph_local?.path ?? '';
+						return {
+							name: r.name,
+							shortname: r.shortname,
+							relevance_function: r.relevance_function,
+							terraphim_it: r.terraphim_it ?? false,
+							theme: r.theme,
+							haystacks: (r.haystacks ?? []).map((h: any) => ({
+								path: h.location || h.path || '', // Handle both old and new field names
+								read_only: h.read_only ?? false,
+								service: h.service || 'Ripgrep',
+								atomic_server_secret: h.atomic_server_secret || '',
+								extra_parameters: h.extra_parameters || {},
+								weight: h.weight ?? 1.0,
+							})),
+							kg: {
+								url,
+								local_path: localPath,
+								local_type: r.kg?.knowledge_graph_local?.input_type ?? 'markdown',
+								public: r.kg?.public ?? false,
+								publish: r.kg?.publish ?? false,
+							},
+							openrouter_enabled: r.openrouter_enabled ?? false,
+							openrouter_api_key: r.openrouter_api_key ?? '',
+							openrouter_model: r.openrouter_model ?? 'openai/gpt-3.5-turbo',
+							openrouter_auto_summarize: r.openrouter_auto_summarize ?? false,
+							openrouter_chat_enabled: r.openrouter_chat_enabled ?? false,
+							openrouter_chat_model:
+								r.openrouter_chat_model ?? r.openrouter_model ?? 'openai/gpt-3.5-turbo',
+							openrouter_chat_system_prompt: r.openrouter_chat_system_prompt ?? '',
+							// Pull generic LLM settings from Role.extra if present
+							llm_provider: r.extra?.llm_provider ?? '',
+							llm_model: r.extra?.llm_model ?? '',
+							llm_base_url: r.extra?.llm_base_url ?? '',
+							llm_auto_summarize: r.extra?.llm_auto_summarize ?? false,
+						};
+					}),
+				}));
 			}
 		} catch (e) {
 			console.error('Failed to load schema', e);
