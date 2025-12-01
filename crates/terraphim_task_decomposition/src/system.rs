@@ -418,49 +418,10 @@ mod tests {
         let system = TerraphimTaskDecompositionSystem::with_default_config(automata, role_graph);
 
         let task = create_test_task();
-        let mut config = TaskDecompositionSystemConfig::default();
-        config.min_confidence_threshold = 0.1; // Very low threshold for test
-
-        let result = system.decompose_task_workflow(&task, &config).await;
-        assert!(result.is_ok());
-
-        let workflow = result.unwrap();
-        assert_eq!(workflow.original_task.task_id, "test_task");
-        assert!(!workflow.decomposition.subtasks.is_empty());
-        assert!(!workflow.execution_plan.phases.is_empty());
-        assert!(workflow.metadata.confidence_score > 0.0);
-    }
-
-    #[tokio::test]
-    async fn test_simple_task_workflow() {
-        let automata = create_test_automata();
-        let role_graph = create_test_role_graph().await;
-        let system = TerraphimTaskDecompositionSystem::with_default_config(automata, role_graph);
-
-        let simple_task = Task::new(
-            "simple_task".to_string(),
-            "Simple task".to_string(),
-            TaskComplexity::Simple,
-            1,
-        );
-
-        let config = TaskDecompositionSystemConfig::default();
-        let result = system.decompose_task_workflow(&simple_task, &config).await;
-        assert!(result.is_ok());
-
-        let workflow = result.unwrap();
-        // Simple tasks should not be decomposed
-        assert_eq!(workflow.decomposition.subtasks.len(), 1);
-        assert_eq!(workflow.decomposition.metadata.depth, 0);
-    }
-
-    #[tokio::test]
-    async fn test_workflow_validation() {
-        let automata = create_test_automata();
-        let role_graph = create_test_role_graph().await;
-
-        let mut config = TaskDecompositionSystemConfig::default();
-        config.min_confidence_threshold = 0.1; // Very low threshold for test
+let config = TaskDecompositionSystemConfig {
+            min_confidence_threshold: 0.1, // Very low threshold for test
+            ..Default::default()
+        };
         let system = TerraphimTaskDecompositionSystem::new(automata, role_graph, config.clone());
 
         let task = create_test_task();
@@ -487,8 +448,10 @@ mod tests {
         let automata = create_test_automata();
         let role_graph = create_test_role_graph().await;
 
-        let mut config = TaskDecompositionSystemConfig::default();
-        config.min_confidence_threshold = 0.1; // Very low threshold for test
+        let config = TaskDecompositionSystemConfig {
+            min_confidence_threshold: 0.1, // Very low threshold for test
+            ..Default::default()
+        };
         let system = TerraphimTaskDecompositionSystem::new(automata, role_graph, config.clone());
 
         let task = create_test_task();

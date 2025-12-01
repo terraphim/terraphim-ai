@@ -48,6 +48,7 @@ This release includes signed updates. The desktop app will automatically check f
 ### Environment Variables
 ```bash
 # For signed releases (maintainers only)
+// pragma: allowlist secret
 export TAURI_PRIVATE_KEY="your_private_key"
 export TAURI_KEY_PASSWORD="optional_password"
 ```
