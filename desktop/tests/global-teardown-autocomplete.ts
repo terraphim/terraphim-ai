@@ -100,7 +100,7 @@ async function stopMCPServer(): Promise<void> {
 					await execAsync(`kill -KILL ${portPid}`);
 					console.log(`🔪 Force killed different process ${portPid} on port ${port}`);
 				}
-			} catch (fallbackError) {
+			} catch {
 				console.log(`✅ Port ${port} is now free`);
 			}
 		}
