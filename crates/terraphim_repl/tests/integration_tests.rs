@@ -6,7 +6,7 @@
 use serial_test::serial;
 use std::path::PathBuf;
 use std::process::Command;
-use terraphim_automata::{builder::Logseq, ThesaurusBuilder};
+use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
 
 /// Build a test thesaurus from the docs/src/kg directory
 async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn std::error::Error>> {
@@ -299,7 +299,9 @@ mod replace_tests {
             Ok(replaced) => {
                 // The context text should be preserved
                 assert!(
-                    replaced.contains("Run") || replaced.contains("install") || replaced.contains("dependencies"),
+                    replaced.contains("Run")
+                        || replaced.contains("install")
+                        || replaced.contains("dependencies"),
                     "Context should be preserved: {}",
                     replaced
                 );
@@ -337,7 +339,11 @@ mod thesaurus_tests {
 
         if let Ok(thesaurus) = result {
             for (key, term) in thesaurus.into_iter() {
-                assert!(!term.value.to_string().is_empty(), "Term {} should have a value", key);
+                assert!(
+                    !term.value.to_string().is_empty(),
+                    "Term {} should have a value",
+                    key
+                );
             }
         }
     }
@@ -456,9 +462,9 @@ mod error_handling_tests {
 
 #[cfg(test)]
 mod output_formatting_tests {
-    use comfy_table::{Cell, Table};
     use comfy_table::modifiers::UTF8_ROUND_CORNERS;
     use comfy_table::presets::UTF8_FULL;
+    use comfy_table::{Cell, Table};
 
     #[test]
     fn test_table_creation() {

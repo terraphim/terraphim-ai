@@ -5,7 +5,7 @@
 
 use serial_test::serial;
 use std::path::PathBuf;
-use terraphim_automata::{builder::Logseq, ThesaurusBuilder};
+use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
 
 /// Build a test thesaurus from the docs/src/kg directory
 async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn std::error::Error>> {
@@ -145,7 +145,10 @@ mod automata_tests {
             terraphim_automata::LinkType::PlainText,
         );
 
-        assert!(result.is_ok(), "replace_matches with PlainText should succeed");
+        assert!(
+            result.is_ok(),
+            "replace_matches with PlainText should succeed"
+        );
     }
 
     #[tokio::test]
