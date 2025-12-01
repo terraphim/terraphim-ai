@@ -11,75 +11,53 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CACHE_KEY: v1-${{ github.run_id }}
+  CACHE_KEY: v1-${{ hashFiles('**/Cargo.lock') }}
 
 concurrency:
   group: ci-${{ github.ref }}
-  cancel-in-progress: true
+
+# cancel-in-progress: true
 
 jobs:
   setup:
     runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    timeout-minutes: 15
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
       rust-targets: ${{ steps.targets.outputs.targets }}
-
     steps:
       - name: Checkout code
         uses: actions/checkout@v5
-
+      
+      - name: Clean target directory
+        run: |
+          rm -rf target || true
+          mkdir -p target
+        
       - name: Generate cache key
         id: cache
         run: |
-          echo "key=${{ env.CACHE_KEY }}" >> $GITHUB_OUTPUT
-
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+      
       - name: Set Ubuntu versions
         id: ubuntu
         run: |
-          # Include Ubuntu 18.04 for terraphim server compatibility
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo 'versions=["18.04", "20.04", "22.04", "24.04"]' >> $GITHUB_OUTPUT
           else
             echo 'versions=["22.04"]' >> $GITHUB_OUTPUT
           fi
-
+      
       - name: Set Rust targets
         id: targets
         run: |
-          # Simplified: Focus on primary target, add others for releases
           if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
             echo 'targets=["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]' >> $GITHUB_OUTPUT
           else
             echo 'targets=["x86_64-unknown-linux-gnu"]' >> $GITHUB_OUTPUT
           fi
-
-  lint-and-format:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [setup]
-    timeout-minutes: 15  # Reduced timeout with faster runner
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Install build dependencies
-        run: |
-          sudo apt-get update -qq
-          sudo apt-get install -yqq --no-install-recommends \
-            build-essential \
-            clang \
-            libclang-dev \
-            llvm-dev \
-            pkg-config \
-            libssl-dev
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain: 1.87.0
-          components: rustfmt, clippy
-
+      
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
@@ -90,206 +68,42 @@ jobs:
           key: ${{ needs.setup.outputs.cache-key }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-cargo-lint-
-
+      
       - name: Run format and linting checks
         run: ./scripts/ci-check-format.sh
 
-  build-frontend:
-    needs: setup
-    uses: ./.github/workflows/frontend-build.yml
-    with:
-      node-version: '18'
-      cache-key: ${{ needs.setup.outputs.cache-key }}
-
-  build-rust:
-    needs: [setup, build-frontend]
+  lint-and-format:
     runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    strategy:
-      fail-fast: false
-      matrix:
-        target: ${{ fromJSON(needs.setup.outputs.rust-targets) }}
-        ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
-        # Exclude some combinations to reduce CI time for non-release builds
-        exclude:
-          - ubuntu-version: "24.04"
-            target: "x86_64-unknown-linux-musl"
-
-    container: ubuntu:${{ matrix.ubuntu-version }}
-
-    env:
-      CARGO_TERM_COLOR: always
-
-    outputs:
-      binary-path: target/${{ matrix.target }}/release
-
+    timeout-minutes: 15
+    needs: [setup]
     steps:
-      - name: Install system dependencies
+      - name: Checkout code
+        uses: actions/checkout@v5
+      
+      - name: Install build dependencies
         run: |
-          apt-get update -qq
-          apt-get install -yqq --no-install-recommends \
+          sudo apt-get update -qq
+          sudo apt-get install -yqq --no-install-recommends \
             build-essential \
-            bison \
-            flex \
-            ca-certificates \
-            openssl \
-            libssl-dev \
-            bc \
-            wget \
-            git \
-            curl \
-            cmake \
-            pkg-config \
-            musl-tools \
-            musl-dev \
-            software-properties-common \
-            gpg-agent \
-            libglib2.0-dev \
-            libgtk-3-dev \
-            libwebkit2gtk-4.1-dev \
-            libsoup2.4-dev \
-            libjavascriptcoregtk-4.1-dev \
-            libayatana-appindicator3-dev \
-            librsvg2-dev \
             clang \
             libclang-dev \
             llvm-dev \
-            libc++-dev \
-            libc++abi-dev
-
-      - name: Setup cross-compilation toolchain
-        if: matrix.target != 'x86_64-unknown-linux-gnu'
-        run: |  # pragma: allowlist secret
-          case "${{ matrix.target }}" in
-            "aarch64-unknown-linux-gnu")
-              apt-get install -yqq gcc-aarch64-linux-gnu libc6-dev-arm64-cross
-              echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
-              echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++" >> $GITHUB_ENV  # pragma: allowlist secret
-              echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
-              ;;
-            "armv7-unknown-linux-musleabihf"|"armv7-unknown-linux-gnueabihf")
-              apt-get install -yqq gcc-arm-linux-gnueabihf libc6-dev-armhf-cross
-              echo "CC_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
-              echo "CXX_armv7_unknown_linux_gnueabihf=arm-linux-gnueabihf-g++" >> $GITHUB_ENV  # pragma: allowlist secret
-              echo "CARGO_TARGET_ARMV7_UNKNOWN_LINUX_GNUEABIHF_LINKER=arm-linux-gnueabihf-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
-              ;;
-            "x86_64-unknown-linux-musl")
-              echo "CC_x86_64_unknown_linux_musl=musl-gcc" >> $GITHUB_ENV  # pragma: allowlist secret
-              ;;
-          esac
-
-      - name: Install Rust
-        run: |
-          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.87.0
-          echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-          echo "CARGO_HOME=$HOME/.cargo" >> $GITHUB_ENV
-
-      - name: Add Rust target
-        run: |
-          rustup target add ${{ matrix.target }}
-          rustup component add clippy rustfmt
-
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ needs.setup.outputs.cache-key }}-${{ matrix.target }}-${{ matrix.ubuntu-version }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ needs.setup.outputs.cache-key }}-${{ matrix.target }}-${{ matrix.ubuntu-version }}-
-            ${{ needs.setup.outputs.cache-key }}-${{ matrix.target }}-
-
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend-dist
-
-      - name: Copy frontend dist
-        run: |
-          mkdir -p terraphim_server/dist
-          cp -r frontend-dist/* terraphim_server/dist/ || echo "No frontend files found"
-
-      - name: Build Rust project
-        run: |
-          # Set target for CI script
-          export TARGET="${{ matrix.target }}"
-          ./scripts/ci-check-rust.sh "$TARGET"
-
-      - name: Upload binary artifacts
-        uses: actions/upload-artifact@v5
-        with:
-          name: rust-binaries-${{ matrix.target }}-${{ matrix.ubuntu-version }}
-          path: target/${{ matrix.target }}/release/terraphim*
-          retention-days: 30
-
-      - name: Install cargo-deb
-        if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
-        run: cargo install cargo-deb
-
-      - name: Create .deb package
-        if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
-        run: |
-          # Create .deb package for terraphim_server
-          cargo deb --target ${{ matrix.target }} --package terraphim_server --no-build
-
-          # Upload .deb package
-          echo "Looking for .deb files..."
-          find target -name "*.deb" -type f
-
-      - name: Upload .deb packages
-        if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
-        uses: actions/upload-artifact@v5
-        with:
-          name: deb-packages-${{ matrix.target }}-${{ matrix.ubuntu-version }}
-          path: target/${{ matrix.target }}/debian/*.deb
-          retention-days: 30
-
-  build-tauri:
-    needs: [setup, build-frontend]
-    if: github.event_name != 'pull_request'
-    uses: ./.github/workflows/tauri-build.yml
-    with:
-      cache-key: ${{ needs.setup.outputs.cache-key }}
-
-  test-suite:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [setup, build-rust]
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y \
+            pkg-config \
+            libssl-dev \
             libglib2.0-dev \
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev \
+            libsoup2.4-dev \
             libjavascriptcoregtk-4.1-dev \
             libayatana-appindicator3-dev \
-            librsvg2-dev \
-            libsoup2.4-dev \
-            pkg-config \
-            build-essential
-          # Create symlinks for webkit2gtk-sys and javascriptcore-rs-sys crates looking for 4.0
-          # Symlink .pc files
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.0.pc
-          # Symlink library files
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so
-
+            librsvg2-dev
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: 1.87.0
-
+          components: rustfmt, clippy
+      
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
@@ -297,239 +111,9 @@ jobs:
             ~/.cargo/registry
             ~/.cargo/git
             target
-          key: ${{ needs.setup.outputs.cache-key }}-cargo-test-${{ hashFiles('**/Cargo.lock') }}
+          key: ${{ needs.setup.outputs.cache-key }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ needs.setup.outputs.cache-key }}-cargo-test-
-
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: terraphim_server/dist
-
-      - name: Run test suite
-        run: ./scripts/ci-check-tests.sh
-
-  test-desktop:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [setup, build-frontend]
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'desktop')
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v5
-        with:
-          node-version: '18'
-          cache: yarn
-          cache-dependency-path: desktop/yarn.lock
-
-      - name: Install system dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev libsoup2.4-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
-          # Create symlinks for webkit2gtk-sys and javascriptcore-rs-sys crates looking for 4.0
-          # Symlink .pc files
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/webkit2gtk-4.0.pc
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.1.pc /usr/lib/x86_64-linux-gnu/pkgconfig/javascriptcoregtk-4.0.pc
-          # Symlink library files
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.1.so /usr/lib/x86_64-linux-gnu/libwebkit2gtk-4.0.so
-          sudo ln -sf /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.1.so /usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so
-
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: desktop/dist
-
-      - name: Install frontend dependencies
-        working-directory: ./desktop
-        run: yarn install --frozen-lockfile
-
-      - name: Install Playwright browsers
-        working-directory: ./desktop
-        run: npx playwright install --with-deps
-
-      - name: Run desktop tests
-        run: ./scripts/ci-check-desktop.sh
-
-  build-docker:
-    needs: [setup, build-rust]
-    if: github.event_name != 'pull_request' || contains(github.event.pull_request.labels.*.name, 'docker')
-
-    uses: ./.github/workflows/docker-multiarch.yml
-    with:
-      platforms: linux/amd64,linux/arm64,linux/arm/v7
-      ubuntu-versions: ${{ needs.setup.outputs.ubuntu-versions }}
-      push: ${{ github.event_name != 'pull_request' }}
-      tag: ${{ github.ref_name }}
-      dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
-    secrets: inherit  # pragma: allowlist secret
-
-  package-repository:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [setup, build-rust]
-    if: github.event_name != 'pull_request'
-    strategy:
-      matrix:
-        ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
-
-    steps:
-      - name: Download all binary artifacts
-        uses: actions/download-artifact@v4
-        with:
-          pattern: deb-packages-*-${{ matrix.ubuntu-version }}
-          path: packages/
-          merge-multiple: true
-
-      - name: Create package repository structure
-        run: |
-          mkdir -p packages/ubuntu-${{ matrix.ubuntu-version }}
-          find packages/ -name "*.deb" -exec mv {} packages/ubuntu-${{ matrix.ubuntu-version }}/ \;
-
-      - name: Generate package metadata
-        run: |
-          cd packages/ubuntu-${{ matrix.ubuntu-version }}
-          apt-ftparchive packages . > Packages
-          gzip -k Packages
-          apt-ftparchive release . > Release
-
-      - name: Upload package repository
-        uses: actions/upload-artifact@v5
-        with:
-          name: deb-repository-ubuntu-${{ matrix.ubuntu-version }}
-          path: packages/ubuntu-${{ matrix.ubuntu-version }}/
-          retention-days: 90
-
-  security-scan:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: build-docker
-    if: github.event_name != 'pull_request'
-
-    steps:
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: ghcr.io/${{ github.repository }}:${{ github.ref_name }}-ubuntu22.04
-          format: 'sarif'
-          output: 'trivy-results.sarif'
-
-      - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
-        with:
-          sarif_file: 'trivy-results.sarif'
-
-  release:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [build-rust, build-docker, build-tauri, test-suite, security-scan]
-    if: startsWith(github.ref, 'refs/tags/')
-
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-
-      - name: Download all artifacts
-        uses: actions/download-artifact@v4
-        with:
-          path: release-artifacts/
-
-      - name: Create release structure
-        run: |
-          mkdir -p release/{binaries,packages,docker-images,desktop}
-
-          # Organize binaries by architecture and Ubuntu version
-          find release-artifacts/ -name "binaries-*" -type d | while read dir; do
-            target=$(basename "$dir" | sed 's/binaries-\(.*\)-ubuntu.*/\1/')
-            ubuntu=$(basename "$dir" | sed 's/.*-ubuntu\(.*\)/\1/')
-            mkdir -p "release/binaries/${target}"
-            cp -r "$dir"/* "release/binaries/${target}/"
-          done
-
-          # Organize .deb packages
-          find release-artifacts/ -name "*.deb" -exec cp {} release/packages/ \;
-
-          # Organize desktop applications
-          find release-artifacts/ -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" | while read file; do
-            cp "$file" release/desktop/
-          done
-
-          # Create checksums
-          cd release
-          find . -type f -name "terraphim*" -exec sha256sum {} \; > SHA256SUMS
-
-      - name: Create GitHub Release
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            release/binaries/**/*
-            release/packages/*.deb
-            release/desktop/*
-            release/SHA256SUMS
-          body: |
-            ## Release ${{ github.ref_name }}
-
-            ### Binaries
-            - Linux x86_64 (GNU and musl)
-            - Linux ARM64
-            - Linux ARMv7
-
-            ### Desktop Applications
-            - macOS: .dmg installer
-            - Linux: .AppImage portable
-            - Windows: .msi and .exe installers
-
-            ### Docker Images
-            Available for Ubuntu 18.04, 20.04, 22.04, and 24.04:
-            ```bash
-            docker pull ghcr.io/${{ github.repository }}:${{ github.ref_name }}-ubuntu22.04
-            ```
-
-            ### Debian Packages
-            Install with:
-            ```bash
-            wget https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/terraphim-server_*.deb
-            sudo dpkg -i terraphim-server_*.deb
-            ```
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-  cleanup:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [build-rust, build-docker, build-tauri, test-suite]
-    if: always() && github.event_name == 'pull_request'
-
-    steps:
-      - name: Clean up PR artifacts
-        uses: geekyeggo/delete-artifact@v5
-        with:
-          name: |
-            frontend-dist
-            binaries-*
-            deb-package-*
-            desktop-*
-        continue-on-error: true
-
-  summary:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
-    needs: [setup, build-frontend, build-rust, build-docker, build-tauri, test-suite]
-    if: always()
-
-    steps:
-      - name: Generate build summary
-        run: |
-          echo "## CI Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Component | Status |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----------|---------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Frontend Build | ${{ needs.build-frontend.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Rust Build | ${{ needs.build-rust.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Docker Build | ${{ needs.build-docker.result == 'success' && '✅' || needs.build-docker.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Tauri Build | ${{ needs.build-tauri.result == 'success' && '✅' || needs.build-tauri.result == 'skipped' && '⏭️' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "| Test Suite | ${{ needs.test-suite.result == 'success' && '✅' || '❌' }} |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "**Ubuntu Versions:** ${{ needs.setup.outputs.ubuntu-versions }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Rust Targets:** ${{ needs.setup.outputs.rust-targets }}" >> $GITHUB_STEP_SUMMARY
-          echo "**Comprehensive CI/CD Pipeline Status:** $([ '${{ needs.build-rust.result }}' == 'success' ] && echo 'ACTIVE ✅' || echo 'FAILED ❌')" >> $GITHUB_STEP_SUMMARY
+            ${{ needs.setup.outputs.cache-key }}-cargo-lint-
+      
+      - name: Run format and linting checks
+        run: ./scripts/ci-check-format.sh
