@@ -415,7 +415,7 @@ mod tests {
     async fn test_workflow_execution() {
         let automata = create_test_automata();
         let role_graph = create_test_role_graph().await;
-        let system = TerraphimTaskDecompositionSystem::with_default_config(automata, role_graph);
+        let _system = TerraphimTaskDecompositionSystem::with_default_config(automata, role_graph);
 
         let task = create_test_task();
         let config = TaskDecompositionSystemConfig {
