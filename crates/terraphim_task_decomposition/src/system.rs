@@ -194,6 +194,7 @@ impl TerraphimTaskDecompositionSystem {
     }
 
     /// Validate that the workflow meets quality thresholds
+    #[allow(dead_code)]
     fn validate_workflow_quality(&self, workflow: &TaskDecompositionWorkflow) -> bool {
         // Check confidence threshold
         if workflow.metadata.confidence_score < self.config.min_confidence_threshold {
