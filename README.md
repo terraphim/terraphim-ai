@@ -5,8 +5,26 @@
 [![PyPI](https://img.shields.io/pypi/v/terraphim-automata.svg)](https://pypi.org/project/terraphim-automata/)
 [![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
 [![Discourse](https://img.shields.io/discourse/users?server=https%3A%2F%2Fterraphim.discourse.group)](https://terraphim.discourse.group)
+[![Crates.io](https://img.shields.io/crates/v/terraphim-repl.svg)](https://crates.io/crates/terraphim-repl)
 
 Terraphim is a privacy-first AI assistant that works for you under your complete control and is fully deterministic.
+
+## 🆕 v1.0.0 Minimal Release - NOW AVAILABLE!
+
+**Quick Install** (works on Linux, macOS, Windows):
+```bash
+cargo install terraphim-repl    # Interactive REPL (11 commands)
+cargo install terraphim-cli     # Automation CLI (8 commands)
+```
+
+**Features**:
+- 🔍 Semantic knowledge graph search
+- 🔗 Smart text linking (markdown/html/wiki)
+- 💾 Offline-capable (embedded defaults)
+- ⚡ Lightweight (15 MB RAM, 13 MB disk)
+- 🚀 Fast (<200ms operations)
+
+**Learn more**: [v1.0.0 Release Notes](RELEASE_NOTES_v1.0.0.md) | [Cross-Platform Guide](CROSS_PLATFORM_STATUS.md)
 
 You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
 
