@@ -1005,7 +1005,6 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 /// - RoleGraphSync serialization methods acquire internal locks automatically
 /// - The serializable representation includes all data needed to rebuild the automata
 /// - Performance consideration: Large graphs may have significant serialization overhead
-
 #[cfg(test)]
 mod tests {
     use super::*;
