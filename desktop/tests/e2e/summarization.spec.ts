@@ -367,7 +367,7 @@ test.describe('Document Summarization E2E Tests', () => {
 					await page.waitForSelector('[data-testid="ai-summary"]', {
 						timeout: 5000, // Very short timeout to trigger timeout scenario
 					});
-				} catch (timeoutError) {
+				} catch {
 					console.log('Expected timeout occurred, checking error handling');
 
 					// Check for timeout error message
