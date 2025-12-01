@@ -5,7 +5,7 @@
 
 use serial_test::serial;
 use std::path::PathBuf;
-use terraphim_automata::{builder::Logseq, ThesaurusBuilder};
+use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
 
 /// Build a test thesaurus from the docs/src/kg directory
 async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn std::error::Error>> {
@@ -64,7 +64,10 @@ mod thesaurus_tests {
         if let Ok(thesaurus) = result {
             let mut count = 0;
             for (_key, term) in thesaurus.into_iter() {
-                assert!(!term.value.to_string().is_empty(), "Term value should not be empty");
+                assert!(
+                    !term.value.to_string().is_empty(),
+                    "Term value should not be empty"
+                );
                 count += 1;
             }
             assert!(count > 0, "Should iterate over at least one term");
@@ -99,7 +102,10 @@ mod find_matches_tests {
         let text = "";
         let result = terraphim_automata::find_matches(text, thesaurus, true);
 
-        assert!(result.is_ok(), "find_matches should succeed with empty text");
+        assert!(
+            result.is_ok(),
+            "find_matches should succeed with empty text"
+        );
         let matches = result.unwrap();
         assert!(matches.is_empty(), "Empty text should have no matches");
     }
@@ -228,9 +234,15 @@ mod replace_matches_tests {
             terraphim_automata::LinkType::MarkdownLinks,
         );
 
-        assert!(result.is_ok(), "replace_matches should succeed with empty text");
+        assert!(
+            result.is_ok(),
+            "replace_matches should succeed with empty text"
+        );
         let replaced = String::from_utf8(result.unwrap()).unwrap();
-        assert!(replaced.is_empty(), "Empty input should produce empty output");
+        assert!(
+            replaced.is_empty(),
+            "Empty input should produce empty output"
+        );
     }
 
     #[tokio::test]
@@ -275,7 +287,10 @@ mod search_query_tests {
 
         assert_eq!(query.search_term.to_string(), "rust async");
         assert_eq!(query.limit, Some(10));
-        assert_eq!(query.role.as_ref().map(|r| r.to_string()), Some("Default".to_string()));
+        assert_eq!(
+            query.role.as_ref().map(|r| r.to_string()),
+            Some("Default".to_string())
+        );
     }
 
     #[test]
@@ -352,18 +367,23 @@ mod embedded_assets_tests {
 
     #[test]
     fn test_default_config_path() {
-        let config_path = dirs::home_dir()
-            .map(|h| h.join(".terraphim").join("config.json"));
+        let config_path = dirs::home_dir().map(|h| h.join(".terraphim").join("config.json"));
 
-        assert!(config_path.is_some(), "Should be able to construct config path");
+        assert!(
+            config_path.is_some(),
+            "Should be able to construct config path"
+        );
     }
 
     #[test]
     fn test_default_thesaurus_path() {
-        let thesaurus_path = dirs::home_dir()
-            .map(|h| h.join(".terraphim").join("default_thesaurus.json"));
+        let thesaurus_path =
+            dirs::home_dir().map(|h| h.join(".terraphim").join("default_thesaurus.json"));
 
-        assert!(thesaurus_path.is_some(), "Should be able to construct thesaurus path");
+        assert!(
+            thesaurus_path.is_some(),
+            "Should be able to construct thesaurus path"
+        );
     }
 
     #[test]
