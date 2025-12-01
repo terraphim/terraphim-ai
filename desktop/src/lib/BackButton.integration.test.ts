@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/svelte';
+import { render, screen } from '@testing-library/svelte/svelte5';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import Chat from './Chat/Chat.svelte';
 import ConfigJsonEditor from './ConfigJsonEditor.svelte';
