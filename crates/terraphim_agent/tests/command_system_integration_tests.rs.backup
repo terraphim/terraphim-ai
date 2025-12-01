@@ -11,13 +11,13 @@
     // Add debug output to understand validation flow
     for (role, command, should_succeed) in &test_cases {
         println!("DEBUG: Testing role='{}', command='{}', should_succeed={}", role, command, should_succeed);
-        
+
         let result = validator
             .validate_command_execution(command, role, &HashMap::new())
             .await;
-        
+
         println!("DEBUG: Validation result: {:?}", result);
-        
+
         if should_succeed {
             assert!(
                 result.is_ok(),
