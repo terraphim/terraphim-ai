@@ -200,7 +200,9 @@ mod role_switching_tests {
                 }
                 // Should have either role or terms field
                 assert!(
-                    json.get("role").is_some() || json.get("terms").is_some() || json.get("name").is_some(),
+                    json.get("role").is_some()
+                        || json.get("terms").is_some()
+                        || json.get("name").is_some(),
                     "Thesaurus should have role, terms, or name field: {:?}",
                     json
                 );
@@ -495,7 +497,10 @@ mod find_tests {
                 if let Some(matches) = json["matches"].as_array() {
                     for m in matches {
                         assert!(m.get("term").is_some(), "Match should have term");
-                        assert!(m.get("normalized").is_some(), "Match should have normalized");
+                        assert!(
+                            m.get("normalized").is_some(),
+                            "Match should have normalized"
+                        );
                     }
                 }
             }
@@ -513,10 +518,7 @@ mod find_tests {
         match result {
             Ok(json) => {
                 let count = json["count"].as_u64().unwrap_or(0) as usize;
-                let matches_len = json["matches"]
-                    .as_array()
-                    .map(|a| a.len())
-                    .unwrap_or(0);
+                let matches_len = json["matches"].as_array().map(|a| a.len()).unwrap_or(0);
                 assert_eq!(count, matches_len, "Count should match array length");
             }
             Err(e) => {
@@ -579,7 +581,10 @@ mod thesaurus_tests {
                     for term in terms {
                         assert!(term.get("id").is_some(), "Term should have id");
                         assert!(term.get("term").is_some(), "Term should have term");
-                        assert!(term.get("normalized").is_some(), "Term should have normalized");
+                        assert!(
+                            term.get("normalized").is_some(),
+                            "Term should have normalized"
+                        );
                     }
                 }
             }
@@ -598,10 +603,7 @@ mod thesaurus_tests {
             Ok(json) => {
                 let total = json["total_count"].as_u64().unwrap_or(0);
                 let shown = json["shown_count"].as_u64().unwrap_or(0);
-                assert!(
-                    total >= shown,
-                    "Total count should be >= shown count"
-                );
+                assert!(total >= shown, "Total count should be >= shown count");
             }
             Err(e) => {
                 eprintln!("Thesaurus count test skipped: {}", e);

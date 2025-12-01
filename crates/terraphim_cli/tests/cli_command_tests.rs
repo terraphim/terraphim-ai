@@ -135,10 +135,7 @@ fn test_no_command_shows_help() {
 
 #[test]
 fn test_invalid_command() {
-    cli_command()
-        .arg("invalid_command")
-        .assert()
-        .failure();
+    cli_command().arg("invalid_command").assert().failure();
 }
 
 // Integration tests that require service initialization
@@ -251,8 +248,8 @@ mod integration {
 
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let parsed: serde_json::Value = serde_json::from_str(&stdout)
-                .expect("Should be valid JSON");
+            let parsed: serde_json::Value =
+                serde_json::from_str(&stdout).expect("Should be valid JSON");
 
             assert_eq!(
                 parsed["role"].as_str(),
@@ -272,8 +269,8 @@ mod integration {
 
         if output.status.success() {
             let stdout = String::from_utf8_lossy(&output.stdout);
-            let parsed: serde_json::Value = serde_json::from_str(&stdout)
-                .expect("Should be valid JSON");
+            let parsed: serde_json::Value =
+                serde_json::from_str(&stdout).expect("Should be valid JSON");
 
             let count = parsed["count"].as_u64().unwrap_or(0);
             assert!(count <= 5, "Results should respect limit");
@@ -330,7 +327,12 @@ mod integration {
     #[serial]
     fn test_replace_command_markdown() {
         let output = cli_command()
-            .args(["replace", "rust async programming", "--link-format", "markdown"])
+            .args([
+                "replace",
+                "rust async programming",
+                "--link-format",
+                "markdown",
+            ])
             .output()
             .expect("Failed to execute command");
 
@@ -480,10 +482,7 @@ mod integration {
             let parsed: serde_json::Value =
                 serde_json::from_str(&stdout).expect("Should be valid JSON");
 
-            assert!(
-                parsed["matches"].is_array(),
-                "Matches should be an array"
-            );
+            assert!(parsed["matches"].is_array(), "Matches should be an array");
         }
     }
 
