@@ -28,6 +28,7 @@ jobs:
       rust-targets: ${{ steps.targets.outputs.targets }}
     steps:
       - name: Clean workspace before checkout
+        shell: bash
         run: |
           sudo rm -rf target || true
           sudo rm -rf .cargo || true
@@ -35,6 +36,8 @@ jobs:
           
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          clean: false
       
       - name: Clean target directory
         run: |
@@ -84,6 +87,7 @@ jobs:
     needs: [setup]
     steps:
       - name: Clean workspace before checkout
+        shell: bash
         run: |
           sudo rm -rf target || true
           sudo rm -rf .cargo || true
@@ -91,6 +95,8 @@ jobs:
           
       - name: Checkout code
         uses: actions/checkout@v5
+        with:
+          clean: false
       
       - name: Install build dependencies
         run: |
