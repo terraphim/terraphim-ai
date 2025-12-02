@@ -121,7 +121,7 @@ source-native:
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   # Exclude problematic firecracker from vendoring for now
-  RUN mkdir -p terraphim_firecracker && echo "placeholder" > terraphim_firecracker/Cargo.toml
+  RUN mkdir -p terraphim_firecracker && echo 'placeholder' > terraphim_firecracker/Cargo.toml
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
