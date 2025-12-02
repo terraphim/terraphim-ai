@@ -122,12 +122,13 @@ source-native:
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   # Remove firecracker before cargo vendor
   RUN rm -rf terraphim_firecracker || true
-  # Remove firecracker from workspace members list
-  RUN sed -i 's/,"terraphim_firecracker"//' Cargo.toml
-  RUN sed -i 's/"terraphim_firecracker",//' Cargo.toml
+  # Create a temporary Cargo.toml without firecracker for CI
+  RUN cp Cargo.toml Cargo.toml.bak
   RUN sed -i '/terraphim_firecracker/d' Cargo.toml
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
+  # Restore original Cargo.toml for other steps
+  RUN mv Cargo.toml.bak Cargo.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
   SAVE ARTIFACT /code
 
