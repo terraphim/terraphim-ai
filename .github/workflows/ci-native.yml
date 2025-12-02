@@ -27,6 +27,12 @@ jobs:
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
       rust-targets: ${{ steps.targets.outputs.targets }}
     steps:
+      - name: Clean workspace before checkout
+        run: |
+          sudo rm -rf target || true
+          sudo rm -rf .cargo || true
+          find . -name "*.lock" -type f -delete 2>/dev/null || true
+          
       - name: Checkout code
         uses: actions/checkout@v5
       
@@ -77,6 +83,12 @@ jobs:
     timeout-minutes: 15
     needs: [setup]
     steps:
+      - name: Clean workspace before checkout
+        run: |
+          sudo rm -rf target || true
+          sudo rm -rf .cargo || true
+          find . -name "*.lock" -type f -delete 2>/dev/null || true
+          
       - name: Checkout code
         uses: actions/checkout@v5
       
