@@ -230,6 +230,8 @@ fmt:
 
 lint:
   FROM +workspace-debug
+  # Temporarily exclude firecracker from workspace for linting
+  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
   RUN rm -rf terraphim_firecracker || true
   RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker
 
