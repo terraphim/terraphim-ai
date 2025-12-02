@@ -230,6 +230,7 @@ fmt:
 lint:
   FROM +workspace-debug
   # Exclude firecracker from workspace for linting
+  RUN rm -rf terraphim_firecracker || true
   RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker
 
 build-focal:
