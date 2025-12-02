@@ -123,6 +123,8 @@ source-native:
   # Remove firecracker before cargo vendor
   RUN rm -rf terraphim_firecracker || true
   # Remove firecracker from workspace members list
+  RUN sed -i 's/,"terraphim_firecracker"//' Cargo.toml
+  RUN sed -i 's/"terraphim_firecracker",//' Cargo.toml
   RUN sed -i '/terraphim_firecracker/d' Cargo.toml
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
