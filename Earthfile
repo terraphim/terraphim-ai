@@ -136,9 +136,12 @@ build-native:
 build-debug-native:
   FROM +source-native
   WORKDIR /code
+  # Remove firecracker from workspace before building
+  RUN rm -rf terraphim_firecracker || true
+  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
   RUN cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
-  # Save the entire target directory for reuse by fmt, lint, test
+  # Save entire target directory for reuse by fmt, lint, test
   SAVE ARTIFACT /code/target /target
 
 workspace-debug:
