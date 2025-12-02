@@ -230,7 +230,7 @@ fmt:
 
 lint:
   FROM +workspace-debug
-  RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker
+  RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker --exclude terraphim_firecracker
 
 build-focal:
   FROM ubuntu:20.04
