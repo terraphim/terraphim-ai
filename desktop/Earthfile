@@ -11,8 +11,8 @@ node-setup:
     ENV DEBCONF_NONINTERACTIVE_SEEN=true
     RUN apt-get update -qq
     RUN apt-get install -yqq --no-install-recommends curl ca-certificates gnupg
-    # Install Node.js 18 from NodeSource official repository
-    RUN curl -fsSL https://deb.nodesource.com/setup_18.x | bash -
+    # Install Node.js 20 from NodeSource official repository
+    RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash -
     RUN apt-get install -yqq nodejs
     # Install Yarn
     RUN npm install -g yarn
