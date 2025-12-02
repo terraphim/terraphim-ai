@@ -27,17 +27,18 @@ jobs:
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
       rust-targets: ${{ steps.targets.outputs.targets }}
     steps:
-      - name: Clean workspace before checkout
+      - name: Force clean workspace
         shell: bash
         run: |
-          sudo rm -rf target || true
-          sudo rm -rf .cargo || true
+          sudo chmod -R 777 . || true
+          sudo rm -rf target .cargo || true
           find . -name "*.lock" -type f -delete 2>/dev/null || true
           
       - name: Checkout code
         uses: actions/checkout@v5
         with:
           clean: false
+          fetch-depth: 0
       
       - name: Clean target directory
         run: |
