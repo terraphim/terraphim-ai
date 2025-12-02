@@ -124,7 +124,12 @@ source-native:
   RUN rm -rf terraphim_firecracker || true
   # Create a temporary Cargo.toml without firecracker for CI
   RUN cp Cargo.toml Cargo.toml.bak
+  # Remove firecracker from members array and fix formatting
+  RUN sed -i 's/,"terraphim_firecracker"//' Cargo.toml
+  RUN sed -i 's/"terraphim_firecracker",//' Cargo.toml
   RUN sed -i '/terraphim_firecracker/d' Cargo.toml
+  # Ensure default-members only contains valid members
+  RUN sed -i 's/default-members = \["terraphim_server"\]/default-members = ["terraphim_server"]/' Cargo.toml
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   # Restore original Cargo.toml for other steps
