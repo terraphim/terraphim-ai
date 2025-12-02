@@ -120,9 +120,8 @@ source-native:
   COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
-  # Exclude problematic firecracker from vendoring for now
-  RUN mkdir -p terraphim_firecracker
-  RUN echo '[package]\nname = "terraphim-firecracker"\nversion = "0.1.0"\nedition = "2021"\n\n[lib]\nname = "terraphim_firecracker"\ncrate-type = ["cdylib"]\nlib.path = "src"' > terraphim_firecracker/Cargo.toml
+  # Remove firecracker before cargo vendor
+  RUN rm -rf terraphim_firecracker || true
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
