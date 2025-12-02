@@ -139,6 +139,8 @@ build-debug-native:
   # Remove firecracker from workspace before building
   RUN rm -rf terraphim_firecracker || true
   RUN sed -i '/terraphim_firecracker/d' Cargo.toml
+  # Also update default-members to match the remaining members
+  RUN sed -i 's/default-members = \["terraphim_server"\]/default-members = ["terraphim_server"]/' Cargo.toml
   RUN cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
   # Save entire target directory for reuse by fmt, lint, test
