@@ -120,10 +120,55 @@ source-native:
   COPY --keep-ts --dir terraphim_server desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
-  # Skip cargo vendor for now to avoid workspace issues
+  # Remove firecracker before cargo vendor
   RUN rm -rf terraphim_firecracker || true
+  # Create a CI-specific Cargo.toml without firecracker
+  RUN cat > Cargo.toml.ci << 'EOF'
+[workspace]
+resolver = "2"
+members = ["crates/*", "terraphim_server", "desktop/src-tauri"]
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py"]
+default-members = ["terraphim_server"]
+
+[workspace.package]
+edition = "2024"
+
+[workspace.dependencies]
+# OpenRouter AI integration dependencies
+tokio = { version = "1.0", features = ["full"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Direct HTTP LLM client approach (removed rig-core)
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+log = "0.4"
+
+[patch.crates-io]
+genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+
+[profile.release]
+panic = "unwind"
+lto = false
+codegen-units = 1
+opt-level = 3
+
+# Optimized release profile for production builds (like ripgrep)
+[profile.release-lto]
+inherits = "release"
+lto = true
+codegen-units = 1
+opt-level = 3
+panic = "abort"
+EOF
+  # Use CI-specific Cargo.toml for vendor
+  RUN cp Cargo.toml.ci Cargo.toml
   RUN mkdir -p .cargo
-  RUN echo "source = 'crates-io'" > .cargo/config.toml
+  RUN cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
   SAVE ARTIFACT /code
 
