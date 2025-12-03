@@ -42,6 +42,7 @@ jobs:
 
       - name: Clone md-book fork
         run: |
+          rm -rf /tmp/md-book || true
           git clone https://github.com/terraphim/md-book.git /tmp/md-book
           cd /tmp/md-book
           cargo build --release
