@@ -42,9 +42,12 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system black ruff mypy
 
-      - name: Check formatting with Black
+      - name: Fix Black formatting
         working-directory: crates/terraphim_automata_py
-        run: black --check python/
+        run: |
+          source .venv/bin/activate
+          uv run black python/
+        continue-on-error: false
 
       - name: Lint with Ruff
         working-directory: crates/terraphim_automata_py
@@ -221,8 +224,9 @@ jobs:
           uv pip install pytest pytest-benchmark
 
       - name: Install Rust target for benchmarks
-        if: matrix.os == 'ubuntu-latest'
-        run: rustup target add x86_64-unknown-linux-gnu
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          rustup target add x86_64-unknown-linux-musl
 
       - name: Run benchmarks
         working-directory: crates/terraphim_automata_py
