@@ -75,8 +75,12 @@ impl TerraphimApp {
         let chat_view_clone = chat_view.clone();
         let search_sub = cx.subscribe(&search_view, move |this: &mut TerraphimApp, _search, event: &AddToContextEvent, cx| {
             log::info!("App received AddToContext for: {}", event.document.title);
+            // Store document for later - we'll open modal when navigating to chat
+            // For now, just navigate to chat - the modal will be opened there
             chat_view_clone.update(cx, |chat, chat_cx| {
-                chat.add_document_as_context(event.document.clone(), chat_cx);
+                // TODO: Open context edit modal with document
+                // For now, directly add to context (will be replaced with modal)
+                chat.add_document_as_context_direct(event.document.clone(), chat_cx);
             });
             // Navigate to chat to show the context
             this.navigate_to(AppView::Chat, cx);

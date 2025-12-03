@@ -6,6 +6,7 @@ use gpui_component::{IconName, StyledExt};
 use std::sync::Arc;
 use terraphim_types::{RoleName, Document};
 use crate::kg_search::{KGSearchService, KGTerm, KGSearchResult};
+use crate::theme::colors::theme;
 
 /// Knowledge Graph search modal
 pub struct KGSearchModal {
@@ -252,9 +253,9 @@ impl Render for KGSearchModal {
             .relative()
             .w(px(600.0))
             .max_h(px(80.0 * 16.0)) // 80vh
-            .bg(rgb(0xffffff))
+            .bg(theme::background())
             .border_2()
-            .border_color(rgb(0xdbdbdb))
+            .border_color(theme::border())
             .rounded_lg()
             .shadow_xl()
             .child(
@@ -271,12 +272,12 @@ impl Render for KGSearchModal {
                             .px_6()
                             .py_4()
                             .border_b_1()
-                            .border_color(rgb(0xdbdbdb))
+                            .border_color(theme::border())
                             .child(
                                 div()
                                     .text_xl()
                                     .font_bold()
-                                    .text_color(rgb(0x363636))
+                                    .text_color(theme::text_primary())
                                     .child("Knowledge Graph Search"),
                             )
                             .child(
@@ -296,7 +297,7 @@ impl Render for KGSearchModal {
                             .child(
                                 div()
                                     .text_sm()
-                                    .text_color(rgb(0x7a7a7a))
+                                    .text_color(theme::text_secondary())
                                     .mb_3()
                                     .child("Search and add terms from the knowledge graph to your context"),
                             )
@@ -317,7 +318,7 @@ impl Render for KGSearchModal {
                     .flex_1()
                     .px_6()
                     .pb_6()
-                    .overflow_y_scroll()
+                    .overflow_hidden()  // Use overflow_hidden instead of overflow_y_scroll
                     .child(
                         if self.is_searching {
                             // Loading state
@@ -333,14 +334,14 @@ impl Render for KGSearchModal {
                                         .h_8()
                                         .border_2()
                                         .border_t_4()
-                                        .border_rgb(rgb(0x3273dc))
-                                        .rounded_full()
-                                        .animate(cx.listener(|view|div.rotate(360.0, cx))),
+                                        .border_color(theme::primary())
+                                        .rounded_full(),
+                                        // TODO: Add spinner animation when GPUI supports it
                                 )
                                 .child(
                                     div()
                                         .mt_4()
-                                        .text_color(rgb(0x7a7a7a))
+                                        .text_color(theme::text_secondary())
                                         .child("Searching knowledge graph..."),
                                 )
                         } else if self.suggestions.is_empty() && self.get_query(cx).trim().len() >= 2 {
@@ -352,7 +353,7 @@ impl Render for KGSearchModal {
                                 .items_center()
                                 .justify_center()
                                 .py_8()
-                                .text_color(rgb(0x7a7a7a))
+                                .text_color(theme::text_secondary())
                                 .child("No knowledge graph terms found")
                         } else if self.get_query(cx).trim().len() >= 2 {
                             // Results list (simplified - add full implementation later)
@@ -369,7 +370,7 @@ impl Render for KGSearchModal {
                                 .items_center()
                                 .justify_center()
                                 .py_8()
-                                .text_color(rgb(0x7a7a7a))
+                                .text_color(theme::text_secondary())
                                 .child("Enter at least 2 characters to search the knowledge graph")
                         }
                     ),
@@ -380,7 +381,7 @@ impl Render for KGSearchModal {
                     div()
                         .px_6()
                         .pb_4()
-                        .text_color(rgb(0xd93025))
+                        .text_color(theme::danger())
                         .child(error)
                 }
             )

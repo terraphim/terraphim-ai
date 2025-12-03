@@ -10,6 +10,13 @@ use terraphim_service::llm;
 use terraphim_types::{ChatMessage, ContextItem, ContextType, Conversation, ConversationId, RoleName};
 use tokio::sync::Mutex as TokioMutex;
 
+use crate::theme::colors::theme;
+
+mod context_edit_modal;
+pub use context_edit_modal::{ContextEditModal, ContextEditModalEvent, ContextEditMode};
+
+impl EventEmitter<ContextEditModalEvent> for ChatView {}
+
 /// Chat view with real ContextManager and LLM backend
 pub struct ChatView {
     context_manager: Arc<TokioMutex<TerraphimContextManager>>,
@@ -21,6 +28,7 @@ pub struct ChatView {
     is_sending: bool,
     show_context_panel: bool,
     context_items: Vec<ContextItem>,
+    context_edit_modal: Entity<ContextEditModal>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -38,7 +46,7 @@ impl ChatView {
 
         // Subscribe to input events for message sending
         let input_clone = input_state.clone();
-        let input_sub = cx.subscribe_in(&input_state, window, move |this, _, ev: &GpuiInputEvent, _window, cx| {
+        let input_sub = cx.subscribe_in(&input_state, window, move |this, _, ev: &GpuiInputEvent, window, cx| {
             match ev {
                 GpuiInputEvent::PressEnter { .. } => {
                     let value = input_clone.read(cx).value();
@@ -48,6 +56,31 @@ impl ChatView {
                     }
                 }
                 _ => {}
+            }
+        });
+
+        // Create context edit modal
+        let context_edit_modal = cx.new(|cx| ContextEditModal::new(window, cx));
+        
+        // Subscribe to context edit modal events
+        let modal_clone = context_edit_modal.clone();
+        let modal_sub = cx.subscribe(&context_edit_modal, move |this, _modal, event: &ContextEditModalEvent, cx| {
+            match event {
+                ContextEditModalEvent::Create(context_item) => {
+                    log::info!("ContextEditModal: Create event received");
+                    this.add_context(context_item.clone(), cx);
+                }
+                ContextEditModalEvent::Update(context_item) => {
+                    log::info!("ContextEditModal: Update event received");
+                    this.update_context(context_item.clone(), cx);
+                }
+                ContextEditModalEvent::Delete(context_id) => {
+                    log::info!("ContextEditModal: Delete event received for: {}", context_id);
+                    this.delete_context(context_id.clone(), cx);
+                }
+                ContextEditModalEvent::Close => {
+                    log::info!("ContextEditModal: Close event received");
+                }
             }
         });
 
@@ -61,7 +94,8 @@ impl ChatView {
             is_sending: false,
             show_context_panel: true,
             context_items: Vec::new(),
-            _subscriptions: vec![input_sub],
+            context_edit_modal,
+            _subscriptions: vec![input_sub, modal_sub],
         }
     }
 
@@ -98,10 +132,21 @@ impl ChatView {
         }).detach();
     }
 
-    /// Add document as context (pattern from Tauri ResultItem.svelte:624)
-    pub fn add_document_as_context(&mut self, document: terraphim_types::Document, cx: &mut Context<Self>) {
-        log::info!("Adding document to context: {}", document.title);
+    /// Add document as context - opens modal for editing before adding
+    /// Matches pattern from Tauri ResultItem.svelte:624 and ContextEditModal.svelte
+    pub fn add_document_as_context(&mut self, document: terraphim_types::Document, window: &mut Window, cx: &mut Context<Self>) {
+        log::info!("Opening context edit modal for document: {}", document.title);
+        
+        // Open the context edit modal with the document pre-populated
+        self.context_edit_modal.update(cx, |modal, modal_cx| {
+            modal.open_with_document(document, window, modal_cx);
+        });
+    }
 
+    /// Add document directly to context (temporary helper until modal is fully integrated)
+    pub fn add_document_as_context_direct(&mut self, document: terraphim_types::Document, cx: &mut Context<Self>) {
+        log::info!("Adding document directly to context: {}", document.title);
+        
         // Create ContextItem from Document (Tauri pattern)
         let context_item = ContextItem {
             id: ulid::Ulid::new().to_string(),
@@ -156,6 +201,48 @@ impl ChatView {
                 }
                 Err(e) => {
                     log::error!("❌ Failed to add context: {}", e);
+                }
+            }
+        }).detach();
+    }
+
+    /// Update context item in conversation
+    pub fn update_context(&mut self, context_item: ContextItem, cx: &mut Context<Self>) {
+        let conv_id = match &self.current_conversation_id {
+            Some(id) => id.clone(),
+            None => {
+                log::warn!("Cannot update context: no active conversation");
+                return;
+            }
+        };
+
+        let manager = self.context_manager.clone();
+
+        cx.spawn(async move |this, cx| {
+            let mut mgr = manager.lock().await;
+
+            // TODO: Implement update_context in ContextManager if it doesn't exist
+            // For now, delete and re-add
+            match mgr.delete_context(&conv_id, &context_item.id) {
+                Ok(()) => {
+                    match mgr.add_context(&conv_id, context_item.clone()) {
+                        Ok(()) => {
+                            log::info!("✅ Updated context in conversation");
+                            this.update(cx, |this, cx| {
+                                // Update in local list
+                                if let Some(item) = this.context_items.iter_mut().find(|item| item.id == context_item.id) {
+                                    *item = context_item.clone();
+                                }
+                                cx.notify();
+                            }).ok();
+                        }
+                        Err(e) => {
+                            log::error!("❌ Failed to re-add context after delete: {}", e);
+                        }
+                    }
+                }
+                Err(e) => {
+                    log::error!("❌ Failed to delete context for update: {}", e);
                 }
             }
         }).detach();
@@ -328,7 +415,7 @@ impl ChatView {
             .px_6()
             .py_4()
             .border_b_1()
-            .border_color(rgb(0xdbdbdb))
+            .border_color(theme::border())
             .child(
                 div()
                     .flex()
@@ -347,13 +434,13 @@ impl ChatView {
                                 div()
                                     .text_lg()
                                     .font_bold()
-                                    .text_color(rgb(0x363636))
+                                    .text_color(theme::text_primary())
                                     .child(title),
                             )
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(rgb(0x7a7a7a))
+                                    .text_color(theme::text_secondary())
                                     .child(format!("{} messages", self.messages.len()))
                             ),
                     ),
@@ -390,7 +477,7 @@ impl ChatView {
             .px_6()
             .py_4()
             .border_t_1()
-            .border_color(rgb(0xdbdbdb))
+            .border_color(theme::border())
             .children(
                 self.input_state.as_ref().map(|input| {
                     div()
@@ -404,13 +491,13 @@ impl ChatView {
                     .py_3()
                     .rounded_md()
                     .bg(if self.is_sending {
-                        rgb(0xdbdbdb)
+                        theme::border()
                     } else {
-                        rgb(0x3273dc)
+                        theme::primary()
                     })
-                    .text_color(rgb(0xffffff))
+                    .text_color(theme::primary_text())
                     .when(!self.is_sending, |this| {
-                        this.hover(|style| style.bg(rgb(0x2366d1)).cursor_pointer())
+                        this.hover(|style| style.bg(theme::primary_hover()).cursor_pointer())
                     })
                     .child(if self.is_sending {
                         "Sending..."
@@ -460,16 +547,16 @@ impl ChatView {
                     .py_3()
                     .rounded_lg()
                     .when(is_user, |this| {
-                        this.bg(rgb(0x3273dc))
-                            .text_color(rgb(0xffffff))
+                        this.bg(theme::primary())
+                            .text_color(theme::primary_text())
                     })
                     .when(!is_user && !is_system, |this| {
-                        this.bg(rgb(0xf5f5f5))
-                            .text_color(rgb(0x363636))
+                        this.bg(theme::surface())
+                            .text_color(theme::text_primary())
                     })
                     .when(is_system, |this| {
-                        this.bg(rgb(0xffdd57))
-                            .text_color(rgb(0x363636))
+                        this.bg(theme::warning())
+                            .text_color(theme::text_primary())
                     })
                     .child(
                         div()
@@ -508,14 +595,14 @@ impl ChatView {
             .child(
                 div()
                     .text_xl()
-                    .text_color(rgb(0x7a7a7a))
+                    .text_color(theme::text_secondary())
                     .mb_2()
                     .child("Start a conversation"),
             )
             .child(
                 div()
                     .text_sm()
-                    .text_color(rgb(0xb5b5b5))
+                    .text_color(theme::text_disabled())
                     .child("Type a message to begin chatting with Terraphim AI"),
             )
     }
@@ -537,14 +624,14 @@ impl ChatView {
             .child(
                 div()
                     .text_xl()
-                    .text_color(rgb(0x7a7a7a))
+                    .text_color(theme::text_secondary())
                     .mb_2()
                     .child("No conversation loaded"),
             )
             .child(
                 div()
                     .text_sm()
-                    .text_color(rgb(0xb5b5b5))
+                    .text_color(theme::text_disabled())
                     .child("Create a new conversation to get started"),
             )
     }
@@ -581,8 +668,8 @@ impl Render for ChatView {
                             div()
                                 .w(px(320.0))
                                 .border_l_1()
-                                .border_color(rgb(0xdbdbdb))
-                                .bg(rgb(0xf9f9f9))
+                                .border_color(theme::border())
+                                .bg(theme::surface())
                                 .child(
                                     div()
                                         .p_4()
@@ -590,14 +677,14 @@ impl Render for ChatView {
                                             div()
                                                 .text_lg()
                                                 .font_bold()
-                                                .text_color(rgb(0x363636))
+                                                .text_color(theme::text_primary())
                                                 .mb_4()
                                                 .child("Context"),
                                         )
                                         .child(
                                             div()
                                                 .text_sm()
-                                                .text_color(rgb(0x7a7a7a))
+                                                .text_color(theme::text_secondary())
                                                 .child(format!(
                                                     "{} items",
                                                     self.context_items.len()
@@ -616,9 +703,9 @@ impl Render for ChatView {
                                                     .px_3()
                                                     .py_2()
                                                     .mb_2()
-                                                    .bg(rgb(0xffffff))
+                                                    .bg(theme::background())
                                                     .border_1()
-                                                    .border_color(rgb(0xdbdbdb))
+                                                    .border_color(theme::border())
                                                     .rounded_md()
                                                     .child(
                                                         div()
@@ -630,13 +717,13 @@ impl Render for ChatView {
                                                                 div()
                                                                     .text_sm()
                                                                     .font_medium()
-                                                                    .text_color(rgb(0x363636))
+                                                                    .text_color(theme::text_primary())
                                                                     .child(item_title)
                                                             )
                                                             .child(
                                                                 div()
                                                                     .text_xs()
-                                                                    .text_color(rgb(0x7a7a7a))
+                                                                    .text_color(theme::text_secondary())
                                                                     .child(format!("{} chars", item_content_len))
                                                             )
                                                     )
@@ -654,6 +741,7 @@ impl Render for ChatView {
                         )
                     }),
             )
+            .child(self.context_edit_modal.clone())  // Render context edit modal
     }
 }
 

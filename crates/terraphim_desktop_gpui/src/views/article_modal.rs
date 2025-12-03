@@ -7,6 +7,8 @@ use gpui::*;
 use gpui_component::{button::*, IconName, StyledExt};
 use terraphim_types::Document;
 
+use crate::theme::colors::theme;
+
 /// Article modal for viewing full document content
 pub struct ArticleModal {
     document: Option<Document>,
@@ -53,7 +55,7 @@ impl Render for ArticleModal {
         div()
             .absolute()
             .inset_0()
-            .bg(rgb(0x000000))
+            .bg(theme::text_primary())  // Use theme color for overlay
             .opacity(0.95)
             .flex()
             .items_center()
@@ -65,7 +67,7 @@ impl Render for ArticleModal {
                     .max_w_full()       // Don't exceed parent width
                     .h(px(600.0))       // Reasonable height for laptop screens
                     .max_h(px(700.0))   // Maximum height cap
-                    .bg(rgb(0xffffff))
+                    .bg(theme::background())
                     .rounded_lg()
                     .shadow_xl()
                     .overflow_hidden()
@@ -80,12 +82,12 @@ impl Render for ArticleModal {
                             .px_6()
                             .py_4()
                             .border_b_1()
-                            .border_color(rgb(0xe0e0e0))
+                            .border_color(theme::border())
                             .child(
                                 div()
                                     .text_xl()
                                     .font_bold()
-                                    .text_color(rgb(0x333333))
+                                    .text_color(theme::text_primary())
                                     .child(title)
                             )
                             .child(
@@ -108,7 +110,7 @@ impl Render for ArticleModal {
                                 div()
                                     .text_sm()
                                     .line_height(px(24.0))
-                                    .text_color(rgb(0x333333))
+                                    .text_color(theme::text_primary())
                                     .child(body)
                             )
                     )
@@ -118,12 +120,12 @@ impl Render for ArticleModal {
                             .px_6()
                             .py_3()
                             .border_t_1()
-                            .border_color(rgb(0xe0e0e0))
-                            .bg(rgb(0xf8f8f8))
+                            .border_color(theme::border())
+                            .bg(theme::surface())
                             .child(
                                 div()
                                     .text_xs()
-                                    .text_color(rgb(0x888888))
+                                    .text_color(theme::text_secondary())
                                     .child(format!("Source: {}", url))
                             )
                     )
