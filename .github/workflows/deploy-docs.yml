@@ -49,9 +49,16 @@ jobs:
       - name: Build documentation with md-book
         working-directory: docs
         run: |
-          echo "DEBUG: Building with md-book fork"
+          echo "=== DEBUG: Starting documentation build ==="
+          echo "DEBUG: Current directory: $(pwd)"
+          echo "DEBUG: Listing files:"
+          ls -la
+          echo "DEBUG: Checking md-book binary:"
+          ls -la /tmp/md-book/target/release/ || echo "md-book binary not found"
+          echo "DEBUG: Building with md-book fork..."
           rm -rf book/
           /tmp/md-book/target/release/md-book -i . -o book || true
+          echo "DEBUG: Build completed with exit code: $?"
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
