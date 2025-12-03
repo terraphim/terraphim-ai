@@ -8,6 +8,12 @@ on:
       - 'terraphim-ai-desktop-v*'
       - 'terraphim_tui-v*'
   workflow_dispatch:
+    inputs:
+      test_run:
+        description: 'Test run without creating release'
+        required: false
+        default: false
+        type: boolean
 
 env:
   CARGO_TERM_COLOR: always
