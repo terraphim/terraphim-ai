@@ -80,6 +80,11 @@ pub enum ReplCommand {
         subcommand: VmSubcommand,
     },
 
+    // Robot mode commands (for AI agents)
+    Robot {
+        subcommand: RobotSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -87,6 +92,18 @@ pub enum ReplCommand {
     Quit,
     Exit,
     Clear,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum RobotSubcommand {
+    /// Get capabilities summary
+    Capabilities,
+    /// Get schema for a command (or all commands)
+    Schemas { command: Option<String> },
+    /// Get examples for a command
+    Examples { command: Option<String> },
+    /// List exit codes
+    ExitCodes,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -925,6 +942,47 @@ impl FromStr for ReplCommand {
                 }
             }
 
+            "robot" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!(
+                        "Robot command requires a subcommand (capabilities | schemas [command] | examples [command] | exit-codes)"
+                    ));
+                }
+
+                match parts[1] {
+                    "capabilities" | "caps" => Ok(ReplCommand::Robot {
+                        subcommand: RobotSubcommand::Capabilities,
+                    }),
+                    "schemas" | "schema" => {
+                        let command = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Robot {
+                            subcommand: RobotSubcommand::Schemas { command },
+                        })
+                    }
+                    "examples" | "example" => {
+                        let command = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Robot {
+                            subcommand: RobotSubcommand::Examples { command },
+                        })
+                    }
+                    "exit-codes" | "exitcodes" | "codes" => Ok(ReplCommand::Robot {
+                        subcommand: RobotSubcommand::ExitCodes,
+                    }),
+                    _ => Err(anyhow!(
+                        "Unknown robot subcommand: {}. Use: capabilities, schemas, examples, exit-codes",
+                        parts[1]
+                    )),
+                }
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -947,7 +1005,7 @@ impl ReplCommand {
     /// Get available commands based on compiled features
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "vm", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "vm", "robot", "help", "quit", "exit", "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
@@ -991,6 +1049,7 @@ impl ReplCommand {
             "exit" => Some("/exit - Exit REPL"),
             "clear" => Some("/clear - Clear screen"),
             "vm" => Some("/vm <subcommand> [args] - VM management (list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor)"),
+            "robot" => Some("/robot <subcommand> - AI agent self-documentation (capabilities, schemas [cmd], examples [cmd], exit-codes)"),
 
             #[cfg(feature = "repl-file")]
             "file" => Some("/file <subcommand> [args] - File operations (search, list, info)"),

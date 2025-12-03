@@ -20,6 +20,10 @@ use tokio::runtime::Runtime;
 mod client;
 mod service;
 
+// Robot mode and forgiving CLI - always available
+mod robot;
+mod forgiving;
+
 #[cfg(feature = "repl")]
 mod repl;
 

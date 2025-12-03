@@ -1,7 +1,10 @@
 //! REPL handler implementation
 
-use super::commands::{ConfigSubcommand, ReplCommand, RoleSubcommand};
+use super::commands::{ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand};
 use crate::{client::ApiClient, service::TuiService};
+
+// Import robot module types
+use crate::robot::{ExitCode, SelfDocumentation};
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -303,6 +306,10 @@ impl ReplHandler {
 
             ReplCommand::Vm { subcommand } => {
                 self.handle_vm(subcommand).await?;
+            }
+
+            ReplCommand::Robot { subcommand } => {
+                self.handle_robot(subcommand).await?;
             }
         }
 
@@ -1505,6 +1512,129 @@ impl ReplHandler {
         #[cfg(not(feature = "repl"))]
         {
             println!("VM operations require repl feature");
+        }
+
+        Ok(())
+    }
+
+    async fn handle_robot(&self, subcommand: RobotSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        {
+            use colored::Colorize;
+
+            let docs = SelfDocumentation::new();
+
+            match subcommand {
+                RobotSubcommand::Capabilities => {
+                    println!("{} Robot Mode - Capabilities\n", "🤖".bold());
+                    let capabilities = docs.capabilities_data();
+                    let json = serde_json::to_string_pretty(&capabilities)?;
+                    println!("{}", json);
+                }
+                RobotSubcommand::Schemas { command } => {
+                    println!("{} Robot Mode - Schemas\n", "📋".bold());
+                    if let Some(cmd) = command {
+                        if let Some(schema) = docs.schema(&cmd) {
+                            let json = serde_json::to_string_pretty(schema)?;
+                            println!("{}", json);
+                        } else {
+                            println!(
+                                "{} No schema found for command: {}",
+                                "ℹ".blue().bold(),
+                                cmd.yellow()
+                            );
+                        }
+                    } else {
+                        // Show all schemas
+                        let schemas = docs.all_schemas();
+                        let json = serde_json::to_string_pretty(schemas)?;
+                        println!("{}", json);
+                    }
+                }
+                RobotSubcommand::Examples { command } => {
+                    println!("{} Robot Mode - Examples\n", "📝".bold());
+                    if let Some(cmd) = command {
+                        if let Some(examples) = docs.examples(&cmd) {
+                            let json = serde_json::to_string_pretty(examples)?;
+                            println!("{}", json);
+                        } else {
+                            println!(
+                                "{} No examples found for command: {}",
+                                "ℹ".blue().bold(),
+                                cmd.yellow()
+                            );
+                        }
+                    } else {
+                        // Show examples for all commands
+                        let all_examples: Vec<_> = docs
+                            .all_schemas()
+                            .iter()
+                            .flat_map(|s| {
+                                s.examples.iter().map(move |e| {
+                                    serde_json::json!({
+                                        "command": s.name,
+                                        "example": e
+                                    })
+                                })
+                            })
+                            .collect();
+                        let json = serde_json::to_string_pretty(&all_examples)?;
+                        println!("{}", json);
+                    }
+                }
+                RobotSubcommand::ExitCodes => {
+                    println!("{} Robot Mode - Exit Codes\n", "🚪".bold());
+                    let exit_codes = vec![
+                        serde_json::json!({
+                            "code": ExitCode::Success.code(),
+                            "name": ExitCode::Success.name(),
+                            "description": ExitCode::Success.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorGeneral.code(),
+                            "name": ExitCode::ErrorGeneral.name(),
+                            "description": ExitCode::ErrorGeneral.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorUsage.code(),
+                            "name": ExitCode::ErrorUsage.name(),
+                            "description": ExitCode::ErrorUsage.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorIndexMissing.code(),
+                            "name": ExitCode::ErrorIndexMissing.name(),
+                            "description": ExitCode::ErrorIndexMissing.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorNotFound.code(),
+                            "name": ExitCode::ErrorNotFound.name(),
+                            "description": ExitCode::ErrorNotFound.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorAuth.code(),
+                            "name": ExitCode::ErrorAuth.name(),
+                            "description": ExitCode::ErrorAuth.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorNetwork.code(),
+                            "name": ExitCode::ErrorNetwork.name(),
+                            "description": ExitCode::ErrorNetwork.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorTimeout.code(),
+                            "name": ExitCode::ErrorTimeout.name(),
+                            "description": ExitCode::ErrorTimeout.description()
+                        }),
+                    ];
+                    let json = serde_json::to_string_pretty(&exit_codes)?;
+                    println!("{}", json);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "repl"))]
+        {
+            println!("Robot mode requires repl feature");
         }
 
         Ok(())
