@@ -40,9 +40,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Rust
-        uses: dtolnay/rust-toolchain@stable
-
       - name: Clone md-book fork
         run: |
           git clone https://github.com/terraphim/md-book.git /tmp/md-book
