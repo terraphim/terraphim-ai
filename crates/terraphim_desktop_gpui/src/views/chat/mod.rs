@@ -165,15 +165,52 @@ impl ChatView {
     }
 
     /// Add context to current conversation (pattern from Tauri cmd.rs:1078-1140)
+    /// Automatically creates a conversation if one doesn't exist
     pub fn add_context(&mut self, context_item: ContextItem, cx: &mut Context<Self>) {
-        let conv_id = match &self.current_conversation_id {
-            Some(id) => id.clone(),
-            None => {
-                log::warn!("Cannot add context: no active conversation");
-                return;
-            }
-        };
+        // If no conversation exists, create one automatically
+        if self.current_conversation_id.is_none() {
+            log::info!("No active conversation, creating one automatically");
+            let role = self.current_role.clone();
+            let title = format!("Context: {}", context_item.title);
+            
+            // Create conversation first, then add context
+            let manager = self.context_manager.clone();
+            let context_item_clone = context_item.clone();
+            
+            cx.spawn(async move |this, cx| {
+                let mut mgr = manager.lock().await;
+                
+                // Create conversation
+                match mgr.create_conversation(title.clone(), role.clone()).await {
+                    Ok(conversation_id) => {
+                        log::info!("✅ Created conversation: {}", conversation_id.as_str());
+                        
+                        // Now add context to the newly created conversation
+                        match mgr.add_context(&conversation_id, context_item_clone.clone()) {
+                            Ok(()) => {
+                                log::info!("✅ Added context to new conversation");
+                                
+                                this.update(cx, |this, cx| {
+                                    this.current_conversation_id = Some(conversation_id);
+                                    this.context_items.push(context_item_clone);
+                                    cx.notify();
+                                }).ok();
+                            }
+                            Err(e) => {
+                                log::error!("❌ Failed to add context to new conversation: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        log::error!("❌ Failed to create conversation: {}", e);
+                    }
+                }
+            }).detach();
+            return;
+        }
 
+        // Conversation exists, add context normally
+        let conv_id = self.current_conversation_id.as_ref().unwrap().clone();
         let manager = self.context_manager.clone();
 
         cx.spawn(async move |this, cx| {
