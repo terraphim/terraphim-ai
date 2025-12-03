@@ -152,9 +152,12 @@ impl ContextManager {
         // Check context length
         let estimated_length = conversation.estimated_context_length() + context.content.len();
         if estimated_length > self.config.max_context_length {
-            return Err(ServiceError::Config(
-                "Adding this context would exceed maximum context length".to_string(),
-            ));
+            return Err(ServiceError::Config(format!(
+                "Adding this context would exceed maximum context length ({} / {} characters). Context item size: {} characters",
+                estimated_length,
+                self.config.max_context_length,
+                context.content.len()
+            )));
         }
 
         // Create a mutable copy and add context

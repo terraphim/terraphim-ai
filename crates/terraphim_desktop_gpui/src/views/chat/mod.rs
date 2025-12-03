@@ -37,8 +37,16 @@ impl ChatView {
         log::info!("ChatView initialized with backend ContextManager");
 
         // Initialize ContextManager using Tauri pattern (cmd.rs:937-947)
+        // Use a more permissive config for desktop app (allow larger context)
+        let context_config = ContextConfig {
+            max_context_items: 100,  // Increased from default 50
+            max_context_length: 500_000,  // Increased from default 100K to 500K characters
+            max_conversations_cache: 100,
+            default_search_results_limit: 5,
+            enable_auto_suggestions: true,
+        };
         let context_manager = Arc::new(TokioMutex::new(
-            TerraphimContextManager::new(ContextConfig::default())
+            TerraphimContextManager::new(context_config)
         ));
 
         // Initialize input for message composition
