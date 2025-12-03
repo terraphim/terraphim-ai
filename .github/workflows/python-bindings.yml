@@ -42,10 +42,25 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system black ruff mypy
 
+      - name: Setup virtual environment
+        working-directory: crates/terraphim_automata_py
+        run: |
+          unset CONDA_PREFIX
+          uv venv
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+
       - name: Fix Black formatting
         working-directory: crates/terraphim_automata_py
         run: |
-          source .venv/bin/activate
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
           uv run black python/
         continue-on-error: false
 
