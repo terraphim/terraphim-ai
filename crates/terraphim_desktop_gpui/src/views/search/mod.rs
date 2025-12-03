@@ -44,7 +44,10 @@ impl SearchView {
         // Forward AddToContextEvent from SearchResults to App
         let results_sub1 = cx.subscribe(&search_results, |_this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
             log::info!("SearchView forwarding AddToContext event");
-            cx.emit(AddToContextEvent { document: event.document.clone() });
+            cx.emit(AddToContextEvent { 
+                document: event.document.clone(),
+                navigate_to_chat: event.navigate_to_chat,
+            });
         });
 
         // Handle OpenArticleEvent to show modal

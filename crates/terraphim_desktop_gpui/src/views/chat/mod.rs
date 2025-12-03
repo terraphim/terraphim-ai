@@ -132,18 +132,7 @@ impl ChatView {
         }).detach();
     }
 
-    /// Add document as context - opens modal for editing before adding
-    /// Matches pattern from Tauri ResultItem.svelte:624 and ContextEditModal.svelte
-    pub fn add_document_as_context(&mut self, document: terraphim_types::Document, window: &mut Window, cx: &mut Context<Self>) {
-        log::info!("Opening context edit modal for document: {}", document.title);
-        
-        // Open the context edit modal with the document pre-populated
-        self.context_edit_modal.update(cx, |modal, modal_cx| {
-            modal.open_with_document(document, window, modal_cx);
-        });
-    }
-
-    /// Add document directly to context (temporary helper until modal is fully integrated)
+    /// Add document directly to context (no modal - used from search results)
     pub fn add_document_as_context_direct(&mut self, document: terraphim_types::Document, cx: &mut Context<Self>) {
         log::info!("Adding document directly to context: {}", document.title);
         
@@ -387,6 +376,22 @@ impl ChatView {
         self.show_context_panel = !self.show_context_panel;
         log::info!("Context panel {}", if self.show_context_panel { "shown" } else { "hidden" });
         cx.notify();
+    }
+
+    /// Open context edit modal for creating a new context item
+    pub fn open_add_context_modal(&mut self, window: &mut Window, cx: &mut Context<Self>) {
+        log::info!("Opening context edit modal to add new context item");
+        self.context_edit_modal.update(cx, |modal, modal_cx| {
+            modal.open_create(window, modal_cx);
+        });
+    }
+
+    /// Open context edit modal for editing an existing context item
+    pub fn open_edit_context_modal(&mut self, context_item: ContextItem, window: &mut Window, cx: &mut Context<Self>) {
+        log::info!("Opening context edit modal to edit: {}", context_item.title);
+        self.context_edit_modal.update(cx, |modal, modal_cx| {
+            modal.open_edit(context_item, window, modal_cx);
+        });
     }
 
     /// Handle delete context button click
@@ -675,16 +680,31 @@ impl Render for ChatView {
                                         .p_4()
                                         .child(
                                             div()
-                                                .text_lg()
-                                                .font_bold()
-                                                .text_color(theme::text_primary())
+                                                .flex()
+                                                .items_center()
+                                                .justify_between()
                                                 .mb_4()
-                                                .child("Context"),
+                                                .child(
+                                                    div()
+                                                        .text_lg()
+                                                        .font_bold()
+                                                        .text_color(theme::text_primary())
+                                                        .child("Context"),
+                                                )
+                                                .child(
+                                                    Button::new("add-context-item")
+                                                        .icon(IconName::Plus)
+                                                        .ghost()
+                                                        .on_click(cx.listener(|this, _ev, window, cx| {
+                                                            this.open_add_context_modal(window, cx);
+                                                        }))
+                                                )
                                         )
                                         .child(
                                             div()
                                                 .text_sm()
                                                 .text_color(theme::text_secondary())
+                                                .mb_4()
                                                 .child(format!(
                                                     "{} items",
                                                     self.context_items.len()
@@ -695,6 +715,7 @@ impl Render for ChatView {
                                                 let item_id = item.id.clone();
                                                 let item_title = item.title.clone();
                                                 let item_content_len = item.content.len();
+                                                let item_clone = item.clone();
 
                                                 div()
                                                     .flex()
@@ -707,24 +728,36 @@ impl Render for ChatView {
                                                     .border_1()
                                                     .border_color(theme::border())
                                                     .rounded_md()
+                                                    .cursor_pointer()
+                                                    .hover(|style| style.bg(theme::surface_hover()))
                                                     .child(
-                                                        div()
+                                                        // Clickable area for editing
+                                                        Button::new(("edit-ctx", idx))
+                                                            .ghost()
                                                             .flex_1()
-                                                            .flex()
-                                                            .flex_col()
-                                                            .gap_1()
+                                                            .justify_start()
+                                                            .on_click(cx.listener(move |this, _ev, window, cx| {
+                                                                // Click to edit
+                                                                this.open_edit_context_modal(item_clone.clone(), window, cx);
+                                                            }))
                                                             .child(
                                                                 div()
-                                                                    .text_sm()
-                                                                    .font_medium()
-                                                                    .text_color(theme::text_primary())
-                                                                    .child(item_title)
-                                                            )
-                                                            .child(
-                                                                div()
-                                                                    .text_xs()
-                                                                    .text_color(theme::text_secondary())
-                                                                    .child(format!("{} chars", item_content_len))
+                                                                    .flex()
+                                                                    .flex_col()
+                                                                    .gap_1()
+                                                                    .child(
+                                                                        div()
+                                                                            .text_sm()
+                                                                            .font_medium()
+                                                                            .text_color(theme::text_primary())
+                                                                            .child(item_title)
+                                                                    )
+                                                                    .child(
+                                                                        div()
+                                                                            .text_xs()
+                                                                            .text_color(theme::text_secondary())
+                                                                            .child(format!("{} chars", item_content_len))
+                                                                    )
                                                             )
                                                     )
                                                     .child(

@@ -8,6 +8,7 @@ use crate::theme::colors::theme;
 /// Event emitted when user wants to add document to context
 pub struct AddToContextEvent {
     pub document: Document,
+    pub navigate_to_chat: bool,  // If true, also navigate to chat after adding
 }
 
 /// Event emitted when user wants to view full document
@@ -73,13 +74,20 @@ impl SearchResults {
 
     fn handle_add_to_context(&mut self, document: Document, cx: &mut Context<Self>) {
         log::info!("Adding to context: {}", document.title);
-        cx.emit(AddToContextEvent { document });
+        // Directly add to context (no modal, no navigation)
+        cx.emit(AddToContextEvent { 
+            document,
+            navigate_to_chat: false,
+        });
     }
 
     fn handle_chat_with_document(&mut self, document: Document, cx: &mut Context<Self>) {
         log::info!("Chat with document: {}", document.title);
-        // Add to context and navigate to chat
-        cx.emit(AddToContextEvent { document });
+        // Add to context AND navigate to chat
+        cx.emit(AddToContextEvent { 
+            document,
+            navigate_to_chat: true,
+        });
     }
 
     fn handle_open_article(&mut self, document: Document, cx: &mut Context<Self>) {
