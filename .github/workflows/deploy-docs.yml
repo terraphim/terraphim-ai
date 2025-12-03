@@ -49,6 +49,7 @@ jobs:
       - name: Build documentation with md-book
         working-directory: docs
         run: |
+          echo "DEBUG: Building with md-book fork"
           rm -rf book/
           /tmp/md-book/target/release/md-book -i . -o book || true
 
