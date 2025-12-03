@@ -1,4 +1,4 @@
-name: Deploy Documentation to Cloudflare Pages
+name: Deploy Documentation to Cloudflare Pages v2
 
 on:
   push:
