@@ -18,7 +18,7 @@ path = "src/lib.rs"
 [dependencies]
 # GPUI framework and components (using git to get compatible versions)
 gpui = "0.2.2"
-gpui-component = { git = "https://github.com/longbridge/gpui-component.git", version = "0.4.1" }
+gpui-component = { git = "https://github.com/longbridge/gpui-component.git", rev = "4be9784f" }
 
 # Direct integration with terraphim crates
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
@@ -32,10 +32,26 @@ terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 
 # Async runtime
 tokio = { version = "1.36", features = ["full"] }
+async-trait = "0.1"
 
 # Error handling
 anyhow = "1.0.81"
 thiserror = "1.0.58"
+
+# Synchronization
+parking_lot = "0.12"
+
+# Regular expressions
+regex = "1.10"
+
+# URL handling
+url = "2.5"
+
+# Futures utilities
+futures = "0.3"
+futures-util = "0.3"
+rand = "0.8"
+tokio-util = "0.7"
 
 # Serialization
 serde = { version = "1.0.197", features = ["derive"] }
@@ -51,6 +67,9 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 ulid = "1.1.2"
 chrono = { version = "0.4.38", features = ["serde"] }
 ahash = "0.8.11"
+
+# Caching
+lru = "0.12"
 
 # Markdown rendering
 pulldown-cmark = "0.12"

@@ -44,7 +44,7 @@ linker = "riscv64-linux-gnu-gcc"
 # Build configuration
 [build]
 # Default target for builds
-target = "x86_64-unknown-linux-gnu"
+# target = "x86_64-unknown-linux-gnu"
 
 # Cross-compilation settings (commented out - let cross-rs handle Docker images)
 # The cross-rs tool automatically manages Docker images for cross-compilation

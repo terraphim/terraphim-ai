@@ -1,5 +1,6 @@
 use anyhow::Result;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
@@ -63,9 +64,15 @@ impl SearchService {
             role: Some(options.role.clone()),
         };
 
+        // Execute search via TerraphimService
+        //
+        // We clone the Arc to avoid lifetime issues, then acquire the async
+        // mutex guard and run the search. This keeps the logic simple and
+        // avoids the incorrect synchronous `unwrap()` on the async lock.
         let documents = {
-            let mut service = self.service.lock().unwrap();
-            service.search(&search_query).await?
+            let service = self.service.clone();
+            let mut guard = service.lock().await;
+            guard.search(&search_query).await?
         };
         let total = documents.len();
 

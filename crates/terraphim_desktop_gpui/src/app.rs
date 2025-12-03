@@ -444,6 +444,7 @@ impl TerraphimApp {
                     .flex()
                     .items_center()
                     .gap_4()
+                    .relative()
                     .child(
                         // Role selector
                         self.role_selector.clone(),
@@ -467,6 +468,83 @@ impl TerraphimApp {
                             .hover(|style| style.bg(rgb(0xf0f0f0)).cursor_pointer())
                             .child("☰"),
                     ),
+            )
+    }
+
+    /// Render role selector dropdown as overlay (appears above all content)
+    fn render_role_dropdown_overlay(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
+        let is_open = self.role_selector.read(cx).is_dropdown_open();
+        
+        if !is_open {
+            return None;
+        }
+
+        // Render dropdown as absolute overlay at top-right (positioned relative to app container)
+        // This ensures it appears above all other content including the search input
+        Some(
+            div()
+                .absolute()
+                .top(px(64.0))  // Below navigation bar (p_4 = 16px, button height ~32px, gap)
+                .right(px(16.0))  // Right edge with padding
+                .w(px(220.0))
+                .max_h(px(300.0))
+                .overflow_hidden()
+                .bg(rgb(0xffffff))
+                .border_1()
+                .border_color(rgb(0xdbdbdb))
+                .rounded_md()
+                .shadow_lg()
+                .child(self.render_role_dropdown_content(cx))
+        )
+    }
+
+
+    /// Render the actual dropdown content
+    fn render_role_dropdown_content(&self, cx: &mut Context<Self>) -> impl IntoElement {
+        let role_selector = self.role_selector.read(cx);
+        let current_role = role_selector.current_role().clone();
+        let available_roles = role_selector.available_roles().to_vec();
+        let roles_to_render: Vec<(usize, RoleName, bool)> = available_roles
+            .iter()
+            .enumerate()
+            .map(|(idx, role)| (idx, role.clone(), role == &current_role))
+            .collect();
+
+        div()
+            .overflow_hidden()
+            .children(
+                roles_to_render.iter().map(|(idx, role, is_current)| {
+                    let role_name = role.to_string();
+                    let icon = role_selector.get_role_icon(role);
+                    let current = *is_current;
+                    let index = *idx;
+
+                    div()
+                        .flex()
+                        .items_center()
+                        .justify_between()
+                        .px_2()
+                        .py_2()
+                        .border_b_1()
+                        .border_color(rgb(0xf0f0f0))
+                        .when(current, |this| this.bg(rgb(0xf5f5f5)))
+                        .child(
+                            Button::new(("role-item", index))
+                                .label(role_name)
+                                .icon(icon)
+                                .ghost()
+                                .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                    this.role_selector.update(cx, |selector, selector_cx| {
+                                        selector.select_role(index, selector_cx);
+                                    });
+                                }))
+                        )
+                        .children(if current {
+                            Some(div().text_color(rgb(0x48c774)).text_sm().child("✓"))
+                        } else {
+                            None
+                        })
+                })
             )
     }
 
@@ -537,6 +615,7 @@ impl Render for TerraphimApp {
             .when(self.show_tray_menu, |this| {
                 this.child(self.tray_menu.clone())
             })
+            .children(self.render_role_dropdown_overlay(cx))
     }
 }
 

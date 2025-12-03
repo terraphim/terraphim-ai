@@ -31,6 +31,26 @@ impl RoleSelector {
         }
     }
 
+    /// Check if dropdown is open (for app-level overlay rendering)
+    pub fn is_dropdown_open(&self) -> bool {
+        self.is_open
+    }
+
+    /// Get available roles (for app-level dropdown rendering)
+    pub fn available_roles(&self) -> &[RoleName] {
+        &self.available_roles
+    }
+
+    /// Get role icon (public for app-level rendering)
+    pub fn get_role_icon(&self, role: &RoleName) -> IconName {
+        self.role_icon(role)
+    }
+
+    /// Handle role selection (public for app-level rendering)
+    pub fn select_role(&mut self, role_index: usize, cx: &mut Context<Self>) {
+        self.handle_role_select(role_index, cx)
+    }
+
     /// Initialize with config state
     pub fn with_config(mut self, config_state: ConfigState) -> Self {
         self.config_state = Some(config_state);
@@ -93,10 +113,18 @@ impl RoleSelector {
     }
 
     /// Toggle dropdown open/closed
-    fn toggle_dropdown(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn toggle_dropdown(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
         self.is_open = !self.is_open;
         log::info!("Role dropdown {}", if self.is_open { "opened" } else { "closed" });
         cx.notify();
+    }
+
+    /// Close dropdown (public for app-level handling)
+    pub fn close_dropdown(&mut self, cx: &mut Context<Self>) {
+        if self.is_open {
+            self.is_open = false;
+            cx.notify();
+        }
     }
 
     /// Handle role selection from dropdown
@@ -169,6 +197,8 @@ impl RoleSelector {
             .top(px(48.0))
             .right(px(0.0))
             .w(px(220.0))
+            .max_h(px(300.0))  // Limit height to prevent extending too far down
+            .overflow_hidden()  // Clip content that exceeds max height
             .bg(rgb(0xffffff))
             .border_1()
             .border_color(rgb(0xdbdbdb))
@@ -214,8 +244,8 @@ impl Render for RoleSelector {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         let current_role_display = self.current_role.to_string();
         let current_icon = self.role_icon(&self.current_role);
-        let is_open = self.is_open;
 
+        // Only render the button - dropdown will be rendered as overlay in app
         div()
             .relative()
             .child(
@@ -226,9 +256,6 @@ impl Render for RoleSelector {
                     .outline()
                     .on_click(cx.listener(Self::toggle_dropdown))
             )
-            .when(is_open, |this| {
-                this.child(self.render_dropdown(cx))
-            })
     }
 }
 

@@ -134,10 +134,10 @@ impl SearchInput {
                     .on_click(cx.listener(move |this, ev, window, cx| {
                         log::info!("Button clicked: suggestion '{}' at index {}", term, index);
 
-                        // Accept the selected suggestion and trigger search immediately
+                        // Accept the suggestion at the clicked index (not the currently selected one)
                         let accepted_term = search_state.update(cx, |state, cx| {
-                            log::debug!("Button: Calling accept_autocomplete for index {}", index);
-                            state.accept_autocomplete(cx)
+                            log::debug!("Button: Calling accept_autocomplete_at_index for index {}", index);
+                            state.accept_autocomplete_at_index(index, cx)
                         });
 
                         if let Some(selected_term) = accepted_term {

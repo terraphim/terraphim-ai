@@ -1,0 +1,943 @@
+/// Enhanced reusable search components
+///
+/// This module provides high-performance, reusable search and autocomplete components
+/// built on the ReusableComponent trait foundation.
+
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+
+use gpui::*;
+use serde::{Deserialize, Serialize};
+use tokio::sync::{mpsc, oneshot, RwLock};
+use tokio::time::timeout;
+
+use crate::autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
+use crate::components::{
+    ComponentConfig, ComponentError, LifecycleEvent, PerformanceTracker,
+    ReusableComponent, ServiceRegistry, ViewContext
+};
+use crate::search_service::{SearchOptions, SearchResults, ParsedQuery, LogicalOperator, SearchService as MainSearchService};
+
+/// Search component configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchComponentConfig {
+    /// Placeholder text for the search input
+    pub placeholder: String,
+
+    /// Minimum characters to trigger autocomplete
+    pub autocomplete_min_chars: usize,
+
+    /// Maximum autocomplete suggestions to show
+    pub max_autocomplete_suggestions: usize,
+
+    /// Search debounce timeout in milliseconds
+    pub search_debounce_ms: u64,
+
+    /// Autocomplete debounce timeout in milliseconds
+    pub autocomplete_debounce_ms: u64,
+
+    /// Enable search history
+    pub enable_search_history: bool,
+
+    /// Maximum search history entries
+    pub max_search_history: usize,
+
+    /// Enable keyboard shortcuts
+    pub enable_keyboard_shortcuts: bool,
+
+    /// Theme customization
+    pub theme: SearchTheme,
+
+    /// Performance settings
+    pub performance: SearchPerformanceConfig,
+}
+
+/// Search theme configuration
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchTheme {
+    /// Primary color for highlights
+    pub primary_color: String,
+
+    /// Background color
+    pub background_color: String,
+
+    /// Text color
+    pub text_color: String,
+
+    /// Border color
+    pub border_color: String,
+
+    /// Font size
+    pub font_size: f32,
+
+    /// Border radius
+    pub border_radius: f32,
+}
+
+impl Default for SearchTheme {
+    fn default() -> Self {
+        Self {
+            primary_color: "#007acc".to_string(),
+            background_color: "#ffffff".to_string(),
+            text_color: "#333333".to_string(),
+            border_color: "#e0e0e0".to_string(),
+            font_size: 14.0,
+            border_radius: 6.0,
+        }
+    }
+}
+
+/// Performance configuration for search components
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchPerformanceConfig {
+    /// Enable caching for search results
+    pub enable_cache: bool,
+
+    /// Cache TTL in seconds
+    pub cache_ttl_seconds: u64,
+
+    /// Maximum concurrent search requests
+    pub max_concurrent_requests: usize,
+
+    /// Request timeout in milliseconds
+    pub request_timeout_ms: u64,
+
+    /// Enable performance monitoring
+    pub enable_monitoring: bool,
+
+    /// Performance alert thresholds
+    pub alert_thresholds: SearchPerformanceThresholds,
+}
+
+/// Performance alert thresholds
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SearchPerformanceThresholds {
+    /// Search response time threshold in milliseconds
+    pub search_response_time_ms: u64,
+
+    /// Autocomplete response time threshold in milliseconds
+    pub autocomplete_response_time_ms: u64,
+
+    /// Error rate threshold percentage
+    pub error_rate_threshold: f64,
+}
+
+impl Default for SearchPerformanceConfig {
+    fn default() -> Self {
+        Self {
+            enable_cache: true,
+            cache_ttl_seconds: 300, // 5 minutes
+            max_concurrent_requests: 3,
+            request_timeout_ms: 5000, // 5 seconds
+            enable_monitoring: true,
+            alert_thresholds: SearchPerformanceThresholds {
+                search_response_time_ms: 500,
+                autocomplete_response_time_ms: 100,
+                error_rate_threshold: 5.0,
+            },
+        }
+    }
+}
+
+impl Default for SearchComponentConfig {
+    fn default() -> Self {
+        Self {
+            placeholder: "Search...".to_string(),
+            autocomplete_min_chars: 2,
+            max_autocomplete_suggestions: 10,
+            search_debounce_ms: 300,
+            autocomplete_debounce_ms: 150,
+            enable_search_history: true,
+            max_search_history: 50,
+            enable_keyboard_shortcuts: true,
+            theme: SearchTheme::default(),
+            performance: SearchPerformanceConfig::default(),
+        }
+    }
+}
+
+impl ComponentConfig for SearchComponentConfig {
+    fn schema() -> crate::components::ConfigSchema {
+        use crate::components::{ConfigSchema, ConfigField, ConfigFieldType, ValidationRule};
+
+        ConfigSchema::new(
+            "SearchComponent".to_string(),
+            "1.0.0".to_string(),
+            "Enhanced search component configuration".to_string(),
+        )
+        .with_field(ConfigField {
+            name: "placeholder".to_string(),
+            field_type: ConfigFieldType::String,
+            required: false,
+            default: Some(crate::components::ConfigValue::String("Search...".to_string())),
+            description: "Placeholder text for search input".to_string(),
+            validation: vec![ValidationRule::MinLength(1), ValidationRule::MaxLength(100)],
+            docs: None,
+        })
+        .with_field(ConfigField {
+            name: "autocomplete_min_chars".to_string(),
+            field_type: ConfigFieldType::Integer,
+            required: false,
+            default: Some(crate::components::ConfigValue::Integer(2)),
+            description: "Minimum characters to trigger autocomplete".to_string(),
+            validation: vec![ValidationRule::MinValue(1.0), ValidationRule::MaxValue(5.0)],
+            docs: None,
+        })
+        .with_field(ConfigField {
+            name: "search_debounce_ms".to_string(),
+            field_type: ConfigFieldType::Integer,
+            required: false,
+            default: Some(crate::components::ConfigValue::Integer(300)),
+            description: "Search debounce timeout in milliseconds".to_string(),
+            validation: vec![ValidationRule::MinValue(0.0), ValidationRule::MaxValue(2000.0)],
+            docs: None,
+        })
+    }
+
+    fn validate(&self) -> Result<(), crate::components::ConfigError> {
+        if self.autocomplete_min_chars == 0 {
+            return Err(crate::components::ConfigError::Validation(
+                "autocomplete_min_chars must be greater than 0".to_string()
+            ));
+        }
+        if self.search_debounce_ms > 5000 {
+            return Err(crate::components::ConfigError::Validation(
+                "search_debounce_ms must be less than 5000".to_string()
+            ));
+        }
+        Ok(())
+    }
+
+    fn default() -> Self {
+        Self::default()
+    }
+
+    fn merge(&self, other: &Self) -> Result<Self, crate::components::ConfigError> {
+        Ok(Self {
+            placeholder: if other.placeholder != "Search..." { other.placeholder.clone() } else { self.placeholder.clone() },
+            autocomplete_min_chars: if other.autocomplete_min_chars != 2 { other.autocomplete_min_chars } else { self.autocomplete_min_chars },
+            max_autocomplete_suggestions: if other.max_autocomplete_suggestions != 10 { other.max_autocomplete_suggestions } else { self.max_autocomplete_suggestions },
+            search_debounce_ms: if other.search_debounce_ms != 300 { other.search_debounce_ms } else { self.search_debounce_ms },
+            autocomplete_debounce_ms: if other.autocomplete_debounce_ms != 150 { other.autocomplete_debounce_ms } else { self.autocomplete_debounce_ms },
+            enable_search_history: if other.enable_search_history != true { other.enable_search_history } else { self.enable_search_history },
+            max_search_history: if other.max_search_history != 50 { other.max_search_history } else { self.max_search_history },
+            enable_keyboard_shortcuts: if other.enable_keyboard_shortcuts != true { other.enable_keyboard_shortcuts } else { self.enable_keyboard_shortcuts },
+            theme: if other.theme != SearchTheme::default() { other.theme.clone() } else { self.theme.clone() },
+            performance: if other.performance != SearchPerformanceConfig::default() { other.performance.clone() } else { self.performance.clone() },
+        })
+    }
+
+    fn to_map(&self) -> std::collections::HashMap<String, crate::components::ConfigValue> {
+        let mut map = std::collections::HashMap::new();
+        map.insert("placeholder".to_string(), crate::components::ConfigValue::String(self.placeholder.clone()));
+        map.insert("autocomplete_min_chars".to_string(), crate::components::ConfigValue::Integer(self.autocomplete_min_chars as i64));
+        map.insert("max_autocomplete_suggestions".to_string(), crate::components::ConfigValue::Integer(self.max_autocomplete_suggestions as i64));
+        map.insert("search_debounce_ms".to_string(), crate::components::ConfigValue::Integer(self.search_debounce_ms as i64));
+        map.insert("autocomplete_debounce_ms".to_string(), crate::components::ConfigValue::Integer(self.autocomplete_debounce_ms as i64));
+        map.insert("enable_search_history".to_string(), crate::components::ConfigValue::Boolean(self.enable_search_history));
+        map.insert("max_search_history".to_string(), crate::components::ConfigValue::Integer(self.max_search_history as i64));
+        map.insert("enable_keyboard_shortcuts".to_string(), crate::components::ConfigValue::Boolean(self.enable_keyboard_shortcuts));
+        map
+    }
+
+    fn from_map(map: std::collections::HashMap<String, crate::components::ConfigValue>) -> Result<Self, crate::components::ConfigError> {
+        Ok(Self {
+            placeholder: map.get("placeholder")
+                .and_then(|v| v.as_string())
+                .unwrap_or("Search...").to_string(),
+            autocomplete_min_chars: map.get("autocomplete_min_chars")
+                .and_then(|v| v.as_integer())
+                .and_then(|i| usize::try_from(i).ok())
+                .unwrap_or(2),
+            max_autocomplete_suggestions: map.get("max_autocomplete_suggestions")
+                .and_then(|v| v.as_integer())
+                .and_then(|i| usize::try_from(i).ok())
+                .unwrap_or(10),
+            search_debounce_ms: map.get("search_debounce_ms")
+                .and_then(|v| v.as_integer())
+                .and_then(|i| u64::try_from(i).ok())
+                .unwrap_or(300),
+            autocomplete_debounce_ms: map.get("autocomplete_debounce_ms")
+                .and_then(|v| v.as_integer())
+                .and_then(|i| u64::try_from(i).ok())
+                .unwrap_or(150),
+            enable_search_history: map.get("enable_search_history")
+                .and_then(|v| v.as_boolean())
+                .unwrap_or(true),
+            max_search_history: map.get("max_search_history")
+                .and_then(|v| v.as_integer())
+                .and_then(|i| usize::try_from(i).ok())
+                .unwrap_or(50),
+            enable_keyboard_shortcuts: map.get("enable_keyboard_shortcuts")
+                .and_then(|v| v.as_boolean())
+                .unwrap_or(true),
+            theme: SearchTheme::default(), // Simplified for now
+            performance: SearchPerformanceConfig::default(), // Simplified for now
+        })
+    }
+
+    fn is_equivalent(&self, other: &Self) -> bool {
+        self.placeholder == other.placeholder &&
+        self.autocomplete_min_chars == other.autocomplete_min_chars &&
+        self.search_debounce_ms == other.search_debounce_ms
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    // TODO: Fix ComponentConfig dyn compatibility issue
+    // The trait is not dyn compatible due to methods returning Self
+    // Need to either split trait or use different approach
+    // fn clone_config(&self) -> Box<dyn ComponentConfig> {
+    //     Box::new(self.clone())
+    // }
+}
+
+/// Search component state
+#[derive(Debug, Clone, PartialEq)]
+pub struct SearchComponentState {
+    /// Current search query
+    pub query: String,
+
+    /// Parsed search query
+    pub parsed_query: Option<ParsedQuery>,
+
+    /// Current search results
+    pub results: Option<SearchResults>,
+
+    /// Autocomplete suggestions
+    pub suggestions: Vec<AutocompleteSuggestion>,
+
+    /// Selected suggestion index
+    pub selected_suggestion_index: Option<usize>,
+
+    /// Whether component is currently loading
+    pub loading: bool,
+
+    /// Whether autocomplete is loading
+    pub autocomplete_loading: bool,
+
+    /// Last error message
+    pub error: Option<String>,
+
+    /// Search history
+    pub search_history: Vec<String>,
+
+    /// Current role for search
+    pub current_role: String,
+
+    /// Whether dropdown is visible
+    pub show_dropdown: bool,
+
+    /// Component statistics
+    pub stats: SearchComponentStats,
+}
+
+/// Search component statistics
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct SearchComponentStats {
+    /// Total searches performed
+    pub total_searches: u64,
+
+    /// Successful searches
+    pub successful_searches: u64,
+
+    /// Failed searches
+    pub failed_searches: u64,
+
+    /// Total autocomplete requests
+    pub total_autocomplete_requests: u64,
+
+    /// Cache hits
+    pub cache_hits: u64,
+
+    /// Average search response time
+    pub avg_search_response_time: Duration,
+
+    /// Average autocomplete response time
+    pub avg_autocomplete_response_time: Duration,
+}
+
+impl Default for SearchComponentState {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            parsed_query: None,
+            results: None,
+            suggestions: Vec::new(),
+            selected_suggestion_index: None,
+            loading: false,
+            autocomplete_loading: false,
+            error: None,
+            search_history: Vec::new(),
+            current_role: "default".to_string(),
+            show_dropdown: false,
+            stats: SearchComponentStats::default(),
+        }
+    }
+}
+
+/// Enhanced reusable search component
+#[derive(Debug)]
+pub struct SearchComponent {
+    config: SearchComponentConfig,
+    state: SearchComponentState,
+    performance_tracker: PerformanceTracker,
+    is_mounted: bool,
+
+    // Async state management
+    search_tx: mpsc::UnboundedSender<SearchRequest>,
+    autocomplete_tx: mpsc::UnboundedSender<AutocompleteRequest>,
+
+    // Caching
+    search_cache: Arc<RwLock<HashMap<String, CachedSearchResult>>>,
+    autocomplete_cache: Arc<RwLock<HashMap<String, CachedAutocompleteResult>>>,
+
+    // Services
+    autocomplete_engine: Option<AutocompleteEngine>,
+
+    // Debounce timers
+    search_debounce_end_time: Option<Instant>,
+    autocomplete_debounce_end_time: Option<Instant>,
+}
+
+/// Search request for async processing
+#[derive(Debug)]
+struct SearchRequest {
+    query: String,
+    options: SearchOptions,
+    response_tx: oneshot::Sender<Result<SearchResults, SearchComponentError>>,
+}
+
+/// Autocomplete request for async processing
+#[derive(Debug)]
+struct AutocompleteRequest {
+    query: String,
+    max_results: usize,
+    response_tx: oneshot::Sender<Result<Vec<AutocompleteSuggestion>, SearchComponentError>>,
+}
+
+/// Cached search result
+#[derive(Debug, Clone)]
+struct CachedSearchResult {
+    result: SearchResults,
+    timestamp: Instant,
+}
+
+/// Cached autocomplete result
+#[derive(Debug, Clone)]
+struct CachedAutocompleteResult {
+    suggestions: Vec<AutocompleteSuggestion>,
+    timestamp: Instant,
+}
+
+/// Search component events
+#[derive(Debug, Clone)]
+pub enum SearchComponentEvent {
+    /// Search query changed
+    QueryChanged { query: String },
+
+    /// Search started
+    SearchStarted { query: String },
+
+    /// Search completed successfully
+    SearchCompleted { results: SearchResults, response_time: Duration },
+
+    /// Search failed
+    SearchFailed { query: String, error: String },
+
+    /// Autocomplete suggestions received
+    AutocompleteReceived { suggestions: Vec<AutocompleteSuggestion>, response_time: Duration },
+
+    /// Suggestion selected
+    SuggestionSelected { suggestion: AutocompleteSuggestion },
+
+    /// Search history updated
+    HistoryUpdated { history: Vec<String> },
+
+    /// Role changed
+    RoleChanged { role: String },
+
+    /// Performance alert
+    PerformanceAlert { metric: String, value: f64, threshold: f64 },
+}
+
+/// Search component errors
+#[derive(Debug, Clone, thiserror::Error)]
+pub enum SearchComponentError {
+    #[error("Search service error: {0}")]
+    SearchService(String),
+
+    #[error("Autocomplete engine error: {0}")]
+    AutocompleteEngine(String),
+
+    #[error("Configuration error: {0}")]
+    Configuration(String),
+
+    #[error("Request timeout: {0}")]
+    Timeout(String),
+
+    #[error("Network error: {0}")]
+    Network(String),
+
+    #[error("Serialization error: {0}")]
+    Serialization(String),
+
+    #[error("Cache error: {0}")]
+    Cache(String),
+
+    #[error("Request cancelled")]
+    Cancelled,
+}
+
+impl SearchComponent {
+    /// Create new search component with configuration
+    pub fn new(config: SearchComponentConfig) -> Self {
+        let (search_tx, _) = mpsc::unbounded_channel();
+        let (autocomplete_tx, _) = mpsc::unbounded_channel();
+
+        Self {
+            config,
+            state: SearchComponentState::default(),
+            performance_tracker: PerformanceTracker::default(),
+            is_mounted: false,
+            search_tx,
+            autocomplete_tx,
+            search_cache: Arc::new(RwLock::new(HashMap::new())),
+            autocomplete_cache: Arc::new(RwLock::new(HashMap::new())),
+            autocomplete_engine: None,
+            search_debounce_end_time: None,
+            autocomplete_debounce_end_time: None,
+        }
+    }
+
+    /// Initialize autocomplete engine for role
+    pub async fn initialize_autocomplete(&mut self, role: &str) -> Result<(), SearchComponentError> {
+        let timer = self.performance_tracker.start_operation();
+
+        match AutocompleteEngine::from_role(role, None).await {
+            Ok(engine) => {
+                self.autocomplete_engine = Some(engine);
+                self.state.current_role = role.to_string();
+                timer.complete_success();
+                Ok(())
+            }
+            Err(e) => {
+                timer.complete_failure();
+                Err(SearchComponentError::AutocompleteEngine(e.to_string()))
+            }
+        }
+    }
+
+    /// Set search query
+    pub fn set_query(&mut self, query: String) {
+        let old_query = self.state.query.clone();
+        self.state.query = query.clone();
+
+        // Parse query
+        self.state.parsed_query = Some(MainSearchService::parse_query(&query));
+
+        // Update selected suggestion index
+        self.state.selected_suggestion_index = None;
+
+        // Trigger autocomplete if needed
+        if query.len() >= self.config.autocomplete_min_chars {
+            self.schedule_autocomplete(query);
+        } else {
+            self.state.suggestions.clear();
+            self.state.show_dropdown = false;
+        }
+
+        // Update search history if query changed and is not empty
+        if !query.is_empty() && query != old_query && self.config.enable_search_history {
+            self.update_search_history(query);
+        }
+    }
+
+    /// Execute search with current query
+    pub async fn execute_search(&mut self, options: SearchOptions) -> Result<SearchResults, SearchComponentError> {
+        let query = self.state.query.clone();
+        if query.is_empty() {
+            return Ok(SearchResults {
+                documents: Vec::new(),
+                total: 0,
+                query: String::new(),
+            });
+        }
+
+        let timer = self.performance_tracker.start_operation();
+
+        // Check cache first
+        if self.config.performance.enable_cache {
+            if let Some(cached) = self.get_cached_search(&query).await {
+                timer.complete_success();
+                return Ok(cached.result);
+            }
+        }
+
+        // Create search request
+        let (response_tx, response_rx) = oneshot::channel();
+        let request = SearchRequest {
+            query: query.clone(),
+            options,
+            response_tx,
+        };
+
+        // Send request (in a real implementation, this would be handled by a worker)
+        if let Err(_) = self.search_tx.send(request) {
+            timer.complete_failure();
+            return Err(SearchComponentError::SearchService("Failed to send search request".to_string()));
+        }
+
+        // Wait for response with timeout
+        match timeout(
+            Duration::from_millis(self.config.performance.request_timeout_ms),
+            response_rx
+        ).await {
+            Ok(search_result_result) => {
+                match search_result_result {
+                    Ok(search_result) => {
+                        timer.complete_success();
+
+                        // Cache successful result
+                        if self.config.performance.enable_cache {
+                            self.cache_search_result(&query, search_result.clone()).await;
+                        }
+
+                        self.state.results = Some(search_result.clone());
+                        self.state.loading = false;
+                        self.state.error = None;
+
+                        // Update stats
+                        self.state.stats.total_searches += 1;
+                        self.state.stats.successful_searches += 1;
+
+                        Ok(search_result)
+                    }
+                    Err(e) => {
+                        timer.complete_failure();
+                        self.state.stats.total_searches += 1;
+                        self.state.stats.failed_searches += 1;
+                        self.state.error = Some(e.to_string());
+                        Err(SearchComponentError::SearchService(e.to_string()))
+                    }
+                }
+            }
+            Err(_) => {
+                timer.complete_failure();
+                self.state.stats.total_searches += 1;
+                self.state.stats.failed_searches += 1;
+                self.state.error = Some("Search request timed out".to_string());
+                Err(SearchComponentError::Timeout(format!("Search timed out after {}ms", self.config.performance.request_timeout_ms)))
+            }
+        }
+    }
+
+    /// Select autocomplete suggestion
+    pub fn select_suggestion(&mut self, index: usize) -> Option<&AutocompleteSuggestion> {
+        if index < self.state.suggestions.len() {
+            self.state.selected_suggestion_index = Some(index);
+            let suggestion = &self.state.suggestions[index];
+
+            // Update query with selected suggestion
+            self.state.query = suggestion.term.clone();
+            self.state.parsed_query = Some(MainSearchService::parse_query(&suggestion.term));
+
+            Some(suggestion)
+        } else {
+            None
+        }
+    }
+
+    /// Clear current query and results
+    pub fn clear(&mut self) {
+        self.state.query.clear();
+        self.state.parsed_query = None;
+        self.state.results = None;
+        self.state.suggestions.clear();
+        self.state.selected_suggestion_index = None;
+        self.state.show_dropdown = false;
+        self.state.error = None;
+        self.state.loading = false;
+        self.state.autocomplete_loading = false;
+    }
+
+    /// Get current configuration
+    pub fn config(&self) -> &SearchComponentConfig {
+        &self.config
+    }
+
+    /// Get current state
+    pub fn state(&self) -> &SearchComponentState {
+        &self.state
+    }
+
+    /// Update configuration
+    pub fn update_config(&mut self, config: SearchComponentConfig) -> Result<(), SearchComponentError> {
+        config.validate()?;
+        self.config = config;
+        Ok(())
+    }
+
+    /// Get performance metrics
+    pub fn performance_metrics(&self) -> &PerformanceTracker {
+        &self.performance_tracker
+    }
+
+    // Private helper methods
+
+    /// Schedule autocomplete request with debouncing
+    fn schedule_autocomplete(&mut self, query: String) {
+        let now = Instant::now();
+        self.autocomplete_debounce_end_time = Some(now + Duration::from_millis(self.config.autocomplete_debounce_ms));
+
+        // In a real implementation, this would use tokio::time::sleep for debouncing
+        self.state.autocomplete_loading = true;
+        self.state.stats.total_autocomplete_requests += 1;
+    }
+
+    /// Update search history
+    fn update_search_history(&mut self, query: String) {
+        if let Some(pos) = self.state.search_history.iter().position(|h| h == &query) {
+            // Move to front if already exists
+            self.state.search_history.remove(pos);
+        }
+
+        self.state.search_history.insert(0, query);
+
+        // Limit history size
+        if self.state.search_history.len() > self.config.max_search_history {
+            self.state.search_history.truncate(self.config.max_search_history);
+        }
+    }
+
+    /// Get cached search result
+    async fn get_cached_search(&self, query: &str) -> Option<CachedSearchResult> {
+        if !self.config.performance.enable_cache {
+            return None;
+        }
+
+        let cache = self.search_cache.read().await;
+        if let Some(cached) = cache.get(query) {
+            let age = cached.timestamp.elapsed();
+            if age < Duration::from_secs(self.config.performance.cache_ttl_seconds) {
+                return Some(cached.clone());
+            }
+        }
+        None
+    }
+
+    /// Cache search result
+    async fn cache_search_result(&self, query: &str, result: SearchResults) {
+        if !self.config.performance.enable_cache {
+            return;
+        }
+
+        let cached = CachedSearchResult {
+            result,
+            timestamp: Instant::now(),
+        };
+
+        let mut cache = self.search_cache.write().await;
+        cache.insert(query.to_string(), cached);
+
+        // Limit cache size
+        if cache.len() > 100 {
+            // Remove oldest entries (simplified)
+            let mut entries: Vec<_> = cache.iter().map(|(k, v)| (k.clone(), v.timestamp)).collect();
+            entries.sort_by_key(|(_, timestamp)| *timestamp);
+
+            for (key, _) in entries.iter().take(cache.len() - 100) {
+                cache.remove(key);
+            }
+        }
+    }
+}
+
+impl ReusableComponent for SearchComponent {
+    type Config = SearchComponentConfig;
+    type State = SearchComponentState;
+    type Event = SearchComponentEvent;
+
+    fn component_id() -> &'static str {
+        "search-component"
+    }
+
+    fn component_version() -> &'static str {
+        "1.0.0"
+    }
+
+    fn init(config: Self::Config) -> Self {
+        Self::new(config)
+    }
+
+    fn config(&self) -> &Self::Config {
+        &self.config
+    }
+
+    fn update_config(&mut self, config: Self::Config) -> Result<(), ComponentError> {
+        self.update_config(config)
+            .map_err(|e| ComponentError::Configuration(e.to_string()))
+    }
+
+    fn state(&self) -> &Self::State {
+        &self.state
+    }
+
+    fn update_state(&mut self, state: Self::State) -> Result<(), ComponentError> {
+        self.state = state;
+        Ok(())
+    }
+
+    fn mount(&mut self, _cx: &mut ViewContext<Self>) -> Result<(), ComponentError> {
+        if self.is_mounted {
+            return Err(ComponentError::AlreadyMounted);
+        }
+
+        let timer = self.performance_tracker.start_operation();
+        self.is_mounted = true;
+        timer.complete_success();
+        Ok(())
+    }
+
+    fn unmount(&mut self, _cx: &mut ViewContext<Self>) -> Result<(), ComponentError> {
+        if !self.is_mounted {
+            return Err(ComponentError::NotMounted);
+        }
+
+        let timer = self.performance_tracker.start_operation();
+        self.is_mounted = false;
+        timer.complete_success();
+        Ok(())
+    }
+
+    fn handle_lifecycle_event(&mut self, event: LifecycleEvent, _cx: &mut ViewContext<Self>) -> Result<(), ComponentError> {
+        let timer = self.performance_tracker.start_operation();
+
+        match event {
+            LifecycleEvent::ConfigChanged => {
+                // Revalidate configuration
+                if let Err(e) = self.config.validate() {
+                    return Err(ComponentError::Configuration(e.to_string()));
+                }
+            }
+            LifecycleEvent::StateChanged => {
+                // Update any derived state
+                self.state.show_dropdown = !self.state.suggestions.is_empty() &&
+                                          self.state.query.len() >= self.config.autocomplete_min_chars;
+            }
+            _ => {}
+        }
+
+        timer.complete_success();
+        Ok(())
+    }
+
+    fn is_mounted(&self) -> bool {
+        self.is_mounted
+    }
+
+    fn performance_metrics(&self) -> &PerformanceTracker {
+        &self.performance_tracker
+    }
+
+    fn reset_performance_metrics(&mut self) {
+        self.performance_tracker.reset();
+    }
+
+    fn dependencies(&self) -> Vec<&'static str> {
+        vec!["SearchService", "AutocompleteEngine"]
+    }
+
+    fn are_dependencies_satisfied(&self, registry: &ServiceRegistry) -> bool {
+        // Check if required services are registered
+        registry.is_service_registered("SearchService") &&
+        (self.autocomplete_engine.is_some() || registry.is_service_registered("AutocompleteEngine"))
+    }
+
+    fn cleanup(&mut self) -> Result<(), ComponentError> {
+        let timer = self.performance_tracker.start_operation();
+
+        // Clear caches
+        if let Ok(mut cache) = self.search_cache.try_write() {
+            cache.clear();
+        }
+        if let Ok(mut cache) = self.autocomplete_cache.try_write() {
+            cache.clear();
+        }
+
+        // Reset state
+        self.clear();
+
+        timer.complete_success();
+        Ok(())
+    }
+
+    fn as_any(&self) -> &dyn std::any::Any {
+        self
+    }
+
+    fn as_any_mut(&mut self) -> &mut dyn std::any::Any {
+        self
+    }
+}
+
+/// Factory for creating search components
+pub struct SearchComponentFactory;
+
+impl SearchComponentFactory {
+    /// Create a new search component with default configuration
+    pub fn create() -> SearchComponent {
+        SearchComponent::new(SearchComponentConfig::default())
+    }
+
+    /// Create a new search component with custom configuration
+    pub fn create_with_config(config: SearchComponentConfig) -> SearchComponent {
+        SearchComponent::new(config)
+    }
+
+    /// Create a search component optimized for performance
+    pub fn create_performance_optimized() -> SearchComponent {
+        let config = SearchComponentConfig {
+            search_debounce_ms: 200,
+            autocomplete_debounce_ms: 100,
+            max_autocomplete_suggestions: 8,
+            performance: SearchPerformanceConfig {
+                enable_cache: true,
+                cache_ttl_seconds: 600, // 10 minutes
+                max_concurrent_requests: 5,
+                request_timeout_ms: 3000,
+                enable_monitoring: true,
+                alert_thresholds: SearchPerformanceThresholds {
+                    search_response_time_ms: 300,
+                    autocomplete_response_time_ms: 50,
+                    error_rate_threshold: 2.0,
+                },
+            },
+            ..Default::default()
+        };
+        SearchComponent::new(config)
+    }
+
+    /// Create a search component for mobile devices
+    pub fn create_mobile_optimized() -> SearchComponent {
+        let config = SearchComponentConfig {
+            placeholder: "Search...".to_string(),
+            autocomplete_min_chars: 3,
+            max_autocomplete_suggestions: 5,
+            search_debounce_ms: 500,
+            autocomplete_debounce_ms: 200,
+            enable_search_history: false,
+            enable_keyboard_shortcuts: false,
+            theme: SearchTheme {
+                font_size: 16.0,
+                border_radius: 8.0,
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        SearchComponent::new(config)
+    }
+}

@@ -5,6 +5,7 @@ use terraphim_automata::{
 use terraphim_types::Thesaurus;
 
 /// Autocomplete engine integrated with Terraphim automata
+#[derive(Debug)]
 pub struct AutocompleteEngine {
     index: AutocompleteIndex,
     thesaurus: Thesaurus,

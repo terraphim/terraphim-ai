@@ -333,10 +333,24 @@ impl SearchState {
         cx.notify();
     }
 
-    /// Accept selected autocomplete suggestion
+    /// Accept selected autocomplete suggestion (uses currently selected index)
     pub fn accept_autocomplete(&mut self, cx: &mut Context<Self>) -> Option<String> {
         if let Some(suggestion) = self.autocomplete_suggestions.get(self.selected_suggestion_index) {
             let term = suggestion.term.clone();
+            self.autocomplete_suggestions.clear();
+            self.show_autocomplete = false;
+            cx.notify();
+            Some(term)
+        } else {
+            None
+        }
+    }
+
+    /// Accept autocomplete suggestion at specific index (for direct clicks)
+    pub fn accept_autocomplete_at_index(&mut self, index: usize, cx: &mut Context<Self>) -> Option<String> {
+        if let Some(suggestion) = self.autocomplete_suggestions.get(index) {
+            let term = suggestion.term.clone();
+            self.selected_suggestion_index = index;
             self.autocomplete_suggestions.clear();
             self.show_autocomplete = false;
             cx.notify();
