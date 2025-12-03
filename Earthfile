@@ -59,7 +59,7 @@ install:
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
@@ -92,7 +92,7 @@ install-native:
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
@@ -121,14 +121,16 @@ source-native:
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
-  RUN cargo vendor > .cargo/config.toml
+  # Optimize cargo vendor for faster dependency resolution
+  RUN CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
   SAVE ARTIFACT /code
 
 build-native:
   FROM +source-native
   WORKDIR /code
-  RUN cargo build --release
+  # Optimize release build with parallel jobs
+  RUN CARGO_BUILD_JOBS=$(nproc) CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
 
 build-debug-native:
@@ -139,7 +141,8 @@ build-debug-native:
   RUN sed -i '/terraphim_firecracker/d' Cargo.toml
   # Also update default-members to match the remaining members
   RUN sed -i 's/default-members = \["terraphim_server"\]/default-members = ["terraphim_server"]/' Cargo.toml
-  RUN cargo build
+  # Optimize build with parallel jobs and optimized settings
+  RUN CARGO_BUILD_JOBS=$(nproc) CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
   # Save entire target directory for reuse by fmt, lint, test
   SAVE ARTIFACT /code/target /target
@@ -259,7 +262,7 @@ build-jammy:
   RUN apt-get update -qq
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   RUN update-ca-certificates
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   # RUN rustup toolchain install stable
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
@@ -317,7 +320,7 @@ docker-aarch64:
   RUN apt-get update && apt-get upgrade -y
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config libssl-dev g++-aarch64-linux-gnu libc6-dev-arm64-cross
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup target add aarch64-unknown-linux-gnu
@@ -352,7 +355,6 @@ docker-scratch:
 docs-deps:
   FROM +install-native
   RUN cargo install mdbook
-  RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
   # RUN cargo install --git https://github.com/typst/typst typst-cli
