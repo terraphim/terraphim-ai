@@ -48,11 +48,13 @@ jobs:
       - name: Install mdBook preprocessors
         run: |
           cargo install mdbook-mermaid --locked
-          mdbook-mermaid install docs/
+          mdbook-mermaid install docs/ || true
 
       - name: Build documentation
         working-directory: docs
-        run: mdbook build
+        run: |
+          rm -rf book/
+          mdbook build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
