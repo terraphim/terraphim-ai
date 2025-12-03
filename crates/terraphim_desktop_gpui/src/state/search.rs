@@ -373,6 +373,11 @@ impl SearchState {
         &self.autocomplete_suggestions
     }
 
+    /// Get term chips for current query
+    pub fn get_term_chips(&self) -> TermChipSet {
+        self.term_chips.clone()
+    }
+
     /// Get currently selected suggestion index
     pub fn get_selected_index(&self) -> usize {
         self.selected_suggestion_index

@@ -3,6 +3,7 @@ use gpui::prelude::FluentBuilder;
 use gpui_component::input::{Input, InputEvent, InputState};
 
 use crate::state::search::{AutocompleteSuggestion, SearchState};
+use crate::theme::colors::theme;
 
 /// Search input component with real-time autocomplete
 pub struct SearchInput {
@@ -83,9 +84,9 @@ impl SearchInput {
                 .left(px(0.0))
                 .w_full()
                 .max_h(px(300.0))
-                .bg(rgb(0xffffff))
+                .bg(theme::background())
                 .border_1()
-                .border_color(rgb(0xdbdbdb))
+                .border_color(theme::border())
                 .rounded_md()
                 .shadow_lg()
                 .overflow_hidden()
@@ -123,7 +124,7 @@ impl SearchInput {
             .w_full()
             .cursor_pointer()
             .when(is_selected, |div| {
-                div.bg(rgb(0xe3f2fd))
+                div.bg(theme::autocomplete_selected())
             })
             .child(
                 // Use Button for clickable suggestions as well (backup click handler)
@@ -263,7 +264,7 @@ impl Render for SearchInput {
                     .gap_2()
                     .child(
                         div()
-                            .text_color(rgb(0x7a7a7a))
+                            .text_color(theme::text_secondary())
                             .child("🔍")
                     )
                     .child(

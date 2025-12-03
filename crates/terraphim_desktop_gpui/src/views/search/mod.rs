@@ -3,13 +3,16 @@ use gpui_component::StyledExt;
 use terraphim_config::ConfigState;
 use crate::state::search::SearchState;
 use crate::views::ArticleModal;
+use crate::theme::colors::theme;
 
 mod autocomplete;
 mod input;
 mod results;
+mod term_chips;
 
 pub use input::SearchInput;
 pub use results::{AddToContextEvent, OpenArticleEvent, SearchResults};
+pub use term_chips::TermChips;
 
 impl EventEmitter<AddToContextEvent> for SearchView {}
 impl EventEmitter<OpenArticleEvent> for SearchView {}
@@ -85,7 +88,10 @@ impl SearchView {
 }
 
 impl Render for SearchView {
-    fn render(&mut self, _window: &mut Window, _cx: &mut Context<Self>) -> impl IntoElement {
+    fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
+        // Get term chips from search state
+        let term_chips = self.search_state.read(cx).get_term_chips();
+        
         div()
             .relative()
             .flex()
@@ -97,10 +103,15 @@ impl Render for SearchView {
                 div()
                     .text_2xl()
                     .font_bold()
-                    .text_color(rgb(0x363636))
+                    .text_color(theme::text_primary())
                     .child("Search"),
             )
             .child(self.search_input.clone())
+            .children(if !term_chips.chips.is_empty() {
+                Some(cx.new(|_cx| TermChips::new(term_chips.clone())))
+            } else {
+                None
+            })
             .child(
                 div()
                     .flex_1()

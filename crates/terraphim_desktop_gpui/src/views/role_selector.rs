@@ -4,6 +4,8 @@ use gpui_component::{button::*, IconName, StyledExt};
 use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
 
+use crate::theme::colors::theme;
+
 /// Event emitted when role changes
 pub struct RoleChangeEvent {
     pub new_role: String,
@@ -179,7 +181,7 @@ impl RoleSelector {
                 div()
                     .text_sm()
                     .font_medium()
-                    .text_color(rgb(0x363636))
+                    .text_color(theme::text_primary())
                     .child(role.to_string()),
             )
     }

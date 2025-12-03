@@ -1,5 +1,7 @@
 use gpui::*;
 
+pub mod colors;
+
 /// Terraphim theme configuration
 pub struct TerraphimTheme {
     pub mode: ThemeMode,

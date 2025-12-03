@@ -7,6 +7,7 @@ use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
 
 use crate::theme::TerraphimTheme;
+use crate::theme::colors::theme;
 use crate::views::chat::ChatView;
 use crate::views::editor::EditorView;
 use crate::views::search::{AddToContextEvent, SearchView};
@@ -414,9 +415,9 @@ impl TerraphimApp {
             .items_center()
             .justify_between()
             .p_4()
-            .bg(rgb(0xf5f5f5))
+            .bg(theme::surface())
             .border_b_1()
-            .border_color(rgb(0xdddddd))
+            .border_color(theme::border())
             .child(
                 div()
                     .flex()
@@ -427,7 +428,7 @@ impl TerraphimApp {
                         div()
                             .text_xl()
                             .font_bold()
-                            .text_color(rgb(0x333333))
+                            .text_color(theme::text_primary())
                             .child("Terraphim AI"),
                     )
                     .child(
@@ -456,16 +457,16 @@ impl TerraphimApp {
                             .py_2()
                             .rounded_md()
                             .bg(if self.show_tray_menu {
-                                rgb(0x3273dc)
+                                theme::primary()
                             } else {
-                                rgb(0xffffff)
+                                theme::background()
                             })
                             .text_color(if self.show_tray_menu {
-                                rgb(0xffffff)
+                                theme::primary_text()
                             } else {
-                                rgb(0x363636)
+                                theme::text_primary()
                             })
-                            .hover(|style| style.bg(rgb(0xf0f0f0)).cursor_pointer())
+                            .hover(|style| style.bg(theme::surface_hover()).cursor_pointer())
                             .child("☰"),
                     ),
             )
@@ -489,9 +490,9 @@ impl TerraphimApp {
                 .w(px(220.0))
                 .max_h(px(300.0))
                 .overflow_hidden()
-                .bg(rgb(0xffffff))
+                .bg(theme::background())
                 .border_1()
-                .border_color(rgb(0xdbdbdb))
+                .border_color(theme::border())
                 .rounded_md()
                 .shadow_lg()
                 .child(self.render_role_dropdown_content(cx))
@@ -526,8 +527,8 @@ impl TerraphimApp {
                         .px_2()
                         .py_2()
                         .border_b_1()
-                        .border_color(rgb(0xf0f0f0))
-                        .when(current, |this| this.bg(rgb(0xf5f5f5)))
+                        .border_color(theme::border_light())
+                        .when(current, |this| this.bg(theme::surface()))
                         .child(
                             Button::new(("role-item", index))
                                 .label(role_name)
@@ -540,7 +541,7 @@ impl TerraphimApp {
                                 }))
                         )
                         .children(if current {
-                            Some(div().text_color(rgb(0x48c774)).text_sm().child("✓"))
+                            Some(div().text_color(theme::success()).text_sm().child("✓"))
                         } else {
                             None
                         })
@@ -599,7 +600,7 @@ impl Render for TerraphimApp {
             .flex()
             .flex_col()
             .size_full()
-            .bg(rgb(0xffffff))
+            .bg(theme::background())
             .relative()
             .child(self.render_navigation(cx))
             .child(

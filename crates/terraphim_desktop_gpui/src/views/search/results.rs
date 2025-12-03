@@ -3,6 +3,7 @@ use gpui_component::{button::*, IconName, StyledExt};
 use terraphim_types::Document;
 
 use crate::state::search::SearchState;
+use crate::theme::colors::theme;
 
 /// Event emitted when user wants to add document to context
 pub struct AddToContextEvent {
@@ -95,20 +96,20 @@ impl SearchResults {
         div()
             .p_4()
             .mb_2()
-            .bg(rgb(0xffffff))
+            .bg(theme::background())
             .border_1()
-            .border_color(rgb(0xdbdbdb))
+            .border_color(theme::border())
             .rounded_md()
-            .hover(|style| style.bg(rgb(0xf5f5f5)))
+            .hover(|style| style.bg(theme::surface_hover()))
             .child(
                 // Clickable title to open modal
                 div()
                     .text_lg()
                     .font_semibold()
-                    .text_color(rgb(0x3273dc))
+                    .text_color(theme::primary())
                     .mb_2()
                     .cursor_pointer()
-                    .hover(|style| style.text_color(rgb(0x2366d1)))
+                    .hover(|style| style.text_color(theme::primary_hover()))
                     .child(
                         Button::new(("open-modal", idx))
                             .label(doc.title.clone())
@@ -121,7 +122,7 @@ impl SearchResults {
             .child(
                 div()
                     .text_sm()
-                    .text_color(rgb(0x7a7a7a))
+                    .text_color(theme::text_secondary())
                     .mb_2()
                     .child(
                         doc.description
@@ -133,7 +134,7 @@ impl SearchResults {
             .child(
                 div()
                     .text_xs()
-                    .text_color(rgb(0xb5b5b5))
+                    .text_color(theme::text_disabled())
                     .mb_2()
                     .child(doc.url.clone()),
             )
@@ -189,14 +190,14 @@ impl SearchResults {
             .child(
                 div()
                     .text_xl()
-                    .text_color(rgb(0x7a7a7a))
+                    .text_color(theme::text_secondary())
                     .mb_2()
                     .child("Search Terraphim Knowledge Graph"),
             )
             .child(
                 div()
                     .text_sm()
-                    .text_color(rgb(0xb5b5b5))
+                    .text_color(theme::text_disabled())
                     .child("Enter a query to search across your knowledge sources"),
             )
     }
@@ -218,7 +219,7 @@ impl Render for SearchResults {
                 .child(
                     div()
                         .text_lg()
-                        .text_color(rgb(0x7a7a7a))
+                        .text_color(theme::text_secondary())
                         .child("Searching...")
                 )
                 .into_any_element()
@@ -226,10 +227,11 @@ impl Render for SearchResults {
             div()
                 .px_4()
                 .py_3()
-                .bg(rgb(0xfef5e7))
+                .bg(theme::warning())  // Use warning color directly
                 .border_1()
-                .border_color(rgb(0xf1c40f))
+                .border_color(theme::warning())
                 .rounded_md()
+                .text_color(theme::text_primary())
                 .child("Search error - please try again")
                 .into_any_element()
         } else if results.is_empty() {
@@ -247,7 +249,7 @@ impl Render for SearchResults {
                         .child(
                             div()
                                 .text_sm()
-                                .text_color(rgb(0x7a7a7a))
+                                .text_color(theme::text_secondary())
                                 .child(format!("Found {} results", results.len()))
                         )
                 )
