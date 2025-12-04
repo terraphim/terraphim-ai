@@ -34,10 +34,19 @@ pub mod service;
 #[cfg(feature = "claude-log-analyzer")]
 pub mod cla;
 
+#[cfg(feature = "enrichment")]
+pub mod enrichment;
+
 // Re-exports for convenience
 pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionConnector};
 pub use model::{ContentBlock, Message, MessageRole, Session, SessionMetadata};
 pub use service::SessionService;
+
+#[cfg(feature = "enrichment")]
+pub use enrichment::{
+    find_related_sessions, search_by_concept, ConceptMatch, ConceptOccurrence, EnrichmentConfig,
+    EnrichmentResult, SessionConcepts, SessionEnricher,
+};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

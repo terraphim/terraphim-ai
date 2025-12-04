@@ -1,7 +1,7 @@
 # Terraphim Agent Session Search - Feature Specification
 
-> **Version**: 1.1.0
-> **Status**: Phase 2 Complete
+> **Version**: 1.2.0
+> **Status**: Phase 3 Complete
 > **Created**: 2025-12-03
 > **Updated**: 2025-12-04
 > **Inspired by**: [Coding Agent Session Search (CASS)](https://github.com/Dicklesworthstone/coding_agent_session_search)
@@ -577,9 +577,10 @@ $ terraphim-agent robot search "async database" --format json --max-results 3
 - [x] Feature-gated architecture (`terraphim_sessions` crate)
 
 ### Phase 3 (Knowledge Graph)
-- [ ] Session enrichment pipeline (feature-gated via `enrichment` feature)
-- [ ] Concept-based session discovery
-- [ ] Cross-session learning integration
+- [x] Session enrichment pipeline (`SessionEnricher`, feature-gated via `enrichment`)
+- [x] Concept-based session discovery (`/sessions concepts`, `/sessions related`)
+- [x] Timeline and export (`/sessions timeline`, `/sessions export`)
+- [ ] Cross-session learning integration (future enhancement)
 
 ---
 

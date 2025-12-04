@@ -157,6 +157,30 @@ pub enum SessionsSubcommand {
     Show {
         session_id: String,
     },
+    /// Search sessions by concept (Phase 3 - requires enrichment)
+    Concepts {
+        concept: String,
+    },
+    /// Find sessions related to a given session
+    Related {
+        session_id: String,
+        min_shared: Option<usize>,
+    },
+    /// Show session timeline grouped by period
+    Timeline {
+        group_by: Option<String>, // day, week, month
+        limit: Option<usize>,
+    },
+    /// Export sessions to file
+    Export {
+        format: Option<String>, // json, markdown
+        output: Option<String>, // file path
+        session_id: Option<String>,
+    },
+    /// Enrich sessions with concepts (Phase 3)
+    Enrich {
+        session_id: Option<String>,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1125,8 +1149,118 @@ impl FromStr for ReplCommand {
                             subcommand: SessionsSubcommand::Show { session_id },
                         })
                     }
+                    "concepts" | "by-concept" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Sessions concepts requires a concept name"));
+                        }
+                        let concept = parts[2..].join(" ");
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Concepts { concept },
+                        })
+                    }
+                    "related" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Sessions related requires a session ID"));
+                        }
+                        let session_id = parts[2].to_string();
+                        let min_shared = if parts.len() > 3 {
+                            parts.iter().position(|&p| p == "--min").and_then(|i| {
+                                parts.get(i + 1).and_then(|v| v.parse().ok())
+                            })
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Related { session_id, min_shared },
+                        })
+                    }
+                    "timeline" => {
+                        let mut group_by = None;
+                        let mut limit = None;
+                        let mut i = 2;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--group-by" | "--group" => {
+                                    if i + 1 < parts.len() {
+                                        group_by = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--group-by requires a value (day, week, month)"));
+                                    }
+                                }
+                                "--limit" => {
+                                    if i + 1 < parts.len() {
+                                        limit = Some(
+                                            parts[i + 1]
+                                                .parse::<usize>()
+                                                .map_err(|_| anyhow!("Invalid limit value"))?,
+                                        );
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--limit requires a value"));
+                                    }
+                                }
+                                _ => i += 1,
+                            }
+                        }
+
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Timeline { group_by, limit },
+                        })
+                    }
+                    "export" => {
+                        let mut format = None;
+                        let mut output = None;
+                        let mut session_id = None;
+                        let mut i = 2;
+
+                        while i < parts.len() {
+                            match parts[i] {
+                                "--format" => {
+                                    if i + 1 < parts.len() {
+                                        format = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--format requires a value (json, markdown)"));
+                                    }
+                                }
+                                "--output" | "-o" => {
+                                    if i + 1 < parts.len() {
+                                        output = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--output requires a file path"));
+                                    }
+                                }
+                                "--session" | "--id" => {
+                                    if i + 1 < parts.len() {
+                                        session_id = Some(parts[i + 1].to_string());
+                                        i += 2;
+                                    } else {
+                                        return Err(anyhow!("--session requires a session ID"));
+                                    }
+                                }
+                                _ => i += 1,
+                            }
+                        }
+
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Export { format, output, session_id },
+                        })
+                    }
+                    "enrich" => {
+                        let session_id = if parts.len() > 2 {
+                            Some(parts[2].to_string())
+                        } else {
+                            None
+                        };
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Enrich { session_id },
+                        })
+                    }
                     _ => Err(anyhow!(
-                        "Unknown sessions subcommand: {}. Use: sources, import, list, search, stats, show",
+                        "Unknown sessions subcommand: {}. Use: sources, import, list, search, stats, show, concepts, related, timeline, export, enrich",
                         parts[1]
                     )),
                 }
@@ -1233,7 +1367,7 @@ impl ReplCommand {
             "thesaurus" => Some("/thesaurus [--role <role>] - Show thesaurus entries"),
 
             #[cfg(feature = "repl-sessions")]
-            "sessions" => Some("/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show)"),
+            "sessions" => Some("/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, concepts, related, timeline, export, enrich)"),
 
             _ => None,
         }

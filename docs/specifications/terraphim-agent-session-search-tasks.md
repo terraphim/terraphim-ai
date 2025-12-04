@@ -1,9 +1,9 @@
 # Terraphim Agent Session Search - Implementation Tasks
 
-> **Version**: 1.1.0
+> **Version**: 1.2.0
 > **Created**: 2025-12-03
 > **Updated**: 2025-12-04
-> **Status**: Phase 1 Complete, Phase 2 In Progress
+> **Status**: Phase 3 Complete
 
 ## Overview
 
@@ -643,9 +643,9 @@ Phase 3:
 
 | Task | Status | Assignee | Notes |
 |------|--------|----------|-------|
-| 3.1 | Not Started | - | Enrichment feature ready |
-| 3.2 | Not Started | - | |
-| 3.3 | ✅ Partial | - | /sessions stats implemented |
+| 3.1 | ✅ Complete | - | SessionEnricher, ConceptMatch, SessionConcepts |
+| 3.2 | ✅ Complete | - | /sessions concepts, related commands |
+| 3.3 | ✅ Complete | - | /sessions timeline, export, enrich commands |
 
 ## Definition of Done
 

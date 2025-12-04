@@ -1848,6 +1848,268 @@ impl ReplHandler {
                     println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
                 }
             }
+
+            SessionsSubcommand::Concepts { concept } => {
+                println!("\n{} Searching sessions by concept: '{}'", "🔍".bold(), concept.cyan());
+                println!("{} This feature requires enrichment. Searching by text match...", "ℹ".blue());
+
+                // Fall back to text search for now (enrichment requires thesaurus)
+                let sessions = svc.search(&concept).await;
+
+                if sessions.is_empty() {
+                    println!("{} No sessions contain concept '{}'", "ℹ".blue().bold(), concept);
+                    return Ok(());
+                }
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("ID").fg(comfy_table::Color::Cyan),
+                        Cell::new("Source").fg(comfy_table::Color::Yellow),
+                        Cell::new("Matches").fg(comfy_table::Color::Green),
+                        Cell::new("Title").fg(comfy_table::Color::White),
+                    ]);
+
+                for session in sessions.iter().take(10) {
+                    let title = session.title.as_ref()
+                        .map(|t| if t.len() > 40 { format!("{}...", &t[..40]) } else { t.clone() })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    // Count occurrences of concept
+                    let count: usize = session.messages.iter()
+                        .filter(|m| m.content.to_lowercase().contains(&concept.to_lowercase()))
+                        .count();
+
+                    table.add_row(vec![
+                        Cell::new(&session.id[..8]),
+                        Cell::new(&session.source),
+                        Cell::new(count.to_string()),
+                        Cell::new(title),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Related { session_id, min_shared } => {
+                println!("\n{} Finding sessions related to: {}", "🔗".bold(), session_id.cyan());
+                println!("{} This feature requires enrichment. Showing based on search similarity...", "ℹ".blue());
+
+                let _min = min_shared.unwrap_or(1); // Will be used with enrichment
+
+                // Get the source session
+                let source = svc.get_session(&session_id).await;
+                if source.is_none() {
+                    println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
+                    return Ok(());
+                }
+                let source = source.unwrap();
+
+                // Get keywords from first user message
+                let keywords = source.messages.iter()
+                    .find(|m| m.role == terraphim_sessions::MessageRole::User)
+                    .map(|m| m.content.split_whitespace().take(3).collect::<Vec<_>>().join(" "))
+                    .unwrap_or_default();
+
+                if keywords.is_empty() {
+                    println!("{} No keywords found in session", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                let related = svc.search(&keywords).await;
+                let related: Vec<_> = related.into_iter()
+                    .filter(|s| s.id != session_id)
+                    .take(5)
+                    .collect();
+
+                if related.is_empty() {
+                    println!("{} No related sessions found", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("Session ID").fg(comfy_table::Color::Cyan),
+                        Cell::new("Source").fg(comfy_table::Color::Yellow),
+                        Cell::new("Messages").fg(comfy_table::Color::Green),
+                        Cell::new("Title").fg(comfy_table::Color::White),
+                    ]);
+
+                for session in related {
+                    let title = session.title.as_ref()
+                        .map(|t| if t.len() > 40 { format!("{}...", &t[..40]) } else { t.clone() })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    table.add_row(vec![
+                        Cell::new(&session.id[..8]),
+                        Cell::new(&session.source),
+                        Cell::new(session.message_count().to_string()),
+                        Cell::new(title),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Timeline { group_by, limit } => {
+                use std::collections::HashMap;
+
+                let group = group_by.as_deref().unwrap_or("day");
+                let max_entries = limit.unwrap_or(30);
+
+                println!("\n{} Session Timeline (grouped by {}):", "📅".bold(), group.cyan());
+
+                let sessions = svc.list_sessions().await;
+                if sessions.is_empty() {
+                    println!("{} No sessions found. Import sessions first.", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                // Group sessions by date
+                let mut grouped: HashMap<String, Vec<&terraphim_sessions::Session>> = HashMap::new();
+
+                for session in &sessions {
+                    let date_key = if let Some(started) = session.started_at {
+                        let date = started.strftime("%Y-%m-%d").to_string();
+                        match group {
+                            "week" => {
+                                // Get week start (Monday)
+                                format!("Week of {}", &date[..10])
+                            }
+                            "month" => {
+                                format!("{}-{}", &date[..4], &date[5..7])
+                            }
+                            _ => date[..10].to_string(), // day
+                        }
+                    } else {
+                        "Unknown".to_string()
+                    };
+
+                    grouped.entry(date_key).or_default().push(session);
+                }
+
+                // Sort by date key
+                let mut sorted: Vec<_> = grouped.into_iter().collect();
+                sorted.sort_by(|a, b| b.0.cmp(&a.0)); // Newest first
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("Date").fg(comfy_table::Color::Cyan),
+                        Cell::new("Sessions").fg(comfy_table::Color::Green),
+                        Cell::new("Messages").fg(comfy_table::Color::Yellow),
+                        Cell::new("Sources").fg(comfy_table::Color::White),
+                    ]);
+
+                for (date, day_sessions) in sorted.into_iter().take(max_entries) {
+                    let session_count = day_sessions.len();
+                    let message_count: usize = day_sessions.iter().map(|s| s.message_count()).sum();
+                    let sources: std::collections::HashSet<_> = day_sessions.iter().map(|s| s.source.as_str()).collect();
+
+                    table.add_row(vec![
+                        Cell::new(&date),
+                        Cell::new(session_count.to_string()),
+                        Cell::new(message_count.to_string()),
+                        Cell::new(sources.into_iter().collect::<Vec<_>>().join(", ")),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Export { format, output, session_id } => {
+                let fmt = format.as_deref().unwrap_or("json");
+
+                println!("\n{} Exporting sessions (format: {})...", "📤".bold(), fmt.cyan());
+
+                let sessions: Vec<terraphim_sessions::Session> = if let Some(id) = session_id {
+                    if let Some(session) = svc.get_session(&id).await {
+                        vec![session]
+                    } else {
+                        println!("{} Session '{}' not found", "⚠".yellow().bold(), id);
+                        return Ok(());
+                    }
+                } else {
+                    svc.list_sessions().await
+                };
+
+                if sessions.is_empty() {
+                    println!("{} No sessions to export", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                let content = match fmt {
+                    "json" => serde_json::to_string_pretty(&sessions)?,
+                    "markdown" | "md" => {
+                        let mut md = String::new();
+                        md.push_str("# AI Coding Sessions Export\n\n");
+                        for session in &sessions {
+                            md.push_str(&format!("## {}\n\n", session.id));
+                            md.push_str(&format!("- **Source**: {}\n", session.source));
+                            if let Some(title) = &session.title {
+                                md.push_str(&format!("- **Title**: {}\n", title));
+                            }
+                            md.push_str(&format!("- **Messages**: {}\n\n", session.message_count()));
+                            md.push_str("### Conversation\n\n");
+                            for msg in &session.messages {
+                                md.push_str(&format!("**{}**: {}\n\n", msg.role, msg.content));
+                            }
+                            md.push_str("---\n\n");
+                        }
+                        md
+                    }
+                    _ => {
+                        println!("{} Unknown format '{}'. Use: json, markdown", "⚠".yellow().bold(), fmt);
+                        return Ok(());
+                    }
+                };
+
+                if let Some(path) = output {
+                    std::fs::write(&path, &content)?;
+                    println!("{} Exported {} sessions to '{}'", "✅".green().bold(), sessions.len(), path.green());
+                } else {
+                    println!("{}", content);
+                }
+            }
+
+            SessionsSubcommand::Enrich { session_id } => {
+                println!("\n{} Enriching sessions with concepts...", "🧠".bold());
+                println!("{} This feature requires the 'enrichment' feature flag.", "ℹ".blue());
+                println!("{} Rebuild with: cargo build --features repl-sessions,enrichment", "💡".yellow());
+
+                // For now, show what would be enriched
+                if let Some(id) = session_id {
+                    if let Some(session) = svc.get_session(&id).await {
+                        println!("\n  Would enrich session: {}", session.id.cyan());
+                        println!("  Messages to process: {}", session.message_count());
+
+                        // Show sample text
+                        if let Some(first_msg) = session.messages.first() {
+                            let preview = if first_msg.content.len() > 100 {
+                                format!("{}...", &first_msg.content[..100])
+                            } else {
+                                first_msg.content.clone()
+                            };
+                            println!("  Sample: {}", preview.italic());
+                        }
+                    } else {
+                        println!("{} Session '{}' not found", "⚠".yellow().bold(), id);
+                    }
+                } else {
+                    let sessions = svc.list_sessions().await;
+                    println!("\n  Would enrich {} sessions", sessions.len().to_string().green());
+
+                    let total_messages: usize = sessions.iter().map(|s| s.message_count()).sum();
+                    println!("  Total messages to process: {}", total_messages.to_string().green());
+                }
+            }
         }
 
         Ok(())

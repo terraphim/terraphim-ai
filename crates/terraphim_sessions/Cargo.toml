@@ -15,7 +15,7 @@ claude-log-analyzer = ["dep:claude-log-analyzer"]
 cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
 
 # Enable terraphim knowledge graph enrichment
-enrichment = ["terraphim_automata", "terraphim_rolegraph"]
+enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
 
 # All features
 full = ["cla-full", "enrichment"]
@@ -45,6 +45,7 @@ claude-log-analyzer = { path = "../claude-log-analyzer", optional = true }
 # Feature-gated: Terraphim enrichment
 terraphim_automata = { path = "../terraphim_automata", optional = true }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
+terraphim_types = { path = "../terraphim_types", optional = true }
 
 [dev-dependencies]
 tempfile = "3.10"
