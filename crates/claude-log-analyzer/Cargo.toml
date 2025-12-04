@@ -19,6 +19,12 @@ terraphim = [
     "dep:terraphim_config",
 ]
 
+# Optional: Multi-agent session connectors (Cursor, Aider, etc.)
+connectors = ["dep:rusqlite"]
+
+# All features
+full = ["terraphim", "connectors"]
+
 [dependencies]
 # Core dependencies
 clap = { version = "4.5", features = ["derive", "env"] }
@@ -64,6 +70,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 terraphim_automata = { path = "../terraphim_automata", optional = true }
 terraphim_types = { path = "../terraphim_types", optional = true }
 terraphim_config = { path = "../terraphim_config", optional = true }
+
+# Feature-gated connector dependencies
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 
 # Unix-specific for terminal detection
 [target.'cfg(unix)'.dependencies]

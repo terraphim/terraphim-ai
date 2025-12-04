@@ -44,6 +44,8 @@ pub mod tool_analyzer;
 #[cfg(feature = "terraphim")]
 pub mod kg;
 
+pub mod connectors;
+
 // Re-export main types for convenience
 pub use analyzer::{Analyzer, SummaryStats};
 pub use models::{
