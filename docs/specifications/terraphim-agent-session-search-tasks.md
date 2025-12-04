@@ -1,8 +1,10 @@
 # Terraphim Agent Session Search - Implementation Tasks
 
-> **Version**: 1.0.0
+> **Version**: 1.1.0
 > **Created**: 2025-12-03
+> **Updated**: 2025-12-04
 > **Status**: In Progress
+> **Leverages**: Claude Code log ecosystem (clog, vibe-log-cli, claude-conversation-extractor)
 
 ## Overview
 
@@ -303,32 +305,93 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 **Priority**: P0 (Critical)
 **Dependencies**: Task 2.1
 **Location**: `crates/terraphim_sessions/src/connector/claude_code.rs`
+**References**:
+- [clog JSONL schema](https://github.com/HillviewCap/clog)
+- [vibe-log-cli sanitization](https://github.com/vibe-log/vibe-log-cli)
+- [claude-conversation-extractor parsing](https://github.com/ZeroSumQuant/claude-conversation-extractor)
+
+#### Claude Code Log Format (from ecosystem analysis)
+
+```json
+{
+  "parentUuid": "string",     // Thread relationship
+  "sessionId": "string",       // Groups interactions
+  "version": "string",
+  "gitBranch": "string",
+  "cwd": "string",             // Project path
+  "message": {
+    "role": "user|assistant",
+    "content": [
+      {"type": "text", "text": "..."},
+      {"type": "tool_use", "id": "...", "name": "...", "input": {}},
+      {"type": "tool_result", "tool_use_id": "...", "content": "..."}
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0
+    }
+  },
+  "uuid": "string",
+  "timestamp": "ISO-8601"
+}
+```
 
 #### Subtasks
 
 - [ ] **2.2.1** Implement detection
-  - Check `~/.claude/` exists
-  - Count available sessions
+  - Check `~/.claude/projects/` exists (macOS/Linux)
+  - Check `%USERPROFILE%\.claude\projects\` (Windows)
+  - Count `chat_*.jsonl` files for estimate
 
-- [ ] **2.2.2** Implement JSONL parsing
-  - Parse session files
-  - Extract messages
-  - Handle code blocks
+- [ ] **2.2.2** Define JSONL data structures
+  ```rust
+  #[derive(Deserialize)]
+  #[serde(rename_all = "camelCase")]
+  struct ClaudeLogEntry {
+      uuid: String,
+      parent_uuid: Option<String>,
+      session_id: String,
+      git_branch: Option<String>,
+      cwd: Option<String>,
+      timestamp: DateTime<Utc>,
+      message: ClaudeMessage,
+  }
 
-- [ ] **2.2.3** Implement import
-  - Read sessions
-  - Normalize to model
-  - Return results
+  #[derive(Deserialize)]
+  #[serde(tag = "type", rename_all = "snake_case")]
+  enum ClaudeContent {
+      Text { text: String },
+      ToolUse { id: String, name: String, input: Value },
+      ToolResult { tool_use_id: String, content: String },
+  }
+  ```
 
-- [ ] **2.2.4** Add tests with fixtures
-  - Create test JSONL files
-  - Test parsing edge cases
+- [ ] **2.2.3** Implement JSONL parsing
+  - Line-by-line streaming parser
+  - Handle malformed lines with logging
+  - Apply date filters (since/until)
+  - Track token usage from `usage` field
+
+- [ ] **2.2.4** Implement file watching (notify crate)
+  - Watch `~/.claude/projects/*/*.jsonl`
+  - Emit `SessionEvent` on file changes
+  - Incremental re-indexing on modifications
+
+- [ ] **2.2.5** Add tests with real fixtures
+  - Create sample JSONL files from actual Claude Code format
+  - Test content type parsing (text, tool_use, tool_result)
+  - Test thread reconstruction via parentUuid
+  - Test token usage extraction
 
 #### Acceptance Criteria
 
-- [ ] Detects Claude Code installation
-- [ ] Imports sessions correctly
-- [ ] Handles malformed files gracefully
+- [ ] Detects Claude Code installation on all platforms
+- [ ] Parses all content types correctly
+- [ ] Token usage tracking works
+- [ ] File watching enables real-time updates
+- [ ] Handles malformed files gracefully with logging
 
 ---
 
@@ -563,12 +626,12 @@ Phase 3:
 
 | Task | Status | Assignee | Notes |
 |------|--------|----------|-------|
-| 1.1 | In Progress | - | Robot output infrastructure |
-| 1.2 | In Progress | - | Forgiving CLI parser |
-| 1.3 | In Progress | - | Self-documentation API |
-| 1.4 | Not Started | - | REPL integration |
+| 1.1 | ✅ Complete | - | Robot output infrastructure implemented |
+| 1.2 | ✅ Complete | - | Forgiving CLI parser with strsim |
+| 1.3 | ✅ Complete | - | Self-documentation API |
+| 1.4 | Partial | - | Robot command added, integration ongoing |
 | 1.5 | Not Started | - | Token budget |
-| 1.6 | Not Started | - | Tests |
+| 1.6 | ✅ Complete | - | 101 tests for Phase 1 modules |
 
 ### Phase 2 Status
 
@@ -615,3 +678,37 @@ For each task:
 - Prefer small, focused PRs over large changes
 - Write tests alongside implementation
 - Update this document as tasks complete
+
+---
+
+## Ecosystem References
+
+### Claude Code Log Analysis Tools
+
+These tools were analyzed to inform our implementation:
+
+| Tool | Language | Key Features | Repository |
+|------|----------|--------------|------------|
+| **clog** | JavaScript | JSONL schema, real-time monitoring, file watching | [HillviewCap/clog](https://github.com/HillviewCap/clog) |
+| **vibe-log-cli** | Node.js | Privacy sanitization, productivity reports, Claude SDK | [vibe-log/vibe-log-cli](https://github.com/vibe-log/vibe-log-cli) |
+| **claude-conversation-extractor** | Python | Export/search, 97% test coverage, cross-platform | [ZeroSumQuant/claude-conversation-extractor](https://github.com/ZeroSumQuant/claude-conversation-extractor) |
+| **claude-code-history-viewer** | Rust/Tauri | Desktop app, activity heatmap, token analytics | [jhlee0409/claude-code-history-viewer](https://github.com/jhlee0409/claude-code-history-viewer) |
+| **cc-log-viewer** | Rust | Web interface, tool visualization, search | [crates.io/cc-log-viewer](https://crates.io/crates/cc-log-viewer) |
+
+### Key Implementation Insights
+
+1. **JSONL Format**: Claude Code stores logs in `~/.claude/projects/*/chat_*.jsonl`
+2. **Threading**: `parentUuid` establishes conversation thread relationships
+3. **Content Types**: Support `text`, `tool_use`, and `tool_result` content blocks
+4. **Token Tracking**: `usage` field includes cache metrics for cost analysis
+5. **Real-Time**: Use `notify` crate for file watching (File System Access API in web)
+6. **Privacy**: Consider sanitization patterns from vibe-log-cli for sensitive data
+
+### Sanitization Patterns (from vibe-log-cli)
+
+For optional privacy mode:
+- Code blocks → `[CODE_BLOCK_1: javascript]`
+- API keys/tokens → `[CREDENTIAL_1]`
+- File paths → `[PATH_1]`
+- URLs → `[URL_1]`
+- Emails → `[EMAIL_1]`

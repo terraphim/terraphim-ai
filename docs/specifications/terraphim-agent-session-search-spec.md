@@ -1,9 +1,11 @@
 # Terraphim Agent Session Search - Feature Specification
 
-> **Version**: 1.0.0
+> **Version**: 1.1.0
 > **Status**: Draft
 > **Created**: 2025-12-03
+> **Updated**: 2025-12-04
 > **Inspired by**: [Coding Agent Session Search (CASS)](https://github.com/Dicklesworthstone/coding_agent_session_search)
+> **Leverages**: Claude Code log ecosystem (clog, vibe-log-cli, claude-conversation-extractor)
 
 ## Executive Summary
 
@@ -280,14 +282,57 @@ Provides runnable examples with expected outputs.
 
 **Supported Sources**:
 
-| Source | Format | Location |
-|--------|--------|----------|
-| Claude Code | JSONL | `~/.claude/` |
-| Cursor | SQLite | `~/.cursor/` |
-| Aider | Markdown | `.aider.chat.history.md` |
-| Cline | JSON | `~/.cline/` |
-| OpenCode | JSONL | `~/.opencode/` |
-| Codex | JSONL | `~/.codex/` |
+| Source | Format | Location | Notes |
+|--------|--------|----------|-------|
+| Claude Code | JSONL | `~/.claude/projects/*/chat_*.jsonl` | Well-documented, primary target |
+| Cursor | SQLite | `~/.cursor/` | Proprietary format |
+| Aider | Markdown | `.aider.chat.history.md` | Per-project history |
+| Cline | JSON | `~/.cline/` | Similar to Claude Code |
+| OpenCode | JSONL | `~/.opencode/` | Follows Claude Code format |
+| Codex | JSONL | `~/.codex/` | Follows Claude Code format |
+
+**Platform-Specific Paths**:
+- **macOS/Linux**: `~/.claude/projects/*/chat_*.jsonl`
+- **Windows**: `%USERPROFILE%\.claude\projects\*\chat_*.jsonl`
+
+**Claude Code JSONL Schema** (from [clog](https://github.com/HillviewCap/clog)):
+```json
+{
+  "parentUuid": "string",
+  "sessionId": "string",
+  "version": "string",
+  "gitBranch": "string",
+  "cwd": "string",
+  "message": {
+    "role": "user|assistant",
+    "content": [
+      {
+        "type": "text|tool_use|tool_result",
+        "text": "string",
+        "name": "string",
+        "input": {},
+        "tool_use_id": "string"
+      }
+    ],
+    "usage": {
+      "input_tokens": 0,
+      "output_tokens": 0,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0
+    }
+  },
+  "uuid": "string",
+  "timestamp": "ISO-8601",
+  "toolUseResult": {}
+}
+```
+
+**Key Insights from Ecosystem Analysis**:
+- `parentUuid` establishes conversation thread relationships
+- `sessionId` groups related interactions
+- Token metrics track computational resource usage
+- Tool interactions maintain bidirectional references (`tool_use_id`)
+- Content types include: `text`, `tool_use`, `tool_result`
 
 **Connector Interface**:
 ```rust
@@ -308,26 +353,50 @@ pub trait SessionConnector: Send + Sync {
 
 #### F4.2 Session Data Model
 
+**Internal Model** (normalized from source formats):
 ```rust
+/// A session containing a conversation thread
 pub struct Session {
     pub id: Uuid,
-    pub source: String,           // "claude-code", "cursor", etc.
-    pub source_id: String,        // Original ID from source
+    pub source: String,              // "claude-code", "cursor", etc.
+    pub source_session_id: String,   // Original sessionId from source
+    pub project_path: Option<PathBuf>,
+    pub git_branch: Option<String>,
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
     pub messages: Vec<Message>,
     pub metadata: SessionMetadata,
 }
 
+/// Individual message in a session
 pub struct Message {
     pub id: Uuid,
-    pub role: MessageRole,        // User, Assistant, System
-    pub content: String,
+    pub parent_id: Option<Uuid>,     // parentUuid for threading
+    pub role: MessageRole,           // User, Assistant, System
+    pub content: Vec<ContentBlock>,  // Supports multiple content types
     pub timestamp: DateTime<Utc>,
-    pub snippets: Vec<CodeSnippet>,
-    pub concepts: Vec<String>,    // Extracted via knowledge graph
+    pub token_usage: Option<TokenUsage>,
+    pub concepts: Vec<String>,       // Extracted via knowledge graph
 }
 
+/// Content block types (matches Claude Code format)
+#[derive(Debug, Clone)]
+pub enum ContentBlock {
+    Text { text: String },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value
+    },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        is_error: bool
+    },
+    CodeSnippet(CodeSnippet),
+}
+
+/// Code extracted from messages
 pub struct CodeSnippet {
     pub language: Option<String>,
     pub content: String,
@@ -335,13 +404,24 @@ pub struct CodeSnippet {
     pub line_range: Option<(usize, usize)>,
 }
 
+/// Token usage tracking (from Claude Code logs)
+pub struct TokenUsage {
+    pub input_tokens: usize,
+    pub output_tokens: usize,
+    pub cache_creation_input_tokens: usize,
+    pub cache_read_input_tokens: usize,
+}
+
+/// Session metadata for indexing and filtering
 pub struct SessionMetadata {
     pub project_path: Option<PathBuf>,
+    pub git_branch: Option<String>,
     pub tags: Vec<String>,
-    pub token_count: usize,
+    pub total_tokens: usize,
     pub message_count: usize,
     pub has_code: bool,
     pub languages: Vec<String>,
+    pub tools_used: Vec<String>,     // List of tools invoked
 }
 ```
 
@@ -583,7 +663,18 @@ $ terraphim-agent robot search "async database" --format json --max-results 3
 
 ## References
 
-- [CASS Repository](https://github.com/Dicklesworthstone/coding_agent_session_search)
-- [Tantivy Documentation](https://docs.rs/tantivy/)
-- [Terraphim Architecture](../specifications/terraphim-desktop-spec.md)
+### Core Inspiration
+- [CASS Repository](https://github.com/Dicklesworthstone/coding_agent_session_search) - Original cross-agent session search
+
+### Claude Code Log Ecosystem
+- [clog](https://github.com/HillviewCap/clog) - Web-based viewer with JSONL schema documentation
+- [vibe-log-cli](https://github.com/vibe-log/vibe-log-cli) - Session analysis with privacy-preserving sanitization
+- [claude-conversation-extractor](https://github.com/ZeroSumQuant/claude-conversation-extractor) - Export/search tool with 97% test coverage
+- [claude-code-history-viewer](https://github.com/jhlee0409/claude-code-history-viewer) - Tauri+Rust desktop app
+- [cc-log-viewer](https://crates.io/crates/cc-log-viewer) - Rust crate for log viewing
+
+### Technical Resources
+- [Tantivy Documentation](https://docs.rs/tantivy/) - Full-text search engine
+- [strsim crate](https://crates.io/crates/strsim) - String similarity algorithms
 - [Jaro-Winkler Algorithm](https://en.wikipedia.org/wiki/Jaro%E2%80%93Winkler_distance)
+- [Terraphim Architecture](../specifications/terraphim-desktop-spec.md)

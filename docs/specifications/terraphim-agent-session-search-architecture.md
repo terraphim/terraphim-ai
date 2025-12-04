@@ -1,8 +1,10 @@
 # Terraphim Agent Session Search - Architecture Document
 
-> **Version**: 1.0.0
+> **Version**: 1.1.0
 > **Status**: Draft
 > **Created**: 2025-12-03
+> **Updated**: 2025-12-04
+> **Leverages**: Claude Code log ecosystem (clog, vibe-log-cli, claude-conversation-extractor)
 
 ## Overview
 
@@ -417,8 +419,59 @@ pub struct ImportResult {
 }
 
 /// Claude Code connector implementation
+/// Based on JSONL schema from clog (https://github.com/HillviewCap/clog)
 pub struct ClaudeCodeConnector {
     base_path: PathBuf,
+}
+
+/// Claude Code JSONL entry (matches actual log format)
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ClaudeLogEntry {
+    uuid: String,
+    parent_uuid: Option<String>,
+    session_id: String,
+    version: Option<String>,
+    git_branch: Option<String>,
+    cwd: Option<String>,
+    timestamp: DateTime<Utc>,
+    message: ClaudeMessage,
+    tool_use_result: Option<serde_json::Value>,
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeMessage {
+    role: String,
+    content: Vec<ClaudeContent>,
+    #[serde(default)]
+    usage: Option<ClaudeUsage>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum ClaudeContent {
+    Text { text: String },
+    ToolUse {
+        id: String,
+        name: String,
+        input: serde_json::Value,
+    },
+    ToolResult {
+        tool_use_id: String,
+        content: String,
+        #[serde(default)]
+        is_error: bool,
+    },
+}
+
+#[derive(Debug, Deserialize)]
+struct ClaudeUsage {
+    input_tokens: usize,
+    output_tokens: usize,
+    #[serde(default)]
+    cache_creation_input_tokens: usize,
+    #[serde(default)]
+    cache_read_input_tokens: usize,
 }
 
 #[async_trait]
@@ -428,29 +481,193 @@ impl SessionConnector for ClaudeCodeConnector {
 
     async fn detect(&self) -> ConnectorStatus {
         let path = self.default_path().unwrap();
-        if path.exists() {
-            ConnectorStatus::Available { path, sessions_estimate: None }
+        let projects_path = path.join("projects");
+        if projects_path.exists() {
+            // Count JSONL files for estimate
+            let estimate = Self::count_sessions(&projects_path).ok();
+            ConnectorStatus::Available { path, sessions_estimate: estimate }
         } else {
             ConnectorStatus::NotFound
         }
     }
 
     fn default_path(&self) -> Option<PathBuf> {
-        dirs::home_dir().map(|h| h.join(".claude"))
+        #[cfg(windows)]
+        {
+            std::env::var("USERPROFILE")
+                .ok()
+                .map(|p| PathBuf::from(p).join(".claude"))
+        }
+        #[cfg(not(windows))]
+        {
+            dirs::home_dir().map(|h| h.join(".claude"))
+        }
     }
 
     async fn import(&self, options: ImportOptions) -> Result<ImportResult, ConnectorError> {
-        let path = options.path.unwrap_or_else(|| self.default_path().unwrap());
+        let base = options.path.unwrap_or_else(|| self.default_path().unwrap());
+        let projects_path = base.join("projects");
 
-        // Parse JSONL files from ~/.claude/projects/*/
-        let sessions = self.parse_jsonl_files(&path, &options).await?;
+        let mut sessions = Vec::new();
+        let mut errors = Vec::new();
+        let start = std::time::Instant::now();
+
+        // Iterate over project directories
+        for project_entry in std::fs::read_dir(&projects_path)? {
+            let project_dir = project_entry?.path();
+            if !project_dir.is_dir() { continue; }
+
+            // Find chat_*.jsonl files in each project
+            for file_entry in std::fs::read_dir(&project_dir)? {
+                let file_path = file_entry?.path();
+                if !file_path.extension().map_or(false, |e| e == "jsonl") { continue; }
+                if !file_path.file_name()
+                    .and_then(|n| n.to_str())
+                    .map_or(false, |n| n.starts_with("chat_")) { continue; }
+
+                match self.parse_jsonl_file(&file_path, &options).await {
+                    Ok(session) => {
+                        if let Some(s) = session {
+                            sessions.push(s);
+                        }
+                    }
+                    Err(e) => errors.push(ImportError {
+                        path: file_path,
+                        error: e.to_string(),
+                    }),
+                }
+            }
+        }
 
         Ok(ImportResult {
             sessions_imported: sessions.len(),
             sessions_skipped: 0,
-            errors: vec![],
-            duration: Duration::from_secs(0),
+            errors,
+            duration: start.elapsed(),
         })
+    }
+
+    fn supports_watch(&self) -> bool { true }
+
+    async fn watch(&self) -> Result<mpsc::Receiver<SessionEvent>, ConnectorError> {
+        // Use notify crate for file watching
+        // Watch ~/.claude/projects/*/*.jsonl for changes
+        todo!("Implement file watching with notify crate")
+    }
+}
+
+impl ClaudeCodeConnector {
+    /// Parse a single JSONL file into a Session
+    async fn parse_jsonl_file(
+        &self,
+        path: &Path,
+        options: &ImportOptions,
+    ) -> Result<Option<Session>, ConnectorError> {
+        let file = std::fs::File::open(path)?;
+        let reader = std::io::BufReader::new(file);
+
+        let mut entries: Vec<ClaudeLogEntry> = Vec::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.trim().is_empty() { continue; }
+
+            match serde_json::from_str::<ClaudeLogEntry>(&line) {
+                Ok(entry) => {
+                    // Apply date filters
+                    if let Some(since) = options.since {
+                        if entry.timestamp < since { continue; }
+                    }
+                    if let Some(until) = options.until {
+                        if entry.timestamp > until { continue; }
+                    }
+                    entries.push(entry);
+                }
+                Err(e) => {
+                    tracing::warn!("Failed to parse JSONL line: {}", e);
+                }
+            }
+        }
+
+        if entries.is_empty() {
+            return Ok(None);
+        }
+
+        // Convert to Session model
+        let session = self.entries_to_session(entries, path)?;
+        Ok(Some(session))
+    }
+
+    fn entries_to_session(
+        &self,
+        entries: Vec<ClaudeLogEntry>,
+        source_path: &Path,
+    ) -> Result<Session, ConnectorError> {
+        let first = entries.first().unwrap();
+        let last = entries.last().unwrap();
+
+        let messages = entries.iter().map(|e| {
+            Message {
+                id: Uuid::parse_str(&e.uuid).unwrap_or_else(|_| Uuid::new_v4()),
+                parent_id: e.parent_uuid.as_ref()
+                    .and_then(|p| Uuid::parse_str(p).ok()),
+                role: match e.message.role.as_str() {
+                    "user" => MessageRole::User,
+                    "assistant" => MessageRole::Assistant,
+                    _ => MessageRole::System,
+                },
+                content: e.message.content.iter().map(|c| match c {
+                    ClaudeContent::Text { text } => ContentBlock::Text { text: text.clone() },
+                    ClaudeContent::ToolUse { id, name, input } => ContentBlock::ToolUse {
+                        id: id.clone(),
+                        name: name.clone(),
+                        input: input.clone(),
+                    },
+                    ClaudeContent::ToolResult { tool_use_id, content, is_error } =>
+                        ContentBlock::ToolResult {
+                            tool_use_id: tool_use_id.clone(),
+                            content: content.clone(),
+                            is_error: *is_error,
+                        },
+                }).collect(),
+                timestamp: e.timestamp,
+                token_usage: e.message.usage.as_ref().map(|u| TokenUsage {
+                    input_tokens: u.input_tokens,
+                    output_tokens: u.output_tokens,
+                    cache_creation_input_tokens: u.cache_creation_input_tokens,
+                    cache_read_input_tokens: u.cache_read_input_tokens,
+                }),
+                concepts: vec![],
+            }
+        }).collect();
+
+        Ok(Session {
+            id: Uuid::new_v4(),
+            source: "claude-code".into(),
+            source_session_id: first.session_id.clone(),
+            project_path: first.cwd.as_ref().map(PathBuf::from),
+            git_branch: first.git_branch.clone(),
+            created_at: first.timestamp,
+            updated_at: last.timestamp,
+            messages,
+            metadata: SessionMetadata::default(),
+        })
+    }
+
+    fn count_sessions(projects_path: &Path) -> std::io::Result<usize> {
+        let mut count = 0;
+        for project in std::fs::read_dir(projects_path)? {
+            let project_dir = project?.path();
+            if project_dir.is_dir() {
+                for file in std::fs::read_dir(&project_dir)? {
+                    let path = file?.path();
+                    if path.extension().map_or(false, |e| e == "jsonl") {
+                        count += 1;
+                    }
+                }
+            }
+        }
+        Ok(count)
     }
 }
 ```
