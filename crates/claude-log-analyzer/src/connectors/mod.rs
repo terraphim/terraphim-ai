@@ -3,7 +3,9 @@
 //! This module provides connectors for various AI coding assistants:
 //! - Claude Code (JSONL) - via existing parser
 //! - Cursor (SQLite) - via cursor module
-//! - Aider (Markdown) - planned
+//! - Codex (JSONL) - OpenAI Codex CLI
+//! - Aider (Markdown) - Aider chat history
+//! - OpenCode (JSONL) - OpenCode AI assistant
 //!
 //! Enable with `--features connectors`
 
@@ -11,7 +13,13 @@ use anyhow::Result;
 use std::path::PathBuf;
 
 #[cfg(feature = "connectors")]
+pub mod aider;
+#[cfg(feature = "connectors")]
+pub mod codex;
+#[cfg(feature = "connectors")]
 pub mod cursor;
+#[cfg(feature = "connectors")]
+pub mod opencode;
 
 /// Status of a connector's detection
 #[derive(Debug, Clone)]
@@ -112,9 +120,14 @@ impl ConnectorRegistry {
         // Add Claude Code connector (always available via parser)
         connectors.push(Box::new(ClaudeCodeConnector::default()));
 
-        // Add Cursor connector if feature enabled
+        // Add additional connectors if feature enabled
         #[cfg(feature = "connectors")]
-        connectors.push(Box::new(cursor::CursorConnector::default()));
+        {
+            connectors.push(Box::new(cursor::CursorConnector::default()));
+            connectors.push(Box::new(codex::CodexConnector::default()));
+            connectors.push(Box::new(aider::AiderConnector::default()));
+            connectors.push(Box::new(opencode::OpenCodeConnector::default()));
+        }
 
         Self { connectors }
     }
