@@ -1,6 +1,8 @@
 //! REPL handler implementation
 
 use super::commands::{ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand};
+#[cfg(feature = "repl-sessions")]
+use super::commands::SessionsSubcommand;
 use crate::{client::ApiClient, service::TuiService};
 
 // Import robot module types
@@ -310,6 +312,11 @@ impl ReplHandler {
 
             ReplCommand::Robot { subcommand } => {
                 self.handle_robot(subcommand).await?;
+            }
+
+            #[cfg(feature = "repl-sessions")]
+            ReplCommand::Sessions { subcommand } => {
+                self.handle_sessions(subcommand).await?;
             }
         }
 
@@ -1635,6 +1642,212 @@ impl ReplHandler {
         #[cfg(not(feature = "repl"))]
         {
             println!("Robot mode requires repl feature");
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-sessions")]
+    async fn handle_sessions(&mut self, subcommand: SessionsSubcommand) -> Result<()> {
+        use colored::Colorize;
+        use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+        use comfy_table::presets::UTF8_FULL;
+        use comfy_table::{Cell, Table};
+        use terraphim_sessions::{SessionService, ImportOptions, ConnectorStatus};
+
+        // Get or create session service
+        static SESSION_SERVICE: std::sync::OnceLock<std::sync::Arc<tokio::sync::Mutex<SessionService>>> = std::sync::OnceLock::new();
+        let service = SESSION_SERVICE.get_or_init(|| {
+            std::sync::Arc::new(tokio::sync::Mutex::new(SessionService::new()))
+        });
+        let mut svc = service.lock().await;
+
+        match subcommand {
+            SessionsSubcommand::Sources => {
+                println!("\n{}", "Available Session Sources:".bold().cyan());
+
+                let sources = svc.detect_sources();
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Status").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Sessions").add_attribute(comfy_table::Attribute::Bold),
+                    ]);
+
+                for source in sources {
+                    let (status, count) = match &source.status {
+                        ConnectorStatus::Available { sessions_estimate, .. } => {
+                            ("Available".green().to_string(),
+                             sessions_estimate.map(|c| c.to_string()).unwrap_or("-".to_string()))
+                        }
+                        ConnectorStatus::NotFound => ("Not Found".yellow().to_string(), "-".to_string()),
+                        ConnectorStatus::Error(e) => (format!("Error: {}", e).red().to_string(), "-".to_string()),
+                    };
+
+                    table.add_row(vec![
+                        Cell::new(&source.id),
+                        Cell::new(status),
+                        Cell::new(count),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Import { source, limit } => {
+                let options = ImportOptions::new()
+                    .with_limit(limit.unwrap_or(100));
+
+                println!("\n{} Importing sessions...", "⏳".bold());
+
+                let sessions = if let Some(source_id) = source {
+                    svc.import_from(&source_id, &options).await?
+                } else {
+                    svc.import_all(&options).await?
+                };
+
+                println!(
+                    "{} Imported {} session(s)",
+                    "✅".bold(),
+                    sessions.len().to_string().green()
+                );
+            }
+
+            SessionsSubcommand::List { source, limit } => {
+                let sessions = if let Some(source_id) = source {
+                    svc.sessions_by_source(&source_id).await
+                } else {
+                    svc.list_sessions().await
+                };
+
+                let sessions: Vec<_> = if let Some(lim) = limit {
+                    sessions.into_iter().take(lim).collect()
+                } else {
+                    sessions.into_iter().take(20).collect()
+                };
+
+                if sessions.is_empty() {
+                    println!("{} No sessions found. Run '/sessions import' first.", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                println!("\n{}", "Sessions:".bold().cyan());
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Messages").add_attribute(comfy_table::Attribute::Bold),
+                    ]);
+
+                for session in &sessions {
+                    let title = session.title.as_ref()
+                        .map(|t| if t.len() > 40 { format!("{}...", &t[..40]) } else { t.clone() })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    table.add_row(vec![
+                        Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                        Cell::new(&session.source),
+                        Cell::new(title),
+                        Cell::new(session.message_count().to_string()),
+                    ]);
+                }
+
+                println!("{}", table);
+                println!("Showing {} session(s)", sessions.len().to_string().green());
+            }
+
+            SessionsSubcommand::Search { query } => {
+                let sessions = svc.search(&query).await;
+
+                if sessions.is_empty() {
+                    println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
+                    return Ok(());
+                }
+
+                println!("\n{} sessions match '{}':", sessions.len().to_string().green(), query.cyan());
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                    ]);
+
+                for session in sessions.iter().take(10) {
+                    let title = session.title.as_ref()
+                        .map(|t| if t.len() > 50 { format!("{}...", &t[..50]) } else { t.clone() })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    table.add_row(vec![
+                        Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                        Cell::new(&session.source),
+                        Cell::new(title),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Stats => {
+                let stats = svc.statistics().await;
+
+                println!("\n{}", "Session Statistics:".bold().cyan());
+                println!("  Total Sessions:          {}", stats.total_sessions.to_string().green());
+                println!("  Total Messages:          {}", stats.total_messages.to_string().green());
+                println!("  User Messages:           {}", stats.total_user_messages.to_string().yellow());
+                println!("  Assistant Messages:      {}", stats.total_assistant_messages.to_string().blue());
+
+                if !stats.sessions_by_source.is_empty() {
+                    println!("\n  Sessions by Source:");
+                    for (source, count) in &stats.sessions_by_source {
+                        println!("    {}: {}", source.yellow(), count);
+                    }
+                }
+            }
+
+            SessionsSubcommand::Show { session_id } => {
+                let session = svc.get_session(&session_id).await;
+
+                if let Some(session) = session {
+                    println!("\n{} Session: {}", "📋".bold(), session.id.cyan());
+                    println!("  Source:       {}", session.source.yellow());
+                    println!("  Title:        {}", session.title.as_ref().unwrap_or(&"-".to_string()));
+                    println!("  Messages:     {}", session.message_count().to_string().green());
+                    if let Some(duration) = session.duration_ms() {
+                        let minutes = duration / 60000;
+                        println!("  Duration:     {} min", minutes);
+                    }
+
+                    println!("\n  {} Messages:", "💬".bold());
+                    for (i, msg) in session.messages.iter().take(5).enumerate() {
+                        let role_color = match msg.role.to_string().as_str() {
+                            "user" => msg.role.to_string().blue(),
+                            "assistant" => msg.role.to_string().green(),
+                            _ => msg.role.to_string().yellow(),
+                        };
+                        let content_preview = if msg.content.len() > 80 {
+                            format!("{}...", &msg.content[..80])
+                        } else {
+                            msg.content.clone()
+                        };
+                        println!("    [{}] {}: {}", i + 1, role_color, content_preview);
+                    }
+                    if session.messages.len() > 5 {
+                        println!("    ... and {} more messages", session.messages.len() - 5);
+                    }
+                } else {
+                    println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
+                }
+            }
         }
 
         Ok(())

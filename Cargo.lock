@@ -8081,6 +8081,7 @@ dependencies = [
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_service",
+ "terraphim_sessions",
  "terraphim_settings",
  "terraphim_types",
  "terraphim_update",
