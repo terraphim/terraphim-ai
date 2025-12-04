@@ -8658,6 +8658,7 @@ dependencies = [
  "tempfile",
  "terraphim_automata",
  "terraphim_rolegraph",
+ "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
