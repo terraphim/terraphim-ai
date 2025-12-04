@@ -1,0 +1,77 @@
+# Built-in tool patterns for common development tools
+# These patterns are used to identify which tools are being invoked in Bash commands
+
+[[tools]]
+name = "wrangler"
+patterns = ["npx wrangler", "bunx wrangler", "pnpm wrangler", "yarn wrangler", "wrangler "]
+metadata = { category = "cloudflare", description = "Cloudflare Workers CLI for deploying and managing serverless applications", confidence = 0.95 }
+
+[[tools]]
+name = "npm"
+patterns = ["npm install", "npm run", "npm test", "npm build", "npm start", "npm ci", "npm "]
+metadata = { category = "package-manager", description = "Node package manager for JavaScript dependencies", confidence = 0.9 }
+
+[[tools]]
+name = "cargo"
+patterns = ["cargo build", "cargo test", "cargo run", "cargo clippy", "cargo fmt", "cargo check", "cargo "]
+metadata = { category = "rust-toolchain", description = "Rust package manager and build tool", confidence = 0.95 }
+
+[[tools]]
+name = "git"
+patterns = ["git commit", "git push", "git pull", "git add", "git status", "git checkout", "git branch", "git merge", "git clone", "git "]
+metadata = { category = "version-control", description = "Distributed version control system", confidence = 0.9 }
+
+[[tools]]
+name = "pytest"
+patterns = ["pytest ", "python -m pytest"]
+metadata = { category = "testing", description = "Python testing framework", confidence = 0.95 }
+
+[[tools]]
+name = "jest"
+patterns = ["jest ", "npm test", "npx jest"]
+metadata = { category = "testing", description = "JavaScript testing framework", confidence = 0.9 }
+
+[[tools]]
+name = "docker"
+patterns = ["docker build", "docker run", "docker compose", "docker-compose", "docker push", "docker pull", "docker "]
+metadata = { category = "containerization", description = "Container platform for building and deploying applications", confidence = 0.95 }
+
+[[tools]]
+name = "kubectl"
+patterns = ["kubectl apply", "kubectl get", "kubectl describe", "kubectl delete", "kubectl create", "kubectl "]
+metadata = { category = "kubernetes", description = "Kubernetes command-line tool", confidence = 0.95 }
+
+[[tools]]
+name = "terraform"
+patterns = ["terraform apply", "terraform plan", "terraform init", "terraform destroy", "terraform "]
+metadata = { category = "infrastructure", description = "Infrastructure as Code tool", confidence = 0.95 }
+
+[[tools]]
+name = "python"
+patterns = ["python ", "python3 "]
+metadata = { category = "runtime", description = "Python interpreter", confidence = 0.85 }
+
+[[tools]]
+name = "node"
+patterns = ["node "]
+metadata = { category = "runtime", description = "Node.js JavaScript runtime", confidence = 0.85 }
+
+[[tools]]
+name = "yarn"
+patterns = ["yarn install", "yarn add", "yarn run", "yarn build", "yarn test", "yarn "]
+metadata = { category = "package-manager", description = "Fast, reliable package manager for JavaScript", confidence = 0.9 }
+
+[[tools]]
+name = "pnpm"
+patterns = ["pnpm install", "pnpm add", "pnpm run", "pnpm build", "pnpm test", "pnpm "]
+metadata = { category = "package-manager", description = "Fast, disk space efficient package manager", confidence = 0.9 }
+
+[[tools]]
+name = "make"
+patterns = ["make ", "make build", "make test", "make clean"]
+metadata = { category = "build-tool", description = "Build automation tool", confidence = 0.9 }
+
+[[tools]]
+name = "gh"
+patterns = ["gh pr", "gh issue", "gh repo", "gh workflow", "gh "]
+metadata = { category = "github-cli", description = "GitHub command-line interface", confidence = 0.95 }

@@ -1,0 +1,76 @@
+[package]
+name = "claude-log-analyzer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Zestic AI Development Team"]
+description = "Analyze Claude session logs to identify AI agent usage"
+
+[[bin]]
+name = "cla"
+path = "src/main.rs"
+
+[features]
+default = []
+
+# Optional: Terraphim knowledge graph integration
+terraphim = [
+    "dep:terraphim_automata",
+    "dep:terraphim_types",
+    "dep:terraphim_config",
+]
+
+[dependencies]
+# Core dependencies
+clap = { version = "4.5", features = ["derive", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time handling (same as charm projects)
+jiff = { version = "0.1", features = ["serde"] }
+
+# Data processing
+regex = "1.10"
+lazy_static = "1.4"
+indexmap = { version = "2.2", features = ["serde"] }
+aho-corasick = "1.1"
+shell-words = "1.1"
+toml = "0.8"
+
+# Terminal UI
+colored = "2.1"
+indicatif = "0.17"
+tabled = "0.15"
+dialoguer = "0.11"
+
+# Parallel processing
+rayon = "1.8"
+
+# File handling
+walkdir = "2.4"
+glob = "0.3"
+home = "0.5"
+
+# Report generation
+handlebars = "5.1"
+csv = "1.3"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Feature-gated Terraphim dependencies (from subtree)
+terraphim_automata = { path = "./terraphim-ai/crates/terraphim_automata", optional = true }
+terraphim_types = { path = "./terraphim-ai/crates/terraphim_types", optional = true }
+terraphim_config = { path = "./terraphim-ai/crates/terraphim_config", optional = true }
+
+# Unix-specific for terminal detection
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+criterion = "0.5"
+insta = "1.34"
+tempfile = "3.8"
+proptest = "1.4"
