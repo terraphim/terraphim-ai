@@ -35,12 +35,14 @@
 //! ```
 
 pub mod analyzer;
-pub mod kg;
 pub mod models;
 pub mod parser;
 pub mod patterns;
 pub mod reporter;
 pub mod tool_analyzer;
+
+#[cfg(feature = "terraphim")]
+pub mod kg;
 
 // Re-export main types for convenience
 pub use analyzer::{Analyzer, SummaryStats};

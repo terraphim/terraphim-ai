@@ -60,10 +60,10 @@ csv = "1.3"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
-# Feature-gated Terraphim dependencies (from subtree)
-terraphim_automata = { path = "./terraphim-ai/crates/terraphim_automata", optional = true }
-terraphim_types = { path = "./terraphim-ai/crates/terraphim_types", optional = true }
-terraphim_config = { path = "./terraphim-ai/crates/terraphim_config", optional = true }
+# Feature-gated Terraphim dependencies (sibling crates in workspace)
+terraphim_automata = { path = "../terraphim_automata", optional = true }
+terraphim_types = { path = "../terraphim_types", optional = true }
+terraphim_config = { path = "../terraphim_config", optional = true }
 
 # Unix-specific for terminal detection
 [target.'cfg(unix)'.dependencies]
