@@ -1,0 +1,51 @@
+[package]
+name = "terraphim_sessions"
+version = "0.1.0"
+edition.workspace = true
+description = "Session management for AI coding assistant history"
+license = "MIT"
+
+[features]
+default = []
+
+# Enable claude-log-analyzer integration for enhanced parsing
+claude-log-analyzer = ["dep:claude-log-analyzer"]
+
+# Enable full CLA features including Cursor support
+cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
+
+# Enable terraphim knowledge graph enrichment
+enrichment = ["terraphim_automata", "terraphim_rolegraph"]
+
+# All features
+full = ["cla-full", "enrichment"]
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true, features = ["full"] }
+async-trait = { workspace = true }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+chrono = { workspace = true, features = ["serde"] }
+uuid = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = "0.1"
+
+# Time handling (same as CLA)
+jiff = { version = "0.1", features = ["serde"] }
+
+# File system
+walkdir = "2.4"
+dirs = "5.0"
+
+# Feature-gated: Claude Log Analyzer
+claude-log-analyzer = { path = "../claude-log-analyzer", optional = true }
+
+# Feature-gated: Terraphim enrichment
+terraphim_automata = { path = "../terraphim_automata", optional = true }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
+
+[dev-dependencies]
+tempfile = "3.10"
+tokio-test = "0.4"

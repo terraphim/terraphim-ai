@@ -897,6 +897,7 @@ dependencies = [
  "proptest",
  "rayon",
  "regex",
+ "rusqlite",
  "serde",
  "serde_json",
  "shell-words",
@@ -8639,6 +8640,29 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "terraphim_sessions"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "claude-log-analyzer",
+ "dirs 5.0.1",
+ "jiff 0.1.29",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_rolegraph",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "uuid",
+ "walkdir",
 ]
 
 [[package]]
