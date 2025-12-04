@@ -1,8 +1,9 @@
 # Terraphim Agent Session Search - Architecture Document
 
-> **Version**: 1.0.0
-> **Status**: Draft
+> **Version**: 1.1.0
+> **Status**: Implemented
 > **Created**: 2025-12-03
+> **Updated**: 2025-12-04
 
 ## Overview
 
@@ -62,61 +63,74 @@ This document describes the technical architecture for the Session Search and Ro
 
 ## Module Architecture
 
+### Implementation Status
+
+The architecture has been implemented using a **feature-gated approach** with `claude-log-analyzer` (CLA) integrated as a git subtree. This allows `terraphim_sessions` to work standalone while gaining enhanced capabilities when CLA is enabled.
+
 ### New Modules
 
 ```
 crates/
-├── terraphim_agent/                    # Existing - Enhanced
+├── claude-log-analyzer/                # ADDED: Git subtree integration
 │   ├── src/
-│   │   ├── main.rs                     # Entry point
+│   │   ├── lib.rs                      # Core CLA exports
+│   │   ├── parser.rs                   # Claude JSONL parsing
+│   │   ├── session.rs                  # Session entry types
+│   │   └── connectors/                 # ADDED: Multi-agent connectors
+│   │       ├── mod.rs                  # Connector trait + registry
+│   │       ├── claude.rs               # Claude Code connector
+│   │       └── cursor.rs               # Cursor SQLite connector
+│
+├── terraphim_agent/                    # ENHANCED
+│   ├── src/
+│   │   ├── main.rs                     # --robot, --format flags
 │   │   ├── repl/
 │   │   │   ├── mod.rs
-│   │   │   ├── commands.rs             # Enhanced: Forgiving parser
-│   │   │   ├── handler.rs              # Enhanced: Robot mode support
-│   │   │   ├── aliases.rs              # NEW: Command aliases
-│   │   │   └── robot_mode.rs           # NEW: Structured output
-│   │   ├── robot/                      # NEW: Robot mode module
+│   │   │   ├── commands.rs             # +SessionsSubcommand
+│   │   │   └── handler.rs              # +handle_sessions()
+│   │   ├── robot/                      # Robot mode module
 │   │   │   ├── mod.rs
-│   │   │   ├── output.rs               # JSON/JSONL formatters
+│   │   │   ├── output.rs               # JSON formatters
 │   │   │   ├── schema.rs               # Response schemas
 │   │   │   └── docs.rs                 # Self-documentation
-│   │   ├── sessions/                   # NEW: Session management
-│   │   │   ├── mod.rs
-│   │   │   ├── commands.rs             # Session REPL commands
-│   │   │   ├── service.rs              # Session service facade
-│   │   │   └── display.rs              # Session output formatting
-│   │   └── forgiving/                  # NEW: Forgiving CLI
+│   │   └── forgiving/                  # Forgiving CLI
 │   │       ├── mod.rs
 │   │       ├── parser.rs               # Edit-distance parser
 │   │       └── suggestions.rs          # Command suggestions
 │
-├── terraphim_sessions/                 # NEW CRATE
+├── terraphim_sessions/                 # NEW CRATE - Feature-gated
+│   ├── Cargo.toml                      # Feature definitions
 │   ├── src/
-│   │   ├── lib.rs
-│   │   ├── connector/                  # Session connectors
-│   │   │   ├── mod.rs
-│   │   │   ├── trait.rs                # SessionConnector trait
-│   │   │   ├── claude_code.rs          # Claude Code JSONL
-│   │   │   ├── cursor.rs               # Cursor SQLite
-│   │   │   ├── aider.rs                # Aider Markdown
-│   │   │   └── registry.rs             # Connector registry
-│   │   ├── index/                      # Tantivy index
-│   │   │   ├── mod.rs
-│   │   │   ├── schema.rs               # Index schema
-│   │   │   ├── writer.rs               # Index writer
-│   │   │   ├── reader.rs               # Index reader/search
-│   │   │   └── tokenizer.rs            # Edge n-gram tokenizer
-│   │   ├── enrichment/                 # KG enrichment
-│   │   │   ├── mod.rs
-│   │   │   ├── concept_extractor.rs
-│   │   │   └── graph_builder.rs
-│   │   ├── model/                      # Data models
-│   │   │   ├── mod.rs
-│   │   │   ├── session.rs
-│   │   │   ├── message.rs
-│   │   │   └── snippet.rs
-│   │   └── service.rs                  # Main service
+│   │   ├── lib.rs                      # Conditional module exports
+│   │   ├── model.rs                    # Session, Message, ContentBlock
+│   │   ├── connector/                  # Connector infrastructure
+│   │   │   ├── mod.rs                  # SessionConnector trait
+│   │   │   └── native.rs               # NativeClaudeConnector (no CLA)
+│   │   ├── service.rs                  # SessionService facade
+│   │   └── cla/                        # #[cfg(feature = "claude-log-analyzer")]
+│   │       ├── mod.rs                  # CLA integration layer
+│   │       └── connector.rs            # ClaClaudeConnector, ClaCursorConnector
 ```
+
+### Feature Gate Configuration
+
+```toml
+# crates/terraphim_sessions/Cargo.toml
+[features]
+default = []
+claude-log-analyzer = ["dep:claude-log-analyzer"]
+cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
+enrichment = ["terraphim_automata", "terraphim_rolegraph"]
+full = ["cla-full", "enrichment"]
+```
+
+| Feature | Enables | Use Case |
+|---------|---------|----------|
+| (none) | `NativeClaudeConnector` only | Minimal JSONL parsing |
+| `claude-log-analyzer` | CLA core + Claude connector | Full Claude analysis |
+| `cla-full` | CLA + Cursor SQLite | Multi-agent support |
+| `enrichment` | Knowledge graph integration | Concept detection |
+| `full` | Everything | Production deployment |
 
 ## Component Details
 

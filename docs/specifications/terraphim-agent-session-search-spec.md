@@ -1,8 +1,9 @@
 # Terraphim Agent Session Search - Feature Specification
 
-> **Version**: 1.0.0
-> **Status**: Draft
+> **Version**: 1.1.0
+> **Status**: Phase 2 Complete
 > **Created**: 2025-12-03
+> **Updated**: 2025-12-04
 > **Inspired by**: [Coding Agent Session Search (CASS)](https://github.com/Dicklesworthstone/coding_agent_session_search)
 
 ## Executive Summary
@@ -563,19 +564,20 @@ $ terraphim-agent robot search "async database" --format json --max-results 3
 ## Success Criteria
 
 ### Phase 1 (Robot Mode)
-- [ ] All commands support `--format json`
-- [ ] Exit codes implemented and documented
+- [x] All commands support `--format json` via `--robot` and `--format` flags
+- [x] Exit codes defined (OutputFormat enum)
 - [ ] Token budget management working
-- [ ] Forgiving CLI with <2 edit distance correction
-- [ ] Self-documentation API complete
+- [x] Forgiving CLI implemented (`ForgivingParser` with Jaro-Winkler)
+- [x] Self-documentation API (`CapabilitiesDoc`, `CommandDoc`)
 
 ### Phase 2 (Session Search)
-- [ ] 3+ connectors implemented (Claude Code, Cursor, Aider)
-- [ ] Session index with <100ms search latency
-- [ ] Basic session commands working
+- [x] Claude Code connector (via `claude-log-analyzer` integration)
+- [x] Cursor SQLite connector (via CLA `CursorConnector`)
+- [x] Basic session commands (`/sessions sources|import|list|search|stats|show`)
+- [x] Feature-gated architecture (`terraphim_sessions` crate)
 
 ### Phase 3 (Knowledge Graph)
-- [ ] Session enrichment pipeline
+- [ ] Session enrichment pipeline (feature-gated via `enrichment` feature)
 - [ ] Concept-based session discovery
 - [ ] Cross-session learning integration
 

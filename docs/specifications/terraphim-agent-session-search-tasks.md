@@ -1,8 +1,9 @@
 # Terraphim Agent Session Search - Implementation Tasks
 
-> **Version**: 1.0.0
+> **Version**: 1.1.0
 > **Created**: 2025-12-03
-> **Status**: In Progress
+> **Updated**: 2025-12-04
+> **Status**: Phase 1 Complete, Phase 2 In Progress
 
 ## Overview
 
@@ -254,98 +255,155 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 **Goal**: Enable importing and searching sessions from external AI tools.
 
-**Estimated Scope**: ~2500 lines of new code
+**Status**: ✅ Complete (via claude-log-analyzer integration)
+
+**Implementation Approach Changed**: Instead of building connectors from scratch, we integrated `claude-log-analyzer` (CLA) as a git subtree and created a feature-gated wrapper in `terraphim_sessions`.
 
 ---
 
-### Task 2.1: Create terraphim_sessions Crate
+### Task 2.1: Integrate claude-log-analyzer via Git Subtree
 
 **Priority**: P0 (Critical)
-**Dependencies**: Phase 1 complete
+**Status**: ✅ Complete
+
+#### Subtasks
+
+- [x] **2.1.1** Add CLA as git subtree
+  ```bash
+  git subtree add --prefix=crates/claude-log-analyzer ../claude-log-analyzer main --squash
+  ```
+
+- [x] **2.1.2** Update CLA dependency paths
+  - Changed terraphim crate paths from `./terraphim-ai/crates/` to `../`
+  - Added feature gate for terraphim integration: `#[cfg(feature = "terraphim")]`
+
+- [x] **2.1.3** Add connectors feature to CLA
+  - Added `connectors = ["dep:rusqlite"]` feature
+  - Enabled optional Cursor SQLite support
+
+---
+
+### Task 2.2: Extend CLA with Cursor SQLite Support
+
+**Priority**: P0 (Critical)
+**Status**: ✅ Complete
+**Location**: `crates/claude-log-analyzer/src/connectors/`
+
+#### Subtasks
+
+- [x] **2.2.1** Create connector infrastructure
+  - `SessionConnector` trait
+  - `ConnectorRegistry`
+  - `NormalizedSession`, `NormalizedMessage` models
+
+- [x] **2.2.2** Implement Cursor connector (based on CASS research)
+  - Platform-aware path detection (macOS, Linux, Windows)
+  - ComposerData format parsing (newer Cursor)
+  - Legacy ItemTable format parsing (older Cursor)
+  - SQLite queries: `SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'`
+
+- [x] **2.2.3** Implement Claude Code connector wrapper
+  - Wraps existing CLA parser
+  - Converts to NormalizedSession format
+
+---
+
+### Task 2.3: Create terraphim_sessions Crate
+
+**Priority**: P0 (Critical)
+**Status**: ✅ Complete
 **Location**: `crates/terraphim_sessions/`
 
 #### Subtasks
 
-- [ ] **2.1.1** Initialize crate
-  ```bash
-  cargo new --lib crates/terraphim_sessions
+- [x] **2.3.1** Create feature-gated crate structure
+  ```toml
+  [features]
+  default = []
+  claude-log-analyzer = ["dep:claude-log-analyzer"]
+  cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
+  enrichment = ["terraphim_automata", "terraphim_rolegraph"]
+  full = ["cla-full", "enrichment"]
   ```
-  - Add to workspace
-  - Configure dependencies
-  - Set up module structure
 
-- [ ] **2.1.2** Define data models
-  - `Session`
-  - `Message`
-  - `CodeSnippet`
+- [x] **2.3.2** Define data models
+  - `Session`, `Message`, `ContentBlock`, `MessageRole`
   - `SessionMetadata`
+  - `SessionId`, `MessageId`
 
-- [ ] **2.1.3** Define connector trait
+- [x] **2.3.3** Define connector trait (async-trait)
   ```rust
-  pub trait SessionConnector: Send + Sync { ... }
+  #[async_trait]
+  pub trait SessionConnector: Send + Sync {
+      fn source_id(&self) -> &str;
+      fn display_name(&self) -> &str;
+      fn detect(&self) -> ConnectorStatus;
+      fn default_path(&self) -> Option<PathBuf>;
+      async fn import(&self, options: &ImportOptions) -> Result<Vec<Session>>;
+  }
   ```
 
-- [ ] **2.1.4** Define service interface
-  ```rust
-  pub struct SessionService { ... }
-  ```
+- [x] **2.3.4** Implement SessionService
+  - Session caching
+  - Multi-source import
+  - Search functionality
+  - Statistics
 
-#### Acceptance Criteria
-
-- [ ] Crate compiles
-- [ ] Models serialize/deserialize correctly
-- [ ] Trait is implementable
+- [x] **2.3.5** Implement connectors
+  - `NativeClaudeConnector` - Lightweight JSONL parser (always available)
+  - `ClaClaudeConnector` - CLA-powered Claude parsing (feature-gated)
+  - `ClaCursorConnector` - Cursor SQLite via CLA (feature-gated)
 
 ---
 
-### Task 2.2: Implement Claude Code Connector
-
-**Priority**: P0 (Critical)
-**Dependencies**: Task 2.1
-**Location**: `crates/terraphim_sessions/src/connector/claude_code.rs`
-
-#### Subtasks
-
-- [ ] **2.2.1** Implement detection
-  - Check `~/.claude/` exists
-  - Count available sessions
-
-- [ ] **2.2.2** Implement JSONL parsing
-  - Parse session files
-  - Extract messages
-  - Handle code blocks
-
-- [ ] **2.2.3** Implement import
-  - Read sessions
-  - Normalize to model
-  - Return results
-
-- [ ] **2.2.4** Add tests with fixtures
-  - Create test JSONL files
-  - Test parsing edge cases
-
-#### Acceptance Criteria
-
-- [ ] Detects Claude Code installation
-- [ ] Imports sessions correctly
-- [ ] Handles malformed files gracefully
-
----
-
-### Task 2.3: Implement Cursor Connector
+### Task 2.4: Add Session Commands to REPL
 
 **Priority**: P1 (High)
-**Dependencies**: Task 2.1
-**Location**: `crates/terraphim_sessions/src/connector/cursor.rs`
+**Status**: ✅ Complete
+**Location**: `crates/terraphim_agent/src/repl/`
 
 #### Subtasks
 
-- [ ] **2.3.1** Implement SQLite reading
-  - Open Cursor database
-  - Query conversation tables
-  - Map to model
+- [x] **2.4.1** Add `repl-sessions` feature to terraphim_agent
+  - Depends on `terraphim_sessions` with `cla-full` features
 
-- [ ] **2.3.2** Implement import
+- [x] **2.4.2** Implement `SessionsSubcommand`
+  - `sources` - Detect available sources
+  - `import` - Import sessions from sources
+  - `list` - List imported sessions
+  - `search` - Search sessions by query
+  - `stats` - Show session statistics
+  - `show` - Display session details
+
+- [x] **2.4.3** Implement `handle_sessions()` handler
+  - Rich terminal output with colored tables
+  - Session service integration
+  - Proper error handling
+
+#### Commands Available
+
+```
+/sessions sources              # Detect available sources
+/sessions import [--source X]  # Import from sources
+/sessions list [--limit N]     # List sessions
+/sessions search "query"       # Search sessions
+/sessions stats                # Show statistics
+/sessions show <id>            # Show session details
+```
+
+---
+
+### Task 2.5 (Previous 2.3): Implement Additional Connectors
+
+**Priority**: P2 (Medium)
+**Dependencies**: Task 2.3
+**Status**: 🔄 Planned
+
+#### Subtasks
+
+- [ ] **2.5.1** Aider connector (Markdown parsing)
+- [ ] **2.5.2** Cline connector (JSON parsing)
+- [ ] **2.5.3** Generic MCP connector
   - Handle schema versions
   - Extract code snippets
   - Incremental import
@@ -563,10 +621,10 @@ Phase 3:
 
 | Task | Status | Assignee | Notes |
 |------|--------|----------|-------|
-| 1.1 | In Progress | - | Robot output infrastructure |
-| 1.2 | In Progress | - | Forgiving CLI parser |
-| 1.3 | In Progress | - | Self-documentation API |
-| 1.4 | Not Started | - | REPL integration |
+| 1.1 | ✅ Complete | - | Robot output infrastructure |
+| 1.2 | ✅ Complete | - | Forgiving CLI parser |
+| 1.3 | ✅ Complete | - | Self-documentation API |
+| 1.4 | 🔄 Partial | - | --robot/--format flags added; REPL dispatch pending |
 | 1.5 | Not Started | - | Token budget |
 | 1.6 | Not Started | - | Tests |
 
@@ -574,20 +632,20 @@ Phase 3:
 
 | Task | Status | Assignee | Notes |
 |------|--------|----------|-------|
-| 2.1 | Not Started | - | |
-| 2.2 | Not Started | - | |
-| 2.3 | Not Started | - | |
-| 2.4 | Not Started | - | |
-| 2.5 | Not Started | - | |
-| 2.6 | Not Started | - | |
+| 2.1 | ✅ Complete | - | CLA git subtree added |
+| 2.2 | ✅ Complete | - | Cursor SQLite connector in CLA |
+| 2.3 | ✅ Complete | - | terraphim_sessions crate with feature gates |
+| 2.4 | ✅ Complete | - | /sessions REPL commands |
+| 2.5 | Planned | - | Aider/Cline connectors |
+| 2.6 | Superseded | - | Merged into 2.4 |
 
 ### Phase 3 Status
 
 | Task | Status | Assignee | Notes |
 |------|--------|----------|-------|
-| 3.1 | Not Started | - | |
+| 3.1 | Not Started | - | Enrichment feature ready |
 | 3.2 | Not Started | - | |
-| 3.3 | Not Started | - | |
+| 3.3 | ✅ Partial | - | /sessions stats implemented |
 
 ## Definition of Done
 
