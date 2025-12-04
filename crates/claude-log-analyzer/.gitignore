@@ -1,0 +1,39 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+
+# Cargo
+Cargo.lock
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Environment variables
+.env
+.env.local
+
+# Test outputs
+*.tmp
+*.temp
+
+# Claude analyzer outputs
+*.html
+*.json
+*.csv
+*.md
+!README.md
+!DEMO.md
+!CONTRIBUTING.md
+!LICENSE.md
+!CHANGELOG.md
