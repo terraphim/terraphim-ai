@@ -69,6 +69,17 @@ enum ViewMode {
     ResultDetail,
 }
 
+#[derive(clap::ValueEnum, Debug, Clone, Default)]
+pub enum OutputFormat {
+    /// Human-readable output (default)
+    #[default]
+    Human,
+    /// Machine-readable JSON output
+    Json,
+    /// Compact JSON for piping
+    JsonCompact,
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "terraphim-agent", version, about = "Terraphim TUI interface")]
 struct Cli {
@@ -81,6 +92,12 @@ struct Cli {
     /// Enable transparent background mode
     #[arg(long, default_value_t = false)]
     transparent: bool,
+    /// Enable robot mode for AI agent integration (JSON output, exit codes)
+    #[arg(long, default_value_t = false)]
+    robot: bool,
+    /// Output format (human, json, json-compact)
+    #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
+    format: OutputFormat,
     #[command(subcommand)]
     command: Option<Command>,
 }
