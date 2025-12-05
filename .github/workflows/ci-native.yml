@@ -20,7 +20,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 15
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
@@ -76,7 +76,7 @@ jobs:
         run: ./scripts/ci-check-format.sh
 
   lint-and-format:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 15
     needs: [setup]
     steps:
