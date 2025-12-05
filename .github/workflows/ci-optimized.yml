@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
@@ -70,7 +70,7 @@ jobs:
           fi
 
   build-base-image:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     needs: setup
     if: needs.setup.outputs.should-build == 'true'
     outputs:
@@ -114,7 +114,7 @@ jobs:
           retention-days: 1
 
   lint-and-format:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     needs: [setup, build-base-image]
     if: needs.setup.outputs.should-build == 'true'
 
@@ -157,7 +157,7 @@ jobs:
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     needs: [setup, build-base-image, build-frontend, lint-and-format]
     if: needs.setup.outputs.should-build == 'true'
     strategy:
@@ -235,7 +235,7 @@ jobs:
           retention-days: 30
 
   test:
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
     needs: [setup, build-base-image, build-rust]
     if: needs.setup.outputs.should-build == 'true'
 
@@ -264,7 +264,7 @@ jobs:
   summary:
     needs: [lint-and-format, build-frontend, build-rust, test]
     if: always()
-    runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Check all jobs succeeded
