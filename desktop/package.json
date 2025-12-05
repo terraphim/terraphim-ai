@@ -96,7 +96,7 @@
 	"dependencies": {
 		"@fortawesome/fontawesome-free": "^7.0.1",
 		"@paralect/novel-svelte": "0.0.7",
-		"@tauri-apps/api": "^1.2.0",
+		"@tauri-apps/api": "^2.9.0",
 		"@tiptap/core": "^3.9.0",
 		"@tiptap/extension-mention": "^2.22.1",
 		"@tiptap/starter-kit": "^2.22.1",
