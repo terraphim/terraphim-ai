@@ -23,6 +23,20 @@ echo "==================="
 echo "Mirroring GitHub Actions lint-and-format job"
 echo ""
 
+# Build frontend assets (required by terraphim_server build.rs)
+echo -e "${BLUE}🌐 Building frontend assets...${NC}"
+if command -v node &> /dev/null && command -v yarn &> /dev/null; then
+    cd "$PROJECT_ROOT/desktop"
+    yarn install --frozen-lockfile 2>/dev/null || yarn install
+    yarn build
+    cd "$PROJECT_ROOT"
+    echo -e "${GREEN}  ✅ Frontend assets built${NC}"
+else
+    echo -e "${YELLOW}  ⚠️  Node.js/yarn not found, creating placeholder dist...${NC}"
+    mkdir -p "$PROJECT_ROOT/terraphim_server/dist"
+    echo '<!DOCTYPE html><html><body>Terraphim Server (CI placeholder)</body></html>' > "$PROJECT_ROOT/terraphim_server/dist/index.html"
+fi
+
 # Install system dependencies (same as CI)
 echo -e "${BLUE}📦 Installing system dependencies...${NC}"
 sudo apt-get update -qq
