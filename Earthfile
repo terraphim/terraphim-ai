@@ -89,7 +89,7 @@ install-native:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang libglib2.0-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
