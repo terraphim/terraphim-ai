@@ -35,11 +35,18 @@ sudo apt-get install -yqq --no-install-recommends \
     libssl-dev \
     libglib2.0-dev \
     libgtk-3-dev \
-    libwebkit2gtk-4.1-dev \
     libsoup2.4-dev \
-    libjavascriptcoregtk-4.1-dev \
-    libayatana-appindicator3-dev \
-    librsvg2-dev
+    librsvg2-dev || true
+# Try webkit 4.1 first (Ubuntu 22.04+), then 4.0 (Ubuntu 20.04)
+sudo apt-get install -yqq --no-install-recommends \
+    libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev 2>/dev/null || \
+sudo apt-get install -yqq --no-install-recommends \
+    libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev
+# Try ayatana-appindicator (newer) or appindicator (older)
+sudo apt-get install -yqq --no-install-recommends \
+    libayatana-appindicator3-dev 2>/dev/null || \
+sudo apt-get install -yqq --no-install-recommends \
+    libappindicator3-dev || true
 
 # Install Rust toolchain (same version as CI)
 echo -e "${BLUE}🦀 Installing Rust toolchain...${NC}"
