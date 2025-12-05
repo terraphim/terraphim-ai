@@ -236,7 +236,7 @@ jobs:
           else
             source .venv/bin/activate
           fi
-          uv pip install pytest pytest-benchmark
+          uv pip install pytest pytest-benchmark pytest-cov
 
       - name: Install Rust target for benchmarks
         run: |
