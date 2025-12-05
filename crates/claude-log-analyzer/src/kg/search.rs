@@ -9,6 +9,9 @@ use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use terraphim_automata::find_matches;
 
+/// Type alias for query match results: (matched_text, concepts, (start, end))
+type MatchResults = Vec<(String, Vec<String>, (usize, usize))>;
+
 /// Knowledge graph search engine
 #[derive(Debug, Clone)]
 pub struct KnowledgeGraphSearch {
@@ -98,7 +101,7 @@ impl KnowledgeGraphSearch {
         &self,
         text: &str,
         query: &QueryNode,
-    ) -> Result<Vec<(String, Vec<String>, (usize, usize))>> {
+    ) -> Result<MatchResults> {
         match query {
             QueryNode::Concept(concept) => self.match_concept(text, concept),
 
@@ -127,7 +130,7 @@ impl KnowledgeGraphSearch {
         &self,
         text: &str,
         concept: &str,
-    ) -> Result<Vec<(String, Vec<String>, (usize, usize))>> {
+    ) -> Result<MatchResults> {
         // Use terraphim find_matches to search for the concept
         // Use false for overlapping matches to get all possible matches
         let matches = find_matches(text, self.builder.thesaurus.clone(), false)
@@ -196,11 +199,11 @@ fn positions_overlap_or_near(pos1: (usize, usize), pos2: (usize, usize), thresho
         return true;
     }
 
-    // Check for nearness
+    // Check for nearness - use saturating_sub to avoid potential overflow
     let distance = if pos1.1 < pos2.0 {
-        pos2.0 - pos1.1
+        pos2.0.saturating_sub(pos1.1)
     } else if pos2.1 < pos1.0 {
-        pos1.0 - pos2.1
+        pos1.0.saturating_sub(pos2.1)
     } else {
         0
     };
@@ -239,18 +242,14 @@ fn deduplicate_results(
 /// Exclude results (NOT operation)
 fn exclude_results(
     _text: &str,
-    exclude: Vec<(String, Vec<String>, (usize, usize))>,
-) -> Vec<(String, Vec<String>, (usize, usize))> {
+    _exclude: MatchResults,
+) -> MatchResults {
     // For NOT operation, we return positions that are NOT in the exclude set
     // This is a simplified implementation - in practice, you'd need the full text
     // to identify non-matching regions
 
-    // For now, return empty if there are matches to exclude
-    if exclude.is_empty() {
-        Vec::new()
-    } else {
-        Vec::new()
-    }
+    // For now, always return empty - NOT operation requires full text context
+    Vec::new()
 }
 
 /// Calculate relevance score based on concepts matched
@@ -372,7 +371,7 @@ mod tests {
 
         // Should find matches where both BUN and DEPLOY concepts appear
         if !results.is_empty() {
-            assert!(results[0].concepts_matched.len() >= 1);
+            assert!(!results[0].concepts_matched.is_empty());
         }
         Ok(())
     }

@@ -22,7 +22,7 @@ use anyhow::{Context, Result};
 use rusqlite::Connection;
 use serde::Deserialize;
 use std::collections::HashSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tracing::{debug, info, warn};
 
 /// Cursor IDE session connector
@@ -171,7 +171,7 @@ impl CursorConnector {
     fn parse_composer_data(
         &self,
         conn: &Connection,
-        db_path: &PathBuf,
+        db_path: &Path,
         seen_ids: &mut HashSet<String>,
     ) -> Result<Vec<NormalizedSession>> {
         let mut sessions = Vec::new();
@@ -220,7 +220,7 @@ impl CursorConnector {
     fn parse_legacy_format(
         &self,
         conn: &Connection,
-        db_path: &PathBuf,
+        db_path: &Path,
         seen_ids: &mut HashSet<String>,
     ) -> Result<Vec<NormalizedSession>> {
         let mut sessions = Vec::new();
@@ -273,7 +273,7 @@ impl CursorConnector {
         &self,
         id: &str,
         data: ComposerData,
-        db_path: &PathBuf,
+        db_path: &Path,
     ) -> Option<NormalizedSession> {
         let tabs = data.tabs.unwrap_or_default();
         if tabs.is_empty() {
@@ -334,7 +334,7 @@ impl CursorConnector {
             source: "cursor".to_string(),
             external_id: id.to_string(),
             title,
-            source_path: db_path.clone(),
+            source_path: db_path.to_path_buf(),
             started_at,
             ended_at,
             messages: all_messages,
@@ -349,7 +349,7 @@ impl CursorConnector {
         &self,
         key: &str,
         data: LegacyChatData,
-        db_path: &PathBuf,
+        db_path: &Path,
     ) -> Option<NormalizedSession> {
         let messages: Vec<NormalizedMessage> = data
             .messages
@@ -385,7 +385,7 @@ impl CursorConnector {
             source: "cursor".to_string(),
             external_id: key.to_string(),
             title,
-            source_path: db_path.clone(),
+            source_path: db_path.to_path_buf(),
             started_at: messages.first().and_then(|m| m.created_at),
             ended_at: messages.last().and_then(|m| m.created_at),
             messages,

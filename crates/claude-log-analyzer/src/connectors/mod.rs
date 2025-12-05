@@ -118,15 +118,15 @@ impl ConnectorRegistry {
         let mut connectors: Vec<Box<dyn SessionConnector>> = Vec::new();
 
         // Add Claude Code connector (always available via parser)
-        connectors.push(Box::new(ClaudeCodeConnector::default()));
+        connectors.push(Box::new(ClaudeCodeConnector));
 
         // Add additional connectors if feature enabled
         #[cfg(feature = "connectors")]
         {
-            connectors.push(Box::new(cursor::CursorConnector::default()));
-            connectors.push(Box::new(codex::CodexConnector::default()));
-            connectors.push(Box::new(aider::AiderConnector::default()));
-            connectors.push(Box::new(opencode::OpenCodeConnector::default()));
+            connectors.push(Box::new(cursor::CursorConnector));
+            connectors.push(Box::new(codex::CodexConnector));
+            connectors.push(Box::new(aider::AiderConnector));
+            connectors.push(Box::new(opencode::OpenCodeConnector));
         }
 
         Self { connectors }
