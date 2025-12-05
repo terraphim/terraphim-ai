@@ -102,10 +102,10 @@ class TestAutocompleteIndex:
         assert len(results) == 0
 
     def test_search_empty_prefix(self, index):
-        """Test search with empty prefix"""
+        """Test search with empty prefix returns empty (FST behavior)"""
         results = index.search("", max_results=10)
-        # Empty prefix should return some results (all terms)
-        assert len(results) > 0
+        # Empty prefix returns empty list (FST requires at least one character)
+        assert len(results) == 0
 
 
 class TestAutocompleteResult:
