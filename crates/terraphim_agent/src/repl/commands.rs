@@ -148,19 +148,13 @@ pub enum SessionsSubcommand {
         limit: Option<usize>,
     },
     /// Search sessions by query
-    Search {
-        query: String,
-    },
+    Search { query: String },
     /// Show session statistics
     Stats,
     /// Show details of a specific session
-    Show {
-        session_id: String,
-    },
+    Show { session_id: String },
     /// Search sessions by concept (Phase 3 - requires enrichment)
-    Concepts {
-        concept: String,
-    },
+    Concepts { concept: String },
     /// Find sessions related to a given session
     Related {
         session_id: String,
@@ -178,9 +172,7 @@ pub enum SessionsSubcommand {
         session_id: Option<String>,
     },
     /// Enrich sessions with concepts (Phase 3)
-    Enrich {
-        session_id: Option<String>,
-    },
+    Enrich { session_id: Option<String> },
 }
 
 #[derive(Debug, Clone, PartialEq)]

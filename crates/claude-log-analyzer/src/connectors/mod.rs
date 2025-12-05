@@ -183,11 +183,7 @@ impl SessionConnector for ClaudeCodeConnector {
                     .max_depth(3)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        e.path()
-                            .extension()
-                            .is_some_and(|ext| ext == "jsonl")
-                    })
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
                     .count();
                 ConnectorStatus::Available {
                     path,

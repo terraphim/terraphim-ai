@@ -1,8 +1,8 @@
 //! REPL handler implementation
 
-use super::commands::{ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand};
 #[cfg(feature = "repl-sessions")]
 use super::commands::SessionsSubcommand;
+use super::commands::{ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand};
 use crate::{client::ApiClient, service::TuiService};
 
 // Import robot module types
@@ -1653,13 +1653,14 @@ impl ReplHandler {
         use comfy_table::modifiers::UTF8_ROUND_CORNERS;
         use comfy_table::presets::UTF8_FULL;
         use comfy_table::{Cell, Table};
-        use terraphim_sessions::{SessionService, ImportOptions, ConnectorStatus};
+        use terraphim_sessions::{ConnectorStatus, ImportOptions, SessionService};
 
         // Get or create session service
-        static SESSION_SERVICE: std::sync::OnceLock<std::sync::Arc<tokio::sync::Mutex<SessionService>>> = std::sync::OnceLock::new();
-        let service = SESSION_SERVICE.get_or_init(|| {
-            std::sync::Arc::new(tokio::sync::Mutex::new(SessionService::new()))
-        });
+        static SESSION_SERVICE: std::sync::OnceLock<
+            std::sync::Arc<tokio::sync::Mutex<SessionService>>,
+        > = std::sync::OnceLock::new();
+        let service = SESSION_SERVICE
+            .get_or_init(|| std::sync::Arc::new(tokio::sync::Mutex::new(SessionService::new())));
         let mut svc = service.lock().await;
 
         match subcommand {
@@ -1679,12 +1680,20 @@ impl ReplHandler {
 
                 for source in sources {
                     let (status, count) = match &source.status {
-                        ConnectorStatus::Available { sessions_estimate, .. } => {
-                            ("Available".green().to_string(),
-                             sessions_estimate.map(|c| c.to_string()).unwrap_or("-".to_string()))
+                        ConnectorStatus::Available {
+                            sessions_estimate, ..
+                        } => (
+                            "Available".green().to_string(),
+                            sessions_estimate
+                                .map(|c| c.to_string())
+                                .unwrap_or("-".to_string()),
+                        ),
+                        ConnectorStatus::NotFound => {
+                            ("Not Found".yellow().to_string(), "-".to_string())
                         }
-                        ConnectorStatus::NotFound => ("Not Found".yellow().to_string(), "-".to_string()),
-                        ConnectorStatus::Error(e) => (format!("Error: {}", e).red().to_string(), "-".to_string()),
+                        ConnectorStatus::Error(e) => {
+                            (format!("Error: {}", e).red().to_string(), "-".to_string())
+                        }
                     };
 
                     table.add_row(vec![
@@ -1698,8 +1707,7 @@ impl ReplHandler {
             }
 
             SessionsSubcommand::Import { source, limit } => {
-                let options = ImportOptions::new()
-                    .with_limit(limit.unwrap_or(100));
+                let options = ImportOptions::new().with_limit(limit.unwrap_or(100));
 
                 println!("\n{} Importing sessions...", "⏳".bold());
 
@@ -1730,7 +1738,10 @@ impl ReplHandler {
                 };
 
                 if sessions.is_empty() {
-                    println!("{} No sessions found. Run '/sessions import' first.", "ℹ".blue().bold());
+                    println!(
+                        "{} No sessions found. Run '/sessions import' first.",
+                        "ℹ".blue().bold()
+                    );
                     return Ok(());
                 }
 
@@ -1747,8 +1758,16 @@ impl ReplHandler {
                     ]);
 
                 for session in &sessions {
-                    let title = session.title.as_ref()
-                        .map(|t| if t.len() > 40 { format!("{}...", &t[..40]) } else { t.clone() })
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 40 {
+                                format!("{}...", &t[..40])
+                            } else {
+                                t.clone()
+                            }
+                        })
                         .unwrap_or_else(|| "-".to_string());
 
                     table.add_row(vec![
@@ -1771,7 +1790,11 @@ impl ReplHandler {
                     return Ok(());
                 }
 
-                println!("\n{} sessions match '{}':", sessions.len().to_string().green(), query.cyan());
+                println!(
+                    "\n{} sessions match '{}':",
+                    sessions.len().to_string().green(),
+                    query.cyan()
+                );
                 let mut table = Table::new();
                 table
                     .load_preset(UTF8_FULL)
@@ -1783,8 +1806,16 @@ impl ReplHandler {
                     ]);
 
                 for session in sessions.iter().take(10) {
-                    let title = session.title.as_ref()
-                        .map(|t| if t.len() > 50 { format!("{}...", &t[..50]) } else { t.clone() })
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 50 {
+                                format!("{}...", &t[..50])
+                            } else {
+                                t.clone()
+                            }
+                        })
                         .unwrap_or_else(|| "-".to_string());
 
                     table.add_row(vec![
@@ -1801,10 +1832,22 @@ impl ReplHandler {
                 let stats = svc.statistics().await;
 
                 println!("\n{}", "Session Statistics:".bold().cyan());
-                println!("  Total Sessions:          {}", stats.total_sessions.to_string().green());
-                println!("  Total Messages:          {}", stats.total_messages.to_string().green());
-                println!("  User Messages:           {}", stats.total_user_messages.to_string().yellow());
-                println!("  Assistant Messages:      {}", stats.total_assistant_messages.to_string().blue());
+                println!(
+                    "  Total Sessions:          {}",
+                    stats.total_sessions.to_string().green()
+                );
+                println!(
+                    "  Total Messages:          {}",
+                    stats.total_messages.to_string().green()
+                );
+                println!(
+                    "  User Messages:           {}",
+                    stats.total_user_messages.to_string().yellow()
+                );
+                println!(
+                    "  Assistant Messages:      {}",
+                    stats.total_assistant_messages.to_string().blue()
+                );
 
                 if !stats.sessions_by_source.is_empty() {
                     println!("\n  Sessions by Source:");
@@ -1820,8 +1863,14 @@ impl ReplHandler {
                 if let Some(session) = session {
                     println!("\n{} Session: {}", "📋".bold(), session.id.cyan());
                     println!("  Source:       {}", session.source.yellow());
-                    println!("  Title:        {}", session.title.as_ref().unwrap_or(&"-".to_string()));
-                    println!("  Messages:     {}", session.message_count().to_string().green());
+                    println!(
+                        "  Title:        {}",
+                        session.title.as_ref().unwrap_or(&"-".to_string())
+                    );
+                    println!(
+                        "  Messages:     {}",
+                        session.message_count().to_string().green()
+                    );
                     if let Some(duration) = session.duration_ms() {
                         let minutes = duration / 60000;
                         println!("  Duration:     {} min", minutes);
@@ -1850,14 +1899,25 @@ impl ReplHandler {
             }
 
             SessionsSubcommand::Concepts { concept } => {
-                println!("\n{} Searching sessions by concept: '{}'", "🔍".bold(), concept.cyan());
-                println!("{} This feature requires enrichment. Searching by text match...", "ℹ".blue());
+                println!(
+                    "\n{} Searching sessions by concept: '{}'",
+                    "🔍".bold(),
+                    concept.cyan()
+                );
+                println!(
+                    "{} This feature requires enrichment. Searching by text match...",
+                    "ℹ".blue()
+                );
 
                 // Fall back to text search for now (enrichment requires thesaurus)
                 let sessions = svc.search(&concept).await;
 
                 if sessions.is_empty() {
-                    println!("{} No sessions contain concept '{}'", "ℹ".blue().bold(), concept);
+                    println!(
+                        "{} No sessions contain concept '{}'",
+                        "ℹ".blue().bold(),
+                        concept
+                    );
                     return Ok(());
                 }
 
@@ -1873,12 +1933,22 @@ impl ReplHandler {
                     ]);
 
                 for session in sessions.iter().take(10) {
-                    let title = session.title.as_ref()
-                        .map(|t| if t.len() > 40 { format!("{}...", &t[..40]) } else { t.clone() })
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 40 {
+                                format!("{}...", &t[..40])
+                            } else {
+                                t.clone()
+                            }
+                        })
                         .unwrap_or_else(|| "-".to_string());
 
                     // Count occurrences of concept
-                    let count: usize = session.messages.iter()
+                    let count: usize = session
+                        .messages
+                        .iter()
                         .filter(|m| m.content.to_lowercase().contains(&concept.to_lowercase()))
                         .count();
 
@@ -1893,9 +1963,19 @@ impl ReplHandler {
                 println!("{}", table);
             }
 
-            SessionsSubcommand::Related { session_id, min_shared } => {
-                println!("\n{} Finding sessions related to: {}", "🔗".bold(), session_id.cyan());
-                println!("{} This feature requires enrichment. Showing based on search similarity...", "ℹ".blue());
+            SessionsSubcommand::Related {
+                session_id,
+                min_shared,
+            } => {
+                println!(
+                    "\n{} Finding sessions related to: {}",
+                    "🔗".bold(),
+                    session_id.cyan()
+                );
+                println!(
+                    "{} This feature requires enrichment. Showing based on search similarity...",
+                    "ℹ".blue()
+                );
 
                 let _min = min_shared.unwrap_or(1); // Will be used with enrichment
 
@@ -1908,9 +1988,17 @@ impl ReplHandler {
                 let source = source.unwrap();
 
                 // Get keywords from first user message
-                let keywords = source.messages.iter()
+                let keywords = source
+                    .messages
+                    .iter()
                     .find(|m| m.role == terraphim_sessions::MessageRole::User)
-                    .map(|m| m.content.split_whitespace().take(3).collect::<Vec<_>>().join(" "))
+                    .map(|m| {
+                        m.content
+                            .split_whitespace()
+                            .take(3)
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    })
                     .unwrap_or_default();
 
                 if keywords.is_empty() {
@@ -1919,7 +2007,8 @@ impl ReplHandler {
                 }
 
                 let related = svc.search(&keywords).await;
-                let related: Vec<_> = related.into_iter()
+                let related: Vec<_> = related
+                    .into_iter()
                     .filter(|s| s.id != session_id)
                     .take(5)
                     .collect();
@@ -1941,8 +2030,16 @@ impl ReplHandler {
                     ]);
 
                 for session in related {
-                    let title = session.title.as_ref()
-                        .map(|t| if t.len() > 40 { format!("{}...", &t[..40]) } else { t.clone() })
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 40 {
+                                format!("{}...", &t[..40])
+                            } else {
+                                t.clone()
+                            }
+                        })
                         .unwrap_or_else(|| "-".to_string());
 
                     table.add_row(vec![
@@ -1962,16 +2059,24 @@ impl ReplHandler {
                 let group = group_by.as_deref().unwrap_or("day");
                 let max_entries = limit.unwrap_or(30);
 
-                println!("\n{} Session Timeline (grouped by {}):", "📅".bold(), group.cyan());
+                println!(
+                    "\n{} Session Timeline (grouped by {}):",
+                    "📅".bold(),
+                    group.cyan()
+                );
 
                 let sessions = svc.list_sessions().await;
                 if sessions.is_empty() {
-                    println!("{} No sessions found. Import sessions first.", "ℹ".blue().bold());
+                    println!(
+                        "{} No sessions found. Import sessions first.",
+                        "ℹ".blue().bold()
+                    );
                     return Ok(());
                 }
 
                 // Group sessions by date
-                let mut grouped: HashMap<String, Vec<&terraphim_sessions::Session>> = HashMap::new();
+                let mut grouped: HashMap<String, Vec<&terraphim_sessions::Session>> =
+                    HashMap::new();
 
                 for session in &sessions {
                     let date_key = if let Some(started) = session.started_at {
@@ -2011,7 +2116,8 @@ impl ReplHandler {
                 for (date, day_sessions) in sorted.into_iter().take(max_entries) {
                     let session_count = day_sessions.len();
                     let message_count: usize = day_sessions.iter().map(|s| s.message_count()).sum();
-                    let sources: std::collections::HashSet<_> = day_sessions.iter().map(|s| s.source.as_str()).collect();
+                    let sources: std::collections::HashSet<_> =
+                        day_sessions.iter().map(|s| s.source.as_str()).collect();
 
                     table.add_row(vec![
                         Cell::new(&date),
@@ -2024,10 +2130,18 @@ impl ReplHandler {
                 println!("{}", table);
             }
 
-            SessionsSubcommand::Export { format, output, session_id } => {
+            SessionsSubcommand::Export {
+                format,
+                output,
+                session_id,
+            } => {
                 let fmt = format.as_deref().unwrap_or("json");
 
-                println!("\n{} Exporting sessions (format: {})...", "📤".bold(), fmt.cyan());
+                println!(
+                    "\n{} Exporting sessions (format: {})...",
+                    "📤".bold(),
+                    fmt.cyan()
+                );
 
                 let sessions: Vec<terraphim_sessions::Session> = if let Some(id) = session_id {
                     if let Some(session) = svc.get_session(&id).await {
@@ -2056,7 +2170,10 @@ impl ReplHandler {
                             if let Some(title) = &session.title {
                                 md.push_str(&format!("- **Title**: {}\n", title));
                             }
-                            md.push_str(&format!("- **Messages**: {}\n\n", session.message_count()));
+                            md.push_str(&format!(
+                                "- **Messages**: {}\n\n",
+                                session.message_count()
+                            ));
                             md.push_str("### Conversation\n\n");
                             for msg in &session.messages {
                                 md.push_str(&format!("**{}**: {}\n\n", msg.role, msg.content));
@@ -2066,14 +2183,23 @@ impl ReplHandler {
                         md
                     }
                     _ => {
-                        println!("{} Unknown format '{}'. Use: json, markdown", "⚠".yellow().bold(), fmt);
+                        println!(
+                            "{} Unknown format '{}'. Use: json, markdown",
+                            "⚠".yellow().bold(),
+                            fmt
+                        );
                         return Ok(());
                     }
                 };
 
                 if let Some(path) = output {
                     std::fs::write(&path, &content)?;
-                    println!("{} Exported {} sessions to '{}'", "✅".green().bold(), sessions.len(), path.green());
+                    println!(
+                        "{} Exported {} sessions to '{}'",
+                        "✅".green().bold(),
+                        sessions.len(),
+                        path.green()
+                    );
                 } else {
                     println!("{}", content);
                 }
@@ -2081,8 +2207,14 @@ impl ReplHandler {
 
             SessionsSubcommand::Enrich { session_id } => {
                 println!("\n{} Enriching sessions with concepts...", "🧠".bold());
-                println!("{} This feature requires the 'enrichment' feature flag.", "ℹ".blue());
-                println!("{} Rebuild with: cargo build --features repl-sessions,enrichment", "💡".yellow());
+                println!(
+                    "{} This feature requires the 'enrichment' feature flag.",
+                    "ℹ".blue()
+                );
+                println!(
+                    "{} Rebuild with: cargo build --features repl-sessions,enrichment",
+                    "💡".yellow()
+                );
 
                 // For now, show what would be enriched
                 if let Some(id) = session_id {
@@ -2104,10 +2236,16 @@ impl ReplHandler {
                     }
                 } else {
                     let sessions = svc.list_sessions().await;
-                    println!("\n  Would enrich {} sessions", sessions.len().to_string().green());
+                    println!(
+                        "\n  Would enrich {} sessions",
+                        sessions.len().to_string().green()
+                    );
 
                     let total_messages: usize = sessions.iter().map(|s| s.message_count()).sum();
-                    println!("  Total messages to process: {}", total_messages.to_string().green());
+                    println!(
+                        "  Total messages to process: {}",
+                        total_messages.to_string().green()
+                    );
                 }
             }
         }

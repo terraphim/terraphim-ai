@@ -276,11 +276,25 @@ impl Default for ForgivingParser {
     fn default() -> Self {
         // Default commands based on terraphim_agent REPL
         let commands = vec![
-            "search", "config", "role", "graph", "vm", "help", "quit", "exit", "clear", "robot",
+            "search",
+            "config",
+            "role",
+            "graph",
+            "vm",
+            "help",
+            "quit",
+            "exit",
+            "clear",
+            "robot",
             // Chat commands
-            "chat", "summarize",
+            "chat",
+            "summarize",
             // MCP commands
-            "autocomplete", "extract", "find", "replace", "thesaurus",
+            "autocomplete",
+            "extract",
+            "find",
+            "replace",
+            "thesaurus",
             // File commands
             "file",
             // Web commands
@@ -360,7 +374,10 @@ mod tests {
             ParseResult::Unknown { .. } => {
                 // Also acceptable for very different input
             }
-            _ => panic!("Expected Suggestions, AutoCorrected, or Unknown, got {:?}", result),
+            _ => panic!(
+                "Expected Suggestions, AutoCorrected, or Unknown, got {:?}",
+                result
+            ),
         }
     }
 
@@ -405,7 +422,10 @@ mod tests {
         let parser = ForgivingParser::default();
 
         let result = parser.parse("search hello world");
-        assert_eq!(result.full_command(), Some("search hello world".to_string()));
+        assert_eq!(
+            result.full_command(),
+            Some("search hello world".to_string())
+        );
 
         let result = parser.parse("quit");
         assert_eq!(result.full_command(), Some("quit".to_string()));

@@ -609,8 +609,8 @@ fn watch_sessions(path: Option<&str>, cli: &Cli, interval: u64) -> Result<()> {
 /// Convert local ToolCategory to library ToolCategory
 #[cfg(feature = "terraphim")]
 fn convert_tool_category(cat: &models::ToolCategory) -> claude_log_analyzer::ToolCategory {
-    use models::ToolCategory as Local;
     use claude_log_analyzer::ToolCategory as Lib;
+    use models::ToolCategory as Local;
     match cat {
         Local::PackageManager => Lib::PackageManager,
         Local::BuildTool => Lib::BuildTool,
@@ -923,7 +923,8 @@ fn analyze_tools(
         }
 
         // Sort by relevance score
-        matching_invocations.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        matching_invocations
+            .sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
 
         // Display results
         println!(
@@ -938,7 +939,9 @@ fn analyze_tools(
             matching_invocations.len().to_string().yellow()
         );
 
-        for (i, (invocation, relevance, matched_concepts)) in matching_invocations.iter().enumerate().take(50) {
+        for (i, (invocation, relevance, matched_concepts)) in
+            matching_invocations.iter().enumerate().take(50)
+        {
             // Show top 50 results
             println!(
                 "{}. {} {}",
@@ -946,11 +949,7 @@ fn analyze_tools(
                 "Command:".bold(),
                 invocation.command_line.green()
             );
-            println!(
-                "   {} {}",
-                "Tool:".dimmed(),
-                invocation.tool_name.cyan()
-            );
+            println!("   {} {}", "Tool:".dimmed(), invocation.tool_name.cyan());
             println!(
                 "   {} {}",
                 "Session:".dimmed(),
@@ -960,11 +959,7 @@ fn analyze_tools(
                 let agent_str = agent.as_str();
                 println!("   {} {}", "Agent:".dimmed(), agent_str.yellow());
             }
-            println!(
-                "   {} {:.2}",
-                "Relevance:".dimmed(),
-                relevance
-            );
+            println!("   {} {:.2}", "Relevance:".dimmed(), relevance);
             println!(
                 "   {} {}",
                 "Matched:".dimmed(),

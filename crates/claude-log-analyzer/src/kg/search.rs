@@ -153,11 +153,7 @@ impl KnowledgeGraphSearch {
                     }
                 });
 
-                (
-                    m.term.clone(),
-                    vec![concept_upper.clone()],
-                    (start, end),
-                )
+                (m.term.clone(), vec![concept_upper.clone()], (start, end))
             })
             .collect();
 
@@ -183,10 +179,7 @@ fn intersect_results(
                 let mut merged_concepts = left_concepts.clone();
                 merged_concepts.extend(right_concepts.clone());
 
-                let merged_pos = (
-                    left_pos.0.min(right_pos.0),
-                    left_pos.1.max(right_pos.1),
-                );
+                let merged_pos = (left_pos.0.min(right_pos.0), left_pos.1.max(right_pos.1));
 
                 results.push((merged_text, merged_concepts, merged_pos));
             }

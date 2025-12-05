@@ -79,7 +79,8 @@ impl KnowledgeGraphBuilder {
         let concept_name = concept.to_uppercase();
 
         // Track in concept map
-        self.concept_map.insert(concept_name.clone(), patterns.clone());
+        self.concept_map
+            .insert(concept_name.clone(), patterns.clone());
 
         // Add each pattern to the thesaurus
         for (idx, pattern) in patterns.iter().enumerate() {
@@ -91,10 +92,8 @@ impl KnowledgeGraphBuilder {
                 url: Some(format!("concept://{concept_name}")),
             };
 
-            self.thesaurus.insert(
-                NormalizedTermValue::from(pattern.as_str()),
-                normalized_term,
-            );
+            self.thesaurus
+                .insert(NormalizedTermValue::from(pattern.as_str()), normalized_term);
         }
 
         Ok(())
@@ -103,95 +102,122 @@ impl KnowledgeGraphBuilder {
     /// Build package manager concepts (BUN, NPM, YARN, etc.)
     fn build_package_manager_concepts(&mut self) {
         // BUN concept
-        let _ = self.add_concept("BUN", vec![
-            "bunx".to_string(),
-            "bun install".to_string(),
-            "bun add".to_string(),
-            "bun run".to_string(),
-            "bun test".to_string(),
-            "bun build".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "BUN",
+            vec![
+                "bunx".to_string(),
+                "bun install".to_string(),
+                "bun add".to_string(),
+                "bun run".to_string(),
+                "bun test".to_string(),
+                "bun build".to_string(),
+            ],
+        );
 
         // NPM concept
-        let _ = self.add_concept("NPM", vec![
-            "npm".to_string(),
-            "npx".to_string(),
-            "npm install".to_string(),
-            "npm test".to_string(),
-            "npm run".to_string(),
-            "npm build".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "NPM",
+            vec![
+                "npm".to_string(),
+                "npx".to_string(),
+                "npm install".to_string(),
+                "npm test".to_string(),
+                "npm run".to_string(),
+                "npm build".to_string(),
+            ],
+        );
 
         // YARN concept
-        let _ = self.add_concept("YARN", vec![
-            "yarn".to_string(),
-            "yarn add".to_string(),
-            "yarn install".to_string(),
-            "yarn test".to_string(),
-            "yarn build".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "YARN",
+            vec![
+                "yarn".to_string(),
+                "yarn add".to_string(),
+                "yarn install".to_string(),
+                "yarn test".to_string(),
+                "yarn build".to_string(),
+            ],
+        );
 
         // PNPM concept
-        let _ = self.add_concept("PNPM", vec![
-            "pnpm".to_string(),
-            "pnpm add".to_string(),
-            "pnpm install".to_string(),
-            "pnpm test".to_string(),
-            "pnpm build".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "PNPM",
+            vec![
+                "pnpm".to_string(),
+                "pnpm add".to_string(),
+                "pnpm install".to_string(),
+                "pnpm test".to_string(),
+                "pnpm build".to_string(),
+            ],
+        );
 
         // CARGO concept
-        let _ = self.add_concept("CARGO", vec![
-            "cargo".to_string(),
-            "cargo build".to_string(),
-            "cargo test".to_string(),
-            "cargo run".to_string(),
-            "cargo clippy".to_string(),
-            "cargo install".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "CARGO",
+            vec![
+                "cargo".to_string(),
+                "cargo build".to_string(),
+                "cargo test".to_string(),
+                "cargo run".to_string(),
+                "cargo clippy".to_string(),
+                "cargo install".to_string(),
+            ],
+        );
     }
 
     /// Build action concepts (install, deploy, test, etc.)
     fn build_action_concepts(&mut self) {
         // INSTALL concept
-        let _ = self.add_concept("INSTALL", vec![
-            "install".to_string(),
-            "npm install".to_string(),
-            "yarn install".to_string(),
-            "pnpm install".to_string(),
-            "bun install".to_string(),
-            "cargo install".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "INSTALL",
+            vec![
+                "install".to_string(),
+                "npm install".to_string(),
+                "yarn install".to_string(),
+                "pnpm install".to_string(),
+                "bun install".to_string(),
+                "cargo install".to_string(),
+            ],
+        );
 
         // DEPLOY concept
-        let _ = self.add_concept("DEPLOY", vec![
-            "deploy".to_string(),
-            "wrangler deploy".to_string(),
-            "vercel deploy".to_string(),
-            "netlify deploy".to_string(),
-            "npx wrangler deploy".to_string(),
-            "bunx wrangler deploy".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "DEPLOY",
+            vec![
+                "deploy".to_string(),
+                "wrangler deploy".to_string(),
+                "vercel deploy".to_string(),
+                "netlify deploy".to_string(),
+                "npx wrangler deploy".to_string(),
+                "bunx wrangler deploy".to_string(),
+            ],
+        );
 
         // TEST concept
-        let _ = self.add_concept("TEST", vec![
-            "test".to_string(),
-            "npm test".to_string(),
-            "yarn test".to_string(),
-            "cargo test".to_string(),
-            "pytest".to_string(),
-            "jest".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "TEST",
+            vec![
+                "test".to_string(),
+                "npm test".to_string(),
+                "yarn test".to_string(),
+                "cargo test".to_string(),
+                "pytest".to_string(),
+                "jest".to_string(),
+            ],
+        );
 
         // BUILD concept
-        let _ = self.add_concept("BUILD", vec![
-            "build".to_string(),
-            "npm run build".to_string(),
-            "yarn build".to_string(),
-            "cargo build".to_string(),
-            "webpack".to_string(),
-            "vite build".to_string(),
-        ]);
+        let _ = self.add_concept(
+            "BUILD",
+            vec![
+                "build".to_string(),
+                "npm run build".to_string(),
+                "yarn build".to_string(),
+                "cargo build".to_string(),
+                "webpack".to_string(),
+                "vite build".to_string(),
+            ],
+        );
     }
 
     /// Build tool-specific concepts from observed patterns

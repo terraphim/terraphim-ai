@@ -60,7 +60,11 @@ impl SessionService {
     }
 
     /// Import sessions from a specific source
-    pub async fn import_from(&self, source_id: &str, options: &ImportOptions) -> Result<Vec<Session>> {
+    pub async fn import_from(
+        &self,
+        source_id: &str,
+        options: &ImportOptions,
+    ) -> Result<Vec<Session>> {
         let connector = self
             .registry
             .get(source_id)
@@ -239,7 +243,7 @@ mod tests {
     async fn test_detect_sources() {
         let service = SessionService::new();
         let sources = service.detect_sources();
-        
+
         // Should have at least the native connector
         assert!(!sources.is_empty());
         assert!(sources.iter().any(|s| s.id == "claude-code-native"));
@@ -249,7 +253,7 @@ mod tests {
     async fn test_statistics_empty() {
         let service = SessionService::new();
         let stats = service.statistics().await;
-        
+
         assert_eq!(stats.total_sessions, 0);
         assert_eq!(stats.total_messages, 0);
     }

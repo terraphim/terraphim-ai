@@ -15,7 +15,9 @@
 //! - `globalStorage/state.vscdb` - Global chat history
 //! - `workspaceStorage/{id}/state.vscdb` - Workspace-specific chats
 
-use super::{ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector};
+use super::{
+    ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector,
+};
 use anyhow::{Context, Result};
 use rusqlite::Connection;
 use serde::Deserialize;
@@ -183,9 +185,8 @@ impl CursorConnector {
             return Ok(sessions);
         }
 
-        let mut stmt = conn.prepare(
-            "SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'",
-        )?;
+        let mut stmt =
+            conn.prepare("SELECT key, value FROM cursorDiskKV WHERE key LIKE 'composerData:%'")?;
 
         let rows = stmt.query_map([], |row| {
             Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?))

@@ -476,7 +476,9 @@ impl SelfDocumentation {
                 }],
                 examples: vec![ExampleDoc {
                     description: "Extract paragraphs".to_string(),
-                    command: "/extract \"This text contains authentication and authorization concepts.\"".to_string(),
+                    command:
+                        "/extract \"This text contains authentication and authorization concepts.\""
+                            .to_string(),
                     output: None,
                 }],
                 response_schema: serde_json::json!({
@@ -532,7 +534,8 @@ impl SelfDocumentation {
                 }],
                 examples: vec![ExampleDoc {
                     description: "Replace with markdown links".to_string(),
-                    command: "/replace \"Learn about authentication\" --format markdown".to_string(),
+                    command: "/replace \"Learn about authentication\" --format markdown"
+                        .to_string(),
                     output: None,
                 }],
                 response_schema: serde_json::json!({

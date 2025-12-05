@@ -42,9 +42,7 @@ impl SessionConnector for ClaClaudeConnector {
                 sessions_estimate,
             },
             claude_log_analyzer::connectors::ConnectorStatus::NotFound => ConnectorStatus::NotFound,
-            claude_log_analyzer::connectors::ConnectorStatus::Error(e) => {
-                ConnectorStatus::Error(e)
-            }
+            claude_log_analyzer::connectors::ConnectorStatus::Error(e) => ConnectorStatus::Error(e),
         }
     }
 
@@ -100,9 +98,7 @@ impl SessionConnector for ClaCursorConnector {
                 sessions_estimate,
             },
             claude_log_analyzer::connectors::ConnectorStatus::NotFound => ConnectorStatus::NotFound,
-            claude_log_analyzer::connectors::ConnectorStatus::Error(e) => {
-                ConnectorStatus::Error(e)
-            }
+            claude_log_analyzer::connectors::ConnectorStatus::Error(e) => ConnectorStatus::Error(e),
         }
     }
 

@@ -57,11 +57,7 @@ impl SessionConnector for OpenCodeConnector {
                 let count = WalkDir::new(&path)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        e.path()
-                            .extension()
-                            .is_some_and(|ext| ext == "jsonl")
-                    })
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
                     .count();
                 ConnectorStatus::Available {
                     path,
@@ -94,11 +90,7 @@ impl SessionConnector for OpenCodeConnector {
         for entry in WalkDir::new(&path)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .is_some_and(|ext| ext == "jsonl")
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
         {
             let file_path = entry.path();
             if let Ok(content) = std::fs::read_to_string(file_path) {
@@ -197,20 +189,19 @@ fn parse_timestamp(ts: &str) -> Option<jiff::Timestamp> {
 fn extract_content(value: &serde_json::Value) -> String {
     match value {
         serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Array(arr) => {
-            arr.iter()
-                .filter_map(|item| {
-                    if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
-                        Some(text.to_string())
-                    } else if let Some(text) = item.get("content").and_then(|t| t.as_str()) {
-                        Some(text.to_string())
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>()
-                .join("\n")
-        }
+        serde_json::Value::Array(arr) => arr
+            .iter()
+            .filter_map(|item| {
+                if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
+                    Some(text.to_string())
+                } else if let Some(text) = item.get("content").and_then(|t| t.as_str()) {
+                    Some(text.to_string())
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>()
+            .join("\n"),
         _ => String::new(),
     }
 }

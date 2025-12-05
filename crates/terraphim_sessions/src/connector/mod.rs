@@ -110,7 +110,7 @@ impl ConnectorRegistry {
         #[cfg(feature = "claude-log-analyzer")]
         {
             connectors.push(Box::new(crate::cla::ClaClaudeConnector::default()));
-            
+
             #[cfg(feature = "cla-full")]
             connectors.push(Box::new(crate::cla::ClaCursorConnector::default()));
         }
@@ -160,11 +160,7 @@ impl ConnectorRegistry {
                     all_sessions.append(&mut sessions);
                 }
                 Err(e) => {
-                    tracing::warn!(
-                        "Failed to import from {}: {}",
-                        connector.display_name(),
-                        e
-                    );
+                    tracing::warn!("Failed to import from {}: {}", connector.display_name(), e);
                 }
             }
 

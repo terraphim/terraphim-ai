@@ -31,11 +31,7 @@ impl SessionConnector for NativeClaudeConnector {
                     .max_depth(3)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        e.path()
-                            .extension()
-                            .is_some_and(|ext| ext == "jsonl")
-                    })
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
                     .count();
                 ConnectorStatus::Available {
                     path,
@@ -69,11 +65,7 @@ impl SessionConnector for NativeClaudeConnector {
             .max_depth(3)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .is_some_and(|ext| ext == "jsonl")
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
             .map(|e| e.path().to_path_buf())
             .collect();
 
@@ -153,9 +145,7 @@ impl NativeClaudeConnector {
             });
 
         // Extract project path from first entry's cwd
-        let project_path = entries
-            .first()
-            .and_then(|e| e.cwd.clone());
+        let project_path = entries.first().and_then(|e| e.cwd.clone());
 
         // Convert entries to messages
         let messages: Vec<Message> = entries
@@ -169,12 +159,8 @@ impl NativeClaudeConnector {
         }
 
         // Parse timestamps
-        let started_at = entries
-            .first()
-            .and_then(|e| parse_timestamp(&e.timestamp));
-        let ended_at = entries
-            .last()
-            .and_then(|e| parse_timestamp(&e.timestamp));
+        let started_at = entries.first().and_then(|e| parse_timestamp(&e.timestamp));
+        let ended_at = entries.last().and_then(|e| parse_timestamp(&e.timestamp));
 
         Ok(Some(Session {
             id: format!("claude-code-native:{}", session_id),
@@ -304,7 +290,9 @@ enum EntryMessage {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum AssistantContentBlock {
-    Text { text: String },
+    Text {
+        text: String,
+    },
     ToolUse {
         id: String,
         name: String,

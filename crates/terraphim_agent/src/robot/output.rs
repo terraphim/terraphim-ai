@@ -261,10 +261,8 @@ mod tests {
             OutputFormat::Minimal
         );
         assert_eq!(OutputFormat::from_str_loose("table"), OutputFormat::Table);
-        assert_eq!(
-            OutputFormat::from_str_loose("unknown"),
-            OutputFormat::Json
-        ); // Default
+        assert_eq!(OutputFormat::from_str_loose("unknown"), OutputFormat::Json);
+        // Default
     }
 
     #[test]
@@ -287,7 +285,8 @@ mod tests {
         let config = RobotConfig::new().with_max_content_length(20);
         let formatter = RobotFormatter::new(config);
 
-        let (truncated, was_truncated) = formatter.truncate_content("This is a very long string that should be truncated");
+        let (truncated, was_truncated) =
+            formatter.truncate_content("This is a very long string that should be truncated");
         assert!(was_truncated);
         assert!(truncated.len() <= 23); // 20 + "..."
 

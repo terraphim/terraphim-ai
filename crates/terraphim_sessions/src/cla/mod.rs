@@ -28,7 +28,9 @@ pub(crate) fn from_normalized_session(ns: NormalizedSession, prefix: &str) -> Se
         ended_at: ns.ended_at,
         messages,
         metadata: SessionMetadata {
-            project_path: ns.metadata.get("project_path")
+            project_path: ns
+                .metadata
+                .get("project_path")
                 .and_then(|v| v.as_str())
                 .map(|s| s.to_string()),
             model: None,
@@ -41,7 +43,7 @@ pub(crate) fn from_normalized_session(ns: NormalizedSession, prefix: &str) -> Se
 /// Convert a CLA NormalizedMessage to our Message type
 fn from_normalized_message(nm: NormalizedMessage) -> Message {
     let role = MessageRole::from(nm.role.as_str());
-    
+
     Message {
         idx: nm.idx,
         role,

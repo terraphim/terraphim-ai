@@ -226,12 +226,7 @@ mod tests {
     fn test_session_concepts() {
         let mut concepts = SessionConcepts::new("test-session".to_string());
 
-        let mut rust = ConceptMatch::new(
-            "rust".to_string(),
-            "Rust".to_string(),
-            1,
-            None,
-        );
+        let mut rust = ConceptMatch::new("rust".to_string(), "Rust".to_string(), 1, None);
         rust.add_occurrence(ConceptOccurrence {
             message_idx: 0,
             start_pos: 0,
@@ -245,12 +240,7 @@ mod tests {
             context: None,
         });
 
-        let mut tokio = ConceptMatch::new(
-            "tokio".to_string(),
-            "Tokio".to_string(),
-            2,
-            None,
-        );
+        let mut tokio = ConceptMatch::new("tokio".to_string(), "Tokio".to_string(), 2, None);
         tokio.add_occurrence(ConceptOccurrence {
             message_idx: 0,
             start_pos: 10,
@@ -270,6 +260,10 @@ mod tests {
 
         concepts.calculate_co_occurrences();
         assert_eq!(concepts.co_occurrences.len(), 1);
-        assert!(concepts.co_occurrences.contains(&("Rust".to_string(), "Tokio".to_string())));
+        assert!(
+            concepts
+                .co_occurrences
+                .contains(&("Rust".to_string(), "Tokio".to_string()))
+        );
     }
 }

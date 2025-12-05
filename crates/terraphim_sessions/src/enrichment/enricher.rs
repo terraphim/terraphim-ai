@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use terraphim_automata::matcher::{find_matches, Matched};
+use terraphim_automata::matcher::{Matched, find_matches};
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::Thesaurus;
 use tokio::sync::RwLock;
@@ -196,7 +196,11 @@ impl SessionEnricher {
 
     /// Find concepts that are connected via the knowledge graph
     fn find_graph_connections(&self, concepts: &mut SessionConcepts, graph: &RoleGraph) {
-        let terms: Vec<String> = concepts.all_terms().into_iter().map(|s| s.to_string()).collect();
+        let terms: Vec<String> = concepts
+            .all_terms()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
 
         for i in 0..terms.len() {
             for j in (i + 1)..terms.len() {
@@ -337,11 +341,7 @@ mod tests {
                     MessageRole::Assistant,
                     "Tokio is a popular async runtime for Rust. You can use it with async/await.",
                 ),
-                Message::text(
-                    2,
-                    MessageRole::User,
-                    "Can I compile rust to wasm?",
-                ),
+                Message::text(2, MessageRole::User, "Can I compile rust to wasm?"),
             ],
             metadata: SessionMetadata::default(),
         }
@@ -356,17 +356,26 @@ mod tests {
         let result = enricher.enrich_session(&session).await.unwrap();
 
         assert_eq!(result.messages_processed, 3);
-        assert!(result.concepts.concept_count() > 0, "Should find at least one concept");
+        assert!(
+            result.concepts.concept_count() > 0,
+            "Should find at least one concept"
+        );
 
         // Debug: print all concept keys
         println!("Found concepts:");
         for (key, concept) in result.concepts.concepts.iter() {
-            println!("  key='{}', term='{}', normalized='{}'", key, concept.term, concept.normalized_term);
+            println!(
+                "  key='{}', term='{}', normalized='{}'",
+                key, concept.term, concept.normalized_term
+            );
         }
 
         // Should find rust, tokio, async, wasm - check by iterating
-        let has_rust = result.concepts.concepts.values().any(|c|
-            c.normalized_term.contains("Rust") || c.term.contains("rust"));
+        let has_rust = result
+            .concepts
+            .concepts
+            .values()
+            .any(|c| c.normalized_term.contains("Rust") || c.term.contains("rust"));
         assert!(has_rust, "Should find rust-related concept");
     }
 
@@ -380,7 +389,10 @@ mod tests {
 
         // Only check if there are concepts
         if result.concepts.concept_count() > 0 {
-            assert!(!result.concepts.dominant_topics.is_empty(), "Should have dominant topics");
+            assert!(
+                !result.concepts.dominant_topics.is_empty(),
+                "Should have dominant topics"
+            );
             println!("Dominant topics: {:?}", result.concepts.dominant_topics);
         }
     }

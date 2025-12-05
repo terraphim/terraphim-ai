@@ -59,8 +59,12 @@ struct ResponseItem {
 #[derive(Debug, Clone, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
 enum ContentBlock {
-    InputText { text: String },
-    Text { text: String },
+    InputText {
+        text: String,
+    },
+    Text {
+        text: String,
+    },
     #[serde(other)]
     Other,
 }
@@ -89,11 +93,7 @@ impl SessionConnector for CodexConnector {
                 let count = WalkDir::new(&path)
                     .into_iter()
                     .filter_map(|e| e.ok())
-                    .filter(|e| {
-                        e.path()
-                            .extension()
-                            .is_some_and(|ext| ext == "jsonl")
-                    })
+                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
                     .count();
                 ConnectorStatus::Available {
                     path,
@@ -124,11 +124,7 @@ impl SessionConnector for CodexConnector {
         for entry in WalkDir::new(&path)
             .into_iter()
             .filter_map(|e| e.ok())
-            .filter(|e| {
-                e.path()
-                    .extension()
-                    .is_some_and(|ext| ext == "jsonl")
-            })
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
         {
             if let Some(limit) = options.limit {
                 if sessions.len() >= limit {

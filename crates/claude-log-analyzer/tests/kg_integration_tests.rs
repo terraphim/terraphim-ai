@@ -80,9 +80,7 @@ fn test_search_install_concept() -> anyhow::Result<()> {
 
     assert!(!results.is_empty(), "Should find INSTALL concept");
     assert!(
-        results[0]
-            .concepts_matched
-            .contains(&"INSTALL".to_string()),
+        results[0].concepts_matched.contains(&"INSTALL".to_string()),
         "Should match INSTALL concept"
     );
 

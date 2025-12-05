@@ -21,8 +21,8 @@ mod client;
 mod service;
 
 // Robot mode and forgiving CLI - always available
-mod robot;
 mod forgiving;
+mod robot;
 
 #[cfg(feature = "repl")]
 mod repl;

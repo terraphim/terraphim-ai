@@ -103,10 +103,7 @@ impl QueryParser {
         let node = parser.parse_expression()?;
 
         if parser.position < parser.tokens.len() {
-            return Err(anyhow!(
-                "Unexpected token at position {}",
-                parser.position
-            ));
+            return Err(anyhow!("Unexpected token at position {}", parser.position));
         }
 
         Ok(node)
@@ -158,7 +155,7 @@ impl ParserState {
     fn parse_not_expression(&mut self) -> Result<QueryNode> {
         if let Some(Token::Not) = self.peek() {
             self.consume(); // consume NOT
-            // Recursively parse NOT expressions to support "not not X"
+                            // Recursively parse NOT expressions to support "not not X"
             let operand = self.parse_not_expression()?;
             Ok(QueryNode::Not(Box::new(operand)))
         } else {

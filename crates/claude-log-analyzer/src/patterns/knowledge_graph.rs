@@ -517,7 +517,12 @@ impl ToolRelationship {
 
     /// Create a new tool relationship
     #[must_use]
-    pub fn new(from_tool: String, to_tool: String, relationship_type: RelationType, confidence: f32) -> Self {
+    pub fn new(
+        from_tool: String,
+        to_tool: String,
+        relationship_type: RelationType,
+        confidence: f32,
+    ) -> Self {
         Self {
             from_tool,
             to_tool,
@@ -534,14 +539,14 @@ fn is_known_dependency(dependency: &str, dependent: &str) -> bool {
     // Common dependency patterns
     matches!(
         (dependency, dependent),
-        ("npm", "wrangler") |
-        ("npm", "vercel") |
-        ("npm", "netlify") |
-        ("cargo", "clippy") |
-        ("git", "npm") |
-        ("git", "cargo") |
-        ("npm", "npx") |
-        ("yarn", "npx")
+        ("npm", "wrangler")
+            | ("npm", "vercel")
+            | ("npm", "netlify")
+            | ("cargo", "clippy")
+            | ("git", "npm")
+            | ("git", "cargo")
+            | ("npm", "npx")
+            | ("yarn", "npx")
     )
 }
 
@@ -750,9 +755,9 @@ fn are_known_alternatives(tool1: &str, tool2: &str) -> bool {
         ("eslint", "biome"),
     ];
 
-    alternatives.iter().any(|(a, b)| {
-        (tool1 == *a && tool2 == *b) || (tool1 == *b && tool2 == *a)
-    })
+    alternatives
+        .iter()
+        .any(|(a, b)| (tool1 == *a && tool2 == *b) || (tool1 == *b && tool2 == *a))
 }
 
 #[cfg(test)]
