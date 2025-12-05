@@ -252,9 +252,11 @@ jobs:
           else
             source .venv/bin/activate
           fi
+          # Override addopts (removes coverage flags) and python_files (adds benchmark_ pattern)
           pytest python/benchmarks/ -v --benchmark-only \
             --benchmark-json=benchmark-results.json \
-            --benchmark-columns=min,max,mean,stddev,median,ops
+            --benchmark-columns=min,max,mean,stddev,median,ops \
+            -o "addopts=" -o "python_files=benchmark_*.py test_*.py"
 
       - name: Store benchmark results
         uses: actions/upload-artifact@v5
