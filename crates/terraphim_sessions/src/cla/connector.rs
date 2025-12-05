@@ -56,7 +56,7 @@ impl SessionConnector for ClaClaudeConnector {
         // CLA import is synchronous, wrap in blocking task
         // Create a new connector inside the blocking task since it's stateless
         let sessions = tokio::task::spawn_blocking(move || {
-            let connector = claude_log_analyzer::connectors::ClaudeCodeConnector::default();
+            let connector = claude_log_analyzer::connectors::ClaudeCodeConnector;
             connector.import(&cla_options)
         })
         .await??;
@@ -112,7 +112,7 @@ impl SessionConnector for ClaCursorConnector {
         // CLA import is synchronous, wrap in blocking task
         // Create a new connector inside the blocking task since it's stateless
         let sessions = tokio::task::spawn_blocking(move || {
-            let connector = claude_log_analyzer::connectors::cursor::CursorConnector::default();
+            let connector = claude_log_analyzer::connectors::cursor::CursorConnector;
             connector.import(&cla_options)
         })
         .await??;
