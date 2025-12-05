@@ -62,7 +62,7 @@ jobs:
           echo "DEBUG: Build completed with exit code: $?"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: docs-build
           path: docs/book/
