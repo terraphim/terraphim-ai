@@ -105,7 +105,7 @@ jobs:
           cd ..
 
       - name: Upload binary artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.target }}
           path: artifacts/*

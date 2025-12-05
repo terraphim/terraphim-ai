@@ -257,7 +257,7 @@ jobs:
             --benchmark-columns=min,max,mean,stddev,median,ops
 
       - name: Store benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-results
           path: crates/terraphim_automata_py/benchmark-results.json
@@ -289,7 +289,7 @@ jobs:
           manylinux: auto
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.os }}
           path: crates/terraphim_automata_py/dist
@@ -309,7 +309,7 @@ jobs:
           args: --out dist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sdist
           path: crates/terraphim_automata_py/dist

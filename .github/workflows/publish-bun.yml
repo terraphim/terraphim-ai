@@ -140,7 +140,7 @@ jobs:
         if: ${{ !matrix.settings.docker }}
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
           path: "*.node"
@@ -296,7 +296,7 @@ jobs:
           ls -la *.node
 
       - name: Upload universal binary
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: bindings-universal-apple-darwin
           path: artifacts/terraphim_ai_nodejs.darwin-universal.node
