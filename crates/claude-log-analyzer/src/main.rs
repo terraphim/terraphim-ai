@@ -390,7 +390,7 @@ fn list_sessions(cli: &Cli, detailed: bool, project_filter: Option<&str>) -> Res
             .filter(|a| {
                 project_filter
                     .as_ref()
-                    .is_none_or(|f| a.project_path.contains(f))
+                    .map_or(true, |f| a.project_path.contains(f))
             })
             .count()
     } else {

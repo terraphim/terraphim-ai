@@ -192,13 +192,10 @@ fn extract_content(value: &serde_json::Value) -> String {
         serde_json::Value::Array(arr) => arr
             .iter()
             .filter_map(|item| {
-                if let Some(text) = item.get("text").and_then(|t| t.as_str()) {
-                    Some(text.to_string())
-                } else if let Some(text) = item.get("content").and_then(|t| t.as_str()) {
-                    Some(text.to_string())
-                } else {
-                    None
-                }
+                item.get("text")
+                    .and_then(|t| t.as_str())
+                    .or_else(|| item.get("content").and_then(|t| t.as_str()))
+                    .map(|text| text.to_string())
             })
             .collect::<Vec<_>>()
             .join("\n"),
@@ -212,7 +209,7 @@ mod tests {
 
     #[test]
     fn test_connector_source_id() {
-        let connector = OpenCodeConnector::default();
+        let connector = OpenCodeConnector;
         assert_eq!(connector.source_id(), "opencode");
         assert_eq!(connector.display_name(), "OpenCode");
     }
