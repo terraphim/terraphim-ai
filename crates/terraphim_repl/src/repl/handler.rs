@@ -449,7 +449,7 @@ impl ReplHandler {
                 Cell::new(term.id.to_string()),
                 Cell::new(key.to_string()),
                 Cell::new(&term.value),
-                Cell::new(term.url.as_ref().map(|u| u.as_str()).unwrap_or("N/A")),
+                Cell::new(term.url.as_deref().unwrap_or("N/A")),
             ]);
         }
 

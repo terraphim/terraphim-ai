@@ -85,7 +85,7 @@ mod role_switch_tests {
     #[test]
     fn test_role_selection_simulation() {
         // Simulate role selection logic
-        let available_roles = vec!["Default", "Engineer", "Admin"];
+        let available_roles = ["Default", "Engineer", "Admin"];
         let selected = "Engineer";
 
         assert!(
@@ -96,7 +96,7 @@ mod role_switch_tests {
 
     #[test]
     fn test_role_not_found() {
-        let available_roles = vec!["Default", "Engineer", "Admin"];
+        let available_roles = ["Default", "Engineer", "Admin"];
         let selected = "NonExistent";
 
         assert!(
