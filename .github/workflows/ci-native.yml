@@ -28,7 +28,7 @@ jobs:
       rust-targets: ${{ steps.targets.outputs.targets }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           clean: false
           fetch-depth: 0
@@ -88,7 +88,7 @@ jobs:
           find . -name "*.lock" -type f -delete 2>/dev/null || true
           
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           clean: false
       
