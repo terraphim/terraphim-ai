@@ -9,12 +9,17 @@ async fn test_role_based_command_permissions() {
     // Note: The validator routes dangerous commands to Firecracker isolation rather than blocking
     // So "systemctl" commands succeed but are routed to Firecracker VM for safety
     let test_cases = vec![
-        ("Default", "ls -la", true, None),                                           // Read-only command - hybrid
-        ("Default", "rm file.txt", false, None),                                     // Write command - blocked for Default
-        ("Default", "systemctl stop nginx", true, Some(ExecutionMode::Firecracker)), // System command - allowed but sandboxed
-        ("Terraphim Engineer", "ls -la", true, None),                                // Read command
-        ("Terraphim Engineer", "rm file.txt", true, None),                           // Write command
-        ("Terraphim Engineer", "systemctl stop nginx", true, None),                  // System command
+        ("Default", "ls -la", true, None), // Read-only command - hybrid
+        ("Default", "rm file.txt", false, None), // Write command - blocked for Default
+        (
+            "Default",
+            "systemctl stop nginx",
+            true,
+            Some(ExecutionMode::Firecracker),
+        ), // System command - allowed but sandboxed
+        ("Terraphim Engineer", "ls -la", true, None), // Read command
+        ("Terraphim Engineer", "rm file.txt", true, None), // Write command
+        ("Terraphim Engineer", "systemctl stop nginx", true, None), // System command
     ];
 
     // Add debug output to understand validation flow
