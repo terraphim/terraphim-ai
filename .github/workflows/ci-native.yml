@@ -109,7 +109,15 @@ jobs:
         with:
           toolchain: 1.87.0
           components: rustfmt, clippy
-      
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install yarn
+        run: npm install -g yarn
+
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
         with:
@@ -120,6 +128,6 @@ jobs:
           key: ${{ needs.setup.outputs.cache-key }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-cargo-lint-
-      
+
       - name: Run format and linting checks
         run: ./scripts/ci-check-format.sh
