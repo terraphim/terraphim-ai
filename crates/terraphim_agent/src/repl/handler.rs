@@ -1,7 +1,12 @@
 //! REPL handler implementation
 
-use super::commands::{ConfigSubcommand, ReplCommand, RoleSubcommand};
+#[cfg(feature = "repl-sessions")]
+use super::commands::SessionsSubcommand;
+use super::commands::{ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand};
 use crate::{client::ApiClient, service::TuiService};
+
+// Import robot module types
+use crate::robot::{ExitCode, SelfDocumentation};
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -303,6 +308,15 @@ impl ReplHandler {
 
             ReplCommand::Vm { subcommand } => {
                 self.handle_vm(subcommand).await?;
+            }
+
+            ReplCommand::Robot { subcommand } => {
+                self.handle_robot(subcommand).await?;
+            }
+
+            #[cfg(feature = "repl-sessions")]
+            ReplCommand::Sessions { subcommand } => {
+                self.handle_sessions(subcommand).await?;
             }
         }
 
@@ -1505,6 +1519,735 @@ impl ReplHandler {
         #[cfg(not(feature = "repl"))]
         {
             println!("VM operations require repl feature");
+        }
+
+        Ok(())
+    }
+
+    async fn handle_robot(&self, subcommand: RobotSubcommand) -> Result<()> {
+        #[cfg(feature = "repl")]
+        {
+            use colored::Colorize;
+
+            let docs = SelfDocumentation::new();
+
+            match subcommand {
+                RobotSubcommand::Capabilities => {
+                    println!("{} Robot Mode - Capabilities\n", "🤖".bold());
+                    let capabilities = docs.capabilities_data();
+                    let json = serde_json::to_string_pretty(&capabilities)?;
+                    println!("{}", json);
+                }
+                RobotSubcommand::Schemas { command } => {
+                    println!("{} Robot Mode - Schemas\n", "📋".bold());
+                    if let Some(cmd) = command {
+                        if let Some(schema) = docs.schema(&cmd) {
+                            let json = serde_json::to_string_pretty(schema)?;
+                            println!("{}", json);
+                        } else {
+                            println!(
+                                "{} No schema found for command: {}",
+                                "ℹ".blue().bold(),
+                                cmd.yellow()
+                            );
+                        }
+                    } else {
+                        // Show all schemas
+                        let schemas = docs.all_schemas();
+                        let json = serde_json::to_string_pretty(schemas)?;
+                        println!("{}", json);
+                    }
+                }
+                RobotSubcommand::Examples { command } => {
+                    println!("{} Robot Mode - Examples\n", "📝".bold());
+                    if let Some(cmd) = command {
+                        if let Some(examples) = docs.examples(&cmd) {
+                            let json = serde_json::to_string_pretty(examples)?;
+                            println!("{}", json);
+                        } else {
+                            println!(
+                                "{} No examples found for command: {}",
+                                "ℹ".blue().bold(),
+                                cmd.yellow()
+                            );
+                        }
+                    } else {
+                        // Show examples for all commands
+                        let all_examples: Vec<_> = docs
+                            .all_schemas()
+                            .iter()
+                            .flat_map(|s| {
+                                s.examples.iter().map(move |e| {
+                                    serde_json::json!({
+                                        "command": s.name,
+                                        "example": e
+                                    })
+                                })
+                            })
+                            .collect();
+                        let json = serde_json::to_string_pretty(&all_examples)?;
+                        println!("{}", json);
+                    }
+                }
+                RobotSubcommand::ExitCodes => {
+                    println!("{} Robot Mode - Exit Codes\n", "🚪".bold());
+                    let exit_codes = vec![
+                        serde_json::json!({
+                            "code": ExitCode::Success.code(),
+                            "name": ExitCode::Success.name(),
+                            "description": ExitCode::Success.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorGeneral.code(),
+                            "name": ExitCode::ErrorGeneral.name(),
+                            "description": ExitCode::ErrorGeneral.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorUsage.code(),
+                            "name": ExitCode::ErrorUsage.name(),
+                            "description": ExitCode::ErrorUsage.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorIndexMissing.code(),
+                            "name": ExitCode::ErrorIndexMissing.name(),
+                            "description": ExitCode::ErrorIndexMissing.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorNotFound.code(),
+                            "name": ExitCode::ErrorNotFound.name(),
+                            "description": ExitCode::ErrorNotFound.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorAuth.code(),
+                            "name": ExitCode::ErrorAuth.name(),
+                            "description": ExitCode::ErrorAuth.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorNetwork.code(),
+                            "name": ExitCode::ErrorNetwork.name(),
+                            "description": ExitCode::ErrorNetwork.description()
+                        }),
+                        serde_json::json!({
+                            "code": ExitCode::ErrorTimeout.code(),
+                            "name": ExitCode::ErrorTimeout.name(),
+                            "description": ExitCode::ErrorTimeout.description()
+                        }),
+                    ];
+                    let json = serde_json::to_string_pretty(&exit_codes)?;
+                    println!("{}", json);
+                }
+            }
+        }
+
+        #[cfg(not(feature = "repl"))]
+        {
+            println!("Robot mode requires repl feature");
+        }
+
+        Ok(())
+    }
+
+    #[cfg(feature = "repl-sessions")]
+    async fn handle_sessions(&mut self, subcommand: SessionsSubcommand) -> Result<()> {
+        use colored::Colorize;
+        use comfy_table::modifiers::UTF8_ROUND_CORNERS;
+        use comfy_table::presets::UTF8_FULL;
+        use comfy_table::{Cell, Table};
+        use terraphim_sessions::{ConnectorStatus, ImportOptions, SessionService};
+
+        // Get or create session service
+        static SESSION_SERVICE: std::sync::OnceLock<
+            std::sync::Arc<tokio::sync::Mutex<SessionService>>,
+        > = std::sync::OnceLock::new();
+        let service = SESSION_SERVICE
+            .get_or_init(|| std::sync::Arc::new(tokio::sync::Mutex::new(SessionService::new())));
+        let mut svc = service.lock().await;
+
+        match subcommand {
+            SessionsSubcommand::Sources => {
+                println!("\n{}", "Available Session Sources:".bold().cyan());
+
+                let sources = svc.detect_sources();
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Status").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Sessions").add_attribute(comfy_table::Attribute::Bold),
+                    ]);
+
+                for source in sources {
+                    let (status, count) = match &source.status {
+                        ConnectorStatus::Available {
+                            sessions_estimate, ..
+                        } => (
+                            "Available".green().to_string(),
+                            sessions_estimate
+                                .map(|c| c.to_string())
+                                .unwrap_or("-".to_string()),
+                        ),
+                        ConnectorStatus::NotFound => {
+                            ("Not Found".yellow().to_string(), "-".to_string())
+                        }
+                        ConnectorStatus::Error(e) => {
+                            (format!("Error: {}", e).red().to_string(), "-".to_string())
+                        }
+                    };
+
+                    table.add_row(vec![
+                        Cell::new(&source.id),
+                        Cell::new(status),
+                        Cell::new(count),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Import { source, limit } => {
+                let options = ImportOptions::new().with_limit(limit.unwrap_or(100));
+
+                println!("\n{} Importing sessions...", "⏳".bold());
+
+                let sessions = if let Some(source_id) = source {
+                    svc.import_from(&source_id, &options).await?
+                } else {
+                    svc.import_all(&options).await?
+                };
+
+                println!(
+                    "{} Imported {} session(s)",
+                    "✅".bold(),
+                    sessions.len().to_string().green()
+                );
+            }
+
+            SessionsSubcommand::List { source, limit } => {
+                let sessions = if let Some(source_id) = source {
+                    svc.sessions_by_source(&source_id).await
+                } else {
+                    svc.list_sessions().await
+                };
+
+                let sessions: Vec<_> = if let Some(lim) = limit {
+                    sessions.into_iter().take(lim).collect()
+                } else {
+                    sessions.into_iter().take(20).collect()
+                };
+
+                if sessions.is_empty() {
+                    println!(
+                        "{} No sessions found. Run '/sessions import' first.",
+                        "ℹ".blue().bold()
+                    );
+                    return Ok(());
+                }
+
+                println!("\n{}", "Sessions:".bold().cyan());
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Messages").add_attribute(comfy_table::Attribute::Bold),
+                    ]);
+
+                for session in &sessions {
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 40 {
+                                format!("{}...", &t[..40])
+                            } else {
+                                t.clone()
+                            }
+                        })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    table.add_row(vec![
+                        Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                        Cell::new(&session.source),
+                        Cell::new(title),
+                        Cell::new(session.message_count().to_string()),
+                    ]);
+                }
+
+                println!("{}", table);
+                println!("Showing {} session(s)", sessions.len().to_string().green());
+            }
+
+            SessionsSubcommand::Search { query } => {
+                let sessions = svc.search(&query).await;
+
+                if sessions.is_empty() {
+                    println!("{} No sessions match '{}'", "ℹ".blue().bold(), query.cyan());
+                    return Ok(());
+                }
+
+                println!(
+                    "\n{} sessions match '{}':",
+                    sessions.len().to_string().green(),
+                    query.cyan()
+                );
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                        Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                    ]);
+
+                for session in sessions.iter().take(10) {
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 50 {
+                                format!("{}...", &t[..50])
+                            } else {
+                                t.clone()
+                            }
+                        })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    table.add_row(vec![
+                        Cell::new(&session.external_id[..8.min(session.external_id.len())]),
+                        Cell::new(&session.source),
+                        Cell::new(title),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Stats => {
+                let stats = svc.statistics().await;
+
+                println!("\n{}", "Session Statistics:".bold().cyan());
+                println!(
+                    "  Total Sessions:          {}",
+                    stats.total_sessions.to_string().green()
+                );
+                println!(
+                    "  Total Messages:          {}",
+                    stats.total_messages.to_string().green()
+                );
+                println!(
+                    "  User Messages:           {}",
+                    stats.total_user_messages.to_string().yellow()
+                );
+                println!(
+                    "  Assistant Messages:      {}",
+                    stats.total_assistant_messages.to_string().blue()
+                );
+
+                if !stats.sessions_by_source.is_empty() {
+                    println!("\n  Sessions by Source:");
+                    for (source, count) in &stats.sessions_by_source {
+                        println!("    {}: {}", source.yellow(), count);
+                    }
+                }
+            }
+
+            SessionsSubcommand::Show { session_id } => {
+                let session = svc.get_session(&session_id).await;
+
+                if let Some(session) = session {
+                    println!("\n{} Session: {}", "📋".bold(), session.id.cyan());
+                    println!("  Source:       {}", session.source.yellow());
+                    println!(
+                        "  Title:        {}",
+                        session.title.as_ref().unwrap_or(&"-".to_string())
+                    );
+                    println!(
+                        "  Messages:     {}",
+                        session.message_count().to_string().green()
+                    );
+                    if let Some(duration) = session.duration_ms() {
+                        let minutes = duration / 60000;
+                        println!("  Duration:     {} min", minutes);
+                    }
+
+                    println!("\n  {} Messages:", "💬".bold());
+                    for (i, msg) in session.messages.iter().take(5).enumerate() {
+                        let role_color = match msg.role.to_string().as_str() {
+                            "user" => msg.role.to_string().blue(),
+                            "assistant" => msg.role.to_string().green(),
+                            _ => msg.role.to_string().yellow(),
+                        };
+                        let content_preview = if msg.content.len() > 80 {
+                            format!("{}...", &msg.content[..80])
+                        } else {
+                            msg.content.clone()
+                        };
+                        println!("    [{}] {}: {}", i + 1, role_color, content_preview);
+                    }
+                    if session.messages.len() > 5 {
+                        println!("    ... and {} more messages", session.messages.len() - 5);
+                    }
+                } else {
+                    println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
+                }
+            }
+
+            SessionsSubcommand::Concepts { concept } => {
+                println!(
+                    "\n{} Searching sessions by concept: '{}'",
+                    "🔍".bold(),
+                    concept.cyan()
+                );
+                println!(
+                    "{} This feature requires enrichment. Searching by text match...",
+                    "ℹ".blue()
+                );
+
+                // Fall back to text search for now (enrichment requires thesaurus)
+                let sessions = svc.search(&concept).await;
+
+                if sessions.is_empty() {
+                    println!(
+                        "{} No sessions contain concept '{}'",
+                        "ℹ".blue().bold(),
+                        concept
+                    );
+                    return Ok(());
+                }
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("ID").fg(comfy_table::Color::Cyan),
+                        Cell::new("Source").fg(comfy_table::Color::Yellow),
+                        Cell::new("Matches").fg(comfy_table::Color::Green),
+                        Cell::new("Title").fg(comfy_table::Color::White),
+                    ]);
+
+                for session in sessions.iter().take(10) {
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 40 {
+                                format!("{}...", &t[..40])
+                            } else {
+                                t.clone()
+                            }
+                        })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    // Count occurrences of concept
+                    let count: usize = session
+                        .messages
+                        .iter()
+                        .filter(|m| m.content.to_lowercase().contains(&concept.to_lowercase()))
+                        .count();
+
+                    table.add_row(vec![
+                        Cell::new(&session.id[..8]),
+                        Cell::new(&session.source),
+                        Cell::new(count.to_string()),
+                        Cell::new(title),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Related {
+                session_id,
+                min_shared,
+            } => {
+                println!(
+                    "\n{} Finding sessions related to: {}",
+                    "🔗".bold(),
+                    session_id.cyan()
+                );
+                println!(
+                    "{} This feature requires enrichment. Showing based on search similarity...",
+                    "ℹ".blue()
+                );
+
+                let _min = min_shared.unwrap_or(1); // Will be used with enrichment
+
+                // Get the source session
+                let source = svc.get_session(&session_id).await;
+                if source.is_none() {
+                    println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
+                    return Ok(());
+                }
+                let source = source.unwrap();
+
+                // Get keywords from first user message
+                let keywords = source
+                    .messages
+                    .iter()
+                    .find(|m| m.role == terraphim_sessions::MessageRole::User)
+                    .map(|m| {
+                        m.content
+                            .split_whitespace()
+                            .take(3)
+                            .collect::<Vec<_>>()
+                            .join(" ")
+                    })
+                    .unwrap_or_default();
+
+                if keywords.is_empty() {
+                    println!("{} No keywords found in session", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                let related = svc.search(&keywords).await;
+                let related: Vec<_> = related
+                    .into_iter()
+                    .filter(|s| s.id != session_id)
+                    .take(5)
+                    .collect();
+
+                if related.is_empty() {
+                    println!("{} No related sessions found", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("Session ID").fg(comfy_table::Color::Cyan),
+                        Cell::new("Source").fg(comfy_table::Color::Yellow),
+                        Cell::new("Messages").fg(comfy_table::Color::Green),
+                        Cell::new("Title").fg(comfy_table::Color::White),
+                    ]);
+
+                for session in related {
+                    let title = session
+                        .title
+                        .as_ref()
+                        .map(|t| {
+                            if t.len() > 40 {
+                                format!("{}...", &t[..40])
+                            } else {
+                                t.clone()
+                            }
+                        })
+                        .unwrap_or_else(|| "-".to_string());
+
+                    table.add_row(vec![
+                        Cell::new(&session.id[..8]),
+                        Cell::new(&session.source),
+                        Cell::new(session.message_count().to_string()),
+                        Cell::new(title),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Timeline { group_by, limit } => {
+                use std::collections::HashMap;
+
+                let group = group_by.as_deref().unwrap_or("day");
+                let max_entries = limit.unwrap_or(30);
+
+                println!(
+                    "\n{} Session Timeline (grouped by {}):",
+                    "📅".bold(),
+                    group.cyan()
+                );
+
+                let sessions = svc.list_sessions().await;
+                if sessions.is_empty() {
+                    println!(
+                        "{} No sessions found. Import sessions first.",
+                        "ℹ".blue().bold()
+                    );
+                    return Ok(());
+                }
+
+                // Group sessions by date
+                let mut grouped: HashMap<String, Vec<&terraphim_sessions::Session>> =
+                    HashMap::new();
+
+                for session in &sessions {
+                    let date_key = if let Some(started) = session.started_at {
+                        let date = started.strftime("%Y-%m-%d").to_string();
+                        match group {
+                            "week" => {
+                                // Get week start (Monday)
+                                format!("Week of {}", &date[..10])
+                            }
+                            "month" => {
+                                format!("{}-{}", &date[..4], &date[5..7])
+                            }
+                            _ => date[..10].to_string(), // day
+                        }
+                    } else {
+                        "Unknown".to_string()
+                    };
+
+                    grouped.entry(date_key).or_default().push(session);
+                }
+
+                // Sort by date key
+                let mut sorted: Vec<_> = grouped.into_iter().collect();
+                sorted.sort_by(|a, b| b.0.cmp(&a.0)); // Newest first
+
+                let mut table = Table::new();
+                table
+                    .load_preset(UTF8_FULL)
+                    .apply_modifier(UTF8_ROUND_CORNERS)
+                    .set_header(vec![
+                        Cell::new("Date").fg(comfy_table::Color::Cyan),
+                        Cell::new("Sessions").fg(comfy_table::Color::Green),
+                        Cell::new("Messages").fg(comfy_table::Color::Yellow),
+                        Cell::new("Sources").fg(comfy_table::Color::White),
+                    ]);
+
+                for (date, day_sessions) in sorted.into_iter().take(max_entries) {
+                    let session_count = day_sessions.len();
+                    let message_count: usize = day_sessions.iter().map(|s| s.message_count()).sum();
+                    let sources: std::collections::HashSet<_> =
+                        day_sessions.iter().map(|s| s.source.as_str()).collect();
+
+                    table.add_row(vec![
+                        Cell::new(&date),
+                        Cell::new(session_count.to_string()),
+                        Cell::new(message_count.to_string()),
+                        Cell::new(sources.into_iter().collect::<Vec<_>>().join(", ")),
+                    ]);
+                }
+
+                println!("{}", table);
+            }
+
+            SessionsSubcommand::Export {
+                format,
+                output,
+                session_id,
+            } => {
+                let fmt = format.as_deref().unwrap_or("json");
+
+                println!(
+                    "\n{} Exporting sessions (format: {})...",
+                    "📤".bold(),
+                    fmt.cyan()
+                );
+
+                let sessions: Vec<terraphim_sessions::Session> = if let Some(id) = session_id {
+                    if let Some(session) = svc.get_session(&id).await {
+                        vec![session]
+                    } else {
+                        println!("{} Session '{}' not found", "⚠".yellow().bold(), id);
+                        return Ok(());
+                    }
+                } else {
+                    svc.list_sessions().await
+                };
+
+                if sessions.is_empty() {
+                    println!("{} No sessions to export", "ℹ".blue().bold());
+                    return Ok(());
+                }
+
+                let content = match fmt {
+                    "json" => serde_json::to_string_pretty(&sessions)?,
+                    "markdown" | "md" => {
+                        let mut md = String::new();
+                        md.push_str("# AI Coding Sessions Export\n\n");
+                        for session in &sessions {
+                            md.push_str(&format!("## {}\n\n", session.id));
+                            md.push_str(&format!("- **Source**: {}\n", session.source));
+                            if let Some(title) = &session.title {
+                                md.push_str(&format!("- **Title**: {}\n", title));
+                            }
+                            md.push_str(&format!(
+                                "- **Messages**: {}\n\n",
+                                session.message_count()
+                            ));
+                            md.push_str("### Conversation\n\n");
+                            for msg in &session.messages {
+                                md.push_str(&format!("**{}**: {}\n\n", msg.role, msg.content));
+                            }
+                            md.push_str("---\n\n");
+                        }
+                        md
+                    }
+                    _ => {
+                        println!(
+                            "{} Unknown format '{}'. Use: json, markdown",
+                            "⚠".yellow().bold(),
+                            fmt
+                        );
+                        return Ok(());
+                    }
+                };
+
+                if let Some(path) = output {
+                    std::fs::write(&path, &content)?;
+                    println!(
+                        "{} Exported {} sessions to '{}'",
+                        "✅".green().bold(),
+                        sessions.len(),
+                        path.green()
+                    );
+                } else {
+                    println!("{}", content);
+                }
+            }
+
+            SessionsSubcommand::Enrich { session_id } => {
+                println!("\n{} Enriching sessions with concepts...", "🧠".bold());
+                println!(
+                    "{} This feature requires the 'enrichment' feature flag.",
+                    "ℹ".blue()
+                );
+                println!(
+                    "{} Rebuild with: cargo build --features repl-sessions,enrichment",
+                    "💡".yellow()
+                );
+
+                // For now, show what would be enriched
+                if let Some(id) = session_id {
+                    if let Some(session) = svc.get_session(&id).await {
+                        println!("\n  Would enrich session: {}", session.id.cyan());
+                        println!("  Messages to process: {}", session.message_count());
+
+                        // Show sample text
+                        if let Some(first_msg) = session.messages.first() {
+                            let preview = if first_msg.content.len() > 100 {
+                                format!("{}...", &first_msg.content[..100])
+                            } else {
+                                first_msg.content.clone()
+                            };
+                            println!("  Sample: {}", preview.italic());
+                        }
+                    } else {
+                        println!("{} Session '{}' not found", "⚠".yellow().bold(), id);
+                    }
+                } else {
+                    let sessions = svc.list_sessions().await;
+                    println!(
+                        "\n  Would enrich {} sessions",
+                        sessions.len().to_string().green()
+                    );
+
+                    let total_messages: usize = sessions.iter().map(|s| s.message_count()).sum();
+                    println!(
+                        "  Total messages to process: {}",
+                        total_messages.to_string().green()
+                    );
+                }
+            }
         }
 
         Ok(())
