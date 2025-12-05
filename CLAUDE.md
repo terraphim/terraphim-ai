@@ -41,6 +41,25 @@ Testing
 - Implement integration tests to validate async behavior and concurrency.
 - Never use mocks in tests.
 
+## Testing Guidelines
+- Keep fast unit tests inline with `mod tests {}`; put multi-crate checks in `tests/` or `test_*.sh`.
+- Scope runs with `cargo test -p crate test`; add regression coverage for new failure modes.
+
+## Rust Performance Practices
+- Profile first (`cargo bench`, `cargo flamegraph`, `perf`) and land only measured wins.
+- Borrow ripgrep tactics: reuse buffers with `with_capacity`, favor iterators, reach for `memchr`/SIMD, and hoist allocations out of loops.
+- Apply inline directives sparingly—mark tiny wrappers `#[inline]`, keep cold errors `#[cold]`, and guard cleora-style `rayon::scope` loops with `#[inline(never)]`.
+- Prefer zero-copy types (`&[u8]`, `bstr`) and parallelize CPU-bound graph work with `rayon`, feature-gated for graceful fallback.
+
+## Commit & Pull Request Guidelines
+- Use Conventional Commit prefixes (`fix:`, `feat:`, `refactor:`) and keep changes scoped.
+- Ensure commits pass `cargo fmt`, `cargo clippy`, required `cargo test`, and desktop checks.
+- PRs should explain motivation, link issues, list manual verification commands, and attach UI screenshots or logs when behavior shifts.
+
+## Configuration & Security Tips
+- Keep secrets in 1Password or `.env`. Use `build-env.sh` or `scripts/` helpers to bootstrap integrations.
+- Wrap optional features (`openrouter`, `mcp-rust-sdk`) with graceful fallbacks for network failures.
+
 Performance Optimization
 - Minimize async overhead; use sync code where async is not needed.
 - Use non-blocking operations and atomic data types for concurrency.
@@ -61,6 +80,12 @@ Async Ecosystem
 - Use `sqlx` or `tokio-postgres` for async database interactions.
 - Utilize `tonic` for gRPC with async support.
 - use [salvo](https://salvo.rs/book/) for async web server and axum
+
+## Important Rules
+
+- **Never use sleep before curl** - Use proper wait mechanisms instead
+- **Never use timeout command** - This command doesn't exist on macOS
+- **Never use mocks in tests** - Use real implementations or integration tests
 
 ## Memory and Task Management
 
@@ -153,7 +178,7 @@ Terraphim AI is a privacy-first AI assistant that operates locally, providing se
 
 The project is organized as a Cargo workspace with multiple components:
 
-- **Core crates**: `crates/*` - 29 library crates providing specialized functionality
+- **Core crates**: `crates/*` - Library crates providing specialized functionality (run `ls crates/` for current list)
 - **Binaries**:
   - `terraphim_server` - Main HTTP API server (default workspace member)
   - `terraphim_firecracker` - Firecracker microVM integration for secure execution

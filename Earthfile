@@ -41,8 +41,8 @@ build-all:
   # TODO: Fix OpenSSL cross-compilation issues for musl targets
   # BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
   # BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
-  # BUILD +cross-build --TARGET=aarch64-unknown-linux-musl
-  # Errors
+  # BUILD +cross-build --TARGET=aarch64-apple-darwin
+  # BUILD +cross-build --TARGET=x86_64-pc-windows-msvc
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
 docker-all:
