@@ -266,7 +266,7 @@ mod tests {
 
     #[test]
     fn test_connector_source_id() {
-        let connector = AiderConnector::default();
+        let connector = AiderConnector;
         assert_eq!(connector.source_id(), "aider");
         assert_eq!(connector.display_name(), "Aider");
     }

@@ -27,10 +27,10 @@ enum Token {
 /// Tokenize a query string into tokens
 fn tokenize(query: &str) -> Result<Vec<Token>> {
     let mut tokens = Vec::new();
-    let mut chars = query.chars().peekable();
+    let chars = query.chars();
     let mut current_word = String::new();
 
-    while let Some(ch) = chars.next() {
+    for ch in chars {
         match ch {
             '(' => {
                 if !current_word.is_empty() {

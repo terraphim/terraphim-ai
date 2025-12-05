@@ -240,7 +240,7 @@ mod tests {
 
     #[test]
     fn test_connector_source_id() {
-        let connector = CodexConnector::default();
+        let connector = CodexConnector;
         assert_eq!(connector.source_id(), "codex");
         assert_eq!(connector.display_name(), "OpenAI Codex CLI");
     }
