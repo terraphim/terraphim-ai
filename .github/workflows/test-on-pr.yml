@@ -19,7 +19,7 @@ jobs:
       - uses: earthly/actions-setup@v1
         with:
           version: v0.8.3
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Docker Login
         run: docker login --username "$DOCKERHUB_USERNAME" --password "$DOCKERHUB_TOKEN"
       - name: Run build
