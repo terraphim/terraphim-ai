@@ -61,20 +61,6 @@ jobs:
             echo 'targets=["x86_64-unknown-linux-gnu"]' >> $GITHUB_OUTPUT
           fi
       
-      - name: Cache Cargo dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: ${{ needs.setup.outputs.cache-key }}-cargo-lint-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ needs.setup.outputs.cache-key }}-cargo-lint-
-      
-      - name: Run format and linting checks
-        run: ./scripts/ci-check-format.sh
-
   lint-and-format:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 15
