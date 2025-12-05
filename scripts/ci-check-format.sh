@@ -105,7 +105,8 @@ else
 fi
 
 # Run clippy with optimized flags and extended timeout
-if timeout 1200 cargo clippy --workspace --all-targets --all-features --message-format=short --quiet -- -D clippy::all -A clippy::nursery -A clippy::pedantic; then
+# Note: -D clippy::all turns clippy warnings to errors, but allows rustc warnings (dead_code, etc.)
+if timeout 1200 cargo clippy --workspace --all-targets --all-features --message-format=short -- -D clippy::all -A clippy::nursery -A clippy::pedantic -A dead_code -A unused; then
     echo -e "${GREEN}  ✅ cargo clippy check passed${NC}"
 else
     echo -e "${RED}  ❌ cargo clippy check failed or timed out${NC}"
