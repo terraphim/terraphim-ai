@@ -104,7 +104,7 @@ impl ConnectorRegistry {
         let mut connectors: Vec<Box<dyn SessionConnector>> = Vec::new();
 
         // Add native Claude Code connector (always available)
-        connectors.push(Box::new(NativeClaudeConnector::default()));
+        connectors.push(Box::new(NativeClaudeConnector));
 
         // Add CLA-based connectors if feature enabled
         #[cfg(feature = "claude-log-analyzer")]
