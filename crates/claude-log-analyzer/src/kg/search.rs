@@ -97,11 +97,7 @@ impl KnowledgeGraphSearch {
     /// Evaluate a query node against the text
     ///
     /// Returns a vector of (matched_text, concepts, position) tuples
-    fn evaluate_query(
-        &self,
-        text: &str,
-        query: &QueryNode,
-    ) -> Result<MatchResults> {
+    fn evaluate_query(&self, text: &str, query: &QueryNode) -> Result<MatchResults> {
         match query {
             QueryNode::Concept(concept) => self.match_concept(text, concept),
 
@@ -126,11 +122,7 @@ impl KnowledgeGraphSearch {
     }
 
     /// Match a single concept using terraphim
-    fn match_concept(
-        &self,
-        text: &str,
-        concept: &str,
-    ) -> Result<MatchResults> {
+    fn match_concept(&self, text: &str, concept: &str) -> Result<MatchResults> {
         // Use terraphim find_matches to search for the concept
         // Use false for overlapping matches to get all possible matches
         let matches = find_matches(text, self.builder.thesaurus.clone(), false)
@@ -240,10 +232,7 @@ fn deduplicate_results(
 }
 
 /// Exclude results (NOT operation)
-fn exclude_results(
-    _text: &str,
-    _exclude: MatchResults,
-) -> MatchResults {
+fn exclude_results(_text: &str, _exclude: MatchResults) -> MatchResults {
     // For NOT operation, we return positions that are NOT in the exclude set
     // This is a simplified implementation - in practice, you'd need the full text
     // to identify non-matching regions
