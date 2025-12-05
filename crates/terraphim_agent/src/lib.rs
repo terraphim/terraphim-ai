@@ -1,6 +1,12 @@
 pub mod client;
 pub mod service;
 
+// Robot mode - always available for AI agent integration
+pub mod robot;
+
+// Forgiving CLI - always available for typo-tolerant parsing
+pub mod forgiving;
+
 #[cfg(feature = "repl")]
 pub mod repl;
 
@@ -8,6 +14,15 @@ pub mod repl;
 pub mod commands;
 
 pub use client::*;
+
+// Re-export robot mode types
+pub use robot::{
+    ExitCode, FieldMode, OutputFormat, RobotConfig, RobotError, RobotFormatter, RobotResponse,
+    SelfDocumentation,
+};
+
+// Re-export forgiving CLI types
+pub use forgiving::{AliasRegistry, ForgivingParser, ParseResult};
 
 #[cfg(feature = "repl")]
 pub use repl::*;
@@ -26,4 +41,7 @@ pub mod test_exports {
 
     #[cfg(feature = "repl-custom")]
     pub use crate::commands::*;
+
+    pub use crate::forgiving::*;
+    pub use crate::robot::*;
 }

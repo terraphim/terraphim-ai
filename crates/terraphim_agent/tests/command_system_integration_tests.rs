@@ -1,6 +1,9 @@
+use std::collections::HashMap;
+use terraphim_agent::commands::CommandValidator;
+
 #[tokio::test]
 async fn test_role_based_command_permissions() {
-    let validator = CommandValidator::new();
+    let mut validator = CommandValidator::new();
 
     // Test different role permissions
     let test_cases = vec![
@@ -25,7 +28,7 @@ async fn test_role_based_command_permissions() {
 
         println!("DEBUG: Validation result: {:?}", result);
 
-        if should_succeed {
+        if *should_succeed {
             assert!(
                 result.is_ok(),
                 "Role '{}' should be able to execute '{}'",
