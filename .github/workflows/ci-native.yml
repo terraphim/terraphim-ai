@@ -11,7 +11,6 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
-  CACHE_KEY: v1-${{ hashFiles('**/Cargo.lock') }}
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -41,7 +40,8 @@ jobs:
       - name: Generate cache key
         id: cache
         run: |
-          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          HASH=$(sha256sum Cargo.lock 2>/dev/null | cut -d' ' -f1 || echo "no-lock")
+          echo "key=v1-${HASH:0:16}" >> $GITHUB_OUTPUT
       
       - name: Set Ubuntu versions
         id: ubuntu
