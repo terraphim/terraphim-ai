@@ -29,7 +29,7 @@ env:
   MDBOOK_VERSION: '0.4.40'
   # 1Password secret references
   OP_API_TOKEN: op://TerraphimPlatform/terraphim-md-book-cloudflare/workers-api-token
-  OP_ACCOUNT_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/account-id
+  OP_ACCOUNT_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/account_id
   OP_ZONE_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/zone-id
 
 jobs:
