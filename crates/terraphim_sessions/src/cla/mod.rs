@@ -15,7 +15,7 @@ pub(crate) fn from_normalized_session(ns: NormalizedSession, prefix: &str) -> Se
     let messages: Vec<Message> = ns
         .messages
         .into_iter()
-        .map(|m| from_normalized_message(m))
+        .map(from_normalized_message)
         .collect();
 
     Session {
