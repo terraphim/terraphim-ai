@@ -250,13 +250,13 @@ async fn test_default_role_ripgrep_integration() {
             .query(&search_params)
             .send()
             .await
-            .expect(&format!("Search for '{}' failed", term));
+            .unwrap_or_else(|_| panic!("Search for '{}' failed", term));
 
         if search_response.status().is_success() {
             let search_json: SearchResponse = search_response
                 .json()
                 .await
-                .expect(&format!("Failed to parse search response for '{}'", term));
+                .unwrap_or_else(|_| panic!("Failed to parse search response for '{}'", term));
 
             log::info!(
                 "✅ Found {} results for '{}'",
