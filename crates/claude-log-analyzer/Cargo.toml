@@ -48,7 +48,7 @@ toml = "0.8"
 colored = "2.1"
 indicatif = "0.17"
 tabled = "0.15"
-dialoguer = "0.11"
+dialoguer = "0.12"
 
 # Parallel processing
 rayon = "1.8"
