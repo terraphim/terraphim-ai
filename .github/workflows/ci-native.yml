@@ -29,15 +29,19 @@ jobs:
       - name: Pre-checkout cleanup
         run: |
           # Clean up files that may have different permissions from previous runs
-          sudo rm -rf desktop/dist desktop/node_modules || true
-          sudo rm -rf target || true
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          # Also clean common build artifacts
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
 
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           clean: false
           fetch-depth: 0
-      
+
       - name: Clean target directory
         run: |
           rm -rf target || true
@@ -75,16 +79,19 @@ jobs:
       - name: Pre-checkout cleanup
         run: |
           # Clean up files that may have different permissions from previous runs
-          sudo rm -rf desktop/dist desktop/node_modules || true
-          sudo rm -rf target || true
-          sudo rm -rf .cargo || true
-          find . -name "*.lock" -type f -delete 2>/dev/null || true
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/.cargo" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+          find "${WORKDIR}" -name "*.lock" -type f -delete 2>/dev/null || true
 
       - name: Checkout code
         uses: actions/checkout@v6
         with:
           clean: false
-      
+
       - name: Install build dependencies
         run: |
           sudo apt-get update -qq
