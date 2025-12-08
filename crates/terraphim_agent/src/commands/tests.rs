@@ -11,18 +11,18 @@ mod tests {
     use std::path::PathBuf;
 
     // Import all the types we need for tests
+    use crate::CommandExecutionResult;
     use crate::commands::executor;
     use crate::commands::registry::CommandRegistry;
     use crate::commands::validator::{CommandValidator, SecurityAction, SecurityResult};
     use crate::commands::{
-        hooks::{BackupHook, EnvironmentHook, LoggingHook, PreflightCheckHook},
-        HookContext,
-    };
-    use crate::commands::{
         CommandDefinition, CommandHook, CommandParameter, ExecutionMode, HookManager,
         ParsedCommand, RiskLevel,
     };
-    use crate::CommandExecutionResult;
+    use crate::commands::{
+        HookContext,
+        hooks::{BackupHook, EnvironmentHook, LoggingHook, PreflightCheckHook},
+    };
 
     // Test data and helper functions
     fn create_test_command_definition() -> CommandDefinition {
@@ -131,9 +131,11 @@ test-command --input "hello" --verbose
         assert_eq!(parsed.definition.parameters.len(), 2);
         // Test that markdown structure is preserved
         assert!(parsed.content.contains("# Test Command"));
-        assert!(parsed
-            .content
-            .contains("This is a test command for unit testing purposes."));
+        assert!(
+            parsed
+                .content
+                .contains("This is a test command for unit testing purposes.")
+        );
     }
 
     #[tokio::test]
@@ -418,7 +420,9 @@ parameters:
         // Note: This test might fail if run on weekends due to default business hour restrictions
         // The validator correctly restricts to Monday-Friday, 9 AM - 5 PM
         if !time_result.is_ok() {
-            println!("Time restriction test info: This may fail on weekends. Current time restrictions: Mon-Fri, 9AM-5PM");
+            println!(
+                "Time restriction test info: This may fail on weekends. Current time restrictions: Mon-Fri, 9AM-5PM"
+            );
         }
         // For now, we'll just ensure the validator doesn't panic
         assert!(
@@ -509,7 +513,10 @@ parameters:
         // Note: This test may fail on weekends or outside business hours due to default time restrictions
         // The validator correctly restricts to Monday-Friday, 9 AM - 5 PM
         if let Err(ref e) = result {
-            println!("Security validation failed (expected on weekends/off-hours): {:?}", e);
+            println!(
+                "Security validation failed (expected on weekends/off-hours): {:?}",
+                e
+            );
             // If the failure is due to time restrictions, that's correct behavior
             let err_msg = e.to_string();
             if err_msg.contains("Commands not allowed on this day")
