@@ -1,5 +1,17 @@
 # Scratchpad - Active Development Tasks
 
+## 2025-12-08 - Repo sync & Tauri build check
+- Pulled main (fast-forward to dd8a02d4); changes touched `crates/haystack_discourse/Cargo.toml` and `scripts/ci-check-frontend.sh`.
+- Reviewed open PRs: Tauri migrations (#295 complete, #291 older), TUI build fix (#268), pre-commit/npm infra (#320), task_decomposition fix (#329), MCP auth (#287), KG schema linter (#294), 1Password CI secrets (#296); none merged yet.
+- Tauri build status: `yarn tauri build --bundles deb rpm appimage` fails because devDependency `@tauri-apps/cli` is 2.9.4 while Rust crates/config are Tauri 1.x, so schema validation fails (`identifier` required, devPath/distDir unexpected).
+- Next: align Tauri versions (either pin CLI to 1.x or land PR #295 migration), add rpm metadata if needed, then re-run build for deb/rpm/appimage on Linux.
+
+## 2025-12-08 (later) - Tauri CLI pinned and rebuild attempt
+- Pinned `@tauri-apps/cli` to 1.5.11 and regenerated yarn.lock.
+- Added `[package.metadata.rpm]` in `desktop/src-tauri/Cargo.toml` mirroring deb assets/requires.
+- Re-ran `yarn tauri build --bundles deb rpm appimage --target x86_64-unknown-linux-gnu`. Deb built, AppImage failed due to missing `appimagetool`; rpm was not reached.
+- Need to install `appimagetool` (or set TAURI_BUNDLE_APPIMAGE_BUNDLE_BIN) and re-run to get rpm/appimage artifacts; updater warning is expected because updater bundle not requested.
+
 ## Current Session: ✅ Phase 1 Security Testing Complete - Ready for Phase 2
 
 **Date**: October 18, 2025 (Continued from 2025-10-07)

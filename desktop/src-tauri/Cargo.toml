@@ -104,3 +104,11 @@ assets = [
     ["icons/128x128.png", "usr/share/icons/hicolor/128x128/apps/terraphim-ai.png", "644"],
     ["../../README.md", "usr/share/doc/terraphim-ai-desktop/README", "644"],
 ]
+
+[package.metadata.rpm]
+requires = "$auto, webkit2gtk4.0, gtk3"
+assets = [
+    ["target/release/terraphim-ai-desktop", "/usr/bin/terraphim-ai-desktop", "755"],
+    ["icons/128x128.png", "/usr/share/icons/hicolor/128x128/apps/terraphim-ai.png", "644"],
+    ["../../README.md", "/usr/share/doc/terraphim-ai-desktop/README", "644"],
+]
