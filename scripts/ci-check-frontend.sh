@@ -173,10 +173,10 @@ else
                 echo "Build errors detected above"
             fi
 
-    # Create a minimal dist folder if build fails (same as CI)
-    echo "Creating fallback build..."
-    mkdir -p dist
-    cat > dist/index.html << 'EOF'
+            # Create a minimal dist folder if build fails (same as CI)
+            echo "Creating fallback build..."
+            mkdir -p dist
+            cat > dist/index.html << 'EOF'
 <!DOCTYPE html>
 <html>
 <head>
@@ -201,7 +201,9 @@ else
 </body>
 </html>
 EOF
-    echo -e "${YELLOW}  ⚠️  Fallback build created${NC}"
+            echo -e "${YELLOW}  ⚠️  Fallback build created${NC}"
+        fi
+    fi
 fi
 
 echo -e "${BLUE}🔍 Verifying build output...${NC}"
