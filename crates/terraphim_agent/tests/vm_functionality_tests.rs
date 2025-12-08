@@ -1,4 +1,3 @@
-use serde_json;
 use terraphim_agent::client::*;
 
 /// Test VM command parsing with feature gates
