@@ -26,6 +26,12 @@ jobs:
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
       rust-targets: ${{ steps.targets.outputs.targets }}
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          # Clean up files that may have different permissions from previous runs
+          sudo rm -rf desktop/dist desktop/node_modules || true
+          sudo rm -rf target || true
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -66,13 +72,14 @@ jobs:
     timeout-minutes: 15
     needs: [setup]
     steps:
-      - name: Clean workspace before checkout
-        shell: bash
+      - name: Pre-checkout cleanup
         run: |
+          # Clean up files that may have different permissions from previous runs
+          sudo rm -rf desktop/dist desktop/node_modules || true
           sudo rm -rf target || true
           sudo rm -rf .cargo || true
           find . -name "*.lock" -type f -delete 2>/dev/null || true
-          
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
