@@ -69,19 +69,16 @@ if ! command -v rustup &> /dev/null; then
     source "$HOME/.cargo/env"
 fi
 
-# Ensure we're using the correct Rust version
-RUST_VERSION="1.87.0"
-echo "Setting Rust version to $RUST_VERSION"
-rustup default "$RUST_VERSION"
+# Ensure we're using stable Rust
+echo "Setting Rust to stable"
+rustup default stable
+# Remove any directory override that might be present
+rustup override unset 2>/dev/null || true
 rustup component add rustfmt clippy
 
 # Verify Rust version
 ACTUAL_RUST_VERSION=$(rustc --version | cut -d' ' -f2)
 echo "Current Rust version: $ACTUAL_RUST_VERSION"
-
-if [[ "$ACTUAL_RUST_VERSION" != "$RUST_VERSION"* ]]; then
-    echo -e "${YELLOW}⚠️  Warning: Rust version mismatch. Expected: $RUST_VERSION, Got: $ACTUAL_RUST_VERSION${NC}"
-fi
 
 # Set environment variables (same as CI)
 export CARGO_TERM_COLOR=always
