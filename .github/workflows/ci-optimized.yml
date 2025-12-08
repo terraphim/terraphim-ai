@@ -27,6 +27,12 @@ jobs:
       should-build: ${{ steps.changes.outputs.should-build }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          # Clean up files that may have different permissions from previous runs
+          sudo rm -rf desktop/dist desktop/node_modules || true
+          sudo rm -rf target || true
+
       - name: Checkout code
         uses: actions/checkout@v6
         with:
@@ -77,6 +83,11 @@ jobs:
       image-tag: ${{ steps.build.outputs.image-tag }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          sudo rm -rf desktop/dist desktop/node_modules || true
+          sudo rm -rf target || true
+
       - name: Checkout code
         uses: actions/checkout@v6
 
