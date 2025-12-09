@@ -9,7 +9,7 @@ use terraphim_agent::commands::hooks::{
     BackupHook, EnvironmentHook, GitHook, LoggingHook, NotificationHook, PreflightCheckHook,
     ResourceMonitoringHook,
 };
-use terraphim_agent::commands::{CommandHook, ExecutionMode, HookContext, HookManager, HookResult};
+use terraphim_agent::commands::{CommandHook, ExecutionMode, HookContext, HookManager};
 use terraphim_agent::CommandExecutionResult;
 use tokio::fs;
 
