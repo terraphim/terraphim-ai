@@ -3,7 +3,6 @@
 //! These tests verify the CliService methods work correctly for
 //! role management, search, find, replace, and thesaurus operations.
 
-use serial_test::serial;
 use std::path::PathBuf;
 use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
 

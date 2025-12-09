@@ -3,8 +3,6 @@
 //! These tests verify the ReplCommand parsing functionality
 //! for role switch, KG search, replace, and find operations.
 
-use std::str::FromStr;
-
 // Re-use the command types from the main crate
 // Note: These tests need access to the repl module
 // We'll test the command structure through the public interface
