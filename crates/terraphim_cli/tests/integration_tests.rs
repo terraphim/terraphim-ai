@@ -5,6 +5,7 @@
 
 #[allow(deprecated)] // cargo_bin is deprecated but still works
 use assert_cmd::Command;
+#[allow(unused_imports)] // Used in test assertions
 use predicates::prelude::*;
 use serial_test::serial;
 use std::process::Command as StdCommand;
@@ -441,7 +442,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                let original = json["original"].as_str().unwrap();
+                let _original = json["original"].as_str().unwrap();
                 let replaced = json["replaced"].as_str().unwrap();
                 // Text without matches should be preserved
                 assert!(replaced.contains("xyz123") || replaced.contains("random"));
