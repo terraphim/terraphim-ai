@@ -3,12 +3,14 @@
 //! These tests verify end-to-end functionality of role switching,
 //! KG search, and replace operations.
 
+#[allow(deprecated)] // cargo_bin is deprecated but still works
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;
 use std::process::Command as StdCommand;
 
 /// Get a command for the terraphim-cli binary
+#[allow(deprecated)] // cargo_bin is deprecated but still functional
 fn cli_command() -> Command {
     Command::cargo_bin("terraphim-cli").unwrap()
 }

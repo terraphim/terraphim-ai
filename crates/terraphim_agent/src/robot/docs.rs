@@ -73,7 +73,8 @@ impl SelfDocumentation {
 
     /// Build documentation for all commands
     fn build_command_docs() -> Vec<CommandDoc> {
-        let docs = vec![
+        #[allow(unused_mut)] // mut needed with feature gates
+        let mut docs = vec![
             // Search command
             CommandDoc {
                 name: "search".to_string(),
