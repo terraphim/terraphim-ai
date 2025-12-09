@@ -115,10 +115,9 @@ impl ConnectorRegistry {
     /// Create a new registry with all available connectors
     #[must_use]
     pub fn new() -> Self {
-        let mut connectors: Vec<Box<dyn SessionConnector>> = Vec::new();
-
         // Add Claude Code connector (always available via parser)
-        connectors.push(Box::new(ClaudeCodeConnector));
+        #[allow(unused_mut)] // mut needed when connectors feature is enabled
+        let mut connectors: Vec<Box<dyn SessionConnector>> = vec![Box::new(ClaudeCodeConnector)];
 
         // Add additional connectors if feature enabled
         #[cfg(feature = "connectors")]
