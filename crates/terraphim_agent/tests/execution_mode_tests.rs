@@ -403,10 +403,7 @@ mod performance_tests {
 
         // Search for commands - use exact match for "cmd-42" instead of contains
         // to ensure only one result is found
-        let results: Vec<_> = commands
-            .iter()
-            .filter(|cmd| cmd.name == "cmd-42")
-            .collect();
+        let results: Vec<_> = commands.iter().filter(|cmd| cmd.name == "cmd-42").collect();
 
         let duration = start.elapsed();
 
