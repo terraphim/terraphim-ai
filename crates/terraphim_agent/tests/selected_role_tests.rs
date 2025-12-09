@@ -6,7 +6,7 @@ use std::str::{self, FromStr};
 /// Test helper to run TUI commands and parse output
 fn run_command_and_parse(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"]).args(args);
+    cmd.args(["run", "-p", "terraphim_agent", "--"]).args(args);
 
     let output = cmd.output()?;
 

@@ -10,7 +10,7 @@ use std::time::Duration;
 /// Test helper to run TUI commands
 fn run_tui_command(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"]).args(args);
+    cmd.args(["run", "-p", "terraphim_agent", "--"]).args(args);
 
     let output = cmd.output()?;
 

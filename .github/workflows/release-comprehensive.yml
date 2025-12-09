@@ -6,7 +6,7 @@ on:
       - 'v*'
       - 'terraphim_server-v*'
       - 'terraphim-ai-desktop-v*'
-      - 'terraphim_tui-v*'
+      - 'terraphim_agent-v*'
   workflow_dispatch:
     inputs:
       test_run:
@@ -121,8 +121,8 @@ jobs:
           # Build server package
           cargo deb -p terraphim_server --output target/debian/
 
-          # Build TUI package
-          cargo deb -p terraphim_tui --output target/debian/
+          # Build agent package
+          cargo deb -p terraphim_agent --output target/debian/
 
           # Build desktop package
           cd desktop

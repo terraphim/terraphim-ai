@@ -10,7 +10,7 @@ use std::str;
 /// Helper function to run TUI extract command
 fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--", "extract"])
+    cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
         .args(args);
 
     let output = cmd.output()?;
@@ -308,7 +308,7 @@ fn test_extract_error_conditions() -> Result<()> {
         println!("  Testing error case: {}", case_name);
 
         let mut cmd = Command::new("cargo");
-        cmd.args(["run", "-p", "terraphim_tui", "--", "extract"])
+        cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
             .args(&args);
 
         let output = cmd.output()?;
