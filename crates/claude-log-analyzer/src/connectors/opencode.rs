@@ -32,6 +32,7 @@ struct OpenCodeEntry {
     #[serde(default)]
     message: Option<OpenCodeMessage>,
     #[serde(rename = "type", default)]
+    #[allow(dead_code)] // Required for deserializing "type" field
     entry_type: Option<String>,
 }
 
