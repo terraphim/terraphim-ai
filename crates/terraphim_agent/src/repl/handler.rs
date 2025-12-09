@@ -1661,7 +1661,7 @@ impl ReplHandler {
         > = std::sync::OnceLock::new();
         let service = SESSION_SERVICE
             .get_or_init(|| std::sync::Arc::new(tokio::sync::Mutex::new(SessionService::new())));
-        let mut svc = service.lock().await;
+        let svc = service.lock().await;
 
         match subcommand {
             SessionsSubcommand::Sources => {

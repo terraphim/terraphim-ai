@@ -73,7 +73,7 @@ impl SelfDocumentation {
 
     /// Build documentation for all commands
     fn build_command_docs() -> Vec<CommandDoc> {
-        let mut docs = vec![
+        let docs = vec![
             // Search command
             CommandDoc {
                 name: "search".to_string(),

@@ -6,4 +6,5 @@
 pub mod commands;
 pub mod handler;
 
+#[allow(unused_imports)] // Exported for potential external use
 pub use handler::{ReplHandler, run_repl_offline_mode};
