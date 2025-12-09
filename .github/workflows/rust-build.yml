@@ -148,7 +148,7 @@ jobs:
           cargo build --release --target ${{ matrix.target }} \
             --package terraphim_server \
             --package terraphim_mcp_server \
-            --package terraphim_tui
+            --package terraphim_agent
 
           # Test binaries
           ./target/${{ matrix.target }}/release/terraphim_server --version
@@ -200,4 +200,4 @@ jobs:
 
       - name: Run basic tests
         run: |
-          cargo test --target ${{ matrix.target }} --workspace --exclude terraphim_tui
+          cargo test --target ${{ matrix.target }} --workspace --exclude terraphim_agent
