@@ -177,7 +177,7 @@ cross-build:
         cargo build --target $TARGET --release \
         --package terraphim_server \
         --package terraphim_mcp_server \
-        --package terraphim_tui
+        --package terraphim_agent
   ELSE
     # For non-musl targets, we would use cross here but it requires Docker daemon
     # For now, skip complex targets that need cross
@@ -188,11 +188,11 @@ cross-build:
   # Test the binaries (note: TUI binary uses hyphen, not underscore)
   RUN ./target/$TARGET/release/terraphim_server --version
   RUN ./target/$TARGET/release/terraphim_mcp_server --version
-  RUN ./target/$TARGET/release/terraphim-tui --version
+  RUN ./target/$TARGET/release/terraphim-agent --version
   # Save all three binaries
   SAVE ARTIFACT ./target/$TARGET/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
   SAVE ARTIFACT ./target/$TARGET/release/terraphim_mcp_server AS LOCAL artifact/bin/terraphim_mcp_server-$TARGET
-  SAVE ARTIFACT ./target/$TARGET/release/terraphim-tui AS LOCAL artifact/bin/terraphim_tui-$TARGET
+  SAVE ARTIFACT ./target/$TARGET/release/terraphim-agent AS LOCAL artifact/bin/terraphim_agent-$TARGET
 
 build:
   FROM +source
@@ -200,17 +200,17 @@ build:
   # Build each package separately to ensure all binaries are created
   DO rust+CARGO --args="build --offline --release --package terraphim_server" --output="release/[^/\.]+"
   DO rust+CARGO --args="build --offline --release --package terraphim_mcp_server" --output="release/[^/\.]+"
-  DO rust+CARGO --args="build --offline --release --package terraphim_tui" --output="release/[^/\.]+"
+  DO rust+CARGO --args="build --offline --release --package terraphim_agent" --output="release/[^/\.]+"
   # Debug: Check what binaries were actually created
   RUN find /code/target/release -name "*terraphim*" -type f -exec ls -la {} \;
   # Test all binaries (note: TUI binary uses hyphen, not underscore)
   RUN /code/target/release/terraphim_server --version
   RUN /code/target/release/terraphim_mcp_server --version
-  RUN /code/target/release/terraphim-tui --version
+  RUN /code/target/release/terraphim-agent --version
   # Save all three binaries
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-
   SAVE ARTIFACT /code/target/release/terraphim_mcp_server AS LOCAL artifact/bin/terraphim_mcp_server-
-  SAVE ARTIFACT /code/target/release/terraphim-tui AS LOCAL artifact/bin/terraphim_tui-
+  SAVE ARTIFACT /code/target/release/terraphim-agent AS LOCAL artifact/bin/terraphim_agent-
 
 build-debug:
   FROM +source
