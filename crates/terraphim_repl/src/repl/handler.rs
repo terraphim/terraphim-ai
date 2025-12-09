@@ -474,6 +474,7 @@ impl ReplHandler {
 }
 
 /// Run REPL in offline mode
+#[allow(dead_code)] // Exported for potential external use
 pub async fn run_repl_offline_mode() -> Result<()> {
     let service = TuiService::new().await?;
     let mut handler = ReplHandler::new_offline(service);

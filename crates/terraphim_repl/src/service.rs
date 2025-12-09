@@ -74,6 +74,7 @@ impl TuiService {
     }
 
     /// Update the selected role
+    #[allow(dead_code)] // Part of public API
     pub async fn update_selected_role(
         &self,
         role_name: RoleName,
@@ -117,6 +118,7 @@ impl TuiService {
     }
 
     /// Search documents using a complete SearchQuery (supports logical operators)
+    #[allow(dead_code)] // Part of public API
     pub async fn search_with_query(&self, query: &SearchQuery) -> Result<Vec<Document>> {
         let mut service = self.service.lock().await;
         Ok(service.search(query).await?)
@@ -176,6 +178,7 @@ impl TuiService {
     }
 
     /// Extract paragraphs from text using thesaurus
+    #[allow(dead_code)] // Part of public API
     pub async fn extract_paragraphs(
         &self,
         role_name: &RoleName,
@@ -266,6 +269,7 @@ impl TuiService {
     }
 
     /// Save configuration changes
+    #[allow(dead_code)] // Part of public API
     pub async fn save_config(&self) -> Result<()> {
         let config = self.config_state.config.lock().await;
         config.save().await?;
