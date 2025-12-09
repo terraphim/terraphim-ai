@@ -5,7 +5,7 @@ use terraphim_agent::client::*;
 #[test]
 fn test_vm_command_features() {
     // This test will only run when repl feature is enabled
-    assert!(true, "VM commands are available with repl feature");
+    // The test passes if the code compiles with repl feature
 }
 
 /// Test VM API type compatibility
@@ -159,7 +159,7 @@ fn test_vm_pool_management_simulation() {
 fn test_vm_monitoring_data_simulation() {
     // Simulate various VM states and metrics
 
-    let scenarios = vec![
+    let scenarios = [
         // Healthy VM
         VmMetricsResponse {
             vm_id: "vm-healthy-001".to_string(),

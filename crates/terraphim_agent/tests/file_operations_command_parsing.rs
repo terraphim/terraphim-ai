@@ -13,7 +13,7 @@ mod tests {
         let result = ReplCommand::from_str("/file search \"test query\"");
         assert!(result.is_ok());
 
-        if let ReplCommand::File { subcommand } = result.unwrap() {
+        if let ReplCommand::File { subcommand: _ } = result.unwrap() {
             // We can't access the subcommand variants directly due to feature gating
             // but we can verify it parsed as a File command
             println!("✅ File search command parsed successfully");
