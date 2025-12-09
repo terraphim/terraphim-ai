@@ -7,7 +7,7 @@ use serial_test::serial;
 /// Test helper to run TUI commands in offline mode
 fn run_offline_command(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"]).args(args);
+    cmd.args(["run", "-p", "terraphim_agent", "--"]).args(args);
 
     let output = cmd.output()?;
 
@@ -24,7 +24,7 @@ fn run_server_command(args: &[&str]) -> Result<(String, String, i32)> {
     cmd_args.extend_from_slice(args);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--"])
         .args(cmd_args);
 
     let output = cmd.output()?;
@@ -336,7 +336,7 @@ async fn test_server_mode_connection_failure() -> Result<()> {
 async fn test_server_mode_with_custom_url() -> Result<()> {
     // Test server mode with custom URL
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"]).args([
+    cmd.args(["run", "-p", "terraphim_agent", "--"]).args([
         "--server",
         "--server-url",
         "http://localhost:9999",
@@ -366,7 +366,7 @@ async fn test_server_mode_with_custom_url() -> Result<()> {
 async fn test_command_line_argument_validation() -> Result<()> {
     // Test invalid command
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--"])
         .args(["invalid-command"]);
 
     let output = cmd.output()?;
