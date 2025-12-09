@@ -149,6 +149,13 @@ jobs:
         run: |
           docker load < terraphim-builder-image.tar.gz
 
+      - name: Create placeholder dist for RustEmbed
+        run: |
+          # Create placeholder dist folder for rust_embed compilation
+          # The actual frontend assets are built in build-frontend job
+          mkdir -p desktop/dist
+          echo '<!DOCTYPE html><html></html>' > desktop/dist/index.html
+
       - name: Run format check
         run: |
           docker run --rm \
