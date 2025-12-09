@@ -52,14 +52,13 @@ RUN apt-get update -qq && \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
 
-# Install Rust toolchain
+# Install Rust toolchain (use stable - don't pin to a specific version)
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
-    PATH=/usr/local/cargo/bin:$PATH \
-    RUST_VERSION=1.85.0
+    PATH=/usr/local/cargo/bin:$PATH
 
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
-    sh -s -- -y --default-toolchain ${RUST_VERSION} --profile minimal && \
+    sh -s -- -y --default-toolchain stable --profile minimal && \
     rustup component add clippy rustfmt && \
     rustup target add x86_64-unknown-linux-gnu && \
     rustup target add aarch64-unknown-linux-gnu && \
