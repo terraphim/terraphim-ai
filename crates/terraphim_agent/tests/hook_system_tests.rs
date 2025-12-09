@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::path::PathBuf;
-use std::str::FromStr;
 use tempfile::TempDir;
 use terraphim_agent::commands::hooks::{
     BackupHook, EnvironmentHook, GitHook, LoggingHook, NotificationHook, PreflightCheckHook,
@@ -615,27 +614,27 @@ async fn test_hook_priority_ordering() {
 
 #[tokio::test]
 async fn test_default_hook_sets() {
-    let default_hooks = vec![
-        Box::new(LoggingHook::new()) as Box<dyn CommandHook + Send + Sync>,
-        Box::new(PreflightCheckHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    let default_hooks: [Box<dyn CommandHook + Send + Sync>; 2] = [
+        Box::new(LoggingHook::new()),
+        Box::new(PreflightCheckHook::new()),
     ];
     assert!(
         !default_hooks.is_empty(),
         "Default hooks should not be empty"
     );
 
-    let development_hooks = vec![
-        Box::new(LoggingHook::new()) as Box<dyn CommandHook + Send + Sync>,
-        Box::new(EnvironmentHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    let development_hooks: [Box<dyn CommandHook + Send + Sync>; 2] = [
+        Box::new(LoggingHook::new()),
+        Box::new(EnvironmentHook::new()),
     ];
     assert!(
         !development_hooks.is_empty(),
         "Development hooks should not be empty"
     );
 
-    let production_hooks = vec![
-        Box::new(PreflightCheckHook::new()) as Box<dyn CommandHook + Send + Sync>,
-        Box::new(ResourceMonitoringHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    let production_hooks: [Box<dyn CommandHook + Send + Sync>; 2] = [
+        Box::new(PreflightCheckHook::new()),
+        Box::new(ResourceMonitoringHook::new()),
     ];
     assert!(
         !production_hooks.is_empty(),

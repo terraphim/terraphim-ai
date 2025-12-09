@@ -5,7 +5,7 @@
 use anyhow::Result;
 use serial_test::serial;
 use std::process::Command;
-use std::str::{self, FromStr};
+use std::str;
 
 /// Helper function to run TUI command with arguments
 fn run_tui_command(args: &[&str]) -> Result<(String, String, i32)> {
