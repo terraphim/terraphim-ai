@@ -2,11 +2,13 @@
 //!
 //! These tests verify the CLI binary produces correct output for various commands.
 
+#[allow(deprecated)] // cargo_bin is deprecated but still works
 use assert_cmd::Command;
 use predicates::prelude::*;
 use serial_test::serial;
 
 /// Get a command for the terraphim-cli binary
+#[allow(deprecated)] // cargo_bin is deprecated but still functional
 fn cli_command() -> Command {
     Command::cargo_bin("terraphim-cli").unwrap()
 }
