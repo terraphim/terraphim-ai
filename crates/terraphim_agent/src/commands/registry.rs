@@ -1308,7 +1308,7 @@ Options:
         );
 
         // Test empty case
-        let similarity3 = registry.calculate_keyword_similarity(&keywords1, &vec![]);
+        let similarity3 = registry.calculate_keyword_similarity(&keywords1, &[]);
         assert_eq!(
             similarity3, 0.0,
             "Should have zero similarity when one list is empty"

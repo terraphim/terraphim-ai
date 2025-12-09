@@ -5,6 +5,7 @@
 //! execution modes, and hooks.
 
 #[cfg(test)]
+#[allow(clippy::module_inception)]
 mod tests {
     use chrono::{Datelike, Timelike};
     use std::collections::HashMap;
@@ -405,28 +406,23 @@ parameters:
 
         // Test that validator can be created and configured
         assert!(
-            validator.is_blacklisted("ls -la") == false,
+            !validator.is_blacklisted("ls -la"),
             "Should not blacklist safe commands by default"
         );
 
         // Test public interface methods
         validator.add_role_permissions("TestRole".to_string(), vec!["read".to_string()]);
-        assert!(true, "Role permissions can be added");
 
         // Test time restrictions
         let time_result = validator.check_time_restrictions();
         // Note: This test might fail if run on weekends due to default business hour restrictions
         // The validator correctly restricts to Monday-Friday, 9 AM - 5 PM
-        if !time_result.is_ok() {
+        if time_result.is_err() {
             println!(
                 "Time restriction test info: This may fail on weekends. Current time restrictions: Mon-Fri, 9AM-5PM"
             );
         }
-        // For now, we'll just ensure the validator doesn't panic
-        assert!(
-            true,
-            "Time restrictions check should complete without panicking"
-        );
+        // For now, we'll just ensure the validator doesn't panic - time_result existence proves no panic
 
         // Test rate limiting
         let rate_result = validator.check_rate_limit("test");
