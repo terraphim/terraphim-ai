@@ -3,9 +3,7 @@
 //! These tests verify the end-to-end functionality of the REPL
 //! including role switching, KG search, and replace operations.
 
-use serial_test::serial;
 use std::path::PathBuf;
-use std::process::Command;
 use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
 
 /// Build a test thesaurus from the docs/src/kg directory
@@ -53,7 +51,6 @@ async fn find_with_kg(
 
 #[cfg(test)]
 mod role_switch_tests {
-    use super::*;
     use terraphim_types::RoleName;
 
     #[test]
@@ -365,8 +362,6 @@ mod thesaurus_tests {
 
 #[cfg(test)]
 mod command_execution_tests {
-    use super::*;
-
     #[test]
     fn test_help_text_contains_commands() {
         // Verify expected commands are documented
