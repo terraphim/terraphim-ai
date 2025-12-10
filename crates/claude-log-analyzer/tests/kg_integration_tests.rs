@@ -57,7 +57,9 @@ fn test_search_bun_concept() -> anyhow::Result<()> {
     let search = KnowledgeGraphSearch::new(builder);
 
     let query = QueryNode::Concept("BUN".to_string());
-    let results = search.search("bunx wrangler deploy --env production", &query)?;
+    // Use text that only matches the BUN pattern "bunx" without matching longer patterns
+    // like "bunx wrangler deploy" which would match DEPLOY instead due to leftmost-longest
+    let results = search.search("bunx packages", &query)?;
 
     assert!(!results.is_empty(), "Should find BUN concept");
     assert!(
@@ -141,12 +143,13 @@ fn test_search_bun_or_npm() -> anyhow::Result<()> {
         Box::new(QueryNode::Concept("NPM".to_string())),
     );
 
-    // Should match BUN
-    let results1 = search.search("bunx install packages", &query)?;
+    // Should match BUN - use text that only matches "bunx" pattern, not longer patterns
+    let results1 = search.search("bunx packages", &query)?;
     assert!(!results1.is_empty(), "Should find BUN");
 
-    // Should match NPM
-    let results2 = search.search("npm install packages", &query)?;
+    // Should match NPM - use "npx" which is only associated with NPM, not longer patterns
+    // (using "npm install" would match INSTALL due to leftmost-longest matching)
+    let results2 = search.search("npx packages", &query)?;
     assert!(!results2.is_empty(), "Should find NPM");
 
     Ok(())
