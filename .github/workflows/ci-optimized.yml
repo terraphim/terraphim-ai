@@ -223,9 +223,9 @@ jobs:
 
       - name: Build Rust project
         run: |
-          # Copy frontend dist
-          mkdir -p terraphim_server/dist
-          cp -r frontend-dist/* terraphim_server/dist/ || echo "No frontend files found"
+          # Copy frontend dist to desktop/dist (RustEmbed expects ../desktop/dist relative to terraphim_server)
+          mkdir -p desktop/dist
+          cp -r frontend-dist/* desktop/dist/ || echo "No frontend files found"
 
           # Build with Docker
           docker run --rm \
