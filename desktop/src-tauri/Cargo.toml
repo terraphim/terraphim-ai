@@ -37,7 +37,7 @@ terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "
 rmcp = { version = "0.9.0", features = ["server"] }
 serde_json_any_key = "2.0.0"
 anyhow = "1.0.81"
-log = "0.4.21"
+log = "0.4.29"
 env_logger = "0.11.8"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
