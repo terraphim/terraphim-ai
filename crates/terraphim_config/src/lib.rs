@@ -108,8 +108,8 @@ fn expand_path(path: &str) -> PathBuf {
                 }
                 if depth == 0 {
                     let default_value = &result[after_colon..end_pos];
-                    let replacement = std::env::var(var_name)
-                        .unwrap_or_else(|_| default_value.to_string());
+                    let replacement =
+                        std::env::var(var_name).unwrap_or_else(|_| default_value.to_string());
                     result = format!(
                         "{}{}{}",
                         &result[..start],
@@ -1347,6 +1347,9 @@ mod tests {
 
         println!("expand_path tests passed!");
         println!("HOME = {}", home_str);
-        println!("${{HOME}}/.terraphim -> {:?}", expand_path("${HOME}/.terraphim"));
+        println!(
+            "${{HOME}}/.terraphim -> {:?}",
+            expand_path("${HOME}/.terraphim")
+        );
     }
 }
