@@ -70,6 +70,99 @@ impl From<terraphim_persistence::Error> for TerraphimConfigError {
     }
 }
 
+/// Expand shell-like variables in a path string.
+///
+/// Supports:
+/// - `${HOME}` or `$HOME` -> user's home directory
+/// - `${TERRAPHIM_DATA_PATH:-default}` -> environment variable with default value
+/// - `~` at the start -> user's home directory
+fn expand_path(path: &str) -> PathBuf {
+    let mut result = path.to_string();
+
+    // Handle ${VAR:-default} syntax (environment variable with default)
+    // This regex handles nested ${...} in the default value by using a greedy match
+    // that captures everything until the last }
+    loop {
+        // Find ${VAR:-...} pattern manually to handle nested braces
+        if let Some(start) = result.find("${") {
+            if let Some(colon_pos) = result[start..].find(":-") {
+                let colon_pos = start + colon_pos;
+                // Find the variable name
+                let var_name = &result[start + 2..colon_pos];
+                // Find the matching closing brace by counting braces
+                let after_colon = colon_pos + 2;
+                let mut depth = 1;
+                let mut end_pos = after_colon;
+                for (i, c) in result[after_colon..].char_indices() {
+                    match c {
+                        '{' => depth += 1,
+                        '}' => {
+                            depth -= 1;
+                            if depth == 0 {
+                                end_pos = after_colon + i;
+                                break;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if depth == 0 {
+                    let default_value = &result[after_colon..end_pos];
+                    let replacement = std::env::var(var_name)
+                        .unwrap_or_else(|_| default_value.to_string());
+                    result = format!(
+                        "{}{}{}",
+                        &result[..start],
+                        replacement,
+                        &result[end_pos + 1..]
+                    );
+                    continue; // Process again in case there are more patterns
+                }
+            }
+        }
+        break;
+    }
+
+    // Handle ${VAR} syntax
+    let re_braces = regex::Regex::new(r"\$\{([^}]+)\}").unwrap();
+    result = re_braces
+        .replace_all(&result, |caps: &regex::Captures| {
+            let var_name = &caps[1];
+            if var_name == "HOME" {
+                dirs::home_dir()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| format!("${{{}}}", var_name))
+            } else {
+                std::env::var(var_name).unwrap_or_else(|_| format!("${{{}}}", var_name))
+            }
+        })
+        .to_string();
+
+    // Handle $VAR syntax (without braces)
+    let re_dollar = regex::Regex::new(r"\$([A-Za-z_][A-Za-z0-9_]*)").unwrap();
+    result = re_dollar
+        .replace_all(&result, |caps: &regex::Captures| {
+            let var_name = &caps[1];
+            if var_name == "HOME" {
+                dirs::home_dir()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .unwrap_or_else(|| format!("${}", var_name))
+            } else {
+                std::env::var(var_name).unwrap_or_else(|_| format!("${}", var_name))
+            }
+        })
+        .to_string();
+
+    // Handle ~ at the beginning of the path
+    if result.starts_with('~') {
+        if let Some(home) = dirs::home_dir() {
+            result = result.replacen('~', &home.to_string_lossy(), 1);
+        }
+    }
+
+    PathBuf::from(result)
+}
+
 /// Default context window size for LLM requests
 fn default_context_window() -> Option<u64> {
     Some(32768)
@@ -441,7 +534,7 @@ impl ConfigBuilder {
     }
 
     pub fn get_default_data_path(&self) -> PathBuf {
-        PathBuf::from(&self.device_settings.default_data_path)
+        expand_path(&self.device_settings.default_data_path)
     }
     pub fn build_default_server(mut self) -> Self {
         self.config.id = ConfigId::Server;
@@ -1223,5 +1316,37 @@ mod tests {
         let toml = toml::to_string_pretty(&config).unwrap();
         log::debug!("Config: {:#?}", config);
         assert!(!toml.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_expand_path_home() {
+        let home = dirs::home_dir().expect("HOME should be set");
+        let home_str = home.to_string_lossy();
+
+        // Test ${HOME} expansion
+        let result = expand_path("${HOME}/.terraphim");
+        assert_eq!(result, home.join(".terraphim"));
+
+        // Test $HOME expansion
+        let result = expand_path("$HOME/.terraphim");
+        assert_eq!(result, home.join(".terraphim"));
+
+        // Test ~ expansion
+        let result = expand_path("~/.terraphim");
+        assert_eq!(result, home.join(".terraphim"));
+
+        // Test nested ${VAR:-default} with ${HOME}
+        let result = expand_path("${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}");
+        assert_eq!(result, home.join(".terraphim"));
+
+        // Test when env var is set
+        std::env::set_var("TERRAPHIM_TEST_PATH", "/custom/path");
+        let result = expand_path("${TERRAPHIM_TEST_PATH:-${HOME}/.default}");
+        assert_eq!(result, PathBuf::from("/custom/path"));
+        std::env::remove_var("TERRAPHIM_TEST_PATH");
+
+        println!("expand_path tests passed!");
+        println!("HOME = {}", home_str);
+        println!("${{HOME}}/.terraphim -> {:?}", expand_path("${HOME}/.terraphim"));
     }
 }
