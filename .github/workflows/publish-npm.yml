@@ -168,7 +168,9 @@ jobs:
         settings:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          - host: macos-latest
+          # Use macos-13 for x86_64 tests (last Intel runner)
+          # macos-latest is now ARM-based (M1/M2)
+          - host: macos-13
             target: x86_64-apple-darwin
           - host: windows-latest
             target: x86_64-pc-windows-msvc
@@ -235,17 +237,18 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: bindings-x86_64-apple-darwin
-          path: artifacts
+          path: terraphim_ai_nodejs/artifacts
 
       - name: Download macOS arm64 artifact
         uses: actions/download-artifact@v4
         with:
           name: bindings-aarch64-apple-darwin
-          path: artifacts
+          path: terraphim_ai_nodejs/artifacts
 
       - name: Create universal binary
         run: |
           cd artifacts
+          ls -la
           lipo -create terraphim_ai_nodejs.x86_64-apple-darwin.node terraphim_ai_nodejs.aarch64-apple-darwin.node -output terraphim_ai_nodejs.darwin-universal.node
           ls -la *.node
 
@@ -253,7 +256,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: bindings-universal-apple-darwin
-          path: artifacts/terraphim_ai_nodejs.darwin-universal.node
+          path: terraphim_ai_nodejs/artifacts/terraphim_ai_nodejs.darwin-universal.node
           if-no-files-found: error
 
   publish:
