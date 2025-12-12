@@ -53,7 +53,10 @@ ENV CARGO_TERM_COLOR=always \
     CARGO_INCREMENTAL=0
 
 # Install Yarn 1.x (classic) - project uses yarn.lock v1 format
-RUN npm install -g yarn@1
+# First disable corepack's yarn and remove the existing symlink
+RUN corepack disable yarn && \
+    rm -f /usr/local/bin/yarn /usr/local/bin/yarnpkg && \
+    npm install -g yarn@1
 
 # Create working directory
 WORKDIR /build
