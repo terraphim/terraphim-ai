@@ -1,5 +1,15 @@
 # Memories - Terraphim AI Development
 
+## Session: 2025-12-08 - Repo sync & Tauri build validation
+- Pulled main (fast-forward to dd8a02d4); latest changes in `crates/haystack_discourse/Cargo.toml` and `scripts/ci-check-frontend.sh`.
+- Open PRs reviewed: Tauri migration (#295 complete, #291 earlier), TUI build fix (#268), pre-commit/npm infra (#320), task_decomposition fix (#329), MCP auth/proxy (#287), KG schema linter (#294), CI 1Password secrets (#296); all still OPEN.
+- Tauri build check on Linux with deb/rpm/appimage bundles failed: CLI `@tauri-apps/cli` 2.9.4 mismatches Rust crates/config still on Tauri 1.x, causing schema errors (`identifier` required, devPath/distDir unexpected). Need version alignment before packaging.
+
+## Session: 2025-12-08 (later) - Tauri CLI pinned & rebuild attempt
+- Set `@tauri-apps/cli` to 1.5.11 and regenerated yarn.lock.
+- Added `[package.metadata.rpm]` to `desktop/src-tauri/Cargo.toml` mirroring deb assets; requires `webkit2gtk4.0, gtk3`.
+- `yarn tauri build --bundles deb rpm appimage --target x86_64-unknown-linux-gnu`: Rust build succeeded; `.deb` produced; AppImage failed because `appimagetool` is missing; rpm bundling not attempted after AppImage failure. Need `appimagetool` installed (or `TAURI_BUNDLE_APPIMAGE_BUNDLE_BIN` set) then rerun to produce rpm/appimage artifacts.
+
 ## Session: 2025-10-08 - TruthForge Phase 5 UI Development (COMPLETE ✅)
 
 ### Context
