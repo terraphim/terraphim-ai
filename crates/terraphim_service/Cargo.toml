@@ -31,7 +31,7 @@ tokio = { workspace = true }
 async-trait = "0.1"
 futures-util = "0.3"
 async-stream = "0.3"
-uuid = { version = "1.6", features = ["v4", "serde"] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # HTTP client for API calls and OpenRouter integration
