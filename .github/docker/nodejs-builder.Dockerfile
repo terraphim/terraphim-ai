@@ -44,9 +44,11 @@ RUN cd /tmp && \
     cd / && rm -rf /tmp/openssl-*
 
 # Set OpenSSL environment variables for aarch64 cross-compilation
-ENV OPENSSL_DIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu \
-    OPENSSL_LIB_DIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib64 \
-    OPENSSL_INCLUDE_DIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/include
+# openssl-sys uses TARGET_OPENSSL_DIR format (uppercase target, underscores)
+ENV AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_DIR=/usr/aarch64-linux-gnu \
+    AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_LIB_DIR=/usr/aarch64-linux-gnu/lib \
+    AARCH64_UNKNOWN_LINUX_GNU_OPENSSL_INCLUDE_DIR=/usr/aarch64-linux-gnu/include \
+    OPENSSL_STATIC=1
 
 # Install Rust toolchain with modern version (supports edition 2024)
 ENV RUSTUP_HOME=/usr/local/rustup \
