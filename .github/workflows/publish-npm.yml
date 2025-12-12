@@ -68,6 +68,9 @@ jobs:
     name: Build Multi-Platform Binaries
     runs-on: ${{ matrix.settings.host }}
     needs: validate
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     strategy:
       fail-fast: false
       matrix:
@@ -98,6 +101,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -125,7 +129,7 @@ jobs:
         if: ${{ matrix.settings.docker }}
         with:
           image: ${{ matrix.settings.docker }}
-          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
+          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build/terraphim_ai_nodejs'
           run: ${{ matrix.settings.build }}
 
       - name: Build
@@ -136,13 +140,16 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: "*.node"
+          path: "terraphim_ai_nodejs/*.node"
           if-no-files-found: error
 
   test-universal:
     name: Test Universal Binaries
     runs-on: ${{ matrix.settings.host }}
     needs: build
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     strategy:
       fail-fast: false
       matrix:
@@ -165,6 +172,7 @@ jobs:
         with:
           node-version: ${{ matrix.node }}
           cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -175,10 +183,10 @@ jobs:
           bun-version: latest
 
       - name: Download artifacts
-        uses: actions/download-artifact@4
+        uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: .
+          path: terraphim_ai_nodejs
 
       - name: Test package functionality with Node.js
         run: |
@@ -194,6 +202,9 @@ jobs:
     name: Create Universal macOS Binary
     runs-on: macos-latest
     needs: build
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -203,6 +214,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
@@ -246,8 +258,10 @@ jobs:
         with:
           node-version: '20'
           cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
+        working-directory: terraphim_ai_nodejs
         run: yarn install --frozen-lockfile
 
       - name: Install 1Password CLI
@@ -285,20 +299,21 @@ jobs:
           path: artifacts
 
       - name: Prepare package for publishing
+        working-directory: terraphim_ai_nodejs
         run: |
           # Create npm directory structure
           mkdir -p npm
 
-          # Copy all built binaries to npm directory
-          find artifacts -name "*.node" -exec cp {} npm/ \;
+          # Copy all built binaries to npm directory (artifacts are in repo root)
+          find ../artifacts -name "*.node" -exec cp {} npm/ \;
 
           # If no binaries found (NAPI build failed), try to find them manually
           if [ ! -n "$(ls -A npm/)" ]; then
             echo "⚠️  No NAPI artifacts found, searching for built libraries..."
             # Look for libraries in target directories
-            find target -name "libterraphim_ai_nodejs.so" -exec cp {} npm/terraphim_ai_nodejs.linux-x64-gnu.node \;
-            find target -name "libterraphim_ai_nodejs.dylib" -exec cp {} npm/terraphim_ai_nodejs.darwin-x64.node \;
-            find target -name "terraphim_ai_nodejs.dll" -exec cp {} npm/terraphim_ai_nodejs.win32-x64-msvc.node \;
+            find ../target -name "libterraphim_ai_nodejs.so" -exec cp {} npm/terraphim_ai_nodejs.linux-x64-gnu.node \;
+            find ../target -name "libterraphim_ai_nodejs.dylib" -exec cp {} npm/terraphim_ai_nodejs.darwin-x64.node \;
+            find ../target -name "terraphim_ai_nodejs.dll" -exec cp {} npm/terraphim_ai_nodejs.win32-x64-msvc.node \;
           fi
 
           # List what we have
@@ -312,6 +327,7 @@ jobs:
           fi
 
       - name: Configure npm for publishing
+        working-directory: terraphim_ai_nodejs
         run: |
           echo "//registry.npmjs.org/:_authToken=${{ steps.token.outputs.token }}" > ~/.npmrc
           npm config set provenance true
@@ -351,6 +367,7 @@ jobs:
           echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG"
 
       - name: Publish to npm
+        working-directory: terraphim_ai_nodejs
         run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             echo "🧪 Dry run mode - checking package only"
@@ -367,6 +384,7 @@ jobs:
 
       - name: Verify published package
         if: inputs.dry_run != 'true'
+        working-directory: terraphim_ai_nodejs
         run: |
           echo "🔍 Verifying published package..."
 
