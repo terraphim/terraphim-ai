@@ -132,7 +132,7 @@ jobs:
         with:
           working-directory: crates/terraphim_automata_py
           args: --release --out dist --find-interpreter --target ${{ matrix.target }}
-          sccache: 'true'
+          sccache: 'false'
           manylinux: auto
 
       - name: Upload wheel artifacts
