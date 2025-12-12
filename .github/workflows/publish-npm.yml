@@ -32,6 +32,9 @@ jobs:
   validate:
     name: Validate Package
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -41,6 +44,7 @@ jobs:
         with:
           node-version: '20'
           cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
