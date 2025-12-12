@@ -88,8 +88,8 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
           - os: macos-latest
-            target: x86_64-apple-darwin
-            macos-arch: universal
+            target: aarch64-apple-darwin
+            macos-arch: arm64
 
     steps:
       - name: Checkout repository
@@ -208,13 +208,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: dist
+          path: ${{ github.workspace }}/dist
 
       - name: Install test dependencies
         working-directory: crates/terraphim_automata_py
         run: |
           uv pip install --system pytest pytest-benchmark pytest-cov black mypy ruff
-          uv pip install --system terraphim-automata --find-links=../../dist
+          uv pip install --system terraphim-automata --find-links=${{ github.workspace }}/dist
 
       - name: Run tests
         working-directory: crates/terraphim_automata_py
