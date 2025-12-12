@@ -19,7 +19,7 @@ RUN apt-get update -qq && \
         git \
         curl \
         pkg-config \
-        # SSL/TLS
+        # SSL/TLS for host
         openssl \
         libssl-dev \
         # Cross-compilation tools for aarch64
@@ -31,6 +31,22 @@ RUN apt-get update -qq && \
         libclang-dev \
     && rm -rf /var/lib/apt/lists/* \
     && apt-get clean
+
+# Download and build OpenSSL for aarch64 cross-compilation
+ENV OPENSSL_VERSION=3.0.15
+RUN cd /tmp && \
+    wget -q https://github.com/openssl/openssl/releases/download/openssl-${OPENSSL_VERSION}/openssl-${OPENSSL_VERSION}.tar.gz && \
+    tar xzf openssl-${OPENSSL_VERSION}.tar.gz && \
+    cd openssl-${OPENSSL_VERSION} && \
+    ./Configure linux-aarch64 --prefix=/usr/aarch64-linux-gnu --cross-compile-prefix=aarch64-linux-gnu- no-shared && \
+    make -j$(nproc) && \
+    make install_sw && \
+    cd / && rm -rf /tmp/openssl-*
+
+# Set OpenSSL environment variables for aarch64 cross-compilation
+ENV OPENSSL_DIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu \
+    OPENSSL_LIB_DIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/lib64 \
+    OPENSSL_INCLUDE_DIR_aarch64_unknown_linux_gnu=/usr/aarch64-linux-gnu/include
 
 # Install Rust toolchain with modern version (supports edition 2024)
 ENV RUSTUP_HOME=/usr/local/rustup \
