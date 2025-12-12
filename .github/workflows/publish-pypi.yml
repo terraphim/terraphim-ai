@@ -223,7 +223,7 @@ jobs:
           python -m pytest python/tests/ -v --cov=terraphim_automata --cov-report=term-missing
 
           # Test basic import
-          python -c "import terraphim_automata; print('✅ Package imports successfully')"
+          python -c "import terraphim_automata; print('OK: Package imports successfully')"
 
   publish-pypi:
     name: Publish to PyPI
