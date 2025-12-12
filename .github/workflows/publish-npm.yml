@@ -168,9 +168,9 @@ jobs:
         settings:
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-          # Use macos-13 for x86_64 tests (last Intel runner)
+          # Use macos-15-intel for x86_64 tests (macos-13 is retired)
           # macos-latest is now ARM-based (M1/M2)
-          - host: macos-13
+          - host: macos-15-intel
             target: x86_64-apple-darwin
           - host: windows-latest
             target: x86_64-pc-windows-msvc
@@ -249,7 +249,8 @@ jobs:
         run: |
           cd artifacts
           ls -la
-          lipo -create terraphim_ai_nodejs.x86_64-apple-darwin.node terraphim_ai_nodejs.aarch64-apple-darwin.node -output terraphim_ai_nodejs.darwin-universal.node
+          # NAPI-RS generates filenames with darwin-x64/darwin-arm64 naming convention
+          lipo -create terraphim_ai_nodejs.darwin-x64.node terraphim_ai_nodejs.darwin-arm64.node -output terraphim_ai_nodejs.darwin-universal.node
           ls -la *.node
 
       - name: Upload universal binary
