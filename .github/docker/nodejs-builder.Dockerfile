@@ -52,8 +52,8 @@ ENV CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
 ENV CARGO_TERM_COLOR=always \
     CARGO_INCREMENTAL=0
 
-# Enable yarn via corepack
-RUN corepack enable && corepack prepare yarn@stable --activate
+# Install Yarn 1.x (classic) - project uses yarn.lock v1 format
+RUN npm install -g yarn@1
 
 # Create working directory
 WORKDIR /build
