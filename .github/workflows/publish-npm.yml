@@ -127,11 +127,13 @@ jobs:
 
       - name: Build cross-compilation docker image
         if: ${{ matrix.settings.cross }}
+        working-directory: ${{ github.workspace }}
         run: |
           docker build -t terraphim-nodejs-builder -f .github/docker/nodejs-builder.Dockerfile .github/docker/
 
       - name: Build in docker (cross-compilation)
         if: ${{ matrix.settings.cross }}
+        working-directory: ${{ github.workspace }}
         run: |
           docker run --rm \
             -v ${{ github.workspace }}:/build \
