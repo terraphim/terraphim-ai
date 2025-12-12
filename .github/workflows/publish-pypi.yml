@@ -125,7 +125,7 @@ jobs:
       - name: Install Python build dependencies
         working-directory: crates/terraphim_automata_py
         run: |
-          uv pip install --system maturin pytest pytest-benchmark build
+          uv pip install --system pip maturin pytest pytest-benchmark build
 
       - name: Build wheel
         uses: PyO3/maturin-action@v1
