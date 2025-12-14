@@ -317,7 +317,7 @@ jobs:
 
   publish:
     name: Publish to npm
-    runs-on: [self-hosted, Linux, terraphim, production, docker]
+    runs-on: [self-hosted, Linux, X64]
     needs: [test-universal, test-macos]
     environment: production
     steps:
