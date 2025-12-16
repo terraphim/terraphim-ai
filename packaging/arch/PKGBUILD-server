@@ -1,0 +1,47 @@
+# PKGBUILD for terraphim-server
+# Arch Linux package for Terraphim AI Server
+
+pkgname=terraphim-server
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Terraphim AI server component for knowledge graph search and AI assistance"
+arch=('x86_64' 'aarch64')
+url="https://github.com/terraphim/terraphim-ai"
+license=('MIT')
+depends=('openssl' 'sqlite')
+makedepends=('rust' 'cargo' 'git')
+provides=('terraphim-server')
+conflicts=('terraphim-server-bin')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/terraphim/terraphim-ai/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  # Update Rust dependencies if needed
+  cargo update
+}
+
+build() {
+  cd "$pkgname-$pkgver"
+  cargo build --release --package terraphim_server --features ""
+}
+
+check() {
+  cd "$pkgname-$pkgver"
+  cargo test --package terraphim_server
+}
+
+package() {
+  cd "$pkgname-$pkgver"
+  install -D -m 755 "target/release/terraphim_server" "$pkgdir/usr/bin/terraphim_server"
+  
+  # Install systemd service
+  install -D -m 644 "$srcdir/../default/terraphim-server.service" "$pkgdir/usr/lib/systemd/system/terraphim-server.service" 2>/dev/null || true
+  
+  # Install default config
+  install -D -m 644 "$srcdir/../default/atomic_server_config_final.json" "$pkgdir/etc/terraphim-server/config.json" 2>/dev/null || true
+  
+  # Install documentation
+  install -D -m 644 README.md "$pkgdir/usr/share/doc/terraphim-server/README.md" 2>/dev/null || true
+  install -D -m 644 LICENSE "$pkgdir/usr/share/licenses/terraphim-server/LICENSE" 2>/dev/null || true
+}

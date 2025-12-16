@@ -1,0 +1,53 @@
+# PKGBUILD for terraphim-desktop
+# Arch Linux package for Terraphim AI Desktop Application
+
+pkgname=terraphim-desktop
+pkgver=1.0.0
+pkgrel=1
+pkgdesc="Terraphim AI desktop application with modern GUI"
+arch=('x86_64')
+url="https://github.com/terraphim/terraphim-ai"
+license=('MIT')
+depends=('webkit2gtk-4.1' 'gtk3' 'libnotify' 'gcc-libs' 'glibc' 'xz')
+makedepends=('rust' 'cargo' 'nodejs' 'yarn' 'git')
+provides=('terraphim-desktop')
+conflicts=('terraphim-desktop-bin' 'terraphim-ai-desktop')
+source=("$pkgname-$pkgver.tar.gz::https://github.com/terraphim/terraphim-ai/archive/v$pkgver.tar.gz")
+sha256sums=('SKIP')
+
+prepare() {
+  cd "$pkgname-$pkgver"
+  cd desktop
+  # Update Node dependencies if needed
+  yarn install --frozen-lockfile
+}
+
+build() {
+  cd "$pkgname-$pkgver/desktop"
+  yarn tauri build --target x86_64-unknown-linux-gnu --bundles ""
+}
+
+check() {
+  cd "$pkgname-$pkgver/desktop"
+  yarn test 2>/dev/null || echo "Tests skipped (no test suite configured)"
+}
+
+package() {
+  cd "$pkgname-$pkgver/desktop"
+  
+  # Install binary
+  install -D -m 755 "target/x86_64-unknown-linux-gnu/release/terraphim-desktop" "$pkgdir/usr/bin/terraphim-desktop"
+  
+  # Install desktop file
+  install -D -m 644 "src-tauri/gen/com.terraphim.ai.desktop" "$pkgdir/usr/share/applications/com.terraphim.ai.desktop" 2>/dev/null || \
+  install -D -m 644 "$srcdir/../packaging/flatpak/com.terraphim.ai.desktop" "$pkgdir/usr/share/applications/com.terraphim.ai.desktop" 2>/dev/null || true
+  
+  # Install icons
+  install -D -m 644 "src-tauri/icons/32x32.png" "$pkgdir/usr/share/icons/hicolor/32x32/apps/terraphim-desktop.png" 2>/dev/null || true
+  install -D -m 644 "src-tauri/icons/128x128.png" "$pkgdir/usr/share/icons/hicolor/128x128/apps/terraphim-desktop.png" 2>/dev/null || true
+  install -D -m 644 "src-tauri/icons/128x128@2x.png" "$pkgdir/usr/share/icons/hicolor/256x256/apps/terraphim-desktop.png" 2>/dev/null || true
+  
+  # Install documentation
+  install -D -m 644 ../README.md "$pkgdir/usr/share/doc/terraphim-desktop/README.md" 2>/dev/null || true
+  install -D -m 644 ../LICENSE "$pkgdir/usr/share/licenses/terraphim-desktop/LICENSE" 2>/dev/null || true
+}

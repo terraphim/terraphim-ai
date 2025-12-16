@@ -1,0 +1,96 @@
+name: terraphim-desktop
+version: 1.0.0
+summary: Terraphim AI desktop application
+description: |
+  Privacy-first AI assistant that operates locally with knowledge graph search.
+  Modern desktop application with web-based interface for document analysis,
+  semantic search, and AI-powered assistance.
+
+base: core22
+confinement: strict
+grade: stable
+
+apps:
+  terraphim-desktop:
+    command: bin/terraphim-desktop
+    desktop: share/applications/com.terraphim.ai.desktop
+    extensions:
+      - gnome-3-38
+    plugs:
+      - home
+      - network
+      - browser-support
+      - desktop
+      - desktop-legacy
+      - gsettings
+      - audio-playback
+      - audio-record
+      - opengl
+
+parts:
+  terraphim-desktop:
+    plugin: rust
+    source: .
+    build-snaps: [nodejs/20/stable]
+    
+    build-packages:
+      - libwebkit2gtk-4.0-dev
+      - libgtk-3-dev
+      - libnotify-dev
+      - libssl-dev
+      - pkg-config
+      - build-essential
+    
+    stage-packages:
+      - libwebkit2gtk-4.0-37
+      - libgtk-3-0
+      - libnotify4
+      - libssl3
+      - libgcc-s1
+      - libstdc++6
+      - libx11-6
+      - libxext6
+      - libxrandr2
+      - libxrender1
+    
+    override-build: |
+      # Install Tauri CLI
+      cargo install tauri-cli --version 1.5.0
+      
+      # Build desktop application
+      cd desktop
+      yarn install --frozen-lockfile
+      
+      # Set environment variables for headless build
+      export TAURI_PRIVATE_KEY=""
+      export TAURI_KEY_PASSWORD=""
+      
+      yarn tauri build \
+        --target x86_64-unknown-linux-gnu \
+        --bundles "" \
+        --verbose
+      
+      mkdir -p $SNAPCRAFT_PART_INSTALL/bin
+      cp target/x86_64-unknown-linux-gnu/release/terraphim-desktop $SNAPCRAFT_PART_INSTALL/bin/
+      
+      # Install desktop file
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/applications
+      cp ../packaging/snap/terraphim-desktop.desktop $SNAPCRAFT_PART_INSTALL/share/applications/
+      
+      # Install icons
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/icons/hicolor/256x256/apps
+      cp src-tauri/icons/256x256.png $SNAPCRAFT_PART_INSTALL/share/icons/hicolor/256x256/apps/terraphim-desktop.png
+      mkdir -p $SNAPCRAFT_PART_INSTALL/share/icons/hicolor/128x128/apps
+      cp src-tauri/icons/128x128.png $SNAPCRAFT_PART_INSTALL/share/icons/hicolor/128x128/apps/terraphim-desktop.png
+
+  desktop-assets:
+    plugin: dump
+    source: packaging/snap/terraphim-desktop.desktop
+    organize:
+      terraphim-desktop.desktop: share/applications/terraphim-desktop.desktop
+
+  icon-assets:
+    plugin: dump
+    source: desktop/src-tauri/icons/256x256.png
+    organize:
+      256x256.png: share/icons/hicolor/256x256/apps/terraphim-desktop.png

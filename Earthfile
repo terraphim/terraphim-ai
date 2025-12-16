@@ -121,8 +121,7 @@ source-native:
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
-  # Optimize cargo vendor for faster dependency resolution
-  RUN CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo vendor > .cargo/config.toml
+  # Skip cargo vendor to avoid CI failures - use direct dependency resolution
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
   SAVE ARTIFACT /code
 

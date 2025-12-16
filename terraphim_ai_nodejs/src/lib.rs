@@ -428,8 +428,8 @@ mod tests {
   }
 
   // Note: NAPI-specific tests removed due to linking issues in cargo test environment
-// All functionality is verified by Node.js integration tests:
-// - test_autocomplete.js: Validates autocomplete and fuzzy search
-// - test_knowledge_graph.js: Validates knowledge graph operations
-// These tests successfully verify all core features in the actual Node.js runtime environment.
+  // All functionality is verified by Node.js integration tests:
+  // - test_autocomplete.js: Validates autocomplete and fuzzy search
+  // - test_knowledge_graph.js: Validates knowledge graph operations
+  // These tests successfully verify all core features in the actual Node.js runtime environment.
 }

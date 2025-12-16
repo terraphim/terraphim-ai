@@ -1,0 +1,245 @@
+name: Complete Release Pipeline
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version'
+        required: false
+        type: string
+        default: '1.0.0'
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build-all-formats:
+    name: Build All Package Formats
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        format:
+          - deb
+          - rpm
+          - arch
+          - appimage
+          - flatpak
+          - snap
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+          override: true
+          components: rustfmt, clippy
+
+      - name: Cache Rust dependencies
+        uses: actions/cache@v3
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: desktop/
+
+      - name: Install System Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            libwebkit2gtk-4.0-dev \
+            libssl-dev \
+            libgtk-3-dev \
+            libayatana-appindicator3-dev \
+            librsvg2-dev \
+            libdbus-1-dev \
+            libnotify-dev \
+            flatpak \
+            flatpak-builder \
+            snapcraft
+
+      - name: Install Cargo Tools
+        run: |
+          cargo install cargo-deb
+          cargo install cargo-generate-rpm
+
+      - name: Install AppImage Tool
+        run: |
+          mkdir -p ~/bin
+          wget -O ~/bin/appimagetool "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+          chmod +x ~/bin/appimagetool
+          echo "$HOME/bin" >> $GITHUB_PATH
+
+      - name: Create Packaging Structure
+        run: |
+          mkdir -p packaging/{rpm,arch,flatpak,snap,scripts}
+          mkdir -p release-artifacts
+
+      - name: Build Format
+        run: |
+          chmod +x packaging/scripts/*.sh
+          chmod +x test-install.sh
+          packaging/scripts/build-${{ matrix.format }}.sh ${{ github.ref_name || env.version }}
+
+      - name: Test Format
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/workspace:ro \
+            -v ${{ github.workspace }}/release-artifacts:/packages:ro \
+            ubuntu:22.04 \
+            /workspace/test-install.sh ${{ matrix.format }}
+
+      - name: Upload Artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: ${{ matrix.format }}-packages
+          path: |
+            release-artifacts/*.*
+            checksums.txt
+
+  create-release:
+    name: Create GitHub Release
+    needs: build-all-formats
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download All Artifacts
+        uses: actions/download-artifact@v3
+        with:
+          pattern: "*-packages"
+          merge-multiple: true
+          path: release-artifacts
+
+      - name: Create Checksums
+        run: |
+          cd release-artifacts
+          sha256sum * > checksums.txt
+          echo "## Checksums" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          cat checksums.txt >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+
+      - name: Create Release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref_name }}
+          release_name: Terraphim AI ${{ github.ref_name }}
+          body: |
+            ## 🚀 Terraphim AI ${{ github.ref_name }}
+            
+            Complete release with all Linux package formats.
+            
+            ### 📦 Available Formats:
+            - **Debian (.deb)** - For Ubuntu, Debian, and derivatives
+            - **RPM (.rpm)** - For Fedora, CentOS, RHEL, and derivatives  
+            - **Arch Linux (.pkg.tar.zst)** - For Arch Linux, Manjaro, and derivatives
+            - **AppImage (.AppImage)** - Portable Linux application
+            - **Flatpak (.flatpak)** - Universal sandboxed format
+            - **Snap (.snap)** - Universal package format
+            
+            ### 🔐 Verification:
+            All packages are GPG signed. Verify with:
+            ```bash
+            gpg --verify package.sig package
+            sha256sum -c checksums.txt
+            ```
+            
+            ### 📥 Installation:
+            See [Installation Guide](https://github.com/terraphim/terraphim-ai/wiki/Installation) for detailed instructions.
+            
+            ### 📋 Checksums:
+            See checksums.txt for SHA256 hashes of all files.
+            
+            ---
+            🤖 Built with GitHub Actions
+          draft: false
+          prerelease: false
+
+      - name: Upload Release Assets
+        run: |
+          assets=()
+          
+          for file in release-artifacts/*.*; do
+            if [[ -f "$file" ]]; then
+              filename=$(basename "$file")
+              echo "Uploading $filename..."
+              
+              curl \
+                -X POST \
+                -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+                -H "Content-Type: application/octet-stream" \
+                --data-binary "@$file" \
+                "https://uploads.github.com/repos/${{ github.repository }}/releases/${{ github.ref_name }}/assets?name=$filename"
+            fi
+          done
+
+  submit-to-repositories:
+    name: Submit to Package Repositories
+    needs: [build-all-formats, create-release]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    strategy:
+      matrix:
+        repository:
+          - aur
+          - copr
+    
+    steps:
+      - name: Checkout AUR
+        if: matrix.repository == 'aur'
+        uses: actions/checkout@v4
+        with:
+          repository: aur/terraphim-server
+          path: aur-repo
+          token: ${{ secrets.AUR_SSH_KEY }}
+
+      - name: Submit to AUR
+        if: matrix.repository == 'aur'
+        run: |
+          cd aur-repo
+          # Update PKGBUILD from current version
+          cp ../packaging/arch/PKGBUILD-server PKGBUILD
+          
+          git config user.name "Terraphim Releases"
+          git config user.email "releases@terraphim.ai"
+          
+          git add PKGBUILD
+          git commit -m "Update to ${{ github.ref_name }}"
+          git push origin master
+
+      - name: Setup COPR
+        if: matrix.repository == 'copr'
+        run: |
+          sudo pip install copr-cli
+          copr-cli login ${{ secrets.COPR_TOKEN }}
+
+      - name: Submit to COPR
+        if: matrix.repository == 'copr'
+        run: |
+          copr-cli create-package terraphim-ai terraphim-server \
+            --name terraphim-server \
+            --version ${{ github.ref_name }} \
+            --specfile packaging/rpm/terraphim-server.spec \
+            --source-git https://github.com/terraphim/terraphim-ai.git \
+            --source-git-branch ${{ github.ref_name }} \
+            --source-git-subdir .

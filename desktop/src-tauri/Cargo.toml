@@ -41,7 +41,7 @@ log = "0.4.21"
 env_logger = "0.11.8"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
-tauri = { version = "1.7.1", features = [ "updater",
+tauri = { version = "1.8.3", features = [ "updater",
     "dialog-all",
     "path-all",
     "fs-all",

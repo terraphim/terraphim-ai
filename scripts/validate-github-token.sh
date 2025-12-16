@@ -15,6 +15,7 @@ NC='\033[0m' # No Color
 # Default values
 VERBOSE=false
 DRY_RUN=false
+NO_MASKING=false
 GITHUB_API_URL="https://api.github.com"
 
 # Function to print colored output
@@ -55,6 +56,7 @@ ARGUMENTS:
 OPTIONS:
     -v, --verbose     Enable verbose output
     -d, --dry-run     Show what would be done without executing
+    -m, --no-masking  Disable output masking for debugging
     -u, --api-url     GitHub API URL (default: https://api.github.com)
     -h, --help        Show this help message
 
@@ -128,30 +130,57 @@ get_token_from_op() {
         return 0
     fi
 
-    local token
+local token
+    print_verbose "About to call op read with URL: $op_url"
     if ! token=$(op read "$op_url" 2>/dev/null); then
         print_error "Failed to retrieve token from 1Password"
         print_info "Please check:"
         print_info "1. The op:// URL is correct"
-        print_info "2. You have access to the vault and item"
+        print_info "2. You have access to vault and item"
         print_info "3. The field exists and contains a token"
         return 1
     fi
-
+    
+    if [[ "$NO_MASKING" == true ]]; then
+        print_verbose "Raw token from op: $token (length: ${#token})"
+    else
+        print_verbose "Raw token from op: ${token:0:10}... (length: ${#token})"
+    fi
+    
+    # Strip whitespace and newlines
+    token=$(echo "$token" | tr -d '[:space:]')
+    
+    if [[ "$NO_MASKING" == true ]]; then
+        print_verbose "After stripping: $token (length: ${#token})"
+    else
+        print_verbose "After stripping: ${token:0:10}... (length: ${#token})"
+    fi
+    
     if [[ -z "$token" ]]; then
         print_error "Retrieved token is empty"
         return 1
     fi
 
-    print_verbose "Token retrieved successfully (length: ${#token})"
+    if [[ "$NO_MASKING" == true ]]; then
+        print_verbose "Token retrieved successfully (length: ${#token})"
+        print_verbose "Token: $token"
+    else
+        print_verbose "Token retrieved successfully (length: ${#token})"
+        print_verbose "Token preview: ${token:0:10}..."
+    fi
     echo "$token"
 }
 
 # Function to validate GitHub token format
 validate_github_token_format() {
     local token="$1"
-
+    
     print_verbose "Validating GitHub token format..."
+    if [[ "$NO_MASKING" == true ]]; then
+        print_verbose "Token to validate: $token (length: ${#token})"
+    else
+        print_verbose "Token to validate: ${token:0:10}... (length: ${#token})"
+    fi
 
     # GitHub personal access tokens (classic)
     if [[ "$token" =~ ^ghp_[a-zA-Z0-9]{36}$ ]]; then
@@ -255,6 +284,10 @@ main() {
                 DRY_RUN=true
                 shift
                 ;;
+            -m|--no-masking)
+                NO_MASKING=true
+                shift
+                ;;
             -u|--api-url)
                 api_url="$2"
                 shift 2
@@ -310,6 +343,12 @@ main() {
     local token
     if ! token=$(get_token_from_op "$op_url"); then
         exit $?
+    fi
+    
+    if [[ "$NO_MASKING" == true ]]; then
+        print_verbose "Token in main function: $token (length: ${#token})"
+    else
+        print_verbose "Token in main function: ${token:0:10}... (length: ${#token})"
     fi
 
     # Validate token format

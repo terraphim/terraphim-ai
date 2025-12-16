@@ -1,0 +1,106 @@
+app-id: com.terraphim.ai.desktop
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: terraphim-desktop
+
+finish-args:
+  - --share=ipc
+  - --share=network
+  - --device=dri
+  - --filesystem=home:ro
+  - --filesystem=xdg-config:ro
+  - --filesystem=xdg-download
+  - --socket=pulseaudio
+  - --socket=session-bus
+  - --talk-name=org.freedesktop.Notifications
+  - --talk-name=org.freedesktop.portal.Desktop
+
+add-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+  - org.freedesktop.Sdk.Extension.node20
+
+modules:
+  - name: libwebkit2gtk-4.1
+    buildsystem: simple
+    config-opts:
+      - -DENABLE_WPE_EXTENSIONS=OFF
+    sources:
+      - type: archive
+        url: https://webkitgtk.org/releases/webkitgtk-2.44.1.tar.xz
+        sha256: 'SKIP'
+    cleanup:
+      - '/include'
+      - '/lib/pkgconfig'
+      - '/lib/*.so'
+
+  - name: terraphim-desktop
+    buildsystem: simple
+    sources:
+      - type: git
+        url: https://github.com/terraphim/terraphim-ai.git
+        tag: v1.0.0
+        commit: v1.0.0
+    
+    modules:
+      - name: rust
+        type: cargo
+        buildsystem: simple
+        sources:
+          - type: archive
+            url: https://static.rust-lang.org/dist/rust-1.75.0-x86_64-unknown-linux-gnu.tar.gz
+            sha256: '0e48a60d8137898fd85f2abbb5e0d5684b8aa44f7c79739fdcf93f03f2c1304
+
+      - name: nodejs
+        buildsystem: simple
+        sources:
+          - type: archive
+            url: https://nodejs.org/dist/v20.10.0/node-v20.10.0-linux-x64.tar.xz
+            sha256: 'SKIP'
+        cleanup:
+          - '/include'
+          - '/share/doc'
+          - '/share/man'
+
+    build-commands:
+      - cd desktop
+      - yarn config set cache-folder /run/build/flatpak-nodejs-cache
+      - yarn install --frozen-lockfile --offline
+      
+      # Install Tauri CLI
+      cargo install tauri-cli --version 1.5.0
+      
+      # Build desktop application
+      cd desktop
+      yarn install --frozen-lockfile --offline
+      
+      # Set environment variables for headless build
+      export TAURI_PRIVATE_KEY=""
+      export TAURI_KEY_PASSWORD=""
+        export NODE_ENV=production
+        yarn tauri build \
+          --target x86_64-unknown-linux-gnu \
+          --bundles ""
+      
+      # Install to app directory
+      - install -D target/x86_64-unknown-linux-gnu/release/terraphim-desktop /app/bin/terraphim-desktop
+      
+      # Install desktop file
+      - install -D ../packaging/flatpak/com.terraphim.ai.desktop /app/share/applications/com.terraphim.ai.desktop
+      
+      # Install icons
+      - install -D src-tauri/icons/128x128.png /app/share/icons/hicolor/128x128/apps/com.terraphim.ai.desktop.png
+      - install -D src-tauri/icons/256x256.png /app/share/icons/hicolor/256x256/apps/com.terraphim.ai.desktop.png
+      
+      # Install documentation
+      - install -D ../README.md /app/share/doc/com.terraphim.ai.desktop/README.md
+      - install -D ../LICENSE /app/share/licenses/com.terraphim.ai.desktop/LICENSE
+
+    cleanup:
+      - '/include'
+      - '/lib/pkgconfig'
+      - 'target/*/debug'
+      - 'target/*/build'
+      - 'node_modules/.bin'
+      - 'node_modules/.cache'
+      - 'yarn-error.log'

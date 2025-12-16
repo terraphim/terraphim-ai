@@ -1,0 +1,22 @@
+[Desktop Entry]
+Type=Application
+Name=Terraphim AI
+GenericName=AI Assistant
+Comment=Privacy-first AI assistant with knowledge graph search
+Comment[de]=KI-Assistent mit Datenschutz und Wissensgraph-Suche
+Exec=terraphim-desktop %U
+Icon=com.terraphim.ai.desktop
+Terminal=false
+StartupWMClass=terraphim-desktop
+Categories=Development;Office;Science;Network;
+Keywords=AI;assistant;search;knowledge;privacy;local;chat;
+MimeType=text/plain;text/html;text/markdown;application/pdf;
+Actions=new-window;new-chat;
+
+[Desktop Action new-window]
+Name=New Window
+Exec=terraphim-desktop --new-window
+
+[Desktop Action new-chat]
+Name=New Chat
+Exec=terraphim-desktop --new-chat
