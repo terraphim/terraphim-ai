@@ -17,6 +17,14 @@ echo ""
 # Create release directory
 mkdir -p "$ROOT/release-artifacts"
 
+# Setup Tauri signing if available
+if [[ -f "$HOME/.tauri/tauriconfig" ]]; then
+    source "$HOME/.tauri/tauriconfig"
+    echo "🔐 Using configured Tauri signing keys"
+else
+    echo "⚠️ Tauri signing not configured, building unsigned packages"
+fi
+
 # Function to build specific format
 build_format() {
     local format="$1"
