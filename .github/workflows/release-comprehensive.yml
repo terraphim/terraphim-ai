@@ -514,16 +514,23 @@ jobs:
 
           🤖 Automated update from release workflow"
 
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
       - name: Push to Homebrew tap
         env:
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
           cd homebrew-terraphim
+
+          # Get token from 1Password
+          HOMEBREW_TAP_TOKEN=$(op read "op://TerraphimPlatform/homebrew-tap-token/token" 2>/dev/null || echo "")
+
           if [ -n "$HOMEBREW_TAP_TOKEN" ]; then
             git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/terraphim/homebrew-terraphim.git"
             git push origin main
             echo "✅ Homebrew formulas updated successfully"
           else
-            echo "⚠️  HOMEBREW_TAP_TOKEN not set - skipping push"
-            echo "To enable automatic updates, add HOMEBREW_TAP_TOKEN secret with repo scope"
+            echo "⚠️  homebrew-tap-token not found in 1Password - skipping push"
+            echo "Ensure token exists at: op://TerraphimPlatform/homebrew-tap-token/token"
           fi
