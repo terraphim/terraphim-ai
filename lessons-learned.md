@@ -2668,5 +2668,164 @@ The 2-routing workflow bug fix represents the final critical piece in creating a
 
 The Terraphim AI agent system demonstrates strong core functionality with 38+ tests passing, but requires systematic infrastructure maintenance to restore full test coverage and resolve compilation issues across the complete codebase.
 ---
+
+## macOS Release Pipeline & Homebrew Publication
+
+### Date: 2024-12-20 - Disciplined Development Approach
+
+#### Pattern 1: Disciplined Research Before Design
+
+**Context**: Needed to implement macOS release artifacts and Homebrew publication without clear requirements.
+
+**What We Learned**:
+- **Phase 1 (Research) prevents scope creep**: Systematically mapping system elements, constraints, and risks before design revealed 8 critical questions
+- **Distinguish problems from solutions**: Research phase explicitly separates "what's wrong" from "how to fix it"
+- **Document assumptions explicitly**: Marked 5 assumptions that could derail implementation if wrong
+- **Ask questions upfront**: Better to clarify ARM runner availability, formula organization, signing scope before writing code
+
+**Implementation**:
+```markdown
+# Phase 1 deliverable structure:
+1. Problem Restatement and Scope
+2. User & Business Outcomes
+3. System Elements and Dependencies
+4. Constraints and Their Implications
+5. Risks, Unknowns, and Assumptions
+6. Context Complexity vs. Simplicity Opportunities
+7. Questions for Human Reviewer (max 10)
+```
+
+**When to Apply**: Any feature touching multiple systems, unclear requirements, significant architectural changes
+
+---
+
+#### Pattern 2: Fine-Grained GitHub PATs Have Limited API Access
+
+**Context**: Token validated for user endpoint but failed for repository API calls.
+
+**What We Learned**:
+- **Fine-grained PATs (github_pat_*) have scoped API access**: May work for git operations but fail REST API calls
+- **Git operations != API operations**: A token can push to a repo but fail `GET /repos/{owner}/{repo}`
+- **Test actual use case**: Don't just validate token exists, test the specific operation (git push, not curl)
+
+**Implementation**:
+```bash
+# BAD: Test with API call (may fail for fine-grained PATs)
+curl -H "Authorization: token $TOKEN" https://api.github.com/repos/org/repo
+
+# GOOD: Test with actual git operation
+git remote set-url origin "https://x-access-token:${TOKEN}@github.com/org/repo.git"
+git push origin main  # This is what the workflow actually does
+```
+
+**When to Apply**: Any GitHub PAT validation, especially fine-grained tokens for CI/CD
+
+---
+
+#### Pattern 3: Native Architecture Builds Over Cross-Compilation
+
+**Context**: macOS builds needed for both Intel (x86_64) and Apple Silicon (arm64).
+
+**What We Learned**:
+- **Native builds are more reliable**: Cross-compiling Rust to aarch64 from x86_64 can fail
+- **Self-hosted runners enable native builds**: `[self-hosted, macOS, ARM64]` for arm64, `[self-hosted, macOS, X64]` for x86_64
+- **lipo creates universal binaries**: Combine after building natively on each architecture
+
+**Implementation**:
+```yaml
+# Build matrix with native runners
+matrix:
+  include:
+    - os: [self-hosted, macOS, X64]
+      target: x86_64-apple-darwin
+    - os: [self-hosted, macOS, ARM64]  # M3 Pro
+      target: aarch64-apple-darwin
+
+# Combine with lipo
+- name: Create universal binary
+  run: |
+    lipo -create x86_64/binary aarch64/binary -output universal/binary
+```
+
+**When to Apply**: Any macOS binary distribution, especially for Homebrew
+
+---
+
+#### Pattern 4: Homebrew Tap Naming Convention
+
+**Context**: Setting up Homebrew distribution for Terraphim tools.
+
+**What We Learned**:
+- **Tap naming**: Repository must be `homebrew-{name}` for `brew tap {org}/{name}`
+- **Formula location**: Formulas go in `Formula/` directory
+- **Start with source builds**: Initial formulas can build from source, upgrade to pre-built binaries later
+- **on_macos/on_linux blocks**: Handle platform-specific URLs and installation
+
+**Implementation**:
+```ruby
+# Formula/terraphim-server.rb
+class TerraphimServer < Formula
+  on_macos do
+    url "https://github.com/.../terraphim_server-universal-apple-darwin"
+    sha256 "..."
+  end
+
+  on_linux do
+    url "https://github.com/.../terraphim_server-x86_64-unknown-linux-gnu"
+    sha256 "..."
+  end
+
+  def install
+    bin.install "binary-name" => "terraphim_server"
+  end
+end
+```
+
+**When to Apply**: Distributing any CLI tools via Homebrew
+
+---
+
+#### Pattern 5: 1Password Integration in GitHub Actions
+
+**Context**: Needed to securely pass Homebrew tap token to workflow.
+
+**What We Learned**:
+- **Use 1Password CLI action**: `1password/install-cli-action@v1`
+- **Service account token in secrets**: `OP_SERVICE_ACCOUNT_TOKEN`
+- **Read at runtime**: `op read "op://Vault/Item/Field"`
+- **Fallback gracefully**: Handle missing tokens without failing entire workflow
+
+**Implementation**:
+```yaml
+- name: Install 1Password CLI
+  uses: 1password/install-cli-action@v1
+
+- name: Use secret
+  env:
+    OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+  run: |
+    TOKEN=$(op read "op://TerraphimPlatform/homebrew-tap-token/token" 2>/dev/null || echo "")
+    if [ -n "$TOKEN" ]; then
+      # Use token
+    else
+      echo "Token not found, skipping"
+    fi
+```
+
+**When to Apply**: Any secret management in CI/CD, especially cross-repo operations
+
+---
+
+### Technical Gotchas Discovered
+
+1. **Shell parsing with 1Password**: `$(op read ...)` in complex shell commands can fail with parse errors. Write token to temp file first.
+
+2. **Commit message hooks**: Multi-line commit messages may fail conventional commit validation even when first line is correct. Use single-line messages for automated commits.
+
+3. **GitHub API version header**: Some API calls require `X-GitHub-Api-Version: 2022-11-28` header.
+
+4. **Universal binary verification**: Use `file binary` and `lipo -info binary` to verify universal binaries contain both architectures.
+
+---
 # Historical Lessons (Merged from @lessons-learned.md)
 ---
