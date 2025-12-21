@@ -1,0 +1,23 @@
+{%- macro from_section(section) -%}
+{%- set section = get_section(path=section) -%}
+{%- for post in section.pages -%}
+{%- if not post.draft -%}
+{"localId": {{ post.permalink | striptags | json_encode | safe}},
+{{ "https://atomicdata.dev/properties/name" | json_encode | safe }} : {{ post.title | striptags | json_encode | safe }},
+{{ config.base_url ~ "/properties/" ~ "url" | json_encode | safe }} : {{ post.permalink | striptags | json_encode | safe }},
+{{ "https://atomicdata.dev/properties/description" | json_encode | safe }} : {{ post.content  | json_encode | safe }},
+{{ config.base_url ~ "/properties/" ~ "date" | json_encode | safe }} : {{ post.date | json_encode | safe }},
+{{ "https://atomicdata.dev/properties/" ~ "tags" | json_encode | safe }} : {{ post.taxonomies | json_encode | safe }},
+"https://atomicdata.dev/properties/isA": [
+    "https://atomicdata.dev/classes/Article"
+  ]
+}{%- if not loop.last -%},{%- endif %}
+{%- endif -%}
+{%- endfor -%}
+{%- if section.subsections -%}
+{%- for subsection in section.subsections -%}
+{{ self::from_section(section=subsection) }}
+{%- if not loop.last -%},{%- endif %}
+{%- endfor -%}
+{%- endif -%}
+{%- endmacro from_section -%}
