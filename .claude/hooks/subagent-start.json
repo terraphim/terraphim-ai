@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cat .docs/summary.md 2>/dev/null || echo 'Terraphim AI: Privacy-first AI assistant'"
+          }
+        ]
+      }
+    ]
+  }
+}
