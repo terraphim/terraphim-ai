@@ -1,0 +1,55 @@
+# Example user configuration for custom tool patterns
+#
+# Save this file to: ~/.config/claude-log-analyzer/tools.toml
+#
+# This file allows you to define custom tool patterns that will be merged with
+# the built-in patterns. User patterns with the same name as built-in patterns
+# will override them.
+
+# Example: Custom deployment script
+[[tools]]
+name = "custom-deploy"
+patterns = ["./deploy.sh", "make deploy"]
+
+[tools.metadata]
+category = "CloudDeploy"
+description = "Custom deployment script"
+confidence = 0.9
+
+# Example: Custom testing tool
+[[tools]]
+name = "my-test-runner"
+patterns = ["./run-tests.sh", "npm run custom-test"]
+
+[tools.metadata]
+category = "Testing"
+description = "Custom test runner script"
+confidence = 0.85
+
+# Example: Override built-in npm pattern with custom behavior
+[[tools]]
+name = "npm"
+patterns = ["npm install", "npm run", "npm ci", "npm test"]
+
+[tools.metadata]
+category = "PackageManager"
+description = "Custom npm configuration with limited patterns"
+confidence = 0.95
+
+# Example: Custom CI/CD tool
+[[tools]]
+name = "jenkins-cli"
+patterns = ["jenkins-cli build", "jenkins-cli deploy"]
+
+[tools.metadata]
+category = "CloudDeploy"
+description = "Jenkins CLI tool"
+confidence = 0.8
+
+# Notes:
+# - The 'name' field must be unique within your configuration
+# - User patterns with the same name as built-in patterns will override them
+# - The 'patterns' array contains strings to match in Bash commands
+# - Confidence should be between 0.0 and 1.0
+# - Category can be one of: PackageManager, BuildTool, Testing, Linting, Git, CloudDeploy, Database
+#   or a custom string for "Other" categories

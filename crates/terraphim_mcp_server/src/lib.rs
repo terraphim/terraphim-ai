@@ -1349,7 +1349,7 @@ impl ServerHandler for McpService {
             Tool {
                 name: "search".into(),
                 title: Some("Search Knowledge Graph".into()),
-                description: Some("Search for documents in the Terraphim knowledge graph".into()),
+                description: Some("Search for documents in Terraphim knowledge graph".into()),
                 input_schema: Arc::new(search_map),
                 output_schema: None,
                 annotations: None,

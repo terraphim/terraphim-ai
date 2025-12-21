@@ -569,8 +569,7 @@ impl SupervisionTreeOrchestrator {
         let time_since_last_restart = workflow
             .recovery_actions
             .iter()
-            .filter(|a| a.action_type == RecoveryActionType::AgentRestart)
-            .next_back()
+            .rfind(|a| a.action_type == RecoveryActionType::AgentRestart)
             .map(|a| a.timestamp.elapsed().unwrap_or(Duration::ZERO))
             .unwrap_or(elapsed);
 

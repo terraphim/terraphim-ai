@@ -402,11 +402,9 @@ mod performance_tests {
 
         let start = Instant::now();
 
-        // Search for commands
-        let results: Vec<_> = commands
-            .iter()
-            .filter(|cmd| cmd.name.contains("42"))
-            .collect();
+        // Search for commands - use exact match for "cmd-42" instead of contains
+        // to ensure only one result is found
+        let results: Vec<_> = commands.iter().filter(|cmd| cmd.name == "cmd-42").collect();
 
         let duration = start.elapsed();
 

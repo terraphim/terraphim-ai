@@ -42,7 +42,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -88,12 +88,12 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
           - os: macos-latest
-            target: x86_64-apple-darwin
-            macos-arch: universal
+            target: aarch64-apple-darwin
+            macos-arch: arm64
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -125,18 +125,18 @@ jobs:
       - name: Install Python build dependencies
         working-directory: crates/terraphim_automata_py
         run: |
-          uv pip install --system maturin pytest pytest-benchmark build
+          uv pip install --system pip maturin pytest pytest-benchmark build
 
       - name: Build wheel
         uses: PyO3/maturin-action@v1
         with:
           working-directory: crates/terraphim_automata_py
           args: --release --out dist --find-interpreter --target ${{ matrix.target }}
-          sccache: 'true'
+          sccache: 'false'
           manylinux: auto
 
       - name: Upload wheel artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
           path: crates/terraphim_automata_py/dist/*.whl
@@ -146,9 +146,12 @@ jobs:
     name: Build Source Distribution
     runs-on: ubuntu-latest
     needs: validate
+    # Note: sdist build may fail due to maturin bug with workspace path dependencies
+    # Wheel builds are the primary artifacts, sdist is optional
+    continue-on-error: true
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -171,7 +174,7 @@ jobs:
           args: --out dist
 
       - name: Upload sdist artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sdist
           path: crates/terraphim_automata_py/dist/*.tar.gz
@@ -189,7 +192,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -205,13 +208,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: wheels-${{ matrix.os }}-py${{ matrix.python-version }}
-          path: dist
+          path: ${{ github.workspace }}/dist
 
       - name: Install test dependencies
         working-directory: crates/terraphim_automata_py
         run: |
           uv pip install --system pytest pytest-benchmark pytest-cov black mypy ruff
-          uv pip install --system terraphim-automata --find-links=../../dist
+          uv pip install --system terraphim-automata --find-links=${{ github.workspace }}/dist
 
       - name: Run tests
         working-directory: crates/terraphim_automata_py
@@ -220,18 +223,19 @@ jobs:
           python -m pytest python/tests/ -v --cov=terraphim_automata --cov-report=term-missing
 
           # Test basic import
-          python -c "import terraphim_automata; print('✅ Package imports successfully')"
+          python -c "import terraphim_automata; print('OK: Package imports successfully')"
 
   publish-pypi:
     name: Publish to PyPI
     runs-on: [self-hosted, Linux, terraphim, production, docker]
     environment: production
-    needs: [build, build-sdist, test]
+    # Note: build-sdist is optional due to maturin bug, wheels are sufficient
+    needs: [build, test]
     permissions:
       id-token: write
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5

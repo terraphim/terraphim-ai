@@ -25,8 +25,16 @@ jobs:
       should-build: ${{ steps.changes.outputs.should-build }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -52,8 +60,16 @@ jobs:
     runs-on: [self-hosted, linux, x64]
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -69,8 +85,16 @@ jobs:
     runs-on: [self-hosted, linux, x64]
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -91,8 +115,16 @@ jobs:
     runs-on: [self-hosted, linux, x64]
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -115,8 +147,16 @@ jobs:
     runs-on: [self-hosted, linux, x64]
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'
@@ -137,8 +177,16 @@ jobs:
           # Add other targets as they become stable
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download Earthly
         run: sudo /bin/sh -c 'wget https://github.com/earthly/earthly/releases/latest/download/earthly-linux-amd64 -O /usr/local/bin/earthly && chmod +x /usr/local/bin/earthly'

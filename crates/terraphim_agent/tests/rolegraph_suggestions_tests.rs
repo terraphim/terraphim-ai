@@ -260,12 +260,12 @@ mod tests {
             MockCommandCompleter::new("System Operator".to_string()).get_role_search_suggestions();
 
         // Engineer should get technical suggestions
-        assert!(engineer_suggestions.iter().any(|&s| s == "Rust"));
-        assert!(engineer_suggestions.iter().any(|&s| s == "Firecracker"));
+        assert!(engineer_suggestions.contains(&"Rust"));
+        assert!(engineer_suggestions.contains(&"Firecracker"));
 
         // Operator should get operational suggestions
-        assert!(operator_suggestions.iter().any(|&s| s == "logs"));
-        assert!(operator_suggestions.iter().any(|&s| s == "security"));
+        assert!(operator_suggestions.contains(&"logs"));
+        assert!(operator_suggestions.contains(&"security"));
 
         // They should have different suggestions
         assert_ne!(engineer_suggestions, operator_suggestions);

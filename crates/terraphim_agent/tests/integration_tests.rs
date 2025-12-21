@@ -1,7 +1,6 @@
 use std::fs;
 use std::path::Path;
 use std::process::{Child, Command, Stdio};
-use std::str::FromStr;
 
 use anyhow::Result;
 use serial_test::serial;
@@ -68,7 +67,7 @@ async fn start_test_server() -> Result<(Child, String)> {
 /// Run TUI command in offline mode
 fn run_offline_command(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"]).args(args);
+    cmd.args(["run", "-p", "terraphim_agent", "--"]).args(args);
 
     let output = cmd.output()?;
 
@@ -85,7 +84,7 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
     cmd_args.extend_from_slice(args);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--"])
         .args(&cmd_args);
 
     let output = cmd.output()?;

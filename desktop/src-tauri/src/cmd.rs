@@ -562,6 +562,7 @@ pub struct AutocompleteResponse {
 /// It uses the atomic client to create the resource with proper authentication.
 #[cfg(feature = "terraphim_atomic_client")]
 #[command]
+#[allow(dead_code)]
 pub async fn save_article_to_atomic(
     article: AtomicArticle,
     server_url: String,

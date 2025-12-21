@@ -75,7 +75,7 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
     cmd_args.extend_from_slice(args);
 
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--"])
         .args(&cmd_args);
 
     let output = cmd.output()?;
@@ -412,7 +412,7 @@ async fn test_server_vs_offline_mode_comparison() -> Result<()> {
 
     // Run offline command
     let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_tui", "--"])
+    cmd.args(["run", "-p", "terraphim_agent", "--"])
         .args(["config", "show"]);
 
     let offline_output = cmd.output()?;

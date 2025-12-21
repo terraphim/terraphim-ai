@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   setup:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, Linux, X64]
     outputs:
       cache-key: ${{ steps.cache.outputs.key }}
       ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
@@ -27,8 +27,17 @@ jobs:
       should-build: ${{ steps.changes.outputs.should-build }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          # Clean up files that may have different permissions from previous runs
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -70,15 +79,23 @@ jobs:
           fi
 
   build-base-image:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, Linux, X64]
     needs: setup
     if: needs.setup.outputs.should-build == 'true'
     outputs:
       image-tag: ${{ steps.build.outputs.image-tag }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -114,13 +131,19 @@ jobs:
           retention-days: 1
 
   lint-and-format:
-    runs-on: [self-hosted, linux, x64]
-    needs: [setup, build-base-image]
+    runs-on: [self-hosted, Linux, X64]
+    needs: [setup, build-base-image, build-frontend]
     if: needs.setup.outputs.should-build == 'true'
 
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
 
       - name: Download Docker image artifact
         uses: actions/download-artifact@v4
@@ -131,6 +154,10 @@ jobs:
       - name: Load Docker image
         run: |
           docker load < terraphim-builder-image.tar.gz
+
+      - name: Verify frontend dist
+        run: |
+          ls -la desktop/dist || echo "No desktop/dist found"
 
       - name: Run format check
         run: |
@@ -157,7 +184,7 @@ jobs:
       cache-key: ${{ needs.setup.outputs.cache-key }}
 
   build-rust:
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, Linux, X64]
     needs: [setup, build-base-image, build-frontend, lint-and-format]
     if: needs.setup.outputs.should-build == 'true'
     strategy:
@@ -167,8 +194,16 @@ jobs:
         ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
 
       - name: Download frontend artifacts
         uses: actions/download-artifact@v4
@@ -188,9 +223,9 @@ jobs:
 
       - name: Build Rust project
         run: |
-          # Copy frontend dist
-          mkdir -p terraphim_server/dist
-          cp -r frontend-dist/* terraphim_server/dist/ || echo "No frontend files found"
+          # Copy frontend dist to desktop/dist (RustEmbed expects ../desktop/dist relative to terraphim_server)
+          mkdir -p desktop/dist
+          cp -r frontend-dist/* desktop/dist/ || echo "No frontend files found"
 
           # Build with Docker
           docker run --rm \
@@ -202,7 +237,7 @@ jobs:
               cargo build --release --target ${{ matrix.target }} \
                 --package terraphim_server \
                 --package terraphim_mcp_server \
-                --package terraphim_tui
+                --package terraphim_agent
 
               # Test binaries
               ./target/${{ matrix.target }}/release/terraphim_server --version
@@ -235,13 +270,27 @@ jobs:
           retention-days: 30
 
   test:
-    runs-on: [self-hosted, linux, x64]
-    needs: [setup, build-base-image, build-rust]
+    runs-on: [self-hosted, Linux, X64]
+    needs: [setup, build-base-image, build-frontend, build-rust]
     if: needs.setup.outputs.should-build == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
 
       - name: Download Docker image artifact
         uses: actions/download-artifact@v4
@@ -264,7 +313,7 @@ jobs:
   summary:
     needs: [lint-and-format, build-frontend, build-rust, test]
     if: always()
-    runs-on: [self-hosted, linux, x64]
+    runs-on: [self-hosted, Linux, X64]
 
     steps:
       - name: Check all jobs succeeded

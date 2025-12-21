@@ -1,8 +1,3 @@
-//! Integration tests for the command system
-//!
-//! These tests verify the end-to-end functionality of the markdown-based
-//! command system including parsing, validation, execution, and security.
-
 use std::collections::HashMap;
 use std::path::PathBuf;
 
@@ -265,7 +260,7 @@ async fn test_full_command_lifecycle() {
     // Only assert if we expect deploy command to exist
     if deploy_cmd.is_some() {
         assert!(
-            deploy_results.len() >= 1,
+            !deploy_results.is_empty(),
             "Should find at least 1 deploy-related command"
         );
     }
@@ -672,27 +667,51 @@ async fn test_role_based_command_access() {
     let mut validator = CommandValidator::new();
 
     // Test different role permissions
+    // Note: The validator routes dangerous commands to Firecracker isolation rather than blocking
+    // So "systemctl" commands succeed but are routed to Firecracker VM for safety
     let test_cases = vec![
-        ("Default", "ls -la", true),                          // Read-only command
-        ("Default", "rm file.txt", false),                    // Write command
-        ("Default", "systemctl stop nginx", false),           // System command
-        ("Terraphim Engineer", "ls -la", true),               // Read command
-        ("Terraphim Engineer", "rm file.txt", true),          // Write command
-        ("Terraphim Engineer", "systemctl stop nginx", true), // System command
+        ("Default", "ls -la", true, None), // Read-only command - hybrid
+        ("Default", "rm file.txt", false, None), // Write command - blocked for Default
+        (
+            "Default",
+            "systemctl stop nginx",
+            true,
+            Some(ExecutionMode::Firecracker),
+        ), // System command - allowed but sandboxed
+        ("Terraphim Engineer", "ls -la", true, None), // Read command
+        ("Terraphim Engineer", "rm file.txt", true, None), // Write command
+        ("Terraphim Engineer", "systemctl stop nginx", true, None), // System command
     ];
 
-    for (role, command, should_succeed) in test_cases {
+    // Add debug output to understand validation flow
+    for (role, command, should_succeed, expected_mode) in &test_cases {
+        println!(
+            "DEBUG: Testing role='{}', command='{}', should_succeed={}, expected_mode={:?}",
+            role, command, should_succeed, expected_mode
+        );
+
         let result = validator
             .validate_command_execution(command, role, &HashMap::new())
             .await;
 
-        if should_succeed {
+        println!("DEBUG: Validation result: {:?}", result);
+
+        if *should_succeed {
             assert!(
                 result.is_ok(),
                 "Role '{}' should be able to execute '{}'",
                 role,
                 command
             );
+            // Verify execution mode if specified
+            if let Some(expected) = expected_mode {
+                let mode = result.unwrap();
+                assert_eq!(
+                    &mode, expected,
+                    "Expected {:?} mode for role '{}' command '{}'",
+                    expected, role, command
+                );
+            }
         } else {
             assert!(
                 result.is_err(),

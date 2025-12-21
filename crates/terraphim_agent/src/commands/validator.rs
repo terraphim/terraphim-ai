@@ -348,6 +348,23 @@ impl CommandValidator {
         safe_commands.iter().any(|cmd| command.starts_with(cmd))
     }
 
+    /// Check if command is a system command
+    fn is_system_command(&self, command: &str) -> bool {
+        let system_commands = [
+            "systemctl",
+            "shutdown",
+            "reboot",
+            "passwd",
+            "chown",
+            "chmod",
+            "iptables",
+            "fdisk",
+            "mkfs",
+        ];
+
+        system_commands.iter().any(|cmd| command.starts_with(cmd))
+    }
+
     /// Add role permissions
     pub fn add_role_permissions(&mut self, role: String, permissions: Vec<String>) {
         self.role_permissions.insert(role, permissions);
@@ -554,6 +571,11 @@ impl CommandValidator {
         }
 
         if self.is_high_risk_command(command) && !permissions.contains(&"execute".to_string()) {
+            return false;
+        }
+
+        // Additional check: system commands should not be executable by default role
+        if self.is_system_command(command) && !permissions.contains(&"execute".to_string()) {
             return false;
         }
 

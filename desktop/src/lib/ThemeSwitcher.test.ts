@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/svelte';
+import { fireEvent, render, screen, waitFor } from '@testing-library/svelte/svelte5';
 import { beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { is_tauri, role, theme } from './stores';
 import ThemeSwitcher from './ThemeSwitcher.svelte';

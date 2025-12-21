@@ -1,32 +1,31 @@
 server_hostname = "127.0.0.1:8000"
 api_endpoint="http://localhost:8000/api"
 initialized = "${TERRAPHIM_INITIALIZED:-false}"
-default_data_path = "${TERRAPHIM_DATA_PATH:-${HOME}/.terraphim}"
+default_data_path = "${TERRAPHIM_DATA_PATH:-~/.terraphim}"
 
-[profiles.rocksdb]
-type = "rocksdb"
-datadir= "/tmp/terraphim_rocksdb"
+# 3-tier non-locking storage configuration for local development
+# - Memory: Ultra-fast cache for hot data
+# - SQLite: Persistent storage with concurrent access (WAL mode)
+# - DashMap: Development fallback with file persistence
 
-[profiles.dashmap]
-type = "dashmap"
-root = "/tmp/dashmaptest"
+# Primary - Ultra-fast in-memory cache
+[profiles.memory]
+type = "memory"
 
-[profiles.rock]
-type = "rocksdb"
-datadir = "/tmp/opendal/rocksdb"
-
-# SQLite with WAL mode for concurrent access without locks
+# Secondary - Persistent with excellent concurrency (WAL mode)
 [profiles.sqlite]
 type = "sqlite"
-datadir = "/tmp/terraphim_sqlite"
+datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
 connection_string = "/tmp/terraphim_sqlite/terraphim.db"
 table = "terraphim_kv"
 
-# ReDB disabled to avoid database locking issues with concurrent access
+# Tertiary - Development fallback with concurrent access
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/terraphim_dashmap"  # Directory auto-created
+
+# ReDB disabled for local development to avoid database locking issues
 # [profiles.redb]
 # type = "redb"
-# datadir = "/tmp/terraphim_redb/terraphim.redb"
+# datadir = "/tmp/terraphim_redb/local_dev.redb"
 # table = "terraphim"
-
-[profiles.memory]
-type = "memory"
