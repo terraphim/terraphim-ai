@@ -1,0 +1,155 @@
+{
+  "name": "default",
+  "data": {
+    "rust": {
+      "id": 1,
+      "nterm": "rust programming language",
+      "url": "https://rust-lang.org"
+    },
+    "async": {
+      "id": 2,
+      "nterm": "asynchronous programming",
+      "url": "https://rust-lang.github.io/async-book/"
+    },
+    "tokio": {
+      "id": 3,
+      "nterm": "tokio async runtime",
+      "url": "https://tokio.rs"
+    },
+    "cargo": {
+      "id": 4,
+      "nterm": "cargo package manager",
+      "url": "https://doc.rust-lang.org/cargo/"
+    },
+    "api": {
+      "id": 5,
+      "nterm": "application programming interface",
+      "url": null
+    },
+    "http": {
+      "id": 6,
+      "nterm": "hypertext transfer protocol",
+      "url": "https://developer.mozilla.org/en-US/docs/Web/HTTP"
+    },
+    "json": {
+      "id": 7,
+      "nterm": "javascript object notation",
+      "url": "https://www.json.org"
+    },
+    "database": {
+      "id": 8,
+      "nterm": "database management system",
+      "url": null
+    },
+    "search": {
+      "id": 9,
+      "nterm": "semantic search",
+      "url": null
+    },
+    "graph": {
+      "id": 10,
+      "nterm": "knowledge graph",
+      "url": null
+    },
+    "terraphim": {
+      "id": 11,
+      "nterm": "terraphim knowledge graph system",
+      "url": "https://github.com/terraphim/terraphim-ai"
+    },
+    "repl": {
+      "id": 12,
+      "nterm": "read eval print loop",
+      "url": null
+    },
+    "cli": {
+      "id": 13,
+      "nterm": "command line interface",
+      "url": null
+    },
+    "terminal": {
+      "id": 14,
+      "nterm": "terminal emulator",
+      "url": null
+    },
+    "server": {
+      "id": 15,
+      "nterm": "web server",
+      "url": null
+    },
+    "client": {
+      "id": 16,
+      "nterm": "client application",
+      "url": null
+    },
+    "config": {
+      "id": 17,
+      "nterm": "configuration management",
+      "url": null
+    },
+    "documentation": {
+      "id": 18,
+      "nterm": "technical documentation",
+      "url": null
+    },
+    "markdown": {
+      "id": 19,
+      "nterm": "markdown markup language",
+      "url": "https://www.markdownguide.org"
+    },
+    "git": {
+      "id": 20,
+      "nterm": "git version control",
+      "url": "https://git-scm.com"
+    },
+    "github": {
+      "id": 21,
+      "nterm": "github platform",
+      "url": "https://github.com"
+    },
+    "docker": {
+      "id": 22,
+      "nterm": "docker container platform",
+      "url": "https://docker.com"
+    },
+    "kubernetes": {
+      "id": 23,
+      "nterm": "kubernetes orchestration",
+      "url": "https://kubernetes.io"
+    },
+    "linux": {
+      "id": 24,
+      "nterm": "linux operating system",
+      "url": "https://linux.org"
+    },
+    "testing": {
+      "id": 25,
+      "nterm": "software testing",
+      "url": null
+    },
+    "debug": {
+      "id": 26,
+      "nterm": "debugging",
+      "url": null
+    },
+    "error": {
+      "id": 27,
+      "nterm": "error handling",
+      "url": null
+    },
+    "logging": {
+      "id": 28,
+      "nterm": "application logging",
+      "url": null
+    },
+    "performance": {
+      "id": 29,
+      "nterm": "performance optimization",
+      "url": null
+    },
+    "security": {
+      "id": 30,
+      "nterm": "application security",
+      "url": null
+    }
+  }
+}

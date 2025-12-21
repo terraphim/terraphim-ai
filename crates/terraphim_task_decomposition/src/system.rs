@@ -460,7 +460,6 @@ mod tests {
     async fn test_workflow_validation() {
         let automata = create_test_automata();
         let role_graph = create_test_role_graph().await;
-
         let config = TaskDecompositionSystemConfig {
             min_confidence_threshold: 0.1, // Very low threshold for test
             ..Default::default()

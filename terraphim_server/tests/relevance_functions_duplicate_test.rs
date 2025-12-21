@@ -91,10 +91,14 @@ async fn test_relevance_functions_with_duplicate_scenarios() {
         });
 
         // Create config with test role
-        let mut config = Config::default();
-        config.id = terraphim_config::ConfigId::Server;
-        config.roles.insert("Test Rust Engineer".into(), test_role);
-        config.default_role = "Test Rust Engineer".into();
+        let mut roles = ahash::AHashMap::new();
+        roles.insert("Test Rust Engineer".into(), test_role);
+        let mut config = Config {
+            id: terraphim_config::ConfigId::Server,
+            roles,
+            default_role: "Test Rust Engineer".into(),
+            ..Config::default()
+        };
 
         // Create config state
         let config_state = ConfigState::new(&mut config)
@@ -225,11 +229,7 @@ async fn test_relevance_functions_with_duplicate_scenarios() {
             "  Total: {}, Unique: {}, Duplicates: {}",
             analysis.total_results,
             analysis.unique_urls,
-            if analysis.total_results > analysis.unique_urls {
-                analysis.total_results - analysis.unique_urls
-            } else {
-                0
-            }
+            analysis.total_results.saturating_sub(analysis.unique_urls)
         );
         log::info!(
             "  QueryRs: {}, GrepApp: {}",

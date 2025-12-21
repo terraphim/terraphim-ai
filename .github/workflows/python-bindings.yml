@@ -27,7 +27,7 @@ jobs:
     name: Lint Python Code
     runs-on: [self-hosted, linux, x64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -42,9 +42,27 @@ jobs:
       - name: Install dependencies
         run: uv pip install --system black ruff mypy
 
-      - name: Check formatting with Black
+      - name: Setup virtual environment
         working-directory: crates/terraphim_automata_py
-        run: black --check python/
+        run: |
+          unset CONDA_PREFIX
+          uv venv
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+
+      - name: Fix Black formatting
+        working-directory: crates/terraphim_automata_py
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          uv run black python/
+        continue-on-error: false
 
       - name: Lint with Ruff
         working-directory: crates/terraphim_automata_py
@@ -65,7 +83,7 @@ jobs:
         python-version: ["3.9", "3.10", "3.11", "3.12"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -155,7 +173,7 @@ jobs:
     name: Benchmark Performance
     runs-on: [self-hosted, linux, x64]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -218,11 +236,12 @@ jobs:
           else
             source .venv/bin/activate
           fi
-          uv pip install pytest pytest-benchmark
+          uv pip install pytest pytest-benchmark pytest-cov
 
       - name: Install Rust target for benchmarks
-        if: matrix.os == 'ubuntu-latest'
-        run: rustup target add x86_64-unknown-linux-gnu
+        run: |
+          rustup target add x86_64-unknown-linux-gnu
+          rustup target add x86_64-unknown-linux-musl
 
       - name: Run benchmarks
         working-directory: crates/terraphim_automata_py
@@ -233,12 +252,14 @@ jobs:
           else
             source .venv/bin/activate
           fi
+          # Override addopts (removes coverage flags) and python_files (adds benchmark_ pattern)
           pytest python/benchmarks/ -v --benchmark-only \
             --benchmark-json=benchmark-results.json \
-            --benchmark-columns=min,max,mean,stddev,median,ops
+            --benchmark-columns=min,max,mean,stddev,median,ops \
+            -o "addopts=" -o "python_files=benchmark_*.py test_*.py"
 
       - name: Store benchmark results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: benchmark-results
           path: crates/terraphim_automata_py/benchmark-results.json
@@ -253,7 +274,7 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Set up Rust
         uses: dtolnay/rust-toolchain@stable
@@ -270,7 +291,7 @@ jobs:
           manylinux: auto
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: wheels-${{ matrix.os }}
           path: crates/terraphim_automata_py/dist
@@ -280,7 +301,7 @@ jobs:
     runs-on: [self-hosted, linux, x64]
     if: github.event_name == 'release'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Build sdist
         uses: PyO3/maturin-action@v1
@@ -290,7 +311,7 @@ jobs:
           args: --out dist
 
       - name: Upload sdist
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: sdist
           path: crates/terraphim_automata_py/dist

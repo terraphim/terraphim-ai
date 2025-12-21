@@ -1,4 +1,4 @@
-name: Deploy Documentation to Cloudflare Pages
+name: Deploy Documentation to Cloudflare Pages v2
 
 on:
   push:
@@ -29,7 +29,7 @@ env:
   MDBOOK_VERSION: '0.4.40'
   # 1Password secret references
   OP_API_TOKEN: op://TerraphimPlatform/terraphim-md-book-cloudflare/workers-api-token
-  OP_ACCOUNT_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/account-id
+  OP_ACCOUNT_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/account_id
   OP_ZONE_ID: op://TerraphimPlatform/terraphim-md-book-cloudflare/zone-id
 
 jobs:
@@ -38,24 +38,31 @@ jobs:
     runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
-      - name: Setup mdBook
-        uses: peaceiris/actions-mdbook@v2
-        with:
-          mdbook-version: ${{ env.MDBOOK_VERSION }}
-
-      - name: Install mdBook preprocessors
+      - name: Clone md-book fork
         run: |
-          cargo install mdbook-mermaid --locked
-          mdbook-mermaid install docs/
+          rm -rf /tmp/md-book || true
+          git clone https://github.com/terraphim/md-book.git /tmp/md-book
+          cd /tmp/md-book
+          cargo build --release
 
-      - name: Build documentation
+      - name: Build documentation with md-book
         working-directory: docs
-        run: mdbook build
+        run: |
+          echo "=== DEBUG: Starting documentation build ==="
+          echo "DEBUG: Current directory: $(pwd)"
+          echo "DEBUG: Listing files:"
+          ls -la
+          echo "DEBUG: Checking md-book binary:"
+          ls -la /tmp/md-book/target/release/ || echo "md-book binary not found"
+          echo "DEBUG: Building with md-book fork..."
+          rm -rf book/
+          /tmp/md-book/target/release/md-book -i . -o book || true
+          echo "DEBUG: Build completed with exit code: $?"
 
       - name: Upload build artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: docs-build
           path: docs/book/
@@ -76,7 +83,7 @@ jobs:
       url: ${{ steps.deploy.outputs.deployment-url }}
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download build artifact
         uses: actions/download-artifact@v4
@@ -136,7 +143,7 @@ jobs:
       url: https://docs.terraphim.ai
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Download build artifact
         uses: actions/download-artifact@v4

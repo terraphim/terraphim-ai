@@ -19,7 +19,7 @@ anyhow = "1.0.75"
 url = "2.5.0"
 
 [dev-dependencies]
-wiremock = "0.6"
+wiremock = "0.6.4"
 
 [[bin]]
 name = "discourse_haystack"

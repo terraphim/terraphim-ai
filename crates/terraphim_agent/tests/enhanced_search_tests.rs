@@ -1,3 +1,5 @@
+#![allow(clippy::bool_assert_comparison)]
+
 use std::str::FromStr;
 #[cfg(feature = "repl")]
 use terraphim_agent::repl::commands::*;
@@ -199,8 +201,8 @@ fn test_search_with_multiple_words_and_spaces() {
     match command {
         ReplCommand::Search {
             query,
-            role,
-            limit,
+            role: _,
+            limit: _,
             semantic,
             concepts,
         } => {
@@ -257,7 +259,7 @@ fn test_search_with_special_characters() {
         ReplCommand::Search {
             query,
             role,
-            limit,
+            limit: _,
             semantic,
             concepts,
         } => {
@@ -277,8 +279,8 @@ fn test_search_concepts_flag_multiple_times() {
     match command {
         ReplCommand::Search {
             query,
-            role,
-            limit,
+            role: _,
+            limit: _,
             semantic,
             concepts,
         } => {
@@ -297,8 +299,8 @@ fn test_search_semantic_flag_multiple_times() {
     match command {
         ReplCommand::Search {
             query,
-            role,
-            limit,
+            role: _,
+            limit: _,
             semantic,
             concepts,
         } => {
@@ -337,10 +339,10 @@ fn test_search_with_very_long_query() {
     match command {
         ReplCommand::Search {
             query,
-            role,
-            limit,
+            role: _,
+            limit: _,
             semantic,
-            concepts,
+            concepts: _,
         } => {
             assert_eq!(query.len(), 1000);
             assert!(semantic);

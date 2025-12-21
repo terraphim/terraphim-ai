@@ -30,8 +30,8 @@ optional = true
 # format = "pdf"
 
 [preprocessor]
-[preprocessor.mermaid]
-command = "mdbook-mermaid"
+# [preprocessor.mermaid]
+# command = "mdbook-mermaid"
 
 # [output.pandoc]
 # hosted-html = "https://docs.terraphim.ai/" # URL of a HTML version of the book
