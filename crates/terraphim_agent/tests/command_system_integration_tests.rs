@@ -667,18 +667,14 @@ async fn test_role_based_command_access() {
     let mut validator = CommandValidator::new();
 
     // Test different role permissions
-    // Note: The validator routes dangerous commands to Firecracker isolation rather than blocking
-    // So "systemctl" commands succeed but are routed to Firecracker VM for safety
+    // Note: The validator implements strict role-based security
+    // Default role cannot execute system commands - security improvement
+    // Only Terraphim Engineer role can execute system commands
     let test_cases = vec![
         ("Default", "ls -la", true, None), // Read-only command - hybrid
         ("Default", "rm file.txt", false, None), // Write command - blocked for Default
-        (
-            "Default",
-            "systemctl stop nginx",
-            true,
-            Some(ExecutionMode::Firecracker),
-        ), // System command - allowed but sandboxed
-        ("Terraphim Engineer", "ls -la", true, None), // Read command
+        ("Default", "systemctl stop nginx", false, None), // System command - blocked for Default role (security improvement)
+        ("Terraphim Engineer", "ls -la", true, None),     // Read command
         ("Terraphim Engineer", "rm file.txt", true, None), // Write command
         ("Terraphim Engineer", "systemctl stop nginx", true, None), // System command
     ];
