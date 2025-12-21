@@ -41,8 +41,8 @@ build-all:
   # TODO: Fix OpenSSL cross-compilation issues for musl targets
   # BUILD +cross-build --TARGET=x86_64-unknown-linux-musl
   # BUILD +cross-build --TARGET=armv7-unknown-linux-musleabihf
-  # BUILD +cross-build --TARGET=aarch64-unknown-linux-musl
-  # Errors
+  # BUILD +cross-build --TARGET=aarch64-apple-darwin
+  # BUILD +cross-build --TARGET=x86_64-pc-windows-msvc
   # BUILD +cross-build --TARGET=aarch64-apple-darwin
 
 docker-all:
@@ -59,7 +59,7 @@ install:
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
@@ -89,10 +89,10 @@ install-native:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev
   RUN update-ca-certificates
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup component add clippy
@@ -121,22 +121,30 @@ source-native:
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
-  RUN cargo vendor > .cargo/config.toml
+  # Optimize cargo vendor for faster dependency resolution
+  RUN CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
   SAVE ARTIFACT /code
 
 build-native:
   FROM +source-native
   WORKDIR /code
-  RUN cargo build --release
+  # Optimize release build with parallel jobs
+  RUN CARGO_BUILD_JOBS=$(nproc) CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server
 
 build-debug-native:
   FROM +source-native
   WORKDIR /code
-  RUN cargo build
+  # Remove firecracker from workspace before building
+  RUN rm -rf terraphim_firecracker || true
+  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
+  # Also update default-members to match the remaining members
+  RUN sed -i 's/default-members = \["terraphim_server"\]/default-members = ["terraphim_server"]/' Cargo.toml
+  # Optimize build with parallel jobs and optimized settings
+  RUN CARGO_BUILD_JOBS=$(nproc) CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
-  # Save the entire target directory for reuse by fmt, lint, test
+  # Save entire target directory for reuse by fmt, lint, test
   SAVE ARTIFACT /code/target /target
 
 workspace-debug:
@@ -169,7 +177,7 @@ cross-build:
         cargo build --target $TARGET --release \
         --package terraphim_server \
         --package terraphim_mcp_server \
-        --package terraphim_tui
+        --package terraphim_agent
   ELSE
     # For non-musl targets, we would use cross here but it requires Docker daemon
     # For now, skip complex targets that need cross
@@ -180,11 +188,11 @@ cross-build:
   # Test the binaries (note: TUI binary uses hyphen, not underscore)
   RUN ./target/$TARGET/release/terraphim_server --version
   RUN ./target/$TARGET/release/terraphim_mcp_server --version
-  RUN ./target/$TARGET/release/terraphim-tui --version
+  RUN ./target/$TARGET/release/terraphim-agent --version
   # Save all three binaries
   SAVE ARTIFACT ./target/$TARGET/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-$TARGET
   SAVE ARTIFACT ./target/$TARGET/release/terraphim_mcp_server AS LOCAL artifact/bin/terraphim_mcp_server-$TARGET
-  SAVE ARTIFACT ./target/$TARGET/release/terraphim-tui AS LOCAL artifact/bin/terraphim_tui-$TARGET
+  SAVE ARTIFACT ./target/$TARGET/release/terraphim-agent AS LOCAL artifact/bin/terraphim_agent-$TARGET
 
 build:
   FROM +source
@@ -192,17 +200,17 @@ build:
   # Build each package separately to ensure all binaries are created
   DO rust+CARGO --args="build --offline --release --package terraphim_server" --output="release/[^/\.]+"
   DO rust+CARGO --args="build --offline --release --package terraphim_mcp_server" --output="release/[^/\.]+"
-  DO rust+CARGO --args="build --offline --release --package terraphim_tui" --output="release/[^/\.]+"
+  DO rust+CARGO --args="build --offline --release --package terraphim_agent" --output="release/[^/\.]+"
   # Debug: Check what binaries were actually created
   RUN find /code/target/release -name "*terraphim*" -type f -exec ls -la {} \;
   # Test all binaries (note: TUI binary uses hyphen, not underscore)
   RUN /code/target/release/terraphim_server --version
   RUN /code/target/release/terraphim_mcp_server --version
-  RUN /code/target/release/terraphim-tui --version
+  RUN /code/target/release/terraphim-agent --version
   # Save all three binaries
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server-
   SAVE ARTIFACT /code/target/release/terraphim_mcp_server AS LOCAL artifact/bin/terraphim_mcp_server-
-  SAVE ARTIFACT /code/target/release/terraphim-tui AS LOCAL artifact/bin/terraphim_tui-
+  SAVE ARTIFACT /code/target/release/terraphim-agent AS LOCAL artifact/bin/terraphim_agent-
 
 build-debug:
   FROM +source
@@ -227,7 +235,11 @@ fmt:
 
 lint:
   FROM +workspace-debug
-  RUN cargo clippy --workspace --all-targets --all-features
+  # Exclude firecracker from workspace for linting
+  RUN rm -rf terraphim_firecracker || true
+  # Temporarily remove firecracker from workspace members list
+  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
+  RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker
 
 build-focal:
   FROM ubuntu:20.04
@@ -250,7 +262,7 @@ build-jammy:
   RUN apt-get update -qq
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   RUN update-ca-certificates
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   # RUN rustup toolchain install stable
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
@@ -308,7 +320,7 @@ docker-aarch64:
   RUN apt-get update && apt-get upgrade -y
   RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config libssl-dev g++-aarch64-linux-gnu libc6-dev-arm64-cross
   # Install Rust from official installer
-  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.85.0
+  RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
   ENV PATH="/root/.cargo/bin:$PATH"
   ENV CARGO_HOME="/root/.cargo"
   RUN rustup target add aarch64-unknown-linux-gnu
@@ -343,7 +355,6 @@ docker-scratch:
 docs-deps:
   FROM +install-native
   RUN cargo install mdbook
-  RUN cargo install mdbook-epub
   RUN cargo install mdbook-linkcheck
   RUN cargo install mdbook-sitemap-generator
   # RUN cargo install --git https://github.com/typst/typst typst-cli

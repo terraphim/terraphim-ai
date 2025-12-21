@@ -14,7 +14,7 @@ jobs:
     runs-on: [self-hosted, linux, x64]
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -52,12 +52,12 @@ jobs:
       - name: Build binaries
         run: |
           cargo build --release --package terraphim_server
-          cargo build --release --package terraphim_tui --features repl-full
+          cargo build --release --package terraphim_agent --features repl-full
 
       - name: Build Debian packages
         run: |
           cargo deb --package terraphim_server
-          cargo deb --package terraphim_tui
+          cargo deb --package terraphim_agent
 
       - name: Build Arch Linux packages
         run: |

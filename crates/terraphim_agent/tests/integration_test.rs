@@ -1,5 +1,4 @@
 use std::process::Command;
-use std::str::FromStr;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -264,7 +263,7 @@ async fn test_search_pagination() {
 #[serial]
 fn test_tui_cli_search_command() {
     if !std::process::Command::new("cargo")
-        .args(["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim-agent"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -277,7 +276,7 @@ fn test_tui_cli_search_command() {
         .args([
             "run",
             "--bin",
-            "terraphim_tui",
+            "terraphim-agent",
             "--",
             "search",
             "test",
@@ -305,7 +304,7 @@ fn test_tui_cli_search_command() {
 #[serial]
 fn test_tui_cli_roles_list_command() {
     if !std::process::Command::new("cargo")
-        .args(["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim-agent"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -315,7 +314,7 @@ fn test_tui_cli_roles_list_command() {
     }
 
     let output = Command::new("cargo")
-        .args(["run", "--bin", "terraphim_tui", "--", "roles", "list"])
+        .args(["run", "--bin", "terraphim-agent", "--", "roles", "list"])
         .env("TERRAPHIM_SERVER", TEST_SERVER_URL)
         .output();
 
@@ -335,7 +334,7 @@ fn test_tui_cli_roles_list_command() {
 #[serial]
 fn test_tui_cli_config_show_command() {
     if !std::process::Command::new("cargo")
-        .args(["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim-agent"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -345,7 +344,7 @@ fn test_tui_cli_config_show_command() {
     }
 
     let output = Command::new("cargo")
-        .args(["run", "--bin", "terraphim_tui", "--", "config", "show"])
+        .args(["run", "--bin", "terraphim-agent", "--", "config", "show"])
         .env("TERRAPHIM_SERVER", TEST_SERVER_URL)
         .output();
 
@@ -374,7 +373,7 @@ fn test_tui_cli_config_show_command() {
 #[serial]
 fn test_tui_cli_graph_command() {
     if !std::process::Command::new("cargo")
-        .args(["build", "--bin", "terraphim_tui"])
+        .args(["build", "--bin", "terraphim-agent"])
         .status()
         .map(|s| s.success())
         .unwrap_or(false)
@@ -387,7 +386,7 @@ fn test_tui_cli_graph_command() {
         .args([
             "run",
             "--bin",
-            "terraphim_tui",
+            "terraphim-agent",
             "--",
             "graph",
             "--top-k",

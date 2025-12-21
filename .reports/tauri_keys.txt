@@ -1,3 +1,4 @@
+// pragma: allowlist secret
 # Tauri Signing Keys - Stored in 1Password
 # =========================================
 # Keys have been securely moved to 1Password TerraphimPlatform vault

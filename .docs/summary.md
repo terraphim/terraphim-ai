@@ -224,11 +224,35 @@ cd desktop && yarn run check
 ### Development Workflow
 
 **Pre-commit Hooks** (Required in CI):
-- Conventional Commits format (feat:, fix:, docs:, test:)
+- Conventional Commits format (feat:, fix:, docs:, test:, refactor:)
 - Automatic cargo fmt for Rust code
 - Biome for JavaScript/TypeScript linting
 - Security checks (no secrets, large files)
 - Test coverage requirements
+
+**Testing Guidelines**:
+- Keep fast unit tests inline with `mod tests {}`; put multi-crate checks in `tests/` or `test_*.sh`
+- Scope runs with `cargo test -p crate test`; add regression coverage for new failure modes
+
+**Rust Performance Practices**:
+- Profile first (`cargo bench`, `cargo flamegraph`, `perf`) and land only measured wins
+- Borrow ripgrep tactics: reuse buffers with `with_capacity`, favor iterators, reach for `memchr`/SIMD
+- Apply inline directives sparingly—mark tiny wrappers `#[inline]`, keep cold errors `#[cold]`
+- Prefer zero-copy types (`&[u8]`, `bstr`) and parallelize CPU-bound graph work with `rayon`
+
+**Commit & PR Guidelines**:
+- Use Conventional Commit prefixes (`fix:`, `feat:`, `refactor:`) and keep changes scoped
+- Ensure commits pass `cargo fmt`, `cargo clippy`, required `cargo test`, and desktop checks
+- PRs should explain motivation, link issues, list manual verification commands
+
+**Configuration & Security Tips**:
+- Keep secrets in 1Password or `.env`. Use `build-env.sh` or `scripts/` helpers to bootstrap integrations
+- Wrap optional features (`openrouter`, `mcp-rust-sdk`) with graceful fallbacks for network failures
+
+**Important Rules**:
+- **Never use sleep before curl** - Use proper wait mechanisms instead
+- **Never use timeout command** - This command doesn't exist on macOS
+- **Never use mocks in tests** - Use real implementations
 
 **Commit Standards**:
 - Clear technical descriptions
@@ -541,4 +565,4 @@ cd desktop && yarn run check
 
 ---
 
-*This summary consolidates information from 8 individual file summaries: CLAUDE.md, README.md, Cargo.toml, TESTING_SCRIPTS_README.md, CONTRIBUTING.md, lessons-learned.md, scratchpad.md, and memories.md. Last updated: 2025-11-04*
+*This summary consolidates information from 8 individual file summaries: CLAUDE.md, README.md, Cargo.toml, TESTING_SCRIPTS_README.md, CONTRIBUTING.md, lessons-learned.md, scratchpad.md, and memories.md. Last updated: 2025-12-03*

@@ -416,19 +416,19 @@ async fn test_git_hook_with_repository() {
     // Initialize a git repository
     std::process::Command::new("git")
         .args(["init"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to initialize git repository");
 
     std::process::Command::new("git")
         .args(["config", "user.email", "test@example.com"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to configure git user");
 
     std::process::Command::new("git")
         .args(["config", "user.name", "Test User"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to configure git name");
 
@@ -438,17 +438,17 @@ async fn test_git_hook_with_repository() {
 
     std::process::Command::new("git")
         .args(["add", "test.txt"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to add file to git");
 
     std::process::Command::new("git")
         .args(["commit", "-m", "Initial commit"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to commit");
 
-    let hook = GitHook::new(&repo_path).with_auto_commit(false);
+    let hook = GitHook::new(repo_path).with_auto_commit(false);
 
     let context = create_test_hook_context("git-test");
 
@@ -484,13 +484,13 @@ async fn test_git_hook_with_dirty_repository() {
     // Initialize git repository
     std::process::Command::new("git")
         .args(["init"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to initialize git repository");
 
     std::process::Command::new("git")
         .args(["config", "user.email", "test@example.com"])
-        .current_dir(&repo_path)
+        .current_dir(repo_path)
         .output()
         .expect("Failed to configure git user");
 
@@ -498,7 +498,7 @@ async fn test_git_hook_with_dirty_repository() {
     let test_file = repo_path.join("untracked.txt");
     fs::write(&test_file, "untracked content").await.unwrap();
 
-    let hook = GitHook::new(&repo_path).with_auto_commit(false);
+    let hook = GitHook::new(repo_path).with_auto_commit(false);
 
     let context = create_test_hook_context("git-dirty-test");
 
@@ -614,27 +614,27 @@ async fn test_hook_priority_ordering() {
 
 #[tokio::test]
 async fn test_default_hook_sets() {
-    let default_hooks = vec![
-        Box::new(LoggingHook::new()) as Box<dyn CommandHook + Send + Sync>,
-        Box::new(PreflightCheckHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    let default_hooks: [Box<dyn CommandHook + Send + Sync>; 2] = [
+        Box::new(LoggingHook::new()),
+        Box::new(PreflightCheckHook::new()),
     ];
     assert!(
         !default_hooks.is_empty(),
         "Default hooks should not be empty"
     );
 
-    let development_hooks = vec![
-        Box::new(LoggingHook::new()) as Box<dyn CommandHook + Send + Sync>,
-        Box::new(EnvironmentHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    let development_hooks: [Box<dyn CommandHook + Send + Sync>; 2] = [
+        Box::new(LoggingHook::new()),
+        Box::new(EnvironmentHook::new()),
     ];
     assert!(
         !development_hooks.is_empty(),
         "Development hooks should not be empty"
     );
 
-    let production_hooks = vec![
-        Box::new(PreflightCheckHook::new()) as Box<dyn CommandHook + Send + Sync>,
-        Box::new(ResourceMonitoringHook::new()) as Box<dyn CommandHook + Send + Sync>,
+    let production_hooks: [Box<dyn CommandHook + Send + Sync>; 2] = [
+        Box::new(PreflightCheckHook::new()),
+        Box::new(ResourceMonitoringHook::new()),
     ];
     assert!(
         !production_hooks.is_empty(),

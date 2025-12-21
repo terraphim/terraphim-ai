@@ -195,8 +195,8 @@ mod tests {
             ReplCommand::Web { subcommand } => match subcommand {
                 WebSubcommand::Screenshot {
                     url,
-                    width,
-                    height,
+                    width: _,
+                    height: _,
                     full_page,
                 } => {
                     assert_eq!(url, "https://docs.rs");
