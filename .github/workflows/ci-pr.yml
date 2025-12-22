@@ -1,0 +1,305 @@
+name: CI PR Validation
+on:
+  pull_request:
+    branches: [ main, develop ]
+    types: [ opened, synchronize, reopened ]
+
+# Concurrency to prevent duplicate runs
+concurrency:
+  group: ci-pr-${{ github.ref }}
+  cancel-in-progress: true
+
+# Self-hosted runners with optimized timeouts
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+
+jobs:
+  # Quick change detection
+  changes:
+    name: Detect Changes
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 1
+    outputs:
+      rust-changed: ${{ steps.changes.outputs.rust }}
+      frontend-changed: ${{ steps.changes.outputs.frontend }}
+      dockerfile-changed: ${{ steps.changes.outputs.dockerfile }}
+      docs-changed: ${{ steps.changes.outputs.docs }}
+      should-run-full-ci: ${{ steps.changes.outputs.should-run_full_ci }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 2
+
+      - name: Check for file changes
+        id: changes
+        uses: dorny/paths-filter@v3
+        with:
+          filters: |
+            rust:
+              - '**/*.rs'
+              - 'Cargo.toml'
+              - 'Cargo.lock'
+              - 'rust-toolchain.toml'
+              - '.github/rust-toolchain.toml'
+            frontend:
+              - 'desktop/src/**'
+              - 'desktop/public/**'
+              - 'desktop/package*.json'
+              - 'desktop/*.config.*'
+            dockerfile:
+              - 'docker/**'
+              - 'Dockerfile*'
+              - '.dockerignore'
+            docs:
+              - '**/*.md'
+              - 'docs/**'
+              - '.github/**/*.md'
+          list-files: shell
+
+      - name: Determine if full CI should run
+        id: should_run
+        run: |
+          if [[ "${{ steps.changes.outputs.rust }}" == "true" ]] || \
+             [[ "${{ steps.changes.outputs.frontend }}" == "true" ]] || \
+             [[ "${{ steps.changes.outputs.dockerfile }}" == "true" ]]; then
+            echo "should_run_full_ci=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_run_full_ci=false" >> $GITHUB_OUTPUT
+          fi
+
+  # Rust formatting and linting (quick checks)
+  rust-format:
+    name: Rust Format Check
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 2
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt
+
+      - name: Rustfmt Check
+        run: cargo fmt --all -- --check
+
+  rust-clippy:
+    name: Rust Clippy
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+          components: clippy
+
+      - name: Clippy Check
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  # Quick Rust compilation check
+  rust-compile:
+    name: Rust Compilation Check
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 4
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+
+      - name: Cache Cargo registry and index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-pr-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-pr-
+            ${{ runner.os }}-cargo-
+
+      - name: Check compilation
+        run: |
+          # Quick compilation check without building all binaries
+          cargo check --workspace --all-features
+          # Check key binaries compile
+          cargo check --package terraphim_server --all-features
+          cargo check --package terraphim_mcp_server --all-features
+
+  # Frontend linting and type checking
+  frontend-check:
+    name: Frontend Check
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    needs: changes
+    if: needs.changes.outputs.frontend-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Lint check
+        working-directory: desktop
+        run: npm run lint || true  # Allow failure during transition
+
+      - name: Type check
+        working-directory: desktop
+        run: npm run check
+
+  # Quick unit tests for changed code
+  rust-tests:
+    name: Rust Unit Tests
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    needs: [changes, rust-compile]
+    if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+
+      - name: Cache Cargo registry and index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index
+            ~/.cargo/registry/cache
+            ~/.cargo/git/db
+            target
+          key: ${{ runner.os }}-cargo-test-pr-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-test-pr-
+            ${{ runner.os }}-cargo-pr-
+            ${{ runner.os }}-cargo-
+
+      - name: Run unit tests
+        run: |
+          # Run only unit tests (skip integration tests for speed)
+          cargo test --workspace --lib --bins --all-features -- --test-threads=4
+
+  # WASM build verification
+  wasm-build:
+    name: WASM Build Check
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
+
+      - name: Build WASM
+        run: |
+          ./scripts/build-wasm.sh web dev
+
+  # Security audit
+  security-audit:
+    name: Security Audit
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 2
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+
+      - name: Install cargo-audit
+        run: cargo install cargo-audit
+
+      - name: Run security audit
+        run: cargo audit
+        continue-on-error: true  # Don't fail PR for security advisories
+
+  # Job summary
+  pr-summary:
+    name: PR Validation Summary
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 1
+    needs: [changes, rust-format, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build]
+    if: always()
+
+    steps:
+      - name: Summary
+        run: |
+          echo "## PR Validation Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Changes Detected | ${{ needs.changes.result }} | Rust: ${{ needs.changes.outputs.rust-changed }}, Frontend: ${{ needs.changes.outputs.frontend-changed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Format | ${{ needs.rust-format.result || 'skipped' }} | Code formatting check |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Clippy | ${{ needs.rust-clippy.result || 'skipped' }} | Linting and warnings |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Compile | ${{ needs.rust-compile.result || 'skipped' }} | Compilation verification |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Tests | ${{ needs.rust-tests.result || 'skipped' }} | Unit test execution |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Check | ${{ needs.frontend-check.result || 'skipped' }} | Frontend linting and types |" >> $GITHUB_STEP_SUMMARY
+          echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-clippy.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-tests.result }}" == "failure" ]]; then
+            echo "❌ **PR Validation Failed** - Please fix the failing checks before merging." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "✅ **PR Validation Passed** - All required checks are successful." >> $GITHUB_STEP_SUMMARY
+          fi
