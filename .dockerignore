@@ -1,0 +1,147 @@
+# Git and version control
+.git
+.gitignore
+.gitattributes
+
+# Documentation and examples
+*.md
+docs/
+examples/
+!README.md
+
+# CI/CD files (not needed in container)
+.github/
+.gitlab-ci.yml
+.travis.yml
+
+# Dependencies and caches
+node_modules/
+target/
+Cargo.lock
+
+# Development and test files
+tests/
+test_*.sh
+*_test.go
+*_test.py
+*_test.js
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+
+# Build artifacts and outputs
+dist/
+build/
+out/
+*.tar.gz
+*.zip
+*.deb
+*.rpm
+
+# Secrets and configuration
+.env
+.env.*
+secrets/
+*.pem
+*.key
+*.crt
+
+# Large binary assets and media
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.bmp
+*.tiff
+*.svg
+*.ico
+*.mp4
+*.avi
+*.mov
+*.mp3
+*.wav
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Backup and cache directories
+backup/
+.cache/
+.cache-*/
+
+# Terraform and infrastructure
+*.tf
+*.tfstate
+.terraform/
+
+# Docker files (don't copy docker into docker)
+Dockerfile*
+docker-compose*.yml
+.dockerignore
+
+# Scripts not needed in container
+scripts/
+!scripts/install-dependencies.sh
+
+# Local development
+local/
+.local/
+*.local
+
+# Performance profiling
+*.prof
+*.pprof
+perf.data
+
+# Linter and formatter caches
+.cargo/
+.rustup/
+.node_repl_history
+
+# Rust-specific
+rust-toolchain
+**/*.rs.bk
+Cargo.lock
+
+# WASM specific
+wasm-pack.log
+pkg/
+*.wasm.map
+
+# Tauri specific
+src-tauri/target/
+src-tauri/Cargo.lock
+
+# Desktop frontend (handled separately)
+desktop/src/
+desktop/public/
+!desktop/dist/
+desktop/node_modules/
+desktop/.svelte-kit/
+desktop/package-lock.json
+desktop/yarn.lock
+
+# Exclude temporary directories from workflows
+.github/workflows/backup/
+
+# Keep essential rust configuration
+!rust-toolchain.toml
+!.github/rust-toolchain.toml

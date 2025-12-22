@@ -1,0 +1,328 @@
+name: CI Optimized (Docker Layer Reuse)
+
+on:
+  push:
+    branches: [main, CI_migration, ci-optimized]
+    tags:
+      - "*.*.*"
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+  CACHE_KEY: v1-${{ github.run_id }}
+
+concurrency:
+  group: ci-optimized-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  setup:
+    runs-on: [self-hosted, Linux, X64]
+    outputs:
+      cache-key: ${{ steps.cache.outputs.key }}
+      ubuntu-versions: ${{ steps.ubuntu.outputs.versions }}
+      rust-targets: ${{ steps.targets.outputs.targets }}
+      should-build: ${{ steps.changes.outputs.should-build }}
+
+    steps:
+      - name: Pre-checkout cleanup
+        run: |
+          # Clean up files that may have different permissions from previous runs
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Generate cache key
+        id: cache
+        run: |
+          echo "key=${{ env.CACHE_KEY }}" >> $GITHUB_OUTPUT
+
+      - name: Set Ubuntu versions
+        id: ubuntu
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo 'versions=["20.04", "22.04", "24.04"]' >> $GITHUB_OUTPUT
+          else
+            echo 'versions=["22.04"]' >> $GITHUB_OUTPUT
+          fi
+
+      - name: Set Rust targets
+        id: targets
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]] || [[ "${{ github.ref }}" == refs/tags/* ]]; then
+            echo 'targets=["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu", "x86_64-unknown-linux-musl"]' >> $GITHUB_OUTPUT
+          else
+            echo 'targets=["x86_64-unknown-linux-gnu"]' >> $GITHUB_OUTPUT
+          fi
+
+      - name: Check for relevant changes
+        id: changes
+        run: |
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]] || [[ "${{ github.ref }}" == refs/tags/* ]] || [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          if git diff --name-only HEAD~1 | grep -E "(\.rs$|Cargo\.|Earthfile|desktop/)" > /dev/null; then
+            echo "should-build=true" >> $GITHUB_OUTPUT
+          else
+            echo "should-build=false" >> $GITHUB_OUTPUT
+          fi
+
+  build-base-image:
+    runs-on: [self-hosted, Linux, X64]
+    needs: setup
+    if: needs.setup.outputs.should-build == 'true'
+    outputs:
+      image-tag: ${{ steps.build.outputs.image-tag }}
+
+    steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build base image
+        id: build
+        run: |
+          IMAGE_TAG="terraphim-builder:${{ github.run_number }}-${{ github.sha }}"
+
+          docker buildx build \
+            --file .github/docker/builder.Dockerfile \
+            --tag "${IMAGE_TAG}" \
+            --build-arg UBUNTU_VERSION=22.04 \
+            --load \
+            .
+
+          echo "image-tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+          # Test the image
+          docker run --rm "${IMAGE_TAG}" rustc --version
+          docker run --rm "${IMAGE_TAG}" cargo --version
+
+      - name: Save Docker image
+        run: |
+          IMAGE_TAG="terraphim-builder:${{ github.run_number }}-${{ github.sha }}"
+          docker save "${IMAGE_TAG}" | gzip > terraphim-builder-image.tar.gz
+
+      - name: Upload Docker image artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: terraphim-builder-image
+          path: terraphim-builder-image.tar.gz
+          retention-days: 1
+
+  lint-and-format:
+    runs-on: [self-hosted, Linux, X64]
+    needs: [setup, build-base-image, build-frontend]
+    if: needs.setup.outputs.should-build == 'true'
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
+
+      - name: Verify frontend dist
+        run: |
+          ls -la desktop/dist || echo "No desktop/dist found"
+
+      - name: Run format check
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            ${{ needs.build-base-image.outputs.image-tag }} \
+            cargo fmt --all -- --check
+
+      - name: Run clippy
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            ${{ needs.build-base-image.outputs.image-tag }} \
+            cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+  build-frontend:
+    needs: setup
+    if: needs.setup.outputs.should-build == 'true'
+    uses: ./.github/workflows/frontend-build.yml
+    with:
+      node-version: '20'
+      cache-key: ${{ needs.setup.outputs.cache-key }}
+
+  build-rust:
+    runs-on: [self-hosted, Linux, X64]
+    needs: [setup, build-base-image, build-frontend, lint-and-format]
+    if: needs.setup.outputs.should-build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(needs.setup.outputs.rust-targets) }}
+        ubuntu-version: ${{ fromJSON(needs.setup.outputs.ubuntu-versions) }}
+
+    steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: frontend-dist
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
+
+      - name: Build Rust project
+        run: |
+          # Copy frontend dist to desktop/dist (RustEmbed expects ../desktop/dist relative to terraphim_server)
+          mkdir -p desktop/dist
+          cp -r frontend-dist/* desktop/dist/ || echo "No frontend files found"
+
+          # Build with Docker
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            ${{ needs.build-base-image.outputs.image-tag }} \
+            bash -c "
+              # Build all main binaries
+              cargo build --release --target ${{ matrix.target }} \
+                --package terraphim_server \
+                --package terraphim_mcp_server \
+                --package terraphim_agent
+
+              # Test binaries
+              ./target/${{ matrix.target }}/release/terraphim_server --version
+              ./target/${{ matrix.target }}/release/terraphim_mcp_server --version
+              ./target/${{ matrix.target }}/release/terraphim-agent --version
+            "
+
+      - name: Create .deb package
+        if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            ${{ needs.build-base-image.outputs.image-tag }} \
+            cargo deb --target ${{ matrix.target }} --package terraphim_server --no-build
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: rust-binaries-${{ matrix.target }}-${{ matrix.ubuntu-version }}
+          path: target/${{ matrix.target }}/release/terraphim*
+          retention-days: 30
+
+      - name: Upload .deb packages
+        if: contains(matrix.target, 'linux') && !contains(matrix.target, 'musl')
+        uses: actions/upload-artifact@v5
+        with:
+          name: deb-packages-${{ matrix.target }}-${{ matrix.ubuntu-version }}
+          path: target/${{ matrix.target }}/debian/*.deb
+          retention-days: 30
+
+  test:
+    runs-on: [self-hosted, Linux, X64]
+    needs: [setup, build-base-image, build-frontend, build-rust]
+    if: needs.setup.outputs.should-build == 'true'
+
+    steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
+
+      - name: Download Docker image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: terraphim-builder-image
+          path: .
+
+      - name: Load Docker image
+        run: |
+          docker load < terraphim-builder-image.tar.gz
+
+      - name: Run tests
+        run: |
+          docker run --rm \
+            -v $PWD:/workspace \
+            -w /workspace \
+            ${{ needs.build-base-image.outputs.image-tag }} \
+            cargo test --workspace --all-features
+
+  summary:
+    needs: [lint-and-format, build-frontend, build-rust, test]
+    if: always()
+    runs-on: [self-hosted, Linux, X64]
+
+    steps:
+      - name: Check all jobs succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1
+
+      - name: All jobs succeeded
+        run: |
+          echo "🎉 All optimized CI jobs completed successfully!"
+          echo "✅ Build dependencies fixed"
+          echo "✅ Docker layer reuse optimized"
+          echo "✅ Matrix configuration working"
