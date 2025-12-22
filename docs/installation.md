@@ -4,9 +4,43 @@ This guide covers all available methods to install and deploy Terraphim AI, from
 
 ## 🚀 Quick Start
 
-### Option 1: Docker (Recommended for Beginners)
+### Option 1: Universal Installer (Recommended)
 
-Docker is the easiest way to get Terraphim AI running quickly with all dependencies handled automatically.
+The universal installer provides a single-command installation for all platforms with automatic platform detection and security verification.
+
+```bash
+# Install terraphim-agent (default)
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+
+# Install both agent and CLI tools
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --with-cli
+
+# Install to custom directory
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --install-dir /usr/local/bin
+```
+
+**Features:**
+- ✅ Cross-platform support (Linux, macOS, Windows/WSL)
+- ✅ Automatic platform detection
+- ✅ Security verification with checksums
+- ✅ Pre-built binaries when available
+- ✅ Fallback to source compilation
+- ✅ Multiple installation options
+
+**Installation Options:**
+```bash
+--install-dir DIR       Custom installation directory (default: ~/.local/bin)
+--with-cli              Also install terraphim-cli (automation-focused CLI)
+--cli-only              Install only terraphim-cli
+--version VERSION       Install specific version (default: latest)
+--skip-verify           Skip checksum verification (not recommended)
+--verbose               Enable verbose logging
+--help, -h              Show help message
+```
+
+### Option 2: Docker (Container-based)
+
+Docker provides an isolated environment with all dependencies handled automatically.
 
 ```bash
 # One-command Docker installation
