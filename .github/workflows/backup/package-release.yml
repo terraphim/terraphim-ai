@@ -1,0 +1,232 @@
+name: Package Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  release:
+    runs-on: [self-hosted, linux, x64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install cargo-deb
+        run: cargo install cargo-deb
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            build-essential \
+            pkg-config \
+            libssl-dev \
+            zstd
+
+      - name: Cache cargo registry
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+      - name: Create LICENSE file for cargo-deb
+        run: cp LICENSE-Apache-2.0 LICENSE
+
+      - name: Temporarily disable panic abort for building
+        run: |
+          sed -i 's/panic = "abort"/# panic = "abort"/' .cargo/config.toml
+
+      - name: Build binaries
+        run: |
+          cargo build --release --package terraphim_server
+          cargo build --release --package terraphim_agent --features repl-full
+
+      - name: Build Debian packages
+        run: |
+          cargo deb --package terraphim_server
+          cargo deb --package terraphim_agent
+
+      - name: Build Arch Linux packages
+        run: |
+          # Create source tarball
+          VERSION=${GITHUB_REF#refs/tags/v}
+          git archive --format=tar.gz --prefix=terraphim-server-$VERSION/ $GITHUB_REF -o terraphim-server-$VERSION.tar.gz
+
+          # Create package structure
+          mkdir -p arch-packages/terraphim-server/usr/bin
+          mkdir -p arch-packages/terraphim-server/etc/terraphim-ai
+          mkdir -p arch-packages/terraphim-server/usr/share/doc/terraphim-server
+          mkdir -p arch-packages/terraphim-server/usr/share/licenses/terraphim-server
+
+          # Copy server files
+          cp target/release/terraphim_server arch-packages/terraphim-server/usr/bin/
+          cp terraphim_server/default/*.json arch-packages/terraphim-server/etc/terraphim-ai/
+          cp README.md arch-packages/terraphim-server/usr/share/doc/terraphim-server/
+          cp LICENSE-Apache-2.0 arch-packages/terraphim-server/usr/share/licenses/terraphim-server/
+
+          # Create server PKGINFO
+          cat > arch-packages/terraphim-server/.PKGINFO << EOF
+          pkgname = terraphim-server
+          pkgbase = terraphim-server
+          pkgver = $VERSION-1
+          pkgdesc = Terraphim AI Server - Privacy-first AI assistant backend
+          url = https://terraphim.ai
+          builddate = $(date +%s)
+          packager = Terraphim Contributors <team@terraphim.ai>
+          size = $(stat -c%s target/release/terraphim_server)
+          arch = x86_64
+          license = Apache-2.0
+          depend = glibc
+          depend = openssl
+          provides = terraphim-server
+          EOF
+
+          # Create TUI package structure
+          mkdir -p arch-packages/terraphim-tui/usr/bin
+          mkdir -p arch-packages/terraphim-tui/usr/share/doc/terraphim-tui
+          mkdir -p arch-packages/terraphim-tui/usr/share/licenses/terraphim-tui
+
+          # Copy TUI files
+          cp target/release/terraphim-tui arch-packages/terraphim-tui/usr/bin/
+          cp README.md arch-packages/terraphim-tui/usr/share/doc/terraphim-tui/
+          cp LICENSE-Apache-2.0 arch-packages/terraphim-tui/usr/share/licenses/terraphim-tui/
+
+          # Create TUI PKGINFO
+          cat > arch-packages/terraphim-tui/.PKGINFO << EOF
+          pkgname = terraphim-tui
+          pkgbase = terraphim-tui
+          pkgver = $VERSION-1
+          pkgdesc = Terraphim TUI - Terminal User Interface for Terraphim AI
+          url = https://terraphim.ai
+          builddate = $(date +%s)
+          packager = Terraphim Contributors <team@terraphim.ai>
+          size = $(stat -c%s target/release/terraphim-tui)
+          arch = x86_64
+          license = Apache-2.0
+          depend = glibc
+          depend = openssl
+          provides = terraphim-tui
+          EOF
+
+          # Create Arch packages
+          cd arch-packages
+          tar -I 'zstd -19' -cf terraphim-server-$VERSION-1-x86_64.pkg.tar.zst terraphim-server/
+          tar -I 'zstd -19' -cf terraphim-tui-$VERSION-1-x86_64.pkg.tar.zst terraphim-tui/
+          cd ..
+
+      - name: Create release directory
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          mkdir -p release/$VERSION
+          cp target/debian/*.deb release/$VERSION/
+          cp arch-packages/*.pkg.tar.zst release/$VERSION/
+
+      - name: Create installation scripts
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > release/$VERSION/install.sh << 'EOF'
+          #!/bin/bash
+          # Terraphim AI Installation Script
+          # Auto-generated for release VERSION
+
+          set -e
+          VERSION="VERSION"
+
+          echo "Installing Terraphim AI $VERSION..."
+          # Installation logic would go here
+          EOF
+
+          chmod +x release/$VERSION/install.sh
+
+      - name: Create release README
+        run: |
+          VERSION=${GITHUB_REF#refs/tags/v}
+          cat > release/$VERSION/README.md << EOF
+          # Terraphim AI v$VERSION Installation Guide
+
+          ## Quick Install Options
+
+          ### Option 1: Docker (Recommended)
+          curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/$VERSION/docker-run.sh | bash
+
+          ### Option 2: Debian/Ubuntu
+          wget https://github.com/terraphim/terraphim-ai/releases/download/v$VERSION/terraphim-server_$VERSION-1_amd64.deb
+          sudo dpkg -i terraphim-server_$VERSION-1_amd64.deb
+
+          ### Option 3: Arch Linux
+          wget https://github.com/terraphim/terraphim-ai/releases/download/v$VERSION/terraphim-server-$VERSION-1-x86_64.pkg.tar.zst
+          sudo pacman -U terraphim-server-$VERSION-1-x86_64.pkg.tar.zst
+          EOF
+
+      - name: Restore panic abort setting
+        run: sed -i 's/# panic = "abort"/panic = "abort"/' .cargo/config.toml
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Terraphim AI ${{ github.ref_name }}
+
+            ### 🚀 Installation Options
+
+            #### Docker (Recommended)
+            ```bash
+            curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/release/${{ github.ref_name }}/docker-run.sh | bash
+            ```
+
+            #### Debian/Ubuntu
+            ```bash
+            wget https://github.com/terraphim/terraphim-ai/releases/download/${{ github.ref_name }}/terraphim-server_${{ github.ref_name }}-1_amd64.deb
+            sudo dpkg -i terraphim-server_${{ github.ref_name }}-1_amd64.deb
+            ```
+
+            #### Arch Linux
+            ```bash
+            wget https://github.com/terraphim/terraphim-ai/releases/download/${{ github.ref_name }}/terraphim-server-${{ github.ref_name }}-1-x86_64.pkg.tar.zst
+            sudo pacman -U terraphim-server-${{ github.ref_name }}-1-x86_64.pkg.tar.zst
+            ```
+
+            ### 📦 Available Packages
+            - **terraphim-server**: Main HTTP API server with semantic search
+            - **terraphim-tui**: Terminal User Interface with interactive REPL
+
+            ### 🔧 Features
+            - Privacy-first AI assistant that operates locally
+            - Semantic search across multiple knowledge repositories
+            - Knowledge graph integration with concept extraction
+
+            🤖 Automated release built with GitHub Actions
+          files: |
+            target/debian/*.deb
+            arch-packages/*.pkg.tar.zst
+            release/${{ github.ref_name }}/install.sh
+            release/${{ github.ref_name }}/README.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Clean up
+        run: |
+          rm -f LICENSE
+          rm -f *.tar.gz
+          rm -rf arch-packages/
+
+      - name: Notify release completion
+        run: |
+          echo "✅ Release ${{ github.ref_name }} completed successfully!"
+          echo "📦 Available at: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}"
