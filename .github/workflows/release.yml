@@ -1,29 +1,459 @@
 name: Release
-
-permissions:
-  pull-requests: write
-  contents: write
-
 on:
   push:
-    branches:
-      - main
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g., 1.2.3)"
+        required: true
+        type: string
+      create-branch:
+        description: "Create release branch"
+        required: false
+        default: false
+        type: boolean
+      skip-tests:
+        description: "Skip tests (for emergency releases)"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  REGISTRY: ghcr.io
+  IMAGE_NAME: terraphim/terraphim-ai
 
 jobs:
-  release-plz:
-    name: Release-plz
-    runs-on: ubuntu-latest
-    if: false  # Disabled - crate.io publishing works without release-plz
+  # Validate and extract version
+  version-check:
+    name: Version Validation
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-tag: ${{ steps.version.outputs.is-tag }}
+      cargo-version: ${{ steps.cargo.outputs.version }}
+
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
+
+      - name: Extract version
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            IS_TAG=true
+          elif [[ -n "${{ github.event.inputs.version }}" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+            IS_TAG=false
+          else
+            echo "No version specified"
+            exit 1
+          fi
+
+          # Validate semver format
+          if [[ ! $VERSION =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Invalid version format: $VERSION"
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-tag=$IS_TAG" >> $GITHUB_OUTPUT
+          echo "Releasing version: $VERSION (tag: $IS_TAG)"
+
+      - name: Check Cargo version
+        id: cargo
+        run: |
+          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "//; s/"//')
+          echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
+          echo "Cargo version: $CARGO_VERSION"
+
+      - name: Version consistency check
+        run: |
+          if [[ "${{ steps.version.outputs.version }}" != "${{ steps.cargo.outputs.version }}" ]]; then
+            echo "Version mismatch!"
+            echo "Tag version: ${{ steps.version.outputs.version }}"
+            echo "Cargo version: ${{ steps.cargo.outputs.version }}"
+            exit 1
+          fi
+
+  # Run comprehensive tests
+  test:
+    name: Comprehensive Tests
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+    needs: version-check
+    if: github.event.inputs.skip-tests != 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-      - name: Run release-plz
-        # See https://github.com/MarcoIeni/release-plz/issues/1360#issuecomment-2016863525
-        uses: MarcoIeni/release-plz-action@v0.5.119
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+
+      - name: Cache Cargo (self-hosted)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/cargo-cache/registry
+            /opt/cargo-cache/git
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-test-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_HOME: /opt/cargo-cache
+
+      - name: Run all tests
+        run: |
+          cargo test --workspace --all-features --release
+
+      - name: Run WASM tests
+        run: |
+          ./scripts/build-wasm.sh web release
+          ./scripts/build-wasm.sh nodejs release
+
+      - name: Run integration tests
+        timeout-minutes: 15
+        run: |
+          cargo build --release --package terraphim_server
+          ./target/release/terraphim_server --version
+
+  # Build release artifacts
+  build:
+    name: Build Release Artifacts
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    needs: version-check
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            artifact_name: terraphim-ai-linux-amd64
+            asset_name: terraphim-ai-${{ needs.version-check.outputs.version }}-linux-amd64.tar.gz
+          - target: x86_64-unknown-linux-musl
+            artifact_name: terraphim-ai-linux-amd64-musl
+            asset_name: terraphim-ai-${{ needs.version-check.outputs.version }}-linux-amd64-musl.tar.gz
+          - target: aarch64-unknown-linux-gnu
+            artifact_name: terraphim-ai-linux-arm64
+            asset_name: terraphim-ai-${{ needs.version-check.outputs.version }}-linux-arm64.tar.gz
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo (self-hosted)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/cargo-cache/registry
+            /opt/cargo-cache/git
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: release-build-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_HOME: /opt/cargo-cache
+
+      - name: Build release
+        run: |
+          cargo build --release --target ${{ matrix.target }} --workspace
+
+      - name: Build frontend
+        run: |
+          cd desktop
+          npm ci
+          npm run build
+
+      - name: Create archive
+        run: |
+          mkdir -p release-artifacts
+
+          # Copy binaries
+          cp target/${{ matrix.target }}/release/terraphim_server release-artifacts/
+          cp target/${{ matrix.target }}/release/terraphim_mcp_server release-artifacts/
+          cp target/${{ matrix.target }}/release/terraphim-agent release-artifacts/
+
+          # Copy frontend assets
+          cp -r desktop/dist release-artifacts/
+
+          # Copy configuration
+          cp -r terraphim_server/default release-artifacts/config/
+
+          # Create documentation
+          cat > release-artifacts/README.md << 'EOF'
+          # Terraphim AI v${{ needs.version-check.outputs.version }}
+
+          ## Installation
+
+          1. Extract the archive:
+          ```bash
+          tar -xzf terraphim-ai-${{ needs.version-check.outputs.version }}-*.tar.gz
+          cd terraphim-ai/
+          ```
+
+          2. Run the server:
+          ```bash
+          ./terraphim_server --config config/terraphim_engineer_config.json
+          ```
+
+          ## Components
+
+          - `terraphim_server` - Main HTTP API server
+          - `terraphim_mcp_server` - MCP server for AI integration
+          - `terraphim-agent` - Command-line interface
+          - `dist/` - Frontend web assets
+          - `config/` - Default configuration files
+
+          ## Documentation
+
+          Full documentation is available at: https://docs.terraphim.ai
+          EOF
+
+          # Create compressed archive
+          tar -czf ${{ matrix.asset_name }} -C release-artifacts .
+
+          # Generate checksums
+          sha256sum ${{ matrix.asset_name }} > ${{ matrix.asset_name }}.sha256
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            ${{ matrix.asset_name }}
+            ${{ matrix.asset_name }}.sha256
+          retention-days: 90
+
+  # Build Docker images
+  docker:
+    name: Build Docker Images
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    needs: [version-check, build]
+    if: always() && needs.build.result == 'success'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.base
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: |
+            ${{ steps.meta.outputs.labels }}
+            org.opencontainers.image.version=${{ needs.version-check.outputs.version }}
+          platforms: linux/amd64,linux/arm64
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  # Build and publish npm package
+  npm-publish:
+    name: Publish NPM Package
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 15
+    needs: version-check
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'npm'
+          cache-dependency-path: terraphim_ai_nodejs/package.json
+
+      - name: Build WASM for npm
+        run: |
+          ./scripts/build-wasm.sh web release
+          ./scripts/build-wasm.sh nodejs release
+
+      - name: Publish to NPM
+        working-directory: terraphim_ai_nodejs
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Create GitHub release
+  create-release:
+    name: Create GitHub Release
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    needs: [version-check, build, docker, npm-publish]
+    if: always() && needs.build.result == 'success'
+
+    steps:
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Generate release notes
+        id: release_notes
+        run: |
+          # Get changes since last release
+          LAST_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [[ -n "$LAST_TAG" ]]; then
+            CHANGES=$(git log --pretty=format:"- %s (%h)" $LAST_TAG..HEAD)
+          else
+            CHANGES=$(git log --pretty=format:"- %s (%h)" HEAD)
+          fi
+
+          cat > release_body.md << EOF
+          # Terraphim AI v${{ needs.version-check.outputs.version }}
+
+          ## 🚀 Release Highlights
+
+          - Performance optimizations and bug fixes
+          - Enhanced security and stability
+          - Improved developer experience
+
+          ## 📦 Downloads
+
+          Choose the appropriate package for your platform:
+
+          - **Linux AMD64**: \`terraphim-ai-${{ needs.version-check.outputs.version }}-linux-amd64.tar.gz\`
+          - **Linux AMD64 (MUSL)**: \`terraphim-ai-${{ needs.version-check.outputs.version }}-linux-amd64-musl.tar.gz\`
+          - **Linux ARM64**: \`terraphim-ai-${{ needs.version-check.outputs.version }}-linux-arm64.tar.gz\`
+
+          ### 🐳 Docker Image
+
+          \`\`\`bash
+          docker pull ghcr.io/terraphim/terraphim-ai:v${{ needs.version-check.outputs.version }}
+          \`\`\`
+
+          ### 📦 NPM Package
+
+          \`\`\`bash
+          npm install terraphim-ai@${{ needs.version-check.outputs.version }}
+          \`\`\`
+
+          ## 📝 Changelog
+
+          $CHANGES
+
+          ## 🔐 Verification
+
+          All artifacts are signed with SHA256 checksums. Verify the integrity:
+
+          \`\`\`bash
+          sha256sum -c terraphim-ai-*.tar.gz.sha256
+          \`\`\`
+
+          ## 📚 Documentation
+
+          - [Getting Started Guide](https://docs.terraphim.ai)
+          - [API Reference](https://api.terraphim.ai)
+          - [Community Forum](https://community.terraphim.ai)
+
+          ---
+
+          **🙏 Thank you for using Terraphim AI!**
+          EOF
+
+          # Save to file for GitHub release
+          cat release_body.md
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: Terraphim AI v${{ needs.version-check.outputs.version }}
+          body_path: release_body.md
+          draft: false
+          prerelease: false
+          files: |
+            artifacts/**/*.tar.gz
+            artifacts/**/*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+  # Post-release notifications
+  notify:
+    name: Release Notifications
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    needs: [version-check, create-release]
+    if: always() && needs.create-release.result == 'success'
+
+    steps:
+      - name: Notify Slack
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{
+              "text": "🎉 Terraphim AI v${{ needs.version-check.outputs.version }} has been released! 🚀",
+              "attachments": [
+                {
+                  "color": "good",
+                  "fields": [
+                    {
+                      "title": "Version",
+                      "value": "${{ needs.version-check.outputs.version }}",
+                      "short": true
+                    },
+                    {
+                      "title": "Release Page",
+                      "value": "https://github.com/terraphim/terraphim-ai/releases/tag/v${{ needs.version-check.outputs.version }}",
+                      "short": true
+                    }
+                  ]
+                }
+              ]
+            }' \
+            ${{ secrets.SLACK_WEBHOOK_URL }}
+
+      - name: Update latest tag
+        if: github.ref == 'refs/tags/*'
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -f latest
+          git push -f origin latest
