@@ -56,7 +56,10 @@ pub use session::{
     MockVmProvider, Session, SessionManager, SessionManagerConfig, SessionState, SessionStats,
     VmProvider,
 };
-pub use workflow::{ParsedWorkflow, WorkflowParser, WorkflowStep};
+pub use workflow::{
+    CommandExecutor, CommandResult, MockCommandExecutor, ParsedWorkflow, WorkflowExecutor,
+    WorkflowExecutorConfig, WorkflowParser, WorkflowStep,
+};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
