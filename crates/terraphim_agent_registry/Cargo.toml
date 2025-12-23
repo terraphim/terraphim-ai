@@ -54,7 +54,7 @@ default = []
 benchmarks = ["dep:criterion"]
 
 [dependencies.criterion]
-version = "0.5"
+version = "0.8"
 optional = true
 
 # Disabled due to compilation errors - needs update for current RoleGraph API

@@ -79,7 +79,7 @@ rusqlite = { version = "0.32", features = ["bundled"], optional = true }
 libc = "0.2"
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 insta = "1.34"
 tempfile = "3.8"
 proptest = "1.4"
