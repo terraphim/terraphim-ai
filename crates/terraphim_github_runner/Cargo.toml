@@ -42,5 +42,8 @@ terraphim_service = { path = "../terraphim_service" }
 # Always needed for types
 terraphim_types = { path = "../terraphim_types" }
 
+# Knowledge graph for learning
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }

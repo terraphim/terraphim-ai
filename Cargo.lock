@@ -8535,6 +8535,7 @@ dependencies = [
  "terraphim-firecracker",
  "terraphim_agent_evolution",
  "terraphim_multi_agent",
+ "terraphim_rolegraph",
  "terraphim_service",
  "terraphim_types",
  "thiserror 1.0.69",
