@@ -48,6 +48,11 @@ pub mod workflow;
 
 // Re-exports for convenient access
 pub use error::{GitHubRunnerError, Result};
+pub use learning::{
+    ApplicableLesson, CommandGraphStats, CommandKnowledgeGraph, FailureTracker,
+    InMemoryLearningCoordinator, LearningCoordinator, LearningStats, OptimizationType,
+    SuccessPattern, WorkflowOptimization,
+};
 pub use models::{
     ExecutionStatus, ExecutionStep, GitHubEvent, GitHubEventType, PullRequestInfo, RepositoryInfo,
     RunnerConfig, SessionId, SnapshotId, WorkflowContext, WorkflowResult,
@@ -60,6 +65,9 @@ pub use workflow::{
     CommandExecutor, CommandResult, MockCommandExecutor, ParsedWorkflow, WorkflowExecutor,
     WorkflowExecutorConfig, WorkflowParser, WorkflowStep,
 };
+
+#[cfg(feature = "github-runner")]
+pub use learning::EvolutionLearningCoordinator;
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
