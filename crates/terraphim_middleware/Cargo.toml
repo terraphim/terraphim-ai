@@ -45,7 +45,7 @@ terraphim_persistence = { path = "../terraphim_persistence", features = ["memory
 terraphim_settings = { path = "../terraphim_settings" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
-test-log = { version = "0.2.11", features = ["trace"] }
+test-log = { version = "0.2.19", features = ["trace"] }
 serial_test = "3.0"
 uuid = { version = "1.8.0", features = ["v4"] }
 dotenvy = "0.15.7"
