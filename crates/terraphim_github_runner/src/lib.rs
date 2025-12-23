@@ -52,6 +52,7 @@ pub use models::{
     ExecutionStatus, ExecutionStep, GitHubEvent, GitHubEventType, PullRequestInfo, RepositoryInfo,
     RunnerConfig, SessionId, SnapshotId, WorkflowContext, WorkflowResult,
 };
+pub use workflow::{ParsedWorkflow, WorkflowParser, WorkflowStep};
 
 /// Crate version
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
