@@ -52,6 +52,10 @@ pub use models::{
     ExecutionStatus, ExecutionStep, GitHubEvent, GitHubEventType, PullRequestInfo, RepositoryInfo,
     RunnerConfig, SessionId, SnapshotId, WorkflowContext, WorkflowResult,
 };
+pub use session::{
+    MockVmProvider, Session, SessionManager, SessionManagerConfig, SessionState, SessionStats,
+    VmProvider,
+};
 pub use workflow::{ParsedWorkflow, WorkflowParser, WorkflowStep};
 
 /// Crate version
