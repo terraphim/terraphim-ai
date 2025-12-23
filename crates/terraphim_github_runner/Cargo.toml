@@ -26,6 +26,9 @@ thiserror.workspace = true
 anyhow.workspace = true
 log.workspace = true
 
+# Concurrent data structures
+dashmap = "5.5"
+
 # Internal dependencies (feature-gated)
 terraphim_multi_agent = { path = "../terraphim_multi_agent", optional = true }
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution", optional = true }

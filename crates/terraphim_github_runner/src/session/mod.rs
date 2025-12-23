@@ -4,5 +4,9 @@
 //! - VM allocation and lifecycle management (manager.rs)
 //! - Session tracking per workflow execution
 
-// Will be implemented in Step 2.1
-// pub mod manager;
+pub mod manager;
+
+pub use manager::{
+    MockVmProvider, Session, SessionManager, SessionManagerConfig, SessionState, SessionStats,
+    VmProvider,
+};
