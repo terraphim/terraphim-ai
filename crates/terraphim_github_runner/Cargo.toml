@@ -33,6 +33,9 @@ terraphim_agent_evolution = { path = "../terraphim_agent_evolution", optional = 
 # Firecracker VM integration
 terraphim-firecracker = { path = "../../terraphim_firecracker" }
 
+# LLM integration for workflow understanding
+terraphim_service = { path = "../terraphim_service" }
+
 # Always needed for types
 terraphim_types = { path = "../terraphim_types" }
 
