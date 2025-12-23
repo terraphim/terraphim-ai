@@ -5,15 +5,21 @@ use gpui_component::input::{Input, InputEvent as GpuiInputEvent, InputState};
 use gpui_component::{IconName, StyledExt};
 use std::sync::Arc;
 use terraphim_config::ConfigState;
-use terraphim_service::context::{ContextConfig, ContextManager as TerraphimContextManager};
+use terraphim_service::context::{ContextConfig, TerraphimContextManager};
 use terraphim_service::llm;
-use terraphim_types::{ChatMessage, ContextItem, ContextType, Conversation, ConversationId, RoleName};
+use terraphim_types::{ChatMessage, ContextItem, ContextType, ConversationId, RoleName};
 use tokio::sync::Mutex as TokioMutex;
 
+use crate::slash_command::{
+    SlashCommandPopup, SlashCommandPopupEvent, ViewScope, SuggestionAction, CommandResult,
+};
 use crate::theme::colors::theme;
 
 mod context_edit_modal;
 pub use context_edit_modal::{ContextEditModal, ContextEditModalEvent, ContextEditMode};
+
+mod virtual_scroll;
+use virtual_scroll::{VirtualScrollState, VirtualScrollConfig};
 
 impl EventEmitter<ContextEditModalEvent> for ChatView {}
 
@@ -24,11 +30,15 @@ pub struct ChatView {
     current_conversation_id: Option<ConversationId>,
     current_role: RoleName,
     messages: Vec<ChatMessage>,
+    virtual_scroll_state: VirtualScrollState,
     input_state: Option<Entity<InputState>>,
     is_sending: bool,
     show_context_panel: bool,
     context_items: Vec<ContextItem>,
     context_edit_modal: Entity<ContextEditModal>,
+    context_warning: Option<String>,  // Warning message when context exceeds limits
+    /// Slash command popup for / commands
+    slash_command_popup: Entity<SlashCommandPopup>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -52,15 +62,81 @@ impl ChatView {
         // Initialize input for message composition
         let input_state = cx.new(|cx| InputState::new(window, cx).placeholder("Type your message..."));
 
-        // Subscribe to input events for message sending
+        // Create slash command popup
+        let slash_command_popup = cx.new(|cx| SlashCommandPopup::new(window, cx, ViewScope::Chat));
+
+        // Subscribe to slash command popup events
+        let slash_popup_clone = slash_command_popup.clone();
+        let input_clone_for_slash = input_state.clone();
+        let slash_sub = cx.subscribe(&slash_command_popup, move |this, _popup, event: &SlashCommandPopupEvent, cx| {
+            match event {
+                SlashCommandPopupEvent::SuggestionSelected(suggestion) => {
+                    log::info!("Slash command suggestion selected: {}", suggestion.text);
+
+                    // Handle the suggestion action
+                    match &suggestion.action {
+                        SuggestionAction::Insert { text, replace_trigger } => {
+                            if let Some(input) = &this.input_state {
+                                // For now, append the text
+                                // TODO: Replace trigger text when replace_trigger is true
+                                input.update(cx, |input, _cx| {
+                                    // Input doesn't have direct append, so we'd need window context
+                                    log::debug!("Would insert: {}", text);
+                                });
+                            }
+                        }
+                        SuggestionAction::ExecuteCommand { command_id, args } => {
+                            log::info!("Execute command: {} with args: {:?}", command_id, args);
+                            this.handle_slash_command(command_id, args.clone(), cx);
+                        }
+                        SuggestionAction::Search { query, use_kg } => {
+                            log::info!("Search: {} (use_kg: {})", query, use_kg);
+                            // TODO: Integrate with search
+                        }
+                        _ => {}
+                    }
+                }
+                SlashCommandPopupEvent::CommandExecuted(result) => {
+                    log::info!("Command executed: success={}", result.success);
+                    if let Some(content) = &result.content {
+                        // Insert command result into chat or handle appropriately
+                        log::debug!("Command result: {}", content);
+                    }
+                }
+                SlashCommandPopupEvent::Closed => {
+                    log::debug!("Slash command popup closed");
+                }
+            }
+        });
+
+        // Subscribe to input events for message sending and slash command detection
         let input_clone = input_state.clone();
+        let slash_popup_for_input = slash_command_popup.clone();
         let input_sub = cx.subscribe_in(&input_state, window, move |this, _, ev: &GpuiInputEvent, window, cx| {
             match ev {
-                GpuiInputEvent::PressEnter { .. } => {
+                GpuiInputEvent::Change => {
+                    // Detect slash commands
                     let value = input_clone.read(cx).value();
-                    if !value.is_empty() {
-                        this.send_message(value.to_string(), cx);
-                        // Input will keep text (clearing not critical for now)
+                    let cursor = value.len(); // Approximate cursor at end
+
+                    slash_popup_for_input.update(cx, |popup, cx| {
+                        popup.process_input(&value, cursor, cx);
+                    });
+                }
+                GpuiInputEvent::PressEnter { .. } => {
+                    // Check if slash popup is open - if so, accept selection
+                    let popup_open = slash_popup_for_input.read(cx).is_open();
+
+                    if popup_open {
+                        slash_popup_for_input.update(cx, |popup, cx| {
+                            popup.accept_selected(cx);
+                        });
+                    } else {
+                        let value = input_clone.read(cx).value();
+                        if !value.is_empty() {
+                            this.send_message(value.to_string(), cx);
+                            // Input will keep text (clearing not critical for now)
+                        }
                     }
                 }
                 _ => {}
@@ -69,9 +145,9 @@ impl ChatView {
 
         // Create context edit modal
         let context_edit_modal = cx.new(|cx| ContextEditModal::new(window, cx));
-        
+
         // Subscribe to context edit modal events
-        let modal_clone = context_edit_modal.clone();
+        let _modal_clone = context_edit_modal.clone();
         let modal_sub = cx.subscribe(&context_edit_modal, move |this, _modal, event: &ContextEditModalEvent, cx| {
             match event {
                 ContextEditModalEvent::Create(context_item) => {
@@ -98,12 +174,15 @@ impl ChatView {
             current_conversation_id: None,
             current_role: RoleName::from("Terraphim Engineer"),
             messages: Vec::new(),
+            virtual_scroll_state: VirtualScrollState::new(VirtualScrollConfig::default()),
             input_state: Some(input_state),
             is_sending: false,
             show_context_panel: true,
             context_items: Vec::new(),
             context_edit_modal,
-            _subscriptions: vec![input_sub, modal_sub],
+            context_warning: None,
+            slash_command_popup,
+            _subscriptions: vec![input_sub, modal_sub, slash_sub],
         }
     }
 
@@ -130,6 +209,7 @@ impl ChatView {
                         this.current_conversation_id = Some(conversation_id);
                         this.messages.clear();
                         this.context_items.clear();
+                        this.update_virtual_scroll_state(cx);
                         cx.notify();
                     }).ok();
                 }
@@ -194,13 +274,15 @@ impl ChatView {
                         log::info!("✅ Created conversation: {}", conversation_id.as_str());
                         
                         // Now add context to the newly created conversation
-                        match mgr.add_context(&conversation_id, context_item_clone.clone()) {
-                            Ok(()) => {
+                        match mgr.add_context(&conversation_id, context_item_clone.clone()).await {
+                            Ok(result) => {
                                 log::info!("✅ Added context to new conversation");
-                                
+                                let warning = result.warning.clone();
+
                                 this.update(cx, |this, cx| {
                                     this.current_conversation_id = Some(conversation_id);
                                     this.context_items.push(context_item_clone);
+                                    this.context_warning = warning;
                                     cx.notify();
                                 }).ok();
                             }
@@ -224,12 +306,14 @@ impl ChatView {
         cx.spawn(async move |this, cx| {
             let mut mgr = manager.lock().await;
 
-            match mgr.add_context(&conv_id, context_item.clone()) {
-                Ok(()) => {
+            match mgr.add_context(&conv_id, context_item.clone()).await {
+                Ok(result) => {
                     log::info!("✅ Added context to conversation");
+                    let warning = result.warning.clone();
 
                     this.update(cx, |this, cx| {
                         this.context_items.push(context_item);
+                        this.context_warning = warning;
                         cx.notify();
                     }).ok();
                 }
@@ -257,16 +341,18 @@ impl ChatView {
 
             // TODO: Implement update_context in ContextManager if it doesn't exist
             // For now, delete and re-add
-            match mgr.delete_context(&conv_id, &context_item.id) {
+            match mgr.delete_context(&conv_id, &context_item.id).await {
                 Ok(()) => {
-                    match mgr.add_context(&conv_id, context_item.clone()) {
-                        Ok(()) => {
+                    match mgr.add_context(&conv_id, context_item.clone()).await {
+                        Ok(result) => {
                             log::info!("✅ Updated context in conversation");
+                            let warning = result.warning.clone();
                             this.update(cx, |this, cx| {
                                 // Update in local list
                                 if let Some(item) = this.context_items.iter_mut().find(|item| item.id == context_item.id) {
                                     *item = context_item.clone();
                                 }
+                                this.context_warning = warning;
                                 cx.notify();
                             }).ok();
                         }
@@ -294,7 +380,7 @@ impl ChatView {
         cx.spawn(async move |this, cx| {
             let mut mgr = manager.lock().await;
 
-            match mgr.delete_context(&conv_id, &context_id) {
+            match mgr.delete_context(&conv_id, &context_id).await {
                 Ok(()) => {
                     log::info!("✅ Deleted context: {}", context_id);
 
@@ -310,6 +396,48 @@ impl ChatView {
         }).detach();
     }
 
+    /// Handle slash command execution
+    fn handle_slash_command(&mut self, command_id: &str, args: Option<String>, cx: &mut Context<Self>) {
+        let args_str = args.unwrap_or_default();
+        log::info!("Handling slash command: /{} {}", command_id, args_str);
+
+        match command_id {
+            "summarize" => {
+                // Add summarize request to chat
+                self.send_message("Please summarize the current context.".to_string(), cx);
+            }
+            "explain" => {
+                if !args_str.is_empty() {
+                    self.send_message(format!("Please explain: {}", args_str), cx);
+                }
+            }
+            "search" => {
+                if !args_str.is_empty() {
+                    // TODO: Trigger actual search
+                    log::info!("Would search for: {}", args_str);
+                }
+            }
+            "clear" => {
+                // Clear context
+                self.context_items.clear();
+                cx.notify();
+                log::info!("Context cleared");
+            }
+            "context" => {
+                // Show context summary
+                let count = self.context_items.len();
+                log::info!("Current context has {} items", count);
+            }
+            "help" => {
+                // Could show help in chat
+                log::info!("Available commands: /search, /summarize, /explain, /clear, /context, /help");
+            }
+            _ => {
+                log::debug!("Unhandled command: {}", command_id);
+            }
+        }
+    }
+
     /// Send message with LLM (pattern from Tauri cmd.rs:1668-1838)
     pub fn send_message(&mut self, content: String, cx: &mut Context<Self>) {
         if content.trim().is_empty() {
@@ -321,6 +449,7 @@ impl ChatView {
         // Add user message to local history
         self.messages.push(ChatMessage::user(content.clone()));
         self.is_sending = true;
+        self.update_virtual_scroll_state(cx);
         cx.notify();
 
         let config_state = match &self.config_state {
@@ -362,6 +491,7 @@ impl ChatView {
                         let response = format!("Simulated response (no LLM configured): {}", content);
                         this.messages.push(ChatMessage::assistant(response, Some("simulated".to_string())));
                         this.is_sending = false;
+                        this.update_virtual_scroll_state(cx);
                         cx.notify();
                     }).ok();
                     return;
@@ -374,7 +504,7 @@ impl ChatView {
             // Inject context if conversation exists
             if let Some(conv_id) = &conv_id {
                 let manager = context_manager.lock().await;
-                if let Some(conversation) = manager.get_conversation(conv_id) {
+                if let Ok(conversation) = manager.get_conversation(conv_id).await {
                     if !conversation.global_context.is_empty() {
                         let mut context_content = String::from("=== CONTEXT ===\n");
                         for (idx, item) in conversation.global_context.iter().enumerate() {
@@ -401,6 +531,7 @@ impl ChatView {
                     this.update(cx, |this, cx| {
                         this.messages.push(ChatMessage::assistant(reply, Some(llm_client.name().to_string())));
                         this.is_sending = false;
+                        this.update_virtual_scroll_state(cx);
                         cx.notify();
                     }).ok();
                 }
@@ -409,6 +540,7 @@ impl ChatView {
                     this.update(cx, |this, cx| {
                         this.messages.push(ChatMessage::system(format!("Error: {}", e)));
                         this.is_sending = false;
+                        this.update_virtual_scroll_state(cx);
                         cx.notify();
                     }).ok();
                 }
@@ -520,57 +652,100 @@ impl ChatView {
     }
 
     /// Render message input with real Input component
-    fn render_input(&self, _cx: &Context<Self>) -> impl IntoElement {
+    fn render_input(&self, cx: &Context<Self>) -> impl IntoElement {
+        let popup = &self.slash_command_popup;
+
         div()
+            .relative()  // For popup positioning
             .flex()
-            .gap_2()
-            .px_6()
-            .py_4()
-            .border_t_1()
-            .border_color(theme::border())
-            .children(
-                self.input_state.as_ref().map(|input| {
-                    div()
-                        .flex_1()
-                        .child(Input::new(input))
-                })
+            .flex_col()
+            .child(
+                // Slash command popup (positioned above input)
+                div()
+                    .absolute()
+                    .bottom(px(60.0))  // Position above input
+                    .left(px(24.0))
+                    .child(popup.clone())
             )
             .child(
+                // Input row
                 div()
+                    .flex()
+                    .gap_2()
                     .px_6()
-                    .py_3()
-                    .rounded_md()
-                    .bg(if self.is_sending {
-                        theme::border()
-                    } else {
-                        theme::primary()
-                    })
-                    .text_color(theme::primary_text())
-                    .when(!self.is_sending, |this| {
-                        this.hover(|style| style.bg(theme::primary_hover()).cursor_pointer())
-                    })
-                    .child(if self.is_sending {
-                        "Sending..."
-                    } else {
-                        "Send"
-                    }),
+                    .py_4()
+                    .border_t_1()
+                    .border_color(theme::border())
+                    .children(
+                        self.input_state.as_ref().map(|input| {
+                            div()
+                                .flex_1()
+                                .child(Input::new(input))
+                        })
+                    )
+                    .child(
+                        div()
+                            .px_6()
+                            .py_3()
+                            .rounded_md()
+                            .bg(if self.is_sending {
+                                theme::border()
+                            } else {
+                                theme::primary()
+                            })
+                            .text_color(theme::primary_text())
+                            .when(!self.is_sending, |d| {
+                                d.hover(|style| style.bg(theme::primary_hover()).cursor_pointer())
+                            })
+                            .when(self.is_sending, |d| {
+                                d.flex()
+                                    .items_center()
+                                    .gap_2()
+                                    .child(
+                                        // Spinner for sending state
+                                        div()
+                                            .w_4()
+                                            .h_4()
+                                            .border_2()
+                                            .border_color(theme::text_secondary())
+                                            .rounded_full()
+                                    )
+                                    .child("Sending...")
+                            })
+                            .when(!self.is_sending, |d| {
+                                d.child("Send")
+                            })
+                    )
             )
     }
 
-    /// Render messages area
+    /// Render messages area with virtual scrolling
     fn render_messages(&self, _cx: &Context<Self>) -> impl IntoElement {
         if self.messages.is_empty() {
             return self.render_empty_state().into_any_element();
         }
 
+        let visible_range = self.virtual_scroll_state.get_visible_range();
+        log::trace!("Rendering messages in virtual scroll range: {:?}", visible_range);
+
+        let scroll_offset = self.virtual_scroll_state.get_scroll_offset();
+
         div()
-            .flex()
-            .flex_col()
-            .gap_4()
-            .px_6()
-            .py_4()
-            .children(
-                self.messages.iter().map(|msg| self.render_message(msg))
+            .relative()
+            .size_full()
+            .overflow_hidden()
+            .child(
+                div()
+                    .absolute()
+                    .top(px(-scroll_offset))
+                    .left(px(0.0))
+                    .w_full()
+                    .children(
+                        self.messages.iter().enumerate().map(|(idx, msg)| {
+                            let y_position = self.virtual_scroll_state.get_message_position(idx);
+                            self.render_message_at_position(msg, idx, y_position)
+                        })
+                    )
             )
             .into_any_element()
     }
@@ -626,6 +801,103 @@ impl ChatView {
                             ),
                     ),
             )
+    }
+
+    /// Render a message at a specific position (for virtual scrolling)
+    fn render_message_at_position(&self, message: &ChatMessage, _index: usize, y_position: f32) -> impl IntoElement {
+        let is_user = message.role == "user";
+        let is_system = message.role == "system";
+        let role_label = match message.role.as_str() {
+            "user" => "You".to_string(),
+            "system" => "System".to_string(),
+            "assistant" => message.model.as_deref().unwrap_or("Assistant").to_string(),
+            _ => "Unknown".to_string(),
+        };
+        let content = message.content.clone();
+
+        // Calculate dynamic height based on content length (for future use)
+        let _estimated_height = self.calculate_message_height(&content, is_user, is_system);
+
+        div()
+            .absolute()
+            .top(px(y_position))
+            .left_0()
+            .right_0()
+            .flex()
+            .when(is_user, |this| this.justify_end())
+            .child(
+                div()
+                    .max_w(px(600.0))
+                    .px_4()
+                    .py_3()
+                    .rounded_lg()
+                    .when(is_user, |this| {
+                        this.bg(theme::primary())
+                            .text_color(theme::primary_text())
+                    })
+                    .when(!is_user && !is_system, |this| {
+                        this.bg(theme::surface())
+                            .text_color(theme::text_primary())
+                    })
+                    .when(is_system, |this| {
+                        this.bg(theme::warning())
+                            .text_color(theme::text_primary())
+                    })
+                    .child(
+                        div()
+                            .flex()
+                            .flex_col()
+                            .gap_1()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .opacity(0.8)
+                                    .child(role_label),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .child(content),
+                            ),
+                    ),
+            )
+    }
+
+    /// Calculate estimated height for a message based on content
+    fn calculate_message_height(&self, content: &str, _is_user: bool, _is_system: bool) -> f32 {
+        // Base height for the message bubble
+        let mut height = 60.0; // Base height with padding
+
+        // Add height based on content length (approximate 20px per line)
+        let lines = (content.len() / 50).max(1) as f32;
+        height += lines * 20.0;
+
+        // Add extra height for role label
+        height += 20.0;
+
+        // Add some padding
+        height += 16.0;
+
+        // Minimum height
+        height.max(80.0)
+    }
+
+    /// Update virtual scroll state with current messages
+    fn update_virtual_scroll_state(&mut self, _cx: &mut Context<Self>) {
+        // Calculate heights for all messages
+        let heights: Vec<f32> = self.messages
+            .iter()
+            .map(|msg| {
+                let is_user = msg.role == "user";
+                let is_system = msg.role == "system";
+                self.calculate_message_height(&msg.content, is_user, is_system)
+            })
+            .collect();
+
+        // Update virtual scroll state
+        self.virtual_scroll_state.update_message_count(self.messages.len(), heights);
+
+        log::trace!("Updated virtual scroll state: {} messages", self.messages.len());
     }
 
     /// Render empty state
@@ -754,6 +1026,28 @@ impl Render for ChatView {
                                                     "{} items",
                                                     self.context_items.len()
                                                 )),
+                                        )
+                                        .children(
+                                            self.context_warning.as_ref().map(|warning| {
+                                                div()
+                                                    .mb_3()
+                                                    .px_3()
+                                                    .py_2()
+                                                    .rounded_md()
+                                                    .bg(theme::warning())
+                                                    .text_color(theme::text_primary())
+                                                    .child(
+                                                        div()
+                                                            .text_sm()
+                                                            .font_medium()
+                                                            .child("Context limits reached")
+                                                    )
+                                                    .child(
+                                                        div()
+                                                            .text_xs()
+                                                            .child(warning.clone())
+                                                    )
+                                            })
                                         )
                                         .children(
                                             self.context_items.iter().enumerate().map(|(idx, item)| {
