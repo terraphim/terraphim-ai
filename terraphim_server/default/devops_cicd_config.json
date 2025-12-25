@@ -1,0 +1,223 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+D",
+  "roles": {
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": ".github/workflows",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "scripts",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "crates/terraphim_github_runner",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "DevOps Engineer": {
+      "shortname": "DevOps",
+      "name": "DevOps Engineer",
+      "relevance_function": "terraphim-graph",
+      "theme": "darkly",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": ".docs"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": ".github/workflows",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "file_patterns": ["*.yml", "*.yaml"]
+          }
+        },
+        {
+          "location": "scripts",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "file_patterns": ["*.sh"]
+          }
+        },
+        {
+          "location": "crates/terraphim_github_runner",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": ".docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "blog-posts",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert DevOps Engineer specializing in CI/CD pipelines, GitHub Actions, Firecracker VMs, and infrastructure automation. You have deep knowledge of workflow orchestration, container security, testing strategies, and deployment automation. Focus on providing practical technical guidance for infrastructure as code, pipeline optimization, and system reliability.",
+      "extra": {
+        "specialization": "cicd",
+        "primary_tools": [
+          "GitHub Actions",
+          "Firecracker microVMs",
+          "Docker Buildx",
+          "Cargo (Rust)",
+          "Node.js/npm",
+          "Python/pip"
+        ],
+        "workflow_types": [
+          "ci-native",
+          "vm-execution-tests",
+          "deploy",
+          "publish-crates",
+          "publish-npm",
+          "publish-pypi"
+        ],
+        "knowledge_areas": [
+          "CI/CD pipeline design",
+          "VM orchestration",
+          "Testing strategies",
+          "Security validation",
+          "Performance optimization",
+          "Multi-platform builds"
+        ]
+      }
+    },
+    "GitHub Runner Specialist": {
+      "shortname": "GHR",
+      "name": "GitHub Runner Specialist",
+      "relevance_function": "terraphim-graph",
+      "theme": "cyborg",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "crates/terraphim_github_runner"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "crates/terraphim_github_runner",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": ".github/workflows",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "file_patterns": ["vm-execution-tests.yml", "ci-native.yml"]
+          }
+        },
+        {
+          "location": "HANDOVER.md",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": ".docs/summary-terraphim_github_runner.md",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "/home/alex/projects/terraphim/firecracker-rust/fcctl-web",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a GitHub Runner and Firecracker VM specialist. You have deep expertise in the terraphim_github_runner crate, Firecracker microVM orchestration, workflow execution patterns, and knowledge graph learning integration. You understand VM lifecycle management, SSH authentication, HTTP API integration, and learning coordinator patterns. Focus on providing technical guidance for runner implementation, VM execution patterns, and workflow automation.",
+      "extra": {
+        "specialization": "github-runner",
+        "core_modules": [
+          "VmCommandExecutor",
+          "CommandKnowledgeGraph",
+          "LearningCoordinator",
+          "WorkflowExecutor",
+          "SessionManager",
+          "LlmParser"
+        ],
+        "infrastructure_components": [
+          "Firecracker API",
+          "fcctl-web",
+          "JWT authentication",
+          "SSH key management",
+          "VM snapshots"
+        ],
+        "testing_approaches": [
+          "Unit tests (49 passing)",
+          "Integration tests with real VMs",
+          "End-to-end workflow validation",
+          "Security testing",
+          "Performance benchmarking"
+        ],
+        "performance_metrics": {
+          "vm_creation": "5-10 seconds",
+          "command_execution": "100-150ms",
+          "learning_overhead": "<10ms"
+        }
+      }
+    }
+  },
+  "default_role": "DevOps Engineer",
+  "selected_role": "DevOps Engineer"
+}
