@@ -1,4 +1,5 @@
 /// Network management for VMs
+#[derive(Default)]
 #[allow(dead_code)]
 pub struct NetworkManager;
 

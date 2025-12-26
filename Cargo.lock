@@ -147,6 +147,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "69f7f8c3906b62b754cd5326047894316021dcfe5a194c8ea52bdd94934a3457"
 
 [[package]]
+name = "arraydeque"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7d902e3d592a523def97af8f317b08ce16b7ab854c1985a0c671e6f15cebc236"
+
+[[package]]
 name = "assert-json-diff"
 version = "2.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1032,6 +1038,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "config"
+version = "0.15.19"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b30fa8254caad766fc03cb0ccae691e14bf3bd72bfff27f72802ce729551b3d6"
+dependencies = [
+ "async-trait",
+ "convert_case 0.6.0",
+ "json5",
+ "pathdiff",
+ "ron",
+ "rust-ini",
+ "serde-untagged",
+ "serde_core",
+ "serde_json",
+ "toml 0.9.8",
+ "winnow 0.7.14",
+ "yaml-rust2",
+]
+
+[[package]]
 name = "config-derive"
 version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1551,6 +1577,19 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
+version = "5.5.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
+dependencies = [
+ "cfg-if",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core 0.9.12",
+]
+
+[[package]]
+name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
@@ -2008,6 +2047,19 @@ checksum = "1bf3c259d255ca70051b30e2e95b5446cdb8949ac4cd22c0d7fd634d89f568e2"
 dependencies = [
  "log",
  "regex",
+]
+
+[[package]]
+name = "env_logger"
+version = "0.10.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
+dependencies = [
+ "humantime",
+ "is-terminal",
+ "log",
+ "regex",
+ "termcolor",
 ]
 
 [[package]]
@@ -3173,6 +3225,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
 
 [[package]]
+name = "humantime"
+version = "2.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
+
+[[package]]
 name = "hyper"
 version = "0.14.32"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3827,6 +3885,17 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror 1.0.69",
+]
+
+[[package]]
+name = "json5"
+version = "0.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "96b0db21af676c1ce64250b5f40f3ce2cf27e4e47cb91ed91eb6fe9350b430c1"
+dependencies = [
+ "pest",
+ "pest_derive",
+ "serde",
 ]
 
 [[package]]
@@ -4758,7 +4827,7 @@ dependencies = [
  "bytes",
  "chrono",
  "crc32c",
- "dashmap",
+ "dashmap 6.1.0",
  "futures",
  "getrandom 0.2.16",
  "http 1.4.0",
@@ -4976,6 +5045,12 @@ name = "path-slash"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "498a099351efa4becc6a19c72aa9270598e8fd274ca47052e37455241c88b696"
+
+[[package]]
+name = "pathdiff"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "df94ce210e5bc13cb6651479fa48d14f601d9858cfe0467f43ae157023b938d3"
 
 [[package]]
 name = "peeking_take_while"
@@ -6224,6 +6299,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ron"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fd490c5b18261893f14449cbd28cb9c0b637aebf161cd77900bfdedaff21ec32"
+dependencies = [
+ "bitflags 2.10.0",
+ "once_cell",
+ "serde",
+ "serde_derive",
+ "typeid",
+ "unicode-ident",
+]
+
+[[package]]
 name = "rsa"
 version = "0.9.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6790,6 +6879,18 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-untagged"
+version = "0.1.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9faf48a4a2d2693be24c6289dbe26552776eb7737074e6722891fadbe6c5058"
+dependencies = [
+ "erased-serde",
+ "serde",
+ "serde_core",
+ "typeid",
 ]
 
 [[package]]
@@ -8005,6 +8106,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "termcolor"
+version = "1.4.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
+dependencies = [
+ "winapi-util",
+]
+
+[[package]]
 name = "termtree"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -8017,7 +8127,7 @@ dependencies = [
  "ahash 0.8.12",
  "anyhow",
  "chrono",
- "env_logger",
+ "env_logger 0.11.8",
  "log",
  "lru 0.16.2",
  "mockall",
@@ -8077,6 +8187,32 @@ dependencies = [
  "terraphim_settings",
  "terraphim_types",
  "tokio",
+]
+
+[[package]]
+name = "terraphim-firecracker"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "clap",
+ "config",
+ "dashmap 5.5.3",
+ "env_logger 0.10.2",
+ "fastrand",
+ "futures",
+ "log",
+ "parking_lot 0.12.5",
+ "reqwest 0.12.24",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "test-log",
+ "thiserror 1.0.69",
+ "tokio",
+ "toml 0.9.8",
+ "uuid",
 ]
 
 [[package]]
@@ -8187,7 +8323,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "log",
  "serde",
@@ -8211,7 +8347,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8238,7 +8374,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "log",
  "serde",
@@ -8334,7 +8470,7 @@ dependencies = [
  "anyhow",
  "chrono",
  "clap",
- "env_logger",
+ "env_logger 0.11.8",
  "indexmap 2.12.1",
  "log",
  "mockall",
@@ -8360,7 +8496,7 @@ dependencies = [
  "async-once-cell",
  "async-trait",
  "dirs 6.0.0",
- "env_logger",
+ "env_logger 0.11.8",
  "log",
  "opendal",
  "regex",
@@ -8386,6 +8522,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_github_runner"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "dashmap 5.5.3",
+ "log",
+ "serde",
+ "serde_json",
+ "terraphim-firecracker",
+ "terraphim_agent_evolution",
+ "terraphim_multi_agent",
+ "terraphim_rolegraph",
+ "terraphim_service",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "terraphim_goal_alignment"
 version = "1.0.0"
 dependencies = [
@@ -8393,7 +8551,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8439,7 +8597,7 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "clap",
- "env_logger",
+ "env_logger 0.11.8",
  "log",
  "regex",
  "serde",
@@ -8460,7 +8618,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8488,7 +8646,7 @@ dependencies = [
  "axum",
  "base64 0.21.7",
  "clap",
- "env_logger",
+ "env_logger 0.11.8",
  "regex",
  "rmcp",
  "serde_json",
@@ -8519,7 +8677,7 @@ dependencies = [
  "async-trait",
  "cached",
  "dotenvy",
- "env_logger",
+ "env_logger 0.11.8",
  "futures",
  "grepapp_haystack",
  "html2md",
@@ -8662,7 +8820,7 @@ dependencies = [
  "chrono",
  "clap",
  "dircpy",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "log",
  "mime_guess",
@@ -8707,7 +8865,7 @@ dependencies = [
  "async-stream",
  "async-trait",
  "chrono",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "log",
  "opendal",
@@ -8780,7 +8938,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger",
+ "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
  "log",
@@ -8847,7 +9005,7 @@ version = "0.2.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1e33b98a582ea0be1168eba097538ee8dd4bbe0f2b01b22ac92ea30054e5be7b"
 dependencies = [
- "env_logger",
+ "env_logger 0.11.8",
  "test-log-macros",
  "tracing-subscriber",
 ]
@@ -10678,6 +10836,17 @@ dependencies = [
  "log",
  "mac",
  "markup5ever 0.12.1",
+]
+
+[[package]]
+name = "yaml-rust2"
+version = "0.10.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2462ea039c445496d8793d052e13787f2b90e750b833afee748e601c17621ed9"
+dependencies = [
+ "arraydeque",
+ "encoding_rs",
+ "hashlink 0.10.0",
 ]
 
 [[package]]
