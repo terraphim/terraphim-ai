@@ -1,0 +1,70 @@
+name: Deploy Terraphim.ai Website
+
+on:
+  push:
+    branches: [main]
+    paths: ['website/**']
+  pull_request:
+    branches: [main]
+    paths: ['website/**']
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      deployments: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup 1Password CLI
+        uses: 1password/setup@v1
+        with:
+          op-service-account-token: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+
+      - name: Install Zola
+        run: |
+          curl -L https://github.com/getzola/zola/releases/download/v0.21.0/zola-v0.21.0-x86_64-unknown-linux-gnu.tar.gz | tar xz
+          sudo mv zola /usr/local/bin
+          zola --version
+
+      - name: Install Wrangler
+        run: npm install -g wrangler
+
+      - name: Load 1Password secrets
+        run: |
+          echo "CLOUDFLARE_API_TOKEN=$(op read 'op://Terraphim/Terraphim AI Cloudflare Workers API Token/credential')" >> $GITHUB_ENV
+          echo "CLOUDFLARE_ACCOUNT_ID=$(op read 'op://Terraphim/Terraphim AI Cloudflare Account ID/Account')" >> $GITHUB_ENV
+
+      - name: Authenticate with Cloudflare
+        run: |
+          echo $CLOUDFLARE_API_TOKEN | wrangler auth login
+
+      - name: Build website
+        run: |
+          cd website
+          zola build
+
+      - name: Deploy to Cloudflare Pages
+        run: |
+          cd website
+          if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+            echo "Deploying to production..."
+            wrangler pages deploy public --project-name=terraphim-ai --branch=main
+          else
+            echo "Deploying to preview..."
+            wrangler pages deploy public --project-name=terraphim-ai --branch=preview
+          fi
+
+      - name: Create deployment
+        uses: chrnorm/deployment-action@v2
+        if: github.ref == 'refs/heads/main'
+        with:
+          token: '${{ github.token }}'
+          environment: production
+          ref: ${{ github.sha }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
