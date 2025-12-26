@@ -169,9 +169,18 @@ async fn end_to_end_real_firecracker_vm() {
 
     // Step 3: Create workflow executor with REAL Firecracker VM
     println!("\n🔧 Step 3: Creating WorkflowExecutor with REAL Firecracker VM...");
+    let http_client = Arc::new(
+        reqwest::Client::builder()
+            .pool_max_idle_per_host(10)
+            .pool_idle_timeout(std::time::Duration::from_secs(90))
+            .timeout(std::time::Duration::from_secs(300))
+            .build()
+            .expect("Failed to create HTTP client"),
+    );
     let executor = Arc::new(VmCommandExecutor::with_auth(
         "http://127.0.0.1:8080",
         jwt_token,
+        http_client,
     ));
     let config = WorkflowExecutorConfig::default();
 

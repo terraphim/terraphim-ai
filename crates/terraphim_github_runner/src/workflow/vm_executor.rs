@@ -9,6 +9,7 @@ use crate::session::Session;
 use crate::workflow::executor::{CommandExecutor, CommandResult};
 use async_trait::async_trait;
 use log::{debug, info, warn};
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Duration;
 
@@ -16,8 +17,8 @@ use std::time::Duration;
 pub struct VmCommandExecutor {
     /// Base URL for the fcctl-web API
     api_base_url: String,
-    /// HTTP client
-    client: reqwest::Client,
+    /// HTTP client (shared)
+    client: Arc<reqwest::Client>,
     /// Snapshot counter
     snapshot_counter: AtomicU64,
     /// JWT auth token for API authentication
@@ -25,16 +26,12 @@ pub struct VmCommandExecutor {
 }
 
 impl VmCommandExecutor {
-    /// Create a new VM command executor
+    /// Create a new VM command executor with a shared HTTP client
     ///
     /// # Arguments
     /// * `api_base_url` - Base URL for the fcctl-web API (e.g., "http://localhost:8080")
-    pub fn new(api_base_url: impl Into<String>) -> Self {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(300))
-            .build()
-            .expect("Failed to create HTTP client");
-
+    /// * `client` - Shared HTTP client
+    pub fn new(api_base_url: impl Into<String>, client: Arc<reqwest::Client>) -> Self {
         // Try to get auth token from environment
         let auth_token = std::env::var("FIRECRACKER_AUTH_TOKEN").ok();
 
@@ -46,13 +43,12 @@ impl VmCommandExecutor {
         }
     }
 
-    /// Create a new VM command executor with authentication
-    pub fn with_auth(api_base_url: impl Into<String>, auth_token: impl Into<String>) -> Self {
-        let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(300))
-            .build()
-            .expect("Failed to create HTTP client");
-
+    /// Create a new VM command executor with authentication and shared client
+    pub fn with_auth(
+        api_base_url: impl Into<String>,
+        auth_token: impl Into<String>,
+        client: Arc<reqwest::Client>,
+    ) -> Self {
         Self {
             api_base_url: api_base_url.into(),
             client,
@@ -110,7 +106,7 @@ impl CommandExecutor for VmCommandExecutor {
         let mut request = self.client.post(self.execute_url()).json(&payload);
 
         if let Some(ref token) = self.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.bearer_auth(token);
         }
 
         let response = request
@@ -180,7 +176,7 @@ impl CommandExecutor for VmCommandExecutor {
             .json(&payload);
 
         if let Some(ref token) = self.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.bearer_auth(token);
         }
 
         let response = request.send().await.map_err(|e| {
@@ -227,7 +223,7 @@ impl CommandExecutor for VmCommandExecutor {
             .post(self.rollback_url(&session.vm_id, &snapshot_id.0));
 
         if let Some(ref token) = self.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.bearer_auth(token);
         }
 
         let response = request

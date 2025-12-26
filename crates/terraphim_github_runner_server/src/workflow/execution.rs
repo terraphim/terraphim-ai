@@ -17,16 +17,11 @@ use tracing::{error, info, warn};
 struct FirecrackerVmProvider {
     api_base_url: String,
     auth_token: Option<String>,
-    client: Client,
+    client: Arc<Client>,
 }
 
 impl FirecrackerVmProvider {
-    pub fn new(api_base_url: String, auth_token: Option<String>) -> Self {
-        let client = Client::builder()
-            .timeout(Duration::from_secs(30))
-            .build()
-            .expect("Failed to create HTTP client");
-
+    pub fn new(api_base_url: String, auth_token: Option<String>, client: Arc<Client>) -> Self {
         Self {
             api_base_url,
             auth_token,
@@ -49,7 +44,7 @@ impl VmProvider for FirecrackerVmProvider {
         let mut request = self.client.post(&url).json(&payload);
 
         if let Some(ref token) = self.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.bearer_auth(token);
         }
 
         let response = request.send().await.map_err(|e| {
@@ -94,7 +89,7 @@ impl VmProvider for FirecrackerVmProvider {
         let mut request = self.client.delete(&url);
 
         if let Some(ref token) = self.auth_token {
-            request = request.header("Authorization", format!("Bearer {}", token));
+            request = request.bearer_auth(token);
         }
 
         let response = request.send().await.map_err(|e| {
@@ -319,6 +314,17 @@ pub async fn execute_workflow_in_vm(
     // Parse workflow (with LLM if available)
     let workflow = parse_workflow_yaml_with_llm(workflow_path, llm_parser).await?;
 
+    // Create shared HTTP client with connection pool limits
+    info!("🌐 Creating shared HTTP client with connection pooling");
+    let http_client = Arc::new(
+        Client::builder()
+            .pool_max_idle_per_host(10) // Limit idle connections per host
+            .pool_idle_timeout(Duration::from_secs(90))
+            .timeout(Duration::from_secs(30))
+            .build()
+            .expect("Failed to create HTTP client"),
+    );
+
     // Create VM provider
     info!("🔧 Initializing Firecracker VM provider");
     info!("   - API URL: {}", firecracker_api_url);
@@ -333,15 +339,16 @@ pub async fn execute_workflow_in_vm(
     let vm_provider: Arc<dyn VmProvider> = Arc::new(FirecrackerVmProvider::new(
         firecracker_api_url.to_string(),
         firecracker_auth_token.map(|s| s.to_string()),
+        http_client.clone(),
     ));
 
     // Create VM command executor
     info!("⚡ Creating VmCommandExecutor for Firecracker HTTP API");
     let command_executor: Arc<VmCommandExecutor> =
         Arc::new(if let Some(token) = firecracker_auth_token {
-            VmCommandExecutor::with_auth(firecracker_api_url, token.to_string())
+            VmCommandExecutor::with_auth(firecracker_api_url, token.to_string(), http_client)
         } else {
-            VmCommandExecutor::new(firecracker_api_url)
+            VmCommandExecutor::new(firecracker_api_url, http_client)
         });
 
     // Create learning coordinator

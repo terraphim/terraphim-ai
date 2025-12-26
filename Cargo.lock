@@ -9021,6 +9021,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2",
+ "subtle",
  "terraphim_config",
  "terraphim_github_runner",
  "terraphim_service",

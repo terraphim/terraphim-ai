@@ -15,13 +15,24 @@ use subtle::ConstantTimeEq;
 /// * `Ok(false)` if signature doesn't match
 /// * `Err` if verification fails
 pub fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<bool> {
-    let signature = signature.replace("sha256=", "");
+    // Strip prefix without allocation
+    let signature_bytes = signature
+        .strip_prefix("sha256=")
+        .ok_or_else(|| anyhow::anyhow!("Invalid signature format: missing sha256= prefix"))?;
+
+    // Decode expected signature to bytes (handle invalid hex gracefully)
+    let expected = match hex::decode(signature_bytes) {
+        Ok(bytes) => bytes,
+        Err(_) => return Ok(false), // Invalid hex means signature doesn't match
+    };
+
+    // Compute HMAC
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())?;
     mac.update(body);
     let result = mac.finalize().into_bytes();
-    let hex_signature = hex::encode(result);
 
-    Ok(hex_signature.as_bytes().ct_eq(signature.as_bytes()).into())
+    // Constant-time comparison of bytes (no hex encoding needed)
+    Ok(result.as_slice().ct_eq(&expected).into())
 }
 
 #[cfg(test)]

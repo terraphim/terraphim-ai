@@ -40,7 +40,7 @@ pub struct ImportOptions {
     pub path: Option<PathBuf>,
     /// Only import sessions after this timestamp
     pub since: Option<jiff::Timestamp>,
-    /// Only import sessions before this timestamp  
+    /// Only import sessions before this timestamp
     pub until: Option<jiff::Timestamp>,
     /// Maximum sessions to import
     pub limit: Option<usize>,
