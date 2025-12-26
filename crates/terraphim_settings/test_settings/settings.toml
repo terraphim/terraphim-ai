@@ -6,18 +6,18 @@ default_data_path = '/tmp/terraphim_test'
 datadir = '/tmp/opendal/rocksdb'
 type = 'rocksdb'
 
+[profiles.dash]
+type = 'dashmap'
+root = '/tmp/dashmaptest'
+
 [profiles.s3]
-bucket = 'test'
-endpoint = 'http://rpi4node3:8333/'
-access_key_id = 'test_key'
-type = 's3'
-region = 'us-west-1'
 secret_access_key = 'test_secret'
+type = 's3'
+bucket = 'test'
+access_key_id = 'test_key'
+endpoint = 'http://rpi4node3:8333/'
+region = 'us-west-1'
 
 [profiles.sled]
-type = 'sled'
 datadir = '/tmp/opendal/sled'
-
-[profiles.dash]
-root = '/tmp/dashmaptest'
-type = 'dashmap'
+type = 'sled'
