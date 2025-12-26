@@ -534,4 +534,4 @@ Configure alerts for:
 6. 🔄 Configure monitoring
 7. 🔄 Optimize performance
 
-See [Architecture Documentation](../docs/github-runner-architecture.md) for deep dive into system design.
+See [Architecture Documentation](./github-runner-architecture.md) for deep dive into system design.

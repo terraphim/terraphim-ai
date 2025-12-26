@@ -1,9 +1,10 @@
 use anyhow::Result;
+use reqwest::Client;
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use terraphim_github_runner::Result as RunnerResult;
 use terraphim_github_runner::{
     ExecutionStatus, InMemoryLearningCoordinator, LearningCoordinator, ParsedWorkflow,
@@ -12,24 +13,105 @@ use terraphim_github_runner::{
 };
 use tracing::{error, info, warn};
 
-/// VM provider that delegates to VmCommandExecutor
+/// VM provider that allocates real Firecracker VMs via fcctl-web API
 struct FirecrackerVmProvider {
-    _api_base_url: String,
-    _auth_token: Option<String>,
+    api_base_url: String,
+    auth_token: Option<String>,
+    client: Client,
+}
+
+impl FirecrackerVmProvider {
+    pub fn new(api_base_url: String, auth_token: Option<String>) -> Self {
+        let client = Client::builder()
+            .timeout(Duration::from_secs(30))
+            .build()
+            .expect("Failed to create HTTP client");
+
+        Self {
+            api_base_url,
+            auth_token,
+            client,
+        }
+    }
 }
 
 #[async_trait::async_trait]
 impl VmProvider for FirecrackerVmProvider {
-    async fn allocate(&self, _vm_type: &str) -> RunnerResult<(String, Duration)> {
-        // This is a placeholder - in real implementation, we'd call the Firecracker API
-        // For now, return a mock VM ID
-        Ok((
-            format!("fc-vm-{}", uuid::Uuid::new_v4()),
-            Duration::from_millis(100),
-        ))
+    async fn allocate(&self, vm_type: &str) -> RunnerResult<(String, Duration)> {
+        let start = Instant::now();
+        let url = format!("{}/api/vms", self.api_base_url);
+
+        let payload = serde_json::json!({
+            "vm_type": vm_type,
+            "vm_name": format!("github-runner-{}", uuid::Uuid::new_v4())
+        });
+
+        let mut request = self.client.post(&url).json(&payload);
+
+        if let Some(ref token) = self.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request.send().await.map_err(|e| {
+            terraphim_github_runner::GitHubRunnerError::VmAllocation(format!(
+                "API request failed: {}",
+                e
+            ))
+        })?;
+
+        if !response.status().is_success() {
+            return Err(terraphim_github_runner::GitHubRunnerError::VmAllocation(
+                format!("Allocation failed with status: {}", response.status()),
+            ));
+        }
+
+        let result: serde_json::Value = response.json().await.map_err(|e| {
+            terraphim_github_runner::GitHubRunnerError::VmAllocation(format!(
+                "Failed to parse response: {}",
+                e
+            ))
+        })?;
+
+        let vm_id = result["id"]
+            .as_str()
+            .ok_or_else(|| {
+                terraphim_github_runner::GitHubRunnerError::VmAllocation(
+                    "No VM ID in response".to_string(),
+                )
+            })?
+            .to_string();
+
+        let duration = start.elapsed();
+
+        info!("Allocated VM {} in {:?}", vm_id, duration);
+
+        Ok((vm_id, duration))
     }
 
-    async fn release(&self, _vm_id: &str) -> RunnerResult<()> {
+    async fn release(&self, vm_id: &str) -> RunnerResult<()> {
+        let url = format!("{}/api/vms/{}", self.api_base_url, vm_id);
+
+        let mut request = self.client.delete(&url);
+
+        if let Some(ref token) = self.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request.send().await.map_err(|e| {
+            terraphim_github_runner::GitHubRunnerError::VmAllocation(format!(
+                "Release API request failed: {}",
+                e
+            ))
+        })?;
+
+        if !response.status().is_success() {
+            return Err(terraphim_github_runner::GitHubRunnerError::VmAllocation(
+                format!("Release failed with status: {}", response.status()),
+            ));
+        }
+
+        info!("Released VM {}", vm_id);
+
         Ok(())
     }
 }
@@ -248,10 +330,10 @@ pub async fn execute_workflow_in_vm(
             "No"
         }
     );
-    let vm_provider: Arc<dyn VmProvider> = Arc::new(FirecrackerVmProvider {
-        _api_base_url: firecracker_api_url.to_string(),
-        _auth_token: firecracker_auth_token.map(|s| s.to_string()),
-    });
+    let vm_provider: Arc<dyn VmProvider> = Arc::new(FirecrackerVmProvider::new(
+        firecracker_api_url.to_string(),
+        firecracker_auth_token.map(|s| s.to_string()),
+    ));
 
     // Create VM command executor
     info!("⚡ Creating VmCommandExecutor for Firecracker HTTP API");

@@ -64,10 +64,10 @@ test_users = [
     },
     {
         "id": "test_user_123",
-        "github_id": 123456789,
+        "github_id": 123456790,
         "username": "testuser",
         "email": "test@example.com",
-        "avatar_url": "https://avatars.githubusercontent.com/u/123456789",
+        "avatar_url": "https://avatars.githubusercontent.com/u/123456790",
         "subscription_tier": "demo",
     },
 ]

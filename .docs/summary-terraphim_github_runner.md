@@ -113,7 +113,7 @@ GitHub Webhook → WorkflowContext → ParsedWorkflow → SessionManager
 ### Optional Environment Variables
 - `FIRECRACKER_VM_TYPE`: Default VM type (default: `bionic-test`)
 - `RUST_LOG`: Logging verbosity (default: `info`)
-- `OPENRouter_API_KEY`: For LLM-based workflow parsing
+- `OPENROUTER_API_KEY`: For LLM-based workflow parsing
 
 ## Test Coverage
 

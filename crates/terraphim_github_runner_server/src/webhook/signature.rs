@@ -1,6 +1,7 @@
 use anyhow::Result;
 use hmac::{Hmac, Mac};
 use sha2::Sha256;
+use subtle::ConstantTimeEq;
 
 /// Verify GitHub webhook signature using HMAC-SHA256
 ///
@@ -13,14 +14,14 @@ use sha2::Sha256;
 /// * `Ok(true)` if signature is valid
 /// * `Ok(false)` if signature doesn't match
 /// * `Err` if verification fails
-pub async fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<bool> {
+pub fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<bool> {
     let signature = signature.replace("sha256=", "");
     let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())?;
     mac.update(body);
     let result = mac.finalize().into_bytes();
     let hex_signature = hex::encode(result);
 
-    Ok(hex_signature == signature)
+    Ok(hex_signature.as_bytes().ct_eq(signature.as_bytes()).into())
 }
 
 #[cfg(test)]
@@ -37,9 +38,7 @@ mod tests {
         mac.update(body);
         let signature = format!("sha256={}", hex::encode(mac.finalize().into_bytes()));
 
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(verify_signature(secret, &signature, body));
+        let result = verify_signature(secret, &signature, body);
 
         assert!(result.unwrap());
     }
@@ -49,9 +48,7 @@ mod tests {
         let secret = "test_secret";
         let body = b"test payload";
 
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(verify_signature(secret, "sha256=invalid", body));
+        let result = verify_signature(secret, "sha256=invalid", body);
 
         assert!(!result.unwrap());
     }
@@ -68,9 +65,7 @@ mod tests {
         let signature = format!("sha256={}", hex::encode(mac.finalize().into_bytes()));
 
         // Verify with secret2
-        let result = tokio::runtime::Runtime::new()
-            .unwrap()
-            .block_on(verify_signature(secret2, &signature, body));
+        let result = verify_signature(secret2, &signature, body);
 
         assert!(!result.unwrap());
     }

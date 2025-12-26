@@ -191,5 +191,5 @@ The SSH connection issue is an **infrastructure problem** (AppArmor permissions)
 
 ---
 
-*Proof generated: 2024-12-24*
+*Proof generated: 2025-12-24*
 *All implementation files in: `crates/terraphim_github_runner/src/`*

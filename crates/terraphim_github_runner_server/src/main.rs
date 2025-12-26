@@ -2,7 +2,7 @@ use anyhow::Result;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{Level, error, info};
+use tracing::{error, info, Level};
 
 mod config;
 mod github;
@@ -192,7 +192,7 @@ async fn handle_webhook(req: &mut Request, res: &mut Response) -> Result<(), Sta
         }
     };
 
-    match verify_signature(&settings.github_webhook_secret, &signature, body).await {
+    match verify_signature(&settings.github_webhook_secret, &signature, body) {
         Ok(true) => (),
         Ok(false) => {
             error!("Invalid webhook signature");

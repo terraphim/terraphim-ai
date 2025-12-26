@@ -82,5 +82,5 @@ The Firecracker rootfs permission issue is **completely fixed**. VMs can now:
 
 ---
 
-*Fixed: 2024-12-24*
+*Fixed: 2025-12-24*
 *All changes in: `/etc/systemd/system/fcctl-web.service.d/`*

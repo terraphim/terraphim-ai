@@ -173,15 +173,19 @@ impl CommandExecutor for VmCommandExecutor {
             "description": format!("Snapshot after step: {}", name),
         });
 
-        let response = self
+        // Send request with optional auth
+        let mut request = self
             .client
             .post(self.snapshot_url(&session.vm_id))
-            .json(&payload)
-            .send()
-            .await
-            .map_err(|e| {
-                GitHubRunnerError::SnapshotFailed(format!("Snapshot request failed: {}", e))
-            })?;
+            .json(&payload);
+
+        if let Some(ref token) = self.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request.send().await.map_err(|e| {
+            GitHubRunnerError::SnapshotFailed(format!("Snapshot request failed: {}", e))
+        })?;
 
         if response.status().is_success() {
             let body: serde_json::Value = response.json().await.map_err(|e| {
@@ -217,9 +221,16 @@ impl CommandExecutor for VmCommandExecutor {
             session.vm_id, snapshot_id.0
         );
 
-        let response = self
+        // Send request with optional auth
+        let mut request = self
             .client
-            .post(self.rollback_url(&session.vm_id, &snapshot_id.0))
+            .post(self.rollback_url(&session.vm_id, &snapshot_id.0));
+
+        if let Some(ref token) = self.auth_token {
+            request = request.header("Authorization", format!("Bearer {}", token));
+        }
+
+        let response = request
             .send()
             .await
             .map_err(|e| GitHubRunnerError::RollbackFailed {

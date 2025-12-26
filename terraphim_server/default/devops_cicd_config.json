@@ -172,13 +172,6 @@
           "read_only": true,
           "atomic_server_secret": null,
           "extra_parameters": {}
-        },
-        {
-          "location": "/home/alex/projects/terraphim/firecracker-rust/fcctl-web",
-          "service": "Ripgrep",
-          "read_only": true,
-          "atomic_server_secret": null,
-          "extra_parameters": {}
         }
       ],
       "llm_provider": "ollama",
