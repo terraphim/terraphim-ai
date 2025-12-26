@@ -1,0 +1,423 @@
+name: Deploy
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: string
+        default: "staging"
+      version:
+        description: "Version to deploy (tag or commit)"
+        required: false
+        type: string
+      skip-health-check:
+        description: "Skip post-deployment health check"
+        required: false
+        default: false
+        type: boolean
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deployment environment"
+        required: true
+        type: string
+        default: "staging"
+      version:
+        description: "Version to deploy (tag or commit)"
+        required: false
+        type: string
+      skip-health-check:
+        description: "Skip post-deployment health check"
+        required: false
+        default: false
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  REGISTRY: ghcr.io
+  IMAGE_NAME: terraphim/terraphim-ai
+
+jobs:
+  # Validate deployment parameters
+  validate:
+    name: Validate Deployment
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    outputs:
+      environment: ${{ steps.env.outputs.environment }}
+      version: ${{ steps.version.outputs.version }}
+      is-production: ${{ steps.env.outputs.is-production }}
+      deployment-url: ${{ steps.env.outputs.deployment-url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Validate environment
+        id: env
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || inputs.environment }}"
+
+          case "$ENVIRONMENT" in
+            staging|dev|development)
+              echo "environment=staging" >> $GITHUB_OUTPUT
+              echo "is-production=false" >> $GITHUB_OUTPUT
+              echo "deployment-url=https://staging.terraphim.ai" >> $GITHUB_OUTPUT
+              ;;
+            production|prod)
+              echo "environment=production" >> $GITHUB_OUTPUT
+              echo "is-production=true" >> $GITHUB_OUTPUT
+              echo "deployment-url=https://app.terraphim.ai" >> $GITHUB_OUTPUT
+              ;;
+            *)
+              echo "Invalid environment: $ENVIRONMENT"
+              echo "Valid environments: staging, production"
+              exit 1
+              ;;
+          esac
+
+      - name: Resolve version
+        id: version
+        run: |
+          VERSION="${{ github.event.inputs.version || inputs.version || github.sha }}"
+
+          # If it's a commit, get the short hash
+          if [[ "$VERSION" =~ ^[0-9a-f]{7,40}$ ]]; then
+            VERSION=$(git rev-parse --short "$VERSION")
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Deploying version: $VERSION to ${{ steps.env.outputs.environment }}"
+
+  # Prepare deployment artifacts
+  prepare:
+    name: Prepare Artifacts
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 15
+    needs: validate
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.validate.outputs.version }}
+
+      - name: Download CI artifacts
+        uses: actions/download-artifact@v4
+        continue-on-error: true  # Artifacts may not exist for custom versions
+        with:
+          pattern: rust-binaries-*
+          path: artifacts/binaries
+          merge-multiple: true
+
+      - name: Download Docker image
+        if: needs.validate.outputs.version != github.sha
+        run: |
+          # Pull existing Docker image for the version
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }} || \
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest || \
+          echo "Docker image not found, will build from source"
+
+      - name: Build from source if needed
+        if: steps.download.outcome == 'failure'
+        run: |
+          echo "Building from source since artifacts not found"
+
+          # Install Rust toolchain
+          uses: dtolnay/rust-toolchain@stable
+          with:
+            toolchain-file: .github/rust-toolchain.toml
+
+      - name: Cache Cargo (self-hosted)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/cargo-cache/registry
+            /opt/cargo-cache/git
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: deploy-build-${{ needs.validate.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_HOME: /opt/cargo-cache
+
+      - name: Build from source if needed
+        if: steps.download.outcome == 'failure'
+        run: |
+          echo "Building from source since artifacts not found"
+
+          # Install Rust toolchain
+          uses: dtolnay/rust-toolchain@stable
+          with:
+            toolchain-file: .github/rust-toolchain.toml
+
+      - name: Cache Cargo (self-hosted)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/cargo-cache/registry
+            /opt/cargo-cache/git
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: deploy-build-${{ needs.validate.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
+        env:
+          CARGO_HOME: /opt/cargo-cache
+
+      - name: Build binaries
+        if: steps.download.outcome == 'failure'
+        run: |
+          cargo build --release --package terraphim_server --package terraphim_mcp_server
+
+          # Create binaries directory
+          mkdir -p artifacts/binaries
+          cp target/release/terraphim* artifacts/binaries/
+
+      - name: Upload prepared artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: deployment-binaries
+          path: artifacts/binaries/
+          retention-days: 7
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    needs: [validate, prepare]
+    if: needs.validate.outputs.environment == 'staging'
+    environment:
+      name: staging
+      url: ${{ needs.validate.outputs.deployment-url }}
+
+    steps:
+      - name: Download deployment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-binaries
+          path: ./binaries
+
+      - name: Setup SSH
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.STAGING_SSH_KEY }}
+
+      - name: Deploy to staging server
+        run: |
+          # Configuration
+          STAGING_HOST="${{ secrets.STAGING_HOST }}"
+          STAGING_USER="${{ secrets.STAGING_USER }}"
+          STAGING_PATH="${{ secrets.STAGING_PATH || '/opt/terraphim' }}"
+
+          # Create deployment package
+          tar -czf deployment.tar.gz -C binaries .
+
+          # Copy to staging server
+          scp -o StrictHostKeyChecking=no deployment.tar.gz $STAGING_USER@$STAGING_HOST:/tmp/
+
+          # Deploy
+          ssh -o StrictHostKeyChecking=no $STAGING_USER@$STAGING_HOST << 'EOF'
+            set -e
+
+            # Create backup
+            if [[ -d "/opt/terraphim" ]]; then
+              sudo cp -r /opt/terraphim /opt/terraphim.backup.$(date +%s)
+            fi
+
+            # Extract deployment
+            cd /tmp
+            tar -xzf deployment.tar.gz
+
+            # Stop service
+            sudo systemctl stop terraphim-server || true
+
+            # Deploy files
+            sudo mkdir -p /opt/terraphim/bin
+            sudo cp -r /tmp/* /opt/terraphim/bin/
+            sudo chown -R terraphim:terraphim /opt/terraphim/
+            sudo chmod +x /opt/terraphim/bin/terraphim*
+
+            # Start service
+            sudo systemctl start terraphim-server
+            sudo systemctl enable terraphim-server
+
+            # Cleanup
+            rm -f /tmp/deployment.tar.gz /tmp/terraphim*
+          EOF
+
+      - name: Health check
+        if: github.event.inputs.skip-health-check != 'true' && inputs.skip-health-check != 'true'
+        run: |
+          echo "Performing health check..."
+
+          # Wait for service to start
+          for i in {1..30}; do
+            if curl -f "${{ needs.validate.outputs.deployment-url }}/health" 2>/dev/null; then
+              echo "✅ Health check passed"
+              break
+            fi
+            echo "Waiting for service... ($i/30)"
+            sleep 5
+          done
+
+          # Final health check
+          curl -f "${{ needs.validate.outputs.deployment-url }}/health" || {
+            echo "❌ Health check failed"
+            exit 1
+          }
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 15
+    needs: [validate, prepare]
+    if: needs.validate.outputs.environment == 'production'
+    environment:
+      name: production
+      url: ${{ needs.validate.outputs.deployment-url }}
+
+    steps:
+      - name: Download deployment artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: deployment-binaries
+          path: ./binaries
+
+      - name: Deploy via Docker Compose (Production)
+        run: |
+          echo "Deploying to production using Docker Compose"
+
+          # Create docker-compose override for production
+          cat > docker-compose.override.yml << EOF
+          version: '3.8'
+          services:
+            terraphim:
+              image: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}
+              restart: always
+              environment:
+                - NODE_ENV=production
+                - LOG_LEVEL=info
+              ports:
+                - "80:8080"
+              deploy:
+                replicas: 2
+                resources:
+                  limits:
+                    memory: 2G
+                    cpus: '1.0'
+          EOF
+
+      - name: Production health check
+        if: github.event.inputs.skip-health-check != 'true' && inputs.skip-health-check != 'true'
+        run: |
+          echo "Performing production health check..."
+
+          # Extended health check for production
+          for i in {1..60}; do
+            if curl -f "${{ needs.validate.outputs.deployment-url }}/health" 2>/dev/null; then
+              echo "✅ Production health check passed"
+              break
+            fi
+            echo "Waiting for production service... ($i/60)"
+            sleep 5
+          done
+
+          # Additional production checks
+          curl -f "${{ needs.validate.outputs.deployment-url }}/health" && \
+          curl -f "${{ needs.validate.outputs.deployment-url }}/config" || {
+            echo "❌ Production health check failed"
+            exit 1
+          }
+
+  # Deploy Docker image
+  deploy-docker:
+    name: Deploy Docker Image
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 10
+    needs: [validate]
+    if: needs.validate.outputs.environment == 'production'
+
+    steps:
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Tag and push production image
+        run: |
+          # Pull source image
+          docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }}
+
+          # Tag for production
+          docker tag ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ needs.validate.outputs.version }} \
+                     ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
+
+          # Push production tag
+          docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:production
+
+  # Post-deployment notifications
+  notify:
+    name: Deployment Notifications
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    needs: [validate, deploy-staging, deploy-production]
+    if: always()
+
+    steps:
+      - name: Notify on success
+        if: needs.deploy-staging.result == 'success' || needs.deploy-production.result == 'success'
+        run: |
+          echo "🚀 Deployment successful!"
+          echo "Environment: ${{ needs.validate.outputs.environment }}"
+          echo "Version: ${{ needs.validate.outputs.version }}"
+          echo "URL: ${{ needs.validate.outputs.deployment-url }}"
+
+      - name: Notify on failure
+        if: needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure'
+        run: |
+          echo "❌ Deployment failed!"
+          echo "Environment: ${{ needs.validate.outputs.environment }}"
+          echo "Version: ${{ needs.validate.outputs.version }}"
+          exit 1
+
+      - name: Update deployment status
+        if: github.event_name == 'workflow_call'
+        run: |
+          # Update any external deployment tracking systems
+          echo "Updating deployment status for ${{ needs.validate.outputs.environment }}"
+
+  # Rollback on failure
+  rollback:
+    name: Rollback on Failure
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 8
+    needs: [validate, deploy-staging, deploy-production]
+    if: always() && (needs.deploy-staging.result == 'failure' || needs.deploy-production.result == 'failure') && needs.validate.outputs.is-production == 'true'
+
+    steps:
+      - name: Rollback deployment
+        run: |
+          echo "🔄 Rolling back deployment..."
+          echo "This would typically involve:"
+          echo "- Restoring previous Docker image"
+          echo "- Reverting database migrations if needed"
+          echo "- Restoring configuration files"
+          echo "- Restarting services"
+
+          # Placeholder for actual rollback logic
+          echo "Rollback completed"

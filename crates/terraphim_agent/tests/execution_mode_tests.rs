@@ -38,6 +38,7 @@ fn create_test_command(
             description: Some("Input parameter".to_string()),
             default_value: None,
             validation: None,
+            allowed_values: None,
         }],
     }
 }

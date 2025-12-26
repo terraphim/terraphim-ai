@@ -12,6 +12,17 @@ Terraphim is a privacy-first AI assistant that works for you under your complete
 ## 🆕 v1.0.0 Minimal Release - NOW AVAILABLE!
 
 **Quick Install** (works on Linux, macOS, Windows):
+
+**Option 1: Universal Installer** (recommended)
+```bash
+# Single command installation with platform detection
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+
+# Install both agent and CLI tools
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --with-cli
+```
+
+**Option 2: Cargo Install**
 ```bash
 cargo install terraphim-repl    # Interactive REPL (11 commands)
 cargo install terraphim-cli     # Automation CLI (8 commands)
@@ -40,14 +51,22 @@ We're excited to announce Terraphim AI v1.0.0 with comprehensive multi-language 
 - **🐍 Python**: `terraphim-automata` - High-performance text processing library via PyPI
 
 ### 🚀 Quick Installation
+
+**Universal Installer (Recommended)**
 ```bash
-# Rust CLI (recommended)
+# Single command installation for all platforms
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+```
+
+**Package Managers**
+```bash
+# Rust CLI (interactive TUI)
 cargo install terraphim_agent
 
-# Node.js package
+# Node.js package (autocomplete + knowledge graph)
 npm install @terraphim/autocomplete
 
-# Python library
+# Python library (high-performance text processing)
 pip install terraphim-automata
 ```
 
