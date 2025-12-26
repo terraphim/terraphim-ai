@@ -316,14 +316,23 @@ pub async fn execute_workflow_in_vm(
 
     // Create shared HTTP client with connection pool limits
     info!("🌐 Creating shared HTTP client with connection pooling");
+
+    // Configure timeouts via environment variables
+    let client_timeout_secs = std::env::var("HTTP_CLIENT_TIMEOUT_SECS")
+        .ok()
+        .and_then(|s| s.parse::<u64>().ok())
+        .unwrap_or(30); // Default 30 seconds
+
     let http_client = Arc::new(
         Client::builder()
             .pool_max_idle_per_host(10) // Limit idle connections per host
             .pool_idle_timeout(Duration::from_secs(90))
-            .timeout(Duration::from_secs(30))
+            .timeout(Duration::from_secs(client_timeout_secs))
             .build()
             .expect("Failed to create HTTP client"),
     );
+
+    info!("⏱️  HTTP client timeout: {}s", client_timeout_secs);
 
     // Create VM provider
     info!("🔧 Initializing Firecracker VM provider");
@@ -444,47 +453,92 @@ pub async fn execute_workflows_in_vms(
     gh_event: &terraphim_github_runner::GitHubEvent,
     firecracker_api_url: &str,
     firecracker_auth_token: Option<&str>,
-    llm_parser: Option<&WorkflowParser>,
+    _llm_parser: Option<&WorkflowParser>,
 ) -> Result<String> {
     if workflow_paths.is_empty() {
         return Ok("No workflows to execute".to_string());
     }
 
-    let mut results = vec![];
+    info!(
+        "🚀 Executing {} workflows in parallel with VM isolation",
+        workflow_paths.len()
+    );
 
-    for workflow_path in &workflow_paths {
-        match execute_workflow_in_vm(
-            workflow_path,
-            gh_event,
-            firecracker_api_url,
-            firecracker_auth_token,
-            llm_parser,
-        )
-        .await
-        {
-            Ok(output) => {
-                results.push(format!(
-                    "## {}\n{}",
-                    workflow_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown"),
-                    output
-                ));
+    // Use JoinSet for bounded parallel execution
+    use tokio::task::JoinSet;
+    let mut join_set = JoinSet::new();
+
+    // Configure max concurrent workflows
+    // Each workflow gets its own VM, so this limits VM usage
+    let max_concurrent = std::env::var("MAX_CONCURRENT_WORKFLOWS")
+        .ok()
+        .and_then(|s| s.parse::<usize>().ok())
+        .unwrap_or(5); // Default to 5 concurrent workflows
+
+    info!("📊 Max concurrent workflows: {}", max_concurrent);
+
+    // Spawn workflow tasks with bounded concurrency
+    for workflow_path in workflow_paths {
+        // Wait for available slot if we've reached max concurrent
+        while join_set.len() >= max_concurrent {
+            if let Some(result) = join_set.join_next().await {
+                // Collect completed result (ignore errors, they're already logged)
+                let _ = result;
             }
+        }
+
+        let workflow_path = workflow_path.clone();
+        let gh_event = gh_event.clone();
+        let firecracker_api_url = firecracker_api_url.to_string();
+        let firecracker_auth_token = firecracker_auth_token.map(|s| s.to_string());
+
+        // Spawn task for each workflow
+        // Each task creates its own HTTP client and VM, ensuring isolation
+        // Note: LLM parser not used in parallel execution to avoid lifetime issues
+        join_set.spawn(async move {
+            let workflow_name = workflow_path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("unknown")
+                .to_string();
+
+            info!("📋 Starting workflow: {}", workflow_name);
+
+            let result = execute_workflow_in_vm(
+                &workflow_path,
+                &gh_event,
+                &firecracker_api_url,
+                firecracker_auth_token.as_deref(),
+                None, // No LLM parser in parallel execution
+            )
+            .await;
+
+            match result {
+                Ok(output) => {
+                    info!("✅ Workflow succeeded: {}", workflow_name);
+                    format!("## {}\n{}", workflow_name, output)
+                }
+                Err(e) => {
+                    warn!("❌ Workflow failed: {} - {}", workflow_name, e);
+                    format!("## ❌ {}\n\nExecution failed: {}", workflow_name, e)
+                }
+            }
+        });
+    }
+
+    // Collect all remaining results
+    let mut results = vec![];
+    while let Some(result) = join_set.join_next().await {
+        match result {
+            Ok(output) => results.push(output),
             Err(e) => {
-                let error_msg = format!(
-                    "## ❌ {}\n\nExecution failed: {}",
-                    workflow_path
-                        .file_name()
-                        .and_then(|n| n.to_str())
-                        .unwrap_or("unknown"),
-                    e
-                );
-                results.push(error_msg);
+                warn!("Workflow task panicked: {}", e);
+                results.push("## ❌ Workflow panicked during execution".to_string());
             }
         }
     }
+
+    info!("✅ All {} workflows completed", results.len());
 
     Ok(results.join("\n\n"))
 }
