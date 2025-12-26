@@ -11,7 +11,7 @@ mod workflow;
 use config::Settings;
 use github::post_pr_comment;
 use webhook::verify_signature;
-use workflow::discover_workflows_for_event;
+use workflow::{discover_workflows_for_event, execute_workflows_in_vms};
 
 /// GitHub webhook payload structure
 #[derive(Debug, Clone, Deserialize)]
@@ -88,8 +88,7 @@ async fn execute_workflows_for_event(
     info!("Found {} workflow(s) to execute", workflows.len());
 
     // Convert GitHub webhook to terraphim_github_runner event format
-    // TODO: Actually execute workflows using gh_event
-    let _gh_event = GitHubEvent {
+    let gh_event = GitHubEvent {
         event_type: match event_type {
             "pull_request" => GitHubEventType::PullRequest,
             "push" => GitHubEventType::Push,
@@ -127,22 +126,20 @@ async fn execute_workflows_for_event(
         extra: std::collections::HashMap::new(),
     };
 
-    // TODO: Execute workflows using terraphim_github_runner
-    // For now, just list what we found
-    let mut results = vec![];
-    for workflow_path in &workflows {
-        let workflow_name = workflow_path
-            .file_name()
-            .and_then(|n| n.to_str())
-            .unwrap_or("unknown");
-        results.push(format!("- {} (would execute)", workflow_name));
-    }
-
-    if results.is_empty() {
-        Ok("No workflows executed".to_string())
+    // Execute workflows in VMs
+    let firecracker_token = if settings.firecracker_auth_token.is_empty() {
+        None
     } else {
-        Ok(format!("Workflows processed:\n{}", results.join("\n")))
-    }
+        Some(settings.firecracker_auth_token.as_str())
+    };
+
+    execute_workflows_in_vms(
+        workflows,
+        &gh_event,
+        &settings.firecracker_api_url,
+        firecracker_token,
+    )
+    .await
 }
 
 /// Handle incoming webhook requests

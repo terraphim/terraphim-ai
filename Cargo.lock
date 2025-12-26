@@ -8988,7 +8988,9 @@ dependencies = [
  "async-trait",
  "chrono",
  "dashmap 5.5.3",
+ "env_logger 0.11.8",
  "log",
+ "reqwest 0.12.24",
  "serde",
  "serde_json",
  "terraphim-firecracker",
@@ -9007,11 +9009,14 @@ name = "terraphim_github_runner_server"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "async-trait",
+ "chrono",
  "clap",
  "hex",
  "hmac",
  "jsonwebtoken",
  "octocrab",
+ "reqwest 0.12.24",
  "salvo",
  "serde",
  "serde_json",
@@ -9021,6 +9026,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+ "uuid",
 ]
 
 [[package]]
