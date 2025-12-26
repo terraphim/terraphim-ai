@@ -1,6 +1,7 @@
 use anyhow::Result;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use tracing::{Level, error, info};
 
 mod config;
@@ -12,6 +13,9 @@ use config::Settings;
 use github::post_pr_comment;
 use webhook::verify_signature;
 use workflow::{discover_workflows_for_event, execute_workflows_in_vms};
+
+// Optional LLM integration using terraphim_service
+use terraphim_service::llm::LlmClient;
 
 /// GitHub webhook payload structure
 #[derive(Debug, Clone, Deserialize)]
@@ -56,7 +60,19 @@ async fn execute_workflows_for_event(
     webhook: &GitHubWebhook,
     settings: &Settings,
 ) -> Result<String> {
-    use terraphim_github_runner::{GitHubEvent, GitHubEventType, RepositoryInfo};
+    use terraphim_github_runner::{GitHubEvent, GitHubEventType, RepositoryInfo, WorkflowParser};
+
+    // Create optional LLM client and parser
+    let llm_client = create_llm_client();
+    let llm_parser = llm_client
+        .as_ref()
+        .map(|client| WorkflowParser::new(client.clone()));
+
+    if llm_parser.is_some() {
+        info!("🤖 LLM-based workflow parsing enabled");
+    } else {
+        info!("📋 Using simple YAML parser (LLM not configured)");
+    }
 
     // Determine event type
     let event_type = if !webhook.action.is_empty() {
@@ -138,6 +154,7 @@ async fn execute_workflows_for_event(
         &gh_event,
         &settings.firecracker_api_url,
         firecracker_token,
+        llm_parser.as_ref(),
     )
     .await
 }
@@ -304,6 +321,69 @@ async fn handle_webhook(req: &mut Request, res: &mut Response) -> Result<(), Sta
     }
 
     Ok(())
+}
+
+/// Create optional LLM client based on configuration and environment
+fn create_llm_client() -> Option<Arc<dyn LlmClient>> {
+    use std::env;
+
+    // Check if LLM parsing is enabled
+    if env::var("USE_LLM_PARSER").unwrap_or_default() != "true" {
+        return None;
+    }
+
+    info!("🔧 Attempting to build LLM client from environment configuration");
+
+    // Build a mock Role from environment variables
+    let mut role = terraphim_config::Role::new("github-runner");
+
+    // Add Ollama configuration from environment
+    if let Ok(base_url) = env::var("OLLAMA_BASE_URL") {
+        role.extra.insert(
+            "llm_provider".to_string(),
+            serde_json::Value::String("ollama".to_string()),
+        );
+        role.extra.insert(
+            "ollama_base_url".to_string(),
+            serde_json::Value::String(base_url),
+        );
+
+        if let Ok(model) = env::var("OLLAMA_MODEL") {
+            role.extra
+                .insert("ollama_model".to_string(), serde_json::Value::String(model));
+        }
+
+        info!("📦 Configured Ollama from environment variables");
+    }
+
+    // Add OpenRouter configuration from environment
+    #[cfg(feature = "openrouter")]
+    if let Ok(api_key) = env::var("OPENROUTER_API_KEY") {
+        role.llm_api_key = Some(api_key);
+        role.llm_enabled = true;
+
+        if let Ok(model) = env::var("OPENROUTER_MODEL") {
+            role.llm_model = Some(model);
+        }
+
+        role.extra.insert(
+            "llm_provider".to_string(),
+            serde_json::Value::String("openrouter".to_string()),
+        );
+
+        info!("📦 Configured OpenRouter from environment variables");
+    }
+
+    // Use terraphim_service's build function
+    let client = terraphim_service::llm::build_llm_from_role(&role);
+
+    if let Some(ref client) = client {
+        info!("✅ Successfully created LLM client: {}", client.name());
+    } else {
+        info!("⚠️  Failed to create LLM client - check configuration");
+    }
+
+    client
 }
 
 #[tokio::main]

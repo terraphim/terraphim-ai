@@ -1,0 +1,25 @@
+name: Test CI Workflow
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        run: echo "Checking out code..."
+
+      - name: Run tests
+        run: |
+          echo "Running tests..."
+          echo "✓ Test 1 passed"
+          echo "✓ Test 2 passed"
+
+      - name: Build project
+        run: |
+          echo "Building project..."
+          echo "Build complete!"

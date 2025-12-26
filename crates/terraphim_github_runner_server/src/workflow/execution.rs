@@ -1,4 +1,5 @@
 use anyhow::Result;
+use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -7,7 +8,7 @@ use terraphim_github_runner::Result as RunnerResult;
 use terraphim_github_runner::{
     ExecutionStatus, InMemoryLearningCoordinator, LearningCoordinator, ParsedWorkflow,
     SessionManager, SessionManagerConfig, VmCommandExecutor, VmProvider, WorkflowContext,
-    WorkflowExecutor, WorkflowExecutorConfig, WorkflowStep,
+    WorkflowExecutor, WorkflowExecutorConfig, WorkflowParser, WorkflowStep,
 };
 use tracing::{error, info, warn};
 
@@ -31,6 +32,54 @@ impl VmProvider for FirecrackerVmProvider {
     async fn release(&self, _vm_id: &str) -> RunnerResult<()> {
         Ok(())
     }
+}
+
+/// Parse a GitHub Actions workflow YAML into a ParsedWorkflow
+/// Uses LLM-based parsing if LLM client is available, otherwise falls back to simple parser
+pub async fn parse_workflow_yaml_with_llm(
+    workflow_path: &Path,
+    llm_parser: Option<&WorkflowParser>,
+) -> Result<ParsedWorkflow> {
+    let workflow_yaml = fs::read_to_string(workflow_path)?;
+    let workflow_name = workflow_path
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or("unknown")
+        .to_string();
+
+    // Use LLM parser if available and enabled
+    if let Some(parser) = llm_parser {
+        if env::var("USE_LLM_PARSER").unwrap_or_default() == "true" {
+            info!("🤖 Using LLM-based workflow parsing for: {}", workflow_name);
+            match parser.parse_workflow_yaml(&workflow_yaml).await {
+                Ok(workflow) => {
+                    info!("✅ LLM successfully parsed workflow: {}", workflow_name);
+                    info!("   - {} steps extracted", workflow.steps.len());
+                    info!("   - {} setup commands", workflow.setup_commands.len());
+                    for (i, step) in workflow.steps.iter().enumerate() {
+                        info!(
+                            "   - Step {}: {} (command: {})",
+                            i + 1,
+                            step.name,
+                            step.command.chars().take(50).collect::<String>()
+                        );
+                    }
+                    return Ok(workflow);
+                }
+                Err(e) => {
+                    warn!(
+                        "⚠️  LLM parsing failed, falling back to simple parser: {}",
+                        e
+                    );
+                    // Fall through to simple parser
+                }
+            }
+        }
+    }
+
+    // Fallback to simple YAML parser
+    info!("📋 Using simple YAML parser for: {}", workflow_name);
+    parse_workflow_yaml_simple(workflow_path)
 }
 
 /// Parse a GitHub Actions workflow YAML into a ParsedWorkflow
@@ -179,19 +228,33 @@ pub async fn execute_workflow_in_vm(
     gh_event: &terraphim_github_runner::GitHubEvent,
     firecracker_api_url: &str,
     firecracker_auth_token: Option<&str>,
+    llm_parser: Option<&WorkflowParser>,
 ) -> Result<String> {
-    info!("Executing workflow: {:?}", workflow_path.file_name());
+    info!("=========================================================");
+    info!("🚀 EXECUTING WORKFLOW: {:?}", workflow_path.file_name());
+    info!("=========================================================");
 
-    // Parse workflow
-    let workflow = parse_workflow_yaml_simple(workflow_path)?;
+    // Parse workflow (with LLM if available)
+    let workflow = parse_workflow_yaml_with_llm(workflow_path, llm_parser).await?;
 
     // Create VM provider
+    info!("🔧 Initializing Firecracker VM provider");
+    info!("   - API URL: {}", firecracker_api_url);
+    info!(
+        "   - Auth: {}",
+        if firecracker_auth_token.is_some() {
+            "Yes"
+        } else {
+            "No"
+        }
+    );
     let vm_provider: Arc<dyn VmProvider> = Arc::new(FirecrackerVmProvider {
         _api_base_url: firecracker_api_url.to_string(),
         _auth_token: firecracker_auth_token.map(|s| s.to_string()),
     });
 
     // Create VM command executor
+    info!("⚡ Creating VmCommandExecutor for Firecracker HTTP API");
     let command_executor: Arc<VmCommandExecutor> =
         Arc::new(if let Some(token) = firecracker_auth_token {
             VmCommandExecutor::with_auth(firecracker_api_url, token.to_string())
@@ -200,10 +263,12 @@ pub async fn execute_workflow_in_vm(
         });
 
     // Create learning coordinator
+    info!("🧠 Initializing LearningCoordinator for pattern tracking");
     let _learning_coordinator: Arc<dyn LearningCoordinator> =
         Arc::new(InMemoryLearningCoordinator::new("github-runner"));
 
     // Create session manager with VM provider
+    info!("🎯 Creating SessionManager with Firecracker VM provider");
     let session_config = SessionManagerConfig::default();
     let session_manager = Arc::new(SessionManager::with_provider(
         vm_provider.clone(),
@@ -211,6 +276,7 @@ pub async fn execute_workflow_in_vm(
     ));
 
     // Create workflow executor
+    info!("🔨 Creating WorkflowExecutor with VM command executor");
     let config = WorkflowExecutorConfig::default();
     let workflow_executor =
         WorkflowExecutor::with_executor(command_executor.clone(), session_manager, config);
@@ -289,6 +355,7 @@ pub async fn execute_workflows_in_vms(
     gh_event: &terraphim_github_runner::GitHubEvent,
     firecracker_api_url: &str,
     firecracker_auth_token: Option<&str>,
+    llm_parser: Option<&WorkflowParser>,
 ) -> Result<String> {
     if workflow_paths.is_empty() {
         return Ok("No workflows to execute".to_string());
@@ -302,6 +369,7 @@ pub async fn execute_workflows_in_vms(
             gh_event,
             firecracker_api_url,
             firecracker_auth_token,
+            llm_parser,
         )
         .await
         {
