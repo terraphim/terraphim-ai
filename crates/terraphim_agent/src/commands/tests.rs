@@ -49,6 +49,7 @@ mod tests {
                     description: Some("Input parameter".to_string()),
                     default_value: None,
                     validation: None,
+                    allowed_values: None,
                 },
                 CommandParameter {
                     name: "verbose".to_string(),
@@ -57,6 +58,7 @@ mod tests {
                     description: Some("Verbose output".to_string()),
                     default_value: Some(serde_json::Value::Bool(false)),
                     validation: None,
+                    allowed_values: None,
                 },
             ],
         }

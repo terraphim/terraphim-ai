@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-use crate::performance::{Sub2SecondOptimizer, PREWARMED_ALLOCATION_TARGET};
+use crate::performance::{PREWARMED_ALLOCATION_TARGET, Sub2SecondOptimizer};
 use crate::vm::{Vm, VmInstance, VmManager, VmState};
 
 pub mod allocation;
@@ -410,7 +410,7 @@ impl VmPoolManager {
 }
 
 /// Pool statistics
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct PoolStats {
     pub type_stats: std::collections::HashMap<String, PoolTypeStats>,
     pub total_vms: usize,
@@ -421,13 +421,7 @@ pub struct PoolStats {
 
 impl PoolStats {
     pub fn new() -> Self {
-        Self {
-            type_stats: std::collections::HashMap::new(),
-            total_vms: 0,
-            total_ready_vms: 0,
-            total_running_vms: 0,
-            total_snapshotted_vms: 0,
-        }
+        Self::default()
     }
 
     pub fn summary(&self) -> String {

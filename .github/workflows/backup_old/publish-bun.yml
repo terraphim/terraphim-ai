@@ -1,0 +1,545 @@
+name: Publish to Bun Registry
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (semantic version)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode only'
+        required: false
+        type: boolean
+        default: true
+      tag:
+        description: 'Bun tag (latest, beta, alpha, etc.)'
+        required: false
+        type: string
+        default: 'latest'
+  push:
+    tags:
+      - 'bun-v*'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Validate Package for Bun
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Run Bun tests
+        run: bun test:all
+
+      - name: Check package.json validity
+        run: |
+          bun -e "const pkg = require('./package.json'); console.log('Package name:', pkg.name); console.log('Version:', pkg.version);"
+
+      - name: Validate Bun compatibility
+        run: |
+          # Test that the package works correctly with Bun
+          bun -e "
+          const pkg = require('./package.json');
+          console.log('✅ Package loaded successfully with Bun');
+          console.log('Bun metadata:', pkg.bun);
+          "
+
+      - name: Validate version format
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/bun-v//')
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid version format: $VERSION"
+              exit 1
+            fi
+            echo "Version to publish: $VERSION"
+          fi
+
+  build:
+    name: Build Multi-Platform Binaries for Bun
+    runs-on: ${{ matrix.settings.host }}
+    needs: validate
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            build: yarn build --target x86_64-apple-darwin
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            build: yarn build --target x86_64-unknown-linux-gnu
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: yarn build --target x86_64-pc-windows-msvc
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            build: yarn build --target aarch64-apple-darwin
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
+            build: yarn build --target aarch64-unknown-linux-gnu
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        if: ${{ !matrix.settings.docker }}
+        with:
+          node-version: '20'
+          cache: 'yarn'
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        if: ${{ !matrix.settings.docker }}
+        with:
+          toolchain: stable
+          targets: ${{ matrix.settings.target }}
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo-cache
+            target/
+          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build in docker
+        uses: addnab/docker-run-action@v3
+        if: ${{ matrix.settings.docker }}
+        with:
+          image: ${{ matrix.settings.docker }}
+          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
+          run: ${{ matrix.settings.build }}
+
+      - name: Build
+        run: ${{ matrix.settings.build }}
+        if: ${{ !matrix.settings.docker }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: "*.node"
+          if-no-files-found: error
+
+  test-bun-compatibility:
+    name: Test Bun Compatibility
+    runs-on: ${{ matrix.settings.os }}
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - os: macos-latest
+            target: x86_64-apple-darwin
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+        bun:
+          - 'latest'
+          - '1.1.13'  # Latest stable
+          - '1.0.0'  # LTS
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: ${{ matrix.bun }}
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: .
+
+      - name: Test package functionality with Bun
+        run: |
+          # Create Bun-specific test
+          cat > test-bun-functionality.js << 'EOF'
+          import * as pkg from './index.js';
+
+          console.log('🧪 Testing package functionality with Bun v' + process.versions.bun);
+          console.log('Available functions:', Object.keys(pkg));
+
+          // Test autocomplete functionality
+          if (typeof pkg.buildAutocompleteIndexFromJson === 'function') {
+            console.log('✅ buildAutocompleteIndexFromJson available');
+
+            const thesaurus = {
+              name: "Test",
+              data: {
+                "machine learning": {
+                  id: 1,
+                  nterm: "machine learning",
+                  url: "https://example.com/ml"
+                }
+              }
+            };
+
+            const indexBytes = pkg.buildAutocompleteIndexFromJson(JSON.stringify(thesaurus));
+            console.log('✅ Autocomplete index built:', indexBytes.length, 'bytes');
+
+            const results = pkg.autocomplete(indexBytes, "machine", 10);
+            console.log('✅ Autocomplete search results:', results.length, 'items');
+          }
+
+          // Test knowledge graph functionality
+          if (typeof pkg.buildRoleGraphFromJson === 'function') {
+            console.log('✅ buildRoleGraphFromJson available');
+
+            const graphBytes = pkg.buildRoleGraphFromJson("Test Role", JSON.stringify(thesaurus));
+            console.log('✅ Role graph built:', graphBytes.length, 'bytes');
+
+            const stats = pkg.getGraphStats(graphBytes);
+            console.log('✅ Graph stats loaded:', stats);
+          }
+
+          console.log('🎉 All functionality tests passed with Bun!');
+          EOF
+
+          bun test-bun-functionality.js
+
+      - name: Test performance with Bun
+        run: |
+          # Performance benchmark
+          cat > benchmark-bun.js << 'EOF'
+          import * as pkg from './index.js';
+          import { performance } from 'perf_hooks';
+
+          const thesaurus = {
+            name: "Performance Test",
+            data: {
+              "machine learning": { id: 1, nterm: "machine learning", url: "https://example.com/ml" },
+              "deep learning": { id: 2, nterm: "deep learning", url: "https://example.com/dl" },
+              "neural networks": { id: 3, nterm: "neural networks", url: "https://example.com/nn" }
+            }
+          };
+
+          // Benchmark autocomplete
+          const start = performance.now();
+          const indexBytes = pkg.buildAutocompleteIndexFromJson(JSON.stringify(thesaurus));
+          const buildTime = performance.now() - start;
+
+          const searchStart = performance.now();
+          const results = pkg.autocomplete(indexBytes, "machine", 10);
+          const searchTime = performance.now() - searchStart;
+
+          console.log('📊 Performance Metrics (Bun):');
+          console.log('  - Index building:', buildTime.toFixed(2), 'ms');
+          console.log('  - Search time:', searchTime.toFixed(2), 'ms');
+          console.log('  - Results found:', results.length);
+          console.log('  - Index size:', indexBytes.length, 'bytes');
+          EOF
+
+          bun benchmark-bun.js
+
+  create-universal-macos-bun:
+    name: Create Universal macOS Binary for Bun
+    runs-on: macos-latest
+    needs: build
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-x86_64-apple-darwin
+          path: artifacts
+
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-aarch64-apple-darwin
+          path: artifacts
+
+      - name: Create universal binary
+        run: |
+          cd artifacts
+          lipo -create terraphim_ai_nodejs.x86_64-apple-darwin.node terraphim_ai_nodejs.aarch64-apple-darwin.node -output terraphim_ai_nodejs.darwin-universal.node
+          ls -la *.node
+
+      - name: Upload universal binary
+        uses: actions/upload-artifact@v5
+        with:
+          name: bindings-universal-apple-darwin
+          path: artifacts/terraphim_ai_nodejs.darwin-universal.node
+          if-no-files-found: error
+
+  publish-to-bun:
+    name: Publish to Bun Registry
+    runs-on: [self-hosted, Linux, terraphim, production, docker]
+    needs: [test-bun-compatibility, create-universal-macos-bun]
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+
+      - name: Install 1Password CLI
+        run: |
+          curl -sSf https://downloads.1password.com/linux/keys/1password.asc | \
+            gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+            sudo tee /etc/apt/sources.list.d/1password.list
+          sudo apt update && sudo apt install op -y
+
+      - name: Authenticate with 1Password
+        run: |
+          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
+
+      - name: Get Bun token from 1Password
+        id: token
+        run: |
+          TOKEN=$(op read "op://TerraphimPlatform/bun.token/token" || echo "")
+          if [[ -z "$TOKEN" ]]; then
+            echo "⚠️  Bun token not found in 1Password, checking GitHub secrets"
+            TOKEN="${{ secrets.BUN_TOKEN }}"
+          fi
+
+          if [[ -z "$TOKEN" ]]; then
+            echo "⚠️  Bun token not available, checking npm token for fallback"
+            TOKEN="${{ secrets.NPM_TOKEN }}"
+          fi
+
+          if [[ -z "$TOKEN" ]]; then
+            echo "❌ No token available for Bun publishing"
+            exit 1
+          fi
+
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "✅ Bun token retrieved successfully"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare package for Bun publishing
+        run: |
+          # Create bun directory structure
+          mkdir -p bun
+
+          # Copy all built binaries to bun directory
+          find artifacts -name "*.node" -exec cp {} bun/ \;
+
+          # If no binaries found (NAPI build failed), try to find them manually
+          if [ ! -n "$(ls -A bun/)" ]; then
+            echo "⚠️  No NAPI artifacts found, searching for built libraries..."
+            # Look for libraries in target directories
+            find target -name "libterraphim_ai_nodejs.so" -exec cp {} bun/terraphim_ai_nodejs.linux-x64-gnu.node \;
+            find target -name "libterraphim_ai_nodejs.dylib" -exec cp {} bun/terraphim_ai_nodejs.darwin-x64.node \;
+            find target -name "terraphim_ai_nodejs.dll" -exec cp {} bun/terraphim_ai_nodejs.win32-x64-msvc.node \;
+          fi
+
+          # List what we have
+          echo "📦 Built binaries for Bun:"
+          ls -la bun/
+
+          # Update package.json version if provided
+          if [[ "${{ inputs.version }}" != "" ]]; then
+            echo "📝 Updating version to ${{ inputs.version }}"
+            bun pm version ${{ inputs.version }} --no-git-tag-version
+          fi
+
+          # Update package.json for Bun registry
+          sed -i 's/"registry": "https:\/\/registry.npmjs.org\/"/"registry": "https:\/\/registry.npmjs.org\/",\n    "publishConfig": {\n      "registry": "https:\/\/registry.npmjs.org\/"\n    },/' package.json
+
+      - name: Configure package managers
+        run: |
+          # Configure npm (primary registry)
+          echo "//registry.npmjs.org/:_authToken=${{ steps.token.outputs.token }}" > ~/.npmrc
+          npm config set provenance true
+
+          # Configure Bun registry (if different token available)
+          if [[ "${{ secrets.BUN_TOKEN }}" != "" && "${{ secrets.BUN_TOKEN }}" != "${{ steps.token.outputs.token }}" ]]; then
+            echo "//registry.npmjs.org/:_authToken=${{ secrets.BUN_TOKEN }}" > ~/.bunfig.toml
+            echo "[install.scopes]\n\"@terraphim\" = \"https://registry.npmjs.org/\"" >> ~/.bunfig.toml
+          fi
+
+          # Show current package info
+          echo "📋 Package information:"
+          npm pack --dry-run | head -20
+
+      - name: Determine publishing strategy
+        id: strategy
+        run: |
+          VERSION_TYPE="patch"
+          REGISTRY="npm"
+          NPM_TAG="latest"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.version }}" != "" ]]; then
+              VERSION_TYPE="manual"
+              NPM_TAG="${{ inputs.tag }}"
+            fi
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/bun-v//')
+            if [[ "$VERSION_TAG" =~ -beta$ ]]; then
+              NPM_TAG="beta"
+            elif [[ "$VERSION_TAG" =~ -alpha$ ]]; then
+              NPM_TAG="alpha"
+            elif [[ "$VERSION_TAG" =~ -rc ]]; then
+              NPM_TAG="rc"
+            else
+              NPM_TAG="latest"
+            fi
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            NPM_TAG="latest"
+          fi
+
+          echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+          echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
+          echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG ($REGISTRY)"
+
+      - name: Publish to npm (works with Bun)
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "🧪 Dry run mode - checking package only"
+            npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }}
+          else
+            echo "🚀 Publishing @terraphim/autocomplete to npm (Bun-compatible)"
+            echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
+
+            # Publish with appropriate tag
+            npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }}
+
+            echo "✅ Package published successfully! (Bun users can install with: bun add @terraphim/autocomplete)"
+          fi
+
+      - name: Verify package for Bun users
+        if: inputs.dry_run != 'true'
+        run: |
+          echo "🔍 Verifying package for Bun users..."
+
+          # Wait a moment for npm registry to update
+          sleep 30
+
+          # Check if package is available
+          PACKAGE_NAME="@terraphim/autocomplete"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
+          npm view $PACKAGE_NAME@$PACKAGE_VERSION || echo "⚠️  Package not immediately visible (may take a few minutes)"
+
+          echo "📊 Package verification completed for Bun users"
+
+          # Test Bun installation
+          echo "🧪 Testing Bun installation..."
+          bunx pkg install $PACKAGE_NAME@$PACKAGE_VERSION --dry-run || echo "⚠️  Dry run failed (package may not be ready yet)"
+
+      - name: Create Bun-specific GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: "@terraphim/autocomplete ${{ github.ref_name }} (Bun Optimized)"
+          body: |
+            ## Node.js Package Release (Bun Compatible)
+
+            **Package**: `@terraphim/autocomplete`
+            **Version**: ${{ steps.strategy.outputs.version_type }}
+            **Tag**: ${{ steps.strategy.outputs.npm_tag }}
+            **Runtime**: Bun Optimized
+
+            ### 🚀 Installation Options
+
+            **With Bun (Recommended):**
+            ```bash
+            bun add @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }}
+            ```
+
+            **With npm:**
+            ```bash
+            npm install @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }}
+            ```
+
+            **With yarn:**
+            ```bash
+            yarn add @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }}
+            ```
+
+            ### ⚡ Bun Performance Benefits
+
+            - **🚀 Faster Installation**: Bun's native package manager
+            - **📦 Optimized Dependencies**: Better dependency resolution
+            - **🧪 Native Testing**: Built-in test runner
+            - **⚡ Hot Reloading**: Faster development cycles
+
+            ### ✨ Features
+            - **Autocomplete**: Fast prefix search with scoring
+            - **Knowledge Graph**: Semantic connectivity analysis
+            - **Native Performance**: Rust backend with NAPI bindings
+            - **Cross-Platform**: Linux, macOS, Windows support
+            - **TypeScript**: Auto-generated type definitions
+
+            ### 📊 Performance
+            - **Autocomplete Index**: ~749 bytes
+            - **Knowledge Graph**: ~856 bytes
+            - **Native Library**: ~10MB (optimized for production)
+
+            ### 🔗 Bun-Specific Features
+            - **Native Module Loading**: Optimized for Bun's runtime
+            - **Fast Test Execution**: Bun's test runner integration
+            - **Enhanced Dependency Resolution**: Faster and more accurate
+
+            ### 🔗 Links
+            - [npm package](https://www.npmjs.com/package/@terraphim/autocomplete)
+            - [Bun documentation](https://bun.sh/docs)
+            - [Package Documentation](https://github.com/terraphim/terraphim-ai/tree/main/terraphim_ai_nodejs)
+
+            ---
+            🤖 Generated on: $(date)
+            🐢 Bun-optimized with love from Terraphim AI
+          draft: false
+          prerelease: ${{ steps.strategy.outputs.npm_tag != 'latest' }}
+
+      - name: Notify on success
+        if: inputs.dry_run != 'true'
+        run: |
+          echo "🎉 Bun publishing workflow completed successfully!"
+          echo "📦 Package: @terraphim/autocomplete"
+          echo "🏷️  Tag: ${{ steps.strategy.outputs.npm_tag }}"
+          echo "🐢 Runtime: Bun-optimized"
+          echo "📋 Version: $(node -p "require('./package.json').version")"

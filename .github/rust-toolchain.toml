@@ -1,0 +1,24 @@
+# Rust toolchain configuration for CI/CD consistency
+# This ensures all builds use the same Rust version across environments
+
+[toolchain]
+# Stable Rust version with edition 2024 support
+channel = "1.87.0"
+
+# Components needed for the project
+components = ["rustfmt", "clippy"]
+
+# Target triples for cross-compilation
+targets = [
+    "x86_64-unknown-linux-gnu",    # Primary Linux target
+    "aarch64-unknown-linux-gnu",   # ARM64 Linux
+    "x86_64-unknown-linux-musl",   # Static linking Linux
+    "wasm32-unknown-unknown",      # WebAssembly
+]
+
+# Profile settings for optimized builds
+[profile.release]
+codegen-units = 1
+lto = true
+panic = "abort"
+strip = true

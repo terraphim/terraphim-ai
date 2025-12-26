@@ -1,0 +1,49 @@
+[package]
+name = "terraphim_github_runner"
+version = "0.1.0"
+edition.workspace = true
+description = "GitHub Actions runner with Firecracker sandbox integration for Terraphim AI"
+license = "Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+
+[features]
+default = []
+# Feature flag for safe rollout
+github-runner = [
+    "dep:terraphim_multi_agent",
+    "dep:terraphim_agent_evolution",
+]
+
+[dependencies]
+# Workspace dependencies
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+chrono.workspace = true
+async-trait.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+
+# Concurrent data structures
+dashmap = "5.5"
+
+# Internal dependencies (feature-gated)
+terraphim_multi_agent = { path = "../terraphim_multi_agent", optional = true }
+terraphim_agent_evolution = { path = "../terraphim_agent_evolution", optional = true }
+
+# Firecracker VM integration
+terraphim-firecracker = { path = "../../terraphim_firecracker" }
+
+# LLM integration for workflow understanding
+terraphim_service = { path = "../terraphim_service" }
+
+# Always needed for types
+terraphim_types = { path = "../terraphim_types" }
+
+# Knowledge graph for learning
+terraphim_rolegraph = { path = "../terraphim_rolegraph" }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["test-util", "macros"] }
