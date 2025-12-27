@@ -20,3 +20,4 @@ jobs:
           echo "Working directory: $(pwd)"
           echo "Date: $(date)"
           echo "✅ Firecracker GitHub runner is working!"
+# Test GitHub runner with new VM limits
