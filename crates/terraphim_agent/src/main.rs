@@ -418,27 +418,22 @@ async fn run_offline_command(command: Command) -> Result<()> {
             };
 
             let link_type = match format.as_deref() {
-                Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
-                Some("wiki") => terraphim_automata::LinkType::WikiLinks,
-                Some("html") => terraphim_automata::LinkType::HTMLLinks,
-                _ => terraphim_automata::LinkType::PlainText,
+                Some("markdown") => terraphim_hooks::LinkType::MarkdownLinks,
+                Some("wiki") => terraphim_hooks::LinkType::WikiLinks,
+                Some("html") => terraphim_hooks::LinkType::HTMLLinks,
+                _ => terraphim_hooks::LinkType::PlainText,
             };
 
-            let result = match service
-                .replace_matches(&role_name, &input_text, link_type)
-                .await
-            {
-                Ok(r) => r,
+            let thesaurus = match service.get_thesaurus(&role_name).await {
+                Ok(t) => t,
                 Err(e) => {
                     if fail_open {
+                        let hook_result = terraphim_hooks::HookResult::fail_open(
+                            input_text.clone(),
+                            e.to_string(),
+                        );
                         if json {
-                            let output = serde_json::json!({
-                                "result": input_text,
-                                "original": input_text,
-                                "replacements": 0,
-                                "error": e.to_string()
-                            });
-                            println!("{}", output);
+                            println!("{}", serde_json::to_string(&hook_result)?);
                         } else {
                             eprintln!("Warning: {}", e);
                             print!("{}", input_text);
@@ -450,19 +445,22 @@ async fn run_offline_command(command: Command) -> Result<()> {
                 }
             };
 
-            let changed = result != input_text;
-            let replacement_count = if changed { 1 } else { 0 };
+            let replacement_service =
+                terraphim_hooks::ReplacementService::new(thesaurus).with_link_type(link_type);
+
+            let hook_result = if fail_open {
+                replacement_service.replace_fail_open(&input_text)
+            } else {
+                replacement_service.replace(&input_text)?
+            };
 
             if json {
-                let output = serde_json::json!({
-                    "result": result,
-                    "original": input_text,
-                    "replacements": replacement_count,
-                    "changed": changed
-                });
-                println!("{}", output);
+                println!("{}", serde_json::to_string(&hook_result)?);
             } else {
-                print!("{}", result);
+                if let Some(ref err) = hook_result.error {
+                    eprintln!("Warning: {}", err);
+                }
+                print!("{}", hook_result.result);
             }
 
             Ok(())
@@ -742,18 +740,14 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             };
 
             if fail_open {
+                let hook_result = terraphim_hooks::HookResult::fail_open(
+                    input_text.clone(),
+                    "Replace command requires offline mode for full functionality".to_string(),
+                );
                 if json {
-                    let output = serde_json::json!({
-                        "result": input_text,
-                        "original": input_text,
-                        "replacements": 0,
-                        "error": "Replace command requires offline mode for full functionality"
-                    });
-                    println!("{}", output);
+                    println!("{}", serde_json::to_string(&hook_result)?);
                 } else {
-                    eprintln!(
-                        "Warning: Replace command requires offline mode for full functionality"
-                    );
+                    eprintln!("Warning: {}", hook_result.error.as_deref().unwrap_or(""));
                     print!("{}", input_text);
                 }
                 Ok(())
