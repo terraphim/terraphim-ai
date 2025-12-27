@@ -19,3 +19,4 @@ jobs:
           echo "User: $(whoami)"
           echo "Working directory: $(pwd)"
           echo "Date: $(date)"
+          echo "✅ Firecracker GitHub runner is working!"
