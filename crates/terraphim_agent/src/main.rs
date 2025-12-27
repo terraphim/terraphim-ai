@@ -147,11 +147,19 @@ enum Command {
         exclude_term: bool,
     },
     Replace {
-        text: String,
+        /// Text to replace (reads from stdin if not provided)
+        text: Option<String>,
         #[arg(long)]
         role: Option<String>,
+        /// Output format: plain (default), markdown, wiki, html
         #[arg(long)]
         format: Option<String>,
+        /// Output as JSON with metadata (for hook integration)
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Suppress errors and pass through unchanged on failure
+        #[arg(long, default_value_t = false)]
+        fail_open: bool,
     },
     Interactive,
 
@@ -386,7 +394,23 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
-        Command::Replace { text, role, format } => {
+        Command::Replace {
+            text,
+            role,
+            format,
+            json,
+            fail_open,
+        } => {
+            let input_text = match text {
+                Some(t) => t,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer
+                }
+            };
+
             let role_name = if let Some(role) = role {
                 RoleName::new(&role)
             } else {
@@ -400,10 +424,46 @@ async fn run_offline_command(command: Command) -> Result<()> {
                 _ => terraphim_automata::LinkType::PlainText,
             };
 
-            let result = service
-                .replace_matches(&role_name, &text, link_type)
-                .await?;
-            println!("{}", result);
+            let result = match service
+                .replace_matches(&role_name, &input_text, link_type)
+                .await
+            {
+                Ok(r) => r,
+                Err(e) => {
+                    if fail_open {
+                        if json {
+                            let output = serde_json::json!({
+                                "result": input_text,
+                                "original": input_text,
+                                "replacements": 0,
+                                "error": e.to_string()
+                            });
+                            println!("{}", output);
+                        } else {
+                            eprintln!("Warning: {}", e);
+                            print!("{}", input_text);
+                        }
+                        return Ok(());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            };
+
+            let changed = result != input_text;
+            let replacement_count = if changed { 1 } else { 0 };
+
+            if json {
+                let output = serde_json::json!({
+                    "result": result,
+                    "original": input_text,
+                    "replacements": replacement_count,
+                    "changed": changed
+                });
+                println!("{}", output);
+            } else {
+                print!("{}", result);
+            }
 
             Ok(())
         }
@@ -664,9 +724,43 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 }
             }
         }
-        Command::Replace { .. } => {
-            eprintln!("Replace command is only available in offline mode");
-            std::process::exit(1);
+        Command::Replace {
+            text,
+            role: _,
+            format: _,
+            json,
+            fail_open,
+        } => {
+            let input_text = match text {
+                Some(t) => t,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer
+                }
+            };
+
+            if fail_open {
+                if json {
+                    let output = serde_json::json!({
+                        "result": input_text,
+                        "original": input_text,
+                        "replacements": 0,
+                        "error": "Replace command requires offline mode for full functionality"
+                    });
+                    println!("{}", output);
+                } else {
+                    eprintln!(
+                        "Warning: Replace command requires offline mode for full functionality"
+                    );
+                    print!("{}", input_text);
+                }
+                Ok(())
+            } else {
+                eprintln!("Replace command is only available in offline mode");
+                std::process::exit(1);
+            }
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
