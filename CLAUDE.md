@@ -87,6 +87,48 @@ Async Ecosystem
 - **Never use timeout command** - This command doesn't exist on macOS
 - **Never use mocks in tests** - Use real implementations or integration tests
 
+## Terraphim Hooks for AI Coding Agents
+
+Terraphim provides hooks to automatically enforce code standards and attribution through knowledge graph-based text replacement.
+
+### Installed Hooks
+
+**PreToolUse Hook (`.claude/hooks/npm_to_bun_guard.sh`)**:
+- Intercepts Bash commands containing npm/yarn/pnpm
+- Automatically replaces with bun equivalents using knowledge graph
+- Knowledge graph files: `docs/src/kg/bun.md`, `docs/src/kg/bun_install.md`
+
+**Git prepare-commit-msg Hook (`scripts/hooks/prepare-commit-msg`)**:
+- Replaces "Claude Code" and "Claude" with "Terraphim AI" in commit messages
+- Knowledge graph files: `docs/src/kg/terraphim_ai.md`, `docs/src/kg/generated_with_terraphim.md`
+
+### Quick Commands
+
+```bash
+# Test replacement
+echo "npm install" | ./target/release/terraphim-agent replace
+
+# Install all hooks
+./scripts/install-terraphim-hooks.sh --easy-mode
+
+# Test hooks
+./scripts/test-terraphim-hooks.sh
+```
+
+### Extending Knowledge Graph
+
+To add new replacement patterns, create markdown files in `docs/src/kg/`:
+
+```markdown
+# replacement_term
+
+Description of what this term represents.
+
+synonyms:: term_to_replace, another_term, third_term
+```
+
+The Aho-Corasick automata use LeftmostLongest matching, so longer patterns match first.
+
 ## Memory and Task Management
 
 Throughout all user interactions, maintain three key files:
