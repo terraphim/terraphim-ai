@@ -2,6 +2,7 @@
 #
 # prepare-commit-msg hook for Terraphim AI
 # Replaces "Claude Code" and "Claude" attribution with "Terraphim AI"
+# using knowledge graph definitions in docs/src/kg/
 #
 # Installation:
 #   cp scripts/hooks/prepare-commit-msg .git/hooks/
@@ -10,56 +11,45 @@
 
 COMMIT_MSG_FILE=$1
 COMMIT_SOURCE=$2
-SHA1=$3
 
 # Skip if this is a merge, squash, or rebase commit
 if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
     exit 0
 fi
 
-# Find terraphim-agent binary
-TERRAPHIM_AGENT=""
-if command -v terraphim-agent >/dev/null 2>&1; then
-    TERRAPHIM_AGENT="terraphim-agent"
-elif [ -x "./target/release/terraphim-agent" ]; then
-    TERRAPHIM_AGENT="./target/release/terraphim-agent"
-elif [ -x "$HOME/.cargo/bin/terraphim-agent" ]; then
-    TERRAPHIM_AGENT="$HOME/.cargo/bin/terraphim-agent"
+# Source shared discovery
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/terraphim-discover.sh" ]; then
+    source "$SCRIPT_DIR/terraphim-discover.sh"
+elif [ -f "scripts/hooks/terraphim-discover.sh" ]; then
+    source "scripts/hooks/terraphim-discover.sh"
 fi
 
-# If terraphim-agent is not available, use sed as fallback
-if [ -z "$TERRAPHIM_AGENT" ]; then
-    # Fallback: Use sed for simple replacements
-    if [ -f "$COMMIT_MSG_FILE" ]; then
-        sed -i.bak \
-            -e 's/Generated with \[Claude Code\]/Generated with [Terraphim AI]/g' \
-            -e 's/Generated with Claude Code/Generated with Terraphim AI/g' \
-            -e 's/Co-Authored-By: Claude/Co-Authored-By: Terraphim AI/g' \
-            -e 's/noreply@anthropic\.com/noreply@terraphim.ai/g' \
-            -e 's|https://claude\.com/claude-code|https://terraphim.ai|g' \
-            "$COMMIT_MSG_FILE"
-        rm -f "${COMMIT_MSG_FILE}.bak"
+# Discover terraphim-agent
+AGENT=""
+if type discover_terraphim_agent >/dev/null 2>&1; then
+    AGENT=$(discover_terraphim_agent)
+else
+    # Inline discovery if shared script not available
+    command -v terraphim-agent >/dev/null 2>&1 && AGENT="terraphim-agent"
+    [ -z "$AGENT" ] && [ -x "./target/release/terraphim-agent" ] && AGENT="./target/release/terraphim-agent"
+    [ -z "$AGENT" ] && [ -x "$HOME/.cargo/bin/terraphim-agent" ] && AGENT="$HOME/.cargo/bin/terraphim-agent"
+fi
 
-        if [ "${TERRAPHIM_VERBOSE:-0}" = "1" ]; then
-            echo "Terraphim: Attribution updated (sed fallback)" >&2
-        fi
-    fi
+# If terraphim-agent not found, pass through unchanged (fail-open)
+if [ -z "$AGENT" ]; then
+    [ "${TERRAPHIM_VERBOSE:-0}" = "1" ] && echo "Terraphim: agent not found, skipping" >&2
     exit 0
 fi
 
-# Use terraphim-agent for replacement
+# Perform replacement
 if [ -f "$COMMIT_MSG_FILE" ]; then
     ORIGINAL=$(cat "$COMMIT_MSG_FILE")
-
-    # Run replacement with fail-open mode (never block commits)
-    REPLACED=$("$TERRAPHIM_AGENT" replace --fail-open 2>/dev/null <<< "$ORIGINAL")
+    REPLACED=$("$AGENT" replace --fail-open 2>/dev/null <<< "$ORIGINAL")
 
     if [ -n "$REPLACED" ] && [ "$REPLACED" != "$ORIGINAL" ]; then
         echo "$REPLACED" > "$COMMIT_MSG_FILE"
-
-        if [ "${TERRAPHIM_VERBOSE:-0}" = "1" ]; then
-            echo "Terraphim: Attribution updated" >&2
-        fi
+        [ "${TERRAPHIM_VERBOSE:-0}" = "1" ] && echo "Terraphim: attribution updated" >&2
     fi
 fi
 
