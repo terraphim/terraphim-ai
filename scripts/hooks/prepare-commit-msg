@@ -1,0 +1,66 @@
+#!/bin/bash
+#
+# prepare-commit-msg hook for Terraphim AI
+# Replaces "Claude Code" and "Claude" attribution with "Terraphim AI"
+#
+# Installation:
+#   cp scripts/hooks/prepare-commit-msg .git/hooks/
+#   chmod +x .git/hooks/prepare-commit-msg
+#
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+SHA1=$3
+
+# Skip if this is a merge, squash, or rebase commit
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
+    exit 0
+fi
+
+# Find terraphim-agent binary
+TERRAPHIM_AGENT=""
+if command -v terraphim-agent >/dev/null 2>&1; then
+    TERRAPHIM_AGENT="terraphim-agent"
+elif [ -x "./target/release/terraphim-agent" ]; then
+    TERRAPHIM_AGENT="./target/release/terraphim-agent"
+elif [ -x "$HOME/.cargo/bin/terraphim-agent" ]; then
+    TERRAPHIM_AGENT="$HOME/.cargo/bin/terraphim-agent"
+fi
+
+# If terraphim-agent is not available, use sed as fallback
+if [ -z "$TERRAPHIM_AGENT" ]; then
+    # Fallback: Use sed for simple replacements
+    if [ -f "$COMMIT_MSG_FILE" ]; then
+        sed -i.bak \
+            -e 's/Generated with \[Claude Code\]/Generated with [Terraphim AI]/g' \
+            -e 's/Generated with Claude Code/Generated with Terraphim AI/g' \
+            -e 's/Co-Authored-By: Claude/Co-Authored-By: Terraphim AI/g' \
+            -e 's/noreply@anthropic\.com/noreply@terraphim.ai/g' \
+            -e 's|https://claude\.com/claude-code|https://terraphim.ai|g' \
+            "$COMMIT_MSG_FILE"
+        rm -f "${COMMIT_MSG_FILE}.bak"
+
+        if [ "${TERRAPHIM_VERBOSE:-0}" = "1" ]; then
+            echo "Terraphim: Attribution updated (sed fallback)" >&2
+        fi
+    fi
+    exit 0
+fi
+
+# Use terraphim-agent for replacement
+if [ -f "$COMMIT_MSG_FILE" ]; then
+    ORIGINAL=$(cat "$COMMIT_MSG_FILE")
+
+    # Run replacement with fail-open mode (never block commits)
+    REPLACED=$("$TERRAPHIM_AGENT" replace --fail-open 2>/dev/null <<< "$ORIGINAL")
+
+    if [ -n "$REPLACED" ] && [ "$REPLACED" != "$ORIGINAL" ]; then
+        echo "$REPLACED" > "$COMMIT_MSG_FILE"
+
+        if [ "${TERRAPHIM_VERBOSE:-0}" = "1" ]; then
+            echo "Terraphim: Attribution updated" >&2
+        fi
+    fi
+fi
+
+exit 0
