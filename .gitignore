@@ -38,3 +38,6 @@ terraphim_server/dist/
 crates/terraphim_atomic_client/.aider.*
 docs/src/thesaurus.json
 lab/parking-lot/server-poem/.env
+website/public/
+website/static/video/
+website/static/images/terraphim_bg.*
