@@ -2,6 +2,7 @@ server_hostname = '127.0.0.1:8000'
 api_endpoint = 'http://localhost:8000/api'
 initialized = true
 default_data_path = '/tmp/terraphim_test'
+
 [profiles.dash]
 root = '/tmp/dashmaptest'
 type = 'dashmap'

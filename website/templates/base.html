@@ -1,0 +1,231 @@
+{% import 'macros.html' as macros %}
+
+<!DOCTYPE html>
+<html lang="{{lang}}">
+
+<head>
+  <meta charset="utf-8" />
+  <meta content="width=device-width, initial-scale=1" name="viewport" />
+  <meta content="#ffffff" name="theme-color" />
+  <meta content="#da532c" name="msapplication-TileColor" />
+
+  {% if config.extra.favicon.webmanifest %}
+  <link href='{{ config.extra.favicon.webmanifest }}' rel="manifest" />
+  {% endif %}
+  {% if config.extra.favicon.safari_pinned_tab %}
+  <link color="#5bbad5" href='{{ config.extra.favicon.safari_pinned_tab }}' rel="mask-icon" />
+  {% endif %}
+  {% if config.extra.favicon.favicon_16x16 %}
+  <link href='{{ config.extra.favicon.favicon_16x16 }}' rel="icon" sizes="16x16" type="image/png" />
+  {% endif %}
+  {% if config.extra.favicon.favicon_32x32 %}
+  <link href='{{ config.extra.favicon.favicon_32x32 }}' rel="icon" sizes="32x32" type="image/png" />
+  {% endif %}
+  {% if config.extra.favicon.apple_touch_icon %}
+  <link href='{{ config.extra.favicon.apple_touch_icon }}' rel="apple-touch-icon" sizes="180x180" />
+  {% endif %}
+
+  {% if config.extra.galleria.enabled %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/galleria@1.6.1/dist/themes/folio/galleria.folio.min.css" integrity="sha384-+rY0QD+LRnTOquDMzGa9lXU6jIwdiQuwCJQ2cdcW0qeP/0UbjQCZlXnRsUMA+9pH" crossorigin="anonymous">
+  {% endif %}
+
+  {% if config.extra.mapbox.enabled %}
+  <link rel="stylesheet" href="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.css" integrity="sha384-oGm59HWAkwO32h2w8u0B98wKBZJwd6MbWtAJwQKCTffZjOXHXrnyv9Syjovgc+UV" crossorigin="anonymous">
+  {% endif %}
+
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/jpswalsh/academicons@1.9.1/css/academicons.min.css" integrity="sha384-FIue+PI4SsI9XfHCz8dBLg33b0c1fMJgNU3X//L26FYbGnlSEfWmNT7zgWc2N9b6" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@5.15.4/css/all.min.css" integrity="sha384-DyZ88mC6Up2uqS4h/KRgHuoeGwBcD4Ng9SiP4dIRy0EXTlnuz47vAwmeGwVChigm" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css" integrity="sha384-IJLmUY0f1ePPX6uSCJ9Bxik64/meJmjSYD7dHaJqTXXEBE4y+Oe9P2KBZa/z7p0Q" crossorigin="anonymous">
+  <link href="{{ get_url(path='deep-thought.css') }}" rel="stylesheet" />
+  {% block user_custom_stylesheet %}
+  <link href="{{ get_url(path='css/bulma-steps.css') }}" rel="stylesheet" />
+  {% endblock %}
+
+  <title>
+    {% block title %}
+    {{ config.title }}
+    {% endblock title %}
+  </title>
+
+  {% if config.extra.analytics.google %}
+  <script async src="https://www.googletagmanager.com/gtag/js?id={{ config.extra.analytics.google }}"></script>
+  <script type="text/javascript">
+    window.dataLayer = window.dataLayer || [];
+    function gtag() {
+      dataLayer.push(arguments);
+    }
+    gtag("js", new Date());
+    gtag("config", "{{ config.extra.analytics.google }}");
+  </script>
+  {% endif %}
+
+  {% if config.extra.katex.enabled %}
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.css" integrity="sha384-R4558gYOUz8mP9YWpZJjofhk+zx0AS11p36HnD2ZKj/6JR5z27gSSULCNHIRReVs" crossorigin="anonymous">
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/katex.min.js" integrity="sha384-z1fJDqw8ZApjGO3/unPWUPsIymfsJmyrDVWC8Tv/a1HeOtGmkwNd/7xUS0Xcnvsx" crossorigin="anonymous"></script>
+
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/contrib/mathtex-script-type.min.js" integrity="sha384-jiBVvJ8NGGj5n7kJaiWwWp9AjC+Yh8rhZY3GtAX8yU28azcLgoRo4oukO87g7zDT" crossorigin="anonymous"></script>
+  {% if config.extra.katex.auto_render %}
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.15.1/dist/contrib/auto-render.min.js" integrity="sha384-+XBljXPPiv+OzfbB3cVmLHf4hdUFHlWNZN5spNQ7rmHTXpd7WvJum6fIACpNNfIR" crossorigin="anonymous"></script>
+  {% endif %}
+  {% endif %}
+</head>
+
+<body class="has-background-white">
+  <nav aria-label="section navigation" class="navbar is-light" role="navigation">
+    <div class="container">
+      <div class="navbar-brand">
+        <a class="navbar-item is-size-5 has-text-weight-bold" href="{{config.base_url}}">{{ config.title }}</a>
+        <a aria-expanded="false" aria-label="menu" class="navbar-burger burger" data-target="navMenu" role="button">
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+          <span aria-hidden="true"></span>
+        </a>
+      </div>
+      <div class="navbar-menu" id="navMenu">
+        <div class="navbar-end has-text-centered">
+          {% for item in config.extra.navbar_items %}
+          {% if lang == item.code %}
+          {% for nav in item.nav_items %}
+          <a class="navbar-item has-text-weight-semibold" href="{{ nav.url | replace(from='$BASE_URL', to=config.base_url) }}">
+            {{ nav.name }}
+          </a>
+          {% endfor %}
+          {% endif %}
+          {% endfor %}
+          <a class="navbar-item" id="nav-search" title="Search" data-target="#search-modal">
+            <span class="icon">
+              <i class="fas fa-search"></i>
+            </span>
+          </a>
+          <a class="navbar-item" id="dark-mode" title="Switch to dark theme">
+            <span class="icon">
+              <i class="fas fa-adjust"></i>
+            </span>
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  {% block header %}
+  {% endblock %}
+
+  {% block content %}
+  {% endblock %}
+
+  {% block search %}
+  <section class="modal" id="search-modal">
+    <div class="modal-background"></div>
+    <div class="modal-card">
+      <header class="modal-card-head">
+        <p class="modal-card-title">Search</p>
+      </header>
+      <section class="modal-card-body">
+        <div class="field mb-2">
+          <div class="control">
+            <input class="input" id="search" placeholder="Search this website." type="search" />
+          </div>
+        </div>
+        <div class="search-results">
+          <div class="search-results__items"></div>
+        </div>
+      </section>
+    </div>
+    <button aria-label="close" class="modal-close is-large"></button>
+  </section>
+  {% endblock %}
+
+
+  {% block pagination %}
+  {% if paginator.previous or paginator.next %}
+  <section class="section">
+    <div class="container">
+      <nav class="pagination is-centered" role="navigation" aria-label="pagination">
+        <a class="pagination-previous" href='{{ paginator.previous }}' {% if not paginator.previous %}disabled{% endif %}>
+          <span class="icon">
+            <i class="fas fa-angle-double-left"></i>
+          </span>
+          Previous
+        </a>
+        <a class="pagination-next" href='{{ paginator.next }}' {% if not paginator.next %}disabled{% endif %}>
+          Next page
+          <span class="icon">
+            <i class="fas fa-angle-double-right"></i>
+          </span>
+        </a>
+        <ul class="pagination-list">
+          {% for pager in range(start=1, end=paginator.number_pagers+1) %}
+          <li>
+            <a class="pagination-link {% if paginator.current_index == pager %}is-current{% endif %}" href='{{ paginator.base_url }}{{pager}}' aria-label="Goto page {{pager}}">
+              {{pager}}
+            </a>
+          </li>
+          {% endfor %}
+        </ul>
+      </nav>
+    </div>
+  </section>
+  {% endif %}
+  {% endblock %}
+
+  {% block comment %}
+  {% endblock %}
+
+  <footer class="footer py-4">
+    <div class="content has-text-centered">
+      <p> Content licensed under <span class="icon-text"><a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank"><img src="https://img.shields.io/badge/License-CC%20BY--SA%204.0-lightgrey.svg"></a></span>
+        Built with
+        <span class="icon-text">
+          <span class="icon">
+            <i class="fas fa-code"></i>
+          </span>
+          <span>code</span>
+        </span>
+        and
+        <span class="icon-text">
+          <span class="icon">
+            <i class="fas fa-heart"></i>
+          </span>
+          <span>love using <a href="https://github.com/RatanShreshtha/DeepThought" target="_blank">Deep Thought</a> theme</span>
+        </span>
+          for
+        <span class="icon-text">
+          <span class="icon">
+            <i class="fas fa-power-off"></i>
+          </span>
+          <span>zola</span>
+        </span>
+      </p>
+    </div>
+  </footer>
+
+  {% if config.extra.galleria.enabled %}
+  <script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js" integrity="sha384-vtXRMe3mGCbOeY7l30aIg8H9p3GdeSe4IFlP6G8JMa7o7lXvnz3GFKzPxzJdPfGK" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/galleria@1.6.1/dist/galleria.min.js" integrity="sha384-QSfwGT8/EU536DKdtyP2D6SLlh8zBaZ0cVkwfrwhqzIU9VCfJT00CLVP5t+HAiYg" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/galleria@1.6.1/dist/themes/folio/galleria.folio.min.js" integrity="sha384-DwpKI+deZB267+hPKwiOIc5Y2GKsVL0mR6hgz7GgIu7AgAMYqJwcJKY1YBNfhWcY" crossorigin="anonymous"></script>
+  {% endif %}
+  {% if config.extra.mermaid.enabled %}
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@8.13.5/dist/mermaid.min.js" integrity="sha384-0yWn54pSGtfKCU+skfA69l25VsCw+MZt4LQov3xNRoS7YkAMrFokGgSBnAWSK4pv" crossorigin="anonymous"></script>
+  {% endif %}
+  {% if config.extra.chart.enabled %}
+  <script src="https://cdn.jsdelivr.net/npm/chart.xkcd@1.1.13/dist/chart.xkcd.min.js" integrity="sha384-xC3h1+IHXK8seA+8KfT79Z4e0GPsznjXBoMa5nd8ooWKplPyXx92NOmljWxLC/cs" crossorigin="anonymous"></script>
+  {% endif %}
+  {% if config.extra.mapbox.enabled %}
+  <script src="https://api.mapbox.com/mapbox-gl-js/v2.6.1/mapbox-gl.js" integrity="sha384-Pulw7+h73841BQIK0LzJCydKRPChJUF9w8h8W0o3h+cLtoyNPJS847bQauLWOTwg" crossorigin="anonymous"></script>
+  {% endif %}
+  <script src="{{ get_url(path='elasticlunr.min.js') }}"></script>
+  <script src="{{ get_url(path='search_index.' ~ lang ~ '.js') }}"></script>
+  {%- if lang != "en" -%}
+  {%- block other_lang_search_js -%}
+  {%- endblock -%}
+  {%- endif -%}
+  <script src="{{ get_url(path='js/site.js') }}"></script>
+
+  {% block custom_js %}
+  {% endblock %}
+
+  {% block user_custom_js %}
+  {% endblock %}
+</body>
+
+</html>
