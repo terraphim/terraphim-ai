@@ -22,25 +22,31 @@ COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
 # Skip if no package manager references
 echo "$COMMAND" | grep -qE '\b(npm|yarn|pnpm|npx)\b' || exit 0
 
-# Find terraphim-agent
+# Source shared discovery
+if [ -f "scripts/hooks/terraphim-discover.sh" ]; then
+    source "scripts/hooks/terraphim-discover.sh"
+fi
+
+# Discover terraphim-agent
 AGENT=""
-command -v terraphim-agent >/dev/null 2>&1 && AGENT="terraphim-agent"
-[ -z "$AGENT" ] && [ -x "./target/release/terraphim-agent" ] && AGENT="./target/release/terraphim-agent"
-[ -z "$AGENT" ] && [ -x "$HOME/.cargo/bin/terraphim-agent" ] && AGENT="$HOME/.cargo/bin/terraphim-agent"
+if type discover_terraphim_agent >/dev/null 2>&1; then
+    AGENT=$(discover_terraphim_agent)
+else
+    command -v terraphim-agent >/dev/null 2>&1 && AGENT="terraphim-agent"
+    [ -z "$AGENT" ] && [ -x "./target/release/terraphim-agent" ] && AGENT="./target/release/terraphim-agent"
+    [ -z "$AGENT" ] && [ -x "$HOME/.cargo/bin/terraphim-agent" ] && AGENT="$HOME/.cargo/bin/terraphim-agent"
+fi
 
 # If no agent found, pass through unchanged
 [ -z "$AGENT" ] && exit 0
 
-# Use terraphim-agent replace with fail-open mode
+# Perform replacement
 REPLACED=$("$AGENT" replace --fail-open 2>/dev/null <<< "$COMMAND")
 
 # If replacement changed something, output modified tool_input
 if [ -n "$REPLACED" ] && [ "$REPLACED" != "$COMMAND" ]; then
     [ "${TERRAPHIM_VERBOSE:-0}" = "1" ] && echo "Terraphim: '$COMMAND' → '$REPLACED'" >&2
-
-    # Output modified tool_input JSON
     echo "$INPUT" | jq --arg cmd "$REPLACED" '.tool_input.command = $cmd'
 fi
 
-# No output = allow original through
 exit 0

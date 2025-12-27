@@ -42,10 +42,12 @@ pub fn find_matches(
     Ok(matches)
 }
 
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub enum LinkType {
     WikiLinks,
     HTMLLinks,
     MarkdownLinks,
+    #[default]
     PlainText,
 }
 
