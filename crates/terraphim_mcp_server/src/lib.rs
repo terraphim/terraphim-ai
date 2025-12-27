@@ -11,9 +11,7 @@ use rmcp::{
     RoleServer, ServerHandler,
 };
 use terraphim_automata::builder::json_decode;
-use terraphim_automata::matcher::{
-    extract_paragraphs_from_automata, find_matches, replace_matches,
-};
+use terraphim_automata::matcher::{extract_paragraphs_from_automata, find_matches};
 use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
@@ -781,28 +779,26 @@ impl McpService {
             .await
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
 
-        // Determine which role to use (provided role or selected role)
         let role_name = if let Some(role_str) = role {
             RoleName::from(role_str)
         } else {
             self.config_state.get_selected_role().await
         };
 
-        // Parse link type
         let link_type_enum = match link_type.to_lowercase().as_str() {
-            "wiki" | "wikilinks" => terraphim_automata::LinkType::WikiLinks,
-            "html" | "htmllinks" => terraphim_automata::LinkType::HTMLLinks,
-            "markdown" | "md" => terraphim_automata::LinkType::MarkdownLinks,
+            "wiki" | "wikilinks" => terraphim_hooks::LinkType::WikiLinks,
+            "html" | "htmllinks" => terraphim_hooks::LinkType::HTMLLinks,
+            "markdown" | "md" => terraphim_hooks::LinkType::MarkdownLinks,
+            "plain" | "plaintext" => terraphim_hooks::LinkType::PlainText,
             _ => {
                 let error_content = Content::text(format!(
-                    "Invalid link type '{}'. Supported types: wiki, html, markdown",
+                    "Invalid link type '{}'. Supported types: wiki, html, markdown, plain",
                     link_type
                 ));
                 return Ok(CallToolResult::error(vec![error_content]));
             }
         };
 
-        // Load thesaurus for the role
         match service.ensure_thesaurus_loaded(&role_name).await {
             Ok(thesaurus_data) => {
                 if thesaurus_data.is_empty() {
@@ -813,19 +809,17 @@ impl McpService {
                     return Ok(CallToolResult::error(vec![error_content]));
                 }
 
-                match replace_matches(&text, thesaurus_data, link_type_enum) {
-                    Ok(replaced_bytes) => {
-                        let replaced_text = String::from_utf8(replaced_bytes)
-                            .unwrap_or_else(|_| "Binary output (non-UTF8)".to_string());
+                let replacement_service = terraphim_hooks::ReplacementService::new(thesaurus_data)
+                    .with_link_type(link_type_enum);
 
+                match replacement_service.replace(&text) {
+                    Ok(hook_result) => {
                         let mut contents = Vec::new();
                         contents.push(Content::text(format!(
-                            "Successfully replaced terms in text for role '{}' using {} format",
-                            role_name, link_type
+                            "Replaced {} term(s) for role '{}' using {} format",
+                            hook_result.replacements, role_name, link_type
                         )));
-                        contents.push(Content::text("Replaced text:".to_string()));
-                        contents.push(Content::text(replaced_text));
-
+                        contents.push(Content::text(hook_result.result));
                         Ok(CallToolResult::success(contents))
                     }
                     Err(e) => {
