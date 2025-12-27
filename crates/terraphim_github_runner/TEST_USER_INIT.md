@@ -214,6 +214,6 @@ The remaining SSH issue is a **fcctl-web configuration bug**, not a `terraphim_g
 
 ---
 
-*User initialization completed: 2024-12-25*
+*User initialization completed: 2025-12-25*
 *Database: `/tmp/fcctl-web.db`*
-*Script: `/tmp/create_test_users.py`
+*Script: `/tmp/create_test_users.py`*
