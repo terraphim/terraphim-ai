@@ -13,7 +13,8 @@ templates = "templates"
 git-repository-icon = "fa-github"
 git-repository-url = "https://github.com/terraphim/terraphim-ai"
 edit-url-template = "https://github.com/terraphim/terraphim-ai/edit/develop/docs/{path}"
-additional-js = ["discord.js","mermaid.min.js", "mermaid-init.js"]
+additional-js = ["mermaid-init.js"]
+additional-css = []
 mathjax-support = true
 
 [output.html.fold]
