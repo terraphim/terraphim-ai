@@ -65,6 +65,7 @@ terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
 terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
+terraphim_hooks = { path = "../terraphim_hooks", version = "1.2.3" }
 terraphim_sessions = { path = "../terraphim_sessions", version = "0.1.0", optional = true, features = ["cla-full"] }
 
 [dev-dependencies]
