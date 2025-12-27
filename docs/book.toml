@@ -4,6 +4,10 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Terraphim AI documentation"
+logo = "/img/terraphim_logo_gray.png"
+
+[paths]
+templates = "templates"
 
 [output.html]
 git-repository-icon = "fa-github"
