@@ -4,7 +4,7 @@ date=2025-12-28
 
 [taxonomies]
 categories = ["Technical"]
-tags = ["Terraphim", "ai", "hooks", "knowledge-graph", "claude-code", "developer-tools"]
+tags = ["Terraphim", "ai", "hooks", "knowledge-graph", "claude-code", "developer-tools", "bun", "anthropic"]
 [extra]
 toc = true
 comments = true
@@ -14,11 +14,35 @@ How we use Aho-Corasick automata and knowledge graphs to automatically enforce c
 
 <!-- more -->
 
-## The Problem: Inconsistent AI-Generated Code
+## Anthropic Bought Bun. Claude Still Outputs `npm install`.
 
-AI coding agents are powerful, but they don't always follow your team's conventions. Maybe your team uses Bun instead of npm, or you want consistent attribution in commit messages. Manually fixing these inconsistencies is tedious and error-prone.
+On December 3, 2025, [Anthropic announced its first-ever acquisition](https://www.anthropic.com/news/anthropic-acquires-bun-as-claude-code-reaches-usd1b-milestone): Bun, the blazing-fast JavaScript runtime. This came alongside Claude Code reaching [$1 billion in run-rate revenue](https://bun.com/blog/bun-joins-anthropic) just six months after public launch.
 
-What if your knowledge graph could automatically teach AI agents your preferences?
+As Mike Krieger, Anthropic's Chief Product Officer, put it:
+
+> "Bun represents exactly the kind of technical excellence we want to bring into Anthropic... bringing the Bun team into Anthropic means we can build the infrastructure to compound that momentum."
+
+Claude Code itself [ships as a Bun executable](https://simonwillison.net/2025/Dec/2/anthropic-acquires-bun/) to millions of users. If Bun breaks, Claude Code breaks.
+
+**And yet...**
+
+Ask Claude to set up a Node.js project, and what do you get?
+
+```bash
+npm install express
+yarn add lodash
+pnpm install --save-dev jest
+```
+
+Even Anthropic's own models—running on Bun infrastructure—still default to npm, yarn, and pnpm in their outputs. The training data predates the acquisition, and old habits die hard.
+
+**So how do you teach your AI coding tools to consistently use Bun, regardless of what the underlying LLM insists on?**
+
+## The Problem: LLMs Don't Know Your Preferences
+
+AI coding agents are powerful, but they're trained on the internet's collective habits—which means npm everywhere. Your team might have standardized on Bun for its speed (25% monthly growth, [7.2 million downloads](https://devclass.com/2025/12/03/bun-javascript-runtime-acquired-by-anthropic-tying-its-future-to-ai-coding/) in October 2025), but every AI agent keeps suggesting the old ways.
+
+Manually fixing these inconsistencies is tedious. What if your knowledge graph could automatically intercept and transform AI outputs?
 
 ## The Solution: Knowledge Graph Hooks
 
