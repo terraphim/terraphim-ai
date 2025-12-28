@@ -229,11 +229,13 @@ impl RipgrepIndexer {
 
                     // Only use the first match for description to avoid long concatenations
                     // Limit description to 200 characters for readability
+                    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
                     if document.description.is_none() {
                         let cleaned_lines = lines.trim();
                         if !cleaned_lines.is_empty() {
                             let description = if cleaned_lines.len() > 200 {
-                                format!("{}...", &cleaned_lines[..197])
+                                let safe_end = cleaned_lines.floor_char_boundary(197);
+                                format!("{}...", &cleaned_lines[..safe_end])
                             } else {
                                 cleaned_lines.to_string()
                             };
@@ -264,11 +266,13 @@ impl RipgrepIndexer {
 
                     // Only use the first context for description to avoid long concatenations
                     // Limit description to 200 characters for readability
+                    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
                     if document.description.is_none() {
                         let cleaned_lines = lines.trim();
                         if !cleaned_lines.is_empty() {
                             let description = if cleaned_lines.len() > 200 {
-                                format!("{}...", &cleaned_lines[..197])
+                                let safe_end = cleaned_lines.floor_char_boundary(197);
+                                format!("{}...", &cleaned_lines[..safe_end])
                             } else {
                                 cleaned_lines.to_string()
                             };

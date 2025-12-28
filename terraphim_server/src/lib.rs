@@ -108,8 +108,10 @@ fn create_document_description(content: &str) -> Option<String> {
     };
 
     // Limit total length to 400 characters for more informative descriptions
+    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
     let description = if combined.len() > 400 {
-        format!("{}...", &combined[..397])
+        let safe_end = combined.floor_char_boundary(397);
+        format!("{}...", &combined[..safe_end])
     } else {
         combined
     };
