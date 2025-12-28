@@ -31,6 +31,7 @@ export TERRAPHIM_SERVER=http://localhost:8000
 - `repl-chat` - AI chat integration with OpenRouter and Ollama
 - `repl-file` - Enhanced file operations with semantic awareness
 - `repl-mcp` - Model Context Protocol (MCP) tools integration
+- `repl-sessions` - AI coding session history search (Claude Code, Cursor, Aider)
 - `repl-full` - All features enabled (recommended)
 
 ## Interactive REPL Mode
@@ -74,6 +75,19 @@ The TUI provides a comprehensive REPL (Read-Eval-Print Loop) with access to all 
 
 **AI Chat:**
 - `/chat "message"` - Interactive AI conversation
+
+**Session Search** (requires `repl-sessions` feature):
+- `/sessions sources` - Detect available session sources
+- `/sessions import [source] [--limit N]` - Import sessions
+- `/sessions list [source] [--limit N]` - List imported sessions
+- `/sessions search "query"` - Full-text search across sessions
+- `/sessions stats` - Show session statistics
+- `/sessions show <id>` - Show session details
+- `/sessions concepts "term"` - Knowledge graph concept search
+- `/sessions related <id> [--min N]` - Find related sessions
+- `/sessions timeline [--group day|week|month]` - Timeline view
+- `/sessions export [--format json|md] [--output file]` - Export sessions
+- `/sessions enrich [id]` - Enrich with knowledge graph concepts
 
 ## CLI subcommands
 
@@ -145,6 +159,38 @@ Traditional CLI commands are also supported:
 - Context-aware conversations
 - Role-based AI interactions
 - Streaming responses (planned)
+
+### Session Search
+- Multi-source support: Claude Code, Cursor, Aider, OpenCode
+- Full-text search across all messages and metadata
+- Knowledge graph concept enrichment for semantic search
+- Related session discovery by shared concepts
+- Timeline visualization by day, week, or month
+- Export to JSON or Markdown formats
+- Session statistics and analytics
+
+**Supported Sources:**
+
+| Source | Location | Description |
+|--------|----------|-------------|
+| claude-code-native | `~/.claude/projects/` | Native Claude Code sessions |
+| claude-code | `~/.claude/projects/` | CLA-parsed Claude Code sessions |
+| cursor | `~/.cursor/` | Cursor IDE sessions |
+| aider | `.aider.chat.history.md` | Aider chat history |
+
+**Example Workflow:**
+
+```bash
+# Launch REPL
+terraphim-agent
+
+# In REPL:
+/sessions sources              # See available sources
+/sessions import --limit 100   # Import sessions
+/sessions search "rust async"  # Search for topics
+/sessions concepts "error"     # Concept-based search
+/sessions timeline --group week # View timeline
+```
 
 ## Roadmap
 
