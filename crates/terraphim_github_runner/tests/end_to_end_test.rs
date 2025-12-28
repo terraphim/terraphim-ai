@@ -110,9 +110,12 @@ async fn end_to_end_real_firecracker_vm() {
 
         if let Some(vms_array) = vms["vms"].as_array() {
             if !vms_array.is_empty() {
-                // Use first running VM
-                if let Some(vm) = vms_array.iter().find(|v| v["status"] == "running") {
-                    println!("✅ Using existing VM: {}", vm["id"]);
+                // Use existing running bionic-test VM (only use VMs with correct type)
+                if let Some(vm) = vms_array
+                    .iter()
+                    .find(|v| v["status"] == "running" && v["vm_type"] == "bionic-test")
+                {
+                    println!("✅ Using existing bionic-test VM: {}", vm["id"]);
                     vm["id"].as_str().unwrap().to_string()
                 } else {
                     // Create new VM
@@ -133,9 +136,9 @@ async fn end_to_end_real_firecracker_vm() {
                     let vm_id = new_vm["id"].as_str().unwrap().to_string();
                     println!("✅ Created new VM: {}", vm_id);
 
-                    // Wait for VM to boot
-                    println!("⏳ Waiting 10 seconds for VM to boot...");
-                    tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                    // Wait for VM to boot (VMs boot in ~0.2s, 3s is 15x safety margin)
+                    println!("⏳ Waiting 3 seconds for VM to boot...");
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                     vm_id
                 }
             } else {
@@ -157,9 +160,9 @@ async fn end_to_end_real_firecracker_vm() {
                 let vm_id = new_vm["id"].as_str().unwrap().to_string();
                 println!("✅ Created new VM: {}", vm_id);
 
-                // Wait for VM to boot
-                println!("⏳ Waiting 10 seconds for VM to boot...");
-                tokio::time::sleep(tokio::time::Duration::from_secs(10)).await;
+                // Wait for VM to boot (VMs boot in ~0.2s, 3s is 15x safety margin)
+                println!("⏳ Waiting 3 seconds for VM to boot...");
+                tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
                 vm_id
             }
         } else {
@@ -179,7 +182,7 @@ async fn end_to_end_real_firecracker_vm() {
     );
     let executor = Arc::new(VmCommandExecutor::with_auth(
         "http://127.0.0.1:8080",
-        jwt_token,
+        jwt_token.clone(),
         http_client,
     ));
     let config = WorkflowExecutorConfig::default();
@@ -364,6 +367,30 @@ async fn end_to_end_real_firecracker_vm() {
     println!("   ✅ Commands execute in real Firecracker VM sandbox");
     println!("   ✅ LearningCoordinator records execution results");
     println!("   ✅ Real VM output captured and returned");
+
+    // Step 7: Cleanup - Delete test VM to prevent stale VM accumulation
+    println!("\n🧹 Step 7: Cleaning up test VM...");
+    let cleanup_client = reqwest::Client::new();
+    match cleanup_client
+        .delete(format!("http://127.0.0.1:8080/api/vms/{}", vm_id))
+        .bearer_auth(&jwt_token)
+        .send()
+        .await
+    {
+        Ok(response) if response.status().is_success() => {
+            println!("✅ Test VM {} deleted successfully", vm_id);
+        }
+        Ok(response) => {
+            println!(
+                "⚠️  Warning: Failed to delete test VM {} (status: {})",
+                vm_id,
+                response.status()
+            );
+        }
+        Err(e) => {
+            println!("⚠️  Warning: Failed to delete test VM {}: {}", vm_id, e);
+        }
+    }
 }
 
 /// Main function to run tests manually
