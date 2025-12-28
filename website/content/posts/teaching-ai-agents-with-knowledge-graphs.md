@@ -22,7 +22,7 @@ As Mike Krieger, Anthropic's Chief Product Officer, put it:
 
 > "Bun represents exactly the kind of technical excellence we want to bring into Anthropic... bringing the Bun team into Anthropic means we can build the infrastructure to compound that momentum."
 
-Claude Code itself [ships as a Bun executable](https://simonwillison.net/2025/Dec/2/anthropic-acquires-bun/) to millions of users. If Bun breaks, Claude Code breaks.
+Claude Code [ships as a Bun executable](https://simonwillison.net/2025/Dec/2/anthropic-acquires-bun/) to millions of developers. Anthropic now owns the runtime their flagship coding tool depends on.
 
 **And yet...**
 
@@ -34,7 +34,7 @@ yarn add lodash
 pnpm install --save-dev jest
 ```
 
-Even Anthropic's own models—running on Bun infrastructure—still default to npm, yarn, and pnpm in their outputs. The training data predates the acquisition, and old habits die hard.
+Yet Anthropic's own models still default to npm, yarn, and pnpm in their outputs. The training data predates the acquisition, and old habits die hard.
 
 **So how do you teach your AI coding tools to consistently use Bun, regardless of what the underlying LLM insists on?**
 
