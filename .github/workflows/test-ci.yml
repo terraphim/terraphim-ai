@@ -13,7 +13,7 @@ jobs:
   quick-check:
     name: Quick Rust Validation
     runs-on: ubuntu-22.04  # Use 22.04 for webkit 4.0 compatibility (Tauri requires it)
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
@@ -40,6 +40,41 @@ jobs:
           sudo apt-get install -yqq --no-install-recommends \
             libappindicator3-dev || true
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache frontend dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            desktop/node_modules
+            ~/.cache/yarn
+          key: ${{ runner.os }}-frontend-${{ hashFiles('desktop/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-frontend-
+
+      - name: Cache frontend build
+        uses: actions/cache@v4
+        with:
+          path: desktop/dist
+          key: ${{ runner.os }}-frontend-dist-${{ hashFiles('desktop/src/**', 'desktop/package.json', 'desktop/vite.config.ts') }}
+          restore-keys: |
+            ${{ runner.os }}-frontend-dist-
+
+      - name: Build frontend
+        working-directory: desktop
+        run: |
+          # Skip build if dist already exists from cache
+          if [ -f "dist/index.html" ]; then
+            echo "Frontend dist found in cache, skipping build"
+          else
+            echo "Building frontend..."
+            yarn install --frozen-lockfile
+            yarn build
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -55,13 +90,6 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-
-
-      - name: Create placeholder dist for Tauri
-        run: |
-          # Create placeholder dist directory so Tauri and terraphim_server can compile
-          # without requiring a full frontend build
-          mkdir -p desktop/dist
-          echo '<!DOCTYPE html><html><body>Placeholder</body></html>' > desktop/dist/index.html
 
       - name: Check formatting
         run: cargo fmt --all -- --check

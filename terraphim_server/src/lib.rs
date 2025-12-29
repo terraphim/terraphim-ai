@@ -153,7 +153,7 @@ pub use error::{Result, Status};
 static INDEX_HTML: &str = "index.html";
 
 #[derive(RustEmbed)]
-#[folder = "dist"]
+#[folder = "../desktop/dist"]
 struct Assets;
 
 // Extended application state that includes workflow management
