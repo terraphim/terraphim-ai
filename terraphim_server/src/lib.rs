@@ -28,6 +28,19 @@ use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
+/// Find the largest valid UTF-8 boundary at or before the given index.
+/// This is a MSRV-compatible replacement for `str::floor_char_boundary` (stable in Rust 1.91+).
+fn find_char_boundary(s: &str, mut index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    // Walk backwards until we find a valid char boundary
+    while index > 0 && !s.is_char_boundary(index) {
+        index -= 1;
+    }
+    index
+}
+
 /// Create a proper description from document content
 /// Collects multiple meaningful sentences to create informative descriptions
 fn create_document_description(content: &str) -> Option<String> {
@@ -108,9 +121,9 @@ fn create_document_description(content: &str) -> Option<String> {
     };
 
     // Limit total length to 400 characters for more informative descriptions
-    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
+    // Use find_char_boundary to safely truncate at a valid UTF-8 boundary
     let description = if combined.len() > 400 {
-        let safe_end = combined.floor_char_boundary(397);
+        let safe_end = find_char_boundary(&combined, 397);
         format!("{}...", &combined[..safe_end])
     } else {
         combined
@@ -140,7 +153,7 @@ pub use error::{Result, Status};
 static INDEX_HTML: &str = "index.html";
 
 #[derive(RustEmbed)]
-#[folder = "../desktop/dist"]
+#[folder = "dist"]
 struct Assets;
 
 // Extended application state that includes workflow management
