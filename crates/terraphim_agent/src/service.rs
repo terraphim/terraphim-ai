@@ -271,4 +271,110 @@ impl TuiService {
         config.save().await?;
         Ok(())
     }
+
+    /// Check if all matched terms in text are connected by a single path in the knowledge graph
+    pub async fn check_connectivity(
+        &self,
+        role_name: &RoleName,
+        text: &str,
+    ) -> Result<ConnectivityResult> {
+        // Get the RoleGraphSync from config_state.roles
+        let rolegraph_sync = self
+            .config_state
+            .roles
+            .get(role_name)
+            .ok_or_else(|| anyhow::anyhow!("RoleGraph not loaded for role '{}'", role_name))?;
+
+        // Lock the RoleGraph and check connectivity
+        let rolegraph = rolegraph_sync.lock().await;
+
+        // Find matched terms for reporting
+        let matched_node_ids = rolegraph.find_matching_node_ids(text);
+
+        if matched_node_ids.is_empty() {
+            return Ok(ConnectivityResult {
+                connected: true, // Trivially connected if no terms
+                matched_terms: vec![],
+                message: format!(
+                    "No terms from role '{}' knowledge graph found in the provided text.",
+                    role_name
+                ),
+            });
+        }
+
+        // Get term names for the matched node IDs
+        let matched_terms: Vec<String> = matched_node_ids
+            .iter()
+            .filter_map(|node_id| {
+                rolegraph
+                    .ac_reverse_nterm
+                    .get(node_id)
+                    .map(|nterm| nterm.to_string())
+            })
+            .collect();
+
+        // Check actual graph connectivity
+        let is_connected = rolegraph.is_all_terms_connected_by_path(text);
+
+        let message = if is_connected {
+            "All matched terms are connected by a single path in the knowledge graph.".to_string()
+        } else {
+            "The matched terms are NOT all connected by a single path.".to_string()
+        };
+
+        Ok(ConnectivityResult {
+            connected: is_connected,
+            matched_terms,
+            message,
+        })
+    }
+
+    /// Perform fuzzy autocomplete search
+    pub async fn fuzzy_suggest(
+        &self,
+        role_name: &RoleName,
+        query: &str,
+        threshold: f64,
+        limit: Option<usize>,
+    ) -> Result<Vec<FuzzySuggestion>> {
+        // Get thesaurus for the role
+        let thesaurus = self.get_thesaurus(role_name).await?;
+
+        // Build autocomplete index
+        let config = Some(terraphim_automata::AutocompleteConfig {
+            max_results: limit.unwrap_or(10),
+            min_prefix_length: 1,
+            case_sensitive: false,
+        });
+
+        let index = terraphim_automata::build_autocomplete_index(thesaurus, config)?;
+
+        // Perform fuzzy search
+        let results =
+            terraphim_automata::fuzzy_autocomplete_search(&index, query, threshold, limit)?;
+
+        // Convert to FuzzySuggestion
+        Ok(results
+            .into_iter()
+            .map(|r| FuzzySuggestion {
+                term: r.term,
+                similarity: r.score,
+            })
+            .collect())
+    }
+}
+
+/// Result of connectivity check
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct ConnectivityResult {
+    pub connected: bool,
+    pub matched_terms: Vec<String>,
+    pub message: String,
+}
+
+/// Fuzzy suggestion result
+#[derive(Debug, Clone, serde::Serialize)]
+pub struct FuzzySuggestion {
+    pub term: String,
+    pub similarity: f64,
 }

@@ -161,6 +161,40 @@ enum Command {
         #[arg(long, default_value_t = false)]
         fail_open: bool,
     },
+    /// Validate text against knowledge graph
+    Validate {
+        /// Text to validate (reads from stdin if not provided)
+        text: Option<String>,
+        /// Role to use for validation
+        #[arg(long)]
+        role: Option<String>,
+        /// Check if all matched terms are connected by a single path
+        #[arg(long, default_value_t = false)]
+        connectivity: bool,
+        /// Output as JSON
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    /// Suggest similar terms using fuzzy matching
+    Suggest {
+        /// Query to search for (reads from stdin if not provided)
+        query: Option<String>,
+        /// Role to use for suggestions
+        #[arg(long)]
+        role: Option<String>,
+        /// Enable fuzzy matching
+        #[arg(long, default_value_t = true)]
+        fuzzy: bool,
+        /// Minimum similarity threshold (0.0-1.0)
+        #[arg(long, default_value_t = 0.6)]
+        threshold: f64,
+        /// Maximum number of suggestions
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+        /// Output as JSON
+        #[arg(long, default_value_t = false)]
+        json: bool,
+    },
     Interactive,
 
     /// Start REPL (Read-Eval-Print-Loop) interface
@@ -465,6 +499,110 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
+        Command::Validate {
+            text,
+            role,
+            connectivity,
+            json,
+        } => {
+            let input_text = match text {
+                Some(t) => t,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer.trim().to_string()
+                }
+            };
+
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+
+            if connectivity {
+                let result = service.check_connectivity(&role_name, &input_text).await?;
+
+                if json {
+                    println!("{}", serde_json::to_string(&result)?);
+                } else {
+                    println!("Connectivity Check for role '{}':", role_name);
+                    println!("  Connected: {}", result.connected);
+                    println!("  Matched terms: {:?}", result.matched_terms);
+                    println!("  {}", result.message);
+                }
+            } else {
+                // Default validation: find matches
+                let matches = service.find_matches(&role_name, &input_text).await?;
+
+                if json {
+                    let output = serde_json::json!({
+                        "role": role_name.to_string(),
+                        "matched_count": matches.len(),
+                        "matches": matches.iter().map(|m| m.term.clone()).collect::<Vec<_>>()
+                    });
+                    println!("{}", serde_json::to_string(&output)?);
+                } else {
+                    println!("Validation for role '{}':", role_name);
+                    println!("  Found {} matched term(s)", matches.len());
+                    for m in &matches {
+                        println!("    - {}", m.term);
+                    }
+                }
+            }
+
+            Ok(())
+        }
+        Command::Suggest {
+            query,
+            role,
+            fuzzy: _,
+            threshold,
+            limit,
+            json,
+        } => {
+            let input_query = match query {
+                Some(q) => q,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer.trim().to_string()
+                }
+            };
+
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+
+            let suggestions = service
+                .fuzzy_suggest(&role_name, &input_query, threshold, Some(limit))
+                .await?;
+
+            if json {
+                println!("{}", serde_json::to_string(&suggestions)?);
+            } else {
+                if suggestions.is_empty() {
+                    println!(
+                        "No suggestions found for '{}' with threshold {}",
+                        input_query, threshold
+                    );
+                } else {
+                    println!(
+                        "Suggestions for '{}' (threshold: {}):",
+                        input_query, threshold
+                    );
+                    for s in &suggestions {
+                        println!("  {} (similarity: {:.2})", s.term, s.similarity);
+                    }
+                }
+            }
+
+            Ok(())
+        }
         Command::CheckUpdate => {
             println!("🔍 Checking for terraphim-agent updates...");
             match check_for_updates("terraphim-agent").await {
@@ -755,6 +893,28 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 eprintln!("Replace command is only available in offline mode");
                 std::process::exit(1);
             }
+        }
+        Command::Validate { json, .. } => {
+            if json {
+                let err = serde_json::json!({
+                    "error": "Validate command is only available in offline mode"
+                });
+                println!("{}", serde_json::to_string(&err)?);
+            } else {
+                eprintln!("Validate command is only available in offline mode");
+            }
+            std::process::exit(1);
+        }
+        Command::Suggest { json, .. } => {
+            if json {
+                let err = serde_json::json!({
+                    "error": "Suggest command is only available in offline mode"
+                });
+                println!("{}", serde_json::to_string(&err)?);
+            } else {
+                eprintln!("Suggest command is only available in offline mode");
+            }
+            std::process::exit(1);
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
