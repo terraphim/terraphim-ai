@@ -139,13 +139,15 @@ if [ "$INSTALL_CLAUDE" = true ]; then
     # Ensure .claude/hooks directory exists
     mkdir -p "$PROJECT_DIR/.claude/hooks"
 
-    # Copy hook script
-    if [ -f "$PROJECT_DIR/.claude/hooks/npm_to_bun_guard.sh" ]; then
-        chmod +x "$PROJECT_DIR/.claude/hooks/npm_to_bun_guard.sh"
-        print_status "SUCCESS" "npm_to_bun_guard.sh hook ready"
-    else
-        print_status "FAIL" "npm_to_bun_guard.sh not found in .claude/hooks/"
-    fi
+    # Make all Claude hooks executable
+    for hook in npm_to_bun_guard.sh pre-llm-validate.sh post-llm-check.sh; do
+        if [ -f "$PROJECT_DIR/.claude/hooks/$hook" ]; then
+            chmod +x "$PROJECT_DIR/.claude/hooks/$hook"
+            print_status "SUCCESS" "$hook ready"
+        else
+            print_status "WARN" "$hook not found (optional)"
+        fi
+    done
 
     # Check if settings.local.json has hooks configured
     if [ -f "$PROJECT_DIR/.claude/settings.local.json" ]; then
@@ -178,11 +180,32 @@ echo ""
 echo "Installation complete!"
 echo ""
 echo "What's installed:"
-[ "$INSTALL_GIT" = true ] && echo "  - Git prepare-commit-msg hook (Claude → Terraphim AI attribution)"
-[ "$INSTALL_CLAUDE" = true ] && echo "  - Claude PreToolUse hook (npm/yarn/pnpm → bun replacement)"
+if [ "$INSTALL_GIT" = true ]; then
+    echo "  - Git prepare-commit-msg hook (attribution + optional concept extraction)"
+    echo "    Enable smart commit: export TERRAPHIM_SMART_COMMIT=1"
+fi
+if [ "$INSTALL_CLAUDE" = true ]; then
+    echo "  - Claude PreToolUse hooks:"
+    echo "    • npm_to_bun_guard.sh (npm/yarn/pnpm → bun replacement)"
+    echo "    • pre-llm-validate.sh (semantic coherence validation)"
+    echo "  - Claude PostToolUse hooks:"
+    echo "    • post-llm-check.sh (checklist validation)"
+fi
+echo ""
+echo "New CLI commands available:"
+echo "  terraphim-agent validate --connectivity 'text'"
+echo "  terraphim-agent validate --checklist code_review 'text'"
+echo "  terraphim-agent suggest --fuzzy 'typo' --threshold 0.7"
+echo "  terraphim-agent hook --hook-type pre-tool-use --input '\$JSON'"
+echo ""
+echo "Skills available:"
+echo "  skills/pre-llm-validate/"
+echo "  skills/post-llm-check/"
+echo "  skills/smart-commit/"
 echo ""
 echo "To test:"
 echo "  echo 'npm install' | terraphim-agent replace"
-echo "  echo '{\"tool_name\":\"Bash\",\"tool_input\":{\"command\":\"npm install\"}}' | .claude/hooks/npm_to_bun_guard.sh"
+echo "  terraphim-agent validate --connectivity 'haystack service automata'"
+echo "  terraphim-agent suggest 'terraphm'"
 echo ""
 echo "NOTE: Restart Claude Code to apply hook changes."
