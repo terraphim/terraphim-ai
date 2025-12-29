@@ -4643,9 +4643,9 @@ dependencies = [
 
 [[package]]
 name = "napi-build"
-version = "2.3.1"
+version = "2.1.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d376940fd5b723c6893cd1ee3f33abbfd86acb1cd1ec079f3ab04a2a3bc4d3b1"
+checksum = "db836caddef23662b94e16bf1f26c40eceb09d6aee5d5b06a7ac199320b69b19"
 
 [[package]]
 name = "napi-derive"
@@ -8739,6 +8739,7 @@ dependencies = [
  "terraphim_agent",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_hooks",
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
@@ -8859,6 +8860,7 @@ dependencies = [
  "napi-derive",
  "serde",
  "serde_json",
+ "tempfile",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_persistence",
@@ -9060,6 +9062,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_hooks"
+version = "1.2.3"
+dependencies = [
+ "dirs 5.0.1",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "terraphim_kg_agents"
 version = "1.0.0"
 dependencies = [
@@ -9143,6 +9159,7 @@ dependencies = [
  "tempfile",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_hooks",
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
