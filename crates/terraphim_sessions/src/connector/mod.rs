@@ -100,6 +100,7 @@ pub struct ConnectorRegistry {
 impl ConnectorRegistry {
     /// Create a new registry with all available connectors
     #[must_use]
+    #[allow(clippy::vec_init_then_push)] // Feature-gated conditional pushes prevent using vec![]
     pub fn new() -> Self {
         let mut connectors: Vec<Box<dyn SessionConnector>> = Vec::new();
 

@@ -56,6 +56,13 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
+      - name: Create placeholder dist for Tauri
+        run: |
+          # Create placeholder dist directory so Tauri and terraphim_server can compile
+          # without requiring a full frontend build
+          mkdir -p desktop/dist
+          echo '<!DOCTYPE html><html><body>Placeholder</body></html>' > desktop/dist/index.html
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
