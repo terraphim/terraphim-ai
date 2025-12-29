@@ -12,4 +12,7 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [dependencies]
-pulldown-cmark = "0.13.0"
+markdown = "1.0.0-alpha.21"
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+thiserror = "1.0"
+ulid = { version = "1.0.0", features = ["serde", "uuid"] }
