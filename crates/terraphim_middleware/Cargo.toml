@@ -20,6 +20,9 @@ terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 terraphim_atomic_client = { path = "../terraphim_atomic_client", features = ["native"], optional = true }
 grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0" }
+claude-log-analyzer = { path = "../claude-log-analyzer", features = ["connectors"], optional = true }
+jiff = { version = "0.1", optional = true }
+home = { version = "0.5", optional = true }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 cached = { version = "0.56.0", features = ["async", "serde", "ahash"] }
@@ -65,3 +68,5 @@ mcp-sse = ["reqwest-eventsource"]
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
 mcp-rust-sdk = ["mcp-sse", "mcp-client", "mcp-spec", "rmcp"]
+# Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
+ai-assistant = ["claude-log-analyzer", "jiff", "home"]
