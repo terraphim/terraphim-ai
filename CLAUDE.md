@@ -98,9 +98,42 @@ Terraphim provides hooks to automatically enforce code standards and attribution
 - Automatically replaces with bun equivalents using knowledge graph
 - Knowledge graph files: `docs/src/kg/bun.md`, `docs/src/kg/bun_install.md`
 
+**Pre-LLM Validation Hook (`.claude/hooks/pre-llm-validate.sh`)**:
+- Validates input before LLM calls for semantic coherence
+- Checks if terms are connected in knowledge graph
+- Advisory mode - warns but doesn't block
+
+**Post-LLM Check Hook (`.claude/hooks/post-llm-check.sh`)**:
+- Validates LLM outputs against domain checklists
+- Checks code changes for tests, docs, error handling, security, performance
+- Advisory mode - provides feedback without blocking
+
 **Git prepare-commit-msg Hook (`scripts/hooks/prepare-commit-msg`)**:
 - Replaces "Claude Code" and "Claude" with "Terraphim AI" in commit messages
+- Optionally extracts concepts from diff (enable with `TERRAPHIM_SMART_COMMIT=1`)
 - Knowledge graph files: `docs/src/kg/terraphim_ai.md`, `docs/src/kg/generated_with_terraphim.md`
+
+### Knowledge Graph Validation Commands
+
+```bash
+# Validate semantic connectivity
+terraphim-agent validate --connectivity "text to check"
+
+# Validate against code review checklist
+terraphim-agent validate --checklist code_review "LLM output"
+
+# Validate against security checklist
+terraphim-agent validate --checklist security "implementation"
+
+# Get fuzzy suggestions for typos
+terraphim-agent suggest --fuzzy "terraphm" --threshold 0.7
+
+# Unified hook handler
+terraphim-agent hook --hook-type pre-tool-use --input "$JSON"
+
+# Enable smart commit
+TERRAPHIM_SMART_COMMIT=1 git commit -m "message"
+```
 
 ### Quick Commands
 
@@ -113,6 +146,9 @@ echo "npm install" | ./target/release/terraphim-agent replace
 
 # Test hooks
 ./scripts/test-terraphim-hooks.sh
+
+# Test validation workflow
+terraphim-agent validate --connectivity --json "haystack service uses automata"
 ```
 
 ### Extending Knowledge Graph

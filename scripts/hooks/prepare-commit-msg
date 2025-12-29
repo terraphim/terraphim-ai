@@ -53,4 +53,28 @@ if [ -f "$COMMIT_MSG_FILE" ]; then
     fi
 fi
 
+# Optional: Extract concepts from staged diff and append to commit message
+# Enable with TERRAPHIM_SMART_COMMIT=1
+if [ "${TERRAPHIM_SMART_COMMIT:-0}" = "1" ] && [ -f "$COMMIT_MSG_FILE" ]; then
+    # Get staged diff
+    DIFF=$(git diff --cached --no-color 2>/dev/null || true)
+
+    if [ -n "$DIFF" ]; then
+        # Extract concepts using hook command
+        CONCEPTS=$("$AGENT" hook --hook-type prepare-commit-msg --input "{\"diff\": $(echo "$DIFF" | jq -Rs .)}" 2>/dev/null || echo '{}')
+        CONCEPT_COUNT=$(echo "$CONCEPTS" | jq -r '.concept_count // 0')
+
+        if [ "$CONCEPT_COUNT" -gt 0 ]; then
+            CONCEPT_LIST=$(echo "$CONCEPTS" | jq -r '.concepts | unique | .[0:5] | join(", ")' 2>/dev/null || echo "")
+
+            if [ -n "$CONCEPT_LIST" ]; then
+                # Append concepts to commit message
+                echo "" >> "$COMMIT_MSG_FILE"
+                echo "Concepts: $CONCEPT_LIST" >> "$COMMIT_MSG_FILE"
+                [ "${TERRAPHIM_VERBOSE:-0}" = "1" ] && echo "Terraphim: added $CONCEPT_COUNT concepts" >&2
+            fi
+        fi
+    fi
+fi
+
 exit 0
