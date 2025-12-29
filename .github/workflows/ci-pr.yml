@@ -262,6 +262,11 @@ jobs:
           name: frontend-dist
           path: desktop/dist
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -yqq --no-install-recommends librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev libclang-dev clang
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
