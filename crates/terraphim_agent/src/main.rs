@@ -47,6 +47,19 @@ impl From<LogicalOperatorCli> for LogicalOperator {
     }
 }
 
+/// Hook types for Claude Code integration
+#[derive(clap::ValueEnum, Debug, Clone)]
+pub enum HookType {
+    /// Pre-tool-use hook (intercepts tool calls)
+    PreToolUse,
+    /// Post-tool-use hook (processes tool results)
+    PostToolUse,
+    /// Pre-commit hook (validate before commit)
+    PreCommit,
+    /// Prepare-commit-msg hook (enhance commit message)
+    PrepareCommitMsg,
+}
+
 /// Create a transparent style for UI elements
 fn transparent_style() -> Style {
     Style::default().bg(Color::Reset)
@@ -196,6 +209,21 @@ enum Command {
         limit: usize,
         /// Output as JSON
         #[arg(long, default_value_t = false)]
+        json: bool,
+    },
+    /// Unified hook handler for Claude Code integration
+    Hook {
+        /// Hook type (pre-tool-use, post-tool-use, pre-commit, etc.)
+        #[arg(long, value_enum)]
+        hook_type: HookType,
+        /// JSON input from Claude Code (reads from stdin if not provided)
+        #[arg(long)]
+        input: Option<String>,
+        /// Role to use for processing
+        #[arg(long)]
+        role: Option<String>,
+        /// Output as JSON (always true for hooks, but explicit)
+        #[arg(long, default_value_t = true)]
         json: bool,
     },
     Interactive,
@@ -635,6 +663,121 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
+        Command::Hook {
+            hook_type,
+            input,
+            role,
+            json: _,
+        } => {
+            // Read JSON input from argument or stdin
+            let input_json = match input {
+                Some(i) => i,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer
+                }
+            };
+
+            let role_name = if let Some(role) = role {
+                RoleName::new(&role)
+            } else {
+                service.get_selected_role().await
+            };
+
+            // Parse input JSON
+            let input_value: serde_json::Value = serde_json::from_str(&input_json)
+                .map_err(|e| anyhow::anyhow!("Invalid JSON input: {}", e))?;
+
+            match hook_type {
+                HookType::PreToolUse => {
+                    // Extract tool_name and tool_input from the hook input
+                    let tool_name = input_value
+                        .get("tool_name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+
+                    // Only process Bash commands
+                    if tool_name == "Bash" {
+                        if let Some(command) = input_value
+                            .get("tool_input")
+                            .and_then(|v| v.get("command"))
+                            .and_then(|v| v.as_str())
+                        {
+                            // Get thesaurus and perform replacement
+                            let thesaurus = service.get_thesaurus(&role_name).await?;
+                            let replacement_service =
+                                terraphim_hooks::ReplacementService::new(thesaurus);
+                            let hook_result = replacement_service.replace_fail_open(command);
+
+                            // If replacement occurred, output modified input
+                            if hook_result.replacements > 0 {
+                                let mut output = input_value.clone();
+                                if let Some(tool_input) = output.get_mut("tool_input") {
+                                    if let Some(obj) = tool_input.as_object_mut() {
+                                        obj.insert(
+                                            "command".to_string(),
+                                            serde_json::Value::String(hook_result.result.clone()),
+                                        );
+                                    }
+                                }
+                                println!("{}", serde_json::to_string(&output)?);
+                            } else {
+                                // No changes, pass through
+                                println!("{}", input_json);
+                            }
+                        } else {
+                            // No command to process
+                            println!("{}", input_json);
+                        }
+                    } else {
+                        // Not a Bash command, pass through
+                        println!("{}", input_json);
+                    }
+                }
+                HookType::PostToolUse => {
+                    // Post-tool-use: validate output against checklist or connectivity
+                    let tool_result = input_value
+                        .get("tool_result")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+
+                    // Check connectivity of the output
+                    let connectivity = service.check_connectivity(&role_name, tool_result).await?;
+
+                    let output = serde_json::json!({
+                        "original": input_value,
+                        "validation": {
+                            "connected": connectivity.connected,
+                            "matched_terms": connectivity.matched_terms
+                        }
+                    });
+                    println!("{}", serde_json::to_string(&output)?);
+                }
+                HookType::PreCommit | HookType::PrepareCommitMsg => {
+                    // Extract commit message or diff
+                    let content = input_value
+                        .get("message")
+                        .or_else(|| input_value.get("diff"))
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("");
+
+                    // Extract concepts from the content
+                    let matches = service.find_matches(&role_name, content).await?;
+                    let concepts: Vec<String> = matches.iter().map(|m| m.term.clone()).collect();
+
+                    let output = serde_json::json!({
+                        "original": input_value,
+                        "concepts": concepts,
+                        "concept_count": concepts.len()
+                    });
+                    println!("{}", serde_json::to_string(&output)?);
+                }
+            }
+
+            Ok(())
+        }
         Command::CheckUpdate => {
             println!("🔍 Checking for terraphim-agent updates...");
             match check_for_updates("terraphim-agent").await {
@@ -946,6 +1089,13 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             } else {
                 eprintln!("Suggest command is only available in offline mode");
             }
+            std::process::exit(1);
+        }
+        Command::Hook { .. } => {
+            let err = serde_json::json!({
+                "error": "Hook command is only available in offline mode"
+            });
+            println!("{}", serde_json::to_string(&err)?);
             std::process::exit(1);
         }
         Command::Interactive => {
