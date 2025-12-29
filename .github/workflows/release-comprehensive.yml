@@ -156,6 +156,79 @@ jobs:
           name: binaries-universal-apple-darwin
           path: universal/*
 
+  sign-and-notarize-macos:
+    name: Sign and notarize macOS binaries
+    needs: create-universal-macos
+    runs-on: [self-hosted, macOS, ARM64]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download universal macOS binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-universal-apple-darwin
+          path: universal
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Load signing credentials from 1Password
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          echo "Loading credentials from 1Password..."
+
+          # Read credentials with --no-newline to avoid trailing characters
+          echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)" >> $GITHUB_ENV
+          echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)" >> $GITHUB_ENV
+          echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)" >> $GITHUB_ENV
+          echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)" >> $GITHUB_ENV
+
+          echo "✅ Credentials loaded successfully"
+
+      - name: Sign and notarize terraphim_server
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          chmod +x scripts/sign-macos-binary.sh
+          ./scripts/sign-macos-binary.sh \
+            "universal/terraphim_server-universal-apple-darwin" \
+            "$APPLE_ID" \
+            "$APPLE_TEAM_ID" \
+            "$APPLE_APP_PASSWORD" \
+            "$CERT_BASE64" \
+            "$CERT_PASSWORD"
+
+      - name: Sign and notarize terraphim-agent
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          ./scripts/sign-macos-binary.sh \
+            "universal/terraphim-agent-universal-apple-darwin" \
+            "$APPLE_ID" \
+            "$APPLE_TEAM_ID" \
+            "$APPLE_APP_PASSWORD" \
+            "$CERT_BASE64" \
+            "$CERT_PASSWORD"
+
+      - name: Verify signed binaries
+        run: |
+          echo "==> Verifying terraphim_server"
+          codesign --verify --deep --strict --verbose=2 universal/terraphim_server-universal-apple-darwin
+          file universal/terraphim_server-universal-apple-darwin
+
+          echo "==> Verifying terraphim-agent"
+          codesign --verify --deep --strict --verbose=2 universal/terraphim-agent-universal-apple-darwin
+          file universal/terraphim-agent-universal-apple-darwin
+
+      - name: Upload signed binaries
+        uses: actions/upload-artifact@v5
+        with:
+          name: binaries-signed-universal-apple-darwin
+          path: universal/*
+
   build-debian-packages:
     name: Build Debian packages
     runs-on: ubuntu-22.04
@@ -286,7 +359,7 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [build-binaries, create-universal-macos, build-debian-packages, build-tauri-desktop]
+    needs: [build-binaries, sign-and-notarize-macos, build-debian-packages, build-tauri-desktop]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -356,6 +429,7 @@ jobs:
             ## Release Assets
 
             ### macOS Universal Binaries (Intel + Apple Silicon)
+            **Signed and Notarized** - No Gatekeeper warnings
             - `terraphim_server-universal-apple-darwin`: Server binary for all Macs
             - `terraphim-agent-universal-apple-darwin`: TUI binary for all Macs
 

@@ -247,12 +247,13 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
     println!("🔗 Connected to MCP server with Terraphim Engineer profile");
 
     // Test 1: Check if terms that should be connected via synonyms are connected
+    // API expects "text" containing terms to be extracted and checked for connectivity
     println!("🔍 Testing connectivity of known synonym terms...");
     let synonym_connectivity = service
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["haystack", "datasource", "service"]
+                "text": "The haystack datasource provides a service interface"
             })
             .as_object()
             .cloned(),
@@ -270,7 +271,7 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["graph", "graph embeddings", "knowledge graph based embeddings"]
+                "text": "The graph uses graph embeddings and knowledge graph based embeddings"
             })
             .as_object()
             .cloned(),
@@ -288,7 +289,7 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["service", "provider", "middleware"]
+                "text": "The service uses a provider and middleware layer"
             })
             .as_object()
             .cloned(),
@@ -300,23 +301,20 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
         service_connectivity.content
     );
 
-    // Test 4: Test with terms that should NOT be connected
-    println!("🔍 Testing non-connected terms...");
+    // Test 4: Test with text containing no known terms (should handle gracefully)
+    println!("🔍 Testing text with no known terms...");
     let unconnected_test = service
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["completely", "random", "unrelated", "words"]
+                "text": "completely random unrelated words that are not in the knowledge graph"
             })
             .as_object()
             .cloned(),
         })
         .await?;
 
-    println!(
-        "✅ Unconnected terms result: {:?}",
-        unconnected_test.content
-    );
+    println!("✅ No known terms result: {:?}", unconnected_test.content);
 
     // Test 5: Test single term (should always be connected to itself)
     println!("🔍 Testing single term connectivity...");
@@ -324,7 +322,7 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["haystack"]
+                "text": "haystack is a useful concept"
             })
             .as_object()
             .cloned(),
@@ -336,13 +334,14 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
         single_term.content
     );
 
-    // Test 6: Test mixed connected and unconnected terms
-    println!("🔍 Testing mixed connectivity...");
-    let mixed_connectivity = service
+    // Test 6: Test with role parameter
+    println!("🔍 Testing with explicit role...");
+    let role_connectivity = service
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["haystack", "service", "completely_random_term"]
+                "text": "The haystack service uses automata",
+                "role": "Terraphim Engineer"
             })
             .as_object()
             .cloned(),
@@ -350,8 +349,8 @@ async fn test_terms_connectivity_with_knowledge_graph() -> Result<()> {
         .await?;
 
     println!(
-        "✅ Mixed connectivity result: {:?}",
-        mixed_connectivity.content
+        "✅ Role-specific connectivity result: {:?}",
+        role_connectivity.content
     );
 
     println!("🎉 All is_all_terms_connected_by_path tests completed!");
@@ -429,12 +428,13 @@ different system components.
     println!("✅ Extracted paragraphs: {:?}", paragraphs.content);
 
     // Step 2: Check if these terms are connected in the knowledge graph
+    // The API expects "text" parameter - terms are extracted from text automatically
     println!("🔗 Step 2: Checking connectivity of service terms...");
     let connectivity = service
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["service", "provider", "middleware"]
+                "text": "The service uses a provider and middleware architecture"
             })
             .as_object()
             .cloned(),
@@ -449,8 +449,7 @@ different system components.
         .call_tool(CallToolRequestParam {
             name: "extract_paragraphs_from_automata".into(),
             arguments: json!({
-                "text": document_text,
-                "terms": ["haystack", "datasource", "agent"]
+                "text": document_text
             })
             .as_object()
             .cloned(),
@@ -463,7 +462,7 @@ different system components.
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["haystack", "datasource", "agent"]
+                "text": "The haystack datasource connects to the agent"
             })
             .as_object()
             .cloned(),
@@ -481,7 +480,7 @@ different system components.
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": ["haystack", "graph embeddings", "service"]
+                "text": "The haystack uses graph embeddings and service layer"
             })
             .as_object()
             .cloned(),
@@ -559,13 +558,13 @@ async fn test_advanced_automata_edge_cases() -> Result<()> {
         Err(e) => println!("⚠️ Empty terms error (expected): {}", e),
     }
 
-    // Test 3: Connectivity with empty terms
-    println!("🔗 Testing connectivity with empty terms...");
+    // Test 3: Connectivity with text that has no known terms
+    println!("🔗 Testing connectivity with text containing no known terms...");
     let empty_connectivity = service
         .call_tool(CallToolRequestParam {
             name: "is_all_terms_connected_by_path".into(),
             arguments: json!({
-                "terms": []
+                "text": "This text contains no terms from the knowledge graph"
             })
             .as_object()
             .cloned(),
@@ -573,8 +572,8 @@ async fn test_advanced_automata_edge_cases() -> Result<()> {
         .await;
 
     match empty_connectivity {
-        Ok(result) => println!("✅ Empty connectivity handled: {:?}", result.content),
-        Err(e) => println!("⚠️ Empty connectivity error (expected): {}", e),
+        Ok(result) => println!("✅ No-terms connectivity handled: {:?}", result.content),
+        Err(e) => println!("⚠️ No-terms connectivity error (expected): {}", e),
     }
 
     // Test 4: Very long text
@@ -585,8 +584,7 @@ async fn test_advanced_automata_edge_cases() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "extract_paragraphs_from_automata".into(),
             arguments: json!({
-                "text": long_text,
-                "terms": ["haystack", "service"]
+                "text": long_text
             })
             .as_object()
             .cloned(),

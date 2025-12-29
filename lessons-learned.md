@@ -2970,3 +2970,206 @@ curl -sI https://example.com/css/styles.css | grep content-type
 ---
 # Historical Lessons (Merged from @lessons-learned.md)
 ---
+
+---
+
+## Session Search & Claude Code Skills Integration
+
+### Date: 2025-12-28 - Teaching LLMs Terraphim Capabilities
+
+#### Pattern 1: REPL TTY Issues with Heredoc Input
+
+**Context**: search-sessions.sh script failed with "Device not configured (os error 6)" when using heredoc to pipe commands to REPL.
+
+**What We Learned**:
+- **Heredoc causes TTY issues**: The REPL expects interactive input; heredoc does not provide proper TTY
+- **Use echo pipe instead**: echo -e "command1\ncommand2\n/quit" | agent repl works reliably
+- **Filter REPL noise**: Use grep to remove banner, help text, and warnings from output
+
+**When to Apply**: Any script that needs to automate REPL commands
+
+---
+
+#### Pattern 2: Agent Binary Discovery
+
+**Context**: Scripts need to find terraphim-agent in various locations (PATH, local build, cargo home).
+
+**What We Learned**:
+- **Multiple search paths needed**: Users may have agent in PATH, local build, or cargo bin
+- **Fail gracefully**: If not found, provide clear build instructions
+- **Working directory matters**: Agent needs to run from terraphim-ai directory for KG access
+
+**When to Apply**: Any script or hook that invokes terraphim-agent
+
+---
+
+#### Pattern 3: Feature Flags for Optional Functionality
+
+**Context**: Session search requires repl-sessions feature which is not built by default.
+
+**What We Learned**:
+- **Use feature flags for optional features**: Keeps binary size small for minimal installs
+- **Document feature requirements**: Skills and scripts should specify required features
+- **Build command**: cargo build -p terraphim_agent --features repl-full --release
+
+**When to Apply**: Any crate with optional dependencies or functionality
+
+---
+
+#### Pattern 4: Skills Documentation Structure
+
+**Context**: Created skills for terraphim-claude-skills plugin that teach AI agents capabilities.
+
+**What We Learned**:
+- **Two audiences**: Skills must document for both humans (quick start, CLI) and AI agents (programmatic usage)
+- **Architecture diagrams help**: Visual representation of data flow aids understanding
+- **Include troubleshooting**: Common issues and solutions reduce support burden
+- **Examples directory**: Separate from skills, contains runnable code and scripts
+
+**When to Apply**: Any new skill or capability documentation
+
+---
+
+### Technical Gotchas Discovered
+
+6. **Session import location**: Sessions are in ~/.claude/projects/ with directory names encoded as -Users-alex-projects-...
+
+7. **Feature flag for sessions**: Must build with --features repl-full or --features repl-sessions to enable session commands
+
+8. **Knowledge graph directory**: Agent looks for docs/src/kg/ relative to working directory - scripts must cd to terraphim-ai first
+
+9. **REPL noise filtering**: Output includes opendal warnings and REPL banner - use grep to clean up automated output
+
+10. **Session sources**: claude-code-native and claude-code are different connectors (native vs CLA-parsed)
+
+---
+
+## Knowledge Graph Validation Workflows - 2025-12-29
+
+### Context: Underutilized Terraphim Features for Pre/Post-LLM Workflows
+
+Successfully implemented local-first knowledge graph validation infrastructure using disciplined research → design → implementation methodology.
+
+### Pattern: MCP Placeholder Detection and Fixing
+
+**What We Learned**:
+- MCP tools can exist but have placeholder implementations that don't call real code
+- Always verify MCP tools call the actual underlying implementation
+- Test updates should verify behavior, not just API contracts
+
+**Implementation**:
+```rust
+// BAD: Placeholder that only finds matches
+let matches = find_matches(&text, thesaurus, false)?;
+return Ok(CallToolResult::success(vec![Content::text(format!("Found {} terms", matches.len()))]));
+
+// GOOD: Calls real RoleGraph implementation
+let rolegraph = self.config_state.roles.get(&role_name)?;
+let is_connected = rolegraph.lock().await.is_all_terms_connected_by_path(&text);
+return Ok(CallToolResult::success(vec![Content::text(format!("Connected: {}", is_connected))]));
+```
+
+**When to Apply**: When adding MCP tool wrappers, always wire to real implementation, not just test data.
+
+### Pattern: Checklist as Knowledge Graph Concept
+
+**What We Learned**:
+- Checklists can be modeled as KG entries with `checklist::` directive
+- Domain validation = matching checklist items against text
+- Advisory mode (warnings) better than blocking mode for AI workflows
+
+**Implementation**:
+```markdown
+# code_review_checklist
+checklist:: tests, documentation, error_handling, security, performance
+
+### tests
+synonyms:: test, testing, unit test, integration test
+```
+
+```rust
+pub async fn validate_checklist(&self, checklist_name: &str, text: &str) -> ChecklistResult {
+    let matches = self.find_matches(role_name, text).await?;
+    let satisfied = categories.filter(|cat| has_match_in_category(cat, &matches));
+    let missing = categories.filter(|cat| !has_match_in_category(cat, &matches));
+    ChecklistResult { passed: missing.is_empty(), satisfied, missing }
+}
+```
+
+**When to Apply**: Domain validation, quality gates, pre/post-processing workflows.
+
+### Pattern: Unified Hook Handler with Type Dispatch
+
+**What We Learned**:
+- Single entry point (`terraphim-agent hook`) simplifies shell scripts
+- Type-based dispatch (`--hook-type`) keeps logic centralized
+- JSON I/O for hooks enables composability
+
+**Implementation**:
+```bash
+# BAD: Multiple separate hook scripts
+.claude/hooks/npm-hook.sh
+.claude/hooks/validation-hook.sh
+.claude/hooks/commit-hook.sh
+
+# GOOD: Single entry point with type dispatch
+terraphim-agent hook --hook-type pre-tool-use --input "$JSON"
+terraphim-agent hook --hook-type post-tool-use --input "$JSON"
+terraphim-agent hook --hook-type prepare-commit-msg --input "$JSON"
+```
+
+**When to Apply**: Hook infrastructure, plugin systems, command dispatchers.
+
+### Pattern: Role-Aware Validation with Default Fallback
+
+**What We Learned**:
+- Role parameter should be optional with sensible default
+- Role detection priority: explicit flag > env var > config > default
+- Each role has its own knowledge graph for domain-specific validation
+
+**Implementation**:
+```rust
+let role_name = if let Some(role) = role {
+    RoleName::new(&role)
+} else {
+    service.get_selected_role().await // Fallback to current role
+};
+```
+
+**When to Apply**: Any role-aware functionality, multi-domain systems.
+
+### Pattern: CLI Commands with JSON Output for Hook Integration
+
+**What We Learned**:
+- Human-readable and JSON output modes serve different purposes
+- `--json` flag enables seamless shell script integration
+- Exit codes should indicate success/failure even in JSON mode
+
+**Implementation**:
+```rust
+if json {
+    println!("{}", serde_json::to_string(&result)?);
+} else {
+    println!("Connectivity: {}", result.connected);
+    println!("Terms: {:?}", result.matched_terms);
+}
+```
+
+**When to Apply**: CLI tools that will be called from hooks or scripts.
+
+### Critical Success Factors
+
+1. **Disciplined Methodology**: Research → Design → Implementation prevented scope creep
+2. **Small Commits**: Each phase committed separately for clean history
+3. **Test-Driven**: Verified each command worked before committing
+4. **Documentation-First**: Skills and CLAUDE.md updated alongside code
+
+### What We Shipped
+
+**Phase A**: Fixed MCP connectivity placeholder
+**Phase B**: Added `validate`, `suggest`, `hook` CLI commands
+**Phase C**: Created 3 skills + 3 hooks for pre/post-LLM workflows
+**Phase D**: Created code_review and security checklists
+**Phase E**: Updated documentation and install scripts
+
+All features are local-first, sub-200ms latency, backward compatible.
