@@ -29,10 +29,12 @@ jobs:
             libgtk-3-dev \
             libsoup2.4-dev \
             librsvg2-dev || true
+          # Install webkit 4.0 (required by some dependencies)
           sudo apt-get install -yqq --no-install-recommends \
-            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev 2>/dev/null || \
+            libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev || true
+          # Also try webkit 4.1 if available (Ubuntu 22.04+)
           sudo apt-get install -yqq --no-install-recommends \
-            libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev
+            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev 2>/dev/null || true
           sudo apt-get install -yqq --no-install-recommends \
             libayatana-appindicator3-dev 2>/dev/null || \
           sudo apt-get install -yqq --no-install-recommends \
