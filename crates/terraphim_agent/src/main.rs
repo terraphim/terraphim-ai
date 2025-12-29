@@ -147,11 +147,19 @@ enum Command {
         exclude_term: bool,
     },
     Replace {
-        text: String,
+        /// Text to replace (reads from stdin if not provided)
+        text: Option<String>,
         #[arg(long)]
         role: Option<String>,
+        /// Output format: plain (default), markdown, wiki, html
         #[arg(long)]
         format: Option<String>,
+        /// Output as JSON with metadata (for hook integration)
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Suppress errors and pass through unchanged on failure
+        #[arg(long, default_value_t = false)]
+        fail_open: bool,
     },
     Interactive,
 
@@ -386,7 +394,23 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
-        Command::Replace { text, role, format } => {
+        Command::Replace {
+            text,
+            role,
+            format,
+            json,
+            fail_open,
+        } => {
+            let input_text = match text {
+                Some(t) => t,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer
+                }
+            };
+
             let role_name = if let Some(role) = role {
                 RoleName::new(&role)
             } else {
@@ -394,16 +418,50 @@ async fn run_offline_command(command: Command) -> Result<()> {
             };
 
             let link_type = match format.as_deref() {
-                Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
-                Some("wiki") => terraphim_automata::LinkType::WikiLinks,
-                Some("html") => terraphim_automata::LinkType::HTMLLinks,
-                _ => terraphim_automata::LinkType::PlainText,
+                Some("markdown") => terraphim_hooks::LinkType::MarkdownLinks,
+                Some("wiki") => terraphim_hooks::LinkType::WikiLinks,
+                Some("html") => terraphim_hooks::LinkType::HTMLLinks,
+                _ => terraphim_hooks::LinkType::PlainText,
             };
 
-            let result = service
-                .replace_matches(&role_name, &text, link_type)
-                .await?;
-            println!("{}", result);
+            let thesaurus = match service.get_thesaurus(&role_name).await {
+                Ok(t) => t,
+                Err(e) => {
+                    if fail_open {
+                        let hook_result = terraphim_hooks::HookResult::fail_open(
+                            input_text.clone(),
+                            e.to_string(),
+                        );
+                        if json {
+                            println!("{}", serde_json::to_string(&hook_result)?);
+                        } else {
+                            eprintln!("Warning: {}", e);
+                            print!("{}", input_text);
+                        }
+                        return Ok(());
+                    } else {
+                        return Err(e);
+                    }
+                }
+            };
+
+            let replacement_service =
+                terraphim_hooks::ReplacementService::new(thesaurus).with_link_type(link_type);
+
+            let hook_result = if fail_open {
+                replacement_service.replace_fail_open(&input_text)
+            } else {
+                replacement_service.replace(&input_text)?
+            };
+
+            if json {
+                println!("{}", serde_json::to_string(&hook_result)?);
+            } else {
+                if let Some(ref err) = hook_result.error {
+                    eprintln!("Warning: {}", err);
+                }
+                print!("{}", hook_result.result);
+            }
 
             Ok(())
         }
@@ -664,9 +722,39 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 }
             }
         }
-        Command::Replace { .. } => {
-            eprintln!("Replace command is only available in offline mode");
-            std::process::exit(1);
+        Command::Replace {
+            text,
+            role: _,
+            format: _,
+            json,
+            fail_open,
+        } => {
+            let input_text = match text {
+                Some(t) => t,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer
+                }
+            };
+
+            if fail_open {
+                let hook_result = terraphim_hooks::HookResult::fail_open(
+                    input_text.clone(),
+                    "Replace command requires offline mode for full functionality".to_string(),
+                );
+                if json {
+                    println!("{}", serde_json::to_string(&hook_result)?);
+                } else {
+                    eprintln!("Warning: {}", hook_result.error.as_deref().unwrap_or(""));
+                    print!("{}", input_text);
+                }
+                Ok(())
+            } else {
+                eprintln!("Replace command is only available in offline mode");
+                std::process::exit(1);
+            }
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")

@@ -1,0 +1,56 @@
+#!/bin/bash
+#
+# prepare-commit-msg hook for Terraphim AI
+# Replaces "Claude Code" and "Claude" attribution with "Terraphim AI"
+# using knowledge graph definitions in docs/src/kg/
+#
+# Installation:
+#   cp scripts/hooks/prepare-commit-msg .git/hooks/
+#   chmod +x .git/hooks/prepare-commit-msg
+#
+
+COMMIT_MSG_FILE=$1
+COMMIT_SOURCE=$2
+
+# Skip if this is a merge, squash, or rebase commit
+if [ "$COMMIT_SOURCE" = "merge" ] || [ "$COMMIT_SOURCE" = "squash" ]; then
+    exit 0
+fi
+
+# Source shared discovery
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+if [ -f "$SCRIPT_DIR/terraphim-discover.sh" ]; then
+    source "$SCRIPT_DIR/terraphim-discover.sh"
+elif [ -f "scripts/hooks/terraphim-discover.sh" ]; then
+    source "scripts/hooks/terraphim-discover.sh"
+fi
+
+# Discover terraphim-agent
+AGENT=""
+if type discover_terraphim_agent >/dev/null 2>&1; then
+    AGENT=$(discover_terraphim_agent)
+else
+    # Inline discovery if shared script not available
+    command -v terraphim-agent >/dev/null 2>&1 && AGENT="terraphim-agent"
+    [ -z "$AGENT" ] && [ -x "./target/release/terraphim-agent" ] && AGENT="./target/release/terraphim-agent"
+    [ -z "$AGENT" ] && [ -x "$HOME/.cargo/bin/terraphim-agent" ] && AGENT="$HOME/.cargo/bin/terraphim-agent"
+fi
+
+# If terraphim-agent not found, pass through unchanged (fail-open)
+if [ -z "$AGENT" ]; then
+    [ "${TERRAPHIM_VERBOSE:-0}" = "1" ] && echo "Terraphim: agent not found, skipping" >&2
+    exit 0
+fi
+
+# Perform replacement
+if [ -f "$COMMIT_MSG_FILE" ]; then
+    ORIGINAL=$(cat "$COMMIT_MSG_FILE")
+    REPLACED=$("$AGENT" replace --fail-open 2>/dev/null <<< "$ORIGINAL")
+
+    if [ -n "$REPLACED" ] && [ "$REPLACED" != "$ORIGINAL" ]; then
+        echo "$REPLACED" > "$COMMIT_MSG_FILE"
+        [ "${TERRAPHIM_VERBOSE:-0}" = "1" ] && echo "Terraphim: attribution updated" >&2
+    fi
+fi
+
+exit 0

@@ -525,6 +525,17 @@ impl ReplHandler {
             }
             RoleSubcommand::Select { name } => {
                 self.current_role = name.clone();
+                // Update the service's selected role so search uses the new role
+                if let Some(service) = &self.service {
+                    let role_name = terraphim_types::RoleName::new(&name);
+                    if let Err(e) = service.update_selected_role(role_name).await {
+                        println!(
+                            "{} Warning: Failed to update service role: {}",
+                            "⚠".yellow().bold(),
+                            e.to_string().yellow()
+                        );
+                    }
+                }
                 println!("{} Switched to role: {}", "✅".bold(), name.green());
             }
         }

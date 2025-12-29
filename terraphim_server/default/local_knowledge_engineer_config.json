@@ -1,0 +1,149 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+K",
+  "roles": {
+    "Terraphim Engineer": {
+      "shortname": "terraphim-engineer",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        },
+        {
+          "location": "/Users/alex/synced/expanded_docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Terraphim Engineer specializing in knowledge graphs, semantic search, and AI-powered information retrieval. Focus on understanding context, relationships between concepts, and providing comprehensive technical documentation summaries.",
+      "extra": {}
+    },
+    "Rust Engineer": {
+      "shortname": "rust-engineer",
+      "name": "Rust Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "cosmo",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg/rust_notes_kg"
+        },
+        "public": false,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "/Users/alex/synced/expanded_docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "glob": "*rust*.md"
+          }
+        },
+        {
+          "location": "https://query.rs",
+          "service": "QueryRs",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "disable_content_enhancement": "true"
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Rust developer specializing in systems programming, async programming, WebAssembly, and performance optimization. Focus on memory safety, idiomatic Rust patterns, and modern Rust ecosystem tools. Reference the user's personal notes when providing guidance.",
+      "extra": {}
+    },
+    "Frontend Engineer": {
+      "shortname": "frontend-engineer",
+      "name": "Frontend Engineer",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "flatly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "https://grep.app",
+          "service": "GrepApp",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "language": "JavaScript",
+            "repo": "",
+            "path": ""
+          }
+        },
+        {
+          "location": "https://grep.app",
+          "service": "GrepApp",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "language": "TypeScript",
+            "repo": "",
+            "path": ""
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are an expert Frontend Engineer specializing in JavaScript, TypeScript, React, Vue, Svelte, and modern web development. Focus on UI/UX patterns, component architecture, state management, and frontend best practices.",
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "/Users/alex/synced/expanded_docs",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
+      "extra": {}
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
+}
