@@ -4153,6 +4153,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "markdown"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a5cab8f2cadc416a82d2e783a1946388b31654d391d1c7d92cc1f03e295b1deb"
+dependencies = [
+ "unicode-id",
+]
+
+[[package]]
 name = "markup5ever"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5614,19 +5623,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f86ba2052aebccc42cbbb3ed234b8b13ce76f75c3551a303cb2bcffcff12bb14"
 dependencies = [
  "bitflags 2.10.0",
- "memchr",
- "pulldown-cmark-escape",
- "unicase",
-]
-
-[[package]]
-name = "pulldown-cmark"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e8bbe1a966bd2f362681a44f6edce3c2310ac21e4d5067a6e7ec396297a6ea0"
-dependencies = [
- "bitflags 2.10.0",
- "getopts",
  "memchr",
  "pulldown-cmark-escape",
  "unicase",
@@ -8219,7 +8215,10 @@ dependencies = [
 name = "terraphim-markdown-parser"
 version = "1.0.0"
 dependencies = [
- "pulldown-cmark 0.13.0",
+ "markdown",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "ulid",
 ]
 
 [[package]]
@@ -8266,7 +8265,7 @@ dependencies = [
  "jiff 0.2.16",
  "log",
  "portpicker",
- "pulldown-cmark 0.12.2",
+ "pulldown-cmark",
  "ratatui",
  "regex",
  "reqwest 0.12.24",
@@ -8280,6 +8279,7 @@ dependencies = [
  "terraphim_agent",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_hooks",
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
@@ -8571,6 +8571,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_hooks"
+version = "1.2.3"
+dependencies = [
+ "dirs 5.0.1",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_automata",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+]
+
+[[package]]
 name = "terraphim_kg_agents"
 version = "1.0.0"
 dependencies = [
@@ -8654,6 +8668,7 @@ dependencies = [
  "tempfile",
  "terraphim_automata",
  "terraphim_config",
+ "terraphim_hooks",
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
@@ -9666,6 +9681,12 @@ name = "unicode-bidi"
 version = "0.3.18"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5c1cb5db39152898a79168971543b1cb5020dff7fe43c8dc468b0885f5e29df5"
+
+[[package]]
+name = "unicode-id"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "70ba288e709927c043cbe476718d37be306be53fb1fafecd0dbe36d072be2580"
 
 [[package]]
 name = "unicode-ident"
