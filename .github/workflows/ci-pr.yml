@@ -73,6 +73,54 @@ jobs:
             echo "should_run_full_ci=false" >> $GITHUB_OUTPUT
           fi
 
+  # Build frontend (required for RustEmbed)
+  build-frontend:
+    name: Build Frontend
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    needs: changes
+    if: needs.changes.outputs.rust-changed == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Cache frontend dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            desktop/node_modules
+            ~/.cache/yarn
+          key: ${{ runner.os }}-frontend-${{ hashFiles('desktop/yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-frontend-
+
+      - name: Cache frontend build
+        id: frontend-cache
+        uses: actions/cache@v4
+        with:
+          path: desktop/dist
+          key: ${{ runner.os }}-frontend-dist-${{ hashFiles('desktop/src/**', 'desktop/package.json', 'desktop/vite.config.ts') }}
+
+      - name: Build frontend
+        if: steps.frontend-cache.outputs.cache-hit != 'true'
+        working-directory: desktop
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Upload frontend dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
+          retention-days: 1
+
   # Rust formatting and linting (quick checks)
   rust-format:
     name: Rust Format Check
@@ -97,13 +145,19 @@ jobs:
   rust-clippy:
     name: Rust Clippy
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 3
-    needs: changes
+    timeout-minutes: 5
+    needs: [changes, build-frontend]
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -118,13 +172,19 @@ jobs:
   rust-compile:
     name: Rust Compilation Check
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 4
-    needs: changes
+    timeout-minutes: 6
+    needs: [changes, build-frontend]
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -187,13 +247,19 @@ jobs:
   rust-tests:
     name: Rust Unit Tests
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
-    needs: [changes, rust-compile]
+    timeout-minutes: 8
+    needs: [changes, rust-compile, build-frontend]
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v6
+
+      - name: Download frontend dist
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -275,7 +341,7 @@ jobs:
     name: PR Validation Summary
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 1
-    needs: [changes, rust-format, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build]
+    needs: [changes, build-frontend, rust-format, rust-clippy, rust-compile, rust-tests, frontend-check, wasm-build]
     if: always()
 
     steps:
@@ -286,6 +352,7 @@ jobs:
           echo "| Job | Status | Notes |" >> $GITHUB_STEP_SUMMARY
           echo "|-----|--------|-------|" >> $GITHUB_STEP_SUMMARY
           echo "| Changes Detected | ${{ needs.changes.result }} | Rust: ${{ needs.changes.outputs.rust-changed }}, Frontend: ${{ needs.changes.outputs.frontend-changed }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Build Frontend | ${{ needs.build-frontend.result || 'skipped' }} | Frontend build for RustEmbed |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust Format | ${{ needs.rust-format.result || 'skipped' }} | Code formatting check |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust Clippy | ${{ needs.rust-clippy.result || 'skipped' }} | Linting and warnings |" >> $GITHUB_STEP_SUMMARY
           echo "| Rust Compile | ${{ needs.rust-compile.result || 'skipped' }} | Compilation verification |" >> $GITHUB_STEP_SUMMARY
@@ -294,7 +361,8 @@ jobs:
           echo "| WASM Build | ${{ needs.wasm-build.result || 'skipped' }} | WebAssembly compilation |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
 
-          if [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
+          if [[ "${{ needs.build-frontend.result }}" == "failure" ]] || \
+             [[ "${{ needs.rust-format.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-clippy.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-compile.result }}" == "failure" ]] || \
              [[ "${{ needs.rust-tests.result }}" == "failure" ]]; then
