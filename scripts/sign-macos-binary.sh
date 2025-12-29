@@ -26,7 +26,8 @@ security unlock-keychain -p "$KEYCHAIN_PASS" "$KEYCHAIN_PATH"
 # Import certificate
 echo "==> Importing certificate"
 CERT_PATH="$RUNNER_TEMP/certificate.p12"
-echo "$CERT_BASE64" | base64 --decode > "$CERT_PATH"
+# Remove newlines from base64 before decoding (macOS base64 is strict)
+echo "$CERT_BASE64" | tr -d '\n' | base64 --decode > "$CERT_PATH"
 
 security import "$CERT_PATH" \
     -k "$KEYCHAIN_PATH" \
