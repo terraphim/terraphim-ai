@@ -137,7 +137,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
           components: rustfmt
 
       - name: Rustfmt Check
@@ -163,7 +162,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
           components: clippy
 
       - name: Clippy Check
@@ -190,7 +188,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -270,7 +268,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
 
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
@@ -306,7 +304,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
@@ -332,8 +329,6 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain-file: .github/rust-toolchain.toml
 
       - name: Install cargo-audit
         run: cargo install cargo-audit
