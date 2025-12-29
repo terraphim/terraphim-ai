@@ -171,6 +171,9 @@ enum Command {
         /// Check if all matched terms are connected by a single path
         #[arg(long, default_value_t = false)]
         connectivity: bool,
+        /// Validate against a named checklist (e.g., "code_review", "security")
+        #[arg(long)]
+        checklist: Option<String>,
         /// Output as JSON
         #[arg(long, default_value_t = false)]
         json: bool,
@@ -503,6 +506,7 @@ async fn run_offline_command(command: Command) -> Result<()> {
             text,
             role,
             connectivity,
+            checklist,
             json,
         } => {
             let input_text = match text {
@@ -531,6 +535,34 @@ async fn run_offline_command(command: Command) -> Result<()> {
                     println!("  Connected: {}", result.connected);
                     println!("  Matched terms: {:?}", result.matched_terms);
                     println!("  {}", result.message);
+                }
+            } else if let Some(checklist_name) = checklist {
+                // Checklist validation mode
+                let result = service
+                    .validate_checklist(&role_name, &checklist_name, &input_text)
+                    .await?;
+
+                if json {
+                    println!("{}", serde_json::to_string(&result)?);
+                } else {
+                    println!(
+                        "Checklist '{}' Validation for role '{}':",
+                        checklist_name, role_name
+                    );
+                    println!("  Passed: {}", result.passed);
+                    println!("  Score: {}/{}", result.satisfied.len(), result.total_items);
+                    if !result.satisfied.is_empty() {
+                        println!("  Satisfied items:");
+                        for item in &result.satisfied {
+                            println!("    ✓ {}", item);
+                        }
+                    }
+                    if !result.missing.is_empty() {
+                        println!("  Missing items:");
+                        for item in &result.missing {
+                            println!("    ✗ {}", item);
+                        }
+                    }
                 }
             } else {
                 // Default validation: find matches
