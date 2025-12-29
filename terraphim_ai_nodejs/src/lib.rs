@@ -418,6 +418,7 @@ mod tests {
   }
 
   #[tokio::test]
+  #[ignore = "Requires server config file with server_hostname - integration test only"]
   async fn async_search_documents_selected_role_test() {
     let result = search_documents_selected_role("agent".to_string()).await;
     println!("Result: {}", result);
