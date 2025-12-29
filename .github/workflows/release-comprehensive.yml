@@ -69,6 +69,21 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Setup Node.js (for frontend build)
+        if: runner.os == 'macOS' || runner.os == 'Linux' && !matrix.use_cross
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Build frontend assets
+        if: runner.os == 'macOS' || runner.os == 'Linux' && !matrix.use_cross
+        working-directory: ./desktop
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
       - name: Build server binary
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
