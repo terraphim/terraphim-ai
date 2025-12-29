@@ -10,7 +10,14 @@
 
 # Default values
 SERVER_URL=${ATOMIC_SERVER_URL:-"http://localhost:9883"}
-TOKEN="eyJwcml2YXRlS2V5IjoiR29xTEdDeFVkaE80cEJWSkVhclUrb2UrUDdPNVJFS3VzRnE3UjAzeDdPZz0iLCJwdWJsaWNLZXkiOiJ6WjJTMEhUZzE3UE01WUxRSkhZa3lGeEcvQmFMMHVYU2h3N0thQjFDSk9nPSIsInN1YmplY3QiOiJodHRwOi8vbG9jYWxob3N0Ojk4ODMvYWdlbnRzL3paMlMwSFRnMTdQTTVZTFFKSFlreUZ4Ry9CYUwwdVhTaHc3S2FCMUNKT2c9IiwiY2xpZW50Ijp7fX0="
+
+# Check for required ATOMIC_TOKEN environment variable
+if [ -z "$ATOMIC_TOKEN" ]; then
+    echo "Error: ATOMIC_TOKEN environment variable is not set."
+    echo "Please set it with your Atomic Server private key."
+    exit 1
+fi
+TOKEN="$ATOMIC_TOKEN"
 
 # Function to create a resource
 create_resource() {
