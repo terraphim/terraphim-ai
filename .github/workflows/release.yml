@@ -425,10 +425,13 @@ jobs:
 
     steps:
       - name: Notify Discord
-        if: ${{ secrets.DISCORD_WEBHOOK_URL != '' }}
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
+            echo "Discord webhook URL not configured, skipping notification"
+            exit 0
+          fi
           curl -X POST -H 'Content-type: application/json' \
             --data '{
               "content": "🎉 **Terraphim AI v${{ needs.version-check.outputs.version }}** has been released! 🚀",
