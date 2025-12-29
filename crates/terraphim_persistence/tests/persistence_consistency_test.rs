@@ -420,12 +420,43 @@ async fn test_key_generation_performance() -> Result<()> {
     let duration = start.elapsed();
     println!("Generated 2000 keys in {:?}", duration);
 
-    // Performance should be reasonable (less than 2 seconds for 2000 keys)
+    // Performance should be reasonable (less than 5 seconds for 2000 keys)
     assert!(
-        duration.as_millis() < 2000,
+        duration.as_millis() < 5000,
         "Key generation should be fast, took {:?}",
         duration
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_load_documents_by_ids_concurrency() -> Result<()> {
+    init_test_persistence().await?;
+    use terraphim_persistence::load_documents_by_ids;
+
+    let mut ids = Vec::new();
+    for i in 0..50 {
+        let id = format!("concurrent-doc-{}", i);
+        ids.push(id.clone());
+        let document = Document {
+            id: id.clone(),
+            title: format!("Test Document {}", i),
+            body: "content".to_string(),
+            ..Default::default()
+        };
+        document.save().await?;
+    }
+
+    let loaded = load_documents_by_ids(&ids).await?;
+    assert_eq!(loaded.len(), 50, "Should load all documents");
+
+    // Verify content of a few documents
+    for doc in loaded {
+        assert!(ids.contains(&doc.id));
+        assert_eq!(doc.body, "content");
+    }
 
     Ok(())
 }

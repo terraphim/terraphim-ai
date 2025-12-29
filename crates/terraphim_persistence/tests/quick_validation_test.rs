@@ -27,7 +27,7 @@ async fn test_quick_validation_all_features() -> Result<()> {
     // Validate key generation
     let key = thesaurus.get_key();
     assert_eq!(
-        key, "thesaurus_testengineer.json",
+        key, "thesaurus_test_engineer.json",
         "Thesaurus key should be normalized correctly"
     );
     println!("  ✅ Key generation: 'Test Engineer' → '{}'", key);
@@ -61,7 +61,7 @@ async fn test_quick_validation_all_features() -> Result<()> {
     // Validate key generation
     let doc_key = document.get_key();
     assert_eq!(
-        doc_key, "document_testdocumentid.json",
+        doc_key, "document_test_document_id.json",
         "Document key should be normalized correctly"
     );
     println!("  ✅ Key generation: 'Test Document ID' → '{}'", doc_key);
@@ -87,9 +87,9 @@ async fn test_quick_validation_all_features() -> Result<()> {
     // Test 3: Key normalization consistency
     println!("🔧 Test 3: Key normalization consistency");
     let challenging_names = vec![
-        ("AI/ML Engineer", "aimlengineer"),
-        ("Data & Analytics", "dataanalytics"),
-        ("Role (v2.0)", "rolev20"),
+        ("AI/ML Engineer", "ai_ml_engineer"),
+        ("Data & Analytics", "data_analytics"),
+        ("Role (v2.0)", "role_v2_0"),
     ];
 
     for (input, expected) in challenging_names {
