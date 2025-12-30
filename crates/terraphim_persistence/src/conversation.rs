@@ -277,6 +277,7 @@ impl ConversationPersistence for OpenDALConversationPersistence {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use terraphim_types::{ChatMessage, RoleName};
 
     #[tokio::test]
@@ -298,6 +299,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_conversation_persistence_save_and_load() {
         // Initialize memory-only storage for testing
         let _ = DeviceStorage::init_memory_only().await.unwrap();
@@ -321,11 +323,18 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_conversation_persistence_list() {
         // Initialize memory-only storage for testing
         let _ = DeviceStorage::init_memory_only().await.unwrap();
 
         let persistence = OpenDALConversationPersistence::new();
+
+        // Clean up any existing conversations first
+        let existing = persistence.list_ids().await.unwrap();
+        for id in existing {
+            let _ = persistence.delete(&id).await;
+        }
 
         // Create multiple conversations
         for i in 0..3 {
@@ -342,6 +351,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_conversation_persistence_delete() {
         // Initialize memory-only storage for testing
         let _ = DeviceStorage::init_memory_only().await.unwrap();

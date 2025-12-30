@@ -5,6 +5,8 @@ use crate::{Error, Result};
 
 mod ripgrep;
 
+#[cfg(feature = "ai-assistant")]
+use crate::haystack::AiAssistantHaystackIndexer;
 #[cfg(feature = "terraphim_atomic_client")]
 use crate::haystack::AtomicHaystackIndexer;
 use crate::haystack::{
@@ -106,6 +108,22 @@ pub async fn search_haystacks(
                 // Search using grep.app for code across GitHub repositories
                 let grep_app = GrepAppHaystackIndexer::default();
                 grep_app.index(needle, haystack).await?
+            }
+            ServiceType::AiAssistant => {
+                #[cfg(feature = "ai-assistant")]
+                {
+                    // Search through AI coding assistant session logs
+                    let ai_assistant = AiAssistantHaystackIndexer;
+                    ai_assistant.index(needle, haystack).await?
+                }
+                #[cfg(not(feature = "ai-assistant"))]
+                {
+                    log::warn!(
+                        "AI assistant haystack support not enabled. Skipping haystack: {}",
+                        haystack.location
+                    );
+                    Index::new()
+                }
             }
         };
 
