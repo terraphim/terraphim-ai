@@ -136,11 +136,6 @@ build-native:
 build-debug-native:
   FROM +source-native
   WORKDIR /code
-  # Remove firecracker from workspace before building
-  RUN rm -rf terraphim_firecracker || true
-  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
-  # Also update default-members to match the remaining members
-  RUN sed -i 's/default-members = \["terraphim_server"\]/default-members = ["terraphim_server"]/' Cargo.toml
   # Optimize build with parallel jobs and optimized settings
   RUN CARGO_BUILD_JOBS=$(nproc) CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
@@ -159,7 +154,7 @@ source:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
@@ -235,11 +230,7 @@ fmt:
 
 lint:
   FROM +workspace-debug
-  # Exclude firecracker from workspace for linting
-  RUN rm -rf terraphim_firecracker || true
-  # Temporarily remove firecracker from workspace members list
-  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
-  RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker
+  RUN cargo clippy --workspace --all-targets --all-features
 
 build-focal:
   FROM ubuntu:20.04
@@ -249,7 +240,7 @@ build-focal:
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN curl https://pkgx.sh | sh
   RUN pkgx +openssl cargo build --release
@@ -266,7 +257,7 @@ build-jammy:
   # RUN rustup toolchain install stable
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   IF [ "$CARGO_HOME" = "" ]
     ENV CARGO_HOME="$HOME/.cargo"
   END
@@ -328,7 +319,7 @@ docker-aarch64:
 
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
