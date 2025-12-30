@@ -117,14 +117,10 @@ source-native:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
-  # Remove firecracker from workspace before vendoring (not included in copy)
-  # Use precise sed to remove only the member entries, not the entire line
-  RUN sed -i 's/, "terraphim_firecracker"//g' Cargo.toml && \
-      sed -i 's/"terraphim_firecracker", //g' Cargo.toml
   # Optimize cargo vendor for faster dependency resolution
   RUN CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
