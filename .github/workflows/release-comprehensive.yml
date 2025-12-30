@@ -420,19 +420,33 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Copy binary artifacts (including universal macOS binaries)
-          find binaries-* -type f \( -executable -o -name "*.exe" \) | while read file; do
-            cp "$file" release-assets/
+          # Copy binary artifacts - look for specific binary names since -executable
+          # doesn't work for cross-platform binaries downloaded as artifacts
+          for artifact_dir in binaries-*; do
+            if [ -d "$artifact_dir" ]; then
+              echo "Processing $artifact_dir..."
+              # Copy all files that look like binaries (no extension or .exe)
+              find "$artifact_dir" -type f \( -name "terraphim*" -o -name "*.exe" \) | while read file; do
+                echo "  Copying: $file"
+                cp "$file" release-assets/
+              done
+            fi
           done
 
           # Copy Debian packages
-          find debian-packages -name "*.deb" -type f | while read file; do
-            cp "$file" release-assets/
-          done
+          if [ -d "debian-packages" ]; then
+            find debian-packages -name "*.deb" -type f | while read file; do
+              cp "$file" release-assets/
+            done
+          fi
 
           # Copy desktop artifacts
-          find desktop-* -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) | while read file; do
-            cp "$file" release-assets/
+          for artifact_dir in desktop-*; do
+            if [ -d "$artifact_dir" ]; then
+              find "$artifact_dir" -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) | while read file; do
+                cp "$file" release-assets/
+              done
+            fi
           done
 
           # List all assets
