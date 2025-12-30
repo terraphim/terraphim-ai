@@ -440,16 +440,11 @@ fn parse_block_id_from_html_node_with_span(
 
 fn parse_block_id_comment(raw_html: &str) -> Option<Ulid> {
     let html = raw_html.trim();
-    let Some(inner) = html
+    let inner = html
         .strip_prefix("<!--")
-        .and_then(|s| s.strip_suffix("-->"))
-    else {
-        return None;
-    };
+        .and_then(|s| s.strip_suffix("-->"))?;
     let inner = inner.trim();
-    let Some(id_str) = inner.strip_prefix(TERRAPHIM_BLOCK_ID_PREFIX) else {
-        return None;
-    };
+    let id_str = inner.strip_prefix(TERRAPHIM_BLOCK_ID_PREFIX)?;
     Ulid::from_str(id_str.trim()).ok()
 }
 
