@@ -121,6 +121,9 @@ source-native:
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
+  # Remove firecracker from workspace before vendoring (not included in copy)
+  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
+  RUN sed -i '/terraphim_github_runner/d' Cargo.toml
   # Optimize cargo vendor for faster dependency resolution
   RUN CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo vendor > .cargo/config.toml
   SAVE ARTIFACT .cargo/config.toml AS LOCAL .cargo/config.toml
