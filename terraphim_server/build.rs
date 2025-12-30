@@ -30,20 +30,23 @@ fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
 
     // Ensure dist directory exists for RustEmbed even if desktop is not built
-    if !dirs.js_dist_tmp.exists() {
-        p!(
-            "Creating dist directory for RustEmbed: {}",
-            dirs.js_dist_tmp.display()
-        );
-        fs::create_dir_all(&dirs.js_dist_tmp)?;
-        // Create minimal placeholder index.html if source doesn't exist
-        let index_path = dirs.js_dist_tmp.join("index.html");
-        if !index_path.exists() && !dirs.js_dist_source.exists() {
-            fs::write(
-                index_path,
-                "<!DOCTYPE html><html><body>Terraphim Server</body></html>",
-            )?;
-            p!("Created placeholder index.html for RustEmbed");
+    // RustEmbed in lib.rs expects ../desktop/dist, so create placeholder there too
+    for dist_dir in [&dirs.js_dist_source, &dirs.js_dist_tmp] {
+        if !dist_dir.exists() {
+            p!(
+                "Creating dist directory for RustEmbed: {}",
+                dist_dir.display()
+            );
+            fs::create_dir_all(dist_dir)?;
+            // Create minimal placeholder index.html
+            let index_path = dist_dir.join("index.html");
+            if !index_path.exists() {
+                fs::write(
+                    &index_path,
+                    "<!DOCTYPE html><html><body>Terraphim Server</body></html>",
+                )?;
+                p!("Created placeholder index.html at {}", index_path.display());
+            }
         }
     }
 
