@@ -48,9 +48,13 @@ fn main() -> std::io::Result<()> {
     }
 
     if should_build(&dirs) {
-        build_js(&dirs);
-        let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
-        dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        let build_succeeded = build_js(&dirs);
+        if build_succeeded && dirs.js_dist_source.exists() {
+            let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
+            dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        } else {
+            p!("JS build did not produce dist folder, using existing or placeholder");
+        }
     } else if dirs.js_dist_tmp.exists() {
         p!("Found {}, skipping copy", dirs.js_dist_tmp.display());
     } else if dirs.js_dist_source.exists() {
@@ -120,23 +124,32 @@ fn should_build(dirs: &Dirs) -> bool {
 }
 
 /// Runs JS package manager to install packages and build the JS bundle
-fn build_js(dirs: &Dirs) {
+/// Returns true if build succeeded, false if it failed (graceful fallback)
+fn build_js(dirs: &Dirs) -> bool {
     let pkg_manager = "./scripts/yarn_and_build.sh";
     p!("install js packages...");
     p!("build js assets...");
     let out = std::process::Command::new("/bin/bash")
         .arg(pkg_manager)
         .current_dir(&dirs.browser_root)
-        .output()
-        .expect("Failed to build js bundle");
-    // Check if out contains errors
-    if out.status.success() {
-        p!("js build successful");
-    } else {
-        panic!(
-            "js build failed: {}",
-            String::from_utf8(out.stderr).unwrap()
-        );
+        .output();
+
+    match out {
+        Ok(output) if output.status.success() => {
+            p!("js build successful");
+            true
+        }
+        Ok(output) => {
+            p!(
+                "js build failed (gracefully continuing): {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            false
+        }
+        Err(e) => {
+            p!("js build command failed (gracefully continuing): {}", e);
+            false
+        }
     }
 }
 
