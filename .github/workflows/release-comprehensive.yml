@@ -142,6 +142,8 @@ jobs:
   create-universal-macos:
     name: Create macOS universal binaries
     needs: build-binaries
+    # Run even if some build jobs failed, as long as macOS builds succeeded
+    if: always()
     runs-on: [self-hosted, macOS]
     steps:
       - name: Download x86_64 macOS binaries
@@ -191,6 +193,8 @@ jobs:
   sign-and-notarize-macos:
     name: Sign and notarize macOS binaries
     needs: create-universal-macos
+    # Only run if universal binaries were created successfully
+    if: always() && needs.create-universal-macos.result == 'success'
     runs-on: [self-hosted, macOS]
     steps:
       - name: Checkout repository
@@ -400,6 +404,8 @@ jobs:
   create-release:
     name: Create GitHub release
     needs: [build-binaries, sign-and-notarize-macos, build-debian-packages, build-tauri-desktop]
+    # Run even if some jobs failed - release whatever was built successfully
+    if: always() && (needs.sign-and-notarize-macos.result == 'success' || needs.build-binaries.result == 'success' || needs.build-debian-packages.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
