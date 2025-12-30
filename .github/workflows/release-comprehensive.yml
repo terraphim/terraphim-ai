@@ -85,8 +85,9 @@ jobs:
           yarn build
 
       - name: Build server binary
+        if: "!matrix.use_cross"
         run: |
-          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
+          cargo build --release \
             --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
 
       - name: Build TUI binary
@@ -97,13 +98,16 @@ jobs:
       - name: Build CLI binary
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim_cli --bin terraphim-cli
+            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
+          # Server binary only exists for non-cross builds
+          if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
+            cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
+          fi
           cp target/${{ matrix.target }}/release/terraphim-agent artifacts/terraphim-agent-${{ matrix.target }}
           cp target/${{ matrix.target }}/release/terraphim-cli artifacts/terraphim-cli-${{ matrix.target }}
           chmod +x artifacts/*
@@ -261,19 +265,26 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Setup Node.js (for frontend assets)
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Build frontend assets
+        working-directory: ./desktop
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
       - name: Build Debian packages
         run: |
-          # Build server package
+          # Build server package (requires desktop/dist from frontend build)
           cargo deb -p terraphim_server --output target/debian/
 
           # Build agent package
           cargo deb -p terraphim_agent --output target/debian/
-
-          # Build desktop package
-          cd desktop
-          yarn install --frozen-lockfile
-          cd ..
-          cargo deb -p terraphim-ai-desktop --output target/debian/
 
       - name: Upload Debian packages
         uses: actions/upload-artifact@v5
