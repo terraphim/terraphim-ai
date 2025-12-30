@@ -64,7 +64,7 @@ jobs:
       - name: Generate cache key
         id: cache
         run: |
-          CACHE_KEY="v2-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/package-lock.json', '.github/rust-toolchain.toml') }}"
+          CACHE_KEY="v2-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/yarn.lock', '.github/rust-toolchain.toml') }}"
           echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
 
       - name: Generate build matrix
@@ -191,12 +191,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: desktop/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
 
       - name: Install dependencies
         working-directory: desktop
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Cache node_modules
         uses: actions/cache@v4
@@ -210,7 +210,7 @@ jobs:
       - name: Build frontend
         working-directory: desktop
         run: |
-          npm run build
+          yarn build
 
           # Show build artifacts
           ls -la dist/

@@ -14,6 +14,7 @@ terraphim-grep/
 artifact/
 nohup.out
 .cargo/
+!.cargo/audit.toml
 localsearch/
 # Local Netlify folder
 .netlify/
@@ -24,7 +25,7 @@ cargo_vendored
 node_modules
 desktop/src-tauri/Cargo.lock
 docs/src/*.json
-# 
+#
 demo_data/
 rust-sdk/
 .env
