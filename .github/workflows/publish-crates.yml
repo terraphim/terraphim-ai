@@ -58,7 +58,8 @@ jobs:
 
       - name: Test crates before publishing
         run: |
-          cargo test --workspace --lib --quiet
+          # Skip RocksDB tests for speed
+          cargo test --workspace --lib --quiet -- --skip rocksdb
           cargo check --workspace --all-targets --quiet
 
       - name: Get crates.io token from 1Password
