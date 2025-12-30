@@ -1,0 +1,13 @@
+# Cargo audit configuration
+# See: https://rustsec.org/advisories/
+
+[advisories]
+# Ignore unmaintained proc-macro-error crate warning (RUSTSEC-2024-0370)
+# This is a transitive dependency from Tauri's GTK stack (gtk3-macros, glib-macros)
+# which we cannot directly control. This is just an unmaintained warning, not
+# an actual security vulnerability. Tracked for resolution when upgrading to Tauri v2.
+#
+# RSA timing sidechannel (RUSTSEC-2023-0071) - transitive from sqlx-mysql via opendal
+# No fixed version available yet. We don't use MySQL features directly.
+# Severity: Medium (5.9). Low risk for our use case.
+ignore = ["RUSTSEC-2024-0370", "RUSTSEC-2023-0071"]
