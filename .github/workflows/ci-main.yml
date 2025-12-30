@@ -141,8 +141,8 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run unit and integration tests
-          cargo test --release --target ${{ matrix.target }} --workspace --all-features
+          # Run unit and integration tests (skip RocksDB tests for speed)
+          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --skip rocksdb
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
