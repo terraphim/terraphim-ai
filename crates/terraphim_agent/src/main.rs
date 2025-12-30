@@ -644,20 +644,18 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             if json {
                 println!("{}", serde_json::to_string(&suggestions)?);
+            } else if suggestions.is_empty() {
+                println!(
+                    "No suggestions found for '{}' with threshold {}",
+                    input_query, threshold
+                );
             } else {
-                if suggestions.is_empty() {
-                    println!(
-                        "No suggestions found for '{}' with threshold {}",
-                        input_query, threshold
-                    );
-                } else {
-                    println!(
-                        "Suggestions for '{}' (threshold: {}):",
-                        input_query, threshold
-                    );
-                    for s in &suggestions {
-                        println!("  {} (similarity: {:.2})", s.term, s.similarity);
-                    }
+                println!(
+                    "Suggestions for '{}' (threshold: {}):",
+                    input_query, threshold
+                );
+                for s in &suggestions {
+                    println!("  {} (similarity: {:.2})", s.term, s.similarity);
                 }
             }
 
