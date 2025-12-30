@@ -52,6 +52,18 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Cleanup self-hosted runner
+        if: contains(matrix.os, 'self-hosted')
+        run: |
+          # Clean up stale keychains from previous runs
+          find /tmp -name "*.keychain-db" -mmin +60 -delete 2>/dev/null || true
+          find /tmp -name "signing.keychain*" -delete 2>/dev/null || true
+          # Clean up stale certificates
+          find /tmp -name "certificate.p12" -delete 2>/dev/null || true
+          # Clean up old build artifacts
+          rm -rf ~/actions-runner/_work/terraphim-ai/terraphim-ai/target/release/*.zip 2>/dev/null || true
+          echo "Cleanup completed"
+
       - name: Checkout repository
         uses: actions/checkout@v6
 
