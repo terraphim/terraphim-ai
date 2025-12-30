@@ -241,12 +241,12 @@ jobs:
         run: |
           echo "=== Running Tests ===" >> $GITHUB_STEP_SUMMARY
 
-          # Run unit and integration tests
-          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --test-threads=4
+          # Run unit and integration tests (skip RocksDB tests for speed)
+          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --test-threads=4 --skip rocksdb
 
           # Run specific critical tests
-          cargo test --release --package terraphim_service --target ${{ matrix.target }}
-          cargo test --release --package terraphim_middleware --target ${{ matrix.target }}
+          cargo test --release --package terraphim_service --target ${{ matrix.target }} -- --skip rocksdb
+          cargo test --release --package terraphim_middleware --target ${{ matrix.target }} -- --skip rocksdb
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4

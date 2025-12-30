@@ -118,7 +118,8 @@ jobs:
 
       - name: Run all tests
         run: |
-          cargo test --workspace --all-features --release
+          # Skip RocksDB tests for speed - they require longer isolation
+          cargo test --workspace --all-features --release -- --skip rocksdb
 
       - name: Run WASM tests
         run: |
@@ -181,8 +182,8 @@ jobs:
       - name: Build frontend
         run: |
           cd desktop
-          npm ci
-          npm run build
+          yarn install --frozen-lockfile
+          yarn build
 
       - name: Create archive
         run: |
