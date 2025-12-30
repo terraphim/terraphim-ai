@@ -15,7 +15,7 @@ readme = "../../README.md"
 serde = { version = "1.0.182", features = ["derive"] }
 serde_json = "1.0.96"
 thiserror = "1.0.56"
-log = "0.4.14"
+log = "0.4.29"
 regex = "1.10.2"
 tokio = { version = "1.35.1", features = ["process", "rt", "macros", "time"] }
 async-trait = "0.1.74"
