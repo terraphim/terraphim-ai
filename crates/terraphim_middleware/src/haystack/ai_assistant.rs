@@ -34,6 +34,9 @@ const DEFAULT_SESSION_LIMIT: usize = 1000;
 pub struct AiAssistantHaystackIndexer;
 
 impl IndexMiddleware for AiAssistantHaystackIndexer {
+    // Allow manual_async_fn because the IndexMiddleware trait requires returning
+    // `impl Future<Output = Result<Index>> + Send` rather than using async_trait.
+    // This pattern is necessary for trait method compatibility.
     #[allow(clippy::manual_async_fn)]
     fn index(
         &self,
@@ -55,21 +58,39 @@ impl IndexMiddleware for AiAssistantHaystackIndexer {
                 needle
             );
 
-            // Get connector from registry
+            // Validate connector exists before spawning blocking task
             let registry = ConnectorRegistry::new();
-            let connector = registry.get(connector_name).ok_or_else(|| {
-                crate::Error::Indexation(format!(
+            if registry.get(connector_name).is_none() {
+                return Err(crate::Error::Indexation(format!(
                     "Unknown connector '{}'. Valid connectors: {}",
                     connector_name,
                     VALID_CONNECTORS.join(", ")
-                ))
-            })?;
+                )));
+            }
 
             // Build import options from haystack config
             let import_options = build_import_options(haystack);
+            let connector_name_owned = connector_name.clone();
 
-            // Import sessions using the connector
-            let sessions = connector.import(&import_options).map_err(|e| {
+            // Import sessions in a blocking task to avoid blocking the async executor.
+            // The connector.import() performs synchronous I/O (reading JSONL files,
+            // SQLite databases) which would block the tokio runtime if run directly.
+            // We create the registry inside the blocking task to satisfy 'static lifetime.
+            let sessions = tokio::task::spawn_blocking(move || {
+                let registry = ConnectorRegistry::new();
+                let connector = registry
+                    .get(&connector_name_owned)
+                    .expect("Connector validated above");
+                connector.import(&import_options)
+            })
+            .await
+            .map_err(|e| {
+                crate::Error::Indexation(format!(
+                    "Task join error while importing from '{}': {}",
+                    connector_name, e
+                ))
+            })?
+            .map_err(|e| {
                 crate::Error::Indexation(format!(
                     "Failed to import sessions from '{}': {}",
                     connector_name, e
@@ -108,7 +129,15 @@ fn build_import_options(haystack: &Haystack) -> ImportOptions {
 
     // Set path from haystack location (with expansion)
     if !haystack.location.is_empty() {
-        options.path = Some(expand_path(&haystack.location));
+        let expanded = expand_path(&haystack.location);
+        if !expanded.exists() {
+            log::warn!(
+                "AiAssistant: Haystack path does not exist: {} (expanded from '{}')",
+                expanded.display(),
+                haystack.location
+            );
+        }
+        options.path = Some(expanded);
     }
 
     // Parse limit from extra_parameters
@@ -120,15 +149,25 @@ fn build_import_options(haystack: &Haystack) -> ImportOptions {
 
     // Parse since timestamp from extra_parameters
     if let Some(since_str) = haystack.extra_parameters.get("since") {
-        if let Ok(ts) = jiff::Timestamp::strptime("%Y-%m-%dT%H:%M:%SZ", since_str) {
-            options.since = Some(ts);
+        match jiff::Timestamp::strptime("%Y-%m-%dT%H:%M:%SZ", since_str) {
+            Ok(ts) => options.since = Some(ts),
+            Err(e) => log::warn!(
+                "Invalid 'since' timestamp '{}': {}. Expected format: YYYY-MM-DDTHH:MM:SSZ",
+                since_str,
+                e
+            ),
         }
     }
 
     // Parse until timestamp from extra_parameters
     if let Some(until_str) = haystack.extra_parameters.get("until") {
-        if let Ok(ts) = jiff::Timestamp::strptime("%Y-%m-%dT%H:%M:%SZ", until_str) {
-            options.until = Some(ts);
+        match jiff::Timestamp::strptime("%Y-%m-%dT%H:%M:%SZ", until_str) {
+            Ok(ts) => options.until = Some(ts),
+            Err(e) => log::warn!(
+                "Invalid 'until' timestamp '{}': {}. Expected format: YYYY-MM-DDTHH:MM:SSZ",
+                until_str,
+                e
+            ),
         }
     }
 
@@ -403,5 +442,62 @@ mod tests {
         // Empty search - should return all messages
         let docs = session_to_documents(&session, "", "claude-code");
         assert_eq!(docs.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_index_missing_connector_returns_error() {
+        let indexer = AiAssistantHaystackIndexer;
+        let haystack = Haystack {
+            location: "/tmp/test".to_string(),
+            service: terraphim_config::ServiceType::AiAssistant,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: Default::default(), // No connector specified
+        };
+
+        let result = indexer.index("test", &haystack).await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Missing 'connector'"),
+            "Expected error about missing connector, got: {}",
+            err_msg
+        );
+        assert!(
+            err_msg.contains("claude-code"),
+            "Expected list of valid connectors, got: {}",
+            err_msg
+        );
+    }
+
+    #[tokio::test]
+    async fn test_index_invalid_connector_returns_error() {
+        let indexer = AiAssistantHaystackIndexer;
+        let mut haystack = Haystack {
+            location: "/tmp/test".to_string(),
+            service: terraphim_config::ServiceType::AiAssistant,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: Default::default(),
+        };
+        haystack
+            .extra_parameters
+            .insert("connector".to_string(), "invalid-connector".to_string());
+
+        let result = indexer.index("test", &haystack).await;
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(
+            err_msg.contains("Unknown connector"),
+            "Expected error about unknown connector, got: {}",
+            err_msg
+        );
+        assert!(
+            err_msg.contains("invalid-connector"),
+            "Expected error to mention the invalid connector name, got: {}",
+            err_msg
+        );
     }
 }
