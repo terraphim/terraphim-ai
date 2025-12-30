@@ -117,7 +117,7 @@ source-native:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server terraphim_firecracker desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
