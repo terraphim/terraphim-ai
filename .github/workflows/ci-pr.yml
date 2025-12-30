@@ -217,7 +217,8 @@ jobs:
       - name: Run unit tests
         run: |
           # Run only unit tests (skip integration tests for speed)
-          cargo test --workspace --lib --bins --all-features -- --test-threads=4
+          # Use --test-threads=1 to avoid RocksDB locking conflicts
+          cargo test --workspace --lib --bins --all-features -- --test-threads=1
 
   # WASM build verification
   wasm-build:
