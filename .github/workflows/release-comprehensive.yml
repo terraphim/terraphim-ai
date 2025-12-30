@@ -314,11 +314,11 @@ jobs:
             webkit-package: ""
             javascriptcore-package: ""
           - platform: ubuntu-22.04
-            webkit-package: "libwebkit2gtk-4.1-dev"
-            javascriptcore-package: "libjavascriptcoregtk-4.1-dev"
+            webkit-package: "libwebkit2gtk-4.0-dev"
+            javascriptcore-package: "libjavascriptcoregtk-4.0-dev"
           - platform: ubuntu-24.04
-            webkit-package: "libwebkit2gtk-4.1-dev"
-            javascriptcore-package: "libjavascriptcoregtk-4.1-dev"
+            webkit-package: "libwebkit2gtk-4.0-dev"
+            javascriptcore-package: "libjavascriptcoregtk-4.0-dev"
           - platform: windows-latest
             webkit-package: ""
             javascriptcore-package: ""
