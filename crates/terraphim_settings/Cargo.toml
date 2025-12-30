@@ -13,7 +13,7 @@ readme = "../../README.md"
 
 [dependencies]
 directories = "6.0.0"
-log = "0.4.14"
+log = "0.4.29"
 thiserror = "1.0.56"
 twelf = { version = "0.15.0", features = ["json", "toml", "env", "clap"] }
 serde = { version = "1.0.182", features = ["derive"] }

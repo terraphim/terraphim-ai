@@ -27,7 +27,7 @@ anyhow = "1.0.40"
 axum = { version = "0.8.7", features = ["macros", "ws"] }
 axum-extra = "0.10.1"
 clap = { version = "4.5.49", features = ["derive"] }
-log = "0.4.14"
+log = "0.4.29"
 portpicker = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 serde = { version = "1.0.149", features = ["derive"] }
