@@ -11,19 +11,17 @@ use cached::proc_macro::cached;
 use terraphim_config::Haystack;
 use tokio::fs as tfs;
 
-/// Find the largest index that is a valid UTF-8 char boundary at or before `index`.
-/// Compatible with Rust < 1.91 (replaces `str::floor_char_boundary`).
-#[inline]
+/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
+/// Polyfill for str::floor_char_boundary (stable since Rust 1.91).
 fn floor_char_boundary(s: &str, index: usize) -> usize {
     if index >= s.len() {
-        s.len()
-    } else {
-        let mut idx = index;
-        while idx > 0 && !s.is_char_boundary(idx) {
-            idx -= 1;
-        }
-        idx
+        return s.len();
     }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
 }
 
 /// Middleware that uses ripgrep to index Markdown haystacks.

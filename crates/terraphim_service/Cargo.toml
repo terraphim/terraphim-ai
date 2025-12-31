@@ -24,14 +24,14 @@ thiserror = "1.0.58"
 opendal = { version = "0.54" }
 serde_json = "1.0.116"
 serde = { version = "1.0.198", features = ["serde_derive"] }
-log = "0.4.21"
+log = "0.4.29"
 strsim = "0.11.1"
 regex = "1.11.0"
 tokio = { workspace = true }
 async-trait = "0.1"
 futures-util = "0.3"
 async-stream = "0.3"
-uuid = { version = "1.6", features = ["v4", "serde"] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # HTTP client for API calls and OpenRouter integration

@@ -16,6 +16,19 @@ use tokio::sync::{broadcast, RwLock};
 static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
     Regex::new(r"[^a-zA-Z0-9]+").expect("Failed to create normalize regex")
 });
+
+/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
+/// Polyfill for str::floor_char_boundary (stable since Rust 1.91).
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_config::ConfigState;
 use terraphim_persistence::Persistable;

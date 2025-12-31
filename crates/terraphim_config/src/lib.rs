@@ -271,6 +271,8 @@ pub enum ServiceType {
     Perplexity,
     /// Use grep.app for searching code across GitHub repositories
     GrepApp,
+    /// Use AI coding assistant session logs (Claude Code, OpenCode, Cursor, Aider, Codex)
+    AiAssistant,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
