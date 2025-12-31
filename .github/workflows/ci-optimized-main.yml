@@ -278,6 +278,14 @@ jobs:
           path: target/${{ matrix.target }}/debian/*.deb
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+
   # Build Summary and Performance Report
   build-summary:
     name: CI Performance Summary
@@ -341,7 +349,13 @@ jobs:
 
           # Final system cleanup
           docker system prune -f --volumes --filter "until=6h" || true
-          docker buildx prune -f --keep-storage=5G --filter until=6h" || true
+          docker buildx prune -f --keep-storage=5G --filter "until=6h" || true
+
+          # Workspace cleanup
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
 
           # Report final system state
           FINAL_STORAGE=$(docker system df --format "{{.Size}}" | head -1)

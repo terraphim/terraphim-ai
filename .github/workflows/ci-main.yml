@@ -176,6 +176,14 @@ jobs:
           path: target/${{ matrix.target }}/debian/*.deb
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+
   # Frontend build
   frontend-build:
     name: Frontend Build
@@ -223,6 +231,12 @@ jobs:
           path: desktop/dist/
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+
   # WASM build
   wasm-build:
     name: WASM Build
@@ -263,6 +277,13 @@ jobs:
           name: wasm-package
           path: crates/terraphim_automata/wasm-test/pkg/
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/crates/terraphim_automata/wasm-test/pkg" || true
 
   # Docker image build
   docker-build:
@@ -323,6 +344,13 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" || true
+
   # Integration tests
   integration-tests:
     name: Integration Tests
@@ -374,6 +402,13 @@ jobs:
           # Clean up
           kill $SERVER_PID 2>/dev/null || true
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" || true
+
   # Security scanning
   security-scan:
     name: Security Scan
@@ -400,6 +435,12 @@ jobs:
         run: |
           cargo install cargo-deny
           cargo deny check
+
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
 
   # Build summary
   build-summary:
