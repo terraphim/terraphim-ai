@@ -104,13 +104,17 @@ jobs:
 
       - name: Build TUI binary
         run: |
+          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent
+            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent \
+            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
 
       - name: Build CLI binary
         run: |
+          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
+            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli \
+            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
@@ -320,9 +324,7 @@ jobs:
           - platform: ubuntu-22.04
             webkit-package: "libwebkit2gtk-4.0-dev"
             javascriptcore-package: "libjavascriptcoregtk-4.0-dev"
-          - platform: ubuntu-24.04
-            webkit-package: "libwebkit2gtk-4.0-dev"
-            javascriptcore-package: "libjavascriptcoregtk-4.0-dev"
+          # NOTE: Ubuntu 24.04 removed - Tauri v1 requires webkit 4.0, but 24.04 only has 4.1
           - platform: windows-latest
             webkit-package: ""
             javascriptcore-package: ""
@@ -350,12 +352,20 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} \
-            ${{ matrix.javascriptcore-package }} libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+          # Try webkit 4.1 first (Ubuntu 24.04+), fallback to 4.0 (Ubuntu 22.04)
+          sudo apt-get install -yqq --no-install-recommends \
+            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev 2>/dev/null || \
+          sudo apt-get install -yqq --no-install-recommends \
+            libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev
+          sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
 
       - name: Install frontend dependencies
         working-directory: ./desktop
         run: yarn install --frozen-lockfile
+
+      - name: Build frontend assets
+        working-directory: ./desktop
+        run: yarn build
 
       - name: Build Tauri app
         working-directory: ./desktop
