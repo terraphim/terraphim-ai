@@ -119,7 +119,7 @@ RUN cd desktop && \
 # ============================================
 # Stage 5: Final Runtime Image
 # ============================================
-FROM debian:12-slim as runtime
+FROM debian:13-slim as runtime
 
 # Install runtime dependencies
 RUN apt-get update && apt-get install -y \
