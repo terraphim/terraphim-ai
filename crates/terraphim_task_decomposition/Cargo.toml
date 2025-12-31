@@ -54,7 +54,7 @@ default = []
 benchmarks = ["dep:criterion"]
 
 [dependencies.criterion]
-version = "0.5"
+version = "0.8"
 optional = true
 
 # Benchmarks will be added later
