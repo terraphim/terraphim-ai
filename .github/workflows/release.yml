@@ -132,6 +132,13 @@ jobs:
           cargo build --release --package terraphim_server
           ./target/release/terraphim_server --version
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+
   # Build release artifacts
   build:
     name: Build Release Artifacts
@@ -245,6 +252,14 @@ jobs:
             ${{ matrix.asset_name }}.sha256
           retention-days: 90
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/release-artifacts" || true
+
   # Build Docker images
   docker:
     name: Build Docker Images
@@ -292,6 +307,12 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
   # Build and publish npm package
   npm-publish:
     name: Publish NPM Package
@@ -321,6 +342,13 @@ jobs:
         run: npm publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Post-run cleanup
+        if: success()
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo rm -rf "${WORKDIR}/crates/terraphim_automata/wasm-test/pkg" || true
 
   # Create GitHub release
   create-release:
