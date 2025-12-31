@@ -28,6 +28,21 @@ use tokio::sync::broadcast::channel;
 use tower_http::cors::{Any, CorsLayer};
 use walkdir::WalkDir;
 
+/// Find the largest index that is a valid UTF-8 char boundary at or before `index`.
+/// Compatible with Rust < 1.91 (replaces `str::floor_char_boundary`).
+#[inline]
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        s.len()
+    } else {
+        let mut idx = index;
+        while idx > 0 && !s.is_char_boundary(idx) {
+            idx -= 1;
+        }
+        idx
+    }
+}
+
 /// Create a proper description from document content
 /// Collects multiple meaningful sentences to create informative descriptions
 fn create_document_description(content: &str) -> Option<String> {
@@ -110,7 +125,7 @@ fn create_document_description(content: &str) -> Option<String> {
     // Limit total length to 400 characters for more informative descriptions
     // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
     let description = if combined.len() > 400 {
-        let safe_end = combined.floor_char_boundary(397);
+        let safe_end = floor_char_boundary(&combined, 397);
         format!("{}...", &combined[..safe_end])
     } else {
         combined

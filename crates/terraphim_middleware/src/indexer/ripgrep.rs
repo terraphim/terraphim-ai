@@ -11,6 +11,21 @@ use cached::proc_macro::cached;
 use terraphim_config::Haystack;
 use tokio::fs as tfs;
 
+/// Find the largest index that is a valid UTF-8 char boundary at or before `index`.
+/// Compatible with Rust < 1.91 (replaces `str::floor_char_boundary`).
+#[inline]
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        s.len()
+    } else {
+        let mut idx = index;
+        while idx > 0 && !s.is_char_boundary(idx) {
+            idx -= 1;
+        }
+        idx
+    }
+}
+
 /// Middleware that uses ripgrep to index Markdown haystacks.
 #[derive(Default)]
 pub struct RipgrepIndexer {}
@@ -234,7 +249,7 @@ impl RipgrepIndexer {
                         let cleaned_lines = lines.trim();
                         if !cleaned_lines.is_empty() {
                             let description = if cleaned_lines.len() > 200 {
-                                let safe_end = cleaned_lines.floor_char_boundary(197);
+                                let safe_end = floor_char_boundary(cleaned_lines, 197);
                                 format!("{}...", &cleaned_lines[..safe_end])
                             } else {
                                 cleaned_lines.to_string()
@@ -271,7 +286,7 @@ impl RipgrepIndexer {
                         let cleaned_lines = lines.trim();
                         if !cleaned_lines.is_empty() {
                             let description = if cleaned_lines.len() > 200 {
-                                let safe_end = cleaned_lines.floor_char_boundary(197);
+                                let safe_end = floor_char_boundary(cleaned_lines, 197);
                                 format!("{}...", &cleaned_lines[..safe_end])
                             } else {
                                 cleaned_lines.to_string()
