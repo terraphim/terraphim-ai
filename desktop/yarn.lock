@@ -836,10 +836,10 @@
   resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-2.27.1.tgz#0a91346952b8314cd6bbe5cda0c32a6e7e24f432"
   integrity sha512-nkerkl8syHj44ZzAB7oA2GPmmZINKBKCa79FuNvmGJrJ4qyZwlkDzszud23YteFZEytbc87kVd/fP76ROS6sLg==
 
-"@tiptap/core@^3.9.0":
-  version "3.11.0"
-  resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-3.11.0.tgz#122a1db7852c9cea48221290210e713bb4efd66e"
-  integrity sha512-kmS7ZVpHm1EMnW1Wmft9H5ZLM7E0G0NGBx+aGEHGDcNxZBXD2ZUa76CuWjIhOGpwsPbELp684ZdpF2JWoNi4Dg==
+"@tiptap/core@^3.13.0":
+  version "3.13.0"
+  resolved "https://registry.yarnpkg.com/@tiptap/core/-/core-3.13.0.tgz#ae3fe6fe7732f36b6ea8a2198e1fc53a4ad0d0d2"
+  integrity sha512-iUelgiTMgPVMpY5ZqASUpk8mC8HuR9FWKaDzK27w9oWip9tuB54Z8mePTxNcQaSPb6ErzEaC8x8egrRt7OsdGQ==
 
 "@tiptap/extension-blockquote@^2.27.1":
   version "2.27.1"
