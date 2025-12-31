@@ -3173,3 +3173,270 @@ if json {
 **Phase E**: Updated documentation and install scripts
 
 All features are local-first, sub-200ms latency, backward compatible.
+
+---
+
+## CI/CD Release Workflow Fixes - 2025-12-31
+
+### Pattern: GitHub Actions Job Dependencies with `if: always()`
+
+**Context:** Matrix jobs where some variants fail shouldn't block downstream jobs that only need specific successful variants.
+
+**What We Learned:**
+- GitHub Actions `needs:` requires ALL dependent jobs to succeed by default
+- Using `if: always()` allows the job to run regardless of dependency status
+- Combine with result checks: `if: always() && needs.job.result == 'success'`
+- This pattern enables partial releases when some platforms fail
+
+**Implementation:**
+```yaml
+# BAD: Skipped if ANY build-binaries job fails
+create-universal-macos:
+  needs: build-binaries
+  # Job skipped because Windows build failed
+
+# GOOD: Runs if job itself can proceed
+create-universal-macos:
+  needs: build-binaries
+  if: always()  # Always attempt to run
+
+sign-and-notarize:
+  needs: create-universal-macos
+  if: always() && needs.create-universal-macos.result == 'success'
+```
+
+**When to Apply:** Any workflow with matrix builds where partial success is acceptable.
+
+### Pattern: Cross-Platform Binary Detection in Release Workflows
+
+**Context:** Need to copy binaries from artifacts to release, but `-executable` flag doesn't work across platforms.
+
+**What We Learned:**
+- `find -executable` checks Unix executable bit, which is lost when downloading artifacts on different platforms
+- macOS binaries downloaded on Linux runner lose their executable bit
+- Use explicit filename patterns instead of permission-based detection
+
+**Implementation:**
+```bash
+# BAD: Relies on executable permission
+find binaries-* -type f -executable
+
+# GOOD: Uses filename patterns
+find binaries-* -type f \( -name "terraphim*" -o -name "*.exe" \)
+```
+
+**When to Apply:** Any cross-platform release workflow that downloads artifacts on a different OS.
+
+### Pattern: Self-Hosted Runner Cleanup
+
+**Context:** Self-hosted runners accumulate artifacts from previous runs that can cause conflicts.
+
+**What We Learned:**
+- Temporary keychains from signing can remain on disk
+- Old build artifacts may interfere with new builds
+- Add cleanup step at start of jobs using self-hosted runners
+
+**Implementation:**
+```yaml
+- name: Cleanup self-hosted runner
+  if: contains(matrix.os, 'self-hosted')
+  run: |
+    find /tmp -name "*.keychain-db" -mmin +60 -delete 2>/dev/null || true
+    find /tmp -name "signing.keychain*" -delete 2>/dev/null || true
+    rm -rf ~/actions-runner/_work/*/target/release/*.zip 2>/dev/null || true
+```
+
+**When to Apply:** Any workflow using self-hosted runners, especially for signing operations.
+
+### Pattern: 1Password CLI for CI/CD Secrets
+
+**Context:** Need to securely inject signing credentials without exposing in workflow files.
+
+**What We Learned:**
+- Use `op read` for individual secrets: `op read 'op://Vault/Item/Field'`
+- Use `op inject` for template files: `op inject -i template.json -o output.json`
+- Use `op run --env-file` for environment-based secrets
+- Always use `--no-newline` flag when reading secrets for environment variables
+
+**Implementation:**
+```yaml
+# Read individual secrets
+- run: |
+    echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
+
+# Inject into template
+- run: |
+    op inject --force -i tauri.conf.json.template -o tauri.conf.json
+
+# Run with injected environment
+- run: |
+    op run --env-file=.env.ci -- yarn tauri build
+```
+
+**When to Apply:** Any CI/CD workflow requiring secrets that should be centrally managed.
+
+### Debugging Insight: Iterative Tag Testing
+
+**What We Learned:**
+- Create test tags (e.g., `v0.0.9-signing-test`) for rapid iteration
+- Each tag triggers full workflow, revealing different failure modes
+- Clean up test releases after validation
+
+**Testing Approach:**
+```bash
+# Create test tag
+git tag v0.0.X-signing-test
+git push origin v0.0.X-signing-test
+
+# Monitor
+gh run watch <run_id>
+
+# Check results
+gh release view v0.0.X-signing-test --json assets
+
+# Cleanup (when done)
+gh release delete v0.0.X-signing-test --yes
+git push origin :refs/tags/v0.0.X-signing-test
+```
+
+### Critical Success Factors
+
+1. **Verify 1Password integration first** - All credentials should come from vault, not workflow secrets
+2. **Test job dependencies with partial failures** - Don't assume all matrix jobs will succeed
+3. **Use explicit file matching** - Permission-based detection fails across platforms
+4. **Clean self-hosted runners** - Previous run artifacts can cause subtle failures
+5. **Iterative testing with tags** - Faster feedback than waiting for production release
+
+### What We Shipped
+
+| Fix | Commit | Impact |
+|-----|--------|--------|
+| Job dependency fix | `bf8551f2` | Signing runs even when cross-builds fail |
+| Asset preparation fix | `086aefa6` | macOS binaries included in releases |
+| Runner cleanup | `ea4027bd` | Prevents signing conflicts |
+| Tauri v1 standardization | `c070ef70`, `a19ed7fb` | Consistent GTK and CLI versions |
+
+All fixes verified with v0.0.11-signing-test release containing signed macOS universal binaries.
+
+---
+
+## CI/CD and PR Triage Session - 2025-12-31
+
+### Pattern: Disciplined Design for Closed PRs
+
+**Context:** Large PRs with conflicts need fresh implementation, not rebasing.
+
+**What We Learned:**
+- PRs older than 4-6 weeks often have significant conflicts
+- Extract valuable features into design plans rather than attempting complex rebases
+- Create GitHub issues linking to design documents for tracking
+- Use disciplined-design skill to create structured implementation plans
+
+**Implementation:**
+```bash
+# Close PR with design plan reference
+gh pr close $PR --comment "See .docs/plans/feature-design.md for fresh implementation"
+
+# Create tracking issue
+gh issue create --title "feat: Implement X" --body "See design plan..."
+```
+
+**When to Apply:** PRs with 50+ files, 4+ weeks old, or CONFLICTING status.
+
+### Pattern: Feature Flags for Cross-Compilation
+
+**Context:** Cross-compiled binaries fail when dependencies require C compilation.
+
+**What We Learned:**
+- `rusqlite` and similar C-binding crates fail on musl/ARM cross-compilation
+- Use `--no-default-features` to exclude problematic dependencies
+- Create feature sets for different build targets (native vs cross)
+- The `memory` and `dashmap` features provide pure-Rust alternatives
+
+**Implementation:**
+```yaml
+# In GitHub Actions workflow
+${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+```
+
+**When to Apply:** Any cross-compilation workflow using `cross` tool.
+
+### Pattern: Webkit Version Fallback for Tauri
+
+**Context:** Tauri v1 requires webkit 4.0, but newer Ubuntu versions only have 4.1.
+
+**What We Learned:**
+- Ubuntu 24.04 dropped webkit 4.0 packages
+- Tauri v1 is incompatible with webkit 4.1 (uses different API)
+- Implement fallback: try 4.1 first, fall back to 4.0
+- Or simply exclude Ubuntu 24.04 from Tauri v1 matrix
+
+**Implementation:**
+```bash
+sudo apt-get install -yqq libwebkit2gtk-4.1-dev 2>/dev/null || \
+sudo apt-get install -yqq libwebkit2gtk-4.0-dev
+```
+
+**When to Apply:** Any Tauri v1 builds on Ubuntu runners.
+
+### Pattern: PR Triage Categories
+
+**Context:** 30 open PRs need systematic triage.
+
+**What We Learned:**
+- Categorize PRs: merge (safe), close (stale/superseded), defer (risky)
+- Dependabot PRs: check for major version bumps (breaking changes)
+- Feature PRs: check CI status before merging
+- Create design plans for valuable but conflicting PRs
+
+**Categories:**
+| Category | Criteria | Action |
+|----------|----------|--------|
+| Merge | Low-risk, passing CI | `gh pr merge` |
+| Close | Stale, superseded, conflicts | `gh pr close` with comment |
+| Defer | Major version, risky | Close with explanation |
+| Design | Valuable but complex | Create plan, close PR |
+
+**When to Apply:** Any PR backlog cleanup session.
+
+### Pattern: GitHub Actions `if: always()` for Partial Success
+
+**Context:** Signing jobs skipped when unrelated builds failed.
+
+**What We Learned:**
+- `needs:` requires ALL dependent jobs to succeed by default
+- Use `if: always()` to run regardless of dependency status
+- Combine with result checks: `if: always() && needs.job.result == 'success'`
+- Enables releasing whatever was built successfully
+
+**Implementation:**
+```yaml
+create-universal-macos:
+  needs: build-binaries
+  if: always()  # Run even if some builds failed
+
+sign-and-notarize:
+  needs: create-universal-macos
+  if: always() && needs.create-universal-macos.result == 'success'
+```
+
+**When to Apply:** Any workflow with matrix builds where partial success is acceptable.
+
+### Critical Success Factors
+
+1. **Design before implementation** - Use disciplined-design skill for complex features
+2. **Categorize PRs systematically** - Don't try to review 30 PRs sequentially
+3. **Create tracking issues** - Link design plans to GitHub issues
+4. **Test CI fixes with tags** - Use `v0.0.X-test` tags for rapid iteration
+5. **Document in .docs/plans/** - Keep design documents in version control
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| PRs Processed | 27 |
+| PRs Merged | 13 |
+| PRs Closed | 11 |
+| Design Plans Created | 2 |
+| GitHub Issues Created | 2 |
+| CI Fixes Applied | 4 |
