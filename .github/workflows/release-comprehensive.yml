@@ -22,6 +22,7 @@ jobs:
   build-binaries:
     name: Build binaries for ${{ matrix.target }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           # Linux builds
@@ -37,11 +38,11 @@ jobs:
           - os: ubuntu-22.04
             target: armv7-unknown-linux-musleabihf
             use_cross: true
-          # macOS builds
-          - os: [self-hosted, macOS, X64]
+          # macOS builds - use same runner with cross-compilation for x86_64
+          - os: [self-hosted, macOS]
             target: x86_64-apple-darwin
             use_cross: false
-          - os: [self-hosted, macOS, X64]
+          - os: [self-hosted, macOS]
             target: aarch64-apple-darwin
             use_cross: false
           # Windows builds
@@ -51,6 +52,18 @@ jobs:
 
     runs-on: ${{ matrix.os }}
     steps:
+      - name: Cleanup self-hosted runner
+        if: contains(matrix.os, 'self-hosted')
+        run: |
+          # Clean up stale keychains from previous runs
+          find /tmp -name "*.keychain-db" -mmin +60 -delete 2>/dev/null || true
+          find /tmp -name "signing.keychain*" -delete 2>/dev/null || true
+          # Clean up stale certificates
+          find /tmp -name "certificate.p12" -delete 2>/dev/null || true
+          # Clean up old build artifacts
+          rm -rf ~/actions-runner/_work/terraphim-ai/terraphim-ai/target/release/*.zip 2>/dev/null || true
+          echo "Cleanup completed"
+
       - name: Checkout repository
         uses: actions/checkout@v6
 
@@ -68,22 +81,51 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Build server binary
+      - name: Setup Node.js (for frontend build)
+        if: runner.os == 'macOS' || runner.os == 'Linux' && !matrix.use_cross
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Build frontend assets
+        if: runner.os == 'macOS' || runner.os == 'Linux' && !matrix.use_cross
+        working-directory: ./desktop
         run: |
-          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} --bin terraphim_server
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Build server binary
+        if: "!matrix.use_cross"
+        run: |
+          cargo build --release \
+            --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
 
       - name: Build TUI binary
         run: |
+          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} --bin terraphim-agent
+            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent \
+            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+
+      - name: Build CLI binary
+        run: |
+          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
+          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
+            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli \
+            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
         run: |
           mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
+          # Server binary only exists for non-cross builds
+          if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
+            cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
+          fi
           cp target/${{ matrix.target }}/release/terraphim-agent artifacts/terraphim-agent-${{ matrix.target }}
+          cp target/${{ matrix.target }}/release/terraphim-cli artifacts/terraphim-cli-${{ matrix.target }}
           chmod +x artifacts/*
 
       - name: Prepare artifacts (Windows)
@@ -93,12 +135,139 @@ jobs:
           mkdir -p artifacts
           cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
+          cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe || true
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v5
         with:
           name: binaries-${{ matrix.target }}
           path: artifacts/*
+
+  create-universal-macos:
+    name: Create macOS universal binaries
+    needs: build-binaries
+    # Run even if some build jobs failed, as long as macOS builds succeeded
+    if: always()
+    runs-on: [self-hosted, macOS]
+    steps:
+      - name: Download x86_64 macOS binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-x86_64-apple-darwin
+          path: x86_64
+
+      - name: Download aarch64 macOS binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-aarch64-apple-darwin
+          path: aarch64
+
+      - name: Create universal binaries
+        run: |
+          mkdir -p universal
+
+          # Create universal binary for terraphim_server
+          lipo -create \
+            x86_64/terraphim_server-x86_64-apple-darwin \
+            aarch64/terraphim_server-aarch64-apple-darwin \
+            -output universal/terraphim_server-universal-apple-darwin
+
+          # Create universal binary for terraphim-agent
+          lipo -create \
+            x86_64/terraphim-agent-x86_64-apple-darwin \
+            aarch64/terraphim-agent-aarch64-apple-darwin \
+            -output universal/terraphim-agent-universal-apple-darwin
+
+          chmod +x universal/*
+
+          # Verify universal binaries
+          echo "Verifying universal binaries:"
+          file universal/terraphim_server-universal-apple-darwin
+          file universal/terraphim-agent-universal-apple-darwin
+
+          lipo -info universal/terraphim_server-universal-apple-darwin
+          lipo -info universal/terraphim-agent-universal-apple-darwin
+
+      - name: Upload universal binaries
+        uses: actions/upload-artifact@v5
+        with:
+          name: binaries-universal-apple-darwin
+          path: universal/*
+
+  sign-and-notarize-macos:
+    name: Sign and notarize macOS binaries
+    needs: create-universal-macos
+    # Only run if universal binaries were created successfully
+    if: always() && needs.create-universal-macos.result == 'success'
+    runs-on: [self-hosted, macOS]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Download universal macOS binaries
+        uses: actions/download-artifact@v4
+        with:
+          name: binaries-universal-apple-darwin
+          path: universal
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Load signing credentials from 1Password
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          echo "Loading credentials from 1Password..."
+
+          # Read credentials with --no-newline to avoid trailing characters
+          echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
+          echo "APPLE_TEAM_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)" >> $GITHUB_ENV
+          echo "APPLE_APP_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)" >> $GITHUB_ENV
+          echo "CERT_BASE64=$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)" >> $GITHUB_ENV
+          echo "CERT_PASSWORD=$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)" >> $GITHUB_ENV
+
+          echo "✅ Credentials loaded successfully"
+
+      - name: Sign and notarize terraphim_server
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          chmod +x scripts/sign-macos-binary.sh
+          ./scripts/sign-macos-binary.sh \
+            "universal/terraphim_server-universal-apple-darwin" \
+            "$APPLE_ID" \
+            "$APPLE_TEAM_ID" \
+            "$APPLE_APP_PASSWORD" \
+            "$CERT_BASE64" \
+            "$CERT_PASSWORD"
+
+      - name: Sign and notarize terraphim-agent
+        env:
+          RUNNER_TEMP: ${{ runner.temp }}
+        run: |
+          ./scripts/sign-macos-binary.sh \
+            "universal/terraphim-agent-universal-apple-darwin" \
+            "$APPLE_ID" \
+            "$APPLE_TEAM_ID" \
+            "$APPLE_APP_PASSWORD" \
+            "$CERT_BASE64" \
+            "$CERT_PASSWORD"
+
+      - name: Verify signed binaries
+        run: |
+          echo "==> Verifying terraphim_server"
+          codesign --verify --deep --strict --verbose=2 universal/terraphim_server-universal-apple-darwin
+          file universal/terraphim_server-universal-apple-darwin
+
+          echo "==> Verifying terraphim-agent"
+          codesign --verify --deep --strict --verbose=2 universal/terraphim-agent-universal-apple-darwin
+          file universal/terraphim-agent-universal-apple-darwin
+
+      - name: Upload signed binaries
+        uses: actions/upload-artifact@v5
+        with:
+          name: binaries-signed-universal-apple-darwin
+          path: universal/*
 
   build-debian-packages:
     name: Build Debian packages
@@ -116,19 +285,26 @@ jobs:
       - name: Cache dependencies
         uses: Swatinem/rust-cache@v2
 
+      - name: Setup Node.js (for frontend assets)
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Build frontend assets
+        working-directory: ./desktop
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
       - name: Build Debian packages
         run: |
-          # Build server package
+          # Build server package (requires desktop/dist from frontend build)
           cargo deb -p terraphim_server --output target/debian/
 
           # Build agent package
           cargo deb -p terraphim_agent --output target/debian/
-
-          # Build desktop package
-          cd desktop
-          yarn install --frozen-lockfile
-          cd ..
-          cargo deb -p terraphim-ai-desktop --output target/debian/
 
       - name: Upload Debian packages
         uses: actions/upload-artifact@v5
@@ -139,17 +315,16 @@ jobs:
   build-tauri-desktop:
     name: Build Tauri desktop app for ${{ matrix.platform }}
     strategy:
+      fail-fast: false
       matrix:
         include:
           - platform: macos-latest
             webkit-package: ""
             javascriptcore-package: ""
           - platform: ubuntu-22.04
-            webkit-package: "libwebkit2gtk-4.1-dev"
-            javascriptcore-package: "libjavascriptcoregtk-4.1-dev"
-          - platform: ubuntu-24.04
-            webkit-package: "libwebkit2gtk-4.1-dev"
-            javascriptcore-package: "libjavascriptcoregtk-4.1-dev"
+            webkit-package: "libwebkit2gtk-4.0-dev"
+            javascriptcore-package: "libjavascriptcoregtk-4.0-dev"
+          # NOTE: Ubuntu 24.04 removed - Tauri v1 requires webkit 4.0, but 24.04 only has 4.1
           - platform: windows-latest
             webkit-package: ""
             javascriptcore-package: ""
@@ -177,12 +352,20 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          sudo apt-get install -y libgtk-3-dev ${{ matrix.webkit-package }} \
-            ${{ matrix.javascriptcore-package }} libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+          # Try webkit 4.1 first (Ubuntu 24.04+), fallback to 4.0 (Ubuntu 22.04)
+          sudo apt-get install -yqq --no-install-recommends \
+            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev 2>/dev/null || \
+          sudo apt-get install -yqq --no-install-recommends \
+            libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev
+          sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
 
       - name: Install frontend dependencies
         working-directory: ./desktop
         run: yarn install --frozen-lockfile
+
+      - name: Build frontend assets
+        working-directory: ./desktop
+        run: yarn build
 
       - name: Build Tauri app
         working-directory: ./desktop
@@ -230,7 +413,9 @@ jobs:
 
   create-release:
     name: Create GitHub release
-    needs: [build-binaries, build-debian-packages, build-tauri-desktop]
+    needs: [build-binaries, sign-and-notarize-macos, build-debian-packages, build-tauri-desktop]
+    # Run even if some jobs failed - release whatever was built successfully
+    if: always() && (needs.sign-and-notarize-macos.result == 'success' || needs.build-binaries.result == 'success' || needs.build-debian-packages.result == 'success')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -245,20 +430,38 @@ jobs:
         run: |
           mkdir -p release-assets
 
-          # Copy binary artifacts
-          find binaries-* -type f -executable -o -name "*.exe" | while read file; do
-            cp "$file" release-assets/
+          # Copy binary artifacts - look for specific binary names since -executable
+          # doesn't work for cross-platform binaries downloaded as artifacts
+          for artifact_dir in binaries-*; do
+            if [ -d "$artifact_dir" ]; then
+              echo "Processing $artifact_dir..."
+              # Copy all files that look like binaries (no extension or .exe)
+              find "$artifact_dir" -type f \( -name "terraphim*" -o -name "*.exe" \) | while read file; do
+                echo "  Copying: $file"
+                cp "$file" release-assets/
+              done
+            fi
           done
 
           # Copy Debian packages
-          find debian-packages -name "*.deb" -type f | while read file; do
-            cp "$file" release-assets/
-          done
+          if [ -d "debian-packages" ]; then
+            find debian-packages -name "*.deb" -type f | while read file; do
+              cp "$file" release-assets/
+            done
+          fi
 
           # Copy desktop artifacts
-          find desktop-* -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) | while read file; do
-            cp "$file" release-assets/
+          for artifact_dir in desktop-*; do
+            if [ -d "$artifact_dir" ]; then
+              find "$artifact_dir" -type f \( -name "*.dmg" -o -name "*.AppImage" -o -name "*.msi" -o -name "*.exe" \) | while read file; do
+                cp "$file" release-assets/
+              done
+            fi
           done
+
+          # List all assets
+          echo "Release assets:"
+          ls -la release-assets/
 
       - name: Generate checksums
         working-directory: release-assets
@@ -295,6 +498,11 @@ jobs:
           body: |
             ## Release Assets
 
+            ### macOS Universal Binaries (Intel + Apple Silicon)
+            **Signed and Notarized** - No Gatekeeper warnings
+            - `terraphim_server-universal-apple-darwin`: Server binary for all Macs
+            - `terraphim-agent-universal-apple-darwin`: TUI binary for all Macs
+
             ### Server Binaries
             - `terraphim_server-*`: Server binaries for various platforms
 
@@ -316,7 +524,9 @@ jobs:
 
             ```bash
             # Install via Homebrew (macOS/Linux)
-            brew install terraphim/terraphim-ai/terraphim-ai
+            brew tap terraphim/terraphim
+            brew install terraphim-server
+            brew install terraphim-agent
 
             # Install Debian package (Ubuntu/Debian)
             sudo dpkg -i terraphim-server_*.deb
@@ -330,13 +540,148 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
   update-homebrew:
-    name: Update Homebrew formula
+    name: Update Homebrew formulas
     needs: create-release
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/v')
     steps:
-      - name: Update Homebrew formula
+      - name: Extract version from tag
+        id: version
         run: |
-          echo "Homebrew formula update will be implemented with tap repository"
-          # This step would typically update a Homebrew tap repository
-          # with the new version and SHA256 checksums
+          VERSION=${GITHUB_REF#refs/tags/v}
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Updating Homebrew formulas for version: $VERSION"
+
+      - name: Download release checksums
+        run: |
+          VERSION=${{ steps.version.outputs.version }}
+          curl -sL "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/checksums.txt" -o checksums.txt
+          cat checksums.txt
+
+      - name: Calculate universal binary checksums
+        id: checksums
+        run: |
+          # Extract SHA256 for universal binaries from checksums.txt
+          SERVER_SHA=$(grep "terraphim_server-universal-apple-darwin" checksums.txt | awk '{print $1}')
+          AGENT_SHA=$(grep "terraphim-agent-universal-apple-darwin" checksums.txt | awk '{print $1}')
+
+          echo "server_sha=$SERVER_SHA" >> $GITHUB_OUTPUT
+          echo "agent_sha=$AGENT_SHA" >> $GITHUB_OUTPUT
+
+          echo "Server universal binary SHA256: $SERVER_SHA"
+          echo "Agent universal binary SHA256: $AGENT_SHA"
+
+      - name: Clone Homebrew tap
+        run: |
+          git clone https://github.com/terraphim/homebrew-terraphim.git
+          cd homebrew-terraphim
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Update formulas
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          SERVER_SHA: ${{ steps.checksums.outputs.server_sha }}
+          AGENT_SHA: ${{ steps.checksums.outputs.agent_sha }}
+        run: |
+          cd homebrew-terraphim
+
+          # Update terraphim-server.rb - switch to pre-built universal binary
+          cat > Formula/terraphim-server.rb << EOF
+          class TerraphimServer < Formula
+            desc "Privacy-first AI assistant HTTP server with semantic search"
+            homepage "https://github.com/terraphim/terraphim-ai"
+            version "${VERSION}"
+            license "Apache-2.0"
+
+            on_macos do
+              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim_server-universal-apple-darwin"
+              sha256 "${SERVER_SHA}"
+            end
+
+            on_linux do
+              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim_server-x86_64-unknown-linux-gnu"
+              sha256 "LINUX_SHA_PLACEHOLDER"
+            end
+
+            def install
+              if OS.mac?
+                bin.install "terraphim_server-universal-apple-darwin" => "terraphim_server"
+              else
+                bin.install "terraphim_server-x86_64-unknown-linux-gnu" => "terraphim_server"
+              end
+            end
+
+            service do
+              run opt_bin/"terraphim_server"
+              keep_alive true
+              log_path var/"log/terraphim-server.log"
+              error_log_path var/"log/terraphim-server-error.log"
+            end
+
+            test do
+              assert_match "terraphim", shell_output("#{bin}/terraphim_server --version 2>&1", 0)
+            end
+          end
+          EOF
+
+          # Update terraphim-agent.rb - switch to pre-built universal binary
+          cat > Formula/terraphim-agent.rb << EOF
+          class TerraphimAgent < Formula
+            desc "Interactive TUI and REPL for Terraphim AI semantic search"
+            homepage "https://github.com/terraphim/terraphim-ai"
+            version "${VERSION}"
+            license "Apache-2.0"
+
+            on_macos do
+              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-agent-universal-apple-darwin"
+              sha256 "${AGENT_SHA}"
+            end
+
+            on_linux do
+              url "https://github.com/terraphim/terraphim-ai/releases/download/v${VERSION}/terraphim-agent-x86_64-unknown-linux-gnu"
+              sha256 "LINUX_SHA_PLACEHOLDER"
+            end
+
+            def install
+              if OS.mac?
+                bin.install "terraphim-agent-universal-apple-darwin" => "terraphim-agent"
+              else
+                bin.install "terraphim-agent-x86_64-unknown-linux-gnu" => "terraphim-agent"
+              end
+            end
+
+            test do
+              assert_match "terraphim", shell_output("#{bin}/terraphim-agent --version 2>&1", 0)
+            end
+          end
+          EOF
+
+          git add Formula/
+          git commit -m "feat: update formulas to v${VERSION} with universal binaries
+
+          - terraphim-server v${VERSION}
+          - terraphim-agent v${VERSION}
+
+          🤖 Automated update from release workflow"
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Push to Homebrew tap
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          cd homebrew-terraphim
+
+          # Get token from 1Password
+          HOMEBREW_TAP_TOKEN=$(op read "op://TerraphimPlatform/homebrew-tap-token/token" 2>/dev/null || echo "")
+
+          if [ -n "$HOMEBREW_TAP_TOKEN" ]; then
+            git remote set-url origin "https://x-access-token:${HOMEBREW_TAP_TOKEN}@github.com/terraphim/homebrew-terraphim.git"
+            git push origin main
+            echo "✅ Homebrew formulas updated successfully"
+          else
+            echo "⚠️  homebrew-tap-token not found in 1Password - skipping push"
+            echo "Ensure token exists at: op://TerraphimPlatform/homebrew-tap-token/token"
+          fi

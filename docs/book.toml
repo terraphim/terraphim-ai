@@ -4,12 +4,17 @@ language = "en"
 multilingual = false
 src = "src"
 title = "Terraphim AI documentation"
+logo = "/img/terraphim_logo_gray.png"
+
+[paths]
+templates = "templates"
 
 [output.html]
 git-repository-icon = "fa-github"
 git-repository-url = "https://github.com/terraphim/terraphim-ai"
 edit-url-template = "https://github.com/terraphim/terraphim-ai/edit/develop/docs/{path}"
-additional-js = ["discord.js","mermaid.min.js", "mermaid-init.js"]
+additional-js = ["mermaid-init.js"]
+additional-css = []
 mathjax-support = true
 
 [output.html.fold]

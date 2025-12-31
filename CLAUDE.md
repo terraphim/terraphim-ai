@@ -87,6 +87,117 @@ Async Ecosystem
 - **Never use timeout command** - This command doesn't exist on macOS
 - **Never use mocks in tests** - Use real implementations or integration tests
 
+## Terraphim Hooks for AI Coding Agents
+
+Terraphim provides hooks to automatically enforce code standards and attribution through knowledge graph-based text replacement.
+
+### Installed Hooks
+
+**PreToolUse Hook (`.claude/hooks/npm_to_bun_guard.sh`)**:
+- Intercepts Bash commands containing npm/yarn/pnpm
+- Automatically replaces with bun equivalents using knowledge graph
+- Knowledge graph files: `docs/src/kg/bun.md`, `docs/src/kg/bun_install.md`
+
+**Pre-LLM Validation Hook (`.claude/hooks/pre-llm-validate.sh`)**:
+- Validates input before LLM calls for semantic coherence
+- Checks if terms are connected in knowledge graph
+- Advisory mode - warns but doesn't block
+
+**Post-LLM Check Hook (`.claude/hooks/post-llm-check.sh`)**:
+- Validates LLM outputs against domain checklists
+- Checks code changes for tests, docs, error handling, security, performance
+- Advisory mode - provides feedback without blocking
+
+**Git prepare-commit-msg Hook (`scripts/hooks/prepare-commit-msg`)**:
+- Replaces "Claude Code" and "Claude" with "Terraphim AI" in commit messages
+- Optionally extracts concepts from diff (enable with `TERRAPHIM_SMART_COMMIT=1`)
+- Knowledge graph files: `docs/src/kg/terraphim_ai.md`, `docs/src/kg/generated_with_terraphim.md`
+
+### Knowledge Graph Validation Commands
+
+```bash
+# Validate semantic connectivity
+terraphim-agent validate --connectivity "text to check"
+
+# Validate against code review checklist
+terraphim-agent validate --checklist code_review "LLM output"
+
+# Validate against security checklist
+terraphim-agent validate --checklist security "implementation"
+
+# Get fuzzy suggestions for typos
+terraphim-agent suggest --fuzzy "terraphm" --threshold 0.7
+
+# Unified hook handler
+terraphim-agent hook --hook-type pre-tool-use --input "$JSON"
+
+# Enable smart commit
+TERRAPHIM_SMART_COMMIT=1 git commit -m "message"
+```
+
+### Quick Commands
+
+```bash
+# Test replacement
+echo "npm install" | ./target/release/terraphim-agent replace
+
+# Install all hooks
+./scripts/install-terraphim-hooks.sh --easy-mode
+
+# Test hooks
+./scripts/test-terraphim-hooks.sh
+
+# Test validation workflow
+terraphim-agent validate --connectivity --json "haystack service uses automata"
+```
+
+### Extending Knowledge Graph
+
+To add new replacement patterns, create markdown files in `docs/src/kg/`:
+
+```markdown
+# replacement_term
+
+Description of what this term represents.
+
+synonyms:: term_to_replace, another_term, third_term
+```
+
+The Aho-Corasick automata use LeftmostLongest matching, so longer patterns match first.
+
+## Claude Code Skills Plugin
+
+Terraphim provides a Claude Code skills plugin with specialized capabilities:
+
+**Installation:**
+```bash
+claude plugin marketplace add terraphim/terraphim-claude-skills
+claude plugin install terraphim-engineering-skills@terraphim-ai
+```
+
+**Terraphim-Specific Skills:**
+- `terraphim-hooks` - Knowledge graph-based text replacement with hooks
+- `session-search` - Search AI coding session history with concept enrichment
+
+**Engineering Skills:**
+- `architecture`, `implementation`, `testing`, `debugging`
+- `rust-development`, `rust-performance`, `code-review`
+- `disciplined-research`, `disciplined-design`, `disciplined-implementation`
+
+**Session Search Commands (REPL):**
+```bash
+/sessions sources       # Detect available sources
+/sessions import        # Import from Claude Code, Cursor, Aider
+/sessions search "query" # Full-text search
+/sessions concepts "term" # Knowledge graph concept search
+/sessions related <id>   # Find related sessions
+/sessions timeline       # Timeline visualization
+```
+
+**Documentation:** See [Claude Code Skills](docs/src/claude-code-skills.md) for full details.
+
+**Repository:** [github.com/terraphim/terraphim-claude-skills](https://github.com/terraphim/terraphim-claude-skills)
+
 ## Memory and Task Management
 
 Throughout all user interactions, maintain three key files:

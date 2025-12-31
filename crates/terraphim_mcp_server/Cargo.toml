@@ -16,6 +16,7 @@ terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 serde_json = "1.0"
 terraphim_automata = { path = "../terraphim_automata" }
 terraphim_config = { path = "../terraphim_config" }
+terraphim_hooks = { path = "../terraphim_hooks" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 terraphim_service = { path = "../terraphim_service" }
 terraphim_types = { path = "../terraphim_types" }

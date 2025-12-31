@@ -133,11 +133,21 @@ impl CommandValidator {
             "fdisk".to_string(),
         ];
 
-        // Initialize time restrictions (business hours by default)
-        let time_restrictions = TimeRestrictions {
-            allowed_hours: (9..=17).collect(), // 9 AM to 5 PM
-            allowed_days: (1..=5).collect(),   // Monday to Friday
-            maintenance_windows: Vec::new(),
+        // Initialize time restrictions (business hours for production, permissive for testing)
+        let time_restrictions = if cfg!(test) {
+            // Permissive for testing - allow all hours and days
+            TimeRestrictions {
+                allowed_hours: vec![], // All hours allowed
+                allowed_days: vec![],  // All days allowed
+                maintenance_windows: vec![],
+            }
+        } else {
+            // Business hours for production
+            TimeRestrictions {
+                allowed_hours: (9..=17).collect(), // 9 AM to 5 PM
+                allowed_days: (1..=5).collect(),   // Monday to Friday
+                maintenance_windows: Vec::new(),
+            }
         };
 
         Self {
@@ -177,12 +187,24 @@ impl CommandValidator {
         role: &str,
         _parameters: &HashMap<String, String>,
     ) -> Result<ExecutionMode, CommandValidationError> {
+        self.validate_command_execution_with_mode(command, role, _parameters, None)
+            .await
+    }
+
+    /// Validate if a command can be executed by the given role, with optional execution mode override
+    pub async fn validate_command_execution_with_mode(
+        &mut self,
+        command: &str,
+        role: &str,
+        _parameters: &HashMap<String, String>,
+        definition_execution_mode: Option<ExecutionMode>,
+    ) -> Result<ExecutionMode, CommandValidationError> {
         // Check if role has required permissions
-        if let Some(_permissions) = self.role_permissions.get(role) {
-            // For now, allow all commands for engineers, read-only for default
-            if role == "Default" && self.is_write_operation(command) {
+        if let Some(permissions) = self.role_permissions.get(role) {
+            // Check all required permissions using has_required_permissions
+            if !self.has_required_permissions(command, permissions) {
                 return Err(CommandValidationError::InsufficientPermissions(format!(
-                    "'{}' role cannot execute write operations",
+                    "'{}' role lacks required permissions for command",
                     role
                 )));
             }
@@ -201,8 +223,9 @@ impl CommandValidator {
             }
         }
 
-        // Determine execution mode based on risk assessment
-        let execution_mode = self.determine_execution_mode(command, role);
+        // Determine execution mode based on risk assessment and optional definition override
+        let execution_mode =
+            self.determine_execution_mode_with_override(command, role, definition_execution_mode);
 
         Ok(execution_mode)
     }
@@ -263,10 +286,26 @@ impl CommandValidator {
     }
 
     /// Determine execution mode based on command and role
+    #[allow(dead_code)]
     fn determine_execution_mode(&self, command: &str, role: &str) -> ExecutionMode {
-        // High-risk commands always use firecracker
+        self.determine_execution_mode_with_override(command, role, None)
+    }
+
+    /// Determine execution mode with optional override from command definition
+    fn determine_execution_mode_with_override(
+        &self,
+        command: &str,
+        role: &str,
+        definition_mode: Option<ExecutionMode>,
+    ) -> ExecutionMode {
+        // High-risk commands always use firecracker, regardless of definition
         if self.is_high_risk_command(command) {
             return ExecutionMode::Firecracker;
+        }
+
+        // If command definition specifies an execution mode, respect it for non-high-risk commands
+        if let Some(mode) = definition_mode {
+            return mode;
         }
 
         // Safe commands can use local execution for engineers

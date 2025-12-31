@@ -1,0 +1,436 @@
+name: CI Main Branch
+on:
+  push:
+    branches: [main, develop]
+    tags: ["*.*.*"]
+  workflow_dispatch:
+    inputs:
+      build-release:
+        description: "Build release binaries"
+        required: false
+        default: "false"
+        type: boolean
+      deploy-staging:
+        description: "Deploy to staging environment"
+        required: false
+        default: "false"
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  REGISTRY: ghcr.io
+  IMAGE_NAME: terraphim/terraphim-ai
+
+jobs:
+  # Build setup and metadata
+  setup:
+    name: Build Setup
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+      cache-key: ${{ steps.cache.outputs.key }}
+      build-matrix: ${{ steps.matrix.outputs.matrix }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Extract version and release info
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            IS_RELEASE=true
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            VERSION=$(git describe --tags --always --dirty)
+            IS_RELEASE=false
+          else
+            VERSION="latest"
+            IS_RELEASE=false
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-release=$IS_RELEASE" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (release: $IS_RELEASE)"
+
+      - name: Generate cache key
+        id: cache
+        run: |
+          CACHE_KEY="v2-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/package-lock.json', '.github/rust-toolchain.toml') }}"
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+
+      - name: Generate build matrix
+        id: matrix
+        run: |
+          if [[ "${{ steps.version.outputs.is-release }}" == "true" ]] || [[ "${{ github.event.inputs.build-release }}" == "true" ]]; then
+            # Full matrix for releases - use self-hosted runners only
+            TARGETS='["x86_64-unknown-linux-gnu","aarch64-unknown-linux-gnu","x86_64-unknown-linux-musl"]'
+          else
+            # Minimal matrix for main branch builds
+            TARGETS='["x86_64-unknown-linux-gnu"]'
+          fi
+          echo "targets=$TARGETS" >> $GITHUB_OUTPUT
+
+  # Rust build with comprehensive caching
+  rust-build:
+    name: Rust Build (${{ matrix.target }})
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.setup.outputs.targets) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+          targets: ${{ matrix.target }}
+
+      - name: Cache Cargo registry and dependencies (self-hosted)
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/cargo-cache/registry
+            /opt/cargo-cache/git
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ needs.setup.outputs.cache-key }}-cargo-registry
+          restore-keys: |
+            ${{ needs.setup.outputs.cache-key }}-cargo-registry-
+            v2-${{ runner.os }}-cargo-registry-
+        env:
+          CARGO_HOME: /opt/cargo-cache
+
+      - name: Cache target directory
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}
+          restore-keys: |
+            ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}-
+            ${{ needs.setup.outputs.cache-key }}-target-
+
+      - name: Build release binaries
+        run: |
+          # Build workspace with all features
+          cargo build --release --target ${{ matrix.target }} --workspace --all-features
+
+          # Verify key binaries exist
+          ls -la target/${{ matrix.target }}/release/terraphim*
+
+          # Show binary sizes
+          for binary in target/${{ matrix.target }}/release/terraphim*; do
+            if [[ -f "$binary" ]]; then
+              echo "$(basename "$binary"): $(du -h "$binary" | cut -f1)"
+            fi
+          done
+
+      - name: Run tests
+        run: |
+          # Run unit and integration tests
+          cargo test --release --target ${{ matrix.target }} --workspace --all-features
+
+      - name: Upload binary artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-binaries-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/terraphim_server
+            target/${{ matrix.target }}/release/terraphim_mcp_server
+            target/${{ matrix.target }}/release/terraphim-agent
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+      - name: Create .deb package
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          # Install cargo-deb if not present
+          if ! command -v cargo-deb &> /dev/null; then
+            cargo install cargo-deb
+          fi
+
+          # Build .deb package
+          cargo deb --target ${{ matrix.target }} --package terraphim_server --no-build
+
+          # Show package info
+          dpkg-deb --info target/${{ matrix.target }}/debian/terraphim-server_*.deb
+
+      - name: Upload .deb artifacts
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-packages
+          path: target/${{ matrix.target }}/debian/*.deb
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+  # Frontend build
+  frontend-build:
+    name: Frontend Build
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 15
+    needs: setup
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: npm ci
+
+      - name: Cache node_modules
+        uses: actions/cache@v4
+        with:
+          path: desktop/node_modules
+          key: ${{ needs.setup.outputs.cache-key }}-node-modules
+          restore-keys: |
+            ${{ needs.setup.outputs.cache-key }}-node-modules-
+            v2-node-modules-
+
+      - name: Build frontend
+        working-directory: desktop
+        run: |
+          npm run build
+
+          # Show build artifacts
+          ls -la dist/
+          du -sh dist/
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist/
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+  # WASM build
+  wasm-build:
+    name: WASM Build
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 12
+    needs: setup
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+          targets: wasm32-unknown-unknown
+
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          version: 'latest'
+
+      - name: Build WASM for web
+        run: |
+          ./scripts/build-wasm.sh web release
+
+          # Show WASM artifacts
+          ls -la crates/terraphim_automata/wasm-test/pkg/
+          du -sh crates/terraphim_automata/wasm-test/pkg/*.wasm
+
+      - name: Build WASM for Node.js
+        run: |
+          ./scripts/build-wasm.sh nodejs release
+
+      - name: Upload WASM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: wasm-package
+          path: crates/terraphim_automata/wasm-test/pkg/
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+  # Docker image build
+  docker-build:
+    name: Docker Build
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 45
+    needs: [setup, rust-build, frontend-build]
+    if: needs.setup.outputs.is-release == 'true' || github.event.inputs.deploy-staging == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-binaries-x86_64-unknown-linux-gnu
+          path: target/x86_64-unknown-linux-gnu/release/
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist/
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./docker/Dockerfile.base
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  # Integration tests
+  integration-tests:
+    name: Integration Tests
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 20
+    needs: [rust-build, frontend-build]
+    if: github.ref == 'refs/heads/main' || needs.setup.outputs.is-release == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download binary artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: rust-binaries-x86_64-unknown-linux-gnu
+          path: target/x86_64-unknown-linux-gnu/release/
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist/
+
+      - name: Make binaries executable
+        run: |
+          chmod +x target/x86_64-unknown-linux-gnu/release/terraphim_*
+
+      - name: Run integration tests
+        timeout-minutes: 10
+        run: |
+          # Start server in background
+          ./target/x86_64-unknown-linux-gnu/release/terraphim_server --config terraphim_server/default/terraphim_engineer_config.json &
+          SERVER_PID=$!
+
+          # Wait for server to be ready
+          for i in {1..30}; do
+            if curl -f http://localhost:8080/health 2>/dev/null; then
+              echo "Server is ready"
+              break
+            fi
+            echo "Waiting for server... ($i/30)"
+            sleep 2
+          done
+
+          # Run basic health test
+          curl -f http://localhost:8080/health || exit 1
+
+          # Clean up
+          kill $SERVER_PID 2>/dev/null || true
+
+  # Security scanning
+  security-scan:
+    name: Security Scan
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    needs: setup
+    if: github.ref == 'refs/heads/main' || needs.setup.outputs.is-release == 'true'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain-file: .github/rust-toolchain.toml
+
+      - name: Run cargo audit
+        run: |
+          cargo install cargo-audit
+          cargo audit
+
+      - name: Run cargo deny
+        run: |
+          cargo install cargo-deny
+          cargo deny check
+
+  # Build summary
+  build-summary:
+    name: Build Summary
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 2
+    needs: [setup, rust-build, frontend-build, wasm-build, docker-build, integration-tests]
+    if: always()
+
+    steps:
+      - name: Generate summary
+        run: |
+          echo "## CI Build Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Version:** ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Release:** ${{ needs.setup.outputs.is-release }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Artifacts |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|-----------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Build | ${{ needs.rust-build.result }} | Binary packages |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Build | ${{ needs.frontend-build.result }} | Web assets |" >> $GITHUB_STEP_SUMMARY
+          echo "| WASM Build | ${{ needs.wasm-build.result }} | WASM modules |" >> $GITHUB_STEP_SUMMARY
+          echo "| Docker Build | ${{ needs.docker-build.result || 'skipped' }} | Container images |" >> $GITHUB_STEP_SUMMARY
+          echo "| Integration Tests | ${{ needs.integration-tests.result || 'skipped' }} | End-to-end validation |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.rust-build.result }}" == "success" ]] && \
+             [[ "${{ needs.frontend-build.result }}" == "success" ]] && \
+             [[ "${{ needs.wasm-build.result }}" == "success" ]]; then
+            echo "✅ **Build Successful** - All components built successfully!" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Build Failed** - Some components failed to build." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi

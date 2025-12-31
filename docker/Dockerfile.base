@@ -1,0 +1,164 @@
+# Multi-stage base Dockerfile for Terraphim AI
+# Optimized for CI/CD with fast builds and layer caching
+
+# ============================================
+# Stage 1: Base Builder
+# ============================================
+FROM rust:1.92.0-slim as base-builder
+
+# Set environment variables
+ENV CARGO_TERM_COLOR=always \
+    DEBIAN_FRONTEND=noninteractive \
+    RUST_BACKTRACE=1 \
+    RUSTFLAGS="-C target-cpu=generic" \
+    CARGO_NET_RETRY=10 \
+    CARGO_IO_MAX_THREADS=8
+
+# Install system dependencies (with proper layering for caching)
+RUN apt-get update && apt-get install -y \
+    # Build essentials
+    build-essential \
+    pkg-config \
+    cmake \
+    # Network and curl
+    curl \
+    wget \
+    git \
+    # Compression and archiving
+    zip \
+    unzip \
+    tar \
+    gzip \
+    # Clean up after base packages
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install Node.js in separate layer for better caching
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - && \
+    apt-get install -y nodejs && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Install WASM build dependencies in separate layer
+RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh -s -- --version 0.12.1
+
+# Create app user
+RUN useradd -m -s /bin/bash terraphim && \
+    mkdir -p /app /home/terraphim/.cargo && \
+    chown -R terraphim:terraphim /app /home/terraphim
+
+# Set working directory
+WORKDIR /app
+
+# Copy rust toolchain configuration
+COPY --chown=terraphim:terraphim .github/rust-toolchain.toml /app/.github/rust-toolchain.toml
+
+# Switch to app user
+USER terraphim
+
+# Pre-install commonly used Cargo crates for faster builds (with version pinning)
+RUN cargo install --version 0.12.2 cargo-edit && \
+    cargo install --version 0.18.3 cargo-audit && \
+    cargo install --version 0.14.2 cargo-deny && \
+    cargo install --version 8.4.0 cargo-watch || true
+
+# ============================================
+# Stage 2: Rust Builder with Cache
+# ============================================
+FROM base-builder as rust-builder
+
+# Copy Cargo files for dependency caching
+COPY --chown=terraphim:terraphim Cargo.toml Cargo.lock ./
+COPY --chown=terraphim:terraphim crates/ ./crates/
+COPY --chown=terraphim:terraphim terraphim_server/ ./terraphim_server/
+COPY --chown=terraphim:terraphim desktop/src-tauri/Cargo.toml ./desktop/src-tauri/
+
+# Create dummy main.rs files to pre-cache dependencies
+RUN mkdir -p crates/terraphim_automata/src && \
+    echo "fn main() {}" > crates/terraphim_automata/src/main.rs && \
+    mkdir -p terraphim_server/src && \
+    echo "fn main() {}" > terraphim_server/src/main.rs
+
+# Build dependencies (creates cached layers)
+RUN cargo build --release --bins --workspace && \
+    rm -rf target/release/deps/terraphim* || true
+
+# ============================================
+# Stage 3: WASM Builder
+# ============================================
+FROM base-builder as wasm-builder
+
+# Copy WASM-specific source
+COPY --chown=terraphim:terraphim crates/terraphim_automata/ /app/crates/terraphim_automata/
+
+# Pre-build WASM dependencies
+RUN cd crates/terraphim_automata/wasm-test && \
+    wasm-pack build --dev --target web --out-dir pkg || true
+
+# ============================================
+# Stage 4: Frontend Builder
+# ============================================
+FROM base-builder as frontend-builder
+
+# Copy frontend package files for dependency caching
+COPY --chown=terraphim:terraphim desktop/package*.json desktop/yarn.lock ./desktop/
+RUN cd desktop && \
+    if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
+    else npm ci; fi
+
+# Copy frontend source
+COPY --chown=terraphim:terraphim desktop/src/ ./desktop/src/
+COPY --chown=terraphim:terraphim desktop/public/ ./desktop/public/
+COPY --chown=terraphim:terraphim desktop/*.config.* ./desktop/
+
+# Build frontend
+RUN cd desktop && \
+    if [ -f yarn.lock ]; then yarn build; \
+    else npm run build; fi
+
+# ============================================
+# Stage 5: Final Runtime Image
+# ============================================
+FROM debian:12-slim as runtime
+
+# Install runtime dependencies
+RUN apt-get update && apt-get install -y \
+    ca-certificates \
+    curl \
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
+
+# Create app user
+RUN useradd -m -s /bin/bash terraphim && \
+    mkdir -p /app/config /app/data && \
+    chown -R terraphim:terraphim /app
+
+# Set working directory
+WORKDIR /app
+
+# Copy built artifacts from builder stages
+COPY --from=rust-builder --chown=terraphim:terraphim /app/target/release/terraphim_server /app/bin/
+COPY --from=rust-builder --chown=terraphim:terraphim /app/target/release/terraphim_mcp_server /app/bin/
+COPY --from=frontend-builder --chown=terraphim:terraphim /app/desktop/dist /app/dist/
+
+# Copy configuration files
+COPY --chown=terraphim:terraphim terraphim_server/default/ /app/config/
+
+# Switch to app user
+USER terraphim
+
+# Set environment variables
+ENV TERRAPHIM_CONFIG_DIR=/app/config \
+    TERRAPHIM_DATA_DIR=/app/data \
+    RUST_LOG=info
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
+    CMD curl -f http://localhost:8080/health || exit 1
+
+# Expose port
+EXPOSE 8080
+
+# Set entrypoint
+ENTRYPOINT ["/app/bin/terraphim_server"]
+CMD ["--config", "/app/config/terraphim_engineer_config.json"]

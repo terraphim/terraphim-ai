@@ -23,7 +23,7 @@ pub enum AllocationStrategy {
 }
 
 /// Allocation scoring factors
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 #[allow(dead_code)]
 pub struct AllocationScore {
     pub performance_score: f64,
@@ -36,13 +36,7 @@ pub struct AllocationScore {
 #[allow(dead_code)]
 impl AllocationScore {
     pub fn new() -> Self {
-        Self {
-            performance_score: 0.0,
-            age_penalty: 0.0,
-            usage_bonus: 0.0,
-            resource_efficiency: 0.0,
-            total_score: 0.0,
-        }
+        Self::default()
     }
 
     pub fn calculate(&mut self) {

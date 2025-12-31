@@ -47,7 +47,7 @@ typescript = ["tsify"]
 wasm = ["typescript"]
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"
 tempfile = "3.23"
 lazy_static = "1.4.0"
 tokio = { version = "1", features = ["io-util", "time","macros","rt","rt-multi-thread"] }

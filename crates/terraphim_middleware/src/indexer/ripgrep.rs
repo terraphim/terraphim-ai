@@ -11,6 +11,19 @@ use cached::proc_macro::cached;
 use terraphim_config::Haystack;
 use tokio::fs as tfs;
 
+/// Find the largest byte index <= `index` that is a valid UTF-8 char boundary.
+/// Polyfill for str::floor_char_boundary (stable since Rust 1.91).
+fn floor_char_boundary(s: &str, index: usize) -> usize {
+    if index >= s.len() {
+        return s.len();
+    }
+    let mut i = index;
+    while i > 0 && !s.is_char_boundary(i) {
+        i -= 1;
+    }
+    i
+}
+
 /// Middleware that uses ripgrep to index Markdown haystacks.
 #[derive(Default)]
 pub struct RipgrepIndexer {}
@@ -229,11 +242,13 @@ impl RipgrepIndexer {
 
                     // Only use the first match for description to avoid long concatenations
                     // Limit description to 200 characters for readability
+                    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
                     if document.description.is_none() {
                         let cleaned_lines = lines.trim();
                         if !cleaned_lines.is_empty() {
                             let description = if cleaned_lines.len() > 200 {
-                                format!("{}...", &cleaned_lines[..197])
+                                let safe_end = floor_char_boundary(cleaned_lines, 197);
+                                format!("{}...", &cleaned_lines[..safe_end])
                             } else {
                                 cleaned_lines.to_string()
                             };
@@ -264,11 +279,13 @@ impl RipgrepIndexer {
 
                     // Only use the first context for description to avoid long concatenations
                     // Limit description to 200 characters for readability
+                    // Use floor_char_boundary to safely truncate at a valid UTF-8 boundary
                     if document.description.is_none() {
                         let cleaned_lines = lines.trim();
                         if !cleaned_lines.is_empty() {
                             let description = if cleaned_lines.len() > 200 {
-                                format!("{}...", &cleaned_lines[..197])
+                                let safe_end = floor_char_boundary(cleaned_lines, 197);
+                                format!("{}...", &cleaned_lines[..safe_end])
                             } else {
                                 cleaned_lines.to_string()
                             };

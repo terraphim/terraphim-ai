@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_server", "desktop/src-tauri", "terraphim_ai_nodejs"]
+members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
 exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py"]  # Experimental crates with incomplete API implementations
 default-members = ["terraphim_server"]
 
@@ -15,7 +15,7 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 # Direct HTTP LLM client approach (removed rig-core)
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
 thiserror = "1.0"
