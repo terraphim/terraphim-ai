@@ -151,8 +151,11 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                 if synonym_keyword != LOGSEQ_SYNONYMS_KEYWORD {
                     continue;
                 }
-                let synonyms: Vec<String> =
-                    synonym.split(',').map(|s| s.trim().to_string()).collect();
+                let synonyms: Vec<String> = synonym
+                    .split(',')
+                    .map(|s| s.trim().to_string())
+                    .filter(|s| !s.is_empty())
+                    .collect();
                 let concept = match current_concept {
                     Some(ref concept) => {
                         let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
