@@ -30,11 +30,41 @@ env:
   IMAGE_NAME: terraphim/terraphim-ai
 
 jobs:
+  # Check for available self-hosted runners
+  runner-check:
+    name: Check Runner Availability
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    outputs:
+      use-self-hosted: ${{ steps.check.outputs.use-self-hosted }}
+      runner-labels: ${{ steps.check.outputs.runner-labels }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Check runner availability
+        id: check
+        run: |
+          ./scripts/check-runner-health.sh
+          EXIT_CODE=$?
+
+          if [[ $EXIT_CODE -eq 0 ]]; then
+            echo "use-self-hosted=true" >> $GITHUB_OUTPUT
+            echo "runner-labels=[\"self-hosted\", \"Linux\", \"X64\"]" >> $GITHUB_OUTPUT
+            echo "✅ Using self-hosted runner"
+          else
+            echo "use-self-hosted=false" >> $GITHUB_OUTPUT
+            echo "runner-labels=ubuntu-latest" >> $GITHUB_OUTPUT
+            echo "⚠️  Using GitHub-hosted runner fallback"
+          fi
+
   # Validate and extract version
   version-check:
     name: Version Validation
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 3
+    needs: runner-check
     outputs:
       version: ${{ steps.version.outputs.version }}
       is-tag: ${{ steps.version.outputs.is-tag }}
@@ -89,9 +119,9 @@ jobs:
   # Run comprehensive tests
   test:
     name: Comprehensive Tests
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 20
-    needs: version-check
+    needs: [runner-check, version-check]
     if: github.event.inputs.skip-tests != 'true'
 
     steps:
@@ -134,9 +164,9 @@ jobs:
   # Build release artifacts
   build:
     name: Build Release Artifacts
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 30
-    needs: version-check
+    needs: [runner-check, version-check]
     strategy:
       fail-fast: false
       matrix:
@@ -247,9 +277,9 @@ jobs:
   # Build Docker images
   docker:
     name: Build Docker Images
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 45
-    needs: [version-check, build]
+    needs: [runner-check, version-check, build]
     if: always() && needs.build.result == 'success'
 
     steps:
@@ -294,9 +324,9 @@ jobs:
   # Build and publish npm package
   npm-publish:
     name: Publish NPM Package
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 15
-    needs: version-check
+    needs: [runner-check, version-check]
 
     steps:
       - name: Checkout
@@ -324,9 +354,9 @@ jobs:
   # Create GitHub release
   create-release:
     name: Create GitHub Release
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 10
-    needs: [version-check, build, docker, npm-publish]
+    needs: [runner-check, version-check, build, docker, npm-publish]
     if: always() && needs.build.result == 'success'
 
     steps:
@@ -418,9 +448,9 @@ jobs:
   # Post-release notifications
   notify:
     name: Release Notifications
-    runs-on: [self-hosted, Linux, X64]
+    runs-on: ${{ needs.runner-check.outputs.runner-labels }}
     timeout-minutes: 5
-    needs: [version-check, create-release]
+    needs: [runner-check, version-check, create-release]
     if: always() && needs.create-release.result == 'success'
 
     steps:
