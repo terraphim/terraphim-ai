@@ -377,7 +377,8 @@ pub trait Persistable: Serialize + DeserializeOwned {
 /// Load multiple documents by their IDs
 ///
 /// This function efficiently loads multiple documents using their IDs.
-/// It attempts to load each document, but continues processing even if some documents fail to load.
+/// It uses `tokio::task::JoinSet` to load documents concurrently, which significantly
+/// improves performance when loading many documents from slower storage backends.
 /// Returns a vector of successfully loaded documents.
 pub async fn load_documents_by_ids(document_ids: &[String]) -> Result<Vec<Document>> {
     log::debug!(
@@ -386,19 +387,31 @@ pub async fn load_documents_by_ids(document_ids: &[String]) -> Result<Vec<Docume
         document_ids
     );
 
-    let mut documents = Vec::new();
+    let mut set = tokio::task::JoinSet::new();
 
     for doc_id in document_ids {
-        let mut doc = Document::new(doc_id.clone());
-        match doc.load().await {
-            Ok(loaded_doc) => {
-                documents.push(loaded_doc);
-                log::trace!("Successfully loaded document: {}", doc_id);
+        let id = doc_id.clone();
+        set.spawn(async move {
+            let mut doc = Document::new(id.clone());
+            match doc.load().await {
+                Ok(loaded_doc) => {
+                    log::trace!("Successfully loaded document: {}", id);
+                    Some(loaded_doc)
+                }
+                Err(e) => {
+                    log::warn!("Failed to load document '{}': {}", id, e);
+                    None
+                }
             }
-            Err(e) => {
-                log::warn!("Failed to load document '{}': {}", doc_id, e);
-                // Continue processing other documents even if this one fails
-            }
+        });
+    }
+
+    let mut documents = Vec::with_capacity(document_ids.len());
+    while let Some(res) = set.join_next().await {
+        match res {
+            Ok(Some(doc)) => documents.push(doc),
+            Ok(None) => {} // Document failed to load, already logged
+            Err(e) => log::error!("Join error in load_documents_by_ids: {}", e),
         }
     }
 

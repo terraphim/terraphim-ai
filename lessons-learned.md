@@ -2970,570 +2970,473 @@ curl -sI https://example.com/css/styles.css | grep content-type
 ---
 # Historical Lessons (Merged from @lessons-learned.md)
 ---
-# Lessons Learned: GitHub Runner Server Integration (2025-01-31)
-
-## Session Overview
-
-Integrated LLM-powered workflow parsing with Firecracker microVM execution for GitHub Actions CI/CD. Achieved **sub-2.5 second end-to-end execution** compared to traditional 2-5 minute runner boot times.
 
 ---
 
-## Technical Discoveries
+## Session Search & Claude Code Skills Integration
 
-### 1. terraphim_service LLM Client Integration
+### Date: 2025-12-28 - Teaching LLMs Terraphim Capabilities
 
-**Discovery**: The `terraphim_service::llm::LlmClient` trait provides a clean abstraction for LLM integration, but requires careful configuration.
+#### Pattern 1: REPL TTY Issues with Heredoc Input
 
-**Working Pattern**:
+**Context**: search-sessions.sh script failed with "Device not configured (os error 6)" when using heredoc to pipe commands to REPL.
+
+**What We Learned**:
+- **Heredoc causes TTY issues**: The REPL expects interactive input; heredoc does not provide proper TTY
+- **Use echo pipe instead**: echo -e "command1\ncommand2\n/quit" | agent repl works reliably
+- **Filter REPL noise**: Use grep to remove banner, help text, and warnings from output
+
+**When to Apply**: Any script that needs to automate REPL commands
+
+---
+
+#### Pattern 2: Agent Binary Discovery
+
+**Context**: Scripts need to find terraphim-agent in various locations (PATH, local build, cargo home).
+
+**What We Learned**:
+- **Multiple search paths needed**: Users may have agent in PATH, local build, or cargo bin
+- **Fail gracefully**: If not found, provide clear build instructions
+- **Working directory matters**: Agent needs to run from terraphim-ai directory for KG access
+
+**When to Apply**: Any script or hook that invokes terraphim-agent
+
+---
+
+#### Pattern 3: Feature Flags for Optional Functionality
+
+**Context**: Session search requires repl-sessions feature which is not built by default.
+
+**What We Learned**:
+- **Use feature flags for optional features**: Keeps binary size small for minimal installs
+- **Document feature requirements**: Skills and scripts should specify required features
+- **Build command**: cargo build -p terraphim_agent --features repl-full --release
+
+**When to Apply**: Any crate with optional dependencies or functionality
+
+---
+
+#### Pattern 4: Skills Documentation Structure
+
+**Context**: Created skills for terraphim-claude-skills plugin that teach AI agents capabilities.
+
+**What We Learned**:
+- **Two audiences**: Skills must document for both humans (quick start, CLI) and AI agents (programmatic usage)
+- **Architecture diagrams help**: Visual representation of data flow aids understanding
+- **Include troubleshooting**: Common issues and solutions reduce support burden
+- **Examples directory**: Separate from skills, contains runnable code and scripts
+
+**When to Apply**: Any new skill or capability documentation
+
+---
+
+### Technical Gotchas Discovered
+
+6. **Session import location**: Sessions are in ~/.claude/projects/ with directory names encoded as -Users-alex-projects-...
+
+7. **Feature flag for sessions**: Must build with --features repl-full or --features repl-sessions to enable session commands
+
+8. **Knowledge graph directory**: Agent looks for docs/src/kg/ relative to working directory - scripts must cd to terraphim-ai first
+
+9. **REPL noise filtering**: Output includes opendal warnings and REPL banner - use grep to clean up automated output
+
+10. **Session sources**: claude-code-native and claude-code are different connectors (native vs CLA-parsed)
+
+---
+
+## Knowledge Graph Validation Workflows - 2025-12-29
+
+### Context: Underutilized Terraphim Features for Pre/Post-LLM Workflows
+
+Successfully implemented local-first knowledge graph validation infrastructure using disciplined research → design → implementation methodology.
+
+### Pattern: MCP Placeholder Detection and Fixing
+
+**What We Learned**:
+- MCP tools can exist but have placeholder implementations that don't call real code
+- Always verify MCP tools call the actual underlying implementation
+- Test updates should verify behavior, not just API contracts
+
+**Implementation**:
 ```rust
-use terraphim_config::Role;
-use terraphim_service::llm::build_llm_from_role;
+// BAD: Placeholder that only finds matches
+let matches = find_matches(&text, thesaurus, false)?;
+return Ok(CallToolResult::success(vec![Content::text(format!("Found {} terms", matches.len()))]));
 
-let mut role = Role::new("github-runner");
-role.extra.insert("llm_provider".to_string(),
-    serde_json::Value::String("ollama".to_string()));
-role.extra.insert("ollama_base_url".to_string(),
-    serde_json::Value::String(base_url));
-role.extra.insert("ollama_model".to_string(),
-    serde_json::Value::String(model));
-
-let client = build_llm_from_role(&role);
+// GOOD: Calls real RoleGraph implementation
+let rolegraph = self.config_state.roles.get(&role_name)?;
+let is_connected = rolegraph.lock().await.is_all_terms_connected_by_path(&text);
+return Ok(CallToolResult::success(vec![Content::text(format!("Connected: {}", is_connected))]));
 ```
 
-**Key Insight**: Always use `Role::new()` constructor, not manual struct initialization. The `Role` type has private fields and specific validation logic.
+**When to Apply**: When adding MCP tool wrappers, always wire to real implementation, not just test data.
 
-**Avoid**:
+### Pattern: Checklist as Knowledge Graph Concept
+
+**What We Learned**:
+- Checklists can be modeled as KG entries with `checklist::` directive
+- Domain validation = matching checklist items against text
+- Advisory mode (warnings) better than blocking mode for AI workflows
+
+**Implementation**:
+```markdown
+# code_review_checklist
+checklist:: tests, documentation, error_handling, security, performance
+
+### tests
+synonyms:: test, testing, unit test, integration test
+```
+
 ```rust
-let role = Role {
-    name: "github-runner".to_string(),
-    // This fails - Role has private fields
+pub async fn validate_checklist(&self, checklist_name: &str, text: &str) -> ChecklistResult {
+    let matches = self.find_matches(role_name, text).await?;
+    let satisfied = categories.filter(|cat| has_match_in_category(cat, &matches));
+    let missing = categories.filter(|cat| !has_match_in_category(cat, &matches));
+    ChecklistResult { passed: missing.is_empty(), satisfied, missing }
+}
+```
+
+**When to Apply**: Domain validation, quality gates, pre/post-processing workflows.
+
+### Pattern: Unified Hook Handler with Type Dispatch
+
+**What We Learned**:
+- Single entry point (`terraphim-agent hook`) simplifies shell scripts
+- Type-based dispatch (`--hook-type`) keeps logic centralized
+- JSON I/O for hooks enables composability
+
+**Implementation**:
+```bash
+# BAD: Multiple separate hook scripts
+.claude/hooks/npm-hook.sh
+.claude/hooks/validation-hook.sh
+.claude/hooks/commit-hook.sh
+
+# GOOD: Single entry point with type dispatch
+terraphim-agent hook --hook-type pre-tool-use --input "$JSON"
+terraphim-agent hook --hook-type post-tool-use --input "$JSON"
+terraphim-agent hook --hook-type prepare-commit-msg --input "$JSON"
+```
+
+**When to Apply**: Hook infrastructure, plugin systems, command dispatchers.
+
+### Pattern: Role-Aware Validation with Default Fallback
+
+**What We Learned**:
+- Role parameter should be optional with sensible default
+- Role detection priority: explicit flag > env var > config > default
+- Each role has its own knowledge graph for domain-specific validation
+
+**Implementation**:
+```rust
+let role_name = if let Some(role) = role {
+    RoleName::new(&role)
+} else {
+    service.get_selected_role().await // Fallback to current role
 };
 ```
 
-**When to Apply**: Anytime you need to create LLM clients from environment configuration in Terraphim codebase.
+**When to Apply**: Any role-aware functionality, multi-domain systems.
 
----
+### Pattern: CLI Commands with JSON Output for Hook Integration
 
-### 2. Pre-commit Hook Validation
+**What We Learned**:
+- Human-readable and JSON output modes serve different purposes
+- `--json` flag enables seamless shell script integration
+- Exit codes should indicate success/failure even in JSON mode
 
-**Discovery**: The conventional commit validation hook checks the ENTIRE commit message body, not just the subject line.
-
-**Problem**: Multi-line commit messages with bullet points failed validation even though the subject line was correct.
-
-**Solution**: Use single-line commit messages for automated commits. The hook expects:
-```
-type(scope): description
-```
-
-NOT:
-```
-type(scope): description
-
-- Bullet point 1
-- Bullet point 2
-```
-
-**Evidence**: Commit attempts with multi-line bodies failed with:
-```
-✗ Commit message does not follow conventional commit format!
-```
-
-Single-line version passed immediately.
-
-**When to Apply**: All automated git commits in this codebase. Manual commits can still use multi-line bodies if needed.
-
----
-
-### 3. SessionManager::with_provider() vs ::new()
-
-**Discovery**: `SessionManager` constructor signature changed between library and server implementations.
-
-**Correct API**:
+**Implementation**:
 ```rust
-SessionManager::with_provider(vm_provider, session_config)
-```
-
-**Incorrect (old API)**:
-```rust
-SessionManager::new(command_executor, learning_coordinator, config)
-```
-
-**Error**:
-```
-error[E0061]: this function takes 1 argument but 3 were supplied
-```
-
-**Lesson**: Always check the current API signature. The refactored version takes a `VmProvider` trait object and config, not individual components.
-
-**When to Apply**: Anytime you're creating a SessionManager in the server context.
-
----
-
-### 4. Type Wrappers for IDs
-
-**Discovery**: Terraphim uses NEWTYPE wrappers for IDs, not raw types.
-
-**Correct**:
-```rust
-SessionId(uuid::Uuid::new_v4())
-```
-
-**Incorrect**:
-```rust
-uuid::Uuid::new_v4()  // Returns Uuid, not SessionId
-```
-
-**Error**:
-```
-error[E0308]: mismatched types
-    expected `SessionId`, found `Uuid`
-```
-
-**Benefit**: Type safety prevents mixing session IDs with VM IDs, workflow IDs, etc.
-
-**When to Apply**: Always use the wrapper type (`SessionId`, `VmId`, `WorkflowId`) instead of raw UUIDs or strings.
-
----
-
-### 5. Firecracker API Not Running in Tests
-
-**Discovery**: End-to-end tests will fail with "Connection refused" if Firecracker API isn't running.
-
-**Expected Behavior**: This is OK for testing the webhook and parsing logic. VM execution will fail, but that's expected.
-
-**Test Output**:
-```
-⚠️  Firecracker API unreachable (expected in test environment)
-Error: Connection refused
-```
-
-**Validation**: Check logs for successful workflow discovery and LLM parsing. VM execution failures are expected without the API.
-
-**When to Apply**: Testing webhook server logic without full Firecracker deployment.
-
----
-
-## Debugging Approaches That Worked
-
-### 1. Emoji-Based Logging
-
-**Problem**: Hard to track execution flow through complex multi-stage pipeline.
-
-**Solution**: Add emoji indicators at each major stage:
-```
-✅ Webhook received
-🤖 LLM-based workflow parsing enabled
-🔧 Initializing Firecracker VM provider
-⚡ Creating VmCommandExecutor
-🎯 Creating SessionManager
-Allocated VM fc-vm-abc123 in 100ms
-```
-
-**Benefit**: Easy to scan logs and identify which stage is executing or failing.
-
-**When to Apply**: Any complex multi-stage async pipeline.
-
----
-
-### 2. LLM Fallback Strategy
-
-**Problem**: LLM parsing might fail (model not available, timeout, invalid JSON).
-
-**Solution**: Always implement graceful fallback:
-```rust
-if let Some(parser) = llm_parser {
-    if env::var("USE_LLM_PARSER").unwrap_or_default() == "true" {
-        match parser.parse_workflow_yaml(&workflow_yaml).await {
-            Ok(workflow) => return Ok(workflow),
-            Err(e) => {
-                warn!("LLM parsing failed, falling back: {}", e);
-                // Fall through to simple parser
-            }
-        }
-    }
-}
-
-// Simple YAML parser as fallback
-parse_workflow_yaml_simple(workflow_path)
-```
-
-**Benefit**: System continues working even if LLM is unavailable.
-
-**When to Apply**: Any optional AI/LLM feature where fallback is available.
-
----
-
-### 3. Environment-Based Feature Flags
-
-**Pattern**: Use environment variables for feature toggles:
-```rust
-if env::var("USE_LLM_PARSER").unwrap_or_default() == "true" {
-    // Enable LLM parsing
+if json {
+    println!("{}", serde_json::to_string(&result)?);
 } else {
-    // Use simple parser
+    println!("Connectivity: {}", result.connected);
+    println!("Terms: {:?}", result.matched_terms);
 }
 ```
 
-**Benefits**:
-- Easy to test both paths
-- Deploy with feature off, roll out gradually
-- Disable without code deployment if issues arise
+**When to Apply**: CLI tools that will be called from hooks or scripts.
 
-**When to Apply**: Any experimental or optional feature.
+### Critical Success Factors
 
----
+1. **Disciplined Methodology**: Research → Design → Implementation prevented scope creep
+2. **Small Commits**: Each phase committed separately for clean history
+3. **Test-Driven**: Verified each command worked before committing
+4. **Documentation-First**: Skills and CLAUDE.md updated alongside code
 
-## Pitfalls to Avoid
+### What We Shipped
 
-### 1. Don't Mock in Tests (Per Project Guidelines)
+**Phase A**: Fixed MCP connectivity placeholder
+**Phase B**: Added `validate`, `suggest`, `hook` CLI commands
+**Phase C**: Created 3 skills + 3 hooks for pre/post-LLM workflows
+**Phase D**: Created code_review and security checklists
+**Phase E**: Updated documentation and install scripts
 
-**Project Rule**: "NEVER use mocks in tests"
-
-**Reason**: Mocks can hide real integration issues. Use real implementations or integration tests.
-
-**Example**: Don't mock the Firecracker HTTP client. Instead:
-- Use real Firecracker API in integration tests (marked `--ignored`)
-- Allow connection failures in unit tests (expected behavior)
-- Test against real services
-
-**When to Apply**: All test writing in this codebase.
+All features are local-first, sub-200ms latency, backward compatible.
 
 ---
 
-### 2. Don't Commit with Unstaged Changes
+## CI/CD Release Workflow Fixes - 2025-12-31
 
-**Pre-commit Hook Behavior**: The hook stashes unstaged changes, runs checks, then restores them.
+### Pattern: GitHub Actions Job Dependencies with `if: always()`
 
-**Gotcha**: If you have unrelated work in progress, it gets stashed and restored during commit.
+**Context:** Matrix jobs where some variants fail shouldn't block downstream jobs that only need specific successful variants.
 
-**Solution**: Commit only related changes. Keep unrelated work in separate branches or use `git stash` manually.
+**What We Learned:**
+- GitHub Actions `needs:` requires ALL dependent jobs to succeed by default
+- Using `if: always()` allows the job to run regardless of dependency status
+- Combine with result checks: `if: always() && needs.job.result == 'success'`
+- This pattern enables partial releases when some platforms fail
 
-**Evidence**: Pre-commit output showed:
-```
-[WARNING] Unstaged files detected.
-[INFO] Stashing unstaged files to /home/alex/.cache/pre-commit/patch1766766479-1749824.
-```
+**Implementation:**
+```yaml
+# BAD: Skipped if ANY build-binaries job fails
+create-universal-macos:
+  needs: build-binaries
+  # Job skipped because Windows build failed
 
-**When to Apply**: Always check `git status` before committing.
+# GOOD: Runs if job itself can proceed
+create-universal-macos:
+  needs: build-binaries
+  if: always()  # Always attempt to run
 
----
-
-### 3. Don't Format Long Lines in Docs
-
-**Discovery**: Pre-commit hooks run `cargo fmt` on Rust files but not documentation files.
-
-**Benefit**: Can use longer lines in Markdown for better readability (e.g., wide code blocks, tables).
-
-**When to Apply**: Writing Markdown documentation. Rust code still gets auto-formatted.
-
----
-
-## Best Practices Discovered
-
-### 1. Comprehensive Documentation with Mermaid Diagrams
-
-**Pattern**: Created three separate documentation files for different audiences:
-
-1. **Architecture Docs** (`docs/github-runner-architecture.md`)
-   - 15+ Mermaid diagrams
-   - Component descriptions
-   - Data flow sequences
-   - Security and performance sections
-
-2. **Setup Guide** (`docs/github-runner-setup.md`)
-   - Step-by-step installation
-   - Configuration examples
-   - Deployment options (systemd, Docker, Nginx)
-   - Troubleshooting section
-
-3. **README** (`crates/terraphim_github_runner_server/README.md`)
-   - Quick start
-   - Feature overview
-   - Configuration reference
-   - Testing instructions
-
-**Benefit**: Each document serves a specific purpose. New users can start with README, operators need setup guide, architects need architecture docs.
-
-**When to Apply**: Any complex feature with multiple user personas.
-
----
-
-### 2. Marketing Materials Alongside Code
-
-**Pattern**: Created announcement materials (blog, Twitter, Reddit) alongside implementation.
-
-**Files Created**:
-- `blog/announcing-github-runner.md` (600+ lines)
-- `blog/twitter-draft.md` (400+ lines)
-- `blog/reddit-draft.md` (1000+ lines, 5 versions)
-
-**Benefit**: Ready to launch immediately after merge. No delay for writing announcements.
-
-**Insight**: Different platforms need different formats:
-- **Blog**: Technical deep dive, comprehensive
-- **Twitter**: Short, punchy, threads
-- **Reddit**: Tailored to subreddit (r/rust vs r/devops vs r/github)
-
-**When to Apply**: Any user-facing feature or major release.
-
----
-
-### 3. Pull Request Description Templates
-
-**Pattern**: PR #381 included comprehensive description:
-
-```markdown
-## Summary
-
-[Integration overview]
-
-## Key Features
-
-### LLM Integration
-- ✅ Feature 1
-- ✅ Feature 2
-
-### Firecracker VM Execution
-- ✅ Feature 3
-
-## Architecture
-
-[Diagram]
-
-## Testing
-
-[Validation results]
-
-## Configuration
-
-[Environment variables]
-
-## Next Steps
-
-- [ ] Item 1
-- [ ] Item 2
+sign-and-notarize:
+  needs: create-universal-macos
+  if: always() && needs.create-universal-macos.result == 'success'
 ```
 
-**Benefit**: Reviewers understand full context without diving into code.
+**When to Apply:** Any workflow with matrix builds where partial success is acceptable.
 
-**When to Apply**: All pull requests, especially complex features.
+### Pattern: Cross-Platform Binary Detection in Release Workflows
 
----
+**Context:** Need to copy binaries from artifacts to release, but `-executable` flag doesn't work across platforms.
 
-## Performance Insights
+**What We Learned:**
+- `find -executable` checks Unix executable bit, which is lost when downloading artifacts on different platforms
+- macOS binaries downloaded on Linux runner lose their executable bit
+- Use explicit filename patterns instead of permission-based detection
 
-### 1. LLM Parsing Latency vs Benefit
-
-**Observation**: LLM parsing takes 500-2000ms vs ~1ms for simple YAML parser.
-
-**Trade-off Analysis**:
-- **Slower parsing**: Yes, but one-time per workflow
-- **Better understanding**: Detects dependencies, cache paths, timeouts
-- **Optimization benefits**: Faster execution, fewer failures
-- **Net result**: Worth it for complex workflows
-
-**Evidence**: 13 workflows parsed successfully with actionable optimizations:
-- Cache path suggestions (40% build time reduction)
-- Dependency detection (prevented 3 potential failures)
-- Timeout adjustments (prevented hung workflows)
-
-**When to Apply**: Decision making for AI/LLM feature integration.
-
----
-
-### 2. Firecracker VM Boot Time Consistency
-
-**Observation**: Firecracker VMs consistently boot in ~1.5s regardless of load.
-
-**Testing**: 13 concurrent VM allocations, all ~100ms allocation + ~1.5s boot.
-
-**Implication**: Can predict performance accurately. No need for complex warm-up strategies (yet).
-
-**Future Optimization**: VM pooling could reduce to ~100ms (reuse allocated VMs).
-
-**When to Apply**: Capacity planning and performance SLAs.
-
----
-
-## Configuration Management
-
-### 1. Environment Variable Validation
-
-**Pattern**: Document required vs optional variables clearly:
-
-**Required**:
+**Implementation:**
 ```bash
-GITHUB_WEBHOOK_SECRET=...   # REQUIRED
-FIRECRACKER_API_URL=...     # REQUIRED
+# BAD: Relies on executable permission
+find binaries-* -type f -executable
+
+# GOOD: Uses filename patterns
+find binaries-* -type f \( -name "terraphim*" -o -name "*.exe" \)
 ```
 
-**Optional**:
+**When to Apply:** Any cross-platform release workflow that downloads artifacts on a different OS.
+
+### Pattern: Self-Hosted Runner Cleanup
+
+**Context:** Self-hosted runners accumulate artifacts from previous runs that can cause conflicts.
+
+**What We Learned:**
+- Temporary keychains from signing can remain on disk
+- Old build artifacts may interfere with new builds
+- Add cleanup step at start of jobs using self-hosted runners
+
+**Implementation:**
+```yaml
+- name: Cleanup self-hosted runner
+  if: contains(matrix.os, 'self-hosted')
+  run: |
+    find /tmp -name "*.keychain-db" -mmin +60 -delete 2>/dev/null || true
+    find /tmp -name "signing.keychain*" -delete 2>/dev/null || true
+    rm -rf ~/actions-runner/_work/*/target/release/*.zip 2>/dev/null || true
+```
+
+**When to Apply:** Any workflow using self-hosted runners, especially for signing operations.
+
+### Pattern: 1Password CLI for CI/CD Secrets
+
+**Context:** Need to securely inject signing credentials without exposing in workflow files.
+
+**What We Learned:**
+- Use `op read` for individual secrets: `op read 'op://Vault/Item/Field'`
+- Use `op inject` for template files: `op inject -i template.json -o output.json`
+- Use `op run --env-file` for environment-based secrets
+- Always use `--no-newline` flag when reading secrets for environment variables
+
+**Implementation:**
+```yaml
+# Read individual secrets
+- run: |
+    echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
+
+# Inject into template
+- run: |
+    op inject --force -i tauri.conf.json.template -o tauri.conf.json
+
+# Run with injected environment
+- run: |
+    op run --env-file=.env.ci -- yarn tauri build
+```
+
+**When to Apply:** Any CI/CD workflow requiring secrets that should be centrally managed.
+
+### Debugging Insight: Iterative Tag Testing
+
+**What We Learned:**
+- Create test tags (e.g., `v0.0.9-signing-test`) for rapid iteration
+- Each tag triggers full workflow, revealing different failure modes
+- Clean up test releases after validation
+
+**Testing Approach:**
 ```bash
-USE_LLM_PARSER=true         # Optional, default: false
-OLLAMA_BASE_URL=...         # Optional, for LLM features
+# Create test tag
+git tag v0.0.X-signing-test
+git push origin v0.0.X-signing-test
+
+# Monitor
+gh run watch <run_id>
+
+# Check results
+gh release view v0.0.X-signing-test --json assets
+
+# Cleanup (when done)
+gh release delete v0.0.X-signing-test --yes
+git push origin :refs/tags/v0.0.X-signing-test
 ```
 
-**Benefit**: Users know what's needed vs what's nice-to-have.
+### Critical Success Factors
 
-**When to Apply**: All server/service configuration.
+1. **Verify 1Password integration first** - All credentials should come from vault, not workflow secrets
+2. **Test job dependencies with partial failures** - Don't assume all matrix jobs will succeed
+3. **Use explicit file matching** - Permission-based detection fails across platforms
+4. **Clean self-hosted runners** - Previous run artifacts can cause subtle failures
+5. **Iterative testing with tags** - Faster feedback than waiting for production release
+
+### What We Shipped
+
+| Fix | Commit | Impact |
+|-----|--------|--------|
+| Job dependency fix | `bf8551f2` | Signing runs even when cross-builds fail |
+| Asset preparation fix | `086aefa6` | macOS binaries included in releases |
+| Runner cleanup | `ea4027bd` | Prevents signing conflicts |
+| Tauri v1 standardization | `c070ef70`, `a19ed7fb` | Consistent GTK and CLI versions |
+
+All fixes verified with v0.0.11-signing-test release containing signed macOS universal binaries.
 
 ---
 
-### 2. Feature Flags in Cargo.toml
+## CI/CD and PR Triage Session - 2025-12-31
 
-**Pattern**: Use feature flags for optional dependencies:
+### Pattern: Disciplined Design for Closed PRs
 
-```toml
-[features]
-default = []
-ollama = ["terraphim_service/ollama"]
-openrouter = ["terraphim_service/openrouter"]
+**Context:** Large PRs with conflicts need fresh implementation, not rebasing.
+
+**What We Learned:**
+- PRs older than 4-6 weeks often have significant conflicts
+- Extract valuable features into design plans rather than attempting complex rebases
+- Create GitHub issues linking to design documents for tracking
+- Use disciplined-design skill to create structured implementation plans
+
+**Implementation:**
+```bash
+# Close PR with design plan reference
+gh pr close $PR --comment "See .docs/plans/feature-design.md for fresh implementation"
+
+# Create tracking issue
+gh issue create --title "feat: Implement X" --body "See design plan..."
 ```
 
-**Benefits**:
-- Smaller binaries if feature not needed
-- Faster compilation (fewer dependencies)
-- Clear feature boundaries
+**When to Apply:** PRs with 50+ files, 4+ weeks old, or CONFLICTING status.
 
-**When to Apply**: Any optional integration or provider.
+### Pattern: Feature Flags for Cross-Compilation
 
----
+**Context:** Cross-compiled binaries fail when dependencies require C compilation.
 
-## Testing Strategy
+**What We Learned:**
+- `rusqlite` and similar C-binding crates fail on musl/ARM cross-compilation
+- Use `--no-default-features` to exclude problematic dependencies
+- Create feature sets for different build targets (native vs cross)
+- The `memory` and `dashmap` features provide pure-Rust alternatives
 
-### 1. Manual Testing with Real Webhooks
-
-**Approach**: Created test webhook script with HMAC signature:
-
-```python
-import hmac, hashlib, json
-
-secret = b"test_secret"
-payload = json.dumps({"action": "opened", ...})
-
-signature = hmac.new(secret, payload.encode(), hashlib.sha256).hexdigest()
+**Implementation:**
+```yaml
+# In GitHub Actions workflow
+${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
 ```
 
-**Benefit**: Tests complete flow including signature verification.
+**When to Apply:** Any cross-compilation workflow using `cross` tool.
 
-**When to Apply**: Any webhook-based integration.
+### Pattern: Webkit Version Fallback for Tauri
 
----
+**Context:** Tauri v1 requires webkit 4.0, but newer Ubuntu versions only have 4.1.
 
-### 2. Comprehensive Logging for Validation
+**What We Learned:**
+- Ubuntu 24.04 dropped webkit 4.0 packages
+- Tauri v1 is incompatible with webkit 4.1 (uses different API)
+- Implement fallback: try 4.1 first, fall back to 4.0
+- Or simply exclude Ubuntu 24.04 from Tauri v1 matrix
 
-**Pattern**: Added detailed logs at each stage to validate execution:
-
-```
-✅ Webhook received
-🤖 LLM-based workflow parsing enabled
-🔧 Initializing Firecracker VM provider
-⚡ Creating VmCommandExecutor
-🎯 Creating SessionManager
-Allocated VM fc-vm-abc123 in 100ms
-Workflow '<name>.yml' completed successfully in 0ms
+**Implementation:**
+```bash
+sudo apt-get install -yqq libwebkit2gtk-4.1-dev 2>/dev/null || \
+sudo apt-get install -yqq libwebkit2gtk-4.0-dev
 ```
 
-**Validation**: Count emoji indicators in logs to verify each stage executed.
+**When to Apply:** Any Tauri v1 builds on Ubuntu runners.
 
-**Result**: 13 workflows × 7 stages = 91 successful operations validated.
+### Pattern: PR Triage Categories
 
-**When to Apply**: Complex multi-stage pipelines where you need proof of execution.
+**Context:** 30 open PRs need systematic triage.
 
----
+**What We Learned:**
+- Categorize PRs: merge (safe), close (stale/superseded), defer (risky)
+- Dependabot PRs: check for major version bumps (breaking changes)
+- Feature PRs: check CI status before merging
+- Create design plans for valuable but conflicting PRs
 
-## Security Considerations
+**Categories:**
+| Category | Criteria | Action |
+|----------|----------|--------|
+| Merge | Low-risk, passing CI | `gh pr merge` |
+| Close | Stale, superseded, conflicts | `gh pr close` with comment |
+| Defer | Major version, risky | Close with explanation |
+| Design | Valuable but complex | Create plan, close PR |
 
-### 1. Webhook Signature Verification
+**When to Apply:** Any PR backlog cleanup session.
 
-**Implementation**: HMAC-SHA256 verification before any processing:
+### Pattern: GitHub Actions `if: always()` for Partial Success
 
-```rust
-pub async fn verify_signature(
-    secret: &str,
-    signature: &str,
-    body: &[u8]
-) -> Result<bool> {
-    let signature = signature.replace("sha256=", "");
-    let mut mac = Hmac::<Sha256>::new_from_slice(secret.as_bytes())?;
-    mac.update(body);
-    let result = mac.finalize().into_bytes();
-    let hex_signature = hex::encode(result);
+**Context:** Signing jobs skipped when unrelated builds failed.
 
-    Ok(hex_signature == signature)
-}
+**What We Learned:**
+- `needs:` requires ALL dependent jobs to succeed by default
+- Use `if: always()` to run regardless of dependency status
+- Combine with result checks: `if: always() && needs.job.result == 'success'`
+- Enables releasing whatever was built successfully
+
+**Implementation:**
+```yaml
+create-universal-macos:
+  needs: build-binaries
+  if: always()  # Run even if some builds failed
+
+sign-and-notarize:
+  needs: create-universal-macos
+  if: always() && needs.create-universal-macos.result == 'success'
 ```
 
-**Critical**: Always return 403 Forbidden on signature mismatch, never process payload.
+**When to Apply:** Any workflow with matrix builds where partial success is acceptable.
 
-**When to Apply**: All webhook handlers.
+### Critical Success Factors
 
----
+1. **Design before implementation** - Use disciplined-design skill for complex features
+2. **Categorize PRs systematically** - Don't try to review 30 PRs sequentially
+3. **Create tracking issues** - Link design plans to GitHub issues
+4. **Test CI fixes with tags** - Use `v0.0.X-test` tags for rapid iteration
+5. **Document in .docs/plans/** - Keep design documents in version control
 
-### 2. No Secrets in Code or Git
+### Session Metrics
 
-**Pattern**: Use environment variables for all secrets:
-
-```rust
-let secret = env::var("GITHUB_WEBHOOK_SECRET)?;
-let token = env::var("FIRECRACKER_AUTH_TOKEN").ok();
-```
-
-**Validation**: Pre-commit hooks include secret detection:
-```
-Checking for secrets and sensitive data...
-✓ No secrets detected
-```
-
-**When to Apply**: Always. No exceptions.
-
----
-
-## Collaboration Tips
-
-### 1. Clear Handover Documents
-
-**Pattern**: Created comprehensive handover with:
-- Executive summary
-- Technical context (git state, commits, files)
-- Prioritized next steps (high/medium/low)
-- Blockers and recommendations
-- Points of contact
-
-**Benefit**: Next person (or future you) can pick up immediately without context switching.
-
-**When to Apply**: End of every development session or before handoff.
-
----
-
-### 2. Dated Handover Files
-
-**Pattern**: Use dated filenames `HANDOVER-YYYY-MM-DD.md` to preserve history.
-
-**Benefit**: Can track project evolution over time. Previous handovers still accessible.
-
-**Evidence**: `HANDOVER.md` (2025-12-25) vs `HANDOVER-2025-01-31.md` (this session)
-
-**When to Apply**: Multiple sessions on same feature or project.
-
----
-
-## Summary
-
-This session successfully integrated LLM-powered workflow parsing with Firecracker microVM execution, achieving:
-
-✅ **52-128x faster** than traditional CI runners (2.5s vs 2-5 minutes)
-✅ **Comprehensive documentation** (1,500+ lines across 3 files)
-✅ **Production-ready** code (all tests passing, pre-commit hooks green)
-✅ **Announcement materials** ready (2,000+ lines across blog, Twitter, Reddit)
-✅ **Clear deployment path** (prioritized next steps with time estimates)
-
-**Key Lesson**: Build complete systems, not just code. Documentation, announcements, and handovers are as important as the implementation.
-
-**Next Session Focus**: Deploy Firecracker API and production webhook configuration.
-
----
-
-**Session Date**: 2025-01-31
-**Branch**: feat/github-runner-ci-integration
-**Status**: Ready for review (PR #381)
+| Metric | Value |
+|--------|-------|
+| PRs Processed | 27 |
+| PRs Merged | 13 |
+| PRs Closed | 11 |
+| Design Plans Created | 2 |
+| GitHub Issues Created | 2 |
+| CI Fixes Applied | 4 |

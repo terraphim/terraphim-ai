@@ -30,11 +30,11 @@ serde = { version = "1.0.198", features = ["derive"] }
 serde_json = "1.0.116"
 
 # Unique identifiers and time handling
-uuid = { version = "1.6", features = ["v4", "serde"] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
 chrono = { version = "0.4", features = ["serde"] }
 
 # Logging
-log = "0.4.21"
+log = "0.4.29"
 
 # Collections and utilities
 ahash = { version = "0.8.8", features = ["serde"] }

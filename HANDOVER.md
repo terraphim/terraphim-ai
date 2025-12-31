@@ -1,193 +1,198 @@
-# Handover Document: docs.terraphim.ai Styling Fix
+# Handover Document - CI/CD Fixes and PR Triage
 
-**Date:** 2025-12-27
-**Session Focus:** Fixing broken CSS/JS styling on docs.terraphim.ai
-**Branch:** `main`
+**Date:** 2025-12-31
+**Branch:** main (commits pushed), remove-unused-petgraph-dependency (local)
+**Last Commit:** 78fc01c1
 
 ---
 
 ## 1. Progress Summary
 
-### Completed This Session
+### Tasks Completed This Session
 
-| Task | Status | Commit |
-|------|--------|--------|
-| Diagnose MIME type issues | ✅ Complete | - |
-| Add missing CSS templates | ✅ Complete | `f71f1489` |
-| Add missing JS templates | ✅ Complete | `f71f1489` |
-| Add web components | ✅ Complete | `f71f1489` |
-| Add Cloudflare _headers file | ✅ Complete | `6dd3076b` |
-| Delete deprecated workflow | ✅ Complete | `f513996d` |
-| Verify server headers | ✅ Complete | curl confirmed |
+| Task | Status | Details |
+|------|--------|---------|
+| Fix Tauri desktop builds | Complete | Removed Ubuntu 24.04, added webkit fallback, frontend build step |
+| Fix cross-compilation | Complete | Added `--no-default-features --features memory,dashmap` for musl/ARM |
+| PR Triage | Complete | 13 merged, 11 closed, 3 deferred, 4 remaining |
+| MCP Auth Design Plan | Complete | `.docs/plans/mcp-authentication-design.md`, Issue #388 |
+| KG Linter Design Plan | Complete | `.docs/plans/kg-schema-linter-design.md`, Issue #389 |
 
-### Current Implementation State
+### Commits Pushed to Main
 
-**What's Working:**
-- Logo displays correctly on docs.terraphim.ai
-- Server returns correct MIME types:
-  - CSS: `text/css; charset=utf-8`
-  - JS: `application/javascript`
-- Documentation content renders
-- Card-based layout structure visible
-- deploy-docs.yml workflow runs successfully
-
-**Verification:**
-```bash
-curl -sI https://docs.terraphim.ai/css/styles.css | grep content-type
-# content-type: text/css; charset=utf-8
-
-curl -sI https://docs.terraphim.ai/js/search-init.js | grep content-type
-# content-type: application/javascript
 ```
+78fc01c1 docs: add design plans for MCP auth and KG linter
+90a22f75 refactor: remove unused petgraph dependency from agent crates
+70a344df fix(ci): fix Tauri desktop builds and cross-compilation
+086aefa6 fix(ci): use binary name pattern instead of executable flag for release
+bf8551f2 fix(ci): allow signing jobs to run when cross-builds fail
+```
+
+### What's Working
+
+| Component | Status |
+|-----------|--------|
+| macOS binary builds (x86_64, aarch64) | Working |
+| Universal binary creation via `lipo` | Working |
+| Code signing and notarization (1Password) | Working |
+| Release creation with all assets | Working |
+| Debian package builds | Working |
+| Linux x86_64 builds | Working |
+| Cross-compilation (musl/ARM) with feature flags | Fixed |
+
+### What's Blocked / Remaining
+
+| Issue | Status | Notes |
+|-------|--------|-------|
+| PR #329 | CI failing | task_decomposition tests, 6 weeks old |
+| PR #374 | Needs review | v1.3.0 release readiness |
+| PR #381 | Needs review | DevOps/CI-CD role config |
+| PR #383 | CI failing | KG validation workflows, Clippy errors |
 
 ---
 
 ## 2. Technical Context
 
-### Repository State
+### Recent Commits (Main Branch)
 
 ```
-Branch: main
-Latest commits:
-  6dd3076b fix: add _headers file for Cloudflare Pages MIME types
-  f71f1489 fix: add missing CSS and JS templates for docs site
-  f513996d chore: remove deprecated deploy-docs-old workflow
-  61a48ada Merge pull request #378 from terraphim/feature/website-migration
-  6718d775 fix: merge main and resolve conflicts
+78fc01c1 docs: add design plans for MCP auth and KG linter
+90a22f75 refactor: remove unused petgraph dependency from agent crates
+7a0f0800 Merge pull request #362 from terraphim/dependabot/cargo/crossterm-0.29.0
+998ebb05 Merge pull request #379 from terraphim/dependabot/docker/docker/rust-1.92.0-slim
+181bca5c Merge pull request #373 from terraphim/dependabot/npm_and_yarn/desktop/types/node-24.10.2
 ```
 
-### Key Files Added/Modified
+### Key Files Modified
 
-| File | Change |
-|------|--------|
-| `docs/templates/css/styles.css` | Added - main stylesheet |
-| `docs/templates/css/search.css` | Added - search styling |
-| `docs/templates/css/highlight.css` | Added - code highlighting |
-| `docs/templates/js/search-init.js` | Added - search initialization |
-| `docs/templates/js/pagefind-search.js` | Added - pagefind integration |
-| `docs/templates/js/code-copy.js` | Added - code copy button |
-| `docs/templates/js/highlight.js` | Added - syntax highlighting |
-| `docs/templates/components/*.js` | Added - web components |
-| `docs/templates/_headers` | Added - Cloudflare MIME types |
-| `docs/book.toml` | Modified - removed mermaid.min.js |
+- `.github/workflows/release-comprehensive.yml` - Tauri and cross-compilation fixes
+- `.docs/plans/mcp-authentication-design.md` - MCP security design (NEW)
+- `.docs/plans/kg-schema-linter-design.md` - KG linter design (NEW)
 
-### Root Cause Analysis
+### PR Status Summary
 
-The md-book fork (`https://github.com/terraphim/md-book.git`) has embedded templates in `src/templates/`. When book.toml sets:
-```toml
-[paths]
-templates = "templates"
-```
-
-md-book looks for templates in local `docs/templates/` and does NOT merge with embedded defaults - local templates REPLACE them entirely. This caused missing CSS/JS files in the build output.
+| Category | PRs |
+|----------|-----|
+| **Merged (13)** | #359, #360, #361, #362, #363, #365, #366, #367, #370, #371, #372, #373, #379 |
+| **Closed (11)** | #264, #268, #287, #291, #294, #295, #296, #313, #320, #369, #387 |
+| **Deferred (3)** | #364 (petgraph 0.8), #368 (axum-extra), #380 (debian 13) |
+| **Remaining (4)** | #329, #374, #381, #383 |
 
 ---
 
 ## 3. Next Steps
 
-### Immediate Actions
+### Priority 1: Fix Remaining PRs
 
-1. **Verify with clean browser cache**
-   - Open https://docs.terraphim.ai in incognito/private mode
-   - Confirm styles load correctly for new visitors
+1. **PR #383** (KG validation workflows)
+   - Has Clippy/compilation errors
+   - Valuable feature, recent (2 days old)
+   - Fix CI errors then merge
 
-2. **Fix terraphim-markdown-parser** (separate issue)
-   - `crates/terraphim-markdown-parser/src/main.rs` has missing function `ensure_terraphim_block_ids`
-   - Causes pre-commit cargo check failures
-   - Used `--no-verify` to bypass for this session
+2. **PR #374** (v1.3.0 Release Readiness)
+   - Documentation improvements
+   - Review and merge if no conflicts
 
-### Future Improvements
+3. **PR #381** (DevOps/CI-CD role)
+   - Large PR (82 files)
+   - Review for conflicts with recent CI changes
 
-3. **Consider mermaid.js CDN** (optional)
-   - Currently removed due to 2.9MB size
-   - Could add CDN link in HTML templates:
-   ```html
-   <script src="https://cdn.jsdelivr.net/npm/mermaid/dist/mermaid.min.js"></script>
-   ```
+4. **PR #329** (task_decomposition tests)
+   - 6 weeks old, 100 files
+   - May need rebase or close
 
-4. **Cleanup test files**
-   - Remove `.playwright-mcp/*.png` screenshots
-   - Remove `MIGRATION_PLAN_ZOLA_TO_MDBOOK.md` if no longer needed
+### Priority 2: Implement Design Plans
 
----
+1. **MCP Authentication** (Issue #388)
+   - 7-day implementation timeline
+   - See `.docs/plans/mcp-authentication-design.md`
 
-## 4. Blockers & Risks
+2. **KG Schema Linter** (Issue #389)
+   - 4-day implementation timeline
+   - See `.docs/plans/kg-schema-linter-design.md`
 
-| Blocker | Impact | Status |
-|---------|--------|--------|
-| terraphim-markdown-parser compilation error | Pre-commit hooks fail | Bypassed with --no-verify |
+### Priority 3: Deferred Dependabot PRs
 
-| Risk | Mitigation |
-|------|------------|
-| Browser caching old MIME types | CDN cache purged; new visitors see correct styles |
-| Mermaid diagrams won't render | Low impact - can add CDN if needed |
-
----
-
-## 5. Architecture Notes
-
-### Cloudflare Pages Headers
-The `_headers` file format:
-```
-/css/*
-  Content-Type: text/css
-
-/js/*
-  Content-Type: application/javascript
-
-/components/*
-  Content-Type: application/javascript
-```
-
-### md-book Template Directory Structure
-```
-docs/templates/
-├── _headers          # Cloudflare Pages config
-├── css/
-│   ├── styles.css    # Main stylesheet
-│   ├── search.css    # Search modal styles
-│   └── highlight.css # Code highlighting
-├── js/
-│   ├── search-init.js
-│   ├── pagefind-search.js
-│   ├── code-copy.js
-│   ├── highlight.js
-│   ├── live-reload.js
-│   └── mermaid-init.js
-├── components/
-│   ├── search-modal.js
-│   ├── simple-block.js
-│   ├── doc-toc.js
-│   └── doc-sidebar.js
-└── img/
-    └── terraphim_logo_gray.png
-```
+Review when time permits:
+- #364 - petgraph 0.6->0.8 (breaking changes likely)
+- #368 - axum-extra 0.10->0.12
+- #380 - debian 12->13 (major version)
 
 ---
 
-## 6. Quick Reference
+## 4. Design Plans Created
 
-### Rebuild Docs Locally
+### MCP Authentication (`.docs/plans/mcp-authentication-design.md`)
+
+- **Purpose**: Add authentication to MCP HTTP/SSE transport
+- **Features**: Bearer tokens, rate limiting, security logging
+- **Timeline**: 7 days
+- **Issue**: #388
+
+### KG Schema Linter (`.docs/plans/kg-schema-linter-design.md`)
+
+- **Purpose**: Validate KG markdown schemas
+- **Features**: CLI tool, JSON output, CI integration
+- **Timeline**: 4 days
+- **Issue**: #389
+
+---
+
+## 5. CI/CD Fixes Applied
+
+### Tauri Desktop Builds
+
+```yaml
+# Removed Ubuntu 24.04 (GTK 4.0/4.1 incompatibility)
+# Added webkit fallback:
+sudo apt-get install -yqq libwebkit2gtk-4.1-dev 2>/dev/null || \
+sudo apt-get install -yqq libwebkit2gtk-4.0-dev
+
+# Added frontend build step before Tauri:
+- name: Build frontend assets
+  run: yarn build
+```
+
+### Cross-Compilation
+
+```yaml
+# Added feature flags to avoid sqlite C compilation:
+${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+```
+
+---
+
+## 6. Monitoring Commands
+
 ```bash
-cd docs
-rm -rf book
-/tmp/md-book/target/release/md-book -i . -o book
-python3 -m http.server 8080 -d book
-```
+# Check open PRs
+gh pr list --state open
 
-### Check Server Headers
-```bash
-curl -sI https://docs.terraphim.ai/css/styles.css | grep content-type
-curl -sI https://docs.terraphim.ai/js/search-init.js | grep content-type
-```
+# Watch workflow
+gh run watch <run_id>
 
-### Trigger Docs Deployment
-```bash
-git push origin main  # deploy-docs.yml triggers on push to main
+# Check release assets
+gh release view <tag> --json assets
+
+# View design plans
+cat .docs/plans/mcp-authentication-design.md
+cat .docs/plans/kg-schema-linter-design.md
 ```
 
 ---
 
-**Previous Session:** macOS Release Pipeline & Homebrew Publication (see git history for details)
+## 7. Session Statistics
 
-**Next Session:** Fix terraphim-markdown-parser compilation error, verify docs styling in clean browser
+| Metric | Count |
+|--------|-------|
+| PRs Merged | 13 |
+| PRs Closed | 11 |
+| PRs Deferred | 3 |
+| PRs Remaining | 4 |
+| Commits Pushed | 5 |
+| Design Plans Created | 2 |
+| GitHub Issues Created | 2 |
+
+---
+
+**Handover complete. Main branch is stable with CI fixes applied.**
