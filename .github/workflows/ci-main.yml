@@ -97,7 +97,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
       - name: Cache Cargo registry and dependencies (self-hosted)
@@ -237,7 +237,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
@@ -388,8 +387,6 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain-file: .github/rust-toolchain.toml
 
       - name: Run cargo audit
         run: |

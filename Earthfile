@@ -56,7 +56,7 @@ install:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
@@ -89,7 +89,7 @@ install-native:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
@@ -117,7 +117,7 @@ source-native:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   COPY --keep-ts desktop+build/dist /code/desktop/dist
   RUN mkdir -p .cargo
@@ -159,7 +159,7 @@ source:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
@@ -249,7 +249,7 @@ build-focal:
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN curl https://pkgx.sh | sh
   RUN pkgx +openssl cargo build --release
@@ -266,7 +266,7 @@ build-jammy:
   # RUN rustup toolchain install stable
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
   IF [ "$CARGO_HOME" = "" ]
     ENV CARGO_HOME="$HOME/.cargo"
   END
@@ -328,7 +328,7 @@ docker-aarch64:
 
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \

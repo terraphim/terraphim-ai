@@ -163,7 +163,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
       - name: Optimized Cargo Cache
@@ -341,7 +341,7 @@ jobs:
 
           # Final system cleanup
           docker system prune -f --volumes --filter "until=6h" || true
-          docker buildx prune -f --keep-storage=5G --filter until=6h" || true
+          docker buildx prune -f --keep-storage=5G --filter "until=6h" || true
 
           # Report final system state
           FINAL_STORAGE=$(docker system df --format "{{.Size}}" | head -1)

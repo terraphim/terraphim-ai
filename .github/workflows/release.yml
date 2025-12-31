@@ -101,7 +101,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
 
       - name: Cache Cargo (self-hosted)
         uses: actions/cache@v4
@@ -158,7 +158,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
       - name: Cache Cargo (self-hosted)
@@ -424,31 +424,38 @@ jobs:
     if: always() && needs.create-release.result == 'success'
 
     steps:
-      - name: Notify Slack
-        if: secrets.SLACK_WEBHOOK_URL != ''
+      - name: Notify Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
+          if [[ -z "$DISCORD_WEBHOOK_URL" ]]; then
+            echo "Discord webhook URL not configured, skipping notification"
+            exit 0
+          fi
           curl -X POST -H 'Content-type: application/json' \
             --data '{
-              "text": "🎉 Terraphim AI v${{ needs.version-check.outputs.version }} has been released! 🚀",
-              "attachments": [
+              "content": "🎉 **Terraphim AI v${{ needs.version-check.outputs.version }}** has been released! 🚀",
+              "embeds": [
                 {
-                  "color": "good",
+                  "title": "Release v${{ needs.version-check.outputs.version }}",
+                  "url": "https://github.com/terraphim/terraphim-ai/releases/tag/v${{ needs.version-check.outputs.version }}",
+                  "color": 5763719,
                   "fields": [
                     {
-                      "title": "Version",
+                      "name": "Version",
                       "value": "${{ needs.version-check.outputs.version }}",
-                      "short": true
+                      "inline": true
                     },
                     {
-                      "title": "Release Page",
-                      "value": "https://github.com/terraphim/terraphim-ai/releases/tag/v${{ needs.version-check.outputs.version }}",
-                      "short": true
+                      "name": "Documentation",
+                      "value": "[View Docs](https://docs.terraphim.ai)",
+                      "inline": true
                     }
                   ]
                 }
               ]
             }' \
-            ${{ secrets.SLACK_WEBHOOK_URL }}
+            "$DISCORD_WEBHOOK_URL"
 
       - name: Update latest tag
         if: github.ref == 'refs/tags/*'

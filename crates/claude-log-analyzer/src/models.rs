@@ -445,7 +445,7 @@ pub fn normalize_agent_name(agent_type: &str) -> String {
     agent_type.to_lowercase().replace(['-', ' '], "_")
 }
 
-/// Used in integration tests and public API  
+/// Used in integration tests and public API
 #[allow(dead_code)]
 #[must_use]
 pub fn get_agent_category(agent_type: &str) -> &'static str {
