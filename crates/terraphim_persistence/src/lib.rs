@@ -91,7 +91,13 @@ async fn init_device_storage() -> Result<DeviceStorage> {
             std::path::PathBuf::from("crates/terraphim_settings/default")
         });
 
-    let settings = DeviceSettings::load_from_env_and_file(Some(settings_path))?;
+    log::debug!("Loading settings from: {:?}", settings_path);
+    let settings = DeviceSettings::load_from_env_and_file(Some(settings_path.clone()))?;
+    log::debug!(
+        "Loaded settings with {} profiles: {:?}",
+        settings.profiles.len(),
+        settings.profiles.keys().collect::<Vec<_>>()
+    );
     init_device_storage_with_settings(settings).await
 }
 
@@ -135,6 +141,18 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
                             log::warn!("Failed to create DashMap directory '{}': {}", root, e);
                         } else {
                             log::info!("✅ Created DashMap directory: {}", root);
+                        }
+                    }
+                }
+            }
+            "rocksdb" => {
+                if let Some(datadir) = profile.get("datadir") {
+                    if !datadir.is_empty() {
+                        log::info!("🔧 Pre-creating RocksDB directory: {}", datadir);
+                        if let Err(e) = std::fs::create_dir_all(datadir) {
+                            log::warn!("Failed to create RocksDB directory '{}': {}", datadir, e);
+                        } else {
+                            log::info!("✅ Created RocksDB directory: {}", datadir);
                         }
                     }
                 }

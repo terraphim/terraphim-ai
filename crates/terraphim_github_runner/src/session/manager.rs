@@ -95,7 +95,7 @@ pub struct SessionManagerConfig {
 impl Default for SessionManagerConfig {
     fn default() -> Self {
         Self {
-            default_vm_type: "focal-optimized".to_string(),
+            default_vm_type: "bionic-test".to_string(),
             session_timeout: Duration::from_secs(3600), // 1 hour
             max_concurrent_sessions: 10,
             auto_cleanup: true,

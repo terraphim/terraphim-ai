@@ -140,9 +140,10 @@ enable_authentication = false
 api_key_required = false # pragma: allowlist secret
 
 # Rate limiting
+# Increased to support 5 concurrent workflows with ~10 requests each
 enable_rate_limiting = true
-rate_limit_requests_per_minute = 100
-rate_limit_burst = 20
+rate_limit_requests_per_minute = 500
+rate_limit_burst = 100
 
 # TLS/SSL settings
 enable_tls = false

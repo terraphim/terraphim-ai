@@ -66,8 +66,10 @@ fn tokenize(query: &str) -> Result<Vec<Token>> {
 }
 
 /// Convert a word into a token
+/// Keywords must be lowercase to be recognized as operators.
+/// Mixed-case or uppercase variants are treated as concepts.
 fn word_to_token(word: &str) -> Result<Token> {
-    match word.to_lowercase().as_str() {
+    match word {
         "and" => Ok(Token::And),
         "or" => Ok(Token::Or),
         "not" => Ok(Token::Not),
@@ -278,39 +280,105 @@ mod tests {
     }
 
     #[test]
-    fn test_case_insensitive_operators() {
-        let query = "BUN AND install";
+    fn test_uppercase_keywords_are_concepts() {
+        // Uppercase keywords should be treated as concepts, not operators
+        // Only lowercase "and", "or", "not" are operators
+        // When used with explicit lowercase operators, uppercase versions are concepts
+        let query = "BUN and AND and install";
+        let result = QueryParser::parse(query);
+        assert!(result.is_ok());
+        // "AND" is a concept (not the operator), chained with lowercase "and" operators
+        assert_eq!(
+            result.unwrap(),
+            QueryNode::And(
+                Box::new(QueryNode::And(
+                    Box::new(QueryNode::Concept("BUN".to_string())),
+                    Box::new(QueryNode::Concept("AND".to_string()))
+                )),
+                Box::new(QueryNode::Concept("install".to_string()))
+            )
+        );
+
+        let query = "deploy or OR or publish";
+        let result = QueryParser::parse(query);
+        assert!(result.is_ok());
+        // "OR" is a concept (not the operator), chained with lowercase "or" operators
+        assert_eq!(
+            result.unwrap(),
+            QueryNode::Or(
+                Box::new(QueryNode::Or(
+                    Box::new(QueryNode::Concept("deploy".to_string())),
+                    Box::new(QueryNode::Concept("OR".to_string()))
+                )),
+                Box::new(QueryNode::Concept("publish".to_string()))
+            )
+        );
+
+        // Uppercase NOT should be a concept
+        let query = "test and NOT";
         let result = QueryParser::parse(query);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
             QueryNode::And(
-                Box::new(QueryNode::Concept("BUN".to_string())),
-                Box::new(QueryNode::Concept("install".to_string()))
+                Box::new(QueryNode::Concept("test".to_string())),
+                Box::new(QueryNode::Concept("NOT".to_string()))
+            )
+        );
+    }
+
+    #[test]
+    fn test_mixed_case_keywords_are_concepts() {
+        // Regression test: mixed-case keywords like "oR" should be concepts
+        // This was caught by proptest which generated "oR" and tried to use it in "oR or a"
+        // Before the fix, "oR" was incorrectly treated as the OR operator
+
+        // "oR" as a concept used with lowercase "or" operator
+        let query = "oR or a";
+        let result = QueryParser::parse(query);
+        assert!(result.is_ok());
+        // "oR" is a concept (not an operator), combined with "a" via lowercase "or"
+        assert_eq!(
+            result.unwrap(),
+            QueryNode::Or(
+                Box::new(QueryNode::Concept("oR".to_string())),
+                Box::new(QueryNode::Concept("a".to_string()))
             )
         );
 
-        let query = "deploy OR publish";
+        // "Or" as a concept
+        let query = "Or and test";
+        let result = QueryParser::parse(query);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            QueryNode::And(
+                Box::new(QueryNode::Concept("Or".to_string())),
+                Box::new(QueryNode::Concept("test".to_string()))
+            )
+        );
+
+        // "aNd" as a concept
+        let query = "aNd or test";
         let result = QueryParser::parse(query);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
             QueryNode::Or(
-                Box::new(QueryNode::Concept("deploy".to_string())),
-                Box::new(QueryNode::Concept("publish".to_string()))
+                Box::new(QueryNode::Concept("aNd".to_string())),
+                Box::new(QueryNode::Concept("test".to_string()))
             )
         );
 
-        let query = "deploy AND NOT test";
+        // "nOt" as a concept
+        let query = "nOt and test";
         let result = QueryParser::parse(query);
         assert!(result.is_ok());
         assert_eq!(
             result.unwrap(),
             QueryNode::And(
-                Box::new(QueryNode::Concept("deploy".to_string())),
-                Box::new(QueryNode::Not(Box::new(QueryNode::Concept(
-                    "test".to_string()
-                ))))
+                Box::new(QueryNode::Concept("nOt".to_string())),
+                Box::new(QueryNode::Concept("test".to_string()))
             )
         );
     }
@@ -517,9 +585,17 @@ mod tests {
         use super::*;
         use proptest::prelude::*;
 
+        // Strategy to generate valid concept names (excluding reserved keywords)
+        fn concept_strategy() -> impl Strategy<Value = String> {
+            "[a-zA-Z][a-zA-Z0-9_-]{0,20}".prop_filter("must not be reserved keyword", |s| {
+                let lower = s.to_lowercase();
+                lower != "and" && lower != "or" && lower != "not"
+            })
+        }
+
         proptest! {
             #[test]
-            fn test_single_concept_always_parses(concept in "[a-zA-Z][a-zA-Z0-9_-]{0,20}") {
+            fn test_single_concept_always_parses(concept in concept_strategy()) {
                 let result = QueryParser::parse(&concept);
                 prop_assert!(result.is_ok());
                 prop_assert_eq!(result.unwrap(), QueryNode::Concept(concept));
@@ -527,8 +603,8 @@ mod tests {
 
             #[test]
             fn test_and_query_parses(
-                left in "[a-zA-Z][a-zA-Z0-9_-]{0,20}",
-                right in "[a-zA-Z][a-zA-Z0-9_-]{0,20}"
+                left in concept_strategy(),
+                right in concept_strategy()
             ) {
                 let query = format!("{} and {}", left, right);
                 let result = QueryParser::parse(&query);
@@ -544,8 +620,8 @@ mod tests {
 
             #[test]
             fn test_or_query_parses(
-                left in "[a-zA-Z][a-zA-Z0-9_-]{0,20}",
-                right in "[a-zA-Z][a-zA-Z0-9_-]{0,20}"
+                left in concept_strategy(),
+                right in concept_strategy()
             ) {
                 let query = format!("{} or {}", left, right);
                 let result = QueryParser::parse(&query);
@@ -560,7 +636,7 @@ mod tests {
             }
 
             #[test]
-            fn test_not_query_parses(concept in "[a-zA-Z][a-zA-Z0-9_-]{0,20}") {
+            fn test_not_query_parses(concept in concept_strategy()) {
                 let query = format!("not {}", concept);
                 let result = QueryParser::parse(&query);
                 prop_assert!(result.is_ok());
@@ -571,7 +647,7 @@ mod tests {
             }
 
             #[test]
-            fn test_parenthesized_query_parses(concept in "[a-zA-Z][a-zA-Z0-9_-]{0,20}") {
+            fn test_parenthesized_query_parses(concept in concept_strategy()) {
                 let query = format!("({})", concept);
                 let result = QueryParser::parse(&query);
                 prop_assert!(result.is_ok());

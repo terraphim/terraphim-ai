@@ -24,6 +24,11 @@ table = "terraphim_kv"
 type = "dashmap"
 root = "/tmp/terraphim_dashmap"  # Directory auto-created
 
+# RocksDB - High-performance embedded database (optional)
+[profiles.rocksdb]
+type = "rocksdb"
+datadir = "/tmp/terraphim_rocksdb"
+
 # ReDB disabled for local development to avoid database locking issues
 # [profiles.redb]
 # type = "redb"
