@@ -45,13 +45,15 @@ jobs:
 
       - name: Check runner availability
         id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           ./scripts/check-runner-health.sh
           EXIT_CODE=$?
 
           if [[ $EXIT_CODE -eq 0 ]]; then
             echo "use-self-hosted=true" >> $GITHUB_OUTPUT
-            echo "runner-labels=[\"self-hosted\", \"Linux\", \"X64\"]" >> $GITHUB_OUTPUT
+            echo "runner-labels=[self-hosted, Linux, X64]" >> $GITHUB_OUTPUT
             echo "✅ Using self-hosted runner"
           else
             echo "use-self-hosted=false" >> $GITHUB_OUTPUT
