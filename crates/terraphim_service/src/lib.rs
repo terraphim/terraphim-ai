@@ -2735,6 +2735,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires local KG fixtures at ~/.terraphim/kg"]
     async fn test_config_building_with_local_kg() {
         // Test that config building works correctly with local KG files
         let mut config = ConfigBuilder::new()
@@ -2939,6 +2940,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires local KG fixtures at 'test' directory"]
     async fn test_kg_term_search_with_atomic_data() {
         use ahash::AHashMap;
         use std::path::PathBuf;
