@@ -2282,12 +2282,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a3076410a55c90011c298b04d0cfa770b00fa04e1e3c97d3f6c9de105a03844"
 
 [[package]]
-name = "fixedbitset"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
-
-[[package]]
 name = "flate2"
 version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5105,18 +5099,6 @@ checksum = "bf1d70880e76bdc13ba52eafa6239ce793d85c8e43896507e43dd8984ff05b82"
 dependencies = [
  "pest",
  "sha2",
-]
-
-[[package]]
-name = "petgraph"
-version = "0.6.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b4c5cc86750666a3ed20bdaf5ca2a0344f9c67674cae0515bec2da16fbaa47db"
-dependencies = [
- "fixedbitset",
- "indexmap 2.12.1",
- "serde",
- "serde_derive",
 ]
 
 [[package]]
@@ -8410,7 +8392,6 @@ dependencies = [
  "futures-util",
  "indexmap 2.12.1",
  "log",
- "petgraph",
  "serde",
  "serde_json",
  "serial_test",
@@ -8614,7 +8595,6 @@ dependencies = [
  "futures-util",
  "indexmap 2.12.1",
  "log",
- "petgraph",
  "serde",
  "serde_json",
  "serial_test",
@@ -9019,7 +8999,6 @@ dependencies = [
  "futures-util",
  "indexmap 2.12.1",
  "log",
- "petgraph",
  "serde",
  "serde_json",
  "serial_test",
