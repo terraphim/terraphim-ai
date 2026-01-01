@@ -104,17 +104,13 @@ jobs:
 
       - name: Build TUI binary
         run: |
-          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent \
-            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent
 
       - name: Build CLI binary
         run: |
-          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli \
-            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
