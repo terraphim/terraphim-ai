@@ -8748,7 +8748,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -8939,7 +8939,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_automata"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
@@ -8989,7 +8989,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_config"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -9101,7 +9101,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_hooks"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "dirs 5.0.1",
  "serde",
@@ -9215,7 +9215,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "async-trait",
@@ -9308,7 +9308,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_persistence"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "async-once-cell",
  "async-trait",
@@ -9334,7 +9334,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rolegraph"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
@@ -9405,7 +9405,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_service"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -9463,7 +9463,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_settings"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "directories",
  "envtestkit",
@@ -9504,7 +9504,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_types"
-version = "1.2.3"
+version = "1.3.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",

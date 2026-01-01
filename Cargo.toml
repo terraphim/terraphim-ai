@@ -5,6 +5,7 @@ exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", 
 default-members = ["terraphim_server"]
 
 [workspace.package]
+version = "1.3.0"
 edition = "2024"
 
 [workspace.dependencies]
