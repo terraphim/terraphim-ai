@@ -1,198 +1,148 @@
-# Handover Document - CI/CD Fixes and PR Triage
+# Session Handover - Git Safety Guard Implementation
 
-**Date:** 2025-12-31
-**Branch:** main (commits pushed), remove-unused-petgraph-dependency (local)
-**Last Commit:** 78fc01c1
+## Date: 2026-01-02
 
----
+## Progress Summary
 
-## 1. Progress Summary
+### Tasks Completed
 
-### Tasks Completed This Session
+1. **Implemented git safety guard command** - New `terraphim-agent guard` subcommand that blocks destructive git/filesystem commands using regex pattern matching with allowlist support
 
-| Task | Status | Details |
-|------|--------|---------|
-| Fix Tauri desktop builds | Complete | Removed Ubuntu 24.04, added webkit fallback, frontend build step |
-| Fix cross-compilation | Complete | Added `--no-default-features --features memory,dashmap` for musl/ARM |
-| PR Triage | Complete | 13 merged, 11 closed, 3 deferred, 4 remaining |
-| MCP Auth Design Plan | Complete | `.docs/plans/mcp-authentication-design.md`, Issue #388 |
-| KG Linter Design Plan | Complete | `.docs/plans/kg-schema-linter-design.md`, Issue #389 |
+2. **Created PreToolUse hook** - `.claude/hooks/git_safety_guard.sh` integrates with Claude Code to block dangerous commands before execution
 
-### Commits Pushed to Main
+3. **Updated hook infrastructure** - Modified `scripts/install-terraphim-hooks.sh` to include the new guard hook and updated `.claude/settings.local.json`
 
-```
-78fc01c1 docs: add design plans for MCP auth and KG linter
-90a22f75 refactor: remove unused petgraph dependency from agent crates
-70a344df fix(ci): fix Tauri desktop builds and cross-compilation
-086aefa6 fix(ci): use binary name pattern instead of executable flag for release
-bf8551f2 fix(ci): allow signing jobs to run when cross-builds fail
-```
+4. **Created skill documentation** - Added `git-safety-guard` skill to terraphim-claude-skills repository
+
+5. **Architect review** - Evaluated whether guard could use existing infrastructure (CommandValidator, DangerousPatternHook, knowledge graph). Conclusion: Keep current regex implementation, future refactor to terraphim_hooks crate
+
+6. **Design plan** - Created `docs/designs/dangerous-pattern-hook-unification.md` for future consolidation of guard patterns with DangerousPatternHook
+
+### Current Implementation State
+
+- Commit: `dbd0d7a5` - feat(agent): add git safety guard to block destructive commands
+- Branch: main
+- All tests passing
+- Hook configured and working
 
 ### What's Working
 
-| Component | Status |
-|-----------|--------|
-| macOS binary builds (x86_64, aarch64) | Working |
-| Universal binary creation via `lipo` | Working |
-| Code signing and notarization (1Password) | Working |
-| Release creation with all assets | Working |
-| Debian package builds | Working |
-| Linux x86_64 builds | Working |
-| Cross-compilation (musl/ARM) with feature flags | Fixed |
+- `terraphim-agent guard` command blocks: git checkout --, git reset --hard, rm -rf (non-temp), git push --force, git stash drop/clear, git branch -D
+- `terraphim-agent guard` allows: git checkout -b, git restore --staged, rm -rf /tmp/, git push --force-with-lease
+- PreToolUse hook integration with Claude Code
+- Fail-open semantics (if agent not found, commands pass through)
+- JSON output for programmatic use
 
-### What's Blocked / Remaining
+### What's Blocked/Pending
 
-| Issue | Status | Notes |
-|-------|--------|-------|
-| PR #329 | CI failing | task_decomposition tests, 6 weeks old |
-| PR #374 | Needs review | v1.3.0 release readiness |
-| PR #381 | Needs review | DevOps/CI-CD role config |
-| PR #383 | CI failing | KG validation workflows, Clippy errors |
+- **terraphim-claude-skills commit** - Skill created but not committed to that repo
+- **DangerousPatternHook unification** - Design plan created, implementation deferred (Phase 2)
+- **Pattern loading from config** - Future feature, not implemented yet
 
----
-
-## 2. Technical Context
-
-### Recent Commits (Main Branch)
-
-```
-78fc01c1 docs: add design plans for MCP auth and KG linter
-90a22f75 refactor: remove unused petgraph dependency from agent crates
-7a0f0800 Merge pull request #362 from terraphim/dependabot/cargo/crossterm-0.29.0
-998ebb05 Merge pull request #379 from terraphim/dependabot/docker/docker/rust-1.92.0-slim
-181bca5c Merge pull request #373 from terraphim/dependabot/npm_and_yarn/desktop/types/node-24.10.2
-```
-
-### Key Files Modified
-
-- `.github/workflows/release-comprehensive.yml` - Tauri and cross-compilation fixes
-- `.docs/plans/mcp-authentication-design.md` - MCP security design (NEW)
-- `.docs/plans/kg-schema-linter-design.md` - KG linter design (NEW)
-
-### PR Status Summary
-
-| Category | PRs |
-|----------|-----|
-| **Merged (13)** | #359, #360, #361, #362, #363, #365, #366, #367, #370, #371, #372, #373, #379 |
-| **Closed (11)** | #264, #268, #287, #291, #294, #295, #296, #313, #320, #369, #387 |
-| **Deferred (3)** | #364 (petgraph 0.8), #368 (axum-extra), #380 (debian 13) |
-| **Remaining (4)** | #329, #374, #381, #383 |
-
----
-
-## 3. Next Steps
-
-### Priority 1: Fix Remaining PRs
-
-1. **PR #383** (KG validation workflows)
-   - Has Clippy/compilation errors
-   - Valuable feature, recent (2 days old)
-   - Fix CI errors then merge
-
-2. **PR #374** (v1.3.0 Release Readiness)
-   - Documentation improvements
-   - Review and merge if no conflicts
-
-3. **PR #381** (DevOps/CI-CD role)
-   - Large PR (82 files)
-   - Review for conflicts with recent CI changes
-
-4. **PR #329** (task_decomposition tests)
-   - 6 weeks old, 100 files
-   - May need rebase or close
-
-### Priority 2: Implement Design Plans
-
-1. **MCP Authentication** (Issue #388)
-   - 7-day implementation timeline
-   - See `.docs/plans/mcp-authentication-design.md`
-
-2. **KG Schema Linter** (Issue #389)
-   - 4-day implementation timeline
-   - See `.docs/plans/kg-schema-linter-design.md`
-
-### Priority 3: Deferred Dependabot PRs
-
-Review when time permits:
-- #364 - petgraph 0.6->0.8 (breaking changes likely)
-- #368 - axum-extra 0.10->0.12
-- #380 - debian 12->13 (major version)
-
----
-
-## 4. Design Plans Created
-
-### MCP Authentication (`.docs/plans/mcp-authentication-design.md`)
-
-- **Purpose**: Add authentication to MCP HTTP/SSE transport
-- **Features**: Bearer tokens, rate limiting, security logging
-- **Timeline**: 7 days
-- **Issue**: #388
-
-### KG Schema Linter (`.docs/plans/kg-schema-linter-design.md`)
-
-- **Purpose**: Validate KG markdown schemas
-- **Features**: CLI tool, JSON output, CI integration
-- **Timeline**: 4 days
-- **Issue**: #389
-
----
-
-## 5. CI/CD Fixes Applied
-
-### Tauri Desktop Builds
-
-```yaml
-# Removed Ubuntu 24.04 (GTK 4.0/4.1 incompatibility)
-# Added webkit fallback:
-sudo apt-get install -yqq libwebkit2gtk-4.1-dev 2>/dev/null || \
-sudo apt-get install -yqq libwebkit2gtk-4.0-dev
-
-# Added frontend build step before Tauri:
-- name: Build frontend assets
-  run: yarn build
-```
-
-### Cross-Compilation
-
-```yaml
-# Added feature flags to avoid sqlite C compilation:
-${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
-```
-
----
-
-## 6. Monitoring Commands
+## Technical Context
 
 ```bash
-# Check open PRs
-gh pr list --state open
+# Current branch
+main
 
-# Watch workflow
-gh run watch <run_id>
+# Recent commits
+dbd0d7a5 feat(agent): add git safety guard to block destructive commands
+eebd8ee8 fix(ci): convert Uint8Array to Buffer for Bun compatibility
+1cb4559c fix(ci): make tests optional and fix universal binary job
+b8caecec fix(docker): use Rust 1.92 for edition2024 support
+4fb03372 fix(ci): use custom Docker image for aarch64 NAPI builds
 
-# Check release assets
-gh release view <tag> --json assets
-
-# View design plans
-cat .docs/plans/mcp-authentication-design.md
-cat .docs/plans/kg-schema-linter-design.md
+# Modified files (uncommitted)
+.docs/plans/pr-381-github-runner-integration-design.md
+.opencode/
+.playwright-mcp/*.png
+MIGRATION_PLAN_ZOLA_TO_MDBOOK.md
+droid_configuration.md
 ```
 
----
+## Key Discoveries
 
-## 7. Session Statistics
+### 1. Rust regex crate doesn't support look-ahead
+- Pattern `(?!-with-lease)` fails to compile
+- Solution: Use allowlist to handle safe variants instead of negative look-ahead
 
-| Metric | Count |
-|--------|-------|
-| PRs Merged | 13 |
-| PRs Closed | 11 |
-| PRs Deferred | 3 |
-| PRs Remaining | 4 |
-| Commits Pushed | 5 |
-| Design Plans Created | 2 |
-| GitHub Issues Created | 2 |
+### 2. TuiService initialization is expensive
+- Guard command doesn't need TuiService but all commands went through it
+- Solution: Handle stateless commands (guard) before TuiService initialization
 
----
+### 3. Claude Code hook output format
+- Must output JSON with `hookSpecificOutput.permissionDecision: "deny"` to block
+- Empty output = allow command
+- Always exit 0 (non-zero exits are treated as hook failures)
 
-**Handover complete. Main branch is stable with CI fixes applied.**
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `crates/terraphim_agent/src/guard_patterns.rs` | NEW - Pattern matching with allowlist |
+| `crates/terraphim_agent/src/main.rs` | MODIFIED - Added guard subcommand |
+| `.claude/hooks/git_safety_guard.sh` | NEW - PreToolUse hook script |
+| `.claude/settings.local.json` | MODIFIED - Added hook config |
+| `scripts/install-terraphim-hooks.sh` | MODIFIED - Include guard in install |
+| `docs/designs/dangerous-pattern-hook-unification.md` | NEW - Future refactor plan |
+
+## Next Steps
+
+### Priority 1: Commit to terraphim-claude-skills
+```bash
+cd /Users/alex/projects/terraphim/terraphim-claude-skills
+git add skills/git-safety-guard/
+git commit -m "feat: add git-safety-guard skill"
+git push
+```
+
+### Priority 2: Test in production Claude Code session
+- Restart Claude Code to load new hooks
+- Verify blocked commands show proper error message
+- Verify allowed commands pass through
+
+### Priority 3 (Future): DangerousPatternHook unification
+- Follow design plan in `docs/designs/dangerous-pattern-hook-unification.md`
+- Move PatternGuard to terraphim_hooks crate
+- Update both terraphim_agent and terraphim_multi_agent
+
+## Architecture Notes
+
+```
+Current:
+  terraphim_agent/guard_patterns.rs
+       |
+       v
+  .claude/hooks/git_safety_guard.sh
+       |
+       v
+  Claude Code PreToolUse
+
+Future (per design plan):
+  terraphim_hooks/guard.rs (shared)
+       /              \
+      v                v
+  terraphim_agent   terraphim_multi_agent
+  (CLI guard)       (DangerousPatternHook)
+```
+
+## Commands Reference
+
+```bash
+# Test guard command
+echo "git checkout -- file.txt" | terraphim-agent guard --json
+
+# Test hook directly
+echo '{"tool_name":"Bash","tool_input":{"command":"git reset --hard"}}' | \
+  .claude/hooks/git_safety_guard.sh
+
+# Run unit tests
+cargo test -p terraphim_agent guard_patterns
+
+# Install all hooks
+./scripts/install-terraphim-hooks.sh --easy-mode
+```
+
+## Background
+
+On December 17, 2025, an AI agent ran `git checkout --` on files containing hours of uncommitted work from another agent (Codex). This destroyed the work instantly. The files were recovered from a dangling Git object, but this incident revealed that instructions alone (AGENTS.md) don't prevent execution of destructive commands. This guard provides mechanical enforcement.
