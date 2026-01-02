@@ -140,7 +140,7 @@ if [ "$INSTALL_CLAUDE" = true ]; then
     mkdir -p "$PROJECT_DIR/.claude/hooks"
 
     # Make all Claude hooks executable
-    for hook in npm_to_bun_guard.sh pre-llm-validate.sh post-llm-check.sh; do
+    for hook in git_safety_guard.sh npm_to_bun_guard.sh pre-llm-validate.sh post-llm-check.sh; do
         if [ -f "$PROJECT_DIR/.claude/hooks/$hook" ]; then
             chmod +x "$PROJECT_DIR/.claude/hooks/$hook"
             print_status "SUCCESS" "$hook ready"
@@ -186,24 +186,28 @@ if [ "$INSTALL_GIT" = true ]; then
 fi
 if [ "$INSTALL_CLAUDE" = true ]; then
     echo "  - Claude PreToolUse hooks:"
-    echo "    • npm_to_bun_guard.sh (npm/yarn/pnpm → bun replacement)"
-    echo "    • pre-llm-validate.sh (semantic coherence validation)"
+    echo "    - git_safety_guard.sh (blocks git checkout --, rm -rf, etc.)"
+    echo "    - npm_to_bun_guard.sh (npm/yarn/pnpm to bun replacement)"
+    echo "    - pre-llm-validate.sh (semantic coherence validation)"
     echo "  - Claude PostToolUse hooks:"
-    echo "    • post-llm-check.sh (checklist validation)"
+    echo "    - post-llm-check.sh (checklist validation)"
 fi
 echo ""
 echo "New CLI commands available:"
+echo "  terraphim-agent guard 'git checkout -- file.txt'  # Check for dangerous commands"
 echo "  terraphim-agent validate --connectivity 'text'"
 echo "  terraphim-agent validate --checklist code_review 'text'"
 echo "  terraphim-agent suggest --fuzzy 'typo' --threshold 0.7"
 echo "  terraphim-agent hook --hook-type pre-tool-use --input '\$JSON'"
 echo ""
-echo "Skills available:"
-echo "  skills/pre-llm-validate/"
-echo "  skills/post-llm-check/"
-echo "  skills/smart-commit/"
+echo "Skills available (in terraphim-claude-skills):"
+echo "  skills/git-safety-guard/  # Block destructive commands"
+echo "  skills/terraphim-hooks/   # Knowledge graph replacement"
+echo "  skills/pre-llm-validate/  # Semantic validation"
+echo "  skills/post-llm-check/    # Checklist validation"
 echo ""
 echo "To test:"
+echo "  echo 'git checkout -- file.txt' | terraphim-agent guard --json"
 echo "  echo 'npm install' | terraphim-agent replace"
 echo "  terraphim-agent validate --connectivity 'haystack service automata'"
 echo "  terraphim-agent suggest 'terraphm'"
