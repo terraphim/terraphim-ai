@@ -3440,3 +3440,227 @@ sign-and-notarize:
 | Design Plans Created | 2 |
 | GitHub Issues Created | 2 |
 | CI Fixes Applied | 4 |
+
+---
+
+## CI/CD Release Workflow Debugging
+
+### Date: 2026-01-01 - v1.3.0 Release Fixes
+
+#### Lesson 1: Verify Which Workflow File Is Actually Running
+
+**Context**: Fixed cross-compilation feature flags in `release.yml` but builds kept failing with the same error.
+
+**Discovery**: The project has multiple release workflows:
+- `release.yml`
+- `release-comprehensive.yml` (name: "Comprehensive Release")
+- `release-minimal.yml`
+
+The tag trigger was using `release-comprehensive.yml`, not `release.yml`.
+
+**How to Check**:
+```bash
+# Find which workflow is running
+gh run view <run_id> --json workflowName
+
+# Find workflow file by name
+grep -l "name: Comprehensive Release" .github/workflows/*.yml
+```
+
+**Lesson**: Always verify the workflow name matches the file you're editing. Use `gh run view --json workflowName` to confirm.
+
+#### Lesson 2: Cargo Features Don't Propagate to Dependencies
+
+**Context**: Cross-compilation using `--no-default-features --features memory,dashmap` on `terraphim_agent`.
+
+**Problem**: Error "the package 'terraphim_agent' does not contain these features: dashmap, memory"
+
+**Root Cause**: `dashmap` and `memory` are features of `terraphim_persistence`, a dependency of `terraphim_agent`. Cargo cannot pass features to transitive dependencies this way.
+
+**Solution**: Either:
+1. Don't pass feature flags to packages that don't define them
+2. Use workspace-level feature propagation if needed
+3. For cross-compilation, use the default features (cross images typically have required libs)
+
+**Anti-pattern**:
+```yaml
+# BAD: Features don't exist on terraphim_agent
+cross build -p terraphim_agent --no-default-features --features memory,dashmap
+
+# GOOD: Use default features or define features on the target package
+cross build -p terraphim_agent
+```
+
+#### Lesson 3: GitHub Actions Workflow Caching on Tags
+
+**Context**: Deleted and recreated v1.3.0 tag with fixed workflow, but CI ran the old workflow commands.
+
+**Discovery**: When a tag is pushed, GitHub Actions reads the workflow file at that moment. If you:
+1. Push tag pointing to commit A
+2. Force-push tag to commit B
+The workflow may use the workflow file from commit A but checkout commit B.
+
+**Symptoms**:
+- `headSha` shows correct commit
+- `HEAD is now at <correct-sha>` in checkout logs
+- But workflow commands contain old code
+
+**Solution**:
+```bash
+# Delete tag completely
+git tag -d v1.3.0
+git push origin :refs/tags/v1.3.0
+
+# Push the fixed main branch
+git push origin main
+
+# Wait a moment for GitHub to process
+sleep 5
+
+# Create fresh tag
+git tag v1.3.0
+git push origin v1.3.0
+```
+
+#### Lesson 4: rustls vs native-tls for Cross-Compilation
+
+**Context**: Cross-builds failing with "Could not find directory of OpenSSL installation"
+
+**Problem**: `reqwest` with default features uses `native-tls` which requires OpenSSL development libraries, which aren't always available in cross-compilation containers.
+
+**Solution**: Use `rustls-tls` feature instead:
+```toml
+# Cargo.toml
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# For self_update crate
+self_update = { version = "0.42", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
+```
+
+**Affected Crates in This Project**:
+- haystack_grepapp, haystack_discourse, haystack_atlassian, haystack_jmap
+- terraphim_automata, terraphim_github_runner, terraphim_github_runner_server
+- terraphim_multi_agent, terraphim_update
+
+#### Lesson 5: Integration Tests Need Correct Working Directory
+
+**Context**: `terraphim_agent` extract tests failing with "Failed to build thesaurus from local KG"
+
+**Problem**: Tests run `cargo run` commands that need access to `docs/src/kg/` which is a relative path from workspace root.
+
+**Solution**: Set working directory explicitly in test helper:
+```rust
+fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
+    let workspace_root = get_workspace_root();
+    let mut cmd = Command::new("cargo");
+    cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
+        .args(args)
+        .current_dir(&workspace_root);  // Critical!
+    cmd.output()
+}
+
+fn get_workspace_root() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    manifest_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or(manifest_dir)
+}
+```
+
+**Lesson**: When integration tests spawn processes that use relative paths, always set `current_dir` to the expected working directory.
+
+## Git Safety Guard Implementation - 2026-01-02
+
+### Pattern 1: Rust regex Crate Doesn't Support Look-ahead
+
+**Context**: Implementing pattern matching to block `git push --force` but allow `git push --force-with-lease`
+
+**Problem**: Initial pattern `git\s+push\s+.*--force(?!-with-lease)` failed with:
+```
+regex parse error: look-around, including look-ahead and look-behind, is not supported
+```
+
+**Solution**: Use allowlist patterns instead of negative look-ahead:
+```rust
+// Blocklist pattern (matches all --force)
+DestructivePattern::new(r"git\s+push\s+.*--force", "Force push can destroy remote history")
+
+// Allowlist pattern (checked FIRST)
+SafePattern::new(r"git\s+push\s+.*--force-with-lease")
+
+// Check order: allowlist first, then blocklist
+fn check(&self, command: &str) -> GuardResult {
+    if self.is_safe(command) { return GuardResult::allow(); }
+    for pattern in &self.blocklist { /* ... */ }
+}
+```
+
+**When to Apply**: Any regex-based filtering where you need "match X but not Y" semantics in Rust
+
+### Pattern 2: Handle Stateless Commands Before Expensive Initialization
+
+**Context**: `terraphim-agent guard` command was slow because it initialized TuiService (knowledge graphs, config, persistence)
+
+**Problem**: All commands went through `run_offline_command()` which called `TuiService::new().await?` at the top, even for commands that don't need it
+
+**Solution**: Check for stateless commands at the start of the function:
+```rust
+async fn run_offline_command(command: Command) -> Result<()> {
+    // Handle stateless commands FIRST
+    if let Command::Guard { command, json, fail_open } = &command {
+        let guard = guard_patterns::CommandGuard::new();
+        let result = guard.check(&input_command);
+        return Ok(());
+    }
+
+    // Expensive initialization only for commands that need it
+    let service = TuiService::new().await?;
+    match command { /* ... */ }
+}
+```
+
+**Performance Impact**: Guard command now executes in milliseconds instead of seconds
+
+### Pattern 3: Claude Code Hook Output Format
+
+**Context**: Creating PreToolUse hook to block dangerous commands
+
+**Problem**: Initial approach of returning non-zero exit codes for blocked commands didn't work - Claude Code treats non-zero exits as hook failures, not blocks
+
+**Solution**: Always exit 0, use JSON output structure to signal block:
+- Empty output = allow command to proceed
+- JSON with `hookSpecificOutput.permissionDecision: "deny"` = block command
+- Non-zero exit = hook failure (logged, command may still proceed)
+
+**Key Insight**: The hook system distinguishes between "hook says no" (JSON deny) vs "hook is broken" (non-zero exit)
+
+### Pattern 4: Architect Review Before Building New Infrastructure
+
+**Context**: Needed to decide whether to build new guard_patterns.rs or extend existing DangerousPatternHook
+
+**Problem**: Multiple existing components could potentially handle guard functionality
+
+**Evaluation Results**:
+1. CommandValidator - No: Only string contains/starts_with, not regex
+2. DangerousPatternHook - Partial: Could extend but needs allowlist support added
+3. Knowledge graph - No: Aho-Corasick matches literals only, not regex patterns
+
+**Decision**: New implementation now, documented design plan for future consolidation to terraphim_hooks crate
+
+**When to Apply**: Before building new infrastructure, use architect agent to evaluate existing options formally
+
+### Pattern 5: Fail-Open Semantics for Safety Hooks
+
+**Context**: Guard hook needs to work even when terraphim-agent isn't installed
+
+**Decision**: Fail-open - if hook fails for any reason (agent not found, parse error, etc.), allow command to proceed
+
+**Rationale**:
+- Fail-closed would break all Bash commands if hook has any bug
+- Guard is a safety net for accidents, not a security boundary
+- Real defense is still documentation in AGENTS.md
+- Prevents accidental destructive commands while maintaining usability
+
+**Trade-off**: Sophisticated bypass possible, but protects against honest mistakes
