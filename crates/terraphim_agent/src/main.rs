@@ -18,6 +18,7 @@ use ratatui::{
 use tokio::runtime::Runtime;
 
 mod client;
+mod guard_patterns;
 mod service;
 
 // Robot mode and forgiving CLI - always available
@@ -226,6 +227,17 @@ enum Command {
         #[arg(long, default_value_t = true)]
         json: bool,
     },
+    /// Check command against safety guard patterns (blocks destructive git/fs commands)
+    Guard {
+        /// Command to check (reads from stdin if not provided)
+        command: Option<String>,
+        /// Output as JSON
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Suppress errors and pass through unchanged on failure
+        #[arg(long, default_value_t = false)]
+        fail_open: bool,
+    },
     Interactive,
 
     /// Start REPL (Read-Eval-Print-Loop) interface
@@ -307,6 +319,40 @@ async fn run_tui_with_service(_service: TuiService, transparent: bool) -> Result
 }
 
 async fn run_offline_command(command: Command) -> Result<()> {
+    // Handle stateless commands that don't need TuiService first
+    if let Command::Guard {
+        command,
+        json,
+        fail_open,
+    } = &command
+    {
+        let input_command = match command {
+            Some(c) => c.clone(),
+            None => {
+                use std::io::Read;
+                let mut buffer = String::new();
+                std::io::stdin().read_to_string(&mut buffer)?;
+                buffer.trim().to_string()
+            }
+        };
+
+        let guard = guard_patterns::CommandGuard::new();
+        let result = guard.check(&input_command);
+
+        if *json {
+            println!("{}", serde_json::to_string(&result)?);
+        } else if result.decision == "block" {
+            if let Some(reason) = &result.reason {
+                eprintln!("BLOCKED: {}", reason);
+                if !fail_open {
+                    std::process::exit(1);
+                }
+            }
+        }
+        // If allowed, no output in non-JSON mode (silent success)
+        return Ok(());
+    }
+
     let service = TuiService::new().await?;
 
     match command {
@@ -776,28 +822,32 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
+        Command::Guard { .. } => {
+            // Handled above before TuiService initialization
+            unreachable!("Guard command should be handled before TuiService initialization")
+        }
         Command::CheckUpdate => {
-            println!("🔍 Checking for terraphim-agent updates...");
+            println!("Checking for terraphim-agent updates...");
             match check_for_updates("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
                 }
                 Err(e) => {
-                    eprintln!("❌ Failed to check for updates: {}", e);
+                    eprintln!("Failed to check for updates: {}", e);
                     std::process::exit(1);
                 }
             }
         }
         Command::Update => {
-            println!("🚀 Updating terraphim-agent...");
+            println!("Updating terraphim-agent...");
             match update_binary("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
                 }
                 Err(e) => {
-                    eprintln!("❌ Update failed: {}", e);
+                    eprintln!("Update failed: {}", e);
                     std::process::exit(1);
                 }
             }
@@ -1095,6 +1145,38 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             });
             println!("{}", serde_json::to_string(&err)?);
             std::process::exit(1);
+        }
+        Command::Guard {
+            command,
+            json,
+            fail_open,
+        } => {
+            // Guard works the same in server mode - no server needed for pattern matching
+            let input_command = match command {
+                Some(c) => c,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer.trim().to_string()
+                }
+            };
+
+            let guard = guard_patterns::CommandGuard::new();
+            let result = guard.check(&input_command);
+
+            if json {
+                println!("{}", serde_json::to_string(&result)?);
+            } else if result.decision == "block" {
+                if let Some(reason) = &result.reason {
+                    eprintln!("BLOCKED: {}", reason);
+                    if !fail_open {
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            Ok(())
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
