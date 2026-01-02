@@ -92,20 +92,20 @@ jobs:
             target: aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
-            docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
+            use_docker: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
-        if: ${{ !matrix.settings.docker }}
+        if: ${{ !matrix.settings.use_docker }}
         with:
           node-version: '20'
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        if: ${{ !matrix.settings.docker }}
+        if: ${{ !matrix.settings.use_docker }}
         with:
           toolchain: stable
           targets: ${{ matrix.settings.target }}
@@ -122,19 +122,28 @@ jobs:
           key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
 
       - name: Install dependencies
+        if: ${{ !matrix.settings.use_docker }}
         run: yarn install --frozen-lockfile
 
+      - name: Build custom Docker image for aarch64
+        if: ${{ matrix.settings.use_docker }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker build -t terraphim-napi-aarch64:latest -f docker/Dockerfile.napi-aarch64 .
+
       - name: Build in docker
-        uses: addnab/docker-run-action@v3
-        if: ${{ matrix.settings.docker }}
-        with:
-          image: ${{ matrix.settings.docker }}
-          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build/terraphim_ai_nodejs'
-          run: yarn build --target ${{ matrix.settings.target }}
+        if: ${{ matrix.settings.use_docker }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/build \
+            -w /build/terraphim_ai_nodejs \
+            terraphim-napi-aarch64:latest \
+            bash -c "yarn install --frozen-lockfile && yarn build --target ${{ matrix.settings.target }}"
 
       - name: Build
         run: yarn build --target ${{ matrix.settings.target }}
-        if: ${{ !matrix.settings.docker }}
+        if: ${{ !matrix.settings.use_docker }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
