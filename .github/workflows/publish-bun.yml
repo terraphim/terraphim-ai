@@ -448,18 +448,20 @@ jobs:
           echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG ($REGISTRY)"
 
       - name: Publish to npm (works with Bun)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            echo "🧪 Dry run mode - checking package only"
+            echo "Dry run mode - checking package only"
             npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }}
           else
-            echo "🚀 Publishing @terraphim/autocomplete to npm (Bun-compatible)"
+            echo "Publishing @terraphim/autocomplete to npm (Bun-compatible)"
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
-            # Publish with appropriate tag
+            # Publish with appropriate tag (GITHUB_TOKEN needed for napi prepublish)
             npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }}
 
-            echo "✅ Package published successfully! (Bun users can install with: bun add @terraphim/autocomplete)"
+            echo "Package published successfully! (Bun users can install with: bun add @terraphim/autocomplete)"
           fi
 
       - name: Verify package for Bun users
