@@ -381,6 +381,9 @@ jobs:
         with:
           path: ${{ github.workspace }}/artifacts
 
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
       - name: Prepare package for Bun publishing
         run: |
           # Copy all built binaries to package directory
@@ -390,10 +393,10 @@ jobs:
           echo "Built binaries for Bun:"
           ls -la *.node || echo "No .node files found"
 
-          # Update package.json version if provided
+          # Update package.json version if provided (skip npm scripts)
           if [[ "${{ inputs.version }}" != "" ]]; then
             echo "Updating version to ${{ inputs.version }}"
-            npm version ${{ inputs.version }} --no-git-tag-version
+            npm version ${{ inputs.version }} --no-git-tag-version --ignore-scripts
           fi
 
       - name: Configure package managers
