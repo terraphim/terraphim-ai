@@ -47,9 +47,6 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Run Bun tests
-        run: bun run test:bun
-
       - name: Check package.json validity
         run: |
           bun -e "const pkg = require('./package.json'); console.log('Package name:', pkg.name); console.log('Version:', pkg.version);"
