@@ -343,7 +343,7 @@ jobs:
 
   publish-to-bun:
     name: Publish to Bun Registry
-    runs-on: [self-hosted, Linux, terraphim, production, docker]
+    runs-on: [self-hosted, Linux]
     needs: build
     # Run after builds complete (tests and universal are optional)
     if: always() && needs.build.result == 'success'
