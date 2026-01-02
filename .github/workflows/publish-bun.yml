@@ -20,8 +20,7 @@ on:
   push:
     tags:
       - 'bun-v*'
-  release:
-    types: [published]
+  # Note: Removed 'release: [published]' trigger - use explicit bun-v* tags or workflow_dispatch
 
 permissions:
   contents: write
@@ -32,6 +31,9 @@ jobs:
   validate:
     name: Validate Package for Bun
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -42,10 +44,10 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Run Bun tests
-        run: bun test:all
+        run: bun run test:bun
 
       - name: Check package.json validity
         run: |
@@ -56,7 +58,7 @@ jobs:
           # Test that the package works correctly with Bun
           bun -e "
           const pkg = require('./package.json');
-          console.log('✅ Package loaded successfully with Bun');
+          console.log('Package loaded successfully with Bun');
           console.log('Bun metadata:', pkg.bun);
           "
 
@@ -75,26 +77,24 @@ jobs:
     name: Build Multi-Platform Binaries for Bun
     runs-on: ${{ matrix.settings.host }}
     needs: validate
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     strategy:
       fail-fast: false
       matrix:
         settings:
           - host: macos-latest
             target: x86_64-apple-darwin
-            build: yarn build --target x86_64-apple-darwin
           - host: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            build: yarn build --target x86_64-unknown-linux-gnu
           - host: windows-latest
             target: x86_64-pc-windows-msvc
-            build: yarn build --target x86_64-pc-windows-msvc
           - host: macos-latest
             target: aarch64-apple-darwin
-            build: yarn build --target aarch64-apple-darwin
           - host: ubuntu-latest
             target: aarch64-unknown-linux-gnu
             docker: ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64
-            build: yarn build --target aarch64-unknown-linux-gnu
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -104,7 +104,6 @@ jobs:
         if: ${{ !matrix.settings.docker }}
         with:
           node-version: '20'
-          cache: 'yarn'
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -132,24 +131,27 @@ jobs:
         if: ${{ matrix.settings.docker }}
         with:
           image: ${{ matrix.settings.docker }}
-          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build'
-          run: ${{ matrix.settings.build }}
+          options: '--user 0:0 -v ${{ github.workspace }}/.cargo-cache/git/db:/usr/local/cargo/git/db -v ${{ github.workspace }}/.cargo/registry/cache:/usr/local/cargo/registry/cache -v ${{ github.workspace }}/.cargo/registry/index:/usr/local/cargo/registry/index -v ${{ github.workspace }}:/build -w /build/terraphim_ai_nodejs'
+          run: yarn build --target ${{ matrix.settings.target }}
 
       - name: Build
-        run: ${{ matrix.settings.build }}
+        run: yarn build --target ${{ matrix.settings.target }}
         if: ${{ !matrix.settings.docker }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v5
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: "*.node"
+          path: terraphim_ai_nodejs/*.node
           if-no-files-found: error
 
   test-bun-compatibility:
     name: Test Bun Compatibility
     runs-on: ${{ matrix.settings.os }}
     needs: build
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     strategy:
       fail-fast: false
       matrix:
@@ -174,13 +176,13 @@ jobs:
           bun-version: ${{ matrix.bun }}
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
           name: bindings-${{ matrix.settings.target }}
-          path: .
+          path: terraphim_ai_nodejs
 
       - name: Test package functionality with Bun
         run: |
@@ -267,6 +269,9 @@ jobs:
     name: Create Universal macOS Binary for Bun
     runs-on: macos-latest
     needs: build
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -275,23 +280,23 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
 
       - name: Download macOS x64 artifact
         uses: actions/download-artifact@v4
         with:
           name: bindings-x86_64-apple-darwin
-          path: artifacts
+          path: ${{ github.workspace }}/artifacts
 
       - name: Download macOS arm64 artifact
         uses: actions/download-artifact@v4
         with:
           name: bindings-aarch64-apple-darwin
-          path: artifacts
+          path: ${{ github.workspace }}/artifacts
 
       - name: Create universal binary
+        working-directory: ${{ github.workspace }}/artifacts
         run: |
-          cd artifacts
           lipo -create terraphim_ai_nodejs.x86_64-apple-darwin.node terraphim_ai_nodejs.aarch64-apple-darwin.node -output terraphim_ai_nodejs.darwin-universal.node
           ls -la *.node
 
@@ -299,7 +304,7 @@ jobs:
         uses: actions/upload-artifact@v5
         with:
           name: bindings-universal-apple-darwin
-          path: artifacts/terraphim_ai_nodejs.darwin-universal.node
+          path: ${{ github.workspace }}/artifacts/terraphim_ai_nodejs.darwin-universal.node
           if-no-files-found: error
 
   publish-to-bun:
@@ -307,6 +312,9 @@ jobs:
     runs-on: [self-hosted, Linux, terraphim, production, docker]
     needs: [test-bun-compatibility, create-universal-macos-bun]
     environment: production
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -315,6 +323,7 @@ jobs:
         uses: oven-sh/setup-bun@v1
 
       - name: Install 1Password CLI
+        working-directory: ${{ github.workspace }}
         run: |
           curl -sSf https://downloads.1password.com/linux/keys/1password.asc | \
             gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
@@ -323,65 +332,52 @@ jobs:
           sudo apt update && sudo apt install op -y
 
       - name: Authenticate with 1Password
+        working-directory: ${{ github.workspace }}
         run: |
           echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
 
       - name: Get Bun token from 1Password
         id: token
+        working-directory: ${{ github.workspace }}
         run: |
           TOKEN=$(op read "op://TerraphimPlatform/bun.token/token" || echo "")
           if [[ -z "$TOKEN" ]]; then
-            echo "⚠️  Bun token not found in 1Password, checking GitHub secrets"
+            echo "Bun token not found in 1Password, checking GitHub secrets"
             TOKEN="${{ secrets.BUN_TOKEN }}"
           fi
 
           if [[ -z "$TOKEN" ]]; then
-            echo "⚠️  Bun token not available, checking npm token for fallback"
+            echo "Bun token not available, checking npm token for fallback"
             TOKEN="${{ secrets.NPM_TOKEN }}"
           fi
 
           if [[ -z "$TOKEN" ]]; then
-            echo "❌ No token available for Bun publishing"
+            echo "No token available for Bun publishing"
             exit 1
           fi
 
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "✅ Bun token retrieved successfully"
+          echo "Bun token retrieved successfully"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
-          path: artifacts
+          path: ${{ github.workspace }}/artifacts
 
       - name: Prepare package for Bun publishing
         run: |
-          # Create bun directory structure
-          mkdir -p bun
-
-          # Copy all built binaries to bun directory
-          find artifacts -name "*.node" -exec cp {} bun/ \;
-
-          # If no binaries found (NAPI build failed), try to find them manually
-          if [ ! -n "$(ls -A bun/)" ]; then
-            echo "⚠️  No NAPI artifacts found, searching for built libraries..."
-            # Look for libraries in target directories
-            find target -name "libterraphim_ai_nodejs.so" -exec cp {} bun/terraphim_ai_nodejs.linux-x64-gnu.node \;
-            find target -name "libterraphim_ai_nodejs.dylib" -exec cp {} bun/terraphim_ai_nodejs.darwin-x64.node \;
-            find target -name "terraphim_ai_nodejs.dll" -exec cp {} bun/terraphim_ai_nodejs.win32-x64-msvc.node \;
-          fi
+          # Copy all built binaries to package directory
+          find ${{ github.workspace }}/artifacts -name "*.node" -exec cp {} . \;
 
           # List what we have
-          echo "📦 Built binaries for Bun:"
-          ls -la bun/
+          echo "Built binaries for Bun:"
+          ls -la *.node || echo "No .node files found"
 
           # Update package.json version if provided
           if [[ "${{ inputs.version }}" != "" ]]; then
-            echo "📝 Updating version to ${{ inputs.version }}"
-            bun pm version ${{ inputs.version }} --no-git-tag-version
+            echo "Updating version to ${{ inputs.version }}"
+            npm version ${{ inputs.version }} --no-git-tag-version
           fi
-
-          # Update package.json for Bun registry
-          sed -i 's/"registry": "https:\/\/registry.npmjs.org\/"/"registry": "https:\/\/registry.npmjs.org\/",\n    "publishConfig": {\n      "registry": "https:\/\/registry.npmjs.org\/"\n    },/' package.json
 
       - name: Configure package managers
         run: |
@@ -396,7 +392,7 @@ jobs:
           fi
 
           # Show current package info
-          echo "📋 Package information:"
+          echo "Package information:"
           npm pack --dry-run | head -20
 
       - name: Determine publishing strategy
