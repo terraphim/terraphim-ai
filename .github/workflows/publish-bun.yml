@@ -450,7 +450,16 @@ jobs:
       - name: Publish to npm (works with Bun)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
+          # Debug: verify token is set (shows first/last 4 chars only)
+          if [[ -n "$NODE_AUTH_TOKEN" ]]; then
+            echo "NODE_AUTH_TOKEN is set: ${NODE_AUTH_TOKEN:0:8}...${NODE_AUTH_TOKEN: -4}"
+          else
+            echo "ERROR: NODE_AUTH_TOKEN is not set!"
+            exit 1
+          fi
+
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             echo "Dry run mode - checking package only"
             npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }}
