@@ -20,7 +20,8 @@ on:
   push:
     tags:
       - 'bun-v*'
-  # Note: Removed 'release: [published]' trigger - use explicit bun-v* tags or workflow_dispatch
+  release:
+    types: [published]
 
 permissions:
   contents: write
