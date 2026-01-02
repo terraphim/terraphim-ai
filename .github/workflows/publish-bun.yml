@@ -193,12 +193,12 @@ jobs:
           cat > test-bun-functionality.js << 'EOF'
           import * as pkg from './index.js';
 
-          console.log('🧪 Testing package functionality with Bun v' + process.versions.bun);
+          console.log('Testing package functionality with Bun v' + process.versions.bun);
           console.log('Available functions:', Object.keys(pkg));
 
           // Test autocomplete functionality
           if (typeof pkg.buildAutocompleteIndexFromJson === 'function') {
-            console.log('✅ buildAutocompleteIndexFromJson available');
+            console.log('buildAutocompleteIndexFromJson available');
 
             const thesaurus = {
               name: "Test",
@@ -212,24 +212,39 @@ jobs:
             };
 
             const indexBytes = pkg.buildAutocompleteIndexFromJson(JSON.stringify(thesaurus));
-            console.log('✅ Autocomplete index built:', indexBytes.length, 'bytes');
+            console.log('Autocomplete index built:', indexBytes.length, 'bytes');
 
-            const results = pkg.autocomplete(indexBytes, "machine", 10);
-            console.log('✅ Autocomplete search results:', results.length, 'items');
+            // Convert to Buffer for Bun compatibility
+            const indexBuffer = Buffer.from(indexBytes);
+            const results = pkg.autocomplete(indexBuffer, "machine", 10);
+            console.log('Autocomplete search results:', results.length, 'items');
           }
 
           // Test knowledge graph functionality
           if (typeof pkg.buildRoleGraphFromJson === 'function') {
-            console.log('✅ buildRoleGraphFromJson available');
+            console.log('buildRoleGraphFromJson available');
+
+            const thesaurus = {
+              name: "Test",
+              data: {
+                "machine learning": {
+                  id: 1,
+                  nterm: "machine learning",
+                  url: "https://example.com/ml"
+                }
+              }
+            };
 
             const graphBytes = pkg.buildRoleGraphFromJson("Test Role", JSON.stringify(thesaurus));
-            console.log('✅ Role graph built:', graphBytes.length, 'bytes');
+            console.log('Role graph built:', graphBytes.length, 'bytes');
 
-            const stats = pkg.getGraphStats(graphBytes);
-            console.log('✅ Graph stats loaded:', stats);
+            // Convert to Buffer for Bun compatibility
+            const graphBuffer = Buffer.from(graphBytes);
+            const stats = pkg.getGraphStats(graphBuffer);
+            console.log('Graph stats loaded:', stats);
           }
 
-          console.log('🎉 All functionality tests passed with Bun!');
+          console.log('All functionality tests passed with Bun!');
           EOF
 
           bun test-bun-functionality.js
@@ -255,11 +270,13 @@ jobs:
           const indexBytes = pkg.buildAutocompleteIndexFromJson(JSON.stringify(thesaurus));
           const buildTime = performance.now() - start;
 
+          // Convert to Buffer for Bun compatibility
+          const indexBuffer = Buffer.from(indexBytes);
           const searchStart = performance.now();
-          const results = pkg.autocomplete(indexBytes, "machine", 10);
+          const results = pkg.autocomplete(indexBuffer, "machine", 10);
           const searchTime = performance.now() - searchStart;
 
-          console.log('📊 Performance Metrics (Bun):');
+          console.log('Performance Metrics (Bun):');
           console.log('  - Index building:', buildTime.toFixed(2), 'ms');
           console.log('  - Search time:', searchTime.toFixed(2), 'ms');
           console.log('  - Results found:', results.length);
