@@ -3664,3 +3664,167 @@ async fn run_offline_command(command: Command) -> Result<()> {
 - Prevents accidental destructive commands while maintaining usability
 
 **Trade-off**: Sophisticated bypass possible, but protects against honest mistakes
+
+---
+
+## Issue #394: Case Preservation and URL Protection in Text Replacement
+
+### Date: 2026-01-03 - Disciplined Development for Knowledge Graph Replacement
+
+### Pattern 1: Separate Storage from Display in Normalized Data Structures
+
+**Context**: Text replacement needed case-insensitive matching but case-preserved output.
+
+**What We Learned**:
+- **Dual-purpose fields create constraints**: Using `NormalizedTermValue` for both matching (lowercase) and display (original case) forces compromises
+- **Optional display field pattern**: Add `display_value: Option<String>` alongside normalized `value`
+- **Fallback semantics**: `display()` method with fallback to `value` ensures backward compatibility
+- **Serialization strategy**: Use `#[serde(default, skip_serializing_if = "Option::is_none")]` for graceful migration
+
+**Implementation**:
+```rust
+// Before: Single field for both purposes
+pub struct NormalizedTerm {
+    pub value: NormalizedTermValue,  // lowercase only
+}
+
+// After: Separate fields with clear purposes
+pub struct NormalizedTerm {
+    pub value: NormalizedTermValue,      // lowercase (for matching)
+    pub display_value: Option<String>,   // original case (for output)
+}
+
+// Accessor with fallback
+pub fn display(&self) -> &str {
+    self.display_value.as_deref().unwrap_or_else(|| self.value.as_str())
+}
+```
+
+**When to Apply**: Any normalized/indexed data structure that needs both case-insensitive lookup and case-preserved display
+
+### Pattern 2: URL Protection via Masking-Replacement-Restoration
+
+**Context**: Text replacement was corrupting URLs by matching text inside them.
+
+**What We Learned**:
+- **Pre-processing beats complex matching**: Mask special contexts before replacement, not during
+- **Regex once, reuse many**: Use `LazyLock` for compiled regex patterns
+- **Placeholder isolation**: Use null bytes (`\x00`) in placeholders to avoid conflicts with normal text
+- **Process order matters**: Markdown links before standalone URLs (nested structures first)
+
+**Implementation Flow**:
+```
+Input: "Visit [Claude](https://claude.ai)"
+  ↓ mask_urls()
+Masked: "Visit [Claude](⌀URL_PLACEHOLDER_0⌀)"
+  ↓ replace_matches()
+Replaced: "Visit [Terraphim](⌀URL_PLACEHOLDER_0⌀)"
+  ↓ restore_urls()
+Output: "Visit [Terraphim](https://claude.ai)"
+```
+
+**Anti-pattern Avoided**: Don't try to add URL awareness to Aho-Corasick - it's optimized for speed, not context
+
+### Pattern 3: Regex Escape Sequences in Character Classes
+
+**Context**: LazyLock regex panicked with "invalid escape sequence" error.
+
+**What We Learned**:
+- **Character class escapes differ**: `\>` is NOT valid in `[...]`, use literal `>` instead
+- **Error messages point to syntax**: "error: invalid escape sequence found in character class"
+- **Valid in class**: `\s`, `\d`, `\w`, `\-` (at start/end)
+- **Invalid in class**: `\>`, `\<`, `\b` (word boundary markers)
+
+**Fix**:
+```rust
+// WRONG: Invalid escape in character class
+Regex::new(r"[^\s\)\]\>]+")  // \> is invalid
+
+// RIGHT: No escape needed for >
+Regex::new(r"[^\s\)\]>]+")   // Plain > works
+```
+
+**When to Apply**: Any regex pattern with character classes, especially when porting from other regex engines
+
+### Pattern 4: Disciplined Development Phases Prevent Scope Creep
+
+**Context**: Issue #394 mentioned three problems: case, URLs, and compound terms.
+
+**What We Learned**:
+- **Research phase surfaces scope decisions**: Identified compound terms as separate concern early
+- **Design phase forces explicit choices**: Documented decision to defer word boundaries to #395
+- **Implementation stays aligned**: No surprise scope additions during coding
+- **Create follow-up issues immediately**: Don't leave deferred work undocumented
+
+**Process**:
+1. Research: Identify all problems + dependencies
+2. Design: Decide what's IN scope vs OUT scope
+3. Create issues for OUT scope items immediately (issue #395)
+4. Implementation: Execute IN scope faithfully
+
+**Result**: Clean commit focused on two specific fixes, third enhancement tracked separately
+
+**When to Apply**: Any bug with multiple symptoms or enhancement requests bundled together
+
+### Pattern 5: Struct Literal Updates After Adding Optional Fields
+
+**Context**: Added `display_value: Option<String>` to widely-used `NormalizedTerm` struct.
+
+**What We Learned**:
+- **Compiler finds all sites**: Use `cargo check --workspace --all-targets --message-format=short` to get file:line locations
+- **Update tests last**: Focus on library code first, tests can temporarily fail
+- **Benchmarks count**: Don't forget `benches/` directory (checked by `--all-targets`)
+- **Optional fields still require initialization**: Rust doesn't auto-fill `None` for struct literals
+
+**Process**:
+```bash
+# Find all struct literals
+grep -r "NormalizedTerm {" crates/
+
+# Build to find missing fields
+cargo check --workspace --all-targets 2>&1 | grep "display_value"
+
+# Fix each occurrence
+# Add: display_value: None,
+```
+
+**When to Apply**: Adding any new field to a widely-used struct, even if optional
+
+### Pattern 6: LazyLock for Thread-Safe Static Regex
+
+**Context**: Need compiled regex accessible from multiple functions/tests without recompilation.
+
+**What We Learned**:
+- **LazyLock is std now**: No external dependency needed (was once_cell)
+- **Poisoning on panic**: If regex compilation panics, LazyLock poisons and all future accesses panic
+- **Test carefully**: Invalid regex patterns poison the static, affecting all tests
+- **Error handling**: Use `.expect()` with clear message for compilation errors
+
+**Implementation**:
+```rust
+use std::sync::LazyLock;
+
+static URL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
+    Regex::new(r"https?://[^\s\)\]>]+")
+        .expect("URL regex should compile")
+});
+
+// Use in function
+fn mask_urls(text: &str) -> Vec<Match> {
+    URL_PATTERN.find_iter(text).collect()
+}
+```
+
+**When to Apply**: Compiled regex patterns, expensive-to-build static data structures
+
+---
+
+### Key Takeaways from This Session
+
+1. **Type design matters**: Separate concerns (matching vs display) at the type level
+2. **Context protection beats complex matching**: Mask special contexts before simple replacement
+3. **Optional fields enable migration**: `Option<T>` with serde defaults allows graceful evolution
+4. **Disciplined phases prevent thrash**: Research → Design → Implementation stays focused
+5. **Create issues for deferred work**: Don't let scope creep, track explicitly
+6. **Regex character classes have different rules**: Invalid escapes poison LazyLock
+7. **WASM verification is critical**: Run `./scripts/build-wasm.sh` before committing changes to automata crate
