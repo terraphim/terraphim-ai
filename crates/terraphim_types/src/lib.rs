@@ -66,11 +66,8 @@
 //! let mut thesaurus = Thesaurus::new("programming".to_string());
 //! thesaurus.insert(
 //!     NormalizedTermValue::from("rust"),
-//!     NormalizedTerm {
-//!         id: 1,
-//!         value: NormalizedTermValue::from("rust programming language"),
-//!         url: Some("https://rust-lang.org".to_string()),
-//!     }
+//!     NormalizedTerm::new(1, NormalizedTermValue::from("rust programming language"))
+//!         .with_url("https://rust-lang.org".to_string())
 //! );
 //! ```
 
@@ -251,25 +248,54 @@ fn get_int_id() -> u64 {
 /// A normalized term is a higher-level term that has been normalized
 ///
 /// It holds a unique identifier to an underlying and the normalized value.
+/// The `display_value` field stores the original case for output purposes.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NormalizedTerm {
     /// Unique identifier for the normalized term
     pub id: u64,
-    /// The normalized value
+    /// The normalized value (lowercase, used for case-insensitive matching)
     // This field is currently called `nterm` in the JSON
     #[serde(rename = "nterm")]
     pub value: NormalizedTermValue,
+    /// The display value with original case preserved (used for replacement output)
+    /// Falls back to `value` if None for backward compatibility
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub display_value: Option<String>,
     /// The URL of the normalized term
     pub url: Option<String>,
 }
 
 impl NormalizedTerm {
+    /// Create a new normalized term with the given id and value.
+    /// The display_value will be None (falls back to value for output).
     pub fn new(id: u64, value: NormalizedTermValue) -> Self {
         Self {
             id,
             value,
+            display_value: None,
             url: None,
         }
+    }
+
+    /// Set the display value (original case for output).
+    /// Use this to preserve the original case from markdown headings.
+    pub fn with_display_value(mut self, display_value: String) -> Self {
+        self.display_value = Some(display_value);
+        self
+    }
+
+    /// Set the URL for this term.
+    pub fn with_url(mut self, url: String) -> Self {
+        self.url = Some(url);
+        self
+    }
+
+    /// Get the display value, falling back to the normalized value if not set.
+    /// This is the value that should be used for replacement output.
+    pub fn display(&self) -> &str {
+        self.display_value
+            .as_deref()
+            .unwrap_or_else(|| self.value.as_str())
     }
 }
 
