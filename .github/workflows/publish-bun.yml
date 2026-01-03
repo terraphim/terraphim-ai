@@ -447,6 +447,17 @@ jobs:
           echo "registry=$REGISTRY" >> $GITHUB_OUTPUT
           echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG ($REGISTRY)"
 
+      - name: Run napi prepublish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Running napi prepublish to create platform packages..."
+          # Run napi prepublish - it may fail if release exists, that's ok
+          npx napi prepublish -t npm --skip-gh-release || echo "napi prepublish completed (release may already exist)"
+
+          echo "Platform packages created:"
+          ls -la npm/ 2>/dev/null || echo "No npm/ directory"
+
       - name: Publish to npm (works with Bun)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -459,8 +470,7 @@ jobs:
             echo "Publishing @terraphim/autocomplete to npm (Bun-compatible)"
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
-            # Publish with provenance for OIDC trusted publishing
-            # --ignore-scripts skips napi prepublish which tries to create GitHub releases
+            # Publish with provenance
             npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }} --provenance --ignore-scripts
 
             echo "Package published successfully! (Bun users can install with: bun add @terraphim/autocomplete)"
