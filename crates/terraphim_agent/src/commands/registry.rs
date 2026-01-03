@@ -552,6 +552,7 @@ impl CommandRegistry {
                 NormalizedTerm {
                     id: command.definition.name.len() as u64,
                     value: term_value.clone(),
+                    display_value: None,
                     url: Some(format!("command:{}", name)),
                 },
             );
@@ -565,6 +566,7 @@ impl CommandRegistry {
                     NormalizedTerm {
                         id: command.definition.name.len() as u64,
                         value: keyword_value,
+                        display_value: None,
                         url: Some(format!("command:{}", name)),
                     },
                 );
@@ -579,6 +581,7 @@ impl CommandRegistry {
                     NormalizedTerm {
                         id: param.name.len() as u64,
                         value: param_value,
+                        display_value: None,
                         url: Some(format!("command:{}:param:{}", name, param.name)),
                     },
                 );
@@ -735,6 +738,7 @@ impl CommandRegistry {
                 NormalizedTerm {
                     id: idx as u64,
                     value: term_value,
+                    display_value: None,
                     url: None,
                 },
             );

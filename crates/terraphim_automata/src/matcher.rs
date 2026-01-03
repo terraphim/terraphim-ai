@@ -1,6 +1,8 @@
 use aho_corasick::{AhoCorasick, MatchKind};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
+use crate::url_protector::UrlProtector;
+
 use crate::{Result, TerraphimAutomataError};
 
 #[derive(Debug, PartialEq, Clone)]
@@ -51,35 +53,47 @@ pub enum LinkType {
     PlainText,
 }
 
-// // This function replacing instead of matching patterns
+/// Replace matches in text using the thesaurus.
+///
+/// Uses `display()` method on `NormalizedTerm` to get the case-preserved
+/// display value for replacement output.
+///
+/// URLs (http, https, mailto, email addresses) are protected from replacement
+/// to prevent corruption of links.
 pub fn replace_matches(text: &str, thesaurus: Thesaurus, link_type: LinkType) -> Result<Vec<u8>> {
+    // Protect URLs from replacement
+    let protector = UrlProtector::new();
+    let (masked_text, protected_urls) = protector.mask_urls(text);
+
     let mut patterns: Vec<String> = Vec::new();
     let mut replace_with: Vec<String> = Vec::new();
     for (key, value) in thesaurus.into_iter() {
+        // Use display() to get case-preserved value for output
+        let display_text = value.display();
         match link_type {
             LinkType::WikiLinks => {
                 patterns.push(key.to_string());
-                replace_with.push(format!("[[{}]]", value.clone().value));
+                replace_with.push(format!("[[{}]]", display_text));
             }
             LinkType::HTMLLinks => {
                 patterns.push(key.to_string());
                 replace_with.push(format!(
                     "<a href=\"{}\">{}</a>",
-                    value.clone().url.unwrap_or_default(),
-                    value.clone().value
+                    value.url.as_deref().unwrap_or_default(),
+                    display_text
                 ));
             }
             LinkType::MarkdownLinks => {
                 patterns.push(key.to_string());
                 replace_with.push(format!(
                     "[{}]({})",
-                    value.clone().value,
-                    value.clone().url.unwrap_or_default()
+                    display_text,
+                    value.url.as_deref().unwrap_or_default()
                 ));
             }
             LinkType::PlainText => {
                 patterns.push(key.to_string());
-                replace_with.push(value.value.to_string());
+                replace_with.push(display_text.to_string());
             }
         }
     }
@@ -88,8 +102,13 @@ pub fn replace_matches(text: &str, thesaurus: Thesaurus, link_type: LinkType) ->
         .ascii_case_insensitive(true)
         .build(patterns)?;
 
-    let result = ac.replace_all_bytes(text.as_bytes(), &replace_with);
-    Ok(result)
+    // Perform replacement on masked text
+    let replaced = ac.replace_all(&masked_text, &replace_with);
+
+    // Restore protected URLs
+    let result = protector.restore_urls(&replaced, &protected_urls);
+
+    Ok(result.into_bytes())
 }
 
 // tests

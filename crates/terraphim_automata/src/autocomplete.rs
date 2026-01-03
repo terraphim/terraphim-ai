@@ -486,6 +486,7 @@ mod tests {
             let normalized_term = NormalizedTerm {
                 id,
                 value: NormalizedTermValue::from(normalized),
+                display_value: None,
                 url: Some(format!(
                     "https://example.com/{}",
                     normalized.replace(' ', "-")
