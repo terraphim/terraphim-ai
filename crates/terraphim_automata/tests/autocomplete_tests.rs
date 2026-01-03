@@ -55,6 +55,7 @@ fn create_test_thesaurus() -> Thesaurus {
         let normalized_term = NormalizedTerm {
             id,
             value: NormalizedTermValue::from(normalized),
+            display_value: None,
             url: Some(format!(
                 "https://example.com/{}",
                 normalized.replace(' ', "-").to_lowercase()
@@ -433,6 +434,7 @@ fn test_autocomplete_performance_characteristics() {
             let normalized_term = NormalizedTerm {
                 id: i as u64 + 1,
                 value: NormalizedTermValue::from(term.clone()),
+                display_value: None,
                 url: Some(format!("https://example.com/{}", term)),
             };
             thesaurus.insert(NormalizedTermValue::from(term), normalized_term);

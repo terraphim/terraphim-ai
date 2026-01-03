@@ -213,6 +213,7 @@ impl TerraphimMatcher {
                 let normalized_term = NormalizedTerm {
                     id: pattern_id,
                     value: NormalizedTermValue::from(tool.name.as_str()),
+                    display_value: None,
                     url: tool.metadata.description.as_ref().map(|d| d.to_string()),
                 };
 
