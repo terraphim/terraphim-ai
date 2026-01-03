@@ -461,7 +461,6 @@ jobs:
       - name: Publish to npm (works with Bun)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
         run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             echo "Dry run mode - checking package only"
@@ -470,7 +469,7 @@ jobs:
             echo "Publishing @terraphim/autocomplete to npm (Bun-compatible)"
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
-            # Publish with provenance
+            # Publish with OIDC provenance (no token needed - trusted publishing)
             npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }} --provenance --ignore-scripts
 
             echo "Package published successfully! (Bun users can install with: bun add @terraphim/autocomplete)"
