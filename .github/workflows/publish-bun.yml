@@ -1,4 +1,4 @@
-name: Publish to Bun Registry
+name: Publish to GitHub Packages (Bun Compatible)
 
 on:
   workflow_dispatch:
@@ -342,7 +342,7 @@ jobs:
           if-no-files-found: error
 
   publish-to-bun:
-    name: Publish to Bun Registry
+    name: Publish to GitHub Packages
     runs-on: [self-hosted, Linux]
     needs: build
     # Run after builds complete (tests and universal are optional)
@@ -362,19 +362,13 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          registry-url: 'https://registry.npmjs.org'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@terraphim'
 
-      - name: Get publish token
-        id: token
+      - name: Verify GitHub token
         run: |
-          # Use NPM_TOKEN from GitHub secrets (works for both npm and Bun)
-          TOKEN="${{ secrets.NPM_TOKEN }}"
-          if [[ -z "$TOKEN" ]]; then
-            echo "No NPM_TOKEN available for publishing"
-            exit 1
-          fi
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "Publish token configured"
+          echo "Using GITHUB_TOKEN for GitHub Packages authentication"
+          echo "Registry: https://npm.pkg.github.com"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -400,16 +394,18 @@ jobs:
           fi
 
       - name: Configure package managers
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Configure npm (primary registry)
-          echo "//registry.npmjs.org/:_authToken=${{ steps.token.outputs.token }}" > ~/.npmrc
-          npm config set provenance true
+          # Configure npm for GitHub Packages
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
+          echo "@terraphim:registry=https://npm.pkg.github.com" >> ~/.npmrc
 
-          # Configure Bun registry (if different token available)
-          if [[ "${{ secrets.BUN_TOKEN }}" != "" && "${{ secrets.BUN_TOKEN }}" != "${{ steps.token.outputs.token }}" ]]; then
-            echo "//registry.npmjs.org/:_authToken=${{ secrets.BUN_TOKEN }}" > ~/.bunfig.toml
-            echo "[install.scopes]\n\"@terraphim\" = \"https://registry.npmjs.org/\"" >> ~/.bunfig.toml
-          fi
+          # Configure Bun registry for GitHub Packages
+          cat > ~/.bunfig.toml << 'EOF'
+          [install.scopes]
+          "@terraphim" = { url = "https://npm.pkg.github.com", token = "$NODE_AUTH_TOKEN" }
+          EOF
 
           # Show current package info
           echo "Package information:"
@@ -458,43 +454,45 @@ jobs:
           echo "Platform packages created:"
           ls -la npm/ 2>/dev/null || echo "No npm/ directory"
 
-      - name: Publish to npm (works with Bun)
+      - name: Publish to GitHub Packages (works with Bun)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
             echo "Dry run mode - checking package only"
-            npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }} --provenance --ignore-scripts
+            npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }} --ignore-scripts
           else
-            echo "Publishing @terraphim/autocomplete to npm (Bun-compatible)"
+            echo "Publishing @terraphim/autocomplete to GitHub Packages"
+            echo "Registry: https://npm.pkg.github.com"
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
-            # Publish with OIDC provenance (no token needed - trusted publishing)
-            npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }} --provenance --ignore-scripts
+            # Publish to GitHub Packages
+            npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }} --ignore-scripts
 
-            echo "Package published successfully! (Bun users can install with: bun add @terraphim/autocomplete)"
+            echo "Package published successfully!"
+            echo "Install with: npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"
+            echo "Or with Bun: bun add @terraphim/autocomplete"
           fi
 
-      - name: Verify package for Bun users
+      - name: Verify package on GitHub Packages
         if: inputs.dry_run != 'true'
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Verifying package for Bun users..."
+          echo "Verifying package on GitHub Packages..."
 
-          # Wait a moment for npm registry to update
-          sleep 30
+          # Wait a moment for registry to update
+          sleep 10
 
           # Check if package is available
           PACKAGE_NAME="@terraphim/autocomplete"
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
-          npm view $PACKAGE_NAME@$PACKAGE_VERSION || echo "⚠️  Package not immediately visible (may take a few minutes)"
+          npm view $PACKAGE_NAME@$PACKAGE_VERSION --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
 
-          echo "📊 Package verification completed for Bun users"
-
-          # Test Bun installation
-          echo "🧪 Testing Bun installation..."
-          bunx pkg install $PACKAGE_NAME@$PACKAGE_VERSION --dry-run || echo "⚠️  Dry run failed (package may not be ready yet)"
+          echo "Package verification completed"
+          echo "GitHub Packages URL: https://github.com/terraphim/terraphim-ai/packages"
 
       - name: Create Bun-specific GitHub Release
         if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
@@ -553,8 +551,8 @@ jobs:
             - **Fast Test Execution**: Bun's test runner integration
             - **Enhanced Dependency Resolution**: Faster and more accurate
 
-            ### 🔗 Links
-            - [npm package](https://www.npmjs.com/package/@terraphim/autocomplete)
+            ### Links
+            - [GitHub Package](https://github.com/terraphim/terraphim-ai/packages)
             - [Bun documentation](https://bun.sh/docs)
             - [Package Documentation](https://github.com/terraphim/terraphim-ai/tree/main/terraphim_ai_nodejs)
 
@@ -567,8 +565,12 @@ jobs:
       - name: Notify on success
         if: inputs.dry_run != 'true'
         run: |
-          echo "🎉 Bun publishing workflow completed successfully!"
-          echo "📦 Package: @terraphim/autocomplete"
-          echo "🏷️  Tag: ${{ steps.strategy.outputs.npm_tag }}"
-          echo "🐢 Runtime: Bun-optimized"
-          echo "📋 Version: $(node -p "require('./package.json').version")"
+          echo "Publishing workflow completed successfully!"
+          echo "Package: @terraphim/autocomplete"
+          echo "Registry: GitHub Packages (npm.pkg.github.com)"
+          echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
+          echo "Version: $(node -p "require('./package.json').version")"
+          echo ""
+          echo "Install with:"
+          echo "  npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"
+          echo "  bun add @terraphim/autocomplete"
