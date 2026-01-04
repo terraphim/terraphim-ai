@@ -47,7 +47,35 @@ env:
   DOCKERHUB_IMAGE: terraphim/terraphim-server
 
 jobs:
+  # Pre-build frontend to avoid SASS issues in Docker
+  build-frontend:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v5
+        with:
+          node-version: 20
+          cache: yarn
+          cache-dependency-path: desktop/yarn.lock
+
+      - name: Build frontend
+        working-directory: ./desktop
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
+      - name: Upload frontend artifacts
+        uses: actions/upload-artifact@v5
+        with:
+          name: frontend-dist
+          path: desktop/dist/
+          retention-days: 1
+
   build-and-push:
+    needs: build-frontend
     runs-on: [self-hosted, Linux, X64]
     strategy:
       fail-fast: false
@@ -60,6 +88,12 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Download frontend artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: frontend-dist
+          path: desktop/dist/
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -286,7 +320,7 @@ jobs:
           fi
 
   build-summary:
-    needs: [build-and-push, create-latest-tag]
+    needs: [build-frontend, build-and-push, create-latest-tag]
     runs-on: [self-hosted, Linux, X64]
     if: always()
 

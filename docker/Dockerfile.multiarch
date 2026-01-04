@@ -6,28 +6,20 @@ ARG RUST_VERSION=1.85.0
 ARG NODE_VERSION=20
 
 # ================================
-# Frontend Build Stage
+# Frontend Stage
 # ================================
-# Use Debian-based image instead of Alpine for better SASS/Bulma compatibility
-FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-slim AS frontend-builder
-
-# Install build dependencies needed for native modules
-RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
-    python3 \
-    build-essential \
-    && rm -rf /var/lib/apt/lists/*
+# Frontend is pre-built by CI workflow and included in build context
+# This stage just verifies the assets exist and prepares them for copy
+FROM --platform=$BUILDPLATFORM alpine:3.19 AS frontend-builder
 
 WORKDIR /app
-# Copy package files - yarn.lock is optional
-COPY desktop/package*.json ./
-COPY desktop/yarn.lock* ./
-RUN yarn install --frozen-lockfile --network-timeout 300000
 
-COPY desktop ./
-RUN yarn run build
+# Copy pre-built frontend assets from CI
+# The desktop/dist directory is populated by the workflow before Docker build
+COPY desktop/dist ./dist/
 
-# Verify frontend build
-RUN ls -la dist/ && test -f dist/index.html
+# Verify frontend build exists
+RUN ls -la dist/ && test -f dist/index.html && echo "Frontend assets verified"
 
 # ================================
 # Rust Build Stage
