@@ -208,7 +208,7 @@ jobs:
           labels: ${{ steps.meta-ghcr.outputs.labels }}
           build-args: |
             UBUNTU_VERSION=${{ matrix.ubuntu-version }}
-            RUST_VERSION=1.85.0
+            RUST_VERSION=1.92.0
             NODE_VERSION=20
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -227,7 +227,7 @@ jobs:
           labels: ${{ steps.meta-dockerhub.outputs.labels }}
           build-args: |
             UBUNTU_VERSION=${{ matrix.ubuntu-version }}
-            RUST_VERSION=1.85.0
+            RUST_VERSION=1.92.0
             NODE_VERSION=20
           cache-from: type=gha
           provenance: false
