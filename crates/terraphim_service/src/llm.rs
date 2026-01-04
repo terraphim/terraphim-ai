@@ -6,11 +6,15 @@ use serde_json::Value;
 #[cfg(feature = "llm_router")]
 use crate::llm::routed_adapter::RoutedLlmClient;
 #[cfg(feature = "llm_router")]
-use crate::llm::router_config::MergedRouterConfig;
+use crate::llm::proxy_client::ProxyLlmClient;
+#[cfg(feature = "llm_router")]
+pub use self::router_config::{MergedRouterConfig, RouterMode};
 #[cfg(feature = "llm_router")]
 mod routed_adapter;
 #[cfg(feature = "llm_router")]
 mod router_config;
+#[cfg(feature = "llm_router")]
+mod proxy_client;
 
 use crate::Result as ServiceResult;
 
@@ -151,13 +155,28 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
     #[cfg(feature = "llm_router")]
     if role.llm_router_enabled {
         log::info!("🛣️  Intelligent routing enabled for role: {}", role.name);
-        // Try to build any static client first, then wrap with routing
-        if let Some(static_client) = build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role)) {
-            let router_config = MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
-            return Some(Arc::new(RoutedLlmClient::new(static_client, router_config)) as Arc<dyn LlmClient>);
+        let router_config = MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
+
+        match router_config.mode {
+            RouterMode::Library => {
+                // Library mode: wrap static client with in-process routing
+                if let Some(static_client) = build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role)) {
+                    return Some(Arc::new(RoutedLlmClient::new(static_client, router_config)) as Arc<dyn LlmClient>);
+                }
+                log::warn!("🛣️  Library routing enabled but no static LLM client could be built for role: {}", role.name);
+            }
+            RouterMode::Service => {
+                // Service mode: use external HTTP proxy client
+                let proxy_url = router_config.get_proxy_url();
+                log::info!("🛣️  Service mode routing to: {}", proxy_url);
+                let proxy_config = crate::llm::proxy_client::ProxyClientConfig {
+                    base_url: proxy_url,
+                    timeout_secs: 60,
+                    log_requests: true,
+                };
+                return Some(Arc::new(ProxyLlmClient::new(proxy_config)) as Arc<dyn LlmClient>);
+            }
         }
-        // If no static client available, log warning but don't fail
-        log::warn!("🛣️  Intelligent routing enabled but no static LLM client could be built for role: {}", role.name);
     }
 
     log::debug!("No LLM client could be built for role: {}", role.name);
