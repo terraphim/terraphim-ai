@@ -2,10 +2,11 @@
 //!
 //! Configuration types for intelligent LLM routing in Terraphim AI.
 
+use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 /// Router configuration from Role
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, JsonSchema)]
 pub struct LlmRouterConfig {
     /// Enable intelligent routing (default: true)
     #[serde(default)]
@@ -16,11 +17,11 @@ pub struct LlmRouterConfig {
     pub mode: RouterMode,
 
     /// Proxy URL for service mode (default: http://127.0.0.1:3456)
-    #[serde(default = "default_proxy_url")]
+    #[serde(default)]
     pub proxy_url: Option<String>,
 
     /// Taxonomy path for pattern-based routing (default: docs/taxonomy)
-    #[serde(default = "default_taxonomy_path")]
+    #[serde(default)]
     pub taxonomy_path: Option<String>,
 
     /// Enable cost optimization phase
@@ -51,10 +52,11 @@ impl Default for LlmRouterConfig {
 }
 
 /// Router mode selection
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, JsonSchema)]
 pub enum RouterMode {
     /// In-process library routing (fast, single deployment)
     #[serde(rename = "library")]
+    #[default]
     Library,
 
     /// External HTTP service (slower, separate deployment)
@@ -63,7 +65,7 @@ pub enum RouterMode {
 }
 
 /// Router strategy for preference
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Default, JsonSchema)]
 pub enum RouterStrategy {
     /// Cost-first optimization
     #[serde(rename = "cost_first")]
@@ -75,6 +77,7 @@ pub enum RouterStrategy {
 
     /// Balanced (cost + quality)
     #[serde(rename = "balanced")]
+    #[default]
     Balanced,
 
     /// Static model selection (backward compatibility)

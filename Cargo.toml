@@ -1,7 +1,7 @@
 
 [workspace]
 resolver = "2"
-members = ["crates/*", "terraphim_llm-proxy", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
+members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
 exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py"]
 
 default-members = ["terraphim_server"]
@@ -26,7 +26,6 @@ anyhow = "1.0"
 log = "0.4"
 
 # LLM Router integration
-terraphim_llm_proxy = { path = "../terraphim-llm-proxy" }
 
 [patch.crates-io]
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }

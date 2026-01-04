@@ -24,7 +24,9 @@ use tsify::Tsify;
 
 
 use crate::llm_router::LlmRouterConfig;
-// LLM Router configuration\npub mod llm_router;
+
+// LLM Router configuration
+pub mod llm_router;
 
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
@@ -216,7 +218,13 @@ pub struct Role {
     #[schemars(skip)]
     #[cfg_attr(feature = "typescript", tsify(type = "Record<string, unknown>"))]
     pub extra: AHashMap<String, Value>,
-    /// Enable intelligent LLM routing with 6-phase architecture    #[serde(default)]    pub llm_router_enabled: bool,    /// Configuration for intelligent routing behavior    #[serde(default)]    pub llm_router_config: Option<LlmRouterConfig>,}
+    /// Enable intelligent LLM routing with 6-phase architecture
+    #[serde(default)]
+    pub llm_router_enabled: bool,
+    /// Configuration for intelligent routing behavior
+    #[serde(default)]
+    pub llm_router_config: Option<LlmRouterConfig>,
+}
 
 impl Role {
     /// Create a new Role with default values for all fields
@@ -238,6 +246,8 @@ impl Role {
             llm_chat_model: None,
             llm_context_window: default_context_window(),
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         }
     }
 
