@@ -8,7 +8,14 @@ ARG NODE_VERSION=20
 # ================================
 # Frontend Build Stage
 # ================================
-FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
+# Use Debian-based image instead of Alpine for better SASS/Bulma compatibility
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-slim AS frontend-builder
+
+# Install build dependencies needed for native modules
+RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 # Copy package files - yarn.lock is optional
@@ -158,27 +165,25 @@ ARG UBUNTU_VERSION
 
 # Install minimal runtime dependencies
 ENV DEBIAN_FRONTEND=noninteractive
-RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
-    ca-certificates \
-    libssl1.1 \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
 
 # Handle different OpenSSL versions across Ubuntu releases
-RUN case "${UBUNTU_VERSION}" in \
-    "18.04") \
-        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl1.1 && rm -rf /var/lib/apt/lists/* \
-        ;; \
-    "20.04") \
-        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl1.1 && rm -rf /var/lib/apt/lists/* \
-        ;; \
-    "22.04") \
-        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl3 && rm -rf /var/lib/apt/lists/* \
-        ;; \
-    "24.04") \
-        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl3 && rm -rf /var/lib/apt/lists/* \
-        ;; \
-    esac
+# Note: Must install OpenSSL first based on version since package names differ
+RUN apt-get update -qq && \
+    case "${UBUNTU_VERSION}" in \
+        "18.04"|"20.04") \
+            apt-get install -yqq --no-install-recommends \
+                ca-certificates curl libssl1.1 \
+            ;; \
+        "22.04"|"24.04") \
+            apt-get install -yqq --no-install-recommends \
+                ca-certificates curl libssl3 \
+            ;; \
+        *) \
+            apt-get install -yqq --no-install-recommends \
+                ca-certificates curl libssl3 \
+            ;; \
+    esac && \
+    rm -rf /var/lib/apt/lists/*
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash terraphim
