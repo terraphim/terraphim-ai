@@ -454,9 +454,10 @@ jobs:
     with:
       platforms: linux/amd64,linux/arm64,linux/arm/v7
       ubuntu-versions: '["20.04", "22.04"]'
-      push: true
+      push: ${{ !inputs.test_run }}
       tag: ${{ github.ref_name }}
       dockerhub-username: ${{ vars.DOCKERHUB_USERNAME || '' }}
+      test_run: ${{ inputs.test_run || false }}
     secrets: inherit  # pragma: allowlist secret
 
   create-release:
