@@ -322,6 +322,8 @@ fn create_ollama_live_role(base_url: &str) -> terraphim_config::Role {
         extra: AHashMap::new(),
         llm_router_enabled: false,
         llm_router_config: None,
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     // Configure for Ollama

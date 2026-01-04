@@ -273,6 +273,8 @@ async fn test_complete_ripgrep_workflow_with_extra_parameters() {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     let config = ConfigBuilder::new()
