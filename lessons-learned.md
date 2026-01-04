@@ -3440,3 +3440,208 @@ sign-and-notarize:
 | Design Plans Created | 2 |
 | GitHub Issues Created | 2 |
 | CI Fixes Applied | 4 |
+
+---
+
+## LLM Router Integration - 2026-01-04
+
+### Context: Multi-Phase Feature Implementation with Disciplined Development
+
+**Feature:** LLM Router with dual-mode support (Library/Service) for intelligent LLM selection across multiple providers.
+
+**Architecture:**
+- **Library Mode**: In-process routing via `RoutedLlmClient` wrapping static LLM client
+- **Service Mode**: HTTP proxy client (`ProxyLlmClient`) forwarding to external `terraphim-llm-proxy` service
+
+### Pattern 1: Feature-Gated Module Organization
+
+**What We Learned:**
+- Feature flags (`#[cfg(feature = "llm_router")]`) keep production builds clean
+- Module declarations must come BEFORE imports in Rust
+- Submodules need proper parent module declarations
+
+**Implementation:**
+```rust
+// In llm.rs - order matters!
+#[cfg(feature = "llm_router")]
+mod routed_adapter;
+#[cfg(feature = "llm_router")]
+mod router_config;
+#[cfg(feature = "llm_router")]
+mod proxy_client;
+
+#[cfg(feature = "llm_router")]
+use crate::llm::routed_adapter::RoutedLlmClient;
+#[cfg(feature = "llm_router")]
+use crate::llm::proxy_client::ProxyLlmClient;
+```
+
+**When to Apply:** Any optional feature with significant code volume.
+
+### Pattern 2: Configuration Re-export for Public API
+
+**What We Learned:**
+- Private imports in submodules need `pub use` to become public
+- `RouterMode` was imported privately in `router_config.rs` causing "private enum" errors
+- Solution: Change `use` to `pub use` in the re-export module
+
+**Implementation:**
+```rust
+// router_config.rs - use becomes pub use
+pub use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
+```
+
+**When to Apply:** Configuration types that need to be accessible from parent modules.
+
+### Pattern 3: Test File Updates for Struct Schema Changes
+
+**What We Learned:**
+- Adding fields to a struct requires updating ALL test initializations
+- Use systematic tools (Python scripts, sed) for bulk updates
+- Risk of duplicates when running fix scripts multiple times
+- Better to restore files and re-run once cleanly
+
+**Implementation:**
+```python
+# Pattern for bulk Role struct updates
+def fix_role_fields(content):
+    pattern = r'(extra:\s*(?:ahash::)?AHashMap::new\(\),)'
+    replacement = r'\1\n        llm_router_enabled: false,\n        llm_router_config: None,'
+    return re.sub(pattern, replacement, content)
+```
+
+**Anti-pattern:** Running fix scripts multiple times creates duplicate field declarations.
+
+**When to Apply:** Any struct schema change affecting test files across multiple crates.
+
+### Pattern 4: ServiceError Variant Selection
+
+**What We Learned:**
+- `ServiceError::Network` and `ServiceError::Parsing` don't exist in this crate
+- Available variants: `Middleware`, `OpenDal`, `Persistence`, `Config`, `OpenRouter`, `Common`
+- Use `ServiceError::Config(String)` for proxy connection failures
+
+**Implementation:**
+```rust
+// Before (doesn't compile)
+return Err(crate::ServiceError::Network(format!("Failed to connect: {}", e)));
+
+// After
+return Err(crate::ServiceError::Config(format!("Failed to connect: {}", e)));
+```
+
+**When to Apply:** Error handling when adding new error scenarios.
+
+### Pattern 5: Submodule Import Paths in Rust
+
+**What We Learned:**
+- `proxy_client.rs` is a submodule of `llm.rs`
+- Use `super::` to access parent module items (not `super::llm::`)
+- Parent module types are directly accessible: `LlmClient`, `SummarizeOptions`, `ChatOptions`
+
+**Implementation:**
+```rust
+// proxy_client.rs - correct imports
+use super::LlmClient;
+use super::SummarizeOptions;
+use super::ChatOptions;
+
+// NOT super::llm::LlmClient
+```
+
+**When to Apply:** Any nested module structure in Rust.
+
+### Pattern 6: JSON Serialization Test Assertions
+
+**What We Learned:**
+- `serde_json::to_string()` doesn't add spaces after colons
+- `"model":"auto"` not `"model": "auto"`
+- Test assertions must match actual serialization format
+
+**Implementation:**
+```rust
+// Before (fails)
+assert!(json_str.contains("\"model\": \"auto\""));
+
+// After (passes)
+assert!(json_str.contains("\"model\":\"auto\""));
+```
+
+**When to Apply:** Any tests checking JSON string format.
+
+### Pattern 7: Default Trait for Configuration Structs
+
+**What We Learned:**
+- `#[derive(Default)]` conflicts with manual `impl Default`
+- Must choose one approach
+- Manual implementation allows setting custom defaults (like port 3456)
+
+**Implementation:**
+```rust
+// Before - derive conflict
+#[derive(Debug, Clone, Default)]
+pub struct ProxyClientConfig { ... }
+
+// After - manual impl without derive
+#[derive(Debug, Clone)]
+pub struct ProxyClientConfig { ... }
+
+impl Default for ProxyClientConfig {
+    fn default() -> Self {
+        Self {
+            base_url: "http://127.0.0.1:3456".to_string(),
+            timeout_secs: 60,
+            log_requests: false,
+        }
+    }
+}
+```
+
+**When to Apply:** Configuration structs needing custom defaults.
+
+### Pattern 8: Mode-Based Client Selection
+
+**What We Learned:**
+- Use Rust `match` for conditional client creation based on config
+- Library mode: wrap existing client with routing adapter
+- Service mode: create HTTP proxy client
+
+**Implementation:**
+```rust
+match router_config.mode {
+    RouterMode::Library => {
+        if let Some(static_client) = build_ollama_from_role(role) {
+            return Some(Arc::new(RoutedLlmClient::new(static_client, router_config)));
+        }
+    }
+    RouterMode::Service => {
+        let proxy_url = router_config.get_proxy_url();
+        let proxy_config = ProxyClientConfig {
+            base_url: proxy_url,
+            timeout_secs: 60,
+            log_requests: true,
+        };
+        return Some(Arc::new(ProxyLlmClient::new(proxy_config)));
+    }
+}
+```
+
+**When to Apply:** Feature toggle patterns with different implementations per toggle.
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| Implementation Steps | 5 |
+| Files Modified | 24 |
+| Test Files Updated | 14 |
+| Lines Added | ~200 |
+| Test Results | 118 passed, 5 unrelated failures |
+
+### Critical Success Factors
+
+1. **Incremental validation**: Run tests after each fix to catch issues early
+2. **Systematic updates**: Use scripts for bulk file updates, avoid manual editing
+3. **Clean restores**: When scripts create duplicates, restore and re-run cleanly
+4. **Build verification**: Run `cargo build --features llm_router` before tests
+5. **Pre-existing failures**: Document unrelated test failures separately

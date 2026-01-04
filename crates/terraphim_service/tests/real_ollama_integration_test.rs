@@ -103,6 +103,8 @@ This document provides a comprehensive overview of advanced Rust programming tec
             fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
