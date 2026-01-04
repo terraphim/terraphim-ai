@@ -30,6 +30,8 @@ fn create_atomic_server_agent_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(16000),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![
             Haystack::new(
                 "http://localhost:9883".to_string(), // Atomic server URL
