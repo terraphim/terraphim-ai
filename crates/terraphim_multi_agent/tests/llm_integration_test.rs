@@ -41,6 +41,8 @@ async fn test_llama_model_response() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         extra,
     };
 
@@ -125,6 +127,8 @@ async fn test_gemma_model_response() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         extra,
     };
 

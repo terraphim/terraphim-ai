@@ -105,6 +105,8 @@ async fn test_perplexity_service_type_integration() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: None,
+        llm_router_enabled: false,
+        llm_router_config: None,
         extra: ahash::AHashMap::new(),
     };
 
@@ -199,6 +201,8 @@ async fn test_perplexity_missing_api_key() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: None,
+        llm_router_enabled: false,
+        llm_router_config: None,
         extra: ahash::AHashMap::new(),
     };
 
@@ -295,6 +299,8 @@ async fn perplexity_live_api_test() {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: None,
+        llm_router_enabled: false,
+        llm_router_config: None,
         extra: ahash::AHashMap::new(),
     };
 
