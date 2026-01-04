@@ -4,7 +4,7 @@
 //! from Role extra fields with environment variable overrides.
 
 use std::env;
-use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
+pub use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
 
 /// Merged router configuration from Role and environment
 #[derive(Debug, Clone, Default)]

@@ -36,6 +36,8 @@ async fn test_ollama_summarize_real() {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
     role.extra
         .insert("llm_provider".into(), serde_json::json!("ollama"));

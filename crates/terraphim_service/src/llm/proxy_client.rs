@@ -11,12 +11,12 @@ use log::{debug, error, warn};
 use tokio::time::Duration;
 
 use crate::Result as ServiceResult;
-use super::llm::LlmClient;
-use super::llm::SummarizeOptions;
-use super::llm::ChatOptions;
+use super::LlmClient;
+use super::SummarizeOptions;
+use super::ChatOptions;
 
 /// External LLM proxy client configuration
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct ProxyClientConfig {
     /// Proxy base URL (default: http://127.0.0.1:3456)
     pub base_url: String,
@@ -24,6 +24,16 @@ pub struct ProxyClientConfig {
     pub timeout_secs: u64,
     /// Enable request/response logging
     pub log_requests: bool,
+}
+
+impl Default for ProxyClientConfig {
+    fn default() -> Self {
+        Self {
+            base_url: "http://127.0.0.1:3456".to_string(),
+            timeout_secs: 60,
+            log_requests: false,
+        }
+    }
 }
 
 /// External LLM proxy client
@@ -91,7 +101,7 @@ impl LlmClient for ProxyLlmClient {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Proxy summarization request failed: {}", e);
-                return Err(crate::ServiceError::Network(
+                return Err(crate::ServiceError::Config(
                     format!("Failed to connect to proxy: {}", e)
                 ));
             }
@@ -101,7 +111,7 @@ impl LlmClient for ProxyLlmClient {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             error!("Proxy returned error {}: {}", status, text);
-            return Err(crate::ServiceError::Network(
+            return Err(crate::ServiceError::Config(
                 format!("Proxy returned error: {} - {}", status, text)
             ));
         }
@@ -110,7 +120,7 @@ impl LlmClient for ProxyLlmClient {
             Ok(t) => t,
             Err(e) => {
                 error!("Failed to read response text: {}", e);
-                return Err(crate::ServiceError::Network(
+                return Err(crate::ServiceError::Config(
                     format!("Failed to read proxy response: {}", e)
                 ));
             }
@@ -148,7 +158,7 @@ impl LlmClient for ProxyLlmClient {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Get models request failed: {}", e);
-                return Err(crate::ServiceError::Network(
+                return Err(crate::ServiceError::Config(
                     format!("Failed to connect to proxy: {}", e)
                 ));
             }
@@ -156,14 +166,14 @@ impl LlmClient for ProxyLlmClient {
 
         if !response.status().is_success() {
             let status = response.status();
-            return Err(crate::ServiceError::Network(
+            return Err(crate::ServiceError::Config(
                 format!("Proxy returned error: {}", status)
             ));
         }
 
         let text = match response.text().await {
             Ok(t) => t,
-            Err(e) => return Err(crate::ServiceError::Network(format!("Failed to read: {}", e))),
+            Err(e) => return Err(crate::ServiceError::Config(format!("Failed to read: {}", e))),
         };
 
         match serde_json::from_str::<Value>(&text) {
@@ -210,7 +220,7 @@ impl LlmClient for ProxyLlmClient {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Proxy chat request failed: {}", e);
-                return Err(crate::ServiceError::Network(
+                return Err(crate::ServiceError::Config(
                     format!("Failed to connect to proxy: {}", e)
                 ));
             }
@@ -220,14 +230,14 @@ impl LlmClient for ProxyLlmClient {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             error!("Proxy returned error {}: {}", status, text);
-            return Err(crate::ServiceError::Network(
+            return Err(crate::ServiceError::Config(
                 format!("Proxy returned error: {} - {}", status, text)
             ));
         }
 
         let text = match response.text().await {
             Ok(t) => t,
-            Err(e) => return Err(crate::ServiceError::Network(format!("Failed to read: {}", e))),
+            Err(e) => return Err(crate::ServiceError::Config(format!("Failed to read: {}", e))),
         };
 
         match serde_json::from_str::<Value>(&text) {
@@ -245,7 +255,7 @@ impl LlmClient for ProxyLlmClient {
             }
             Err(e) => {
                 warn!("Failed to parse chat response: {}", e);
-                Err(crate::ServiceError::Parsing(e.to_string()))
+                Err(crate::ServiceError::Config(e.to_string()))
             }
         }
     }
@@ -301,8 +311,8 @@ mod tests {
         });
 
         let json_str = serde_json::to_string(&expected_request).unwrap();
-        assert!(json_str.contains("\"model\": \"auto\""));
-        assert!(json_str.contains("\"max_tokens\": 500"));
+        assert!(json_str.contains("\"model\":\"auto\""));
+        assert!(json_str.contains("\"max_tokens\":500"));
     }
 
     #[tokio::test]
@@ -327,9 +337,9 @@ mod tests {
         });
 
         let json_str = serde_json::to_string(&expected_request).unwrap();
-        assert!(json_str.contains("\"model\": \"auto\""));
-        assert!(json_str.contains("\"temperature\": 0.5"));
-        assert!(json_str.contains("\"max_tokens\": 100"));
+        assert!(json_str.contains("\"model\":\"auto\""));
+        assert!(json_str.contains("\"temperature\":0.5"));
+        assert!(json_str.contains("\"max_tokens\":100"));
     }
 
     #[tokio::test]
