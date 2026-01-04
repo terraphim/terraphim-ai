@@ -38,7 +38,6 @@ chrono = { version = "0.4", features = ["serde"] }
 reqwest = { workspace = true }
 
 # LLM Router integration
-terraphim_llm_proxy = { workspace = true, optional = true }
 
 # Logging utilities
 env_logger = "0.11"
@@ -51,7 +50,7 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = tr
 default = ["ollama", "llm_router"]
 openrouter = ["terraphim_config/openrouter"]
 ollama = []
-llm_router = ["dep:terraphim_llm_proxy"]
+llm_router = []
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [dev-dependencies]
