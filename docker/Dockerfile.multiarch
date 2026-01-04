@@ -104,26 +104,17 @@ RUN case "${TARGETARCH}" in \
 
 WORKDIR /code
 
-# Copy dependency files first for better caching
+# Copy all source code - simpler approach for reliable builds
+# Caching is handled by GitHub Actions GHA cache
 COPY Cargo.toml Cargo.lock ./
-COPY crates/*/Cargo.toml crates/
-COPY terraphim_server/Cargo.toml terraphim_server/
-
-# Create empty source files to satisfy cargo
-RUN find crates -name Cargo.toml -exec dirname {} \; | while read dir; do \
-    mkdir -p "$dir/src" && echo 'fn main() {}' > "$dir/src/lib.rs" || true; \
-    done && \
-    mkdir -p terraphim_server/src && echo 'fn main() {}' > terraphim_server/src/main.rs
-
-# Pre-build dependencies
-RUN . /root/.profile && \
-    RUST_TARGET=$(cat /tmp/rust-target) && \
-    cargo fetch --target=$RUST_TARGET
-
-# Copy source code
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
 COPY --from=frontend-builder /app/dist ./terraphim_server/dist
+
+# Fetch dependencies
+RUN . /root/.profile && \
+    RUST_TARGET=$(cat /tmp/rust-target) && \
+    cargo fetch --target=$RUST_TARGET
 
 # Build the application
 RUN . /root/.profile && \
@@ -131,7 +122,7 @@ RUN . /root/.profile && \
     cargo build --release --target=$RUST_TARGET \
     --package terraphim_server \
     --package terraphim_mcp_server \
-    --package terraphim_tui
+    --package terraphim_agent
 
 # Test the binaries
 RUN . /root/.profile && \
