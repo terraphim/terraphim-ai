@@ -13,7 +13,7 @@ use super::ChatOptions;
 use super::SummarizeOptions as SummarizationOptions;
 use crate::Result as ServiceResult;
 use async_trait::async_trait;
-use tracing::{debug, info};
+use log::{debug, info};
 
 /// Routed LLM client that wraps intelligent routing
 ///

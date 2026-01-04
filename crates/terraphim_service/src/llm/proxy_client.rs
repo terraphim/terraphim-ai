@@ -4,38 +4,26 @@
 //! terraphim-llm-proxy service running on port 3456. This provides
 //! service mode routing without embedding proxy routing logic in main codebase.
 
-use super::llm::LlmClient;
-use super::llm::LlmRequest;
-use super::llm::LlmResponse;
-use super::llm::LlmError;
-use super::llm::summarization::SummarizationOptions;
-use super::llm::chat::ChatOptions;
-use super::llm::LlmMessage;
-use serde_json::json;
-use tracing::{debug, error, warn};
+use std::sync::Arc;
+use async_trait::async_trait;
+use serde_json::{json, Value};
+use log::{debug, error, warn};
 use tokio::time::Duration;
 
+use crate::Result as ServiceResult;
+use super::llm::LlmClient;
+use super::llm::SummarizeOptions;
+use super::llm::ChatOptions;
+
 /// External LLM proxy client configuration
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ProxyClientConfig {
     /// Proxy base URL (default: http://127.0.0.1:3456)
     pub base_url: String,
-
     /// Request timeout (default: 60 seconds)
     pub timeout_secs: u64,
-
     /// Enable request/response logging
     pub log_requests: bool,
-}
-
-impl Default for ProxyClientConfig {
-    fn default() -> Self {
-        Self {
-            base_url: "http://127.0.0.1:3456".to_string(),
-            timeout_secs: 60,
-            log_requests: false,
-        }
-    }
 }
 
 /// External LLM proxy client
@@ -43,11 +31,10 @@ impl Default for ProxyClientConfig {
 /// This client forwards requests to the external terraphim-llm-proxy
 /// service (which implements 6-phase intelligent routing) and provides
 /// graceful degradation via HTTP API calls.
-#[derive(Debug)]
+#[derive(Clone)]
 pub struct ProxyLlmClient {
     /// Client configuration
     config: ProxyClientConfig,
-
     /// HTTP client for proxy requests
     http: reqwest::Client,
 }
@@ -57,14 +44,14 @@ impl ProxyLlmClient {
     pub fn new(config: ProxyClientConfig) -> Self {
         let http = reqwest::Client::builder()
             .timeout(Duration::from_secs(config.timeout_secs))
-            .build();
+            .build()
+            .unwrap_or_else(|_| reqwest::Client::new());
 
         Self { config, http }
     }
 
     /// Check if external proxy mode is active
     pub fn is_proxy_mode(&self) -> bool {
-        // External proxy mode always active for this client
         true
     }
 
@@ -74,109 +61,73 @@ impl ProxyLlmClient {
     }
 }
 
+#[async_trait]
 impl LlmClient for ProxyLlmClient {
-    async fn summarize(&self, content: &str, opts: SummarizationOptions) -> Result<String> {
+    fn name(&self) -> &'static str {
+        "external_proxy_llm"
+    }
+
+    async fn summarize(&self, content: &str, opts: SummarizeOptions) -> ServiceResult<String> {
         debug!("Summarization via external proxy (service mode)");
 
-        let request = serde_json::json!({
-            "model": "auto", // Let proxy routing decide
+        let request = json!({
+            "model": "auto",
             "messages": [{
                 "role": "user",
-                "content": content
+                "content": format!("Please summarize the following in {} characters or less:\n\n{}", 
+                    opts.max_length, content)
             }],
-            "max_tokens": opts.max_tokens,
-            "temperature": opts.temperature,
+            "max_tokens": opts.max_length.min(1024),
+            "temperature": 0.3,
         });
 
-        let response = self
+        let response = match self
             .http
-            .post(&format!("{}/v1/summarize", self.config.base_url))
+            .post(&format!("{}/v1/chat/completions", self.config.base_url))
             .json(&request)
             .send()
             .await
-            .map_err(|e| {
-                error!("Proxy summarization failed: {}", e);
-                LlmError::Internal(anyhow::anyhow!(e))
-            })?;
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("Proxy summarization request failed: {}", e);
+                return Err(crate::ServiceError::Network(
+                    format!("Failed to connect to proxy: {}", e)
+                ));
+            }
+        };
 
-        self.extract_summary(response).await
-    }
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            error!("Proxy returned error {}: {}", status, text);
+            return Err(crate::ServiceError::Network(
+                format!("Proxy returned error: {} - {}", status, text)
+            ));
+        }
 
-    async fn chat(&self, messages: Vec<super::llm::LlmMessage>, opts: ChatOptions) -> Result<super::llm::LlmResponse> {
-        debug!("Chat via external proxy (service mode)");
+        let text = match response.text().await {
+            Ok(t) => t,
+            Err(e) => {
+                error!("Failed to read response text: {}", e);
+                return Err(crate::ServiceError::Network(
+                    format!("Failed to read proxy response: {}", e)
+                ));
+            }
+        };
 
-        let request = serde_json::json!({
-            "model": "auto", // Let proxy routing decide
-            "messages": messages.iter().map(|m| json!({
-                "role": match m.role {
-                    super::llm::MessageRole::System => "system",
-                    super::llm::MessageRole::User => "user",
-                    super::llm::MessageRole::Assistant => "assistant",
-                    super::llm::MessageRole::Tool => "user",
-                },
-                "content": m.content,
-            })).collect(),
-            "temperature": opts.temperature,
-            "max_tokens": opts.max_tokens,
-        });
-
-        let response = self
-            .http
-            .post(&format!("{}/v1/chat", self.config.base_url))
-            .json(&request)
-            .send()
-            .await
-            .map_err(|e| {
-                error!("Proxy chat failed: {}", e);
-                LlmError::Internal(anyhow::anyhow!(e))
-            })?;
-
-        Ok(self.transform_chat_response(response).await?)
-    }
-
-    async fn get_models(&self) -> Result<Vec<String>> {
-        debug!("Get models via external proxy");
-
-        let response = self
-            .http
-            .get(&format!("{}/v1/models", self.config.base_url))
-            .send()
-            .await
-            .map_err(|e| {
-                error!("Get models failed: {}", e);
-                LlmError::Internal(anyhow::anyhow!(e))
-            })?;
-
-        self.extract_models(response).await
-    }
-
-    async fn stream_chat(
-        &self,
-        messages: Vec<super::llm::LlmMessage>,
-        opts: ChatOptions,
-    ) -> Result<Box<dyn futures::Stream<Item = Result<String>> + Unpin + Send + 'static>> {
-        // Streaming will be implemented in later steps
-        // Phase 3+ covers streaming support
-        Err(LlmError::NotImplemented(
-            "Stream chat not yet implemented in external proxy client".to_string()
-        ))
-    }
-
-    /// Extract summary from proxy response
-    async fn extract_summary(&self, mut response: reqwest::Response) -> Result<String> {
-        let text = response.text().await.map_err(|e| {
-            error!("Failed to read response text: {}", e);
-            LlmError::Internal(anyhow::anyhow!(e))
-        })?;
-
-        match serde_json::from_str::<serde_json::Value>(&text) {
+        match serde_json::from_str::<Value>(&text) {
             Ok(json) => {
-                let summary = json["choices"][0]["message"]["content"]
-                    .as_str()
-                    .unwrap_or("No summary generated");
+                let summary = json["choices"]
+                    .get(0)
+                    .and_then(|c| c.get("message"))
+                    .and_then(|m| m.get("content"))
+                    .and_then(|c| c.as_str())
+                    .unwrap_or("")
+                    .to_string();
 
-                debug!("Extracted summary from proxy: {}", summary);
-                Ok(summary.to_string())
+                debug!("Extracted summary from proxy ({} chars)", summary.len());
+                Ok(summary)
             }
             Err(e) => {
                 warn!("Failed to parse JSON response: {}", e);
@@ -185,91 +136,116 @@ impl LlmClient for ProxyLlmClient {
         }
     }
 
-    /// Extract models list from proxy response
-    async fn extract_models(&self, mut response: reqwest::Response) -> Result<Vec<String>> {
-        let text = response.text().await.map_err(|e| {
-            error!("Failed to read response text: {}", e);
-            LlmError::Internal(anyhow::anyhow!(e))
-        })?;
+    async fn list_models(&self) -> ServiceResult<Vec<String>> {
+        debug!("Get models via external proxy");
 
-        match serde_json::from_str::<serde_json::Value>(&text) {
+        let response = match self
+            .http
+            .get(&format!("{}/v1/models", self.config.base_url))
+            .send()
+            .await
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("Get models request failed: {}", e);
+                return Err(crate::ServiceError::Network(
+                    format!("Failed to connect to proxy: {}", e)
+                ));
+            }
+        };
+
+        if !response.status().is_success() {
+            let status = response.status();
+            return Err(crate::ServiceError::Network(
+                format!("Proxy returned error: {}", status)
+            ));
+        }
+
+        let text = match response.text().await {
+            Ok(t) => t,
+            Err(e) => return Err(crate::ServiceError::Network(format!("Failed to read: {}", e))),
+        };
+
+        match serde_json::from_str::<Value>(&text) {
             Ok(json) => {
-                if let Some(data) = json.get("data") {
-                    if let Some(models) = data.as_array() {
-                        let model_names: Vec<String> = models
-                            .iter()
-                            .filter_map(|m| m.as_str())
-                            .map(|s| s.unwrap_or("").to_string())
-                            .collect();
+                let models: Vec<String> = json["data"]
+                    .as_array()
+                    .unwrap_or(&vec![])
+                    .iter()
+                    .filter_map(|m| m.get("id").and_then(|id| id.as_str()))
+                    .map(|s| s.to_string())
+                    .collect();
 
-                        debug!("Extracted {} models from proxy", model_names.len());
-                        Ok(model_names)
-                    } else {
-                        warn!("No 'data' field in proxy models response");
-                        Ok(vec![])
-                    }
-                } else {
-                    warn!("No 'data' field in proxy models response");
-                    Ok(vec![])
-                }
+                debug!("Extracted {} models from proxy", models.len());
+                Ok(models)
             }
             Err(e) => {
-                warn!("Failed to parse JSON response: {}", e);
+                warn!("Failed to parse models response: {}", e);
                 Ok(vec![])
             }
         }
     }
 
-    /// Transform proxy chat response to internal format
-    async fn transform_chat_response(&self, mut response: reqwest::Response) -> Result<super::llm::LlmResponse> {
-        let text = response.text().await.map_err(|e| {
-            error!("Failed to read response text: {}", e);
-            LlmError::Internal(anyhow::anyhow!(e))
-        })?;
+    async fn chat_completion(
+        &self,
+        messages: Vec<Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
+        debug!("Chat via external proxy (service mode)");
 
-        match serde_json::from_str::<serde_json::Value>(&text) {
+        let request = json!({
+            "model": "auto",
+            "messages": messages,
+            "temperature": opts.temperature.unwrap_or(0.7),
+            "max_tokens": opts.max_tokens.unwrap_or(1024),
+        });
+
+        let response = match self
+            .http
+            .post(&format!("{}/v1/chat/completions", self.config.base_url))
+            .json(&request)
+            .send()
+            .await
+        {
+            Ok(resp) => resp,
+            Err(e) => {
+                error!("Proxy chat request failed: {}", e);
+                return Err(crate::ServiceError::Network(
+                    format!("Failed to connect to proxy: {}", e)
+                ));
+            }
+        };
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            error!("Proxy returned error {}: {}", status, text);
+            return Err(crate::ServiceError::Network(
+                format!("Proxy returned error: {} - {}", status, text)
+            ));
+        }
+
+        let text = match response.text().await {
+            Ok(t) => t,
+            Err(e) => return Err(crate::ServiceError::Network(format!("Failed to read: {}", e))),
+        };
+
+        match serde_json::from_str::<Value>(&text) {
             Ok(json) => {
-                let choice = &json["choices"][0];
-
-                let content = choice["message"]["content"]
-                    .as_str()
+                let content = json["choices"]
+                    .get(0)
+                    .and_then(|c| c.get("message"))
+                    .and_then(|m| m.get("content"))
+                    .and_then(|c| c.as_str())
                     .unwrap_or("")
                     .to_string();
 
-                let finish_reason = choice
-                    .get("finish_reason")
-                    .and_then(|v| v.as_str())
-                    .unwrap_or("stop")
-                    .to_string();
-
-                let model_used = choice.get("model")
-                    .and_then(|m| m.as_str())
-                    .unwrap_or("unknown")
-                    .to_string();
-
-                Ok(super::llm::LlmResponse {
-                    content,
-                    finish_reason,
-                    model_used,
-                    input_tokens: json.get("usage")
-                        .and_then(|u| u["prompt_tokens"])
-                        .and_then(|t| t.as_u64())
-                        .unwrap_or(0),
-                    output_tokens: json.get("usage")
-                        .and_then(|u| u["completion_tokens"])
-                        .and_then(|t| t.as_u64())
-                        .unwrap_or(0),
-                })
+                debug!("Chat response: {} chars", content.len());
+                Ok(content)
             }
             Err(e) => {
-                warn!("Failed to parse JSON response: {}", e);
-                Ok(super::llm::LlmResponse {
-                    content: "<proxy error>".to_string(),
-                    finish_reason: "error".to_string(),
-                    model_used: "unknown".to_string(),
-                    input_tokens: 0,
-                    output_tokens: 0,
-                })
+                warn!("Failed to parse chat response: {}", e);
+                Err(crate::ServiceError::Parsing(e.to_string()))
             }
         }
     }
@@ -286,6 +262,7 @@ mod tests {
 
         assert!(client.is_proxy_mode());
         assert_eq!(client.name(), "external_proxy_llm");
+        assert_eq!(client.config.base_url, "http://127.0.0.1:3456");
     }
 
     #[tokio::test]
@@ -305,22 +282,27 @@ mod tests {
     async fn test_summarize_request_format() {
         let client = ProxyLlmClient::new(ProxyClientConfig::default());
 
-        let messages = vec![super::llm::LlmMessage {
-            role: super::llm::MessageRole::User,
-            content: "test content",
-        }];
+        let opts = SummarizeOptions {
+            max_length: 500,
+        };
 
-        // Capture the JSON that would be sent
-        let request = serde_json::json!({
+        let content = "This is a test document that needs to be summarized. ".repeat(10);
+
+        // Build the expected request
+        let expected_request = json!({
             "model": "auto",
-            "messages": messages,
-            "max_tokens": 1000,
-            "temperature": 0.7,
+            "messages": [{
+                "role": "user",
+                "content": format!("Please summarize the following in {} characters or less:\n\n{}", 
+                    opts.max_length, content)
+            }],
+            "max_tokens": 500,
+            "temperature": 0.3,
         });
 
-        let json_str = serde_json::to_string(&request).unwrap();
+        let json_str = serde_json::to_string(&expected_request).unwrap();
         assert!(json_str.contains("\"model\": \"auto\""));
-        assert!(json_str.contains("\"max_tokens\": 1000"));
+        assert!(json_str.contains("\"max_tokens\": 500"));
     }
 
     #[tokio::test]
@@ -328,62 +310,31 @@ mod tests {
         let client = ProxyLlmClient::new(ProxyClientConfig::default());
 
         let messages = vec![
-            super::llm::LlmMessage {
-                role: super::llm::MessageRole::System,
-                content: "You are helpful",
-            },
-            super::llm::LlmMessage {
-                role: super::llm::MessageRole::User,
-                content: "Hello",
-            },
+            json!({"role": "system", "content": "You are helpful"}),
+            json!({"role": "user", "content": "Hello"}),
         ];
 
-        let opts = super::llm::ChatOptions {
-            temperature: 0.5,
-            max_tokens: 100,
+        let opts = ChatOptions {
+            temperature: Some(0.5),
+            max_tokens: Some(100),
         };
 
-        let request = serde_json::json!({
+        let expected_request = json!({
             "model": "auto",
             "messages": messages,
             "temperature": 0.5,
             "max_tokens": 100,
         });
 
-        let json_str = serde_json::to_string(&request).unwrap();
+        let json_str = serde_json::to_string(&expected_request).unwrap();
         assert!(json_str.contains("\"model\": \"auto\""));
         assert!(json_str.contains("\"temperature\": 0.5"));
         assert!(json_str.contains("\"max_tokens\": 100"));
     }
 
     #[tokio::test]
-    async fn test_json_extraction_error_handling() {
+    async fn test_name_method() {
         let client = ProxyLlmClient::new(ProxyClientConfig::default());
-
-        // Mock a JSON response with usage field
-        let mock_response = r#"{
-            "choices": [{
-                "message": {
-                    "content": "Test summary"
-                },
-                "finish_reason": "stop"
-            }],
-            "usage": {
-                "prompt_tokens": 50,
-                "completion_tokens": 30
-            }
-        }"#;
-
-        let response = mock_response.parse().unwrap();
-
-        match client.extract_models(std::pin::pin(response)).await {
-            Ok(models) => {
-                assert_eq!(models.len(), 1);
-                assert_eq!(models[0], "unknown"); // get_models returns unknown model for this test
-            }
-            Err(e) => {
-                panic!("Expected Ok but got error: {}", e);
-            }
-        }
+        assert_eq!(client.name(), "external_proxy_llm");
     }
 }
