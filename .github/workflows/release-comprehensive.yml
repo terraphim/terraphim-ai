@@ -210,7 +210,7 @@ jobs:
           path: universal
 
       - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v1
+        uses: 1password/install-cli-action@v2
 
       - name: Load signing credentials from 1Password
         env:
@@ -366,7 +366,7 @@ jobs:
 
       - name: Install 1Password CLI (macOS/Linux)
         if: runner.os != 'Windows'
-        uses: 1password/install-cli-action@v1
+        uses: 1password/install-cli-action@v2
 
       - name: Load Tauri signing key from 1Password (macOS/Linux)
         if: runner.os != 'Windows'
@@ -715,7 +715,7 @@ jobs:
           🤖 Automated update from release workflow"
 
       - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v1
+        uses: 1password/install-cli-action@v2
 
       - name: Push to Homebrew tap
         env:

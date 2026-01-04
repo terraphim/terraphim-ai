@@ -251,7 +251,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install 1Password CLI
-        uses: 1password/install-cli-action@v1.0.0
+        uses: 1password/install-cli-action@v2
 
       - name: Authenticate with 1Password
         run: |
