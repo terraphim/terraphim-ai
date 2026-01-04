@@ -27,7 +27,6 @@ pub mod llm;
 
 pub mod llm_proxy;
 
-// LLM proxy service\npub mod proxy_client;
 
 // LLM Router configuration integration\n
 
