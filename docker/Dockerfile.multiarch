@@ -110,7 +110,9 @@ COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
 COPY terraphim_firecracker ./terraphim_firecracker
-COPY --from=frontend-builder /app/dist ./terraphim_server/dist
+
+# Copy frontend to desktop/dist (RustEmbed expects ../desktop/dist relative to terraphim_server)
+COPY --from=frontend-builder /app/dist ./desktop/dist
 
 # Modify workspace to exclude Tauri and nodejs members (not needed for server build)
 RUN sed -i 's/, "desktop\/src-tauri", "terraphim_ai_nodejs"//g' Cargo.toml
