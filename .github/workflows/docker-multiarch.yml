@@ -97,8 +97,8 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
           if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-            DOCKERHUB_USER=$(op read "op://TerraphimPlatform/dockerhub-credentials/username" 2>/dev/null || echo "")
-            DOCKERHUB_TOKEN=$(op read "op://TerraphimPlatform/dockerhub-credentials/token" 2>/dev/null || echo "")
+            DOCKERHUB_USER=$(op read "op://TerraphimPlatform/DockerHubTokenGithub/username" 2>/dev/null || echo "")
+            DOCKERHUB_TOKEN=$(op read "op://TerraphimPlatform/DockerHubTokenGithub/token" 2>/dev/null || echo "")
             if [ -n "$DOCKERHUB_USER" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
               echo "DOCKERHUB_USERNAME=$DOCKERHUB_USER" >> $GITHUB_ENV
               echo "DOCKERHUB_TOKEN=$DOCKERHUB_TOKEN" >> $GITHUB_ENV
@@ -239,8 +239,8 @@ jobs:
           OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
           if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
-            DOCKERHUB_USER=$(op read "op://TerraphimPlatform/dockerhub-credentials/username" 2>/dev/null || echo "")
-            DOCKERHUB_TOKEN=$(op read "op://TerraphimPlatform/dockerhub-credentials/token" 2>/dev/null || echo "")
+            DOCKERHUB_USER=$(op read "op://TerraphimPlatform/DockerHubTokenGithub/username" 2>/dev/null || echo "")
+            DOCKERHUB_TOKEN=$(op read "op://TerraphimPlatform/DockerHubTokenGithub/token" 2>/dev/null || echo "")
             if [ -n "$DOCKERHUB_USER" ] && [ -n "$DOCKERHUB_TOKEN" ]; then
               echo "DOCKERHUB_USERNAME=$DOCKERHUB_USER" >> $GITHUB_ENV
               echo "DOCKERHUB_TOKEN=$DOCKERHUB_TOKEN" >> $GITHUB_ENV
