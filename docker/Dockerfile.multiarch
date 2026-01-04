@@ -109,6 +109,7 @@ WORKDIR /code
 COPY Cargo.toml Cargo.lock ./
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
+COPY terraphim_firecracker ./terraphim_firecracker
 COPY --from=frontend-builder /app/dist ./terraphim_server/dist
 
 # Fetch dependencies
