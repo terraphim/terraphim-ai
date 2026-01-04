@@ -364,10 +364,12 @@ jobs:
         working-directory: ./desktop
         run: yarn build
 
-      - name: Install 1Password CLI
+      - name: Install 1Password CLI (macOS/Linux)
+        if: runner.os != 'Windows'
         uses: 1password/install-cli-action@v1
 
-      - name: Load Tauri signing key from 1Password
+      - name: Load Tauri signing key from 1Password (macOS/Linux)
+        if: runner.os != 'Windows'
         id: tauri-key
         continue-on-error: true
         shell: bash
@@ -403,8 +405,11 @@ jobs:
             mv tauri.conf.json.tmp tauri.conf.json
           else
             # Fallback: use sed to disable updater
-            sed -i.bak 's/"active": true/"active": false/' tauri.conf.json
-            rm -f tauri.conf.json.bak
+            if [[ "$OSTYPE" == "darwin"* ]]; then
+              sed -i '' 's/"active": true/"active": false/' tauri.conf.json
+            else
+              sed -i 's/"active": true/"active": false/' tauri.conf.json
+            fi
           fi
           echo "Updater disabled in tauri.conf.json"
 
