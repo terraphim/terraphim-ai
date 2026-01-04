@@ -98,16 +98,19 @@ jobs:
 
       - name: Build server binary
         if: "!matrix.use_cross"
+        shell: bash
         run: |
           cargo build --release \
             --target ${{ matrix.target }} -p terraphim_server --bin terraphim_server
 
       - name: Build TUI binary
+        shell: bash
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
             --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent
 
       - name: Build CLI binary
+        shell: bash
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
             --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
