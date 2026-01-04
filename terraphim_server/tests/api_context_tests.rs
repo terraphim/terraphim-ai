@@ -41,6 +41,8 @@ fn create_test_config() -> Config {
                 llm_router_enabled: false,
                 llm_router_config: None,
                 extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
                 terraphim_it: false,
             },
         )

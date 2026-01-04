@@ -38,6 +38,8 @@ async fn test_ollama_summarize_real() {
         extra: ahash::AHashMap::new(),
         llm_router_enabled: false,
         llm_router_config: None,
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
     role.extra
         .insert("llm_provider".into(), serde_json::json!("ollama"));

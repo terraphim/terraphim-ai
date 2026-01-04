@@ -108,6 +108,8 @@ async fn test_perplexity_service_type_integration() {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     assert_eq!(role.haystacks.len(), 1);
@@ -204,6 +206,8 @@ async fn test_perplexity_missing_api_key() {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     let mut config = ConfigBuilder::new()
@@ -302,6 +306,8 @@ async fn perplexity_live_api_test() {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     let mut config = ConfigBuilder::new()

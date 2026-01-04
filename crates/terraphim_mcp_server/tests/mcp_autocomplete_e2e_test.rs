@@ -101,6 +101,8 @@ async fn create_autocomplete_test_config() -> Result<String> {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     let mut config = ConfigBuilder::new()
@@ -579,6 +581,8 @@ async fn test_autocomplete_error_handling() -> Result<()> {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     let invalid_config = ConfigBuilder::new()
