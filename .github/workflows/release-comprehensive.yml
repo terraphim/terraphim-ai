@@ -351,12 +351,10 @@ jobs:
         if: startsWith(matrix.platform, 'ubuntu-')
         run: |
           sudo apt-get update
-          # Try webkit 4.1 first (Ubuntu 24.04+), fallback to 4.0 (Ubuntu 22.04)
+          # Tauri v1 requires webkit 4.0 - install from matrix variables
           sudo apt-get install -yqq --no-install-recommends \
-            libwebkit2gtk-4.1-dev libjavascriptcoregtk-4.1-dev 2>/dev/null || \
-          sudo apt-get install -yqq --no-install-recommends \
-            libwebkit2gtk-4.0-dev libjavascriptcoregtk-4.0-dev
-          sudo apt-get install -y libgtk-3-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
+            ${{ matrix.webkit-package }} ${{ matrix.javascriptcore-package }} \
+            libgtk-3-dev libsoup2.4-dev libayatana-appindicator3-dev librsvg2-dev pkg-config
 
       - name: Install frontend dependencies
         working-directory: ./desktop
@@ -366,11 +364,57 @@ jobs:
         working-directory: ./desktop
         run: yarn build
 
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v1
+
+      - name: Load Tauri signing key from 1Password
+        id: tauri-key
+        continue-on-error: true
+        shell: bash
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          if [ -n "$OP_SERVICE_ACCOUNT_TOKEN" ]; then
+            TAURI_KEY=$(op read "op://TerraphimPlatform/tauri-signing-key/private-key" 2>/dev/null || echo "")
+            if [ -n "$TAURI_KEY" ]; then
+              echo "TAURI_PRIVATE_KEY<<EOF" >> $GITHUB_ENV
+              echo "$TAURI_KEY" >> $GITHUB_ENV
+              echo "EOF" >> $GITHUB_ENV
+              echo "has_key=true" >> $GITHUB_OUTPUT
+              echo "Tauri signing key loaded successfully"
+            else
+              echo "has_key=false" >> $GITHUB_OUTPUT
+              echo "Tauri signing key not found in 1Password"
+            fi
+          else
+            echo "has_key=false" >> $GITHUB_OUTPUT
+            echo "No 1Password token available"
+          fi
+
+      - name: Disable updater if no signing key
+        if: steps.tauri-key.outputs.has_key != 'true'
+        shell: bash
+        working-directory: ./desktop/src-tauri
+        run: |
+          echo "Disabling Tauri updater (no signing key available)"
+          # Remove pubkey to disable updater signing requirement
+          if command -v jq &> /dev/null; then
+            jq '.tauri.updater.active = false | del(.tauri.updater.pubkey)' tauri.conf.json > tauri.conf.json.tmp
+            mv tauri.conf.json.tmp tauri.conf.json
+          else
+            # Fallback: use sed to disable updater
+            sed -i.bak 's/"active": true/"active": false/' tauri.conf.json
+            rm -f tauri.conf.json.bak
+          fi
+          echo "Updater disabled in tauri.conf.json"
+
       - name: Build Tauri app
         working-directory: ./desktop
+        shell: bash
         run: yarn tauri build
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_PRIVATE_KEY: ${{ env.TAURI_PRIVATE_KEY }}
 
       - name: Upload desktop artifacts (macOS)
         if: matrix.platform == 'macos-latest'
