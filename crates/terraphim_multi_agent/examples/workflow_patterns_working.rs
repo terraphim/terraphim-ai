@@ -383,6 +383,8 @@ fn create_simple_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
@@ -406,6 +408,8 @@ fn create_complex_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
@@ -429,6 +433,8 @@ fn create_perspective_role(perspective: &str) -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
@@ -452,6 +458,8 @@ fn create_orchestrator_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
@@ -475,6 +483,8 @@ fn create_worker_role(worker_name: &str) -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
@@ -498,6 +508,8 @@ fn create_generator_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
@@ -521,6 +533,8 @@ fn create_evaluator_role() -> Role {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         haystacks: vec![],
         extra,
     }
