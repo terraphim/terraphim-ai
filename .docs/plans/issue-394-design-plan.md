@@ -338,3 +338,51 @@ The implementation is broken into 8 incremental steps, each keeping the system d
 ---
 
 **Do you approve this plan as-is, or would you like to adjust any part?**
+
+---
+
+## Implementation Progress
+
+### Completed Steps ✅
+
+#### Step 0: Fix Empty Pattern Bug (CRITICAL - Added during implementation)
+- **Date**: 2026-01-04
+- **PR**: #396
+- **Commit**: `f4c60fc1`
+- **Problem Discovered**: Empty patterns in thesaurus caused spurious text insertions between every character
+- **Root Cause**: Aho-Corasick empty patterns match at every position (index 0, 1, 2, ...)
+- **Fix Applied**:
+  - Added `MIN_PATTERN_LENGTH` constant (2) to filter invalid patterns
+  - Updated both `find_matches()` and `replace_matches()` in `crates/terraphim_automata/src/matcher.rs`
+  - Added logging for skipped invalid patterns
+  - Return original text when no valid patterns exist
+- **Tests Added**: 6 comprehensive regression tests:
+  - `test_empty_pattern_does_not_cause_spurious_insertions`
+  - `test_single_char_pattern_is_filtered`
+  - `test_whitespace_only_pattern_is_filtered`
+  - `test_valid_replacement_still_works`
+  - `test_empty_thesaurus_returns_original`
+  - `test_find_matches_filters_empty_patterns`
+- **Status**: ✅ Merged to `fix/replacement-empty-pattern-bug` branch
+
+### Steps 1-8: Original Plan (Pending)
+
+The original design plan steps for case preservation and URL protection remain pending:
+- Step 1: Add `display_value` field to `NormalizedTerm` - ✅ Completed in prior PR
+- Step 2: Update `NormalizedTerm::new()` with builder method - ✅ Completed in prior PR
+- Step 3: Update `index_inner()` to store original case - ✅ Completed in prior PR
+- Step 4: Create `url_protector` module - ✅ Completed in prior PR
+- Step 5: Update `replace_matches()` to use display_value - ✅ Completed in prior PR
+- Step 6: Integrate URL protection into `replace_matches()` - ✅ Completed in prior PR
+- Step 7: Update integration tests - ✅ Completed in prior PR
+- Step 8: Verify WASM compatibility - ✅ Verified
+
+### Bug Discovery Notes
+
+The empty pattern bug was discovered during implementation when testing the replacement functionality. The symptom was:
+- Input: `npm install express`
+- Output: `bun install exmatching_and_iterators_in_rustpmatching_and_iterators_in_rustpmatching...`
+
+Investigation revealed that an empty pattern `""` in the thesaurus was matching at every character boundary, causing the replacement value to be inserted between each character.
+
+This bug is now fixed and documented for future reference.
