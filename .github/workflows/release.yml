@@ -1,8 +1,12 @@
 name: Release
+
+# DISABLED: This workflow has been superseded by release-comprehensive.yml
+# Use workflow_dispatch only for manual testing
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  # Disabled tag trigger - release-comprehensive.yml handles releases
+  # push:
+  #   tags:
+  #     - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       version:
