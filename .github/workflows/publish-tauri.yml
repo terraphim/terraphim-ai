@@ -1,9 +1,13 @@
 name: Publish Tauri with Auto-Update
+
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles Tauri builds
+# Use workflow_dispatch for manual Tauri builds
 on:
-  push:
-    tags:
-      - "v*"
-      - "app-v*"
+  # Disabled tag trigger - release-comprehensive.yml handles Tauri builds
+  # push:
+  #   tags:
+  #     - "v*"
+  #     - "app-v*"
   workflow_dispatch:
 
 jobs:

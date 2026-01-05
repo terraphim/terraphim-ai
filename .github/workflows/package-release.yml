@@ -1,9 +1,18 @@
 name: Package Release
 
+# DISABLED: This workflow has been superseded by release-comprehensive.yml
+# Use workflow_dispatch only for manual testing
 on:
-  push:
-    tags:
-      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to release (for testing)'
+        required: true
+        type: string
+  # Disabled tag trigger - release-comprehensive.yml handles releases
+  # push:
+  #   tags:
+  #     - 'v*'
 
 permissions:
   contents: write

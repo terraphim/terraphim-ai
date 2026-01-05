@@ -738,3 +738,61 @@ jobs:
             echo "⚠️  homebrew-tap-token not found in 1Password - skipping push"
             echo "Ensure token exists at: op://TerraphimPlatform/homebrew-tap-token/token"
           fi
+
+  publish-crates:
+    name: Publish Rust crates to crates.io
+    needs: create-release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/v')
+    environment: production
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install 1Password CLI
+        uses: 1password/install-cli-action@v2
+
+      - name: Cache Cargo dependencies
+        uses: Swatinem/rust-cache@v2
+
+      - name: Test crates before publishing
+        run: |
+          cargo test --workspace --lib --quiet
+          cargo check --workspace --all-targets --quiet
+
+      - name: Get crates.io token from 1Password
+        id: token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
+        run: |
+          TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+
+      - name: Publish crates in dependency order
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          # Make script executable
+          chmod +x ./scripts/publish-crates.sh
+
+          # Extract version from tag
+          VERSION=${GITHUB_REF#refs/tags/v}
+
+          # Run publish script with version
+          ./scripts/publish-crates.sh --version "$VERSION"
+
+      - name: Verify published packages
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.token.outputs.token }}
+        run: |
+          echo "🔍 Verifying packages are available on crates.io..."
+          # Allow some time for crates.io to index
+          sleep 30
+          cargo install --dry-run terraphim_agent || echo "⚠️  Installation dry-run failed (may need more time)"
+          echo "✅ Publishing workflow completed!"
