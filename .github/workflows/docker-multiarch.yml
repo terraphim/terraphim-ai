@@ -218,6 +218,7 @@ jobs:
       - name: Build and push to DockerHub
         if: inputs.push && steps.dockerhub-check.outputs.enabled == 'true'
         uses: docker/build-push-action@v6
+        continue-on-error: true  # DockerHub is optional, don't fail if unavailable
         with:
           context: .
           file: docker/Dockerfile.multiarch
@@ -241,6 +242,7 @@ jobs:
 
       - name: Verify DockerHub build
         if: inputs.push && steps.dockerhub-check.outputs.enabled == 'true'
+        continue-on-error: true  # DockerHub is optional
         run: |
           echo "Verifying DockerHub build for Ubuntu ${{ matrix.ubuntu-version }}:"
           docker buildx imagetools inspect ${{ env.DOCKERHUB_IMAGE }}:${{ inputs.tag }}-ubuntu${{ matrix.ubuntu-version }} || true
