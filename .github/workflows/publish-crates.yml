@@ -1,5 +1,7 @@
 name: Publish Rust Crates
 
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles crate publishing
+# Use workflow_dispatch for manual crate publishing (e.g., publishing a single crate)
 on:
   workflow_dispatch:
     inputs:
@@ -12,9 +14,10 @@ on:
         required: false
         type: boolean
         default: true
-  push:
-    tags:
-      - 'v*'
+  # Disabled tag trigger - release-comprehensive.yml handles crate publishing
+  # push:
+  #   tags:
+  #     - 'v*'
 
 permissions:
   contents: write

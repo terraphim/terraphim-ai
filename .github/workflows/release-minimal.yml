@@ -1,9 +1,12 @@
 name: Release Minimal Binaries
 
+# DISABLED: This workflow has been superseded by release-comprehensive.yml
+# Use workflow_dispatch only for manual testing
 on:
-  push:
-    tags:
-      - 'v*'  # Triggers on version tags like v1.0.0, v1.1.0, etc.
+  # Disabled tag trigger - release-comprehensive.yml handles releases
+  # push:
+  #   tags:
+  #     - 'v*'  # Triggers on version tags like v1.0.0, v1.1.0, etc.
   workflow_dispatch:
     inputs:
       version:
