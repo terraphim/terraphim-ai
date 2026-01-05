@@ -41,6 +41,10 @@ on:
         description: '1Password service account token'
         required: false
 
+permissions:
+  contents: read
+  packages: write
+
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
