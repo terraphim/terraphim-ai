@@ -130,12 +130,13 @@ RUN . /root/.profile && \
     --package terraphim_mcp_server \
     --package terraphim_agent
 
-# Test the binaries
+# Verify binaries exist (can't test cross-compiled binaries on build host)
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
-    ./target/$RUST_TARGET/release/terraphim_server --version && \
-    ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
-    ./target/$RUST_TARGET/release/terraphim-agent --version
+    ls -la ./target/$RUST_TARGET/release/terraphim_server && \
+    ls -la ./target/$RUST_TARGET/release/terraphim_mcp_server && \
+    ls -la ./target/$RUST_TARGET/release/terraphim-agent && \
+    file ./target/$RUST_TARGET/release/terraphim_server
 
 # Move binaries to predictable location
 RUN . /root/.profile && \
