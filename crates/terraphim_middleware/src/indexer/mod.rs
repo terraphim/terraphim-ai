@@ -9,9 +9,10 @@ mod ripgrep;
 use crate::haystack::AiAssistantHaystackIndexer;
 #[cfg(feature = "terraphim_atomic_client")]
 use crate::haystack::AtomicHaystackIndexer;
+#[cfg(feature = "grepapp")]
+use crate::haystack::GrepAppHaystackIndexer;
 use crate::haystack::{
-    ClickUpHaystackIndexer, GrepAppHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
-    QueryRsHaystackIndexer,
+    ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -105,9 +106,20 @@ pub async fn search_haystacks(
                 perplexity.index(needle, haystack).await?
             }
             ServiceType::GrepApp => {
-                // Search using grep.app for code across GitHub repositories
-                let grep_app = GrepAppHaystackIndexer::default();
-                grep_app.index(needle, haystack).await?
+                #[cfg(feature = "grepapp")]
+                {
+                    // Search using grep.app for code across GitHub repositories
+                    let grep_app = GrepAppHaystackIndexer::default();
+                    grep_app.index(needle, haystack).await?
+                }
+                #[cfg(not(feature = "grepapp"))]
+                {
+                    log::warn!(
+                        "GrepApp haystack support not enabled. Skipping haystack: {}",
+                        haystack.location
+                    );
+                    Index::new()
+                }
             }
             ServiceType::AiAssistant => {
                 #[cfg(feature = "ai-assistant")]

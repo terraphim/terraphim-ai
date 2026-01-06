@@ -18,9 +18,9 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["tokio-runtime"] }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
-terraphim_atomic_client = { path = "../terraphim_atomic_client", features = ["native"], optional = true }
-grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0" }
-claude-log-analyzer = { path = "../claude-log-analyzer", features = ["connectors"], optional = true }
+terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
+grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
+claude-log-analyzer = { path = "../claude-log-analyzer", version = "0.1.0", features = ["connectors"], optional = true }
 jiff = { version = "0.1", optional = true }
 home = { version = "0.5", optional = true }
 
@@ -62,6 +62,8 @@ default = []
 # atomic = ["terraphim_atomic_client"]
 # Enable openrouter integration
 openrouter = ["terraphim_config/openrouter"]
+# Enable grepapp haystack (disabled for crates.io publishing - not published yet)
+grepapp = ["grepapp_haystack"]
 # Enable SSE-based MCP client probing
 mcp-sse = ["reqwest-eventsource"]
 # High-level MCP support using SSE/http-only (no rust-sdk)
