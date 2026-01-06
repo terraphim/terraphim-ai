@@ -46,10 +46,12 @@ CRATES=(
   "terraphim_types"
   "terraphim_settings"
   "terraphim_persistence"
-  "terraphim_config"
   "terraphim_automata"
+  "terraphim_config"
   "terraphim_rolegraph"
+  "terraphim_hooks"
   "terraphim_middleware"
+  "terraphim_update"
   "terraphim_service"
   "terraphim_agent"
 )
