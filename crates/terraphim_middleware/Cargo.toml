@@ -21,7 +21,7 @@ terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 # NOTE: terraphim_atomic_client and grepapp_haystack are commented out for crates.io publishing (not published yet)
 # terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
 # grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
-claude-log-analyzer = { path = "../claude-log-analyzer", version = "0.1.0", features = ["connectors"], optional = true }
+claude-log-analyzer = { path = "../claude-log-analyzer", version = "1.0.0", features = ["connectors"], optional = true }
 jiff = { version = "0.1", optional = true }
 home = { version = "0.5", optional = true }
 
