@@ -1,0 +1,71 @@
+{
+  "gates": [
+    {
+      "name": "API Response Time",
+      "metric": "search_api.avg_time_ms",
+      "operator": "LessThan",
+      "threshold": 1000.0,
+      "severity": "Blocking"
+    },
+    {
+      "name": "Search Success Rate",
+      "metric": "search_api.success_rate",
+      "operator": "GreaterThanOrEqual",
+      "threshold": 99.0,
+      "severity": "Blocking"
+    },
+    {
+      "name": "CPU Usage Idle",
+      "metric": "resource_monitoring_idle.cpu_percent",
+      "operator": "LessThan",
+      "threshold": 5.0,
+      "severity": "Warning"
+    },
+    {
+      "name": "CPU Usage Load",
+      "metric": "resource_monitoring_load.cpu_percent",
+      "operator": "LessThan",
+      "threshold": 80.0,
+      "severity": "Warning"
+    },
+    {
+      "name": "Memory Usage",
+      "metric": "resource_monitoring_load.memory_mb",
+      "operator": "LessThan",
+      "threshold": 1024.0,
+      "severity": "Blocking"
+    },
+    {
+      "name": "Health Check Response Time",
+      "metric": "health_check.avg_time_ms",
+      "operator": "LessThan",
+      "threshold": 100.0,
+      "severity": "Warning"
+    },
+    {
+      "name": "Chat API Response Time",
+      "metric": "chat_api.avg_time_ms",
+      "operator": "LessThan",
+      "threshold": 2000.0,
+      "severity": "Warning"
+    },
+    {
+      "name": "Config API Response Time",
+      "metric": "config_api.avg_time_ms",
+      "operator": "LessThan",
+      "threshold": 500.0,
+      "severity": "Warning"
+    }
+  ],
+  "fail_on_regression": true,
+  "regression_threshold_percent": 5.0,
+  "update_baseline_on_success": true,
+  "reporting": {
+    "json": true,
+    "html": true,
+    "markdown": true,
+    "upload_external": false,
+    "upload_url": null
+  }
+}</content>
+<parameter name="filePath">benchmark-config.json
