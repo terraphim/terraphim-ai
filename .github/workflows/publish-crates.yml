@@ -85,11 +85,17 @@ jobs:
 
           if [[ -n "${{ github.event.inputs.dry_run }}" && "${{ github.event.inputs.dry_run }}" == "true" ]]; then
             ARGS="$ARGS --dry-run"
-          elif [[ "${{ github.event_name }}" == "push" && startsWith(github.ref, 'refs/tags/v') ]]; then
-            # Extract version from tag
-            VERSION=${GITHUB_REF#refs/tags/v}
-            ARGS="$ARGS --version $VERSION"
           fi
+
+          # Get version - from tag or from Cargo.toml
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+          else
+            # Extract version from Cargo.toml for manual dispatch
+            VERSION=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "//; s/"//')
+          fi
+          ARGS="$ARGS --version $VERSION"
+          echo "Publishing with version: $VERSION"
 
           # Run publish script
           ./scripts/publish-crates.sh $ARGS
