@@ -252,21 +252,19 @@ main() {
   local -a crates_to_publish
 
   if [[ -n "$SPECIFIC_CRATE" ]]; then
-    # Publish specific crate and its dependencies
+    # Publish specific crate and all its dependencies (crates that come before it in the list)
     log_info "Publishing specific crate: $SPECIFIC_CRATE and its dependencies"
 
-    local publish=false
+    local found=false
     for crate in "${CRATES[@]}"; do
+      crates_to_publish+=("$crate")
       if [[ "$crate" == "$SPECIFIC_CRATE" ]]; then
-        publish=true
-      fi
-
-      if [[ "$publish" == "true" ]]; then
-        crates_to_publish+=("$crate")
+        found=true
+        break
       fi
     done
 
-    if [[ ${#crates_to_publish[@]} -eq 0 ]]; then
+    if [[ "$found" != "true" ]]; then
       log_error "Crate $SPECIFIC_CRATE not found in dependency chain"
       exit 1
     fi
