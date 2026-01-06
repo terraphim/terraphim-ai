@@ -39,17 +39,7 @@ jobs:
           components: rustfmt, clippy
 
       - name: Install 1Password CLI
-        run: |
-          curl -sSf https://downloads.1password.com/linux/keys/1password.asc | \
-            gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-            sudo tee /etc/apt/sources.list.d/1password.list
-          sudo apt update && sudo apt install op -y
-
-      - name: Authenticate with 1Password
-        run: |
-          # Set up 1Password authentication for CI
-          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
+        uses: 1password/install-cli-action@v2
 
       - name: Cache Cargo dependencies
         uses: actions/cache@v4
@@ -60,13 +50,12 @@ jobs:
             target
           key: ${{ runner.os }}-cargo-publish-${{ hashFiles('**/Cargo.lock') }}
 
-      - name: Test crates before publishing
-        run: |
-          cargo test --workspace --lib --quiet
-          cargo check --workspace --all-targets --quiet
+      # NOTE: Tests skipped - CI workflow already validates before release
 
       - name: Get crates.io token from 1Password
         id: token
+        env:
+          OP_SERVICE_ACCOUNT_TOKEN: ${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}
         run: |
           TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
           echo "token=$TOKEN" >> $GITHUB_OUTPUT
