@@ -476,7 +476,116 @@ For development, see our comprehensive [Development Setup Guide](docs/src/develo
 
 ## Claude Code Integration
 
-Terraphim provides seamless integration with Claude Code through multiple approaches, enabling intelligent text replacement and codebase quality evaluation.
+Terraphim provides seamless integration with Claude Code through hooks, skills, and the terraphim-agent CLI.
+
+### Quick Setup (User-Level)
+
+**Step 1: Install terraphim-agent**
+```bash
+# macOS ARM64 (Apple Silicon)
+gh release download --repo terraphim/terraphim-ai \
+  --pattern "terraphim-agent-aarch64-apple-darwin" --dir /tmp
+chmod +x /tmp/terraphim-agent-aarch64-apple-darwin
+mv /tmp/terraphim-agent-aarch64-apple-darwin ~/.cargo/bin/terraphim-agent
+
+# macOS x86_64 (Intel)
+gh release download --repo terraphim/terraphim-ai \
+  --pattern "terraphim-agent-x86_64-apple-darwin" --dir /tmp
+chmod +x /tmp/terraphim-agent-x86_64-apple-darwin
+mv /tmp/terraphim-agent-x86_64-apple-darwin ~/.cargo/bin/terraphim-agent
+
+# Linux x86_64
+gh release download --repo terraphim/terraphim-ai \
+  --pattern "terraphim-agent-x86_64-unknown-linux-gnu" --dir /tmp
+chmod +x /tmp/terraphim-agent-x86_64-unknown-linux-gnu
+mv /tmp/terraphim-agent-x86_64-unknown-linux-gnu ~/.cargo/bin/terraphim-agent
+```
+
+**Note:** The crates.io version (`cargo install terraphim_agent`) is v1.0.0 and missing `hook` and `guard` commands. Use GitHub releases.
+
+**Step 2: Install Claude Code Skills Plugin**
+```bash
+claude plugin marketplace add terraphim/terraphim-skills
+claude plugin install terraphim-engineering-skills@terraphim-skills
+```
+
+**Step 3: Configure User-Level Hooks**
+
+Add to `~/.claude/settings.local.json`:
+```json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{
+        "type": "command",
+        "command": "~/.claude/hooks/pre_tool_use.sh"
+      }]
+    }]
+  }
+}
+```
+
+Create `~/.claude/hooks/pre_tool_use.sh`:
+```bash
+#!/bin/bash
+set -euo pipefail
+INPUT=$(cat)
+TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
+COMMAND=$(echo "$INPUT" | jq -r '.tool_input.command // empty')
+
+[ "$TOOL_NAME" != "Bash" ] && exit 0
+[ -z "$COMMAND" ] && exit 0
+
+AGENT="$HOME/.cargo/bin/terraphim-agent"
+[ ! -x "$AGENT" ] && exit 0
+
+# Git Safety Guard - block destructive commands
+GUARD=$($AGENT guard --json <<< "$COMMAND" 2>/dev/null || echo '{"decision":"allow"}')
+if echo "$GUARD" | jq -e '.decision == "block"' >/dev/null 2>&1; then
+    REASON=$(echo "$GUARD" | jq -r '.reason')
+    echo '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"BLOCKED: '"$REASON"'"}}'
+    exit 0
+fi
+
+# Knowledge graph replacement
+cd ~/.config/terraphim 2>/dev/null && $AGENT hook --hook-type pre-tool-use --json <<< "$INPUT" 2>/dev/null
+```
+
+```bash
+mkdir -p ~/.claude/hooks && chmod +x ~/.claude/hooks/pre_tool_use.sh
+```
+
+**Step 4: Set Up Knowledge Graph**
+```bash
+mkdir -p ~/.config/terraphim/docs/src/kg
+
+cat > ~/.config/terraphim/docs/src/kg/bun_install.md << 'EOF'
+# bun install
+synonyms:: npm install, yarn install, pnpm install
+EOF
+```
+
+### Features
+
+| Feature | Command | Description |
+|---------|---------|-------------|
+| **Git Safety Guard** | `terraphim-agent guard` | Blocks destructive commands (git reset --hard, rm -rf, etc.) |
+| **Text Replacement** | `terraphim-agent replace` | Knowledge graph-based text substitution |
+| **Hook Integration** | `terraphim-agent hook` | Claude Code PreToolUse/PostToolUse hooks |
+
+### Verification
+```bash
+# Test guard
+echo "git reset --hard" | terraphim-agent guard --json
+# {"decision":"block","reason":"git reset --hard destroys uncommitted changes..."}
+
+# Test replacement
+cd ~/.config/terraphim && echo "npm install" | terraphim-agent replace
+# bun install
+```
+
+📖 **Full Documentation**: [terraphim-skills README](https://github.com/terraphim/terraphim-skills)
 
 ### 🔄 Text Replacement (Hooks & Skills)
 
@@ -485,8 +594,8 @@ Use Terraphim's knowledge graph capabilities to automatically replace text patte
 **Claude Code Hooks** - Automatic, transparent replacements:
 ```bash
 # Example: Automatically replace npm with bun
-echo "npm install" | terraphim-tui replace
-# Output: bun_install
+echo "npm install" | terraphim-agent replace
+# Output: bun install
 ```
 
 **Claude Skills** - Context-aware, conversational assistance:
@@ -495,8 +604,8 @@ echo "npm install" | terraphim-tui replace
 - Progressive disclosure of functionality
 
 **Examples:**
-- Package manager enforcement (npm/yarn/pnpm → bun)
-- Attribution replacement (Claude Code → Terraphim AI)
+- Package manager enforcement (npm/yarn/pnpm -> bun)
+- Attribution replacement (Claude Code -> Terraphim AI)
 - Custom domain-specific replacements
 
 📖 **Complete Guide**: [examples/TERRAPHIM_CLAUDE_INTEGRATION.md](examples/TERRAPHIM_CLAUDE_INTEGRATION.md)
