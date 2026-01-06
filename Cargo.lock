@@ -9763,6 +9763,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "cached",
+ "claude-log-analyzer",
  "dotenvy",
  "env_logger 0.11.8",
  "futures",
