@@ -220,12 +220,12 @@ publish_crate() {
   fi
 
   if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "Dry-run: cargo publish --package $crate --dry-run"
-    cargo publish --package "$crate" --dry-run
+    log_info "Dry-run: cargo publish --package $crate --dry-run --allow-dirty"
+    cargo publish --package "$crate" --dry-run --allow-dirty
   else
-    log_info "Running: cargo publish --package $crate"
+    log_info "Running: cargo publish --package $crate --allow-dirty"
 
-    if cargo publish --package "$crate"; then
+    if cargo publish --package "$crate" --allow-dirty; then
       log_success "Published $crate v$version successfully"
       log_info "Waiting 60 seconds for crates.io to process..."
       sleep 60
