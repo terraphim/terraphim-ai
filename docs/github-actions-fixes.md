@@ -36,17 +36,17 @@ lint-and-format:
 lint-and-format:
   runs-on: [self-hosted, linux, x64, repository, terraphim-ai, linux-self-hosted]
   timeout-minutes: 15
-  
+
   # Add cleanup step to prevent permission issues
   steps:
     - name: Checkout code
       uses: actions/checkout@v5
-      
+
     - name: Clean target directory
       run: |
         rm -rf target || true
         mkdir -p target
-        
+
     - name: Cache Cargo dependencies
       uses: actions/cache@v4
       with:
@@ -96,24 +96,24 @@ build-frontend:
   steps:
     - name: Checkout code
       uses: actions/checkout@v5
-      
+
     - name: Setup Node.js
       uses: actions/setup-node@v4
       with:
         node-version: '20'
-        
+
     - name: Cache node modules
       uses: actions/cache@v4
       with:
         path: ~/.npm
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-        
+
     - name: Install dependencies
       run: npm ci
-      
+
     - name: Build frontend
       run: npm run build:ci
-      
+
     - name: Upload frontend artifacts
       uses: actions/upload-artifact@v4
       with:

@@ -111,6 +111,61 @@ Terraphim is built as a modular Rust project with multiple crates, each serving 
 
 **Dependencies**: serde, tokio
 
+## Session Management
+
+### terraphim_sessions
+**Purpose**: AI coding assistant session history management
+**Key Features**:
+- Multi-source session import (Claude Code, Cursor, Aider, OpenCode)
+- Session caching and search
+- Knowledge graph concept enrichment
+- Related session discovery
+- Timeline visualization
+- Export to JSON/Markdown
+
+**Feature Flags**:
+- `claude-log-analyzer` - Enhanced Claude Code parsing via CLA
+- `cla-full` - CLA with Cursor connector support
+- `enrichment` - Knowledge graph concept matching
+- `full` - All features enabled
+
+**Dependencies**: tokio, serde, terraphim_automata (optional)
+
+### claude-log-analyzer
+**Purpose**: Parse and analyze Claude Code session logs
+**Key Features**:
+- JSONL session log parsing from `~/.claude/projects/`
+- Agent type detection and attribution
+- File operation tracking
+- Timeline visualization
+- Export to JSON, CSV, Markdown
+- Real-time session monitoring
+- Knowledge graph integration (optional)
+
+**Connectors**:
+- `cursor` - Cursor IDE sessions
+- `aider` - Aider chat history
+- `opencode` - OpenCode sessions
+- `codex` - Codex sessions
+
+**Dependencies**: serde_json, regex, home
+
+### terraphim_hooks
+**Purpose**: Unified hook infrastructure for AI coding agents
+**Key Features**:
+- ReplacementService for knowledge graph-based text transformation
+- HookResult struct for structured JSON output
+- Binary discovery utilities
+- Fail-open error handling
+- Support for Claude Code PreToolUse and Git hooks
+
+**Usage**:
+- CLI: `terraphim-agent replace` command
+- MCP: `replace_matches` tool
+- Hooks: npm→bun, Claude→Terraphim attribution
+
+**Dependencies**: terraphim_automata, terraphim_types, serde
+
 ## Build & Configuration
 
 ### terraphim_build_args

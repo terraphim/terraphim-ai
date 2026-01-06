@@ -1,212 +1,252 @@
-# Terraphim AI Release Process
+# Release Process Documentation
 
-This document describes the complete process for creating and publishing a new release of Terraphim AI.
+## Overview
+
+Terraphim AI uses an automated release pipeline that builds, signs, notarizes, and publishes binaries across multiple platforms.
+
+## Release Types
+
+| Tag Format | Trigger | Artifacts |
+|------------|---------|-----------|
+| `v*` | Main release | All platforms + Homebrew update |
+| `terraphim_server-v*` | Server-only | Server binaries only |
+| `terraphim-ai-desktop-v*` | Desktop-only | Desktop apps only |
+| `terraphim_agent-v*` | TUI-only | TUI binaries only |
 
 ## Prerequisites
 
-- GitHub CLI (`gh`) installed and authenticated
-- Rust toolchain with cargo-deb installed
-- Docker and Docker Buildx installed
-- Git access to the repository
-- Pre-commit hooks installed (`./scripts/install-hooks.sh`)
+### Required Credentials (stored in 1Password)
 
-## Release Process Steps
+1. **Apple Developer** (`TerraphimPlatform` vault)
+   - `apple.developer.certificate` - Developer ID Application certificate
+     - Fields: `base64` (certificate), `password` (export password)
+   - `apple.developer.credentials` - Apple ID and notarization credentials
+     - Fields: `username` (Apple ID), `APPLE_TEAM_ID`, `APPLE_APP_SPECIFIC_PASSWORD`
 
-### 1. Update Version Numbers
+2. **GitHub** (`TerraphimPlatform` vault)
+   - `homebrew-tap-token` - GitHub PAT with `repo` scope
+     - Field: `token`
 
-1. Update version in `terraphim_server/Cargo.toml`
-2. Update version in `crates/terraphim_tui/Cargo.toml`
-3. Update any other references to the old version number
+3. **GitHub Secrets**
+   - `OP_SERVICE_ACCOUNT_TOKEN` - 1Password service account token
+   - `DOCKERHUB_USERNAME` - Docker Hub username (optional)
 
-### 2. Create Release Tag
+### Required Infrastructure
 
-```bash
-git tag -a v0.2.3 -m "Release v0.2.3"
-git push origin v0.2.3
-```
+- **Self-hosted macOS Runners**:
+  - `[self-hosted, macOS, X64]` - Intel Mac for x86_64 builds
+  - `[self-hosted, macOS, ARM64]` - M-series Mac for arm64 builds + signing
 
-### 3. Create GitHub Release
+## Release Steps
 
-```bash
-gh release create v0.2.3 --title "Release v0.2.3" --notes "Release notes here"
-```
-
-### 4. Build Debian Packages
+### 1. Create Release Tag
 
 ```bash
-# Temporarily disable panic abort for building
-sed -i 's/panic = "abort"/# panic = "abort"/' .cargo/config.toml
+# For a full release
+git tag -a v1.2.3 -m "Release v1.2.3: Description"
+git push origin v1.2.3
 
-# Create LICENSE file for cargo-deb
-cp LICENSE-Apache-2.0 LICENSE
-
-# Build binaries
-cargo build --release --package terraphim_server
-cargo build --release --package terraphim_tui --features repl-full
-
-# Create Debian packages
-cargo deb --package terraphim_server
-cargo deb --package terraphim_tui
-
-# Restore panic abort
-sed -i 's/# panic = "abort"/panic = "abort"/' .cargo/config.toml
+# For a specific component
+git tag -a terraphim_server-v1.2.3 -m "Server v1.2.3: Description"
+git push origin terraphim_server-v1.2.3
 ```
 
-### 5. Build Arch Linux Packages
+### 2. Automated Pipeline Execution
+
+The `release-comprehensive.yml` workflow automatically:
+
+1. **Builds Binaries** (parallel)
+   - Linux: x86_64-gnu, x86_64-musl, aarch64-musl, armv7-musl
+   - macOS: x86_64 (Intel), aarch64 (Apple Silicon)
+   - Windows: x86_64-msvc
+
+2. **Creates Universal macOS Binaries**
+   - Combines x86_64 + aarch64 using `lipo`
+   - Produces single binary that runs on all Macs
+
+3. **Signs and Notarizes macOS Binaries**
+   - Signs with Developer ID Application certificate
+   - Adds hardened runtime (`--options runtime`)
+   - Submits to Apple for notarization
+   - Waits for Apple approval (~2-10 minutes)
+   - Verifies with `codesign --verify` and `spctl --assess`
+
+4. **Builds Debian Packages**
+   - `terraphim-server_*.deb`
+   - `terraphim-agent_*.deb`
+   - `terraphim-ai-desktop_*.deb`
+
+5. **Builds Tauri Desktop Apps**
+   - macOS: `.dmg` and `.app`
+   - Linux: `.AppImage` and `.deb`
+   - Windows: `.msi` and `.exe`
+
+6. **Builds Docker Images**
+   - Multi-arch: linux/amd64, linux/arm64, linux/arm/v7
+   - Ubuntu 20.04 and 22.04 variants
+   - Pushed to `ghcr.io/terraphim/terraphim-server`
+
+7. **Creates GitHub Release**
+   - Uploads all binaries with checksums
+   - Generates release notes with asset descriptions
+   - Marks pre-releases (alpha/beta/rc tags)
+
+8. **Updates Homebrew Formulas** (for `v*` tags only)
+   - Downloads checksums from release
+   - Updates `terraphim/homebrew-terraphim` repository
+   - Updates `terraphim-server.rb` and `terraphim-agent.rb`
+   - Commits and pushes with automation message
+
+## Workflow Jobs
+
+```
+build-binaries (matrix: 8 targets)
+  ├── Linux: x86_64-gnu, x86_64-musl, aarch64-musl, armv7-musl
+  ├── macOS: x86_64 (Intel runner), aarch64 (ARM runner)
+  └── Windows: x86_64-msvc
+  ↓
+create-universal-macos
+  └── Combines macOS x86_64 + aarch64 → universal binary
+  ↓
+sign-and-notarize-macos
+  ├── Import certificate from 1Password
+  ├── Sign with codesign --options runtime
+  ├── Submit to Apple notarization service
+  └── Verify signature and Gatekeeper acceptance
+  ↓
+create-release
+  ├── Download all artifacts
+  ├── Generate checksums
+  └── Create GitHub Release with signed binaries
+  ↓
+update-homebrew (only for v* tags)
+  ├── Clone terraphim/homebrew-terraphim
+  ├── Update formula versions and SHA256 checksums
+  └── Push to GitHub with homebrew-tap-token
+```
+
+## Manual Testing
+
+### Test Signing Locally
 
 ```bash
-# Create source tarball
-git archive --format=tar.gz --prefix=terraphim-server-0.2.3/ v0.2.3 -o terraphim-server-0.2.3.tar.gz
+# Build a binary
+cargo build --release --bin terraphim_server
 
-# Create package structure
-mkdir -p arch-packages/terraphim-server/usr/bin
-mkdir -p arch-packages/terraphim-server/etc/terraphim-ai
-mkdir -p arch-packages/terraphim-server/usr/share/doc/terraphim-server
-mkdir -p arch-packages/terraphim-server/usr/share/licenses/terraphim-server
+# Test signing script
+export RUNNER_TEMP=/tmp/signing-test
+./scripts/sign-macos-binary.sh \
+  "target/release/terraphim_server" \
+  "$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" \
+  "$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_TEAM_ID' --no-newline)" \
+  "$(op read 'op://TerraphimPlatform/apple.developer.credentials/APPLE_APP_SPECIFIC_PASSWORD' --no-newline)" \
+  "$(op read 'op://TerraphimPlatform/apple.developer.certificate/base64' --no-newline)" \
+  "$(op read 'op://TerraphimPlatform/apple.developer.certificate/password' --no-newline)"
 
-# Copy files
-cp target/release/terraphim_server arch-packages/terraphim-server/usr/bin/
-cp terraphim_server/default/*.json arch-packages/terraphim-server/etc/terraphim-ai/
-cp README.md arch-packages/terraphim-server/usr/share/doc/terraphim-server/
-cp LICENSE-Apache-2.0 arch-packages/terraphim-server/usr/share/licenses/terraphim-server/
-
-# Create PKGINFO
-cat > arch-packages/terraphim-server/.PKGINFO << EOF
-pkgname = terraphim-server
-pkgbase = terraphim-server
-pkgver = 0.2.3-1
-pkgdesc = Terraphim AI Server - Privacy-first AI assistant backend
-url = https://terraphim.ai
-builddate = $(date +%s)
-packager = Terraphim Contributors <team@terraphim.ai>
-size = 38865120
-arch = x86_64
-license = Apache-2.0
-depend = glibc
-depend = openssl
-provides = terraphim-server
-EOF
-
-# Create package
-cd arch-packages
-tar -I 'zstd -19' -cf terraphim-server-0.2.3-1-x86_64.pkg.tar.zst terraphim-server/
-cd ..
+# Verify signature
+codesign --verify --deep --strict --verbose=2 target/release/terraphim_server
+spctl --assess --type execute --verbose target/release/terraphim_server
 ```
 
-### 6. Create Installation Scripts
-
-The installation scripts should already exist in `release/v0.2.3/`:
-- `install.sh` - Automated source installation
-- `docker-run.sh` - Docker deployment script
-
-### 7. Upload Artifacts
+### Test Homebrew Installation
 
 ```bash
-# Create release directory
-mkdir -p release/v0.2.3
+# Test tap
+brew tap terraphim/terraphim
 
-# Copy all artifacts
-cp target/debian/*.deb release/v0.2.3/
-cp arch-packages/*.pkg.tar.zst release/v0.2.3/
-cp release/v0.2.3/*.sh release/v0.2.3/
-cp release/v0.2.3/*.md release/v0.2.3/
+# Test installation
+brew install terraphim-server
+brew install terraphim-agent
 
-# Upload to GitHub
-gh release upload v0.2.3 release/v0.2.3/*.deb release/v0.2.3/*.pkg.tar.zst release/v0.2.3/*.sh release/v0.2.3/*.md
+# Verify binaries run
+terraphim_server --version
+terraphim-agent --version
+
+# Verify signatures (macOS only)
+codesign --verify --deep --strict $(which terraphim_server)
+spctl --assess --type execute $(which terraphim_server)
 ```
-
-### 8. Update Documentation
-
-Update `README.md` with new release information and installation instructions.
-
-### 9. Commit Changes
-
-```bash
-# Stage changes (excluding large binary files)
-git add README.md release/v0.2.3/*.sh release/v0.2.3/*.md
-
-# Commit with conventional format
-git commit -m "docs: update documentation for v0.2.3 release"
-```
-
-## Automated Release Workflow (Future)
-
-A GitHub Actions workflow should be created to automate this process:
-
-### Workflow Steps:
-1. Trigger on tag push (e.g., `v*.*.*`)
-2. Build Debian packages using cargo-deb
-3. Build Arch Linux packages
-4. Create installation scripts
-5. Upload all artifacts to GitHub release
-6. Update documentation
-
-### Workflow File: `.github/workflows/release.yml`
-
-```yaml
-name: Release
-on:
-  push:
-    tags:
-      - 'v*'
-
-jobs:
-  release:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions-rs/toolchain@v1
-        with:
-          toolchain: stable
-      - name: Install cargo-deb
-        run: cargo install cargo-deb
-      - name: Build packages
-        run: |
-          # Build steps...
-      - name: Upload Release Assets
-        uses: softprops/action-gh-release@v1
-        with:
-          files: |
-            target/debian/*.deb
-            arch-packages/*.pkg.tar.zst
-            release/*/install.sh
-            release/*/docker-run.sh
-            release/*/README.md
-```
-
-## Release Checklist
-
-- [ ] Version numbers updated in all Cargo.toml files
-- [ ] Release tag created and pushed
-- [ ] GitHub release created
-- [ ] Debian packages built successfully
-- [ ] Arch Linux packages built successfully
-- [ ] Installation scripts created/updated
-- [ ] README.md updated with new release info
-- [ ] All artifacts uploaded to GitHub release
-- [ ] Documentation updated
-- [ ] Changes committed to repository
-- [ ] Release tested on fresh system (optional but recommended)
 
 ## Troubleshooting
 
-### Common Issues:
+### Signing Failures
 
-1. **Panic strategy conflicts**: Temporarily disable `panic = "abort"` in `.cargo/config.toml`
-2. **Missing LICENSE file**: Copy `LICENSE-Apache-2.0` to `LICENSE` for cargo-deb
-3. **Large file errors in pre-commit**: Don't commit binary packages, only infrastructure files
-4. **Conventional commit format errors**: Keep commit message simple and follow format
+**Issue**: `security: SecKeychainCreate: A keychain with the same name already exists`
+- **Solution**: Temporary keychain from previous run wasn't cleaned up
+- **Fix**: `security delete-keychain /tmp/signing-test/signing.keychain-db`
 
-### Dependencies for Future Improvements:
+**Issue**: `base64: invalid input`
+- **Solution**: Base64 certificate in 1Password has newlines
+- **Fix**: Regenerate with `base64 certificate.p12 | tr -d '\n'` and update 1Password
 
-- **RPM packages**: Install `rpmbuild` or use `alien` to convert from .deb
-- **Windows installer**: Set up cross-compilation toolchain
-- **macOS app bundle**: Set up macOS build environment
-- **Multi-arch Docker**: Fix html2md dependency issues
+**Issue**: Notarization rejected
+- **Solution**: Check notarization log
+- **Fix**: `xcrun notarytool log <submission-id> --keychain-profile "..."`
+- Common issues: Missing `--options runtime`, unsigned dependencies
 
-## Post-Release
+### Homebrew Update Failures
 
-1. Announce the release on community channels (Discourse, Discord)
-2. Update website with new release information
-3. Monitor for installation issues and bug reports
-4. Plan next release based on user feedback and roadmap
+**Issue**: `homebrew-tap-token not found in 1Password`
+- **Solution**: Token not created or wrong vault/name
+- **Fix**: Create GitHub PAT with `repo` scope, store in `TerraphimPlatform/homebrew-tap-token`
+
+**Issue**: Formula update fails with authentication error
+- **Solution**: GitHub PAT expired or insufficient permissions
+- **Fix**: Regenerate PAT with `repo` scope, update in 1Password
+
+### Release Workflow Failures
+
+**Issue**: Workflow doesn't trigger on tag push
+- **Solution**: Tag format doesn't match pattern
+- **Fix**: Use `v*`, `terraphim_server-v*`, etc. format
+
+**Issue**: Self-hosted runner offline
+- **Solution**: macOS runner not available
+- **Fix**: Check runner status, restart if needed
+
+## Post-Release Checklist
+
+- [ ] Verify GitHub Release created with all artifacts
+- [ ] Check Docker images published to ghcr.io
+- [ ] Test Homebrew installation on macOS
+- [ ] Verify macOS binaries are signed and notarized
+- [ ] Update CHANGELOG.md with release notes
+- [ ] Announce release on Discord/Discourse
+- [ ] Update documentation if needed
+
+## Rollback
+
+If a release needs to be rolled back:
+
+1. **Delete the tag**:
+   ```bash
+   git tag -d v1.2.3
+   git push origin :refs/tags/v1.2.3
+   ```
+
+2. **Delete the GitHub Release** (UI or CLI):
+   ```bash
+   gh release delete v1.2.3
+   ```
+
+3. **Revert Homebrew formulas** (if updated):
+   ```bash
+   cd ~/terraphim-homebrew-terraphim-checkout
+   git revert HEAD
+   git push origin main
+   ```
+
+## Security Notes
+
+- All credentials stored in 1Password (never in Git)
+- Apple Developer ID certificate has 5-year expiration
+- GitHub PATs should be rotated annually
+- Self-hosted runners must be secured (firewalled, monitored)
+- Signed binaries ensure authenticity and prevent tampering
+
+## References
+
+- [Apple Notarization Guide](https://developer.apple.com/documentation/security/notarizing_macos_software_before_distribution)
+- [Homebrew Formula Cookbook](https://docs.brew.sh/Formula-Cookbook)
+- [GitHub Actions Self-Hosted Runners](https://docs.github.com/en/actions/hosting-your-own-runners)
+- [Code Signing Guide](../.docs/guide-apple-developer-setup.md)

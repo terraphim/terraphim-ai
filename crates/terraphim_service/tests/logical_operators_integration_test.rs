@@ -253,8 +253,7 @@ mod logical_operators_integration_tests {
             let result = service.search(&query).await;
 
             // Should work for any valid role
-            if result.is_ok() {
-                let documents = result.unwrap();
+            if let Ok(documents) = result {
                 println!(
                     "Role '{}' search returned {} documents",
                     role_name,

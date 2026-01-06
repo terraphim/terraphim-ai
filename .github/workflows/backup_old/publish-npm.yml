@@ -1,0 +1,522 @@
+name: Publish Node.js Package to npm
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to publish (semantic version)'
+        required: true
+        type: string
+      dry_run:
+        description: 'Run in dry-run mode only'
+        required: false
+        type: boolean
+        default: true
+      tag:
+        description: 'npm tag (latest, beta, next, etc.)'
+        required: false
+        type: string
+        default: 'latest'
+  push:
+    tags:
+      - 'nodejs-v*'
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+jobs:
+  validate:
+    name: Validate Package
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Check package.json validity
+        run: |
+          node -e "const pkg = require('./package.json'); console.log('Package name:', pkg.name); console.log('Version:', pkg.version);"
+
+      - name: Validate version format
+        run: |
+          if [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/nodejs-v//')
+            if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+              echo "Invalid version format: $VERSION"
+              exit 1
+            fi
+            echo "Version to publish: $VERSION"
+          fi
+
+  build:
+    name: Build Multi-Platform Binaries
+    runs-on: ${{ matrix.settings.host }}
+    needs: validate
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            build: yarn build --target x86_64-apple-darwin
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            build: yarn build --target x86_64-unknown-linux-gnu
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            build: yarn build --target x86_64-pc-windows-msvc
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            build: yarn build --target aarch64-apple-darwin
+          - host: ubuntu-latest
+            target: aarch64-unknown-linux-gnu
+            cross: true
+            build: yarn build --target aarch64-unknown-linux-gnu
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        if: ${{ !matrix.settings.cross }}
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        if: ${{ !matrix.settings.cross }}
+        with:
+          toolchain: stable
+          targets: ${{ matrix.settings.target }}
+
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            .cargo-cache
+            target/
+          key: ${{ matrix.settings.target }}-cargo-${{ matrix.settings.host }}
+
+      - name: Install dependencies
+        if: ${{ !matrix.settings.cross }}
+        run: yarn install --frozen-lockfile
+
+      - name: Build cross-compilation docker image
+        if: ${{ matrix.settings.cross }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker build -t terraphim-nodejs-builder -f .github/docker/nodejs-builder.Dockerfile .github/docker/
+
+      - name: Build in docker (cross-compilation)
+        if: ${{ matrix.settings.cross }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          docker run --rm \
+            -v ${{ github.workspace }}:/build \
+            -w /build/terraphim_ai_nodejs \
+            -e CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
+            -e CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \
+            -e CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++ \
+            terraphim-nodejs-builder \
+            bash -c "yarn install --frozen-lockfile && ${{ matrix.settings.build }}"
+
+      - name: Build
+        run: ${{ matrix.settings.build }}
+        if: ${{ !matrix.settings.cross }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v5
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: "*.node"
+          if-no-files-found: error
+
+  test-universal:
+    name: Test Universal Binaries
+    runs-on: ${{ matrix.settings.host }}
+    needs: build
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+        node:
+          - '18'
+          - '20'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: terraphim_ai_nodejs
+
+      - name: Test package functionality with Node.js
+        run: |
+          node test_autocomplete.js
+          node test_knowledge_graph.js
+
+      - name: Test package functionality with Bun
+        run: |
+          bun test_autocomplete.js
+          bun test_knowledge_graph.js
+
+  test-macos:
+    name: Test macOS Universal Binary
+    runs-on: ${{ matrix.host }}
+    needs: create-universal-macos
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
+    strategy:
+      fail-fast: false
+      matrix:
+        # Test on both Intel and ARM macOS runners
+        host:
+          - macos-15-intel
+          - macos-latest
+        node:
+          - '18'
+          - '20'
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: latest
+
+      - name: Download universal binary
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-universal-apple-darwin
+          path: terraphim_ai_nodejs
+
+      - name: Rename universal binary for NAPI
+        run: |
+          ls -la *.node || echo "No .node files found"
+          # Rename to what index.js expects
+          mv terraphim_ai_nodejs.darwin-universal.node terraphim_ai_nodejs.darwin-universal.node 2>/dev/null || true
+          ls -la *.node
+
+      - name: Test package functionality with Node.js
+        run: |
+          node test_autocomplete.js
+          node test_knowledge_graph.js
+
+      - name: Test package functionality with Bun
+        run: |
+          bun test_autocomplete.js
+          bun test_knowledge_graph.js
+
+  create-universal-macos:
+    name: Create Universal macOS Binary
+    runs-on: macos-latest
+    needs: build
+    defaults:
+      run:
+        working-directory: terraphim_ai_nodejs
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-x86_64-apple-darwin
+          path: terraphim_ai_nodejs/artifacts
+
+      - name: Download macOS arm64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: bindings-aarch64-apple-darwin
+          path: terraphim_ai_nodejs/artifacts
+
+      - name: Create universal binary
+        run: |
+          cd artifacts
+          ls -la
+          # NAPI-RS generates filenames with darwin-x64/darwin-arm64 naming convention
+          lipo -create terraphim_ai_nodejs.darwin-x64.node terraphim_ai_nodejs.darwin-arm64.node -output terraphim_ai_nodejs.darwin-universal.node
+          ls -la *.node
+
+      - name: Upload universal binary
+        uses: actions/upload-artifact@v5
+        with:
+          name: bindings-universal-apple-darwin
+          path: terraphim_ai_nodejs/artifacts/terraphim_ai_nodejs.darwin-universal.node
+          if-no-files-found: error
+
+  publish:
+    name: Publish to npm
+    runs-on: [self-hosted, Linux, X64]
+    needs: [test-universal, test-macos]
+    environment: production
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: terraphim_ai_nodejs/yarn.lock
+
+      - name: Install dependencies
+        working-directory: terraphim_ai_nodejs
+        run: yarn install --frozen-lockfile
+
+      - name: Install 1Password CLI
+        run: |
+          curl -sSf https://downloads.1password.com/linux/keys/1password.asc | \
+            gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
+          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
+            sudo tee /etc/apt/sources.list.d/1password.list
+          sudo apt update && sudo apt install op -y
+
+      - name: Authenticate with 1Password
+        run: |
+          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
+
+      - name: Get npm token from 1Password
+        id: token
+        run: |
+          TOKEN=$(op read "op://TerraphimPlatform/npm.token/token" || echo "")
+          if [[ -z "$TOKEN" ]]; then
+            echo "⚠️  npm token not found in 1Password, checking GitHub secrets"
+            TOKEN="${{ secrets.NPM_TOKEN }}"
+          fi
+
+          if [[ -z "$TOKEN" ]]; then
+            echo "❌ No npm token available"
+            exit 1
+          fi
+
+          echo "token=$TOKEN" >> $GITHUB_OUTPUT
+          echo "✅ npm token retrieved successfully"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+
+      - name: Prepare package for publishing
+        working-directory: terraphim_ai_nodejs
+        run: |
+          # Create npm directory structure
+          mkdir -p npm
+
+          # Copy all built binaries to npm directory (artifacts are in repo root)
+          find ../artifacts -name "*.node" -exec cp {} npm/ \;
+
+          # If no binaries found (NAPI build failed), try to find them manually
+          if [ ! -n "$(ls -A npm/)" ]; then
+            echo "⚠️  No NAPI artifacts found, searching for built libraries..."
+            # Look for libraries in target directories
+            find ../target -name "libterraphim_ai_nodejs.so" -exec cp {} npm/terraphim_ai_nodejs.linux-x64-gnu.node \;
+            find ../target -name "libterraphim_ai_nodejs.dylib" -exec cp {} npm/terraphim_ai_nodejs.darwin-x64.node \;
+            find ../target -name "terraphim_ai_nodejs.dll" -exec cp {} npm/terraphim_ai_nodejs.win32-x64-msvc.node \;
+          fi
+
+          # List what we have
+          echo "📦 Built binaries:"
+          ls -la npm/
+
+          # Update package.json version if needed
+          if [[ "${{ inputs.version }}" != "" ]]; then
+            echo "📝 Updating version to ${{ inputs.version }}"
+            npm version ${{ inputs.version }} --no-git-tag-version
+          fi
+
+      - name: Configure npm for publishing
+        working-directory: terraphim_ai_nodejs
+        run: |
+          echo "//registry.npmjs.org/:_authToken=${{ steps.token.outputs.token }}" > ~/.npmrc
+          npm config set provenance true
+
+          # Show current package info
+          echo "📋 Package information:"
+          npm pack --dry-run | head -20
+
+      - name: Determine publishing strategy
+        id: strategy
+        run: |
+          VERSION_TYPE="patch"
+          NPM_TAG="latest"
+
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ "${{ inputs.version }}" != "" ]]; then
+              VERSION_TYPE="manual"
+              NPM_TAG="${{ inputs.tag }}"
+            fi
+          elif [[ "${{ github.event_name }}" == "push" && "${{ github.ref }}" == refs/tags/* ]]; then
+            VERSION_TAG=$(echo "${{ github.ref }}" | sed 's/refs\/tags\/nodejs-v//')
+            if [[ "$VERSION_TAG" =~ -beta$ ]]; then
+              NPM_TAG="beta"
+            elif [[ "$VERSION_TAG" =~ -alpha$ ]]; then
+              NPM_TAG="alpha"
+            elif [[ "$VERSION_TAG" =~ -rc ]]; then
+              NPM_TAG="rc"
+            else
+              NPM_TAG="latest"
+            fi
+          elif [[ "${{ github.event_name }}" == "release" ]]; then
+            NPM_TAG="latest"
+          fi
+
+          echo "version_type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+          echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
+          echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG"
+
+      - name: Publish to npm
+        working-directory: terraphim_ai_nodejs
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "🧪 Dry run mode - checking package only"
+            npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }}
+          else
+            echo "🚀 Publishing @terraphim/autocomplete to npm"
+            echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
+
+            # Publish with appropriate tag
+            npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }}
+
+            echo "✅ Package published successfully!"
+          fi
+
+      - name: Verify published package
+        if: inputs.dry_run != 'true'
+        working-directory: terraphim_ai_nodejs
+        run: |
+          echo "🔍 Verifying published package..."
+
+          # Wait a moment for npm to update
+          sleep 30
+
+          # Check if package is available
+          PACKAGE_NAME="@terraphim/autocomplete"
+          PACKAGE_VERSION=$(node -p "require('./package.json').version")
+
+          echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
+          npm view $PACKAGE_NAME@$PACKAGE_VERSION || echo "⚠️  Package not immediately visible (may take a few minutes)"
+
+          echo "📊 Package info:"
+          npm view $PACKAGE_NAME || echo "⚠️  General package info not available yet"
+
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ github.ref }}
+          release_name: "@terraphim/autocomplete ${{ github.ref_name }}"
+          body: |
+            ## Node.js Package Release
+
+            **Package**: `@terraphim/autocomplete`
+            **Version**: ${{ steps.strategy.outputs.version_type }}
+            **Tag**: ${{ steps.strategy.outputs.npm_tag }}
+
+            ### 🚀 Installation
+            ```bash
+            npm install @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }}
+            ```
+
+            ### ✨ Features
+            - **Autocomplete**: Fast prefix search with scoring
+            - **Knowledge Graph**: Semantic connectivity analysis
+            - **Native Performance**: Rust backend with NAPI bindings
+            - **Cross-Platform**: Linux, macOS, Windows support
+            - **TypeScript**: Auto-generated type definitions
+
+            ### 📊 Performance
+            - **Autocomplete Index**: ~749 bytes
+            - **Knowledge Graph**: ~856 bytes
+            - **Native Library**: ~10MB (optimized for production)
+
+            ### 🔗 Links
+            - [npm package](https://www.npmjs.com/package/@terraphim/autocomplete)
+            - [Documentation](https://github.com/terraphim/terraphim-ai/tree/main/terraphim_ai_nodejs)
+
+            ---
+            🤖 Generated on: $(date)
+          draft: false
+          prerelease: ${{ steps.strategy.outputs.npm_tag != 'latest' }}
+
+      - name: Notify on success
+        if: inputs.dry_run != 'true'
+        run: |
+          echo "🎉 npm publishing workflow completed successfully!"
+          echo "📦 Package: @terraphim/autocomplete"
+          echo "🏷️  Tag: ${{ steps.strategy.outputs.npm_tag }}"
+          echo "📋 Version: $(node -p "require('./package.json').version")"

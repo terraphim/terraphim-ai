@@ -4,14 +4,29 @@
 
 use anyhow::Result;
 use serial_test::serial;
+use std::path::PathBuf;
 use std::process::Command;
 use std::str;
 
+/// Get the workspace root directory
+fn get_workspace_root() -> PathBuf {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    // Go up from crates/terraphim_agent to workspace root
+    manifest_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .map(|p| p.to_path_buf())
+        .unwrap_or(manifest_dir)
+}
+
 /// Helper function to run TUI extract command
 fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
+    let workspace_root = get_workspace_root();
+
     let mut cmd = Command::new("cargo");
     cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
-        .args(args);
+        .args(args)
+        .current_dir(&workspace_root);
 
     let output = cmd.output()?;
 
@@ -304,12 +319,15 @@ fn test_extract_error_conditions() -> Result<()> {
         ("Very long text", vec![long_text.as_str()]),
     ];
 
+    let workspace_root = get_workspace_root();
+
     for (case_name, args) in error_cases {
         println!("  Testing error case: {}", case_name);
 
         let mut cmd = Command::new("cargo");
         cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
-            .args(&args);
+            .args(&args)
+            .current_dir(&workspace_root);
 
         let output = cmd.output()?;
         let exit_code = output.status.code().unwrap_or(-1);

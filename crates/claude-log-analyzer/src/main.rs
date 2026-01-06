@@ -499,15 +499,15 @@ fn generate_timeline_html(analysis: &SessionAnalysis) -> Result<String> {
         body { font-family: Arial, sans-serif; margin: 20px; }
         .timeline { border-left: 3px solid #ccc; padding-left: 20px; margin: 20px 0; }
         .event { margin-bottom: 20px; position: relative; }
-        .event::before { 
-            content: ''; 
-            position: absolute; 
-            left: -26px; 
-            top: 5px; 
-            width: 12px; 
-            height: 12px; 
-            border-radius: 50%; 
-            background: #007acc; 
+        .event::before {
+            content: '';
+            position: absolute;
+            left: -26px;
+            top: 5px;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #007acc;
         }
         .time { color: #666; font-size: 0.9em; }
         .agent { font-weight: bold; color: #007acc; }

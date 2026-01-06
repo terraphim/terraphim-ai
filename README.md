@@ -1,6 +1,7 @@
 # Terraphim AI Assistant
 
 [![Crates.io](https://img.shields.io/crates/v/terraphim_agent.svg)](https://crates.io/crates/terraphim_agent)
+[![Homebrew](https://img.shields.io/badge/homebrew-terraphim-orange?logo=homebrew)](https://github.com/terraphim/homebrew-terraphim)
 [![npm](https://img.shields.io/npm/v/@terraphim/autocomplete.svg)](https://www.npmjs.com/package/@terraphim/autocomplete)
 [![PyPI](https://img.shields.io/pypi/v/terraphim-automata.svg)](https://pypi.org/project/terraphim-automata/)
 [![Discord](https://img.shields.io/discord/852545081613615144?label=Discord&logo=Discord)](https://discord.gg/VPJXB6BGuY)
@@ -12,6 +13,29 @@ Terraphim is a privacy-first AI assistant that works for you under your complete
 ## 🆕 v1.0.0 Minimal Release - NOW AVAILABLE!
 
 **Quick Install** (works on Linux, macOS, Windows):
+
+**Option 1: Universal Installer** (recommended)
+```bash
+# Single command installation with platform detection
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+
+# Install both agent and CLI tools
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash --with-cli
+```
+
+**Option 2: Homebrew** (macOS/Linux - recommended)
+```bash
+# Add Terraphim tap
+brew tap terraphim/terraphim
+
+# Install server
+brew install terraphim-server
+
+# Install TUI/REPL
+brew install terraphim-agent
+```
+
+**Option 3: Cargo Install**
 ```bash
 cargo install terraphim-repl    # Interactive REPL (11 commands)
 cargo install terraphim-cli     # Automation CLI (8 commands)
@@ -40,14 +64,27 @@ We're excited to announce Terraphim AI v1.0.0 with comprehensive multi-language 
 - **🐍 Python**: `terraphim-automata` - High-performance text processing library via PyPI
 
 ### 🚀 Quick Installation
+
+**Universal Installer (Recommended)**
 ```bash
-# Rust CLI (recommended)
+# Single command installation for all platforms
+curl -fsSL https://raw.githubusercontent.com/terraphim/terraphim-ai/main/scripts/install.sh | bash
+```
+
+**Package Managers**
+```bash
+# Homebrew (macOS/Linux - signed & notarized binaries)
+brew tap terraphim/terraphim
+brew install terraphim-server  # HTTP API server
+brew install terraphim-agent   # TUI/REPL interface
+
+# Rust CLI (interactive TUI)
 cargo install terraphim_agent
 
-# Node.js package
+# Node.js package (autocomplete + knowledge graph)
 npm install @terraphim/autocomplete
 
-# Python library
+# Python library (high-performance text processing)
 pip install terraphim-automata
 ```
 

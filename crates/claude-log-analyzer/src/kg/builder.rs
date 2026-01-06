@@ -89,6 +89,7 @@ impl KnowledgeGraphBuilder {
             let normalized_term = NormalizedTerm {
                 id,
                 value: NormalizedTermValue::from(concept_name.as_str()),
+                display_value: None,
                 url: Some(format!("concept://{concept_name}")),
             };
 

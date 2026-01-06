@@ -82,6 +82,19 @@ fn should_build(dirs: &Dirs) -> bool {
         p!("Could not find browser folder, assuming this is a `cargo publish` run. Skipping JS build.");
         return false;
     }
+
+    // On Windows, skip JS build via build.rs - use pre-built assets from CI
+    #[cfg(target_os = "windows")]
+    {
+        if dirs.js_dist_source.exists() {
+            p!(
+                "Windows detected, using pre-built assets from {}",
+                dirs.js_dist_source.display()
+            );
+            return false;
+        }
+    }
+
     // Check if any JS files were modified since the last build
     if let Ok(tmp_dist_index_html) =
         std::fs::metadata(format!("{}/index.html", dirs.js_dist_tmp.display()))
@@ -92,7 +105,7 @@ fn should_build(dirs: &Dirs) -> bool {
                 entry
                     .file_name()
                     .to_str()
-                    .map(|s| !s.starts_with(".DS_Store"))
+                    .map(|s| !s.starts_with(".DS_Store") && s != "dist" && s != "node_modules")
                     .unwrap_or(false)
             })
             .any(|entry| is_older_than(&entry.unwrap(), &tmp_dist_index_html));
