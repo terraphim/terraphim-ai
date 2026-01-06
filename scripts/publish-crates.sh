@@ -200,7 +200,11 @@ check_if_published() {
 
   log_info "Checking if $crate v$version is already published..."
 
-  if cargo search "$crate" --limit 1 2>/dev/null | grep -q "$crate = \"$version\""; then
+  # Use crates.io API directly for reliable version detection
+  local response
+  response=$(curl -s "https://crates.io/api/v1/crates/$crate/versions" 2>/dev/null || echo "")
+
+  if echo "$response" | grep -q "\"num\":\"$version\""; then
     log_warning "$crate v$version already exists on crates.io"
     return 0
   else
@@ -227,13 +231,21 @@ publish_crate() {
   else
     log_info "Running: cargo publish --package $crate --allow-dirty"
 
-    if cargo publish --package "$crate" --allow-dirty; then
+    local output
+    if output=$(cargo publish --package "$crate" --allow-dirty 2>&1); then
       log_success "Published $crate v$version successfully"
       log_info "Waiting 60 seconds for crates.io to process..."
       sleep 60
     else
-      log_error "Failed to publish $crate"
-      return 1
+      # Check if it failed because the crate already exists
+      if echo "$output" | grep -q "already exists on"; then
+        log_warning "$crate v$version already exists - skipping"
+        return 0
+      else
+        log_error "Failed to publish $crate"
+        echo "$output"
+        return 1
+      fi
     fi
   fi
 }
