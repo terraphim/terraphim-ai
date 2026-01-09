@@ -1,6 +1,4 @@
-#[cfg(feature = "ai-assistant")]
-pub mod ai_assistant;
-#[cfg(feature = "terraphim_atomic_client")]
+#[cfg(feature = "atomic")]
 pub mod atomic;
 pub mod clickup;
 #[cfg(feature = "grepapp")]
@@ -10,7 +8,7 @@ pub mod perplexity;
 pub mod query_rs;
 #[cfg(feature = "ai-assistant")]
 pub use ai_assistant::AiAssistantHaystackIndexer;
-#[cfg(feature = "terraphim_atomic_client")]
+#[cfg(feature = "atomic")]
 pub use atomic::AtomicHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
 #[cfg(feature = "grepapp")]
