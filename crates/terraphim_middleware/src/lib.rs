@@ -7,7 +7,7 @@ pub mod haystack;
 pub mod indexer;
 pub mod thesaurus;
 
-#[cfg(feature = "terraphim_atomic_client")]
+#[cfg(feature = "atomic")]
 pub use haystack::AtomicHaystackIndexer;
 pub use haystack::QueryRsHaystackIndexer;
 pub use indexer::{search_haystacks, RipgrepIndexer};

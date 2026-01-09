@@ -15,12 +15,20 @@ cd "$ROOT_DIR"
 CONFIG_FILE="build_config.toml"
 
 if [[ ! -f "$CONFIG_FILE" ]]; then
-    echo "Error: Build configuration file '$CONFIG_FILE' not found!"
-    exit 1
+    echo "Warning: Build configuration file '$CONFIG_FILE' not found, using default build"
+    cargo build --release
+    echo "Build completed successfully!"
+    exit 0
 fi
 
-# Invoke the build argument manager (Rust tool)
-./target/release/terraphim-build-args --config "$CONFIG_FILE" \
-    --output "cargo"
+# Check if terraphim-build-args exists
+if [ -f "./target/release/terraphim-build-args" ]; then
+    # Invoke the build argument manager (Rust tool)
+    ./target/release/terraphim-build-args --config "$CONFIG_FILE" \
+        --output "cargo"
+else
+    echo "Warning: terraphim-build-args not found, using default cargo build"
+    cargo build --release
+fi
 
 echo "Build completed successfully!"
