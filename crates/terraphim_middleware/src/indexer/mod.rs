@@ -7,7 +7,7 @@ mod ripgrep;
 
 #[cfg(feature = "ai-assistant")]
 use crate::haystack::AiAssistantHaystackIndexer;
-#[cfg(feature = "terraphim_atomic_client")]
+#[cfg(feature = "atomic")]
 use crate::haystack::AtomicHaystackIndexer;
 #[cfg(feature = "grepapp")]
 use crate::haystack::GrepAppHaystackIndexer;
@@ -45,7 +45,7 @@ pub async fn search_haystacks(
     let needle = search_query.search_term.as_str();
 
     let ripgrep = RipgrepIndexer::default();
-    #[cfg(feature = "terraphim_atomic_client")]
+    #[cfg(feature = "atomic")]
     let atomic = AtomicHaystackIndexer::default();
     let query_rs = QueryRsHaystackIndexer::default();
     let clickup = ClickUpHaystackIndexer::default();
@@ -66,12 +66,12 @@ pub async fn search_haystacks(
                 ripgrep.index(needle, haystack).await?
             }
             ServiceType::Atomic => {
-                #[cfg(feature = "terraphim_atomic_client")]
+                #[cfg(feature = "atomic")]
                 {
                     // Search through documents using atomic-server
                     atomic.index(needle, haystack).await?
                 }
-                #[cfg(not(feature = "terraphim_atomic_client"))]
+                #[cfg(not(feature = "atomic"))]
                 {
                     log::warn!(
                         "Atomic haystack support not enabled. Skipping haystack: {}",

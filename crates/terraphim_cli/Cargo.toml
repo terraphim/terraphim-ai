@@ -49,8 +49,4 @@ tempfile = "3.10"
 assert_cmd = "2.0"
 predicates = "3.1"
 
-[profile.release]
-opt-level = "z"     # Optimize for size
-lto = true          # Enable link-time optimization
-codegen-units = 1   # Better optimization
-strip = true        # Strip symbols for smaller binary
+# Profile configuration moved to workspace Cargo.toml for consistency
