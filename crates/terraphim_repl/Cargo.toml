@@ -60,8 +60,4 @@ tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "test-util"
 serial_test = "3.0"
 tempfile = "3.10"
 
-[profile.release]
-opt-level = "z"     # Optimize for size
-lto = true          # Enable link-time optimization
-codegen-units = 1   # Better optimization
-strip = true        # Strip symbols for smaller binary
+# NOTE: Profile configuration moved to workspace Cargo.toml for consistency

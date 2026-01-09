@@ -277,6 +277,30 @@ fn main() -> Result<()> {
 
     match cli.command {
         Some(Command::Interactive) | None => {
+            // Check if we're in a TTY for interactive mode (both stdout and stdin required)
+            use atty::Stream;
+            if !atty::is(Stream::Stdout) {
+                eprintln!("Error: Interactive mode requires a terminal.");
+                eprintln!("Issue: stdout is not a TTY (not a terminal).");
+                eprintln!("");
+                eprintln!("For non-interactive use, try:");
+                eprintln!("  1. REPL mode: terraphim-agent repl");
+                eprintln!("  2. Command mode: terraphim-agent search \"query\"");
+                eprintln!("  3. CLI tool: terraphim-cli search \"query\"");
+                std::process::exit(1);
+            }
+
+            if !atty::is(Stream::Stdin) {
+                eprintln!("Error: Interactive mode requires a terminal.");
+                eprintln!("Issue: stdin is not a TTY (not a terminal).");
+                eprintln!("");
+                eprintln!("For non-interactive use, try:");
+                eprintln!("  1. REPL mode: terraphim-agent repl");
+                eprintln!("  2. Command mode: terraphim-agent search \"query\"");
+                eprintln!("  3. CLI tool: terraphim-cli search \"query\"");
+                std::process::exit(1);
+            }
+
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
@@ -1190,23 +1214,64 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
 }
 
 fn run_tui(transparent: bool) -> Result<()> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    // Attempt to set up terminal for TUI
+    let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
 
-    let res = ui_loop(&mut terminal, transparent);
+    // Try to enter raw mode and alternate screen
+    // These operations can fail in non-interactive environments
+    match enable_raw_mode() {
+        Ok(()) => {
+            // Successfully entered raw mode, proceed with TUI setup
+            let mut stdout = io::stdout();
+            if let Err(e) = execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
+                // Clean up raw mode before returning error
+                let _ = disable_raw_mode();
+                return Err(anyhow::anyhow!(
+                    "Failed to initialize terminal for interactive mode: {}. \
+                     Try using 'repl' mode instead: terraphim-agent repl",
+                    e
+                ));
+            }
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+            let mut terminal = match Terminal::new(backend) {
+                Ok(t) => t,
+                Err(e) => {
+                    // Clean up before returning
+                    let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+                    let _ = disable_raw_mode();
+                    return Err(anyhow::anyhow!(
+                        "Failed to create terminal: {}. \
+                         Try using 'repl' mode instead: terraphim-agent repl",
+                        e
+                    ));
+                }
+            };
 
-    res
+            let res = ui_loop(&mut terminal, transparent);
+
+            // Always clean up terminal state
+            let _ = disable_raw_mode();
+            let _ = execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            );
+            let _ = terminal.show_cursor();
+
+            res
+        }
+        Err(e) => {
+            // Failed to enter raw mode - not a TTY
+            Err(anyhow::anyhow!(
+                "Terminal does not support raw mode (not a TTY?). \
+                 Interactive mode requires a terminal. \
+                 Try using 'repl' mode instead: terraphim-agent repl. \
+                 Error: {}",
+                e
+            ))
+        }
+    }
 }
 
 fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: bool) -> Result<()> {
