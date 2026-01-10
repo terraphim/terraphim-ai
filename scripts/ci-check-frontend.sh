@@ -24,7 +24,7 @@ echo "Mirroring GitHub Actions build-frontend job"
 echo ""
 
 # Configuration (same as CI)
-NODE_VERSION="18"
+NODE_VERSION="20"
 DESKTOP_DIR="$PROJECT_ROOT/desktop"
 
 if [[ ! -d "$DESKTOP_DIR" ]]; then

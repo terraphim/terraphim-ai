@@ -1,3 +1,5 @@
+#[cfg(feature = "ai-assistant")]
+pub mod ai_assistant;
 #[cfg(feature = "atomic")]
 pub mod atomic;
 pub mod clickup;
