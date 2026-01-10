@@ -197,3 +197,77 @@ cargo yank --version 1.4.10 claude-log-analyzer
 ---
 
 **Handover complete. terraphim-session-analyzer v1.4.11 is live on crates.io.**
+
+---
+
+# Handover Document - Terraphim Skills and Hooks Activation
+
+**Date**: 2026-01-09
+**Session**: Activation of terraphim-engineering-skills plugin and hooks
+**Status**: COMPLETE - All components activated and tested
+
+---
+
+## 1. Progress Summary
+
+### Tasks Completed
+
+1. **Installed terraphim-agent v1.3.0**
+   - Downloaded from GitHub releases
+   - Installed to ~/.cargo/bin/
+
+2. **Added terraphim marketplace**
+   - Configured via SSH URL: git@github.com:terraphim/terraphim-skills.git
+   - Installed terraphim-engineering-skills plugin (25 skills)
+
+3. **Created knowledge graph rules**
+   - ~/.config/terraphim/docs/src/kg/bun install.md (npm → bun)
+   - ~/.config/terraphim/docs/src/kg/bunx.md (npx → bunx)
+   - ~/.config/terraphim/docs/src/kg/terraphim_ai.md (Claude Code → Terraphim AI)
+
+4. **Updated settings.local.json**
+   - Added all 27 skill permissions
+   - Configured PreToolUse and PostToolUse hooks
+
+5. **Fixed documentation**
+   - Corrected terraphim-skills README.md: bun_install.md → "bun install.md"
+   - Pushed fix upstream to main branch
+
+### What's Working
+
+- npm → bun replacement in all bash commands
+- npx → bunx replacement in all bash commands
+- Claude Code/Terraphim AI replacement in commits and PRs
+- Git safety guard blocking destructive commands
+- All 25 terraphim-engineering-skills available
+
+### Blockers
+
+- None
+
+## 2. Technical Context
+
+```bash
+Current branch: main
+Modified files: Cargo.lock, Cargo.toml, crates/terraphim_agent/src/*
+```
+
+## 3. Testing Commands
+
+```bash
+# Test replacement
+cd ~/.config/terraphim && echo "npm install react" | terraphim-agent replace
+# Expected: bun install react
+
+# Test safety guard
+echo "git reset --hard" | terraphim-agent guard --json
+# Expected: {"decision":"block",...}
+```
+
+## 4. Next Steps
+
+1. Restart Claude Code to pick up new plugin
+2. Request skills: "Use disciplined-research skill" or "/brainstorm"
+3. Optionally add more knowledge graph rules
+
+**End of Handover**
