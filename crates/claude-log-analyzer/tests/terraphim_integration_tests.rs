@@ -23,6 +23,7 @@ fn create_wrangler_thesaurus() -> Thesaurus {
 
     for (pattern, normalized, id) in wrangler_patterns {
         let normalized_term = NormalizedTerm {
+            display_value: None,
             id,
             value: NormalizedTermValue::from(normalized),
             url: Some("https://developers.cloudflare.com/workers/wrangler/".to_string()),
@@ -71,6 +72,7 @@ fn create_comprehensive_thesaurus() -> Thesaurus {
 
     for (pattern, normalized, id, url) in patterns {
         let normalized_term = NormalizedTerm {
+            display_value: None,
             id,
             value: NormalizedTermValue::from(normalized),
             url: Some(url.to_string()),
