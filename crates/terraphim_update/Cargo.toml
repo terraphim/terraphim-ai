@@ -12,8 +12,18 @@ license = "Apache-2.0"
 [dependencies]
 anyhow = "1.0"
 thiserror = "1.0"
-self_update = { version = "0.42", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
+self_update = { version = "0.42", default-features = false, features = ["archive-tar", "compression-flate2", "rustls", "signatures"] }
 tokio = { version = "1.0", features = ["full"] }
 tracing = "0.1"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+jiff = { version = "0.2", features = ["serde"] }
+chrono = "0.4"
+sha2 = "0.10"
+ureq = "2.9"
+dirs = "5.0"
+dialoguer = "0.11"
+
+[dev-dependencies]
+tempfile = "3.0"
+serial_test = "3.1"
