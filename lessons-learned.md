@@ -3828,3 +3828,87 @@ fn mask_urls(text: &str) -> Vec<Match> {
 5. **Create issues for deferred work**: Don't let scope creep, track explicitly
 6. **Regex character classes have different rules**: Invalid escapes poison LazyLock
 7. **WASM verification is critical**: Run `./scripts/build-wasm.sh` before committing changes to automata crate
+
+---
+
+### Pattern 7: Filenames with Spaces in Knowledge Graph
+
+**Context**: Setting up terraphim-skills knowledge graph replacement rules.
+
+**What We Learned**:
+- **Markdown filenames with spaces work**: Use "bun install.md" with quotes
+- **Documentation had bug**: terraphim-skills README.md showed bun_install.md which does not normalize correctly
+- **Fix pushed upstream**: Corrected README.md in terraphim-skills repo, committed and pushed to main
+- **SSH vs HTTPS for marketplaces**: Use SSH URL for GitHub repos in marketplace config to avoid authentication prompts
+
+**Implementation**:
+```bash
+# Create knowledge graph file with spaces
+cat > ~/.config/terraphim/docs/src/kg/"bun install.md" << 'EOF'
+# bun install
+
+Install dependencies using Bun package manager.
+
+synonyms:: npm install, yarn install, pnpm install, npm i
+EOF
+
+# Add marketplace via SSH
+claude plugin marketplace add git@github.com:terraphim/terraphim-skills.git
+```
+
+**When to Apply**: Creating knowledge graph replacement rules, setting up Claude Code marketplaces
+
+### Pattern 8: terraphim-agent Installation Location
+
+**Context**: Setting up hooks that depend on terraphim-agent binary.
+
+**What We Learned**:
+- **GitHub releases have platform-specific binaries**: terraphim-agent-x86_64-unknown-linux-gnu
+- **crates.io version is outdated**: v1.0.0 missing hook and guard commands - use GitHub releases
+- **Install to ~/.cargo/bin/**: Standard location for user-level Rust binaries
+- **Hook script falls back gracefully**: If terraphim-agent not in PATH, script exits silently
+
+**Implementation**:
+```bash
+# Download from GitHub releases
+gh release download --repo terraphim/terraphim-ai \
+  --pattern "terraphim-agent-x86_64-unknown-linux-gnu" --dir /tmp
+chmod +x /tmp/terraphim-agent-x86_64-unknown-linux-gnu
+mv /tmp/terraphim-agent-x86_64-unknown-linux-gnu ~/.cargo/bin/terraphim-agent
+```
+
+**When to Apply**: Installing terraphim-agent for hooks, setting up knowledge graph replacements
+
+### Pattern 9: Claude Code Plugin Marketplace via SSH
+
+**Context**: Adding terraphim-skills marketplace to Claude Code.
+
+**What We Learned**:
+- **HTTPS requires credentials**: Without git credentials, HTTPS cloning fails
+- **SSH works with agent**: SSH URLs work if ssh-agent has keys loaded
+- **Command sequence matters**: Remove first if already partially installed
+- **Plugin installation requires marketplace first**: Install plugin from marketplace after adding
+
+**Implementation**:
+```bash
+# Remove if partially installed
+claude plugin marketplace remove terraphim-skills
+
+# Add via SSH
+claude plugin marketplace add git@github.com:terraphim/terraphim-skills.git
+
+# Install plugin
+claude plugin install terraphim-engineering-skills@terraphim-skills
+```
+
+**When to Apply**: Adding any GitHub-hosted marketplace to Claude Code
+
+---
+
+### Key Takeaways from This Session
+
+1. **Use quotes for filenames with spaces**: "bun install.md" not bun install.md in cat/heredoc
+2. **GitHub releases over crates.io for latest**: releases have newer features than published crates
+3. **SSH marketplace URLs avoid auth prompts**: Configure git for GitHub SSH access first
+4. **Knowledge graph powers all replacements**: npm-bun, Claude-Terraphim, git safety guard all use same system
+5. **Hooks are opt-in per user**: settings.local.json controls what hooks run
