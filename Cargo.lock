@@ -9469,11 +9469,11 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bollard",
- "chrono",
  "dashmap 5.5.3",
  "futures",
  "hyper 1.8.1",
  "hyper-util",
+ "jiff 0.2.16",
  "log",
  "parking_lot 0.12.5",
  "reqwest 0.12.24",
@@ -9490,7 +9490,7 @@ dependencies = [
  "tokio-test",
  "tokio-util",
  "trust-dns-resolver",
- "uuid",
+ "ulid",
 ]
 
 [[package]]

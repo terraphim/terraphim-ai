@@ -3,32 +3,37 @@
 //! This module defines shared types used across the crate including session identifiers,
 //! command types, and state tracking structures.
 
-use chrono::{DateTime, Utc};
+use jiff::{Timestamp, ToSpan};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
+use ulid::Ulid;
 
 /// Unique identifier for an RLM session.
 ///
 /// A session represents a single conversation context with VM affinity,
 /// accumulated state, and budget tracking.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SessionId(pub Uuid);
+pub struct SessionId(pub Ulid);
 
 impl SessionId {
     /// Create a new random session ID.
     pub fn new() -> Self {
-        Self(Uuid::new_v4())
+        Self(Ulid::new())
     }
 
-    /// Create a session ID from a UUID.
-    pub fn from_uuid(uuid: Uuid) -> Self {
-        Self(uuid)
+    /// Create a session ID from a ULID.
+    pub fn from_ulid(ulid: Ulid) -> Self {
+        Self(ulid)
     }
 
-    /// Get the inner UUID.
-    pub fn as_uuid(&self) -> &Uuid {
+    /// Get the inner ULID.
+    pub fn as_ulid(&self) -> &Ulid {
         &self.0
+    }
+
+    /// Parse from string.
+    pub fn from_string(s: &str) -> Result<Self, ulid::DecodeError> {
+        Ok(Self(Ulid::from_string(s)?))
     }
 }
 
@@ -75,9 +80,9 @@ pub struct SessionInfo {
     /// Current session state.
     pub state: SessionState,
     /// When the session was created.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
     /// When the session expires.
-    pub expires_at: DateTime<Utc>,
+    pub expires_at: Timestamp,
     /// Number of extensions applied.
     pub extension_count: u32,
     /// Current recursion depth.
@@ -93,12 +98,14 @@ pub struct SessionInfo {
 impl SessionInfo {
     /// Create a new session info with default values.
     pub fn new(id: SessionId, duration_secs: u64) -> Self {
-        let now = Utc::now();
+        let now = Timestamp::now();
         Self {
             id,
             state: SessionState::Initializing,
             created_at: now,
-            expires_at: now + chrono::Duration::seconds(duration_secs as i64),
+            expires_at: now
+                .checked_add((duration_secs as i64).seconds())
+                .expect("adding seconds to timestamp should not fail"),
             extension_count: 0,
             recursion_depth: 0,
             budget_status: BudgetStatus::default(),
@@ -109,7 +116,7 @@ impl SessionInfo {
 
     /// Check if the session has expired.
     pub fn is_expired(&self) -> bool {
-        Utc::now() > self.expires_at
+        Timestamp::now() > self.expires_at
     }
 
     /// Check if the session can be extended.
@@ -161,7 +168,7 @@ impl BudgetStatus {
 
     /// Check if recursion depth limit is reached.
     pub fn depth_exhausted(&self) -> bool {
-        self.current_recursion_depth >= self.max_recursion_depth
+        self.current_recursion_depth > self.max_recursion_depth
     }
 
     /// Check if any budget is exhausted.
@@ -271,9 +278,9 @@ impl LlmQuery {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct QueryMetadata {
     /// Unique query identifier.
-    pub query_id: Uuid,
+    pub query_id: Ulid,
     /// Parent query ID (for recursive queries).
-    pub parent_query_id: Option<Uuid>,
+    pub parent_query_id: Option<Ulid>,
     /// Session this query belongs to.
     pub session_id: SessionId,
     /// Iteration number within the query loop.
@@ -281,21 +288,21 @@ pub struct QueryMetadata {
     /// Recursion depth.
     pub depth: u32,
     /// Timestamp when query started.
-    pub started_at: DateTime<Utc>,
+    pub started_at: Timestamp,
     /// Timestamp when query completed (if done).
-    pub completed_at: Option<DateTime<Utc>>,
+    pub completed_at: Option<Timestamp>,
 }
 
 impl QueryMetadata {
     /// Create new query metadata.
     pub fn new(session_id: SessionId) -> Self {
         Self {
-            query_id: Uuid::new_v4(),
+            query_id: Ulid::new(),
             parent_query_id: None,
             session_id,
             iteration: 0,
             depth: 0,
-            started_at: Utc::now(),
+            started_at: Timestamp::now(),
             completed_at: None,
         }
     }
@@ -303,19 +310,19 @@ impl QueryMetadata {
     /// Create child query metadata (for recursive calls).
     pub fn child(&self) -> Self {
         Self {
-            query_id: Uuid::new_v4(),
+            query_id: Ulid::new(),
             parent_query_id: Some(self.query_id),
             session_id: self.session_id,
             iteration: 0,
             depth: self.depth + 1,
-            started_at: Utc::now(),
+            started_at: Timestamp::now(),
             completed_at: None,
         }
     }
 
     /// Mark the query as completed.
     pub fn complete(&mut self) {
-        self.completed_at = Some(Utc::now());
+        self.completed_at = Some(Timestamp::now());
     }
 }
 
@@ -366,7 +373,7 @@ pub struct CommandHistoryEntry {
     /// Execution time in milliseconds.
     pub execution_time_ms: u64,
     /// Timestamp of execution.
-    pub executed_at: DateTime<Utc>,
+    pub executed_at: Timestamp,
 }
 
 #[cfg(test)]
@@ -399,7 +406,7 @@ mod tests {
         // Session with 0 duration should be expired immediately
         let expired_info = SessionInfo::new(id, 0);
         // Note: This might still pass due to timing, but demonstrates the concept
-        assert!(expired_info.expires_at <= Utc::now() || !expired_info.is_expired());
+        assert!(expired_info.expires_at <= Timestamp::now() || !expired_info.is_expired());
     }
 
     #[test]
@@ -425,7 +432,7 @@ mod tests {
             stderr: "".to_string(),
             exit_code: Some(0),
             execution_time_ms: 100,
-            executed_at: Utc::now(),
+            executed_at: Timestamp::now(),
         });
 
         assert_eq!(history.last_successful_index(), Some(0));

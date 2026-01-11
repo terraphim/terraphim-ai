@@ -2,34 +2,34 @@
 //!
 //! These types are shared across all execution backends.
 
-use chrono::{DateTime, Utc};
+use jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use uuid::Uuid;
+use ulid::Ulid;
 
 use crate::types::SessionId;
 
 /// Unique identifier for a snapshot.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct SnapshotId {
-    /// Internal UUID.
-    pub id: Uuid,
+    /// Internal ULID.
+    pub id: Ulid,
     /// User-provided name.
     pub name: String,
     /// Session this snapshot belongs to.
     pub session_id: SessionId,
     /// When the snapshot was created.
-    pub created_at: DateTime<Utc>,
+    pub created_at: Timestamp,
 }
 
 impl SnapshotId {
     /// Create a new snapshot ID.
     pub fn new(name: impl Into<String>, session_id: SessionId) -> Self {
         Self {
-            id: Uuid::new_v4(),
+            id: Ulid::new(),
             name: name.into(),
             session_id,
-            created_at: Utc::now(),
+            created_at: Timestamp::now(),
         }
     }
 }
@@ -64,8 +64,8 @@ pub struct ExecutionContext {
     /// Maximum output size before streaming to file.
     pub max_output_bytes: u64,
 
-    /// Cancellation token (passed as UUID for serialization).
-    pub cancellation_token: Option<Uuid>,
+    /// Cancellation token (passed as ULID for serialization).
+    pub cancellation_token: Option<Ulid>,
 
     /// Session token for LLM bridge authentication.
     pub session_token: Option<String>,

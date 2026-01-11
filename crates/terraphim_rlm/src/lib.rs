@@ -52,11 +52,13 @@ pub mod types;
 // Execution environment abstraction
 pub mod executor;
 
+// Session and budget management (Phase 2)
+pub mod budget;
+pub mod session;
+
 // RLM orchestration (to be implemented in later phases)
 // pub mod rlm;
-// pub mod session;
 // pub mod query_loop;
-// pub mod budget;
 // pub mod validator;
 // pub mod command;
 // pub mod preamble;
@@ -68,12 +70,14 @@ pub mod executor;
 // pub mod mcp_errors;
 
 // Re-exports for convenient access
+pub use budget::BudgetTracker;
 pub use config::{BackendType, KgStrictness, RlmConfig, SessionModel};
 pub use error::RlmError;
 pub use executor::{
     Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId,
     ValidationResult,
 };
+pub use session::{SessionManager, SessionStats};
 pub use types::{
     BudgetStatus, Command, CommandHistory, QueryMetadata, SessionId, SessionInfo, SessionState,
 };
