@@ -93,6 +93,11 @@ pub struct SessionInfo {
     pub vm_instance_id: Option<String>,
     /// Context variables stored in the session.
     pub context_variables: HashMap<String, String>,
+    /// Current active snapshot ID (for rollback support).
+    /// This tracks the last successfully restored snapshot.
+    pub current_snapshot_id: Option<String>,
+    /// Number of snapshots created for this session.
+    pub snapshot_count: u32,
 }
 
 impl SessionInfo {
@@ -111,6 +116,8 @@ impl SessionInfo {
             budget_status: BudgetStatus::default(),
             vm_instance_id: None,
             context_variables: HashMap::new(),
+            current_snapshot_id: None,
+            snapshot_count: 0,
         }
     }
 

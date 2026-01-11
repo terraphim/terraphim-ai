@@ -294,6 +294,85 @@ impl SessionManager {
         Ok(session.recursion_depth)
     }
 
+    /// Record that a snapshot was created for a session.
+    ///
+    /// This updates the session's snapshot count and optionally sets the current snapshot.
+    pub fn record_snapshot_created(
+        &self,
+        session_id: &SessionId,
+        snapshot_id: String,
+        set_as_current: bool,
+    ) -> RlmResult<()> {
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
+
+        session.snapshot_count += 1;
+        if set_as_current {
+            session.current_snapshot_id = Some(snapshot_id);
+        }
+
+        log::debug!(
+            "Recorded snapshot for session {} (count: {})",
+            session_id,
+            session.snapshot_count
+        );
+
+        Ok(())
+    }
+
+    /// Record that a snapshot was restored for a session.
+    ///
+    /// This sets the current snapshot ID for rollback tracking.
+    pub fn record_snapshot_restored(
+        &self,
+        session_id: &SessionId,
+        snapshot_id: String,
+    ) -> RlmResult<()> {
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
+
+        session.current_snapshot_id = Some(snapshot_id.clone());
+
+        log::debug!(
+            "Recorded snapshot restore for session {}: {}",
+            session_id,
+            snapshot_id
+        );
+
+        Ok(())
+    }
+
+    /// Get the current snapshot ID for a session.
+    pub fn get_current_snapshot(&self, session_id: &SessionId) -> RlmResult<Option<String>> {
+        let session = self.get_session(session_id)?;
+        Ok(session.current_snapshot_id)
+    }
+
+    /// Clear snapshot tracking for a session (used when all snapshots are deleted).
+    pub fn clear_snapshot_tracking(&self, session_id: &SessionId) -> RlmResult<()> {
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or_else(|| RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
+
+        session.current_snapshot_id = None;
+        session.snapshot_count = 0;
+
+        log::debug!("Cleared snapshot tracking for session {}", session_id);
+
+        Ok(())
+    }
+
     /// Destroy a session and release resources.
     pub fn destroy_session(&self, session_id: &SessionId) -> RlmResult<()> {
         // Remove from sessions
@@ -511,5 +590,45 @@ mod tests {
         let stats = manager.get_stats();
         assert_eq!(stats.total_sessions_created, 2);
         assert_eq!(stats.active_sessions, 2);
+    }
+
+    #[test]
+    fn test_snapshot_tracking() {
+        let manager = SessionManager::new(test_config());
+        let session = manager.create_session().unwrap();
+
+        // Initial state - no snapshots
+        assert!(manager.get_current_snapshot(&session.id).unwrap().is_none());
+        let s = manager.get_session(&session.id).unwrap();
+        assert_eq!(s.snapshot_count, 0);
+
+        // Record a snapshot creation without setting as current
+        manager
+            .record_snapshot_created(&session.id, "snap1".to_string(), false)
+            .unwrap();
+        let s = manager.get_session(&session.id).unwrap();
+        assert_eq!(s.snapshot_count, 1);
+        assert!(s.current_snapshot_id.is_none());
+
+        // Record a snapshot creation and set as current
+        manager
+            .record_snapshot_created(&session.id, "snap2".to_string(), true)
+            .unwrap();
+        let s = manager.get_session(&session.id).unwrap();
+        assert_eq!(s.snapshot_count, 2);
+        assert_eq!(s.current_snapshot_id, Some("snap2".to_string()));
+
+        // Record a snapshot restore
+        manager
+            .record_snapshot_restored(&session.id, "snap1".to_string())
+            .unwrap();
+        let current = manager.get_current_snapshot(&session.id).unwrap();
+        assert_eq!(current, Some("snap1".to_string()));
+
+        // Clear snapshot tracking
+        manager.clear_snapshot_tracking(&session.id).unwrap();
+        let s = manager.get_session(&session.id).unwrap();
+        assert_eq!(s.snapshot_count, 0);
+        assert!(s.current_snapshot_id.is_none());
     }
 }

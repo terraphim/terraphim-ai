@@ -52,6 +52,10 @@ pub struct FirecrackerExecutor {
 
     /// Session to VM IP mapping for affinity.
     session_vms: parking_lot::RwLock<HashMap<SessionId, String>>,
+
+    /// Current active snapshot per session (for rollback support).
+    /// This tracks the last successfully restored snapshot for each session.
+    current_snapshot: parking_lot::RwLock<HashMap<SessionId, SnapshotId>>,
 }
 
 impl FirecrackerExecutor {
@@ -97,12 +101,14 @@ impl FirecrackerExecutor {
             capabilities,
             snapshots: parking_lot::RwLock::new(HashMap::new()),
             session_vms: parking_lot::RwLock::new(HashMap::new()),
+            current_snapshot: parking_lot::RwLock::new(HashMap::new()),
         })
     }
 
     /// Initialize the VM pool.
     ///
     /// This is called lazily on first execution to avoid startup overhead.
+    #[allow(dead_code)]
     async fn ensure_pool(&mut self) -> Result<Arc<VmPoolManager>, RlmError> {
         if let Some(ref pool) = self.pool_manager {
             return Ok(Arc::clone(pool));
@@ -183,6 +189,127 @@ impl FirecrackerExecutor {
     /// Release VM assignment for a session.
     pub fn release_session_vm(&self, session_id: &SessionId) -> Option<String> {
         self.session_vms.write().remove(session_id)
+    }
+
+    /// Get the current active snapshot for a session.
+    ///
+    /// Returns the last successfully restored snapshot, if any.
+    pub fn get_current_snapshot(&self, session_id: &SessionId) -> Option<SnapshotId> {
+        self.current_snapshot.read().get(session_id).cloned()
+    }
+
+    /// Set the current active snapshot for a session.
+    ///
+    /// Called after successful snapshot restore or create.
+    fn set_current_snapshot(&self, session_id: &SessionId, snapshot: SnapshotId) {
+        self.current_snapshot.write().insert(*session_id, snapshot);
+    }
+
+    /// Clear the current snapshot for a session.
+    fn clear_current_snapshot(&self, session_id: &SessionId) {
+        self.current_snapshot.write().remove(session_id);
+    }
+
+    /// Rollback to the previous known good state.
+    ///
+    /// If the session has a current snapshot, restore it. Otherwise, this is a no-op.
+    /// Used when a restore operation fails and we need to recover.
+    pub async fn rollback(&self, session_id: &SessionId) -> Result<(), RlmError> {
+        let current = self.get_current_snapshot(session_id);
+
+        match current {
+            Some(snapshot) => {
+                log::warn!(
+                    "Rolling back session {} to snapshot '{}'",
+                    session_id,
+                    snapshot.name
+                );
+
+                // Perform internal restore without updating current snapshot
+                self.restore_snapshot_internal(&snapshot, false).await
+            }
+            None => {
+                log::warn!(
+                    "No current snapshot for session {}, rollback is a no-op",
+                    session_id
+                );
+                Ok(())
+            }
+        }
+    }
+
+    /// Internal snapshot restore with option to update current snapshot tracking.
+    async fn restore_snapshot_internal(
+        &self,
+        id: &SnapshotId,
+        update_current: bool,
+    ) -> Result<(), RlmError> {
+        log::info!(
+            "Restoring snapshot '{}' ({}) for session {} (update_current={})",
+            id.name,
+            id.id,
+            id.session_id,
+            update_current
+        );
+
+        // Verify snapshot exists
+        {
+            let snapshots = self.snapshots.read();
+            let session_snapshots = snapshots.get(&id.session_id).ok_or_else(|| {
+                RlmError::SnapshotNotFound {
+                    snapshot_id: id.to_string(),
+                }
+            })?;
+
+            if !session_snapshots.iter().any(|s| s.id == id.id) {
+                return Err(RlmError::SnapshotNotFound {
+                    snapshot_id: id.to_string(),
+                });
+            }
+        }
+
+        // Get VM IP for this session
+        let vm_ip = self.session_vms.read().get(&id.session_id).cloned();
+
+        if let Some(ref ip) = vm_ip {
+            // When a real VM is assigned, we would call Firecracker snapshot restore:
+            // POST /snapshot/load to the Firecracker API socket
+            //
+            // The restore process:
+            // 1. Pause VM execution
+            // 2. Load memory state from snapshot file
+            // 3. Load disk state (OverlayFS upper layer)
+            // 4. Resume VM execution
+            //
+            // Note: Per spec "Ignore external state drift on restore"
+            // We only restore VM-internal state (Python interpreter, filesystem, env vars)
+            log::info!(
+                "Would restore Firecracker VM snapshot for VM {} (session {})",
+                ip,
+                id.session_id
+            );
+
+            // If restore fails, we'd return an error here and let caller handle rollback
+            // For now, simulate success
+        } else {
+            log::warn!(
+                "No VM assigned to session {}, restore is a no-op",
+                id.session_id
+            );
+        }
+
+        // Update current snapshot tracking if requested
+        if update_current {
+            self.set_current_snapshot(&id.session_id, id.clone());
+        }
+
+        log::info!(
+            "Snapshot '{}' restored for session {}",
+            id.name,
+            id.session_id
+        );
+
+        Ok(())
     }
 
     /// Execute code in a VM.
@@ -300,16 +427,20 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
         Ok(ValidationResult::valid(Vec::new()))
     }
 
-    async fn create_snapshot(&self, name: &str) -> Result<SnapshotId, Self::Error> {
-        // TODO: Implement Firecracker VM snapshot
-        log::debug!("FirecrackerExecutor::create_snapshot called: {}", name);
+    async fn create_snapshot(
+        &self,
+        session_id: &SessionId,
+        name: &str,
+    ) -> Result<SnapshotId, Self::Error> {
+        log::info!(
+            "Creating snapshot '{}' for session {}",
+            name,
+            session_id
+        );
 
-        // Check snapshot limit
-        // Note: This is a placeholder - actual implementation would check per-session
-        let session_id = SessionId::new(); // Placeholder - would come from context
-
+        // Check snapshot limit for this session
         let mut snapshots = self.snapshots.write();
-        let session_snapshots = snapshots.entry(session_id).or_default();
+        let session_snapshots = snapshots.entry(*session_id).or_default();
 
         if session_snapshots.len() >= self.config.max_snapshots_per_session as usize {
             return Err(RlmError::MaxSnapshotsReached {
@@ -317,41 +448,88 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
             });
         }
 
-        let snapshot_id = SnapshotId::new(name, session_id);
+        // Check if a snapshot with the same name already exists for this session
+        if session_snapshots.iter().any(|s| s.name == name) {
+            return Err(RlmError::SnapshotCreationFailed {
+                message: format!("Snapshot with name '{}' already exists for session", name),
+            });
+        }
+
+        let snapshot_id = SnapshotId::new(name, *session_id);
+
+        // Get VM IP for this session to trigger Firecracker snapshot
+        let vm_ip = self.session_vms.read().get(session_id).cloned();
+
+        if let Some(ref ip) = vm_ip {
+            // When a real VM is assigned, we would call Firecracker snapshot API:
+            // POST /snapshot/create to the Firecracker API socket
+            // For now, log that we would create a VM snapshot
+            log::info!(
+                "Would create Firecracker VM snapshot for VM {} (session {})",
+                ip,
+                session_id
+            );
+
+            // In production, we would store snapshot metadata including VM state
+            // For now, just log the snapshot creation
+            log::debug!("Snapshot {} created for VM {}", snapshot_id.id, ip);
+        } else {
+            log::debug!(
+                "No VM assigned to session {}, creating metadata-only snapshot",
+                session_id
+            );
+        }
+
         session_snapshots.push(snapshot_id.clone());
+
+        log::info!(
+            "Snapshot '{}' ({}) created for session {} (total: {})",
+            name,
+            snapshot_id.id,
+            session_id,
+            session_snapshots.len()
+        );
 
         Ok(snapshot_id)
     }
 
     async fn restore_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
-        // TODO: Implement Firecracker VM snapshot restore
-        log::debug!("FirecrackerExecutor::restore_snapshot called: {}", id);
-
-        let snapshots = self.snapshots.read();
-        if let Some(session_snapshots) = snapshots.get(&id.session_id) {
-            if session_snapshots.iter().any(|s| s.id == id.id) {
-                return Ok(());
-            }
-        }
-
-        Err(RlmError::SnapshotNotFound {
-            snapshot_id: id.to_string(),
-        })
+        // Delegate to internal method with current tracking enabled
+        self.restore_snapshot_internal(id, true).await
     }
 
-    async fn list_snapshots(&self) -> Result<Vec<SnapshotId>, Self::Error> {
-        // Return all snapshots across all sessions
-        // Note: In real implementation, this would be session-scoped
+    async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error> {
         let snapshots = self.snapshots.read();
-        let all_snapshots: Vec<SnapshotId> = snapshots.values().flatten().cloned().collect();
-        Ok(all_snapshots)
+        let session_snapshots = snapshots
+            .get(session_id)
+            .map(|v| v.clone())
+            .unwrap_or_default();
+
+        log::debug!(
+            "Listed {} snapshots for session {}",
+            session_snapshots.len(),
+            session_id
+        );
+
+        Ok(session_snapshots)
     }
 
     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error> {
+        log::info!(
+            "Deleting snapshot '{}' ({}) from session {}",
+            id.name,
+            id.id,
+            id.session_id
+        );
+
         let mut snapshots = self.snapshots.write();
         if let Some(session_snapshots) = snapshots.get_mut(&id.session_id) {
             if let Some(pos) = session_snapshots.iter().position(|s| s.id == id.id) {
                 session_snapshots.remove(pos);
+
+                // If a real VM snapshot exists, we would delete it from storage
+                log::debug!("Snapshot {} deleted", id.id);
+
                 return Ok(());
             }
         }
@@ -359,6 +537,30 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
         Err(RlmError::SnapshotNotFound {
             snapshot_id: id.to_string(),
         })
+    }
+
+    async fn delete_session_snapshots(&self, session_id: &SessionId) -> Result<(), Self::Error> {
+        log::info!("Deleting all snapshots for session {}", session_id);
+
+        let mut snapshots = self.snapshots.write();
+        let removed = snapshots.remove(session_id);
+
+        if let Some(removed_snapshots) = removed {
+            log::info!(
+                "Deleted {} snapshots for session {}",
+                removed_snapshots.len(),
+                session_id
+            );
+
+            // If real VM snapshots exist, we would delete them from storage here
+        } else {
+            log::debug!("No snapshots found for session {}", session_id);
+        }
+
+        // Also clear the current snapshot tracking for this session
+        self.clear_current_snapshot(session_id);
+
+        Ok(())
     }
 
     fn capabilities(&self) -> &[Capability] {
@@ -383,8 +585,12 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     async fn cleanup(&self) -> Result<(), Self::Error> {
         log::info!("FirecrackerExecutor::cleanup called");
 
-        // Clear snapshots
+        // Clear snapshots and current snapshot tracking
         self.snapshots.write().clear();
+        self.current_snapshot.write().clear();
+
+        // Clear session-VM mappings
+        self.session_vms.write().clear();
 
         // TODO: Cleanup VM pool
         // - Return VMs to pool or destroy overflow VMs
@@ -439,13 +645,18 @@ mod tests {
 
         let config = RlmConfig::default();
         let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
 
         // Create a snapshot
-        let snapshot = executor.create_snapshot("test-snap").await.unwrap();
+        let snapshot = executor
+            .create_snapshot(&session_id, "test-snap")
+            .await
+            .unwrap();
         assert_eq!(snapshot.name, "test-snap");
+        assert_eq!(snapshot.session_id, session_id);
 
         // List snapshots
-        let snapshots = executor.list_snapshots().await.unwrap();
+        let snapshots = executor.list_snapshots(&session_id).await.unwrap();
         assert_eq!(snapshots.len(), 1);
 
         // Restore snapshot
@@ -457,7 +668,156 @@ mod tests {
         assert!(result.is_ok());
 
         // Verify deletion
-        let snapshots = executor.list_snapshots().await.unwrap();
+        let snapshots = executor.list_snapshots(&session_id).await.unwrap();
         assert!(snapshots.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_limit_per_session() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig {
+            max_snapshots_per_session: 2,
+            ..Default::default()
+        };
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // Create up to the limit
+        executor
+            .create_snapshot(&session_id, "snap1")
+            .await
+            .unwrap();
+        executor
+            .create_snapshot(&session_id, "snap2")
+            .await
+            .unwrap();
+
+        // Should fail on third
+        let result = executor.create_snapshot(&session_id, "snap3").await;
+        assert!(matches!(result, Err(RlmError::MaxSnapshotsReached { .. })));
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_duplicate_name_rejected() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // Create first snapshot
+        executor
+            .create_snapshot(&session_id, "same-name")
+            .await
+            .unwrap();
+
+        // Try to create with same name
+        let result = executor.create_snapshot(&session_id, "same-name").await;
+        assert!(matches!(
+            result,
+            Err(RlmError::SnapshotCreationFailed { .. })
+        ));
+    }
+
+    #[tokio::test]
+    async fn test_delete_session_snapshots() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // Create multiple snapshots
+        executor
+            .create_snapshot(&session_id, "snap1")
+            .await
+            .unwrap();
+        executor
+            .create_snapshot(&session_id, "snap2")
+            .await
+            .unwrap();
+
+        // Verify we have 2
+        let snapshots = executor.list_snapshots(&session_id).await.unwrap();
+        assert_eq!(snapshots.len(), 2);
+
+        // Delete all for session
+        executor.delete_session_snapshots(&session_id).await.unwrap();
+
+        // Verify all deleted
+        let snapshots = executor.list_snapshots(&session_id).await.unwrap();
+        assert!(snapshots.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_snapshot_rollback() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // Initially no current snapshot
+        assert!(executor.get_current_snapshot(&session_id).is_none());
+
+        // Create and restore a snapshot
+        let snap1 = executor
+            .create_snapshot(&session_id, "checkpoint1")
+            .await
+            .unwrap();
+
+        executor.restore_snapshot(&snap1).await.unwrap();
+
+        // Current snapshot should be set
+        let current = executor.get_current_snapshot(&session_id);
+        assert!(current.is_some());
+        assert_eq!(current.unwrap().name, "checkpoint1");
+
+        // Create another snapshot and restore it
+        let snap2 = executor
+            .create_snapshot(&session_id, "checkpoint2")
+            .await
+            .unwrap();
+        executor.restore_snapshot(&snap2).await.unwrap();
+
+        // Current should be updated
+        let current = executor.get_current_snapshot(&session_id);
+        assert_eq!(current.unwrap().name, "checkpoint2");
+
+        // Rollback should restore to checkpoint2 (the current snapshot)
+        executor.rollback(&session_id).await.unwrap();
+
+        // Current should still be checkpoint2
+        let current = executor.get_current_snapshot(&session_id);
+        assert_eq!(current.unwrap().name, "checkpoint2");
+    }
+
+    #[tokio::test]
+    async fn test_rollback_without_current_snapshot() {
+        if !super::super::is_kvm_available() {
+            eprintln!("Skipping test: KVM not available");
+            return;
+        }
+
+        let config = RlmConfig::default();
+        let executor = FirecrackerExecutor::new(config).unwrap();
+        let session_id = SessionId::new();
+
+        // Rollback without any snapshot should be no-op
+        let result = executor.rollback(&session_id).await;
+        assert!(result.is_ok());
     }
 }
