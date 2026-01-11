@@ -64,10 +64,12 @@ pub mod query_loop;
 // RLM orchestration (Phase 5)
 pub mod rlm;
 
+// Trajectory logging (Phase 5)
+pub mod logger;
+
 // Remaining phases (to be implemented)
 // pub mod validator;
 // pub mod preamble;
-// pub mod logger;
 // pub mod autoscaler;
 // pub mod dns_security;
 // pub mod operations;
@@ -82,6 +84,7 @@ pub use executor::{
     ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
+pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read_trajectory_file};
 pub use parser::CommandParser;
 pub use query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult, TerminationReason};
 pub use rlm::TerraphimRlm;
