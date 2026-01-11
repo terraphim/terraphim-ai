@@ -44,7 +44,7 @@ trust-dns-resolver = { version = "0.23", optional = true }
 
 # Utilities
 parking_lot = "0.12"
-dashmap = "5.5"
+dashmap = "6.1"
 
 [dev-dependencies]
 tokio-test = "0.4"
