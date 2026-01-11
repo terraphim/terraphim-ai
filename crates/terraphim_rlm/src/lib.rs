@@ -54,6 +54,7 @@ pub mod executor;
 
 // Session and budget management (Phase 2)
 pub mod budget;
+pub mod llm_bridge;
 pub mod session;
 
 // RLM orchestration (to be implemented in later phases)
@@ -62,7 +63,6 @@ pub mod session;
 // pub mod validator;
 // pub mod command;
 // pub mod preamble;
-// pub mod llm_bridge;
 // pub mod logger;
 // pub mod autoscaler;
 // pub mod dns_security;
@@ -77,6 +77,7 @@ pub use executor::{
     Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId,
     ValidationResult,
 };
+pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use session::{SessionManager, SessionStats};
 pub use types::{
     BudgetStatus, Command, CommandHistory, QueryMetadata, SessionId, SessionInfo, SessionState,

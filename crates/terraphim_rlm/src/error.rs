@@ -134,6 +134,14 @@ pub enum RlmError {
     #[error("LLM bridge authentication failed: invalid session token")]
     LlmBridgeAuthFailed,
 
+    /// Invalid session token format.
+    #[error("Invalid session token: {token}")]
+    InvalidSessionToken { token: String },
+
+    /// Batch query size too large.
+    #[error("Batch size {size} exceeds maximum {max}")]
+    BatchSizeTooLarge { size: usize, max: usize },
+
     // Output errors
     /// Output too large for inline return.
     #[error("Output exceeds inline limit ({size} > {limit} bytes), streamed to {file_path}")]
