@@ -1,3 +1,37 @@
+//! ## Logging and OpenDAL Warning Messages
+//!
+//! This server uses OpenDAL library for storage operations. You may see
+//! WARN-level messages about "NotFound" errors when reading configuration files:
+//! ```text
+//! [WARN  opendal::services] service=memory name=0x... path=embedded_config.json: read failed NotFound (permanent)
+//! ```
+//!
+//! These messages are **expected and harmless** - they occur when OpenDAL attempts
+//! to read configuration files that don't exist yet. The system correctly falls back
+//! to default values and continues normal operation.
+//!
+//! ### Why These Warnings Appear
+//!
+//! OpenDAL has an internal `LoggingLayer` that logs directly to the Rust `log` crate.
+//! This logging is independent of application logging configuration and occurs before
+//! our tracing setup takes effect.
+//!
+//! ### Suppressing These Warnings
+//!
+//! If you want cleaner logs (without these expected warnings), you can set the
+//! `RUST_LOG` environment variable:
+//!
+//! ```bash
+//! # Option 1: Suppress all warnings (includes real ones)
+//! RUST_LOG=error terraphim-mcp-server
+//!
+//! # Option 2: Suppress OpenDAL-specific warnings
+//! RUST_LOG="opendal=error" terraphim-mcp-server
+//!
+//! # Option 3: Use quieter mode
+//! RUST_LOG=warn terraphim-mcp-server
+//! ```
+
 use std::sync::Arc;
 
 use anyhow::Result;
