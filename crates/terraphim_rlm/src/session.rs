@@ -85,12 +85,12 @@ impl SessionManager {
         session_id: &SessionId,
         state: SessionState,
     ) -> RlmResult<()> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.state = state;
         Ok(())
@@ -127,12 +127,12 @@ impl SessionManager {
 
     /// Extend a session's lifetime.
     pub fn extend_session(&self, session_id: &SessionId) -> RlmResult<SessionInfo> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         if !session.can_extend(self.config.max_extensions) {
             return Err(RlmError::MaxExtensionsReached {
@@ -181,18 +181,19 @@ impl SessionManager {
         }
 
         // Update session with VM ID
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.vm_instance_id = Some(vm_instance_id.clone());
         session.state = SessionState::Ready;
 
         // Update mappings
-        self.vm_to_session.insert(vm_instance_id.clone(), *session_id);
+        self.vm_to_session
+            .insert(vm_instance_id.clone(), *session_id);
         self.session_to_vm.insert(*session_id, vm_instance_id);
 
         Ok(())
@@ -215,19 +216,23 @@ impl SessionManager {
         key: String,
         value: String,
     ) -> RlmResult<()> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.context_variables.insert(key, value);
         Ok(())
     }
 
     /// Get a context variable from a session.
-    pub fn get_context_variable(&self, session_id: &SessionId, key: &str) -> RlmResult<Option<String>> {
+    pub fn get_context_variable(
+        &self,
+        session_id: &SessionId,
+        key: &str,
+    ) -> RlmResult<Option<String>> {
         let session = self.get_session(session_id)?;
         Ok(session.context_variables.get(key).cloned())
     }
@@ -243,12 +248,12 @@ impl SessionManager {
 
     /// Update budget status for a session.
     pub fn update_budget(&self, session_id: &SessionId, budget: BudgetStatus) -> RlmResult<()> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.budget_status = budget;
         Ok(())
@@ -256,12 +261,12 @@ impl SessionManager {
 
     /// Increment recursion depth for a session.
     pub fn increment_recursion_depth(&self, session_id: &SessionId) -> RlmResult<u32> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         let new_depth = session.recursion_depth + 1;
 
@@ -281,12 +286,12 @@ impl SessionManager {
 
     /// Decrement recursion depth for a session.
     pub fn decrement_recursion_depth(&self, session_id: &SessionId) -> RlmResult<u32> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.recursion_depth = session.recursion_depth.saturating_sub(1);
         session.budget_status.current_recursion_depth = session.recursion_depth;
@@ -303,12 +308,12 @@ impl SessionManager {
         snapshot_id: String,
         set_as_current: bool,
     ) -> RlmResult<()> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.snapshot_count += 1;
         if set_as_current {
@@ -332,12 +337,12 @@ impl SessionManager {
         session_id: &SessionId,
         snapshot_id: String,
     ) -> RlmResult<()> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.current_snapshot_id = Some(snapshot_id.clone());
 
@@ -358,12 +363,12 @@ impl SessionManager {
 
     /// Clear snapshot tracking for a session (used when all snapshots are deleted).
     pub fn clear_snapshot_tracking(&self, session_id: &SessionId) -> RlmResult<()> {
-        let mut session = self
-            .sessions
-            .get_mut(session_id)
-            .ok_or_else(|| RlmError::SessionNotFound {
-                session_id: *session_id,
-            })?;
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
 
         session.current_snapshot_id = None;
         session.snapshot_count = 0;
@@ -514,10 +519,7 @@ mod tests {
             manager.get_assigned_vm(&session.id),
             Some("vm-123".to_string())
         );
-        assert_eq!(
-            manager.get_session_for_vm("vm-123"),
-            Some(session.id)
-        );
+        assert_eq!(manager.get_session_for_vm("vm-123"), Some(session.id));
     }
 
     #[test]
@@ -529,9 +531,7 @@ mod tests {
             .set_context_variable(&session.id, "key1".to_string(), "value1".to_string())
             .unwrap();
 
-        let value = manager
-            .get_context_variable(&session.id, "key1")
-            .unwrap();
+        let value = manager.get_context_variable(&session.id, "key1").unwrap();
         assert_eq!(value, Some("value1".to_string()));
 
         let all_vars = manager.get_all_context_variables(&session.id).unwrap();
@@ -553,7 +553,10 @@ mod tests {
 
         // Should fail on exceeding max depth
         let result = manager.increment_recursion_depth(&session.id);
-        assert!(matches!(result, Err(RlmError::RecursionDepthExceeded { .. })));
+        assert!(matches!(
+            result,
+            Err(RlmError::RecursionDepthExceeded { .. })
+        ));
 
         // Decrement should work
         assert_eq!(manager.decrement_recursion_depth(&session.id).unwrap(), 2);

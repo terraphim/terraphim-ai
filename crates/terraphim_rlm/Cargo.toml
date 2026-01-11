@@ -27,6 +27,9 @@ terraphim_service = { path = "../terraphim_service", optional = true }
 terraphim_automata = { path = "../terraphim_automata", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
 
+# Firecracker-rust core for VM and snapshot management
+fcctl-core = { path = "../../../firecracker-rust/fcctl-core" }
+
 # Async utilities
 tokio-util = "0.7"
 futures = "0.3"
