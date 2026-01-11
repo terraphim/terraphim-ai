@@ -57,11 +57,13 @@ pub mod budget;
 pub mod llm_bridge;
 pub mod session;
 
+// Command parsing and query loop (Phase 4)
+pub mod parser;
+pub mod query_loop;
+
 // RLM orchestration (to be implemented in later phases)
 // pub mod rlm;
-// pub mod query_loop;
 // pub mod validator;
-// pub mod command;
 // pub mod preamble;
 // pub mod logger;
 // pub mod autoscaler;
@@ -78,9 +80,12 @@ pub use executor::{
     ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
+pub use parser::CommandParser;
+pub use query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult, TerminationReason};
 pub use session::{SessionManager, SessionStats};
 pub use types::{
-    BudgetStatus, Command, CommandHistory, QueryMetadata, SessionId, SessionInfo, SessionState,
+    BashCommand, BudgetStatus, Command, CommandHistory, LlmQuery, PythonCode, QueryMetadata,
+    SessionId, SessionInfo, SessionState,
 };
 
 /// Crate version
