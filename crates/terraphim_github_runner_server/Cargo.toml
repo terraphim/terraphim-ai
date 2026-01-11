@@ -5,7 +5,7 @@ edition = "2021"
 
 [dependencies]
 # Web framework
-salvo = { version = "0.74.3" }
+salvo = { version = "0.86.0" }
 tokio = { version = "1.36", features = ["full"] }
 
 # GitHub integration
@@ -58,4 +58,4 @@ ollama = ["terraphim_service/ollama"]
 openrouter = ["terraphim_service/openrouter"]
 
 [dev-dependencies]
-salvo = { version = "0.74.3", features = ["test"] }
+salvo = { version = "0.86.0", features = ["test"] }
