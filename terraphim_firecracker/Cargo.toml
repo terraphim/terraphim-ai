@@ -24,7 +24,7 @@ env_logger = "0.10"
 clap = { version = "4.0", features = ["derive"] }
 config = "0.15"
 parking_lot = "0.12"
-dashmap = "5.5"
+dashmap = "6.1"
 futures = "0.3"
 fastrand = "2.0"
 toml = "0.9"
