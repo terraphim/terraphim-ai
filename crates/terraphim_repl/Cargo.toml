@@ -25,7 +25,7 @@ terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 log = "0.4"
 
 # REPL interface
-rustyline = "14.0"
+rustyline = "17.0"
 colored = "2.1"
 comfy-table = "7.1"
 dirs = "5.0"
