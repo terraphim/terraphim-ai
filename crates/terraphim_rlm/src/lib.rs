@@ -61,8 +61,10 @@ pub mod session;
 pub mod parser;
 pub mod query_loop;
 
-// RLM orchestration (to be implemented in later phases)
-// pub mod rlm;
+// RLM orchestration (Phase 5)
+pub mod rlm;
+
+// Remaining phases (to be implemented)
 // pub mod validator;
 // pub mod preamble;
 // pub mod logger;
@@ -82,6 +84,7 @@ pub use executor::{
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use parser::CommandParser;
 pub use query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult, TerminationReason};
+pub use rlm::TerraphimRlm;
 pub use session::{SessionManager, SessionStats};
 pub use types::{
     BashCommand, BudgetStatus, Command, CommandHistory, LlmQuery, PythonCode, QueryMetadata,

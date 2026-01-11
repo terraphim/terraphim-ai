@@ -92,7 +92,7 @@ impl Default for QueryLoopConfig {
 }
 
 /// The query loop orchestrator.
-pub struct QueryLoop<E: ExecutionEnvironment> {
+pub struct QueryLoop<E: ExecutionEnvironment + ?Sized> {
     /// Session manager for session state.
     session_manager: Arc<SessionManager>,
     /// Budget tracker for resource limits (per-session).
@@ -111,7 +111,7 @@ pub struct QueryLoop<E: ExecutionEnvironment> {
     cancel_rx: Option<mpsc::Receiver<()>>,
 }
 
-impl<E: ExecutionEnvironment> QueryLoop<E> {
+impl<E: ExecutionEnvironment + ?Sized> QueryLoop<E> {
     /// Create a new query loop for a specific session.
     pub fn new(
         session_id: SessionId,
