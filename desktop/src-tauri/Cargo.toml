@@ -65,7 +65,7 @@ lru = "0.16"
 
 [dev-dependencies]
 tokio-test = "0.4.4"
-serial_test = "3.1.1"
+serial_test = "3.3.1"
 tempfile = "3.23.0"
 mockall = "0.14.0"
 
