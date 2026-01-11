@@ -24,9 +24,10 @@ use std::time::Instant;
 
 use terraphim_firecracker::{PoolConfig, Sub2SecondOptimizer, VmPoolManager};
 
+use super::ssh::SshExecutor;
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 use crate::config::{BackendType, RlmConfig};
-use crate::error::RlmError;
+use crate::error::{RlmError, RlmResult};
 use crate::types::SessionId;
 
 /// Firecracker execution backend.
@@ -40,11 +41,17 @@ pub struct FirecrackerExecutor {
     /// VM pool manager (will be initialized on first use).
     pool_manager: Option<Arc<VmPoolManager>>,
 
+    /// SSH executor for running commands on VMs.
+    ssh_executor: SshExecutor,
+
     /// Capabilities supported by this executor.
     capabilities: Vec<Capability>,
 
     /// Active snapshots keyed by session.
     snapshots: parking_lot::RwLock<HashMap<SessionId, Vec<SnapshotId>>>,
+
+    /// Session to VM IP mapping for affinity.
+    session_vms: parking_lot::RwLock<HashMap<SessionId, String>>,
 }
 
 impl FirecrackerExecutor {
@@ -78,11 +85,18 @@ impl FirecrackerExecutor {
             Capability::FileOperations,
         ];
 
+        // Configure SSH executor with sensible defaults for VM access
+        let ssh_executor = SshExecutor::new()
+            .with_user("root")
+            .with_output_dir(std::env::temp_dir().join("terraphim_rlm_output"));
+
         Ok(Self {
             config,
             pool_manager: None,
+            ssh_executor,
             capabilities,
             snapshots: parking_lot::RwLock::new(HashMap::new()),
+            session_vms: parking_lot::RwLock::new(HashMap::new()),
         })
     }
 
@@ -102,7 +116,7 @@ impl FirecrackerExecutor {
         );
 
         // Create pool configuration from RLM config
-        let pool_config = PoolConfig {
+        let _pool_config = PoolConfig {
             min_pool_size: self.config.pool_min_size,
             max_pool_size: self.config.pool_max_size,
             target_pool_size: self.config.pool_target_size,
@@ -112,7 +126,7 @@ impl FirecrackerExecutor {
 
         // Create optimizer and VM manager
         // Note: This is a stub - actual implementation will create real VmManager
-        let optimizer = Arc::new(Sub2SecondOptimizer::new());
+        let _optimizer = Arc::new(Sub2SecondOptimizer::new());
 
         // TODO: Create actual VmManager and VmPoolManager
         // For now, we'll return an error indicating initialization is incomplete
@@ -124,6 +138,53 @@ impl FirecrackerExecutor {
         })
     }
 
+    /// Get or allocate a VM for a session.
+    ///
+    /// Returns the VM IP address if available, or None if no VM could be allocated.
+    async fn get_or_allocate_vm(&self, session_id: &SessionId) -> RlmResult<Option<String>> {
+        // Check if session already has an assigned VM
+        {
+            let session_vms = self.session_vms.read();
+            if let Some(ip) = session_vms.get(session_id) {
+                log::debug!("Using existing VM for session {}: {}", session_id, ip);
+                return Ok(Some(ip.clone()));
+            }
+        }
+
+        // Try to allocate from pool
+        // Note: Full pool integration requires terraphim_firecracker enhancements (GitHub #15)
+        // For now, we check if pool_manager is initialized
+        if self.pool_manager.is_some() {
+            // Pool allocation would happen here
+            // let (vm, _alloc_time) = self.pool_manager.as_ref().unwrap()
+            //     .allocate_vm("terraphim-minimal")
+            //     .await
+            //     .map_err(|e| RlmError::VmAllocationTimeout {
+            //         timeout_ms: self.config.allocation_timeout_ms,
+            //     })?;
+            //
+            // if let Some(ip) = vm.read().await.ip_address.clone() {
+            //     self.session_vms.write().insert(*session_id, ip.clone());
+            //     return Ok(Some(ip));
+            // }
+            log::debug!("VM pool available but allocation not yet implemented");
+        }
+
+        log::debug!("No VM available for session {}", session_id);
+        Ok(None)
+    }
+
+    /// Assign a VM to a session (for external allocation).
+    pub fn assign_vm_to_session(&self, session_id: SessionId, vm_ip: String) {
+        log::info!("Assigning VM {} to session {}", vm_ip, session_id);
+        self.session_vms.write().insert(session_id, vm_ip);
+    }
+
+    /// Release VM assignment for a session.
+    pub fn release_session_vm(&self, session_id: &SessionId) -> Option<String> {
+        self.session_vms.write().remove(session_id)
+    }
+
     /// Execute code in a VM.
     async fn execute_in_vm(
         &self,
@@ -133,39 +194,78 @@ impl FirecrackerExecutor {
     ) -> Result<ExecutionResult, RlmError> {
         let start = Instant::now();
 
-        // For now, return a stub result indicating the executor is not fully implemented
         log::debug!(
             "FirecrackerExecutor::execute_in_vm called (python={}, session={})",
             is_python,
             ctx.session_id
         );
 
-        // TODO: Implement actual VM execution:
-        // 1. Allocate VM from pool (or use session-affinity VM)
-        // 2. Copy code to VM via vsock or SSH
-        // 3. Execute and capture output
-        // 4. Handle timeout and cancellation
-        // 5. Return result
+        // Try to get a VM for this session
+        let vm_ip = self.get_or_allocate_vm(&ctx.session_id).await?;
 
-        let execution_time = start.elapsed().as_millis() as u64;
+        match vm_ip {
+            Some(ref ip) => {
+                // Execute via SSH on the allocated VM
+                log::info!("Executing on VM {} for session {}", ip, ctx.session_id);
 
-        Ok(ExecutionResult {
-            stdout: format!(
-                "[FirecrackerExecutor stub] Would execute: {}",
-                if code.len() > 100 {
-                    format!("{}...", &code[..100])
+                let result = if is_python {
+                    self.ssh_executor.execute_python(ip, code, ctx).await
                 } else {
-                    code.to_string()
+                    self.ssh_executor.execute_command(ip, code, ctx).await
+                };
+
+                match result {
+                    Ok(mut res) => {
+                        // Add VM metadata
+                        res.metadata
+                            .insert("vm_ip".to_string(), ip.clone());
+                        res.metadata
+                            .insert("backend".to_string(), "firecracker".to_string());
+                        Ok(res)
+                    }
+                    Err(e) => {
+                        log::error!("VM execution failed: {}", e);
+                        Err(e)
+                    }
                 }
-            ),
-            stderr: String::new(),
-            exit_code: 0,
-            execution_time_ms: execution_time,
-            output_truncated: false,
-            output_file_path: None,
-            timed_out: false,
-            metadata: HashMap::new(),
-        })
+            }
+            None => {
+                // No VM available - return stub response indicating this
+                // In production, this would be an error, but for development
+                // we return a stub to allow testing without VMs
+                log::warn!(
+                    "No VM available for execution (session={}), returning stub response",
+                    ctx.session_id
+                );
+
+                let execution_time = start.elapsed().as_millis() as u64;
+
+                Ok(ExecutionResult {
+                    stdout: format!(
+                        "[FirecrackerExecutor] No VM available. Would execute: {}",
+                        if code.len() > 100 {
+                            format!("{}...", &code[..100])
+                        } else {
+                            code.to_string()
+                        }
+                    ),
+                    stderr: "Warning: No VM allocated for this session. \
+                             Assign a VM using assign_vm_to_session() or ensure VM pool is initialized."
+                        .to_string(),
+                    exit_code: 0,
+                    execution_time_ms: execution_time,
+                    output_truncated: false,
+                    output_file_path: None,
+                    timed_out: false,
+                    metadata: {
+                        let mut m = HashMap::new();
+                        m.insert("stub".to_string(), "true".to_string());
+                        m.insert("backend".to_string(), "firecracker".to_string());
+                        m
+                    },
+                })
+            }
+        }
     }
 }
 

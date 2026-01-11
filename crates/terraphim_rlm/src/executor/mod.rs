@@ -21,10 +21,12 @@
 
 mod context;
 mod firecracker;
+mod ssh;
 mod r#trait;
 
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
 pub use firecracker::FirecrackerExecutor;
+pub use ssh::SshExecutor;
 pub use r#trait::ExecutionEnvironment;
 
 use crate::config::{BackendType, RlmConfig};

@@ -9,7 +9,6 @@
 use dashmap::DashMap;
 use jiff::{Timestamp, ToSpan};
 use std::sync::atomic::{AtomicU32, Ordering};
-use std::sync::Arc;
 
 use crate::config::RlmConfig;
 use crate::error::{RlmError, RlmResult};

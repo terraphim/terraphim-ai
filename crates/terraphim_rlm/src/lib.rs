@@ -75,7 +75,7 @@ pub use config::{BackendType, KgStrictness, RlmConfig, SessionModel};
 pub use error::RlmError;
 pub use executor::{
     Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId,
-    ValidationResult,
+    SshExecutor, ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use session::{SessionManager, SessionStats};
