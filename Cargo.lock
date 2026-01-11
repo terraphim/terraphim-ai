@@ -8934,7 +8934,6 @@ dependencies = [
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_service",
- "terraphim_sessions",
  "terraphim_settings",
  "terraphim_types",
  "terraphim_update",
@@ -9375,7 +9374,6 @@ dependencies = [
  "dotenvy",
  "env_logger 0.11.8",
  "futures",
- "grepapp_haystack",
  "home",
  "html2md",
  "jiff 0.1.29",
@@ -9390,7 +9388,6 @@ dependencies = [
  "serde_json",
  "serial_test",
  "tempfile",
- "terraphim_atomic_client",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_persistence",
@@ -9485,7 +9482,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rlm"
-version = "1.4.7"
+version = "1.4.8"
 dependencies = [
  "anyhow",
  "async-trait",

@@ -18,10 +18,9 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["tokio-runtime"] }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
-# Atomic Data Server haystack integration
-terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
-# grep.app haystack integration
-grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
+# NOTE: Atomic Data Server and grep.app haystacks commented out for crates.io publishing (not published yet)
+# terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
+# grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
 claude-log-analyzer = { path = "../claude-log-analyzer", version = "1.0.0", features = ["connectors"], optional = true }
 jiff = { version = "0.1", optional = true }
 home = { version = "0.5", optional = true }
@@ -60,10 +59,9 @@ tempfile = "3.23"
 
 [features]
 default = []
-# Enable Atomic Data Server haystack integration
-atomic = ["dep:terraphim_atomic_client"]
-# Enable grep.app haystack integration
-grepapp = ["dep:grepapp_haystack"]
+# NOTE: atomic and grepapp features disabled for crates.io publishing (dependencies not published yet)
+# atomic = ["dep:terraphim_atomic_client"]
+# grepapp = ["dep:grepapp_haystack"]
 # Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
 ai-assistant = ["claude-log-analyzer", "jiff", "home"]
 # Enable openrouter integration
