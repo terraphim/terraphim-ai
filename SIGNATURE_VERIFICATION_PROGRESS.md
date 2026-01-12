@@ -242,52 +242,104 @@
 
 ---
 
-### Step 7: Create Public Key Documentation ⏳
+### Step 7: Create Public Key Documentation ✅
 
-**File**: `docs/updates/KEYS.md`
+**Status**: Complete
+
+**Implementation**: Created `docs/updates/KEYS.md`
 
 **Contents**:
-- How public keys are embedded
-- How to verify the public key
-- Key distribution strategy
-- Security considerations
-- Key rotation procedure (for v1.1)
 
-**Estimated Effort**: 1 hour
+1. **Overview** (lines 1-36):
+   - Ed25519 signature explanation
+   - Security benefits (128-bit security, fast verification, small signatures)
+   - Comparison with RSA/PGP
 
-### Step 8: CI/CD Release Signing Workflow ⏳
+2. **Public Key Distribution** (lines 38-96):
+   - Primary method: Embedded public key in binary
+   - Code location and implementation details
+   - Alternative methods: Environment variable, config file
+   - Key generation process
 
-**File**: `.github/workflows/release-sign.yml`
+3. **Security Practices**:
+   - Private key storage (1Password, password managers)
+   - Security checklist for maintainers
+   - Threat model explanation
 
-**Workflow**:
-```yaml
-name: Sign Release
+4. **Signature Format** (lines 98-130):
+   - Embedded signatures in archives
+   - GZIP comment storage for .tar.gz
+   - Verification process flow
+   - Failure modes
 
-on:
-  release:
-    types: [created]
+5. **User Guide**:
+   - Manual verification instructions
+   - Installing zipsign CLI
+   - Extracting and verifying public keys
+   - Troubleshooting common issues
 
-jobs:
-  sign:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: Install zipsign
-        run: cargo install zipsign
-      - name: Download release artifacts
-        # Download all release assets
-      - name: Sign artifacts
-        env:
-          PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
-        run: |
-          for artifact in *.tar.gz; do
-            zipsign sign tar "$artifact" <(echo "$PRIVATE_KEY")
-          done
-      - name: Upload signatures
-        # Upload .tar.gz files with embedded signatures
-```
+6. **Key Rotation** (lines 168-200):
+   - Planned rotation procedure (v1.1+)
+   - Emergency rotation process
+   - Key fingerprint table (to be populated)
+   - Grace period support
 
-**Estimated Effort**: 2 hours
+7. **Trust Model** (lines 242-260):
+   - Developer trust assumptions
+   - Verification trust guarantees
+   - What signatures protect against (and don't)
+
+**Result**: Comprehensive documentation covering all aspects of public key distribution, verification, and security practices.
+
+---
+
+### Step 8: CI/CD Release Signing Workflow ✅
+
+**Status**: Complete
+
+**Implementation**: Created `.github/workflows/release-sign.yml`
+
+**Features**:
+
+1. **Trigger**: Runs automatically when a GitHub release is created
+
+2. **Job: Sign** (lines 30-200):
+   - Checks out code
+   - Installs zipsign CLI via cargo
+   - Downloads all release artifacts (.tar.gz, .tar.zst)
+   - Signs each artifact with Ed25519 signature
+   - Verifies all signatures after signing
+   - Uploads signed artifacts back to release
+
+3. **Security**:
+   - Private key from GitHub Secrets (`ZIPSIGN_PRIVATE_KEY`)
+   - Private key never logged or exposed
+   - Temporary key file with secure permissions (600)
+   - Key cleaned up after use
+
+4. **Error Handling**:
+   - Validates artifacts exist before signing
+   - Checks private key secret is set
+   - Verifies all signatures after signing
+   - Fails workflow if any signature verification fails
+
+5. **Job: Summary** (lines 202-240):
+   - Generates signature verification report
+   - Uploads report as workflow artifact
+   - Adds report to GitHub Actions summary
+
+6. **Permissions**:
+   - `contents: write` - Required to upload artifacts to releases
+
+**Setup Required**:
+1. Generate Ed25519 key pair: `./scripts/generate-zipsign-keypair.sh`
+2. Store private key in GitHub repository settings as secret `ZIPSIGN_PRIVATE_KEY`
+3. Add public key to `crates/terraphim_update/src/signature.rs`
+4. Create a release to trigger the workflow
+
+**Result**: Automated signing of all release binaries via GitHub Actions when releases are created.
+
+---
 
 ### Step 9: Generate Real Ed25519 Key Pair ⏳
 
