@@ -2,7 +2,7 @@
 
 **Date**: 2025-01-12
 **Issue**: #421 - CRITICAL: Implement actual signature verification for auto-update
-**Status**: ✅ **COMPLETE** (100%)
+**Status**: Phase 3 - Step 2 Complete (20% done)
 
 ## Completed Work ✅
 
@@ -96,427 +96,159 @@
 
 ---
 
-### Step 3: Create Signing Script ✅
+### Step 3: Create Signing Script ⏳
 
-**Status**: Complete
+**File**: `scripts/sign-release.sh`
 
-**Implementation**: Created `scripts/sign-release.sh`
+**Requirements**:
+```bash
+#!/usr/bin/env bash
+# Sign all release binaries using zipsign
 
-**Features**:
-1. **Comprehensive Signing Script** (`scripts/sign-release.sh`):
-   - Signs all .tar.gz and .tar.zst archives in a release directory
-   - Supports custom private key path via argument or $ZIPSIGN_PRIVATE_KEY env var
-   - Skips already-signed archives to avoid re-signing
-   - Verifies all signatures after signing
-   - Proper error handling and colored output
-   - Checks for insecure private key permissions
-   - Detailed usage instructions and examples
+# Usage: ./scripts/sign-release.sh <release_directory>
 
-2. **Usage**:
-   ```bash
-   ./scripts/sign-release.sh <release_directory> [private_key_path]
-   ./scripts/sign-release.sh target/release/
-   ZIPSIGN_PRIVATE_KEY=keys/production.key ./scripts/sign-release.sh target/release/
-   ```
+SIGNING_KEY="path/to/private.key"
 
-3. **Safety Features**:
-   - Checks if zipsign CLI is installed
-   - Validates release directory exists
-   - Validates private key file exists
-   - Warns on insecure key permissions
-   - Skips already-signed archives
-   - Verifies all signatures after signing
+for binary in "$RELEASE_DIR"/*.{tar.gz,tar.zst}; do
+    zipsign sign tar "$binary" "$SIGNING_KEY"
+done
+```
 
-4. **Output**:
-   - Color-coded status messages (info, warning, error)
-   - Progress tracking (signed, skipped, failed)
-   - Verification results
-   - Summary statistics
+**Estimated Effort**: 1 hour
 
-**Result**: Release signing automation is ready. The script can be manually run or integrated into CI/CD pipelines.
+### Step 4: Integrate Signing into Release Pipeline ⏳
 
----
+**File**: `scripts/release.sh`
 
-### Step 4: Integrate Signing into Release Pipeline ✅
+**Add after build step**:
+```bash
+# After build_binaries() call
+sign_binaries() {
+    if [[ -f "$PRIVATE_KEY_FILE" ]]; then
+        ./scripts/sign-release.sh "$RELEASE_DIR"
+    else
+        echo "Warning: No signing key found, skipping signature generation"
+    fi
+}
 
-**Status**: Complete
+sign_binaries
+```
 
-**Implementation**: Updated `scripts/release.sh` to call signing script
+**Estimated Effort**: 1 hour
 
-**Changes Made**:
+### Step 5: Add Comprehensive Test Suite ⏳
 
-1. **Added `sign_binaries()` function** (`scripts/release.sh` line 382-429):
-   - Checks if signing script exists
-   - Verifies zipsign CLI is installed
-   - Validates private key exists
-   - Counts archives to sign
-   - Calls `scripts/sign-release.sh` with release directory and private key
-   - Gracefully skips signing if requirements not met
+**File**: `crates/terraphim_update/tests/signature_test.rs`
 
-2. **Updated `main()` function** (line 649-650):
-   - Added `sign_binaries` call after package creation
-   - Positioned before Docker image build
-   - Ensures all archives are signed before upload
+**Test Cases**:
+1. ✅ Valid signature verification
+2. ✅ Invalid signature detection
+3. ✅ Missing signature handling
+4. ✅ Tampered archive rejection
+5. ✅ Placeholder key behavior
+6. ⏳ Integration test with actual signed archive
+7. ⏳ Property-based tests for verification
+8. ⏳ Performance benchmarks
 
-3. **Safety Features**:
-   - Checks for signing script existence
-   - Warns if zipsign not installed (doesn't fail)
-   - Warns if private key missing (doesn't fail)
-   - Checks if archives exist before attempting to sign
-   - Respects DRY_RUN mode
-
-4. **Environment Variables**:
-   - `ZIPSIGN_PRIVATE_KEY`: Path to private signing key
-   - Default: `keys/private.key`
-
-**Result**: Release pipeline now automatically signs all .tar.gz and .tar.zst archives if the private key is available. Signing is optional - if the key is missing, the release continues with a warning.
-
----
-
-### Step 5: Add Comprehensive Test Suite ✅
-
-**Status**: Complete
-
-**Implementation**: Created `crates/terraphim_update/tests/signature_test.rs`
-
-**Test Categories**:
-
-1. **Unit Tests** (15 tests):
-   - ✅ `test_placeholder_key_accepts_any_archive` - Placeholder key behavior
-   - ✅ `test_nonexistent_archive_returns_error` - Error handling
-   - ✅ `test_invalid_base64_key_returns_error` - Invalid key format
-   - ✅ `test_wrong_length_key_returns_invalid` - Key length validation
-   - ✅ `test_empty_archive_without_signature` - Empty archive handling
-   - ✅ `test_verification_result_equality` - Result type equality
-   - ✅ `test_verification_result_debug_format` - Debug formatting
-
-2. **Edge Case Tests**:
-   - ✅ `test_corrupted_archive_returns_error` - Corrupted archive handling
-   - ✅ `test_verification_with_custom_public_key` - Custom key testing
-   - ✅ `test_multiple_verifications_same_archive` - Repeatability
-   - ✅ `test_verification_non_file_path` - Non-file path handling
-
-3. **Integration Tests** (require `integration-signing` feature):
-   - ✅ `test_signed_archive_verification` - Valid signature verification
-   - ✅ `test_wrong_key_rejects_signed_archive` - Wrong key rejection
-   - ✅ `test_tampered_archive_rejected` - Tamper detection
-
-4. **Property-Based Tests**:
-   - ✅ `test_verification_deterministic` - Deterministic behavior
-   - ✅ `test_verification_no_panic` - No panics on any input
-
-5. **Performance Tests**:
-   - ✅ `test_verification_performance_small_archive` - Performance verification
-   - ✅ `test_verification_multiple_archives_performance` - Batch performance
-
-**Test Results**:
-- All 15 tests passing ✅
-- Coverage: unit, integration, edge cases, property, performance
-- Integration tests are gated behind `integration-signing` feature (requires zipsign CLI)
-
-**Result**: Comprehensive test suite provides thorough coverage of signature verification functionality.
-
----
+**Estimated Effort**: 3-4 hours
 
 ### Step 6: Update Integration Tests ⏳
 
-**Status**: Deferred (requires real Ed25519 key pair)
-
 **File**: `crates/terraphim_update/tests/integration_test.rs`
 
-**Requirements**:
-- Add end-to-end tests for update flow with signature verification
-- Test update with valid signature succeeds
-- Test update with invalid signature fails
-- Test update with missing signature fails
+**Add**:
+```rust
+#[test]
+fn test_update_with_valid_signature() {
+    // Create test archive with valid signature
+    // Verify update succeeds
+}
 
-**Implementation Notes**:
-- Current implementation uses placeholder key that accepts any archive
-- Full integration tests require:
-  1. Real Ed25519 key pair generation (Step 9)
-  2. Test archive signed with real key
-  3. Mock-free verification testing
-- Can be implemented after Step 9 (key generation)
+#[test]
+fn test_update_rejects_invalid_signature() {
+    // Create test archive with invalid signature
+    // Verify update fails gracefully
+}
+```
 
-**Estimated Effort**: 2 hours (after key generation)
+**Estimated Effort**: 2 hours
 
----
+### Step 7: Create Public Key Documentation ⏳
 
-### Step 7: Create Public Key Documentation ✅
-
-**Status**: Complete
-
-**Implementation**: Created `docs/updates/KEYS.md`
+**File**: `docs/updates/KEYS.md`
 
 **Contents**:
-
-1. **Overview** (lines 1-36):
-   - Ed25519 signature explanation
-   - Security benefits (128-bit security, fast verification, small signatures)
-   - Comparison with RSA/PGP
-
-2. **Public Key Distribution** (lines 38-96):
-   - Primary method: Embedded public key in binary
-   - Code location and implementation details
-   - Alternative methods: Environment variable, config file
-   - Key generation process
-
-3. **Security Practices**:
-   - Private key storage (1Password, password managers)
-   - Security checklist for maintainers
-   - Threat model explanation
-
-4. **Signature Format** (lines 98-130):
-   - Embedded signatures in archives
-   - GZIP comment storage for .tar.gz
-   - Verification process flow
-   - Failure modes
-
-5. **User Guide**:
-   - Manual verification instructions
-   - Installing zipsign CLI
-   - Extracting and verifying public keys
-   - Troubleshooting common issues
-
-6. **Key Rotation** (lines 168-200):
-   - Planned rotation procedure (v1.1+)
-   - Emergency rotation process
-   - Key fingerprint table (to be populated)
-   - Grace period support
-
-7. **Trust Model** (lines 242-260):
-   - Developer trust assumptions
-   - Verification trust guarantees
-   - What signatures protect against (and don't)
-
-**Result**: Comprehensive documentation covering all aspects of public key distribution, verification, and security practices.
-
----
-
-### Step 8: CI/CD Release Signing Workflow ✅
-
-**Status**: Complete
-
-**Implementation**: Created `.github/workflows/release-sign.yml`
-
-**Features**:
-
-1. **Trigger**: Runs automatically when a GitHub release is created
-
-2. **Job: Sign** (lines 30-200):
-   - Checks out code
-   - Installs zipsign CLI via cargo
-   - Downloads all release artifacts (.tar.gz, .tar.zst)
-   - Signs each artifact with Ed25519 signature
-   - Verifies all signatures after signing
-   - Uploads signed artifacts back to release
-
-3. **Security**:
-   - Private key from GitHub Secrets (`ZIPSIGN_PRIVATE_KEY`)
-   - Private key never logged or exposed
-   - Temporary key file with secure permissions (600)
-   - Key cleaned up after use
-
-4. **Error Handling**:
-   - Validates artifacts exist before signing
-   - Checks private key secret is set
-   - Verifies all signatures after signing
-   - Fails workflow if any signature verification fails
-
-5. **Job: Summary** (lines 202-240):
-   - Generates signature verification report
-   - Uploads report as workflow artifact
-   - Adds report to GitHub Actions summary
-
-6. **Permissions**:
-   - `contents: write` - Required to upload artifacts to releases
-
-**Setup Required**:
-1. Generate Ed25519 key pair: `./scripts/generate-zipsign-keypair.sh`
-2. Store private key in GitHub repository settings as secret `ZIPSIGN_PRIVATE_KEY`
-3. Add public key to `crates/terraphim_update/src/signature.rs`
-4. Create a release to trigger the workflow
-
-**Result**: Automated signing of all release binaries via GitHub Actions when releases are created.
-
----
-
-### Step 9: Generate Real Ed25519 Key Pair ✅
-
-**Status**: Complete
-
-**Implementation**: Generated Ed25519 key pair and embedded public key
-
-**What was implemented**:
-
-1. **Key Generation**:
-   - Ran `./scripts/generate-zipsign-keypair.sh`
-   - Generated Ed25519 key pair using zipsign CLI
-   - Private key: `keys/private.key` (64 bytes)
-   - Public key: `keys/public.key` (32 bytes)
-
-2. **Public Key Embedding**:
-   - Added to `crates/terraphim_update/src/signature.rs`
-   - Base64-encoded: `1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4=`
-   - Fingerprint: `1c78db3c8e1afa3af4fcbaf32ccfa30988c82f9e7d383dfb127ae202732b631a`
-
-3. **Test Updates**:
-   - Updated all 107 lib tests to expect unsigned archive rejection
-   - Updated all 15 integration tests to expect unsigned archive rejection
-   - Removed placeholder key behavior completely
-   - All tests now pass with real public key
-
-4. **Documentation**:
-   - Updated `docs/updates/KEYS.md` with key information
-   - Added key fingerprint to documentation
-   - Created `keys/README.md` with secure storage instructions
-
-5. **Git Security**:
-   - Added `keys/` directory to `.gitignore`
-   - Private key never committed to repository
-   - Only `keys/README.md` tracked (contains instructions, not keys)
-
-**Commit**: `feat(update): embed real Ed25519 public key for signature verification`
-
-**Test Results**:
-- ✅ 107/107 lib tests passing
-- ✅ 15/15 integration tests passing
-- ✅ All tests verify rejection of unsigned/corrupted archives
-
-**Next Immediate Steps**:
-1. ✅ Store `keys/private.key` in 1Password vault "TerraphimPlatform"
-2. ✅ Delete private key from filesystem using `shred -vfz -n 3 keys/private.key`
-3. ✅ Update all signing scripts to use 1Password item ID
-4. ✅ Perform security audit
-
----
-
-### Step 10: Security Audit ✅
-
-**Status**: Complete
-
-**Implementation**: Comprehensive security audit passed
-
-**Audit Results**:
-
-**Review Checklist**: All items passed ✅
-- ✅ Placeholder key removed
-- ✅ Private key never committed to git
-- ✅ Private key stored securely (1Password)
-- ✅ Public key verified in documentation
-- ✅ All tests pass with real signatures
-- ✅ Integration tests pass end-to-end
-- ✅ Error handling comprehensive
-- ✅ Rollback procedure documented
-
-**Security Analysis**:
-
-1. **Attack Surface Reduction** ✅
-   - Private key stored in 1Password (encrypted at rest)
-   - Private key never touches filesystem permanently (temp files only)
-   - Temp files shredded after use (shred -vfz -n 3)
-   - No key material in environment variables longer than necessary
-   - Git hooks prevent accidental key commits
-
-2. **Defense in Depth** ✅
-   - Layer 1: 1Password vault encryption and access controls
-   - Layer 2: Temporary key files with 600 permissions
-   - Layer 3: Secure deletion with shred
-   - Layer 4: Git .gitignore prevents key commits
-   - Layer 5: Pre-commit hooks detect potential secrets
-
-3. **Cryptographic Correctness** ✅
-   - Algorithm: Ed25519 (modern, secure, fast)
-   - Implementation: zipsign-api (audited library)
-   - Key Length: 32 bytes (256-bit security)
-   - Signature Format: Embedded in .tar.gz archives (GZIP comment)
-   - Verification: Full signature validation before installation
-
-4. **Operational Security** ✅
-   - Key Access: Requires 1Password authentication
-   - Audit Trail: 1Password access logging enabled
-   - Key Rotation: Documented procedure for compromise response
-   - Fallback: File-based keys available for offline signing
-   - CI/CD Integration: Both 1Password Action and GitHub Secret methods
-
-**Security Audit Conclusion**: ✅ **SECURE - READY FOR PRODUCTION**
-
-All critical security requirements have been met:
-- Real cryptographic signature verification implemented
-- Private key stored securely in 1Password
-- Public key embedded in code for verification
-- Comprehensive test coverage with real key
-- Error handling and rollback procedures documented
-- No placeholder code or TODOs remaining
-- Defense in depth strategy implemented
-
-**Recommendation**: APPROVED for production use
-
-**Commit**: `feat(signing): integrate 1Password for secure key retrieval` (53d6580c)
-
----
-
-## 1Password Integration Complete ✅
-
-**Implementation**: Updated all signing scripts to use 1Password
-
-**What was implemented**:
-
-1. **scripts/sign-release.sh** - Full 1Password CLI integration:
-   - Added `get_key_from_op()` function to retrieve key from 1Password
-   - Support `ZIPSIGN_OP_ITEM` environment variable for item ID
-   - Support `ZIPSIGN_PRIVATE_KEY=op://` to trigger 1Password retrieval
-   - Automatic cleanup of temporary key files with shred
-   - Updated usage documentation with 1Password examples
-
-2. **scripts/release.sh** - 1Password preference in sign_binaries():
-   - Detect 1Password CLI availability
-   - Use `ZIPSIGN_OP_ITEM=jbhgblc7m2pluxe6ahqdfr5b6a` when available
-   - Fall back to file-based keys when 1Password CLI not found
-   - Fixed sign_cmd variable usage in execute call
-
-3. **keys/README.md** - Updated documentation:
-   - Document item ID: `jbhgblc7m2pluxe6ahqdfr5b6a`
-   - Add three methods for using the signing key
-   - Update GitHub Actions integration examples
-   - Include 1Password Action configuration
-
-**1Password Key Details**:
-- **Vault**: TerraphimPlatform
-- **Item ID**: jbhgblc7m2pluxe6ahqdfr5b6a
-- **Title**: "Terraphim AI Release Signing Key (Ed25519)"
-- **Retrieval**: `op item get jbhgblc7m2pluxe6ahqdfr5b6a --reveal`
-
-**Security Verification**:
-- ✅ Private key deleted from filesystem (shred -vfz -n 3)
-- ✅ keys/ directory in .gitignore
-- ✅ Only keys/README.md tracked (contains instructions, not keys)
-- ✅ 1Password retrieval verified and working
-- ✅ All signing scripts updated with correct item ID
-
----
-
-## Total Implementation Effort
-
-**Completed**: ~30 hours (all 10 steps)
-**Actual Timeline**: 3-4 days
-**Result**: Production-ready signature verification system
-
-## Final Status
-
-**Issue #421**: ✅ **COMPLETE**
-
-All acceptance criteria met:
-- ✅ Implement actual cryptographic signature verification
-- ✅ Reject binaries without valid signatures
-- ✅ Reject binaries with invalid/tampered signatures
-- ✅ Add unit tests for valid, invalid, and missing signatures
-- ✅ Update integration tests to verify signature checking
-- ✅ Document the public key distribution mechanism
-- ✅ Generate and embed real Ed25519 key pair
-- ✅ Securely store private key in 1Password
-- ✅ Update all signing scripts for 1Password integration
-- ✅ Pass comprehensive security audit
+- How public keys are embedded
+- How to verify the public key
+- Key distribution strategy
+- Security considerations
+- Key rotation procedure (for v1.1)
+
+**Estimated Effort**: 1 hour
+
+### Step 8: CI/CD Release Signing Workflow ⏳
+
+**File**: `.github/workflows/release-sign.yml`
+
+**Workflow**:
+```yaml
+name: Sign Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  sign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install zipsign
+        run: cargo install zipsign
+      - name: Download release artifacts
+        # Download all release assets
+      - name: Sign artifacts
+        env:
+          PRIVATE_KEY: ${{ secrets.ZIPSIGN_PRIVATE_KEY }}
+        run: |
+          for artifact in *.tar.gz; do
+            zipsign sign tar "$artifact" <(echo "$PRIVATE_KEY")
+          done
+      - name: Upload signatures
+        # Upload .tar.gz files with embedded signatures
+```
+
+**Estimated Effort**: 2 hours
+
+### Step 9: Generate Real Ed25519 Key Pair ⏳
+
+**Action Items**:
+1. Run `./scripts/generate-zipsign-keypair.sh`
+2. Store private key in 1Password
+3. Add public key to `get_embedded_public_key()` function
+4. Update documentation
+
+**Estimated Effort**: 30 minutes
+
+### Step 10: Security Audit ⏳
+
+**Review Checklist**:
+- [ ] Placeholder key removed
+- [ ] Private key never committed to git
+- [ ] Private key stored securely (1Password)
+- [ ] Public key verified in documentation
+- [ ] All tests pass with real signatures
+- [ ] Integration tests pass end-to-end
+- [ ] Error handling comprehensive
+- [ ] Rollback procedure documented
+
+**Estimated Effort**: 2 hours
+
+## Total Estimated Effort
+
+**Completed**: 8 hours (research, design, Step 1)
+**Remaining**: 18-22 hours (Steps 2-10)
+**Total**: 26-30 hours (3-4 days)
 
 ## Next Immediate Steps
 
@@ -583,16 +315,16 @@ fn get_embedded_public_key() -> &'static str {
 Issue #421 will be complete when:
 - [x] Actual cryptographic signature verification implemented
 - [x] Verification API functional (verify_archive_signature)
-- [x] Invalid/tampered signatures are rejected
-- [x] Missing signatures are detected
-- [x] Unit tests for valid/invalid/missing signatures
-- [x] Integration tests verify signature checking
-- [x] Public key distribution documented
-- [x] Real Ed25519 key generated and embedded
-- [x] Release pipeline signs all binaries
-- [x] CI/CD workflow automated
+- [ ] Invalid/tampered signatures are rejected
+- [ ] Missing signatures are detected
+- [ ] Unit tests for valid/invalid/missing signatures
+- [ ] Integration tests verify signature checking
+- [ ] Public key distribution documented
+- [ ] Real Ed25519 key generated and embedded
+- [ ] Release pipeline signs all binaries
+- [ ] CI/CD workflow automated
 
-**Current Progress**: 9 of 10 criteria met (90%)
+**Current Progress**: 3 of 10 criteria met (30%)
 
 ## References
 
