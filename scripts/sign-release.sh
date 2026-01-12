@@ -14,7 +14,8 @@
 #                       $ZIPSIGN_PRIVATE_KEY or keys/private.key)
 #
 # Environment Variables:
-#   ZIPSIGN_PRIVATE_KEY - Path to private signing key
+#   ZIPSIGN_PRIVATE_KEY - Path to private signing key (or "op://" to use 1Password)
+#   ZIPSIGN_OP_ITEM - 1Password item reference (default: jbhgblc7m2pluxe6ahqdfr5b6a)
 #
 # Output:
 #   Each archive is signed in-place, with the signature embedded in the archive
@@ -23,12 +24,20 @@
 #   ./scripts/sign-release.sh target/release/
 #   ./scripts/sign-release.sh target/release/ keys/production.key
 #   ZIPSIGN_PRIVATE_KEY=keys/production.key ./scripts/sign-release.sh target/release/
+#   ZIPSIGN_OP_ITEM=jbhgblc7m2pluxe6ahqdfr5b6a ./scripts/sign-release.sh target/release/
 #
 # Requirements:
 #   - zipsign CLI installed (cargo install zipsign)
-#   - Private signing key file exists
+#   - Private signing key (file or 1Password)
 #   - Release directory exists with archives to sign
+#   - 1Password CLI (op) for 1Password retrieval
 #
+# 1Password Integration:
+#   The script can retrieve the private key from 1Password automatically.
+#   Set ZIPSIGN_OP_ITEM environment variable to specify the 1Password item.
+#   Default item: jbhgblc7m2pluxe6ahqdfr5b6a (Terraphim AI Release Signing Key)
+#
+
 
 set -euo pipefail
 
@@ -62,6 +71,45 @@ print_info() {
     echo -e "${BLUE}[INFO]${NC} $*"
 }
 
+# Retrieve private key from 1Password
+get_key_from_op() {
+    local op_item="${1:-jbhgblc7m2pluxe6ahqdfr5b6a}"
+
+    if ! command -v op &> /dev/null; then
+        print_error "1Password CLI (op) not installed"
+        echo ""
+        echo "Install with:"
+        echo "  brew install --cask 1password-cli  # macOS"
+        echo "  Or visit: https://developer.1password.com/docs/cli/get-started/"
+        return 1
+    fi
+
+    print_status "Retrieving signing key from 1Password..."
+
+    # Get the note field and extract the key contents
+    local key_contents
+    key_contents=$(op item get "$op_item" --reveal --fields note 2>/dev/null | \
+        sed -n '/Key contents:/,/Public Key/p' | \
+        tail -n +3 | \
+        head -n -3)
+
+    if [[ -z "$key_contents" ]]; then
+        print_error "Failed to retrieve key from 1Password"
+        print_error "Item: $op_item"
+        return 1
+    fi
+
+    # Create a temporary file for the key
+    local temp_key
+    temp_key=$(mktemp)
+    chmod 600 "$temp_key"
+
+    # Write key to temp file
+    echo "$key_contents" > "$temp_key"
+
+    echo "$temp_key"
+}
+
 # Usage function
 usage() {
     cat <<EOF
@@ -75,15 +123,20 @@ Arguments:
 
 Environment Variables:
   ZIPSIGN_PRIVATE_KEY  Path to private signing key (overrides default)
+                       Set to "op://" to use 1Password
+  ZIPSIGN_OP_ITEM     1Password item reference (default: jbhgblc7m2pluxe6ahqdfr5b6a)
 
 Examples:
   $0 target/release/
   $0 target/release/ keys/production.key
   ZIPSIGN_PRIVATE_KEY=keys/production.key $0 target/release/
+  ZIPSIGN_OP_ITEM=jbhgblc7m2pluxe6ahqdfr5b6a $0 target/release/
+  ZIPSIGN_PRIVATE_KEY=op:// $0 target/release/
 
 Requirements:
   - zipsign CLI installed (cargo install zipsign)
-  - Private signing key file exists
+  - Private signing key (file or 1Password)
+  - 1Password CLI (op) if using ZIPSIGN_OP_ITEM
   - Release directory exists with archives to sign
 
 EOF
@@ -101,7 +154,33 @@ fi
 
 # Parse arguments
 RELEASE_DIR="${1:-}"
-PRIVATE_KEY="${2:-${ZIPSIGN_PRIVATE_KEY:-$DEFAULT_PRIVATE_KEY}}"
+PRIVATE_KEY_ARG="${2:-}"
+USE_1PASSWORD=false
+CLEANUP_KEY=false
+
+# Determine key source
+if [[ -n "${ZIPSIGN_OP_ITEM:-}" ]]; then
+    # 1Password item explicitly specified
+    USE_1PASSWORD=true
+elif [[ "$ZIPSIGN_PRIVATE_KEY" == "op://" ]]; then
+    # 1Password requested via environment variable
+    USE_1PASSWORD=true
+elif [[ -n "$PRIVATE_KEY_ARG" ]]; then
+    # Command-line argument takes precedence
+    PRIVATE_KEY="$PRIVATE_KEY_ARG"
+elif [[ -n "${ZIPSIGN_PRIVATE_KEY:-}" ]]; then
+    # Environment variable
+    PRIVATE_KEY="$ZIPSIGN_PRIVATE_KEY"
+else
+    # Default to file path
+    PRIVATE_KEY="$DEFAULT_PRIVATE_KEY"
+fi
+
+# If using 1Password, retrieve the key
+if [[ "$USE_1PASSWORD" == "true" ]]; then
+    PRIVATE_KEY=$(get_key_from_op "${ZIPSIGN_OP_ITEM:-jbhgblc7m2pluxe6ahqdfr5b6a}")
+    CLEANUP_KEY=true
+fi
 
 # Validate arguments
 if [[ -z "$RELEASE_DIR" ]]; then
@@ -118,11 +197,10 @@ fi
 if [[ ! -f "$PRIVATE_KEY" ]]; then
     print_error "Private key not found: $PRIVATE_KEY"
     echo ""
-    echo "Generate a key pair:"
-    echo "  ./scripts/generate-zipsign-keypair.sh"
-    echo ""
-    echo "Or specify a custom key path:"
-    echo "  $0 $RELEASE_DIR /path/to/private.key"
+    echo "Options:"
+    echo "  1. Use 1Password: ZIPSIGN_OP_ITEM=jbhgblc7m2pluxe6ahqdfr5b6a $0 $RELEASE_DIR"
+    echo "  2. Generate a key pair: ./scripts/generate-zipsign-keypair.sh"
+    echo "  3. Specify a custom key path: $0 $RELEASE_DIR /path/to/private.key"
     exit 1
 fi
 
@@ -226,10 +304,19 @@ fi
 
 if [[ $FAILED_COUNT -gt 0 ]]; then
     print_error "Failed to sign $FAILED_COUNT archive(s)"
+    if [[ "$CLEANUP_KEY" == "true" ]]; then
+        shred -vfz -n 3 "$PRIVATE_KEY" 2>/dev/null || rm -f "$PRIVATE_KEY"
+    fi
     exit 1
 fi
 
 print_status "All archives signed and verified successfully!"
+
+# Cleanup temporary key file if retrieved from 1Password
+if [[ "$CLEANUP_KEY" == "true" ]]; then
+    print_info "Cleaning up temporary key file..."
+    shred -vfz -n 3 "$PRIVATE_KEY" 2>/dev/null || rm -f "$PRIVATE_KEY"
+fi
 echo ""
 print_info "You can now upload the signed archives to GitHub Releases"
 echo ""
