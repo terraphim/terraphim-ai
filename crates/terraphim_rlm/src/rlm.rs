@@ -603,6 +603,178 @@ impl TerraphimRlm {
     pub fn version() -> &'static str {
         crate::VERSION
     }
+
+    // ========================================================================
+    // Additional MCP Tool Support Methods
+    // ========================================================================
+
+    /// List all context variables in a session.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The session to query
+    ///
+    /// # Returns
+    ///
+    /// A HashMap of all context variables.
+    pub async fn list_context_variables(
+        &self,
+        session_id: &SessionId,
+    ) -> RlmResult<std::collections::HashMap<String, String>> {
+        self.session_manager.get_all_context_variables(session_id)
+    }
+
+    /// Delete a context variable from a session.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The session to modify
+    /// * `key` - Variable key to delete
+    pub async fn delete_context_variable(
+        &self,
+        session_id: &SessionId,
+        key: &str,
+    ) -> RlmResult<()> {
+        self.session_manager
+            .delete_context_variable(session_id, key)?;
+        Ok(())
+    }
+
+    /// Delete a snapshot by name.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The session that owns the snapshot
+    /// * `snapshot_name` - Name of the snapshot to delete
+    pub async fn delete_snapshot(
+        &self,
+        session_id: &SessionId,
+        snapshot_name: &str,
+    ) -> RlmResult<()> {
+        // Find snapshot by name
+        let snapshots = self
+            .executor
+            .list_snapshots(session_id)
+            .await
+            .map_err(|e| RlmError::Internal {
+                message: format!("Failed to list snapshots: {}", e),
+            })?;
+
+        let snapshot = snapshots
+            .iter()
+            .find(|s| s.name == snapshot_name)
+            .ok_or_else(|| RlmError::SnapshotNotFound {
+                snapshot_id: snapshot_name.to_string(),
+            })?;
+
+        self.executor
+            .delete_snapshot(snapshot)
+            .await
+            .map_err(|e| RlmError::Internal {
+                message: format!("Failed to delete snapshot: {}", e),
+            })?;
+
+        log::info!(
+            "Deleted snapshot '{}' for session {}",
+            snapshot_name,
+            session_id
+        );
+        Ok(())
+    }
+
+    /// Query the LLM directly (without the full query loop).
+    ///
+    /// This is useful for one-off LLM queries that don't need VM execution.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The session making the query (for budget tracking)
+    /// * `prompt` - The prompt to send to the LLM
+    ///
+    /// # Returns
+    ///
+    /// The LLM response with metadata.
+    pub async fn query_llm(
+        &self,
+        session_id: &SessionId,
+        prompt: &str,
+    ) -> RlmResult<LlmQueryResult> {
+        // Validate session
+        self.session_manager.validate_session(session_id)?;
+
+        // Make the LLM query via the bridge
+        let request = crate::llm_bridge::QueryRequest {
+            prompt: prompt.to_string(),
+            model: None,
+            temperature: None,
+            max_tokens: None,
+        };
+
+        match self.llm_bridge.query(session_id, request).await {
+            Ok(response) => Ok(LlmQueryResult {
+                response: response.response,
+                tokens_used: response.tokens_used,
+                model: "default".to_string(), // LLM bridge doesn't return model name yet
+            }),
+            Err(e) => Err(RlmError::LlmCallFailed {
+                message: e.to_string(),
+            }),
+        }
+    }
+
+    /// Get detailed session status.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - The session to query
+    /// * `include_history` - Whether to include command history
+    ///
+    /// # Returns
+    ///
+    /// Detailed status information about the session.
+    pub async fn get_session_status(
+        &self,
+        session_id: &SessionId,
+        include_history: bool,
+    ) -> RlmResult<SessionStatus> {
+        let session = self.session_manager.get_session(session_id)?;
+        let snapshots = self.list_snapshots(session_id).await.unwrap_or_default();
+
+        Ok(SessionStatus {
+            session_info: session,
+            snapshot_count: snapshots.len(),
+            snapshot_names: snapshots.iter().map(|s| s.name.clone()).collect(),
+            backend_type: self.executor.backend_type(),
+            include_history,
+            // Command history would be added here if tracking is enabled
+        })
+    }
+}
+
+/// Result from a direct LLM query.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct LlmQueryResult {
+    /// The LLM response text.
+    pub response: String,
+    /// Number of tokens used.
+    pub tokens_used: u64,
+    /// Model used for the query.
+    pub model: String,
+}
+
+/// Detailed session status.
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+pub struct SessionStatus {
+    /// Core session information.
+    pub session_info: SessionInfo,
+    /// Number of snapshots for this session.
+    pub snapshot_count: usize,
+    /// Names of all snapshots.
+    pub snapshot_names: Vec<String>,
+    /// Backend type in use.
+    pub backend_type: crate::config::BackendType,
+    /// Whether history was requested.
+    pub include_history: bool,
 }
 
 #[cfg(test)]
