@@ -22,8 +22,9 @@ repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
 repl-web = ["repl"]   # Web operations and configuration
-# NOTE: repl-sessions disabled for crates.io publishing (terraphim_sessions not published yet)
-# repl-sessions = ["repl", "dep:terraphim_sessions"]  # Session history search
+# Session search - placeholder feature (terraphim_sessions not published to crates.io yet)
+# When terraphim_sessions is published, change to: repl-sessions = ["repl", "dep:terraphim_sessions"]
+repl-sessions = ["repl"]
 
 [dependencies]
 anyhow = "1.0"
