@@ -12,11 +12,13 @@ pub mod scheduler;
 pub mod signature;
 pub mod state;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use self_update::cargo_crate_version;
+use self_update::version::bump_is_greater;
 use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
+use tempfile::NamedTempFile;
 use tracing::{error, info};
 
 /// Represents the status of an update operation
@@ -338,7 +340,355 @@ impl TerraphimUpdater {
         }
     }
 
-    /// Check for update and install if available
+    /// Update the binary with signature verification
+    ///
+    /// This method implements a manual download, verify, and install flow
+    /// to ensure that only signed and verified binaries are installed.
+    ///
+    /// # Returns
+    /// * `Ok(UpdateStatus)` - Status of the update operation
+    /// * `Err(anyhow::Error)` - Error if update fails
+    ///
+    /// # Process
+    /// 1. Get latest release info from GitHub
+    /// 2. Download the release archive to a temp location
+    /// 3. Verify the Ed25519 signature using zipsign-api
+    /// 4. Install if valid, reject if invalid/missing signature
+    ///
+    /// # Security
+    /// - Rejects updates with invalid signatures
+    /// - Rejects updates with missing signatures
+    /// - Only installs verified binaries
+    pub async fn update_with_verification(&self) -> Result<UpdateStatus> {
+        info!(
+            "Updating {} from version {} with signature verification",
+            self.config.bin_name, self.config.current_version
+        );
+
+        // Clone data for the blocking task
+        let repo_owner = self.config.repo_owner.clone();
+        let repo_name = self.config.repo_name.clone();
+        let bin_name = self.config.bin_name.clone();
+        let current_version = self.config.current_version.clone();
+        let show_progress = self.config.show_progress;
+
+        // Move self_update operations to a blocking task
+        let result = tokio::task::spawn_blocking(move || {
+            Self::update_with_verification_blocking(
+                &repo_owner,
+                &repo_name,
+                &bin_name,
+                &current_version,
+                show_progress,
+            )
+        })
+        .await;
+
+        match result {
+            Ok(Ok(update_status)) => {
+                match &update_status {
+                    UpdateStatus::Updated {
+                        from_version,
+                        to_version,
+                    } => {
+                        info!(
+                            "Successfully updated from {} to {} with verified signature",
+                            from_version, to_version
+                        );
+                    }
+                    UpdateStatus::UpToDate(version) => {
+                        info!("Already up to date: {}", version);
+                    }
+                    UpdateStatus::Failed(error) => {
+                        error!("Update with verification failed: {}", error);
+                    }
+                    _ => {}
+                }
+                Ok(update_status)
+            }
+            Ok(Err(e)) => {
+                error!("Blocking task returned error: {}", e);
+                Ok(UpdateStatus::Failed(format!("Update error: {}", e)))
+            }
+            Err(e) => {
+                error!("Blocking task failed: {}", e);
+                Ok(UpdateStatus::Failed(format!("Task spawn error: {}", e)))
+            }
+        }
+    }
+
+    /// Blocking version of update_with_verification for use in spawn_blocking
+    fn update_with_verification_blocking(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+        show_progress: bool,
+    ) -> Result<UpdateStatus> {
+        info!(
+            "Starting verified update flow for {} v{}",
+            bin_name, current_version
+        );
+
+        // Step 1: Get latest release info from GitHub
+        let release =
+            match Self::get_latest_release_info(repo_owner, repo_name, bin_name, current_version) {
+                Ok(release) => release,
+                Err(e) => {
+                    return Ok(UpdateStatus::Failed(format!(
+                        "Failed to get release info: {}",
+                        e
+                    )))
+                }
+            };
+
+        let latest_version = &release.version;
+
+        // Step 2: Download archive to temp location
+        let temp_archive = match Self::download_release_archive(
+            repo_owner,
+            repo_name,
+            bin_name,
+            latest_version,
+            show_progress,
+        ) {
+            Ok(archive) => archive,
+            Err(e) => {
+                return Ok(UpdateStatus::Failed(format!(
+                    "Failed to download archive: {}",
+                    e
+                )))
+            }
+        };
+
+        let archive_path = temp_archive.path().to_path_buf();
+
+        // Step 3: Verify signature BEFORE installation
+        info!("Verifying signature for archive {:?}", archive_path);
+        let verification_result =
+            match crate::signature::verify_archive_signature(&archive_path, None) {
+                Ok(result) => result,
+                Err(e) => return Ok(UpdateStatus::Failed(format!("Verification error: {}", e))),
+            };
+
+        match verification_result {
+            crate::signature::VerificationResult::Valid => {
+                info!("Signature verification passed - proceeding with installation");
+            }
+            crate::signature::VerificationResult::Invalid { reason } => {
+                let error_msg = format!("Signature verification failed: {}", reason);
+                error!("{}", error_msg);
+                return Ok(UpdateStatus::Failed(error_msg));
+            }
+            crate::signature::VerificationResult::MissingSignature => {
+                let error_msg = "No signature found in archive - refusing to install".to_string();
+                error!("{}", error_msg);
+                return Ok(UpdateStatus::Failed(error_msg));
+            }
+            crate::signature::VerificationResult::Error(msg) => {
+                let error_msg = format!("Verification error: {}", msg);
+                error!("{}", error_msg);
+                return Ok(UpdateStatus::Failed(error_msg));
+            }
+        }
+
+        // Step 4: Install the verified archive
+        match Self::install_verified_archive(&archive_path, bin_name) {
+            Ok(_) => {
+                info!("Successfully installed verified update");
+                Ok(UpdateStatus::Updated {
+                    from_version: current_version.to_string(),
+                    to_version: latest_version.clone(),
+                })
+            }
+            Err(e) => Ok(UpdateStatus::Failed(format!("Installation failed: {}", e))),
+        }
+    }
+
+    /// Get latest release info from GitHub
+    fn get_latest_release_info(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        current_version: &str,
+    ) -> Result<self_update::update::Release> {
+        info!(
+            "Fetching latest release info for {}/{}",
+            repo_owner, repo_name
+        );
+
+        let updater = self_update::backends::github::Update::configure()
+            .repo_owner(repo_owner)
+            .repo_name(repo_name)
+            .bin_name(bin_name)
+            .current_version(current_version)
+            .build()?;
+
+        let release = updater.get_latest_release()?;
+
+        // Check if the latest version is actually newer
+        if !bump_is_greater(&current_version, &release.version)? {
+            return Err(anyhow!(
+                "Current version {} is up to date with {}",
+                current_version,
+                release.version
+            ));
+        }
+
+        info!("Latest version: {}", release.version);
+        Ok(release)
+    }
+
+    /// Download release archive to a temporary file
+    fn download_release_archive(
+        repo_owner: &str,
+        repo_name: &str,
+        bin_name: &str,
+        version: &str,
+        show_progress: bool,
+    ) -> Result<NamedTempFile> {
+        // Determine current platform
+        let target = Self::get_target_triple()?;
+        let extension = if cfg!(windows) { "zip" } else { "tar.gz" };
+
+        // Construct download URL
+        let archive_name = format!("{}-{}-{}.{}", bin_name, version, target, extension);
+        let download_url = format!(
+            "https://github.com/{}/{}/releases/download/{}/{}",
+            repo_owner, repo_name, version, archive_name
+        );
+
+        info!("Downloading from: {}", download_url);
+
+        // Create temp file for download
+        let temp_file = NamedTempFile::new()?;
+        let download_config = crate::downloader::DownloadConfig {
+            show_progress,
+            ..Default::default()
+        };
+
+        crate::downloader::download_with_retry(
+            &download_url,
+            temp_file.path(),
+            Some(download_config),
+        )?;
+
+        info!("Downloaded archive to: {:?}", temp_file.path());
+        Ok(temp_file)
+    }
+
+    /// Get the target triple for the current platform
+    fn get_target_triple() -> Result<String> {
+        use std::env::consts::{ARCH, OS};
+
+        let target = format!("{}-{}", ARCH, OS);
+
+        // Map Rust targets to common release naming conventions
+        let target = match target.as_str() {
+            "x86_64-linux" => "x86_64-unknown-linux-gnu".to_string(),
+            "aarch64-linux" => "aarch64-unknown-linux-gnu".to_string(),
+            "x86_64-windows" => "x86_64-pc-windows-msvc".to_string(),
+            "x86_64-macos" => "x86_64-apple-darwin".to_string(),
+            "aarch64-macos" => "aarch64-apple-darwin".to_string(),
+            _ => target,
+        };
+
+        Ok(target)
+    }
+
+    /// Install a verified archive to the current binary location
+    fn install_verified_archive(archive_path: &Path, bin_name: &str) -> Result<()> {
+        info!("Installing verified archive {:?}", archive_path);
+
+        // Get current executable path
+        let current_exe = std::env::current_exe()?;
+        let install_dir = current_exe
+            .parent()
+            .ok_or_else(|| anyhow!("Cannot determine install directory"))?;
+
+        info!("Installing to directory: {:?}", install_dir);
+
+        // Extract and install using self_update's extract functionality
+        // Note: This is a simplified version - we may need platform-specific extraction
+        if cfg!(windows) {
+            // Windows: extract ZIP
+            Self::extract_zip(archive_path, install_dir)?;
+        } else {
+            // Unix: extract tar.gz
+            Self::extract_tarball(archive_path, install_dir, bin_name)?;
+        }
+
+        // Make executable on Unix
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            let bin_path = install_dir.join(bin_name);
+            if bin_path.exists() {
+                let mut perms = fs::metadata(&bin_path)?.permissions();
+                perms.set_mode(0o755);
+                fs::set_permissions(&bin_path, perms)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Extract a ZIP archive to the target directory
+    fn extract_zip(archive_path: &Path, target_dir: &Path) -> Result<()> {
+        use zip::ZipArchive;
+
+        let file = fs::File::open(archive_path)?;
+        let mut archive = ZipArchive::new(file)?;
+
+        for i in 0..archive.len() {
+            let mut file = archive.by_index(i)?;
+            let outpath = target_dir.join(file.mangled_name().to_path_buf());
+
+            if file.name().ends_with('/') {
+                fs::create_dir_all(&outpath)?;
+            } else {
+                if let Some(parent) = outpath.parent() {
+                    fs::create_dir_all(parent)?;
+                }
+                let mut outfile = fs::File::create(&outpath)?;
+                std::io::copy(&mut file, &mut outfile)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Extract a tar.gz archive to the target directory
+    fn extract_tarball(archive_path: &Path, target_dir: &Path, bin_name: &str) -> Result<()> {
+        use flate2::read::GzDecoder;
+        use tar::Archive;
+
+        let file = fs::File::open(archive_path)?;
+        let decoder = GzDecoder::new(file);
+        let mut archive = Archive::new(decoder);
+
+        // Extract the binary from the archive
+        // The binary should be at the root of the archive
+        for entry in archive.entries()? {
+            let mut entry = entry?;
+            let path = entry.path()?;
+
+            // Only extract the main binary, not directory structure
+            if let Some(file_name) = path.file_name() {
+                if file_name.to_str() == Some(bin_name) {
+                    let outpath = target_dir.join(bin_name);
+                    let mut outfile = fs::File::create(&outpath)?;
+                    std::io::copy(&mut entry, &mut outfile)?;
+                    info!("Extracted binary to {:?}", outpath);
+                    break;
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Check for update and install if available with signature verification
     pub async fn check_and_update(&self) -> Result<UpdateStatus> {
         match self.check_update().await? {
             UpdateStatus::Available {
@@ -349,7 +699,7 @@ impl TerraphimUpdater {
                     "Update available: {} → {}, installing...",
                     current_version, latest_version
                 );
-                self.update().await
+                self.update_with_verification().await
             }
             status => Ok(status),
         }

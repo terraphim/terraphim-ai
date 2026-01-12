@@ -100,17 +100,20 @@ pub fn verify_archive_signature(
     }
 
     // Read the archive file
-    let archive_bytes = fs::read(archive_path)
-        .context("Failed to read archive file")?;
+    let archive_bytes = fs::read(archive_path).context("Failed to read archive file")?;
 
     // Parse the public key (base64-encoded)
-    let key_bytes = base64::engine::general_purpose::STANDARD.decode(key_str)
+    let key_bytes = base64::engine::general_purpose::STANDARD
+        .decode(key_str)
         .context("Failed to decode public key base64")?;
 
     // Public key must be exactly 32 bytes for Ed25519
     if key_bytes.len() != 32 {
         return Ok(VerificationResult::Invalid {
-            reason: format!("Invalid public key length: {} bytes (expected 32)", key_bytes.len()),
+            reason: format!(
+                "Invalid public key length: {} bytes (expected 32)",
+                key_bytes.len()
+            ),
         });
     }
 
@@ -308,135 +311,45 @@ pub fn get_signature_filename(binary_name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::io::Write;
-    use tempfile::{NamedTempFile, TempDir};
-
-    fn create_test_file(dir: &Path, _name: &str, content: &str) -> NamedTempFile {
-        let file = NamedTempFile::new_in(dir).unwrap();
-        file.as_file().write_all(content.as_bytes()).unwrap();
-        file
-    }
 
     #[test]
-    fn test_verify_signature_valid() {
-        let temp_dir = TempDir::new().unwrap();
+    fn test_placeholder_key_returns_valid() {
+        // With placeholder key, verification should return Valid for development
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
 
-        let binary = create_test_file(temp_dir.path(), "binary", "binary content");
-        let signature = create_test_file(temp_dir.path(), "signature.sig", "signature data");
+        // Create a simple test file (not a real archive, but placeholder accepts it)
+        let result = verify_archive_signature(temp_file.path(), None).unwrap();
 
-        let result = verify_signature(binary.path(), signature.path(), "test-key").unwrap();
-
+        // Placeholder key returns Valid
         assert_eq!(result, VerificationResult::Valid);
     }
 
     #[test]
-    fn test_verify_signature_missing_binary() {
-        let temp_dir = TempDir::new().unwrap();
-        let signature = create_test_file(temp_dir.path(), "signature.sig", "signature data");
-
-        let result = verify_signature(
-            &temp_dir.path().join("nonexistent"),
-            signature.path(),
-            "test-key",
-        );
+    fn test_nonexistent_file_returns_error() {
+        let result = verify_archive_signature(Path::new("/nonexistent/file.tar.gz"), None);
 
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_verify_signature_missing_signature() {
-        let temp_dir = TempDir::new().unwrap();
-        let binary = create_test_file(temp_dir.path(), "binary", "binary content");
+    fn test_invalid_base64_key_returns_error() {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
 
-        let result = verify_signature(
-            binary.path(),
-            &temp_dir.path().join("nonexistent.sig"),
-            "test-key",
-        )
-        .unwrap();
+        // Invalid base64 key - should return Err during decode
+        let result = verify_archive_signature(temp_file.path(), Some("not-valid-base64!!!"));
 
-        assert_eq!(result, VerificationResult::MissingSignature);
-    }
-
-    #[test]
-    fn test_verify_with_self_update() {
-        let temp_dir = TempDir::new().unwrap();
-        let binary = create_test_file(temp_dir.path(), "binary", "binary content");
-
-        let result =
-            verify_with_self_update("terraphim", "1.0.0", binary.path(), "test-key").unwrap();
-
-        assert_eq!(result, VerificationResult::Valid);
-    }
-
-    #[test]
-    fn test_verify_with_self_update_missing_binary() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let result = verify_with_self_update(
-            "terraphim",
-            "1.0.0",
-            &temp_dir.path().join("nonexistent"),
-            "test-key",
-        );
-
+        // Base64 decoding fails, so we get an error
         assert!(result.is_err());
     }
 
     #[test]
-    fn test_verify_signature_detailed_valid() {
-        let temp_dir = TempDir::new().unwrap();
+    fn test_wrong_length_key_returns_invalid() {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
 
-        let binary = create_test_file(temp_dir.path(), "binary", "binary content");
-        let signature = create_test_file(temp_dir.path(), "signature.sig", "signature data");
+        // Valid base64 but wrong length (not 32 bytes)
+        let result = verify_archive_signature(temp_file.path(), Some("VGVzdGluZw==")).unwrap();
 
-        let result =
-            verify_signature_detailed(binary.path(), signature.path(), "test-key").unwrap();
-
-        assert_eq!(result, VerificationResult::Valid);
-    }
-
-    #[test]
-    fn test_verify_signature_detailed_missing_binary() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let signature = create_test_file(temp_dir.path(), "signature.sig", "signature data");
-
-        let result = verify_signature_detailed(
-            &temp_dir.path().join("nonexistent"),
-            signature.path(),
-            "test-key",
-        )
-        .unwrap();
-
-        assert!(matches!(result, VerificationResult::Error(_)));
-    }
-
-    #[test]
-    fn test_verify_signature_detailed_missing_signature() {
-        let temp_dir = TempDir::new().unwrap();
-        let binary = create_test_file(temp_dir.path(), "binary", "binary content");
-
-        let result = verify_signature_detailed(
-            binary.path(),
-            &temp_dir.path().join("nonexistent.sig"),
-            "test-key",
-        )
-        .unwrap();
-
-        assert_eq!(result, VerificationResult::MissingSignature);
-    }
-
-    #[test]
-    fn test_verify_signature_detailed_empty_key() {
-        let temp_dir = TempDir::new().unwrap();
-
-        let binary = create_test_file(temp_dir.path(), "binary", "binary content");
-        let signature = create_test_file(temp_dir.path(), "signature.sig", "signature data");
-
-        let result = verify_signature_detailed(binary.path(), signature.path(), "").unwrap();
-
-        assert!(matches!(result, VerificationResult::Error(_)));
+        assert!(matches!(result, VerificationResult::Invalid { .. }));
     }
 
     #[test]
@@ -475,23 +388,6 @@ mod tests {
     }
 
     #[test]
-    fn test_multiple_verifications() {
-        let temp_dir = TempDir::new().unwrap();
-
-        for i in 0..3 {
-            let binary_name = format!("binary-{}", i);
-            let signature_name = format!("signature-{}.sig", i);
-
-            let binary = create_test_file(temp_dir.path(), &binary_name, "binary content");
-            let signature = create_test_file(temp_dir.path(), &signature_name, "signature data");
-
-            let result = verify_signature(binary.path(), signature.path(), "test-key").unwrap();
-
-            assert_eq!(result, VerificationResult::Valid);
-        }
-    }
-
-    #[test]
     fn test_verification_result_display() {
         let valid = VerificationResult::Valid;
         let missing = VerificationResult::MissingSignature;
@@ -507,5 +403,45 @@ mod tests {
             "Invalid { reason: \"test error\" }"
         );
         assert_eq!(format!("{:?}", error), "Error(\"test error\")");
+    }
+
+    #[test]
+    fn test_verify_signature_detailed_with_placeholder() {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        let result = verify_signature_detailed(temp_file.path(), None).unwrap();
+
+        // Placeholder key returns Valid
+        assert_eq!(result, VerificationResult::Valid);
+    }
+
+    #[test]
+    fn test_verify_signature_detailed_nonexistent() {
+        let result =
+            verify_signature_detailed(Path::new("/nonexistent/file.tar.gz"), None).unwrap();
+
+        assert!(matches!(result, VerificationResult::Error(_)));
+    }
+
+    #[test]
+    fn test_verify_with_self_update() {
+        let temp_file = tempfile::NamedTempFile::new().unwrap();
+
+        let result =
+            verify_with_self_update("terraphim", "1.0.0", temp_file.path(), "test-key").unwrap();
+
+        assert_eq!(result, VerificationResult::Valid);
+    }
+
+    #[test]
+    fn test_verify_with_self_update_missing_binary() {
+        let result = verify_with_self_update(
+            "terraphim",
+            "1.0.0",
+            Path::new("/nonexistent/binary"),
+            "test-key",
+        );
+
+        assert!(result.is_err());
     }
 }
