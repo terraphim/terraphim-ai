@@ -96,45 +96,82 @@
 
 ---
 
-### Step 3: Create Signing Script ⏳
+### Step 3: Create Signing Script ✅
 
-**File**: `scripts/sign-release.sh`
+**Status**: Complete
 
-**Requirements**:
-```bash
-#!/usr/bin/env bash
-# Sign all release binaries using zipsign
+**Implementation**: Created `scripts/sign-release.sh`
 
-# Usage: ./scripts/sign-release.sh <release_directory>
+**Features**:
+1. **Comprehensive Signing Script** (`scripts/sign-release.sh`):
+   - Signs all .tar.gz and .tar.zst archives in a release directory
+   - Supports custom private key path via argument or $ZIPSIGN_PRIVATE_KEY env var
+   - Skips already-signed archives to avoid re-signing
+   - Verifies all signatures after signing
+   - Proper error handling and colored output
+   - Checks for insecure private key permissions
+   - Detailed usage instructions and examples
 
-SIGNING_KEY="path/to/private.key"
+2. **Usage**:
+   ```bash
+   ./scripts/sign-release.sh <release_directory> [private_key_path]
+   ./scripts/sign-release.sh target/release/
+   ZIPSIGN_PRIVATE_KEY=keys/production.key ./scripts/sign-release.sh target/release/
+   ```
 
-for binary in "$RELEASE_DIR"/*.{tar.gz,tar.zst}; do
-    zipsign sign tar "$binary" "$SIGNING_KEY"
-done
-```
+3. **Safety Features**:
+   - Checks if zipsign CLI is installed
+   - Validates release directory exists
+   - Validates private key file exists
+   - Warns on insecure key permissions
+   - Skips already-signed archives
+   - Verifies all signatures after signing
 
-**Estimated Effort**: 1 hour
+4. **Output**:
+   - Color-coded status messages (info, warning, error)
+   - Progress tracking (signed, skipped, failed)
+   - Verification results
+   - Summary statistics
 
-### Step 4: Integrate Signing into Release Pipeline ⏳
+**Result**: Release signing automation is ready. The script can be manually run or integrated into CI/CD pipelines.
 
-**File**: `scripts/release.sh`
+---
 
-**Add after build step**:
-```bash
-# After build_binaries() call
-sign_binaries() {
-    if [[ -f "$PRIVATE_KEY_FILE" ]]; then
-        ./scripts/sign-release.sh "$RELEASE_DIR"
-    else
-        echo "Warning: No signing key found, skipping signature generation"
-    fi
-}
+### Step 4: Integrate Signing into Release Pipeline ✅
 
-sign_binaries
-```
+**Status**: Complete
 
-**Estimated Effort**: 1 hour
+**Implementation**: Updated `scripts/release.sh` to call signing script
+
+**Changes Made**:
+
+1. **Added `sign_binaries()` function** (`scripts/release.sh` line 382-429):
+   - Checks if signing script exists
+   - Verifies zipsign CLI is installed
+   - Validates private key exists
+   - Counts archives to sign
+   - Calls `scripts/sign-release.sh` with release directory and private key
+   - Gracefully skips signing if requirements not met
+
+2. **Updated `main()` function** (line 649-650):
+   - Added `sign_binaries` call after package creation
+   - Positioned before Docker image build
+   - Ensures all archives are signed before upload
+
+3. **Safety Features**:
+   - Checks for signing script existence
+   - Warns if zipsign not installed (doesn't fail)
+   - Warns if private key missing (doesn't fail)
+   - Checks if archives exist before attempting to sign
+   - Respects DRY_RUN mode
+
+4. **Environment Variables**:
+   - `ZIPSIGN_PRIVATE_KEY`: Path to private signing key
+   - Default: `keys/private.key`
+
+**Result**: Release pipeline now automatically signs all .tar.gz and .tar.zst archives if the private key is available. Signing is optional - if the key is missing, the release continues with a warning.
+
+---
 
 ### Step 5: Add Comprehensive Test Suite ⏳
 
