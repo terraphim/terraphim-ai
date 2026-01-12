@@ -379,6 +379,55 @@ create_macos_packages() {
     fi
 }
 
+# Function to sign release archives
+sign_binaries() {
+    print_status "Signing release archives"
+
+    # Check if signing script exists
+    if [[ ! -f "scripts/sign-release.sh" ]]; then
+        print_warning "Signing script not found, skipping binary signing"
+        return 0
+    fi
+
+    # Check if zipsign is installed
+    if ! command -v zipsign &> /dev/null; then
+        print_warning "zipsign CLI not found, skipping binary signing"
+        print_warning "Install with: cargo install zipsign"
+        return 0
+    fi
+
+    # Check if private key exists
+    local private_key="${ZIPSIGN_PRIVATE_KEY:-keys/private.key}"
+    if [[ ! -f "$private_key" ]]; then
+        print_warning "Private key not found: $private_key"
+        print_warning "Generate with: ./scripts/generate-zipsign-keypair.sh"
+        print_warning "Skipping binary signing"
+        return 0
+    fi
+
+    # Sign all archives in release directory
+    if [[ -d "$RELEASE_DIR" ]]; then
+        # Find archives to sign
+        local archive_count=$(find "$RELEASE_DIR" -maxdepth 1 \( -name "*.tar.gz" -o -name "*.tar.zst" \) -type f | wc -l)
+
+        if [[ "$archive_count" -eq 0 ]]; then
+            print_warning "No archives found to sign in $RELEASE_DIR"
+            return 0
+        fi
+
+        print_status "Found $archive_count archive(s) to sign"
+
+        # Call signing script
+        if [[ "$DRY_RUN" == "true" ]]; then
+            print_status "[DRY-RUN] Would sign archives in $RELEASE_DIR"
+        else
+            execute scripts/sign-release.sh "$RELEASE_DIR" "$private_key"
+        fi
+    else
+        print_warning "Release directory $RELEASE_DIR does not exist, skipping signing"
+    fi
+}
+
 # Function to build Docker images
 build_docker_images() {
     if [[ "$SKIP_DOCKER" == "true" ]]; then
@@ -596,6 +645,9 @@ main() {
     create_arch_packages
     create_rpm_packages
     create_macos_packages
+
+    # Sign release archives
+    sign_binaries
 
     # Build Docker images
     build_docker_images
