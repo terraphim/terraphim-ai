@@ -246,6 +246,22 @@ impl SessionManager {
         Ok(session.context_variables.clone())
     }
 
+    /// Delete a context variable from a session.
+    pub fn delete_context_variable(
+        &self,
+        session_id: &SessionId,
+        key: &str,
+    ) -> RlmResult<Option<String>> {
+        let mut session =
+            self.sessions
+                .get_mut(session_id)
+                .ok_or_else(|| RlmError::SessionNotFound {
+                    session_id: *session_id,
+                })?;
+
+        Ok(session.context_variables.remove(key))
+    }
+
     /// Update budget status for a session.
     pub fn update_budget(&self, session_id: &SessionId, budget: BudgetStatus) -> RlmResult<()> {
         let mut session =

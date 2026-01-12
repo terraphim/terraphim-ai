@@ -9548,6 +9548,7 @@ dependencies = [
  "log",
  "parking_lot 0.12.5",
  "reqwest 0.12.24",
+ "rmcp",
  "serde",
  "serde_json",
  "tempfile",

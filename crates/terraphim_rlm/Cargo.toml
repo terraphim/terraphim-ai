@@ -47,6 +47,9 @@ reqwest = { workspace = true, optional = true }
 # DNS security
 trust-dns-resolver = { version = "0.23", optional = true }
 
+# MCP (Model Context Protocol)
+rmcp = { version = "0.9.0", features = ["server"], optional = true }
+
 # Utilities
 parking_lot = "0.12"
 dashmap = "5.5"
@@ -58,7 +61,7 @@ test-log = "0.2"
 
 [features]
 default = ["full"]
-full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security"]
+full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security", "mcp"]
 llm = ["dep:terraphim_service"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
@@ -66,3 +69,4 @@ llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
 e2b-backend = ["dep:reqwest"]
 dns-security = ["dep:trust-dns-resolver"]
+mcp = ["dep:rmcp"]
