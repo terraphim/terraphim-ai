@@ -37,7 +37,10 @@ fn create_test_archive(dir: &PathBuf, name: &str) -> PathBuf {
 
 /// Helper function to sign an archive with zipsign
 #[cfg(feature = "integration-signing")]
-fn sign_archive(archive_path: &PathBuf, private_key: &str) -> Result<(), Box<dyn std::error::Error>> {
+fn sign_archive(
+    archive_path: &PathBuf,
+    private_key: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
 
     let output = Command::new("zipsign")
@@ -45,7 +48,11 @@ fn sign_archive(archive_path: &PathBuf, private_key: &str) -> Result<(), Box<dyn
         .output()?;
 
     if !output.status.success() {
-        return Err(format!("zipsign failed: {}", String::from_utf8_lossy(&output.stderr)).into());
+        return Err(format!(
+            "zipsign failed: {}",
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
     }
 
     Ok(())
@@ -56,13 +63,16 @@ fn sign_archive(archive_path: &PathBuf, private_key: &str) -> Result<(), Box<dyn
 // ============================================================================
 
 #[test]
-fn test_placeholder_key_accepts_any_archive() {
+fn test_real_key_rejects_unsigned_archive() {
     let temp_dir = TempDir::new().unwrap();
     let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
 
-    // With placeholder key, verification should pass
+    // With real embedded key, unsigned archives should be rejected
     let result = verify_archive_signature(&archive, None).unwrap();
-    assert_eq!(result, VerificationResult::Valid);
+    assert!(matches!(result, VerificationResult::Invalid { .. }));
+    if let VerificationResult::Invalid { reason } = result {
+        assert!(reason.contains("Failed to read signatures") || reason.contains("magic"));
+    }
 }
 
 #[test]
@@ -107,11 +117,9 @@ fn test_empty_archive_without_signature() {
     let enc = GzEncoder::new(file, flate2::Compression::default());
     let _tar = Builder::new(enc);
 
-    // Try to verify - will fail to read signature
+    // With real key, unsigned archives should be rejected
     let result = verify_archive_signature(&archive_path, None).unwrap();
-
-    // With placeholder key, it should pass
-    assert_eq!(result, VerificationResult::Valid);
+    assert!(matches!(result, VerificationResult::Invalid { .. }));
 }
 
 #[test]
@@ -164,9 +172,12 @@ fn test_corrupted_archive_returns_error() {
     let mut file = fs::File::create(&archive_path).unwrap();
     file.write_all(b"This is not a valid gzip file").unwrap();
 
-    // With placeholder key, it should still pass (placeholder accepts anything)
+    // With real key, corrupted archives should be rejected
     let result = verify_archive_signature(&archive_path, None).unwrap();
-    assert_eq!(result, VerificationResult::Valid);
+    assert!(matches!(result, VerificationResult::Invalid { .. }));
+    if let VerificationResult::Invalid { reason } = result {
+        assert!(reason.contains("magic") || reason.contains("corrupted"));
+    }
 }
 
 #[test]
@@ -188,15 +199,17 @@ fn test_multiple_verifications_same_archive() {
     let temp_dir = TempDir::new().unwrap();
     let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
 
-    // Verify multiple times
+    // Verify multiple times with real key
     let result1 = verify_archive_signature(&archive, None).unwrap();
     let result2 = verify_archive_signature(&archive, None).unwrap();
     let result3 = verify_archive_signature(&archive, None).unwrap();
 
-    // All should return the same result
-    assert_eq!(result1, VerificationResult::Valid);
-    assert_eq!(result2, VerificationResult::Valid);
-    assert_eq!(result3, VerificationResult::Valid);
+    // All should return the same result (Invalid for unsigned archive)
+    assert!(matches!(result1, VerificationResult::Invalid { .. }));
+    assert!(matches!(result2, VerificationResult::Invalid { .. }));
+    assert!(matches!(result3, VerificationResult::Invalid { .. }));
+    assert_eq!(result1, result2);
+    assert_eq!(result2, result3);
 }
 
 #[test]
@@ -211,8 +224,9 @@ fn test_verification_non_file_path() {
         Ok(_) => {} // Placeholder accepts anything
         Err(e) => {
             // Real key would return an error about reading the file
-            assert!(e.to_string().contains("Failed to read") ||
-                    e.to_string().contains("archive file"));
+            assert!(
+                e.to_string().contains("Failed to read") || e.to_string().contains("archive file")
+            );
         }
     }
 }
@@ -353,10 +367,7 @@ mod integration_tests {
 
         // Tamper with the archive by appending garbage
         {
-            let mut file = fs::OpenOptions::new()
-                .append(true)
-                .open(&archive)
-                .unwrap();
+            let mut file = fs::OpenOptions::new().append(true).open(&archive).unwrap();
             file.write_all(b"TAMPERED DATA").unwrap();
         }
 
@@ -421,7 +432,11 @@ fn test_verification_performance_small_archive() {
     let elapsed = start.elapsed();
 
     // Verification should be fast (< 100ms for small archive)
-    assert!(elapsed.as_millis() < 100, "Verification took too long: {:?}", elapsed);
+    assert!(
+        elapsed.as_millis() < 100,
+        "Verification took too long: {:?}",
+        elapsed
+    );
 }
 
 #[test]

@@ -28,12 +28,11 @@ pub use zipsign_api::ZipsignError;
 /// Run: ./scripts/generate-zipsign-keypair.sh
 /// Then add the public key here
 fn get_embedded_public_key() -> &'static str {
-    // Placeholder public key - REPLACE WITH ACTUAL KEY
-    // This is a test key for development only
-    "TODO: Generate and add real public key here using ./scripts/generate-zipsign-keypair.sh"
-
-    // Example format (this will be replaced):
-    // "RWT+5ZvQzV/5/K5Z9Y3v6Y8V6Z8Z6Z9Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6Z6"
+    // Ed25519 public key for verifying Terraphim AI release signatures
+    // Generated: 2025-01-12
+    // Key type: Ed25519 (32 bytes, base64-encoded)
+    // Fingerprint: Calculate with: echo -n "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4=" | base64 -d | sha256sum
+    "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
 }
 
 /// Result of a signature verification operation
@@ -313,15 +312,15 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_placeholder_key_returns_valid() {
-        // With placeholder key, verification should return Valid for development
+    fn test_real_key_rejects_unsigned_file() {
+        // With real public key, unsigned files should be rejected
         let temp_file = tempfile::NamedTempFile::new().unwrap();
 
-        // Create a simple test file (not a real archive, but placeholder accepts it)
+        // Create a simple test file (not a signed archive)
         let result = verify_archive_signature(temp_file.path(), None).unwrap();
 
-        // Placeholder key returns Valid
-        assert_eq!(result, VerificationResult::Valid);
+        // Real key rejects unsigned files
+        assert!(matches!(result, VerificationResult::Invalid { .. }));
     }
 
     #[test]
@@ -406,13 +405,13 @@ mod tests {
     }
 
     #[test]
-    fn test_verify_signature_detailed_with_placeholder() {
+    fn test_verify_signature_detailed_with_real_key() {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
 
         let result = verify_signature_detailed(temp_file.path(), None).unwrap();
 
-        // Placeholder key returns Valid
-        assert_eq!(result, VerificationResult::Valid);
+        // Real key rejects unsigned files
+        assert!(matches!(result, VerificationResult::Invalid { .. }));
     }
 
     #[test]

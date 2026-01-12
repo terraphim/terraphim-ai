@@ -42,3 +42,6 @@ website/public/
 website/static/video/
 website/static/images/terraphim_bg.*
 releases/
+
+# Signing keys (NEVER commit private keys)
+keys/
