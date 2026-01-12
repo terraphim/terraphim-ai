@@ -67,8 +67,11 @@ pub mod rlm;
 // Trajectory logging (Phase 5)
 pub mod logger;
 
+// Knowledge graph validation (Phase 5)
+#[cfg(feature = "kg-validation")]
+pub mod validator;
+
 // Remaining phases (to be implemented)
-// pub mod validator;
 // pub mod preamble;
 // pub mod autoscaler;
 // pub mod dns_security;
@@ -92,6 +95,11 @@ pub use session::{SessionManager, SessionStats};
 pub use types::{
     BashCommand, BudgetStatus, Command, CommandHistory, LlmQuery, PythonCode, QueryMetadata,
     SessionId, SessionInfo, SessionState,
+};
+#[cfg(feature = "kg-validation")]
+pub use validator::{
+    KnowledgeGraphValidator, ValidationContext, ValidationResult as KgValidationResult,
+    ValidatorConfig,
 };
 
 /// Crate version

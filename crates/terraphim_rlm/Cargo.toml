@@ -25,6 +25,8 @@ log.workspace = true
 terraphim_firecracker = { package = "terraphim-firecracker", path = "../../terraphim_firecracker" }
 terraphim_service = { path = "../terraphim_service", optional = true }
 terraphim_automata = { path = "../terraphim_automata", optional = true }
+terraphim_types = { path = "../terraphim_types", optional = true }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
 
 # Firecracker-rust core for VM and snapshot management
@@ -58,7 +60,7 @@ test-log = "0.2"
 default = ["full"]
 full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security"]
 llm = ["dep:terraphim_service"]
-kg-validation = ["dep:terraphim_automata"]
+kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
 llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
