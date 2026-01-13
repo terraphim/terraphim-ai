@@ -1493,3 +1493,82 @@ The 2-routing workflow bug fix represents the final critical piece in creating a
 ### **Current System Status: CORE FUNCTIONAL, INFRASTRUCTURE MAINTENANCE NEEDED** ⚡
 
 The Terraphim AI agent system demonstrates strong core functionality with 38+ tests passing, but requires systematic infrastructure maintenance to restore full test coverage and resolve compilation issues across the complete codebase.
+
+---
+
+## Aho-Corasick Empty Pattern Bug Fix (2026-01-04) - CRITICAL BUG LESSONS
+
+### **Bug Discovery: Issue #394**
+
+A critical bug was discovered in the text replacement functionality where empty patterns in the thesaurus caused spurious text insertions between every character.
+
+**Symptom:**
+- Input: `npm install express`
+- Expected: `bun install express`
+- Actual: `bun install exmatching_and_iterators_in_rustpmatching_and_iterators_in_rustpmatching...`
+
+**Root Cause:**
+Empty string patterns (`""`) in Aho-Corasick automata match at every position (index 0, 1, 2, ...) in the input text. When replacement is performed, the replacement value is inserted at every boundary between characters.
+
+### **Key Lessons Learned**
+
+**1. Validate Input Patterns Before Building Automata** ⚠️
+- Empty patterns should never be passed to Aho-Corasick builders
+- Single-character patterns can cause excessive matches (consider filtering)
+- Pattern length validation is a MUST for any text replacement system
+- Log warnings when skipping invalid patterns for debugging
+
+**2. Defensive Programming in Text Processing** 🛡️
+```rust
+// Always filter patterns before building automata
+if pattern_str.trim().is_empty() || pattern_str.len() < MIN_PATTERN_LENGTH {
+    log::warn!("Skipping invalid pattern: {:?}", pattern_str);
+    continue;
+}
+```
+
+**3. Regression Tests Are Essential** 🧪
+- Added 6 comprehensive tests covering:
+  - Empty pattern filtering
+  - Single-character pattern filtering
+  - Whitespace-only pattern filtering
+  - Valid replacement still works
+  - Empty thesaurus returns original text
+  - Both `find_matches` and `replace_matches` filter correctly
+
+**4. The Bug Cascaded Through Multiple Functions** 🔄
+- Both `find_matches()` and `replace_matches()` were affected
+- Had to fix both functions to prevent the issue in all codepaths
+- Consistency is key - if one function validates, all similar functions should too
+
+**5. Constants for Magic Numbers** 📐
+```rust
+/// Minimum pattern length to prevent spurious matches
+const MIN_PATTERN_LENGTH: usize = 2;
+```
+- Makes the code self-documenting
+- Easy to adjust if requirements change
+- Clear intent for future maintainers
+
+### **Technical Implementation Details**
+
+**Fix Location:** `crates/terraphim_automata/src/matcher.rs`
+
+**Changes Made:**
+1. Added `MIN_PATTERN_LENGTH` constant (value: 2)
+2. Filter patterns before building automata in `find_matches()`
+3. Filter patterns before building automata in `replace_matches()`
+4. Return original text unchanged when no valid patterns exist
+5. Log warnings for skipped patterns to aid debugging
+
+**PR:** #396
+**Commit:** `f4c60fc1`
+
+### **Pattern for Similar Issues**
+
+When working with pattern matching libraries (Aho-Corasick, regex, etc.):
+1. **Validate inputs** - Check for empty/invalid patterns
+2. **Handle edge cases** - Empty input, empty patterns, no matches
+3. **Test boundaries** - Single char, zero length, maximum length
+4. **Log debugging info** - Warn when skipping inputs
+5. **Return sensible defaults** - Empty results, original input unchanged

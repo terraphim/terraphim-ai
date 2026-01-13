@@ -46,10 +46,13 @@ CRATES=(
   "terraphim_types"
   "terraphim_settings"
   "terraphim_persistence"
-  "terraphim_config"
   "terraphim_automata"
+  "terraphim_config"
   "terraphim_rolegraph"
+  "terraphim_hooks"
+  "terraphim-session-analyzer"
   "terraphim_middleware"
+  "terraphim_update"
   "terraphim_service"
   "terraphim_agent"
 )
@@ -198,7 +201,11 @@ check_if_published() {
 
   log_info "Checking if $crate v$version is already published..."
 
-  if cargo search "$crate" --limit 1 2>/dev/null | grep -q "$crate = \"$version\""; then
+  # Use crates.io API directly for reliable version detection
+  local response
+  response=$(curl -s "https://crates.io/api/v1/crates/$crate/versions" 2>/dev/null || echo "")
+
+  if echo "$response" | grep -q "\"num\":\"$version\""; then
     log_warning "$crate v$version already exists on crates.io"
     return 0
   else
@@ -220,18 +227,26 @@ publish_crate() {
   fi
 
   if [[ "$DRY_RUN" == "true" ]]; then
-    log_info "Dry-run: cargo publish --package $crate --dry-run"
-    cargo publish --package "$crate" --dry-run
+    log_info "Dry-run: cargo publish --package $crate --dry-run --allow-dirty"
+    cargo publish --package "$crate" --dry-run --allow-dirty
   else
-    log_info "Running: cargo publish --package $crate"
+    log_info "Running: cargo publish --package $crate --allow-dirty"
 
-    if cargo publish --package "$crate"; then
+    local output
+    if output=$(cargo publish --package "$crate" --allow-dirty 2>&1); then
       log_success "Published $crate v$version successfully"
       log_info "Waiting 60 seconds for crates.io to process..."
       sleep 60
     else
-      log_error "Failed to publish $crate"
-      return 1
+      # Check if it failed because the crate already exists
+      if echo "$output" | grep -q "already exists on"; then
+        log_warning "$crate v$version already exists - skipping"
+        return 0
+      else
+        log_error "Failed to publish $crate"
+        echo "$output"
+        return 1
+      fi
     fi
   fi
 }
@@ -250,21 +265,19 @@ main() {
   local -a crates_to_publish
 
   if [[ -n "$SPECIFIC_CRATE" ]]; then
-    # Publish specific crate and its dependencies
+    # Publish specific crate and all its dependencies (crates that come before it in the list)
     log_info "Publishing specific crate: $SPECIFIC_CRATE and its dependencies"
 
-    local publish=false
+    local found=false
     for crate in "${CRATES[@]}"; do
+      crates_to_publish+=("$crate")
       if [[ "$crate" == "$SPECIFIC_CRATE" ]]; then
-        publish=true
-      fi
-
-      if [[ "$publish" == "true" ]]; then
-        crates_to_publish+=("$crate")
+        found=true
+        break
       fi
     done
 
-    if [[ ${#crates_to_publish[@]} -eq 0 ]]; then
+    if [[ "$found" != "true" ]]; then
       log_error "Crate $SPECIFIC_CRATE not found in dependency chain"
       exit 1
     fi

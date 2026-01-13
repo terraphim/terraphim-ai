@@ -18,6 +18,7 @@ use ratatui::{
 use tokio::runtime::Runtime;
 
 mod client;
+mod guard_patterns;
 mod service;
 
 // Robot mode and forgiving CLI - always available
@@ -226,6 +227,17 @@ enum Command {
         #[arg(long, default_value_t = true)]
         json: bool,
     },
+    /// Check command against safety guard patterns (blocks destructive git/fs commands)
+    Guard {
+        /// Command to check (reads from stdin if not provided)
+        command: Option<String>,
+        /// Output as JSON
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Suppress errors and pass through unchanged on failure
+        #[arg(long, default_value_t = false)]
+        fail_open: bool,
+    },
     Interactive,
 
     /// Start REPL (Read-Eval-Print-Loop) interface
@@ -265,6 +277,30 @@ fn main() -> Result<()> {
 
     match cli.command {
         Some(Command::Interactive) | None => {
+            // Check if we're in a TTY for interactive mode (both stdout and stdin required)
+            use atty::Stream;
+            if !atty::is(Stream::Stdout) {
+                eprintln!("Error: Interactive mode requires a terminal.");
+                eprintln!("Issue: stdout is not a TTY (not a terminal).");
+                eprintln!("");
+                eprintln!("For non-interactive use, try:");
+                eprintln!("  1. REPL mode: terraphim-agent repl");
+                eprintln!("  2. Command mode: terraphim-agent search \"query\"");
+                eprintln!("  3. CLI tool: terraphim-cli search \"query\"");
+                std::process::exit(1);
+            }
+
+            if !atty::is(Stream::Stdin) {
+                eprintln!("Error: Interactive mode requires a terminal.");
+                eprintln!("Issue: stdin is not a TTY (not a terminal).");
+                eprintln!("");
+                eprintln!("For non-interactive use, try:");
+                eprintln!("  1. REPL mode: terraphim-agent repl");
+                eprintln!("  2. Command mode: terraphim-agent search \"query\"");
+                eprintln!("  3. CLI tool: terraphim-cli search \"query\"");
+                std::process::exit(1);
+            }
+
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
@@ -307,6 +343,40 @@ async fn run_tui_with_service(_service: TuiService, transparent: bool) -> Result
 }
 
 async fn run_offline_command(command: Command) -> Result<()> {
+    // Handle stateless commands that don't need TuiService first
+    if let Command::Guard {
+        command,
+        json,
+        fail_open,
+    } = &command
+    {
+        let input_command = match command {
+            Some(c) => c.clone(),
+            None => {
+                use std::io::Read;
+                let mut buffer = String::new();
+                std::io::stdin().read_to_string(&mut buffer)?;
+                buffer.trim().to_string()
+            }
+        };
+
+        let guard = guard_patterns::CommandGuard::new();
+        let result = guard.check(&input_command);
+
+        if *json {
+            println!("{}", serde_json::to_string(&result)?);
+        } else if result.decision == "block" {
+            if let Some(reason) = &result.reason {
+                eprintln!("BLOCKED: {}", reason);
+                if !fail_open {
+                    std::process::exit(1);
+                }
+            }
+        }
+        // If allowed, no output in non-JSON mode (silent success)
+        return Ok(());
+    }
+
     let service = TuiService::new().await?;
 
     match command {
@@ -776,28 +846,32 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             Ok(())
         }
+        Command::Guard { .. } => {
+            // Handled above before TuiService initialization
+            unreachable!("Guard command should be handled before TuiService initialization")
+        }
         Command::CheckUpdate => {
-            println!("🔍 Checking for terraphim-agent updates...");
+            println!("Checking for terraphim-agent updates...");
             match check_for_updates("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
                 }
                 Err(e) => {
-                    eprintln!("❌ Failed to check for updates: {}", e);
+                    eprintln!("Failed to check for updates: {}", e);
                     std::process::exit(1);
                 }
             }
         }
         Command::Update => {
-            println!("🚀 Updating terraphim-agent...");
+            println!("Updating terraphim-agent...");
             match update_binary("terraphim-agent").await {
                 Ok(status) => {
                     println!("{}", status);
                     Ok(())
                 }
                 Err(e) => {
-                    eprintln!("❌ Update failed: {}", e);
+                    eprintln!("Update failed: {}", e);
                     std::process::exit(1);
                 }
             }
@@ -1096,6 +1170,38 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             println!("{}", serde_json::to_string(&err)?);
             std::process::exit(1);
         }
+        Command::Guard {
+            command,
+            json,
+            fail_open,
+        } => {
+            // Guard works the same in server mode - no server needed for pattern matching
+            let input_command = match command {
+                Some(c) => c,
+                None => {
+                    use std::io::Read;
+                    let mut buffer = String::new();
+                    std::io::stdin().read_to_string(&mut buffer)?;
+                    buffer.trim().to_string()
+                }
+            };
+
+            let guard = guard_patterns::CommandGuard::new();
+            let result = guard.check(&input_command);
+
+            if json {
+                println!("{}", serde_json::to_string(&result)?);
+            } else if result.decision == "block" {
+                if let Some(reason) = &result.reason {
+                    eprintln!("BLOCKED: {}", reason);
+                    if !fail_open {
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            Ok(())
+        }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -1108,23 +1214,64 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
 }
 
 fn run_tui(transparent: bool) -> Result<()> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    // Attempt to set up terminal for TUI
+    let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
 
-    let res = ui_loop(&mut terminal, transparent);
+    // Try to enter raw mode and alternate screen
+    // These operations can fail in non-interactive environments
+    match enable_raw_mode() {
+        Ok(()) => {
+            // Successfully entered raw mode, proceed with TUI setup
+            let mut stdout = io::stdout();
+            if let Err(e) = execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
+                // Clean up raw mode before returning error
+                let _ = disable_raw_mode();
+                return Err(anyhow::anyhow!(
+                    "Failed to initialize terminal for interactive mode: {}. \
+                     Try using 'repl' mode instead: terraphim-agent repl",
+                    e
+                ));
+            }
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+            let mut terminal = match Terminal::new(backend) {
+                Ok(t) => t,
+                Err(e) => {
+                    // Clean up before returning
+                    let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+                    let _ = disable_raw_mode();
+                    return Err(anyhow::anyhow!(
+                        "Failed to create terminal: {}. \
+                         Try using 'repl' mode instead: terraphim-agent repl",
+                        e
+                    ));
+                }
+            };
 
-    res
+            let res = ui_loop(&mut terminal, transparent);
+
+            // Always clean up terminal state
+            let _ = disable_raw_mode();
+            let _ = execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            );
+            let _ = terminal.show_cursor();
+
+            res
+        }
+        Err(e) => {
+            // Failed to enter raw mode - not a TTY
+            Err(anyhow::anyhow!(
+                "Terminal does not support raw mode (not a TTY?). \
+                 Interactive mode requires a terminal. \
+                 Try using 'repl' mode instead: terraphim-agent repl. \
+                 Error: {}",
+                e
+            ))
+        }
+    }
 }
 
 fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: bool) -> Result<()> {

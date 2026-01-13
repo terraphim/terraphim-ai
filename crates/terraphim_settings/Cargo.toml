@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_settings"
-version = "1.3.0"
+version = "1.4.10"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim settings handling library"

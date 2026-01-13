@@ -36,7 +36,7 @@ clap = { version = "4.5", features = ["derive"] }
 jsonwebtoken = "9"
 
 # HTTP client (for Firecracker API)
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Time handling
 chrono = "0.4"

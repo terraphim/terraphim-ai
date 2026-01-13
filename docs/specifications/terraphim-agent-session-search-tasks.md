@@ -255,13 +255,13 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 **Goal**: Enable importing and searching sessions from external AI tools.
 
-**Status**: ✅ Complete (via claude-log-analyzer integration)
+**Status**: ✅ Complete (via terraphim-session-analyzer integration)
 
-**Implementation Approach Changed**: Instead of building connectors from scratch, we integrated `claude-log-analyzer` (CLA) as a git subtree and created a feature-gated wrapper in `terraphim_sessions`.
+**Implementation Approach Changed**: Instead of building connectors from scratch, we integrated `terraphim-session-analyzer` (CLA) as a git subtree and created a feature-gated wrapper in `terraphim_sessions`.
 
 ---
 
-### Task 2.1: Integrate claude-log-analyzer via Git Subtree
+### Task 2.1: Integrate terraphim-session-analyzer via Git Subtree
 
 **Priority**: P0 (Critical)
 **Status**: ✅ Complete
@@ -270,7 +270,7 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 - [x] **2.1.1** Add CLA as git subtree
   ```bash
-  git subtree add --prefix=crates/claude-log-analyzer ../claude-log-analyzer main --squash
+  git subtree add --prefix=crates/terraphim-session-analyzer ../terraphim-session-analyzer main --squash
   ```
 
 - [x] **2.1.2** Update CLA dependency paths
@@ -287,7 +287,7 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
 
 **Priority**: P0 (Critical)
 **Status**: ✅ Complete
-**Location**: `crates/claude-log-analyzer/src/connectors/`
+**Location**: `crates/terraphim-session-analyzer/src/connectors/`
 
 #### Subtasks
 
@@ -320,8 +320,8 @@ This document tracks implementation tasks for the Session Search and Robot Mode 
   ```toml
   [features]
   default = []
-  claude-log-analyzer = ["dep:claude-log-analyzer"]
-  cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
+  terraphim-session-analyzer = ["dep:terraphim-session-analyzer"]
+  cla-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors"]
   enrichment = ["terraphim_automata", "terraphim_rolegraph"]
   full = ["cla-full", "enrichment"]
   ```

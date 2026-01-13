@@ -107,12 +107,12 @@ impl ConnectorRegistry {
         // Add native Claude Code connector (always available)
         connectors.push(Box::new(NativeClaudeConnector));
 
-        // Add CLA-based connectors if feature enabled
-        #[cfg(feature = "claude-log-analyzer")]
+        // Add TSA-based connectors if feature enabled
+        #[cfg(feature = "terraphim-session-analyzer")]
         {
             connectors.push(Box::new(crate::cla::ClaClaudeConnector::default()));
 
-            #[cfg(feature = "cla-full")]
+            #[cfg(feature = "tsa-full")]
             connectors.push(Box::new(crate::cla::ClaCursorConnector::default()));
         }
 
