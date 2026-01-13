@@ -3645,3 +3645,86 @@ match router_config.mode {
 3. **Clean restores**: When scripts create duplicates, restore and re-run cleanly
 4. **Build verification**: Run `cargo build --features llm_router` before tests
 5. **Pre-existing failures**: Document unrelated test failures separately
+
+---
+
+## LLM Router Integration: Test Management Patterns
+
+### Date: 2026-01-13 - CI-Compatible Integration Tests
+
+#### Pattern 1: Ignoring Tests for CI with Local Execution
+
+**Context**: Integration test `test_ai_summarization_uniqueness` requires running Ollama and a free port 8000, which CI environments don't provide.
+
+**What We Learned**:
+- **Use `#[ignore = "message"]`**: Provides clear reason in test output
+- **Document run command**: Add comment showing how to run locally
+- **Keep tests valuable**: Don't delete tests just because CI can't run them
+
+**Implementation**:
+```rust
+/// Test that validates AI summaries are unique per document and role
+/// Run locally with: cargo test -p terraphim_middleware test_name -- --ignored
+#[tokio::test]
+#[ignore = "Requires running Ollama and configured haystacks - run locally with --ignored"]
+async fn test_ai_summarization_uniqueness() {
+    // Test implementation...
+}
+```
+
+**When to Apply**: Any test requiring external services (databases, LLMs, APIs, specific ports)
+
+**Anti-pattern to Avoid**: Deleting tests because they don't work in CI
+
+#### Pattern 2: Workspace Path Resolution in Tests
+
+**Context**: Test needed to find workspace root to build and run server binary.
+
+**What We Learned**:
+- **Don't use "."**: Current directory varies based on how test is run
+- **Use `CARGO_MANIFEST_DIR`**: Compile-time constant, always correct
+- **Navigate up from crate dir**: `crate/tests/` -> `crate/` -> `workspace/`
+
+**Implementation**:
+```rust
+// WRONG: Unreliable, depends on cwd
+let workspace = PathBuf::from(".");
+
+// CORRECT: Always works
+let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .parent() // crates/
+    .and_then(|p| p.parent()) // workspace root
+    .map(|p| p.to_path_buf())
+    .unwrap_or_else(|| std::path::PathBuf::from("."));
+```
+
+**When to Apply**: Any test that needs to reference workspace-level paths (configs, binaries, fixtures)
+
+#### Pattern 3: Cargo Build Commands for Workspace Members
+
+**Context**: Test was using wrong cargo command to build server binary.
+
+**What We Learned**:
+- **`--bin` is for binaries in current package**: Not for workspace members
+- **`-p <package>` selects workspace member**: Works for both libs and bins
+- **Default-run binary is still built**: No need to specify binary name
+
+**Implementation**:
+```bash
+# WRONG: Error "no bin target named 'terraphim_server' in default-run packages"
+cargo build --release --bin terraphim_server
+
+# CORRECT: Build the package (includes its default-run binary)
+cargo build --release -p terraphim_server
+```
+
+**When to Apply**: Building any workspace member binary from tests or scripts
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| Test files fixed | 1 |
+| Commits pushed | 2 |
+| Patterns documented | 3 |
+| CI compatibility | Achieved |
