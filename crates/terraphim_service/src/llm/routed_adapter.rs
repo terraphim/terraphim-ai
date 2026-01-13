@@ -39,15 +39,6 @@ impl RoutedLlmClient {
     fn is_routing_enabled(&self) -> bool {
         self.config.enabled
     }
-
-    /// Get the name of this client
-    pub fn name(&self) -> &'static str {
-        if self.is_routing_enabled() {
-            "routed_llm"
-        } else {
-            self.client.as_ref().name()
-        }
-    }
 }
 
 #[async_trait]

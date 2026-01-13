@@ -38,8 +38,6 @@ async fn mcp_live_haystack_smoke() {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
     };
 
     let mut config = ConfigBuilder::new()
