@@ -5,9 +5,9 @@
 
 #![cfg(feature = "terraphim")]
 
-use claude_log_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch, QueryNode};
-use claude_log_analyzer::models::{ToolCategory, ToolInvocation};
 use std::collections::HashMap;
+use terraphim_session_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch, QueryNode};
+use terraphim_session_analyzer::models::{ToolCategory, ToolInvocation};
 
 fn create_test_tool(tool_name: &str, command: &str) -> ToolInvocation {
     ToolInvocation {

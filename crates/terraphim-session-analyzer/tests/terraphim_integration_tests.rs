@@ -23,6 +23,7 @@ fn create_wrangler_thesaurus() -> Thesaurus {
 
     for (pattern, normalized, id) in wrangler_patterns {
         let normalized_term = NormalizedTerm {
+            display_value: None,
             id,
             value: NormalizedTermValue::from(normalized),
             display_value: None,
@@ -72,6 +73,7 @@ fn create_comprehensive_thesaurus() -> Thesaurus {
 
     for (pattern, normalized, id, url) in patterns {
         let normalized_term = NormalizedTerm {
+            display_value: None,
             id,
             value: NormalizedTermValue::from(normalized),
             display_value: None,
@@ -227,6 +229,7 @@ fn test_leftmost_longest_matching() {
     thesaurus.insert(
         NormalizedTermValue::from("npm"),
         NormalizedTerm {
+            display_value: None,
             id: 1,
             value: NormalizedTermValue::from("npm"),
             display_value: None,
@@ -237,6 +240,7 @@ fn test_leftmost_longest_matching() {
     thesaurus.insert(
         NormalizedTermValue::from("npm install"),
         NormalizedTerm {
+            display_value: None,
             id: 2,
             value: NormalizedTermValue::from("npm-install"),
             display_value: None,
@@ -365,6 +369,7 @@ fn test_terraphim_automata_performance() {
         thesaurus.insert(
             NormalizedTermValue::from(pattern.as_str()),
             NormalizedTerm {
+                display_value: None,
                 id: i,
                 value: NormalizedTermValue::from(pattern.as_str()),
                 display_value: None,

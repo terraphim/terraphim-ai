@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_update"
-version = "1.0.0"
+version = "1.4.10"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Shared auto-update functionality for Terraphim AI binaries"
