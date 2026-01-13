@@ -138,9 +138,10 @@ impl LlmBridge {
     ///
     /// Returns the session ID if valid.
     pub fn validate_token(&self, token: &str) -> RlmResult<SessionId> {
-        let session_id = SessionId::from_string(token).map_err(|_| RlmError::InvalidSessionToken {
-            token: token.to_string(),
-        })?;
+        let session_id =
+            SessionId::from_string(token).map_err(|_| RlmError::InvalidSessionToken {
+                token: token.to_string(),
+            })?;
 
         // Validate session exists and is not expired
         self.session_manager.validate_session(&session_id)?;

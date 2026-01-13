@@ -23,6 +23,7 @@ fn create_wrangler_thesaurus() -> Thesaurus {
 
     for (pattern, normalized, id) in wrangler_patterns {
         let normalized_term = NormalizedTerm {
+            display_value: None,
             id,
             value: NormalizedTermValue::from(normalized),
             url: Some("https://developers.cloudflare.com/workers/wrangler/".to_string()),
@@ -71,6 +72,7 @@ fn create_comprehensive_thesaurus() -> Thesaurus {
 
     for (pattern, normalized, id, url) in patterns {
         let normalized_term = NormalizedTerm {
+            display_value: None,
             id,
             value: NormalizedTermValue::from(normalized),
             url: Some(url.to_string()),
@@ -225,6 +227,7 @@ fn test_leftmost_longest_matching() {
     thesaurus.insert(
         NormalizedTermValue::from("npm"),
         NormalizedTerm {
+            display_value: None,
             id: 1,
             value: NormalizedTermValue::from("npm"),
             url: Some("https://npmjs.com".to_string()),
@@ -234,6 +237,7 @@ fn test_leftmost_longest_matching() {
     thesaurus.insert(
         NormalizedTermValue::from("npm install"),
         NormalizedTerm {
+            display_value: None,
             id: 2,
             value: NormalizedTermValue::from("npm-install"),
             url: Some("https://npmjs.com/install".to_string()),
@@ -361,6 +365,7 @@ fn test_terraphim_automata_performance() {
         thesaurus.insert(
             NormalizedTermValue::from(pattern.as_str()),
             NormalizedTerm {
+                display_value: None,
                 id: i,
                 value: NormalizedTermValue::from(pattern.as_str()),
                 url: Some(format!("https://example.com/{}", i)),

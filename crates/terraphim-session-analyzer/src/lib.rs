@@ -16,7 +16,7 @@
 //! ## Example Usage
 //!
 //! ```rust
-//! use claude_log_analyzer::{Analyzer, Reporter};
+//! use terraphim_session_analyzer::{Analyzer, Reporter};
 //!
 //! # fn main() -> Result<(), Box<dyn std::error::Error>> {
 //! // Analyze sessions from default location

@@ -2,7 +2,7 @@
 
 ## 1. Summary of Target Behavior
 
-A **unified haystack** for searching across AI coding assistant session logs. Uses `claude-log-analyzer`'s connector system to support:
+A **unified haystack** for searching across AI coding assistant session logs. Uses `terraphim-session-analyzer`'s connector system to support:
 
 | Connector | Source ID | Format | Default Path |
 |-----------|-----------|--------|--------------|
@@ -84,7 +84,7 @@ Users configure haystacks with `ServiceType::AiAssistant` and specify the connec
                               │
                               ▼
 ┌────────────────────────────────────────────────────────────────┐
-│                     claude-log-analyzer                        │
+│                     terraphim-session-analyzer                        │
 ├────────────────────────────────────────────────────────────────┤
 │  connectors/mod.rs                                             │
 │    ├─ SessionConnector trait                                   │
@@ -105,7 +105,7 @@ Users configure haystacks with `ServiceType::AiAssistant` and specify the connec
 
 1. **Single ServiceType**: `AiAssistant` instead of 5 separate types
 2. **Connector Selection**: Via `extra_parameters["connector"]`
-3. **Feature Flag**: `connectors` feature in claude-log-analyzer (Cursor needs SQLite)
+3. **Feature Flag**: `connectors` feature in terraphim-session-analyzer (Cursor needs SQLite)
 4. **Document Mapping**: `NormalizedSession` → multiple `Document` (one per message)
 
 ## 4. File/Module-Level Change Plan
@@ -113,9 +113,9 @@ Users configure haystacks with `ServiceType::AiAssistant` and specify the connec
 | File/Module | Action | Change | Dependencies |
 |-------------|--------|--------|--------------|
 | `terraphim_config/src/lib.rs:273` | Modify | Add `AiAssistant` to ServiceType | None |
-| `terraphim_middleware/Cargo.toml` | Modify | Add `claude-log-analyzer = { features = ["connectors"] }` | claude-log-analyzer |
+| `terraphim_middleware/Cargo.toml` | Modify | Add `terraphim-session-analyzer = { features = ["connectors"] }` | terraphim-session-analyzer |
 | `terraphim_middleware/src/haystack/mod.rs` | Modify | Add `ai_assistant` module + export | ai_assistant.rs |
-| `terraphim_middleware/src/haystack/ai_assistant.rs` | Create | `AiAssistantHaystackIndexer` | claude-log-analyzer connectors |
+| `terraphim_middleware/src/haystack/ai_assistant.rs` | Create | `AiAssistantHaystackIndexer` | terraphim-session-analyzer connectors |
 | `terraphim_middleware/src/indexer/mod.rs` | Modify | Add match arm for `ServiceType::AiAssistant` | ai_assistant module |
 
 ## 5. Step-by-Step Implementation Sequence
@@ -133,7 +133,7 @@ AiAssistant,
 **File**: `crates/terraphim_middleware/Cargo.toml`
 **Change**: Add to `[dependencies]`:
 ```toml
-claude-log-analyzer = { path = "../claude-log-analyzer", features = ["connectors"] }
+terraphim-session-analyzer = { path = "../terraphim-session-analyzer", features = ["connectors"] }
 ```
 **Deployable**: Yes
 

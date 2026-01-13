@@ -12,8 +12,8 @@
 //! ## Example
 //!
 //! ```rust
-//! use claude_log_analyzer::patterns::knowledge_graph::{PatternLearner, LearnedPattern};
-//! use claude_log_analyzer::models::ToolCategory;
+//! use terraphim_session_analyzer::patterns::knowledge_graph::{PatternLearner, LearnedPattern};
+//! use terraphim_session_analyzer::models::ToolCategory;
 //!
 //! # fn main() -> anyhow::Result<()> {
 //! let mut learner = PatternLearner::new();
@@ -468,8 +468,8 @@ impl ToolRelationship {
     /// # Examples
     ///
     /// ```ignore
-    /// use claude_log_analyzer::patterns::knowledge_graph::ToolRelationship;
-    /// use claude_log_analyzer::models::ToolChain;
+    /// use terraphim_session_analyzer::patterns::knowledge_graph::ToolRelationship;
+    /// use terraphim_session_analyzer::models::ToolChain;
     ///
     /// let chain = ToolChain {
     ///     tools: vec!["npm".to_string(), "wrangler".to_string()],
@@ -579,8 +579,8 @@ impl KnowledgeGraph {
     /// # Examples
     ///
     /// ```ignore
-    /// use claude_log_analyzer::patterns::knowledge_graph::KnowledgeGraph;
-    /// use claude_log_analyzer::models::ToolChain;
+    /// use terraphim_session_analyzer::patterns::knowledge_graph::KnowledgeGraph;
+    /// use terraphim_session_analyzer::models::ToolChain;
     ///
     /// let chains = vec![
     ///     ToolChain {

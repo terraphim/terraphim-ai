@@ -13,7 +13,7 @@
 //! ## Example
 //!
 //! ```rust
-//! use claude_log_analyzer::patterns::{create_matcher, load_patterns};
+//! use terraphim_session_analyzer::patterns::{create_matcher, load_patterns};
 //!
 //! # fn main() -> anyhow::Result<()> {
 //! // Load patterns from built-in TOML

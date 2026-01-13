@@ -50,7 +50,7 @@ CRATES=(
   "terraphim_config"
   "terraphim_rolegraph"
   "terraphim_hooks"
-  "claude-log-analyzer"
+  "terraphim-session-analyzer"
   "terraphim_middleware"
   "terraphim_update"
   "terraphim_service"

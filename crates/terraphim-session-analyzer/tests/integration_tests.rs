@@ -5,13 +5,13 @@
 //! and generating reports.
 
 use anyhow::Result;
-use claude_log_analyzer::models::*;
-use claude_log_analyzer::utils;
-use claude_log_analyzer::{Analyzer, Reporter, SessionParser, TimelineEventType};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use tempfile::{tempdir, NamedTempFile};
+use terraphim_session_analyzer::models::*;
+use terraphim_session_analyzer::utils;
+use terraphim_session_analyzer::{Analyzer, Reporter, SessionParser, TimelineEventType};
 
 /// Test data directory path
 #[allow(dead_code)]
