@@ -40,8 +40,6 @@ async fn test_llm_client_integration() {
         extra: AHashMap::new(),
         llm_router_enabled: false,
         llm_router_config: None,
-        llm_router_enabled: false,
-        llm_router_config: None,
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
@@ -116,8 +114,6 @@ async fn test_llm_client_error_handling() {
         extra: AHashMap::new(),
         llm_router_enabled: false,
         llm_router_config: None,
-        llm_router_enabled: false,
-        llm_router_config: None,
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
@@ -164,8 +160,6 @@ async fn test_role_validation() {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
         llm_router_enabled: false,
         llm_router_config: None,
     };

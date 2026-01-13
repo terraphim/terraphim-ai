@@ -110,8 +110,6 @@ async fn create_terraphim_engineer_config() -> Result<String> {
         llm_router_enabled: false,
         llm_router_config: None,
         extra: ahash::AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
     };
 
     let mut config = ConfigBuilder::new()
