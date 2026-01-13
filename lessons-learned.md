@@ -3728,3 +3728,115 @@ cargo build --release -p terraphim_server
 | Commits pushed | 2 |
 | Patterns documented | 3 |
 | CI compatibility | Achieved |
+
+---
+
+## Session Analyzer: Crate Rename and Multi-Assistant Support
+
+### Date: 2026-01-13 - OpenCode Connector Fix and crates.io Publishing
+
+#### Pattern 1: Verify Actual File Locations Before Implementation
+
+**Context**: OpenCode connector was looking in `~/.opencode/` but actual data is at `~/.local/state/opencode/`.
+
+**What We Learned**:
+- **Check actual installations**: Don't assume directory locations, verify with `ls`
+- **Read actual data formats**: Don't assume JSONL schema matches other tools
+- **XDG Base Directory Spec**: Many tools use `~/.local/state/` for state data
+
+**Implementation**:
+```rust
+// WRONG: Assumed location based on tool name
+fn default_path(&self) -> Option<PathBuf> {
+    home::home_dir().map(|h| h.join(".opencode"))
+}
+
+// CORRECT: Actual location following XDG spec
+fn default_path(&self) -> Option<PathBuf> {
+    home::home_dir().map(|h| h.join(".local").join("state").join("opencode"))
+}
+```
+
+**When to Apply**: Any connector or integration with external tools
+
+**Anti-pattern to Avoid**: Implementing parsers based on assumed formats without checking actual data
+
+#### Pattern 2: 1Password CLI Authentication for Scripts
+
+**Context**: Publishing to crates.io required token from 1Password, but `op signin` doesn't work in scripts.
+
+**What We Learned**:
+- **Interactive signin doesn't work**: `eval $(op signin)` prompts for GUI/biometrics
+- **Account-specific scripts exist**: `~/op_zesticai_non_prod.sh` handles auth
+- **Pattern for token export**: Source script, then use `op read`
+
+**Implementation**:
+```bash
+# WRONG: Prompts for interactive authentication
+eval $(op signin)
+op read "op://TerraphimPlatform/crates.io.token/token"
+
+# CORRECT: Use account-specific auth script
+source ~/op_zesticai_non_prod.sh
+export CARGO_REGISTRY_TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
+cargo publish -p crate-name --allow-dirty
+```
+
+**When to Apply**: Any script needing 1Password secrets (crates.io, npm, pypi tokens)
+
+#### Pattern 3: publish-crates.sh Side Effects
+
+**Context**: Script updated ALL workspace crates when publishing single crate with `-c` flag.
+
+**What We Learned**:
+- **Version flag affects all crates**: `-v 1.4.11` updates entire workspace
+- **Side effects leave uncommitted changes**: Check `git status` after running
+- **Manual publish may be cleaner**: Direct `cargo publish` avoids side effects
+
+**Implementation**:
+```bash
+# This creates side effects (updates ALL crate versions):
+./scripts/publish-crates.sh -c terraphim-session-analyzer -v 1.4.11
+
+# Cleaner approach for single crate:
+# 1. Manually update version in Cargo.toml
+# 2. Commit the change
+# 3. Publish directly:
+source ~/op_zesticai_non_prod.sh
+export CARGO_REGISTRY_TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
+cargo publish -p terraphim-session-analyzer --allow-dirty
+```
+
+**When to Apply**: Publishing individual crates vs full workspace releases
+
+#### Pattern 4: Deprecating crates.io Packages
+
+**Context**: Needed to deprecate old `claude-log-analyzer` crate after rename.
+
+**What We Learned**:
+- **Use `cargo yank`**: Marks versions as unavailable but doesn't delete
+- **Yank all versions**: Each version must be yanked individually
+- **Existing installs still work**: Yanking only prevents new installations
+
+**Implementation**:
+```bash
+# Yank all versions of deprecated crate
+cargo yank --version 1.4.10 claude-log-analyzer
+cargo yank --version 1.4.8 claude-log-analyzer
+cargo yank --version 1.4.7 claude-log-analyzer
+
+# Verify yanking worked
+curl -s "https://crates.io/api/v1/crates/claude-log-analyzer/versions" | jq '.versions[] | "\(.num) yanked: \(.yanked)"'
+```
+
+**When to Apply**: Renaming crates, deprecating old packages, removing security vulnerabilities
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| Crate versions yanked | 3 |
+| New version published | 1 (v1.4.11) |
+| Files fixed | 2 |
+| Tests passing | 325 |
+| Patterns documented | 4 |
