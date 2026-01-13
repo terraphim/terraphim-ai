@@ -1,7 +1,9 @@
+
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py"]  # Experimental crates with incomplete API implementations
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py"]
+
 default-members = ["terraphim_server"]
 
 [workspace.package]
@@ -23,6 +25,8 @@ thiserror = "1.0"
 anyhow = "1.0"
 log = "0.4"
 
+# LLM Router integration
+
 [patch.crates-io]
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 
@@ -32,7 +36,6 @@ lto = false
 codegen-units = 1
 opt-level = 3
 
-# Optimized release profile for production builds (like ripgrep)
 [profile.release-lto]
 inherits = "release"
 lto = true

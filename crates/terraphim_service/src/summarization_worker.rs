@@ -659,6 +659,8 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: ahash::AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         }
     }
 

@@ -38,6 +38,8 @@ async fn test_llm_client_integration() {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
@@ -110,6 +112,8 @@ async fn test_llm_client_error_handling() {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
     role.extra
         .insert("llm_provider".to_string(), serde_json::json!("ollama"));
@@ -147,15 +151,17 @@ async fn test_role_validation() {
         theme: "default".into(),
         kg: None,
         haystacks: vec![],
-        llm_enabled: false,
+        llm_enabled: true,
         llm_api_key: None,
-        llm_model: None,
+        llm_model: Some("gemma3:270m".to_string()),
         llm_auto_summarize: false,
-        llm_chat_enabled: false,
-        llm_chat_system_prompt: None,
-        llm_chat_model: None,
+        llm_chat_enabled: true,
+        llm_chat_system_prompt: Some("You are a helpful assistant.".to_string()),
+        llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     // Should return error for disabled LLM

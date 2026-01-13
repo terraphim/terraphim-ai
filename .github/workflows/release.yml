@@ -71,7 +71,7 @@ jobs:
       - name: Check Cargo version
         id: cargo
         run: |
-          CARGO_VERSION=$(grep -m1 '^version = ' Cargo.toml | sed 's/version = "//; s/"//')
+          CARGO_VERSION=$(cargo metadata --format-version 1 --no-deps 2>/dev/null)
           echo "version=$CARGO_VERSION" >> $GITHUB_OUTPUT
           echo "Cargo version: $CARGO_VERSION"
 
