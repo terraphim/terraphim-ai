@@ -639,6 +639,7 @@ The system uses role-based configuration with multiple backends:
 - **Atlassian**: Confluence and Jira integration
 - **Discourse**: Forum integration
 - **JMAP**: Email integration
+- **Quickwit**: Cloud-native search engine for log and observability data with hybrid index discovery
 
 ## Firecracker Integration
 
@@ -945,7 +946,7 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
   "haystacks": [
     {
       "name": "Haystack Name",
-      "service": "Ripgrep|AtomicServer|QueryRs|MCP",
+      "service": "Ripgrep|AtomicServer|QueryRs|MCP|Quickwit",
       "extra_parameters": {}
     }
   ]
