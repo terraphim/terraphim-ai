@@ -271,16 +271,13 @@ TERRAPHIM_EOF"#,
                     if stdout_buf.len() + line.len() + 1 > ctx.max_output_bytes as usize {
                         // Stream to file
                         if output_file_path.is_none() {
-                            let file_path = self.output_dir.join(format!(
-                                "output_{}.txt",
-                                ctx.session_id
-                            ));
+                            let file_path = self
+                                .output_dir
+                                .join(format!("output_{}.txt", ctx.session_id));
                             tokio::fs::create_dir_all(&self.output_dir).await.ok();
 
                             // Write existing buffer to file
-                            if let Ok(mut file) =
-                                tokio::fs::File::create(&file_path).await
-                            {
+                            if let Ok(mut file) = tokio::fs::File::create(&file_path).await {
                                 file.write_all(stdout_buf.as_bytes()).await.ok();
                                 file.write_all(b"\n").await.ok();
                                 file.write_all(line.as_bytes()).await.ok();
@@ -292,10 +289,8 @@ TERRAPHIM_EOF"#,
                             stdout_buf.push_str("\n[Output truncated - see file]");
                         } else if let Some(ref path) = output_file_path {
                             // Append to existing file
-                            if let Ok(mut file) = tokio::fs::OpenOptions::new()
-                                .append(true)
-                                .open(path)
-                                .await
+                            if let Ok(mut file) =
+                                tokio::fs::OpenOptions::new().append(true).open(path).await
                             {
                                 file.write_all(line.as_bytes()).await.ok();
                                 file.write_all(b"\n").await.ok();

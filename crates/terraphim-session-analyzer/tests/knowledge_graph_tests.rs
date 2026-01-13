@@ -3,11 +3,11 @@
 //! Tests the complete learning lifecycle: observation -> voting -> promotion -> caching
 
 use anyhow::Result;
-use claude_log_analyzer::models::ToolCategory;
-use claude_log_analyzer::patterns::knowledge_graph::{
+use tempfile::TempDir;
+use terraphim_session_analyzer::models::ToolCategory;
+use terraphim_session_analyzer::patterns::knowledge_graph::{
     infer_category_from_contexts, PatternLearner,
 };
-use tempfile::TempDir;
 
 #[test]
 fn test_complete_learning_lifecycle() -> Result<()> {

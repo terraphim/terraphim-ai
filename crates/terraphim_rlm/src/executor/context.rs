@@ -350,10 +350,8 @@ mod tests {
         assert!(result.is_valid);
         assert_eq!(result.matched_terms.len(), 2);
 
-        let invalid = ValidationResult::invalid(
-            vec!["python".to_string()],
-            vec!["foobar".to_string()],
-        );
+        let invalid =
+            ValidationResult::invalid(vec!["python".to_string()], vec!["foobar".to_string()]);
         assert!(!invalid.is_valid);
         assert_eq!(invalid.unknown_terms.len(), 1);
     }

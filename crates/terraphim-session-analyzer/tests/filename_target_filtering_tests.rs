@@ -9,12 +9,12 @@
 //! - Empty results for non-matching files
 
 use anyhow::Result;
-use claude_log_analyzer::{Analyzer, Reporter};
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
 use tempfile::{tempdir, NamedTempFile};
+use terraphim_session_analyzer::{Analyzer, Reporter};
 
 /// Test data directory path
 #[allow(dead_code)]

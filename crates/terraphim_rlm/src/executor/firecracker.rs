@@ -217,8 +217,7 @@ impl FirecrackerExecutor {
                 match result {
                     Ok(mut res) => {
                         // Add VM metadata
-                        res.metadata
-                            .insert("vm_ip".to_string(), ip.clone());
+                        res.metadata.insert("vm_ip".to_string(), ip.clone());
                         res.metadata
                             .insert("backend".to_string(), "firecracker".to_string());
                         Ok(res)

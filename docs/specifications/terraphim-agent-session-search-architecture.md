@@ -65,13 +65,13 @@ This document describes the technical architecture for the Session Search and Ro
 
 ### Implementation Status
 
-The architecture has been implemented using a **feature-gated approach** with `claude-log-analyzer` (CLA) integrated as a git subtree. This allows `terraphim_sessions` to work standalone while gaining enhanced capabilities when CLA is enabled.
+The architecture has been implemented using a **feature-gated approach** with `terraphim-session-analyzer` (CLA) integrated as a git subtree. This allows `terraphim_sessions` to work standalone while gaining enhanced capabilities when CLA is enabled.
 
 ### New Modules
 
 ```
 crates/
-├── claude-log-analyzer/                # ADDED: Git subtree integration
+├── terraphim-session-analyzer/                # ADDED: Git subtree integration
 │   ├── src/
 │   │   ├── lib.rs                      # Core CLA exports
 │   │   ├── parser.rs                   # Claude JSONL parsing
@@ -107,7 +107,7 @@ crates/
 │   │   │   ├── mod.rs                  # SessionConnector trait
 │   │   │   └── native.rs               # NativeClaudeConnector (no CLA)
 │   │   ├── service.rs                  # SessionService facade
-│   │   └── cla/                        # #[cfg(feature = "claude-log-analyzer")]
+│   │   └── cla/                        # #[cfg(feature = "terraphim-session-analyzer")]
 │   │       ├── mod.rs                  # CLA integration layer
 │   │       └── connector.rs            # ClaClaudeConnector, ClaCursorConnector
 ```
@@ -118,8 +118,8 @@ crates/
 # crates/terraphim_sessions/Cargo.toml
 [features]
 default = []
-claude-log-analyzer = ["dep:claude-log-analyzer"]
-cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
+terraphim-session-analyzer = ["dep:terraphim-session-analyzer"]
+cla-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors"]
 enrichment = ["terraphim_automata", "terraphim_rolegraph"]
 full = ["cla-full", "enrichment"]
 ```
@@ -127,7 +127,7 @@ full = ["cla-full", "enrichment"]
 | Feature | Enables | Use Case |
 |---------|---------|----------|
 | (none) | `NativeClaudeConnector` only | Minimal JSONL parsing |
-| `claude-log-analyzer` | CLA core + Claude connector | Full Claude analysis |
+| `terraphim-session-analyzer` | CLA core + Claude connector | Full Claude analysis |
 | `cla-full` | CLA + Cursor SQLite | Multi-agent support |
 | `enrichment` | Knowledge graph integration | Concept detection |
 | `full` | Everything | Production deployment |

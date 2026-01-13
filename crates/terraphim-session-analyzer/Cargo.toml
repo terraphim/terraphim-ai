@@ -1,18 +1,22 @@
 [package]
-name = "claude-log-analyzer"
-version = "1.3.0"
+name = "terraphim-session-analyzer"
+version = "1.4.10"
 edition = "2021"
 authors = ["Zestic AI Development Team"]
-description = "Analyze Claude session logs to identify AI agent usage patterns"
+description = "Analyze AI coding assistant session logs to identify agent usage patterns"
 documentation = "https://terraphim.ai"
 homepage = "https://terraphim.ai"
 repository = "https://github.com/terraphim/terraphim-ai"
 license = "Apache-2.0"
-keywords = ["claude", "ai", "session-analysis", "log-analysis", "agent"]
+keywords = ["terraphim", "ai", "session-analysis", "log-analysis", "agent"]
 readme = "../../README.md"
 
 [[bin]]
 name = "cla"
+path = "src/main.rs"
+
+[[bin]]
+name = "tsa"
 path = "src/main.rs"
 
 [features]

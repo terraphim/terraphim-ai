@@ -53,8 +53,8 @@ impl KnowledgeGraphSearch {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use claude_log_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch};
-    /// use claude_log_analyzer::kg::query::QueryNode;
+    /// use terraphim_session_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch};
+    /// use terraphim_session_analyzer::kg::query::QueryNode;
     ///
     /// let builder = KnowledgeGraphBuilder::new();
     /// let search = KnowledgeGraphSearch::new(builder);

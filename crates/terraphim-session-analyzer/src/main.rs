@@ -608,9 +608,9 @@ fn watch_sessions(path: Option<&str>, cli: &Cli, interval: u64) -> Result<()> {
 
 /// Convert local ToolCategory to library ToolCategory
 #[cfg(feature = "terraphim")]
-fn convert_tool_category(cat: &models::ToolCategory) -> claude_log_analyzer::ToolCategory {
-    use claude_log_analyzer::ToolCategory as Lib;
+fn convert_tool_category(cat: &models::ToolCategory) -> terraphim_session_analyzer::ToolCategory {
     use models::ToolCategory as Local;
+    use terraphim_session_analyzer::ToolCategory as Lib;
     match cat {
         Local::PackageManager => Lib::PackageManager,
         Local::BuildTool => Lib::BuildTool,
@@ -625,8 +625,10 @@ fn convert_tool_category(cat: &models::ToolCategory) -> claude_log_analyzer::Too
 
 /// Convert local ToolInvocation to library ToolInvocation for KG module
 #[cfg(feature = "terraphim")]
-fn convert_to_lib_invocation(inv: &models::ToolInvocation) -> claude_log_analyzer::ToolInvocation {
-    claude_log_analyzer::ToolInvocation {
+fn convert_to_lib_invocation(
+    inv: &models::ToolInvocation,
+) -> terraphim_session_analyzer::ToolInvocation {
+    terraphim_session_analyzer::ToolInvocation {
         timestamp: inv.timestamp,
         tool_name: inv.tool_name.clone(),
         tool_category: convert_tool_category(&inv.tool_category),
@@ -883,14 +885,16 @@ fn analyze_tools(
     // Handle KG search if provided
     #[cfg(feature = "terraphim")]
     if let Some(query_str) = kg_search_query {
-        use claude_log_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch, QueryParser};
+        use terraphim_session_analyzer::kg::{
+            KnowledgeGraphBuilder, KnowledgeGraphSearch, QueryParser,
+        };
 
         // Parse the query
         let query_ast = QueryParser::parse(query_str)
             .with_context(|| format!("Failed to parse query: {query_str}"))?;
 
         // Convert to library types for KG module
-        let lib_invocations: Vec<claude_log_analyzer::ToolInvocation> = all_invocations
+        let lib_invocations: Vec<terraphim_session_analyzer::ToolInvocation> = all_invocations
             .iter()
             .map(convert_to_lib_invocation)
             .collect();

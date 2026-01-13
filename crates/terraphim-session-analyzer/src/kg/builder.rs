@@ -36,8 +36,8 @@ impl KnowledgeGraphBuilder {
     /// # Examples
     ///
     /// ```rust,ignore
-    /// use claude_log_analyzer::kg::KnowledgeGraphBuilder;
-    /// use claude_log_analyzer::models::ToolInvocation;
+    /// use terraphim_session_analyzer::kg::KnowledgeGraphBuilder;
+    /// use terraphim_session_analyzer::models::ToolInvocation;
     ///
     /// let tools = vec![/* tool invocations */];
     /// let builder = KnowledgeGraphBuilder::from_tool_invocations(&tools);
