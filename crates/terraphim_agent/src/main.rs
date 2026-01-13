@@ -282,7 +282,7 @@ fn main() -> Result<()> {
             if !atty::is(Stream::Stdout) {
                 eprintln!("Error: Interactive mode requires a terminal.");
                 eprintln!("Issue: stdout is not a TTY (not a terminal).");
-                eprintln!("");
+                eprintln!();
                 eprintln!("For non-interactive use, try:");
                 eprintln!("  1. REPL mode: terraphim-agent repl");
                 eprintln!("  2. Command mode: terraphim-agent search \"query\"");
@@ -293,7 +293,7 @@ fn main() -> Result<()> {
             if !atty::is(Stream::Stdin) {
                 eprintln!("Error: Interactive mode requires a terminal.");
                 eprintln!("Issue: stdin is not a TTY (not a terminal).");
-                eprintln!("");
+                eprintln!();
                 eprintln!("For non-interactive use, try:");
                 eprintln!("  1. REPL mode: terraphim-agent repl");
                 eprintln!("  2. Command mode: terraphim-agent search \"query\"");
