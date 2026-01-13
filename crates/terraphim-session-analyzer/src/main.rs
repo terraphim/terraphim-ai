@@ -29,7 +29,7 @@ Terraphim Session Analyzer (tsa/cla) - Analyze AI coding assistant session logs
 
 Supported AI assistants:
   - Claude Code    ($HOME/.claude/projects/)
-  - OpenCode       ($HOME/.opencode/)
+  - OpenCode       ($HOME/.local/state/opencode/)
   - Cursor         ($HOME/.cursor/)
   - Aider          ($HOME/.aider.chat.history.md)
   - Codex          ($HOME/.codex/)
