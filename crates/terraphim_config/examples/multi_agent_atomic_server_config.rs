@@ -88,6 +88,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(32768),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     let config = ConfigBuilder::new()

@@ -3443,388 +3443,288 @@ sign-and-notarize:
 
 ---
 
-## CI/CD Release Workflow Debugging
+## LLM Router Integration - 2026-01-04
 
-### Date: 2026-01-01 - v1.3.0 Release Fixes
+### Context: Multi-Phase Feature Implementation with Disciplined Development
 
-#### Lesson 1: Verify Which Workflow File Is Actually Running
+**Feature:** LLM Router with dual-mode support (Library/Service) for intelligent LLM selection across multiple providers.
 
-**Context**: Fixed cross-compilation feature flags in `release.yml` but builds kept failing with the same error.
+**Architecture:**
+- **Library Mode**: In-process routing via `RoutedLlmClient` wrapping static LLM client
+- **Service Mode**: HTTP proxy client (`ProxyLlmClient`) forwarding to external `terraphim-llm-proxy` service
 
-**Discovery**: The project has multiple release workflows:
-- `release.yml`
-- `release-comprehensive.yml` (name: "Comprehensive Release")
-- `release-minimal.yml`
+### Pattern 1: Feature-Gated Module Organization
 
-The tag trigger was using `release-comprehensive.yml`, not `release.yml`.
+**What We Learned:**
+- Feature flags (`#[cfg(feature = "llm_router")]`) keep production builds clean
+- Module declarations must come BEFORE imports in Rust
+- Submodules need proper parent module declarations
 
-**How to Check**:
-```bash
-# Find which workflow is running
-gh run view <run_id> --json workflowName
-
-# Find workflow file by name
-grep -l "name: Comprehensive Release" .github/workflows/*.yml
-```
-
-**Lesson**: Always verify the workflow name matches the file you're editing. Use `gh run view --json workflowName` to confirm.
-
-#### Lesson 2: Cargo Features Don't Propagate to Dependencies
-
-**Context**: Cross-compilation using `--no-default-features --features memory,dashmap` on `terraphim_agent`.
-
-**Problem**: Error "the package 'terraphim_agent' does not contain these features: dashmap, memory"
-
-**Root Cause**: `dashmap` and `memory` are features of `terraphim_persistence`, a dependency of `terraphim_agent`. Cargo cannot pass features to transitive dependencies this way.
-
-**Solution**: Either:
-1. Don't pass feature flags to packages that don't define them
-2. Use workspace-level feature propagation if needed
-3. For cross-compilation, use the default features (cross images typically have required libs)
-
-**Anti-pattern**:
-```yaml
-# BAD: Features don't exist on terraphim_agent
-cross build -p terraphim_agent --no-default-features --features memory,dashmap
-
-# GOOD: Use default features or define features on the target package
-cross build -p terraphim_agent
-```
-
-#### Lesson 3: GitHub Actions Workflow Caching on Tags
-
-**Context**: Deleted and recreated v1.3.0 tag with fixed workflow, but CI ran the old workflow commands.
-
-**Discovery**: When a tag is pushed, GitHub Actions reads the workflow file at that moment. If you:
-1. Push tag pointing to commit A
-2. Force-push tag to commit B
-The workflow may use the workflow file from commit A but checkout commit B.
-
-**Symptoms**:
-- `headSha` shows correct commit
-- `HEAD is now at <correct-sha>` in checkout logs
-- But workflow commands contain old code
-
-**Solution**:
-```bash
-# Delete tag completely
-git tag -d v1.3.0
-git push origin :refs/tags/v1.3.0
-
-# Push the fixed main branch
-git push origin main
-
-# Wait a moment for GitHub to process
-sleep 5
-
-# Create fresh tag
-git tag v1.3.0
-git push origin v1.3.0
-```
-
-#### Lesson 4: rustls vs native-tls for Cross-Compilation
-
-**Context**: Cross-builds failing with "Could not find directory of OpenSSL installation"
-
-**Problem**: `reqwest` with default features uses `native-tls` which requires OpenSSL development libraries, which aren't always available in cross-compilation containers.
-
-**Solution**: Use `rustls-tls` feature instead:
-```toml
-# Cargo.toml
-reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
-
-# For self_update crate
-self_update = { version = "0.42", default-features = false, features = ["archive-tar", "compression-flate2", "rustls"] }
-```
-
-**Affected Crates in This Project**:
-- haystack_grepapp, haystack_discourse, haystack_atlassian, haystack_jmap
-- terraphim_automata, terraphim_github_runner, terraphim_github_runner_server
-- terraphim_multi_agent, terraphim_update
-
-#### Lesson 5: Integration Tests Need Correct Working Directory
-
-**Context**: `terraphim_agent` extract tests failing with "Failed to build thesaurus from local KG"
-
-**Problem**: Tests run `cargo run` commands that need access to `docs/src/kg/` which is a relative path from workspace root.
-
-**Solution**: Set working directory explicitly in test helper:
+**Implementation:**
 ```rust
-fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
-    let workspace_root = get_workspace_root();
-    let mut cmd = Command::new("cargo");
-    cmd.args(["run", "-p", "terraphim_agent", "--", "extract"])
-        .args(args)
-        .current_dir(&workspace_root);  // Critical!
-    cmd.output()
-}
+// In llm.rs - order matters!
+#[cfg(feature = "llm_router")]
+mod routed_adapter;
+#[cfg(feature = "llm_router")]
+mod router_config;
+#[cfg(feature = "llm_router")]
+mod proxy_client;
 
-fn get_workspace_root() -> PathBuf {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .map(|p| p.to_path_buf())
-        .unwrap_or(manifest_dir)
-}
+#[cfg(feature = "llm_router")]
+use crate::llm::routed_adapter::RoutedLlmClient;
+#[cfg(feature = "llm_router")]
+use crate::llm::proxy_client::ProxyLlmClient;
 ```
 
-**Lesson**: When integration tests spawn processes that use relative paths, always set `current_dir` to the expected working directory.
+**When to Apply:** Any optional feature with significant code volume.
 
-## Git Safety Guard Implementation - 2026-01-02
+### Pattern 2: Configuration Re-export for Public API
 
-### Pattern 1: Rust regex Crate Doesn't Support Look-ahead
+**What We Learned:**
+- Private imports in submodules need `pub use` to become public
+- `RouterMode` was imported privately in `router_config.rs` causing "private enum" errors
+- Solution: Change `use` to `pub use` in the re-export module
 
-**Context**: Implementing pattern matching to block `git push --force` but allow `git push --force-with-lease`
-
-**Problem**: Initial pattern `git\s+push\s+.*--force(?!-with-lease)` failed with:
-```
-regex parse error: look-around, including look-ahead and look-behind, is not supported
-```
-
-**Solution**: Use allowlist patterns instead of negative look-ahead:
+**Implementation:**
 ```rust
-// Blocklist pattern (matches all --force)
-DestructivePattern::new(r"git\s+push\s+.*--force", "Force push can destroy remote history")
-
-// Allowlist pattern (checked FIRST)
-SafePattern::new(r"git\s+push\s+.*--force-with-lease")
-
-// Check order: allowlist first, then blocklist
-fn check(&self, command: &str) -> GuardResult {
-    if self.is_safe(command) { return GuardResult::allow(); }
-    for pattern in &self.blocklist { /* ... */ }
-}
+// router_config.rs - use becomes pub use
+pub use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
 ```
 
-**When to Apply**: Any regex-based filtering where you need "match X but not Y" semantics in Rust
+**When to Apply:** Configuration types that need to be accessible from parent modules.
 
-### Pattern 2: Handle Stateless Commands Before Expensive Initialization
+### Pattern 3: Test File Updates for Struct Schema Changes
 
-**Context**: `terraphim-agent guard` command was slow because it initialized TuiService (knowledge graphs, config, persistence)
+**What We Learned:**
+- Adding fields to a struct requires updating ALL test initializations
+- Use systematic tools (Python scripts, sed) for bulk updates
+- Risk of duplicates when running fix scripts multiple times
+- Better to restore files and re-run once cleanly
 
-**Problem**: All commands went through `run_offline_command()` which called `TuiService::new().await?` at the top, even for commands that don't need it
+**Implementation:**
+```python
+# Pattern for bulk Role struct updates
+def fix_role_fields(content):
+    pattern = r'(extra:\s*(?:ahash::)?AHashMap::new\(\),)'
+    replacement = r'\1\n        llm_router_enabled: false,\n        llm_router_config: None,'
+    return re.sub(pattern, replacement, content)
+```
 
-**Solution**: Check for stateless commands at the start of the function:
+**Anti-pattern:** Running fix scripts multiple times creates duplicate field declarations.
+
+**When to Apply:** Any struct schema change affecting test files across multiple crates.
+
+### Pattern 4: ServiceError Variant Selection
+
+**What We Learned:**
+- `ServiceError::Network` and `ServiceError::Parsing` don't exist in this crate
+- Available variants: `Middleware`, `OpenDal`, `Persistence`, `Config`, `OpenRouter`, `Common`
+- Use `ServiceError::Config(String)` for proxy connection failures
+
+**Implementation:**
 ```rust
-async fn run_offline_command(command: Command) -> Result<()> {
-    // Handle stateless commands FIRST
-    if let Command::Guard { command, json, fail_open } = &command {
-        let guard = guard_patterns::CommandGuard::new();
-        let result = guard.check(&input_command);
-        return Ok(());
+// Before (doesn't compile)
+return Err(crate::ServiceError::Network(format!("Failed to connect: {}", e)));
+
+// After
+return Err(crate::ServiceError::Config(format!("Failed to connect: {}", e)));
+```
+
+**When to Apply:** Error handling when adding new error scenarios.
+
+### Pattern 5: Submodule Import Paths in Rust
+
+**What We Learned:**
+- `proxy_client.rs` is a submodule of `llm.rs`
+- Use `super::` to access parent module items (not `super::llm::`)
+- Parent module types are directly accessible: `LlmClient`, `SummarizeOptions`, `ChatOptions`
+
+**Implementation:**
+```rust
+// proxy_client.rs - correct imports
+use super::LlmClient;
+use super::SummarizeOptions;
+use super::ChatOptions;
+
+// NOT super::llm::LlmClient
+```
+
+**When to Apply:** Any nested module structure in Rust.
+
+### Pattern 6: JSON Serialization Test Assertions
+
+**What We Learned:**
+- `serde_json::to_string()` doesn't add spaces after colons
+- `"model":"auto"` not `"model": "auto"`
+- Test assertions must match actual serialization format
+
+**Implementation:**
+```rust
+// Before (fails)
+assert!(json_str.contains("\"model\": \"auto\""));
+
+// After (passes)
+assert!(json_str.contains("\"model\":\"auto\""));
+```
+
+**When to Apply:** Any tests checking JSON string format.
+
+### Pattern 7: Default Trait for Configuration Structs
+
+**What We Learned:**
+- `#[derive(Default)]` conflicts with manual `impl Default`
+- Must choose one approach
+- Manual implementation allows setting custom defaults (like port 3456)
+
+**Implementation:**
+```rust
+// Before - derive conflict
+#[derive(Debug, Clone, Default)]
+pub struct ProxyClientConfig { ... }
+
+// After - manual impl without derive
+#[derive(Debug, Clone)]
+pub struct ProxyClientConfig { ... }
+
+impl Default for ProxyClientConfig {
+    fn default() -> Self {
+        Self {
+            base_url: "http://127.0.0.1:3456".to_string(),
+            timeout_secs: 60,
+            log_requests: false,
+        }
     }
-
-    // Expensive initialization only for commands that need it
-    let service = TuiService::new().await?;
-    match command { /* ... */ }
 }
 ```
 
-**Performance Impact**: Guard command now executes in milliseconds instead of seconds
+**When to Apply:** Configuration structs needing custom defaults.
 
-### Pattern 3: Claude Code Hook Output Format
+### Pattern 8: Mode-Based Client Selection
 
-**Context**: Creating PreToolUse hook to block dangerous commands
+**What We Learned:**
+- Use Rust `match` for conditional client creation based on config
+- Library mode: wrap existing client with routing adapter
+- Service mode: create HTTP proxy client
 
-**Problem**: Initial approach of returning non-zero exit codes for blocked commands didn't work - Claude Code treats non-zero exits as hook failures, not blocks
+**Implementation:**
+```rust
+match router_config.mode {
+    RouterMode::Library => {
+        if let Some(static_client) = build_ollama_from_role(role) {
+            return Some(Arc::new(RoutedLlmClient::new(static_client, router_config)));
+        }
+    }
+    RouterMode::Service => {
+        let proxy_url = router_config.get_proxy_url();
+        let proxy_config = ProxyClientConfig {
+            base_url: proxy_url,
+            timeout_secs: 60,
+            log_requests: true,
+        };
+        return Some(Arc::new(ProxyLlmClient::new(proxy_config)));
+    }
+}
+```
 
-**Solution**: Always exit 0, use JSON output structure to signal block:
-- Empty output = allow command to proceed
-- JSON with `hookSpecificOutput.permissionDecision: "deny"` = block command
-- Non-zero exit = hook failure (logged, command may still proceed)
+**When to Apply:** Feature toggle patterns with different implementations per toggle.
 
-**Key Insight**: The hook system distinguishes between "hook says no" (JSON deny) vs "hook is broken" (non-zero exit)
+### Session Metrics
 
-### Pattern 4: Architect Review Before Building New Infrastructure
+| Metric | Value |
+|--------|-------|
+| Implementation Steps | 5 |
+| Files Modified | 24 |
+| Test Files Updated | 14 |
+| Lines Added | ~200 |
+| Test Results | 118 passed, 5 unrelated failures |
 
-**Context**: Needed to decide whether to build new guard_patterns.rs or extend existing DangerousPatternHook
+### Critical Success Factors
 
-**Problem**: Multiple existing components could potentially handle guard functionality
-
-**Evaluation Results**:
-1. CommandValidator - No: Only string contains/starts_with, not regex
-2. DangerousPatternHook - Partial: Could extend but needs allowlist support added
-3. Knowledge graph - No: Aho-Corasick matches literals only, not regex patterns
-
-**Decision**: New implementation now, documented design plan for future consolidation to terraphim_hooks crate
-
-**When to Apply**: Before building new infrastructure, use architect agent to evaluate existing options formally
-
-### Pattern 5: Fail-Open Semantics for Safety Hooks
-
-**Context**: Guard hook needs to work even when terraphim-agent isn't installed
-
-**Decision**: Fail-open - if hook fails for any reason (agent not found, parse error, etc.), allow command to proceed
-
-**Rationale**:
-- Fail-closed would break all Bash commands if hook has any bug
-- Guard is a safety net for accidents, not a security boundary
-- Real defense is still documentation in AGENTS.md
-- Prevents accidental destructive commands while maintaining usability
-
-**Trade-off**: Sophisticated bypass possible, but protects against honest mistakes
+1. **Incremental validation**: Run tests after each fix to catch issues early
+2. **Systematic updates**: Use scripts for bulk file updates, avoid manual editing
+3. **Clean restores**: When scripts create duplicates, restore and re-run cleanly
+4. **Build verification**: Run `cargo build --features llm_router` before tests
+5. **Pre-existing failures**: Document unrelated test failures separately
 
 ---
 
-## Issue #394: Case Preservation and URL Protection in Text Replacement
+## LLM Router Integration: Test Management Patterns
 
-### Date: 2026-01-03 - Disciplined Development for Knowledge Graph Replacement
+### Date: 2026-01-13 - CI-Compatible Integration Tests
 
-### Pattern 1: Separate Storage from Display in Normalized Data Structures
+#### Pattern 1: Ignoring Tests for CI with Local Execution
 
-**Context**: Text replacement needed case-insensitive matching but case-preserved output.
+**Context**: Integration test `test_ai_summarization_uniqueness` requires running Ollama and a free port 8000, which CI environments don't provide.
 
 **What We Learned**:
-- **Dual-purpose fields create constraints**: Using `NormalizedTermValue` for both matching (lowercase) and display (original case) forces compromises
-- **Optional display field pattern**: Add `display_value: Option<String>` alongside normalized `value`
-- **Fallback semantics**: `display()` method with fallback to `value` ensures backward compatibility
-- **Serialization strategy**: Use `#[serde(default, skip_serializing_if = "Option::is_none")]` for graceful migration
+- **Use `#[ignore = "message"]`**: Provides clear reason in test output
+- **Document run command**: Add comment showing how to run locally
+- **Keep tests valuable**: Don't delete tests just because CI can't run them
 
 **Implementation**:
 ```rust
-// Before: Single field for both purposes
-pub struct NormalizedTerm {
-    pub value: NormalizedTermValue,  // lowercase only
-}
-
-// After: Separate fields with clear purposes
-pub struct NormalizedTerm {
-    pub value: NormalizedTermValue,      // lowercase (for matching)
-    pub display_value: Option<String>,   // original case (for output)
-}
-
-// Accessor with fallback
-pub fn display(&self) -> &str {
-    self.display_value.as_deref().unwrap_or_else(|| self.value.as_str())
+/// Test that validates AI summaries are unique per document and role
+/// Run locally with: cargo test -p terraphim_middleware test_name -- --ignored
+#[tokio::test]
+#[ignore = "Requires running Ollama and configured haystacks - run locally with --ignored"]
+async fn test_ai_summarization_uniqueness() {
+    // Test implementation...
 }
 ```
 
-**When to Apply**: Any normalized/indexed data structure that needs both case-insensitive lookup and case-preserved display
+**When to Apply**: Any test requiring external services (databases, LLMs, APIs, specific ports)
 
-### Pattern 2: URL Protection via Masking-Replacement-Restoration
+**Anti-pattern to Avoid**: Deleting tests because they don't work in CI
 
-**Context**: Text replacement was corrupting URLs by matching text inside them.
+#### Pattern 2: Workspace Path Resolution in Tests
+
+**Context**: Test needed to find workspace root to build and run server binary.
 
 **What We Learned**:
-- **Pre-processing beats complex matching**: Mask special contexts before replacement, not during
-- **Regex once, reuse many**: Use `LazyLock` for compiled regex patterns
-- **Placeholder isolation**: Use null bytes (`\x00`) in placeholders to avoid conflicts with normal text
-- **Process order matters**: Markdown links before standalone URLs (nested structures first)
+- **Don't use "."**: Current directory varies based on how test is run
+- **Use `CARGO_MANIFEST_DIR`**: Compile-time constant, always correct
+- **Navigate up from crate dir**: `crate/tests/` -> `crate/` -> `workspace/`
 
-**Implementation Flow**:
-```
-Input: "Visit [Claude](https://claude.ai)"
-  ↓ mask_urls()
-Masked: "Visit [Claude](⌀URL_PLACEHOLDER_0⌀)"
-  ↓ replace_matches()
-Replaced: "Visit [Terraphim](⌀URL_PLACEHOLDER_0⌀)"
-  ↓ restore_urls()
-Output: "Visit [Terraphim](https://claude.ai)"
-```
-
-**Anti-pattern Avoided**: Don't try to add URL awareness to Aho-Corasick - it's optimized for speed, not context
-
-### Pattern 3: Regex Escape Sequences in Character Classes
-
-**Context**: LazyLock regex panicked with "invalid escape sequence" error.
-
-**What We Learned**:
-- **Character class escapes differ**: `\>` is NOT valid in `[...]`, use literal `>` instead
-- **Error messages point to syntax**: "error: invalid escape sequence found in character class"
-- **Valid in class**: `\s`, `\d`, `\w`, `\-` (at start/end)
-- **Invalid in class**: `\>`, `\<`, `\b` (word boundary markers)
-
-**Fix**:
+**Implementation**:
 ```rust
-// WRONG: Invalid escape in character class
-Regex::new(r"[^\s\)\]\>]+")  // \> is invalid
+// WRONG: Unreliable, depends on cwd
+let workspace = PathBuf::from(".");
 
-// RIGHT: No escape needed for >
-Regex::new(r"[^\s\)\]>]+")   // Plain > works
+// CORRECT: Always works
+let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .parent() // crates/
+    .and_then(|p| p.parent()) // workspace root
+    .map(|p| p.to_path_buf())
+    .unwrap_or_else(|| std::path::PathBuf::from("."));
 ```
 
-**When to Apply**: Any regex pattern with character classes, especially when porting from other regex engines
+**When to Apply**: Any test that needs to reference workspace-level paths (configs, binaries, fixtures)
 
-### Pattern 4: Disciplined Development Phases Prevent Scope Creep
+#### Pattern 3: Cargo Build Commands for Workspace Members
 
-**Context**: Issue #394 mentioned three problems: case, URLs, and compound terms.
-
-**What We Learned**:
-- **Research phase surfaces scope decisions**: Identified compound terms as separate concern early
-- **Design phase forces explicit choices**: Documented decision to defer word boundaries to #395
-- **Implementation stays aligned**: No surprise scope additions during coding
-- **Create follow-up issues immediately**: Don't leave deferred work undocumented
-
-**Process**:
-1. Research: Identify all problems + dependencies
-2. Design: Decide what's IN scope vs OUT scope
-3. Create issues for OUT scope items immediately (issue #395)
-4. Implementation: Execute IN scope faithfully
-
-**Result**: Clean commit focused on two specific fixes, third enhancement tracked separately
-
-**When to Apply**: Any bug with multiple symptoms or enhancement requests bundled together
-
-### Pattern 5: Struct Literal Updates After Adding Optional Fields
-
-**Context**: Added `display_value: Option<String>` to widely-used `NormalizedTerm` struct.
+**Context**: Test was using wrong cargo command to build server binary.
 
 **What We Learned**:
-- **Compiler finds all sites**: Use `cargo check --workspace --all-targets --message-format=short` to get file:line locations
-- **Update tests last**: Focus on library code first, tests can temporarily fail
-- **Benchmarks count**: Don't forget `benches/` directory (checked by `--all-targets`)
-- **Optional fields still require initialization**: Rust doesn't auto-fill `None` for struct literals
+- **`--bin` is for binaries in current package**: Not for workspace members
+- **`-p <package>` selects workspace member**: Works for both libs and bins
+- **Default-run binary is still built**: No need to specify binary name
 
-**Process**:
+**Implementation**:
 ```bash
-# Find all struct literals
-grep -r "NormalizedTerm {" crates/
+# WRONG: Error "no bin target named 'terraphim_server' in default-run packages"
+cargo build --release --bin terraphim_server
 
-# Build to find missing fields
-cargo check --workspace --all-targets 2>&1 | grep "display_value"
-
-# Fix each occurrence
-# Add: display_value: None,
+# CORRECT: Build the package (includes its default-run binary)
+cargo build --release -p terraphim_server
 ```
 
-**When to Apply**: Adding any new field to a widely-used struct, even if optional
+**When to Apply**: Building any workspace member binary from tests or scripts
 
-### Pattern 6: LazyLock for Thread-Safe Static Regex
+### Session Metrics
 
-**Context**: Need compiled regex accessible from multiple functions/tests without recompilation.
-
-**What We Learned**:
-- **LazyLock is std now**: No external dependency needed (was once_cell)
-- **Poisoning on panic**: If regex compilation panics, LazyLock poisons and all future accesses panic
-- **Test carefully**: Invalid regex patterns poison the static, affecting all tests
-- **Error handling**: Use `.expect()` with clear message for compilation errors
-
-**Implementation**:
-```rust
-use std::sync::LazyLock;
-
-static URL_PATTERN: LazyLock<Regex> = LazyLock::new(|| {
-    Regex::new(r"https?://[^\s\)\]>]+")
-        .expect("URL regex should compile")
-});
-
-// Use in function
-fn mask_urls(text: &str) -> Vec<Match> {
-    URL_PATTERN.find_iter(text).collect()
-}
-```
-
-**When to Apply**: Compiled regex patterns, expensive-to-build static data structures
-
----
-
-### Key Takeaways from This Session
-
-1. **Type design matters**: Separate concerns (matching vs display) at the type level
-2. **Context protection beats complex matching**: Mask special contexts before simple replacement
-3. **Optional fields enable migration**: `Option<T>` with serde defaults allows graceful evolution
-4. **Disciplined phases prevent thrash**: Research → Design → Implementation stays focused
-5. **Create issues for deferred work**: Don't let scope creep, track explicitly
-6. **Regex character classes have different rules**: Invalid escapes poison LazyLock
-7. **WASM verification is critical**: Run `./scripts/build-wasm.sh` before committing changes to automata crate
+| Metric | Value |
+|--------|-------|
+| Test files fixed | 1 |
+| Commits pushed | 2 |
+| Patterns documented | 3 |
+| CI compatibility | Achieved |
