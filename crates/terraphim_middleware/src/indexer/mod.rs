@@ -13,6 +13,7 @@ use crate::haystack::AtomicHaystackIndexer;
 use crate::haystack::GrepAppHaystackIndexer;
 use crate::haystack::{
     ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
+    QuickwitHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -136,6 +137,11 @@ pub async fn search_haystacks(
                     );
                     Index::new()
                 }
+            }
+            ServiceType::Quickwit => {
+                // Search using Quickwit search engine for log and observability data
+                let quickwit = QuickwitHaystackIndexer::default();
+                quickwit.index(needle, haystack).await?
             }
         };
 
