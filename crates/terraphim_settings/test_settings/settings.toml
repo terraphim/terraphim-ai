@@ -7,12 +7,16 @@ type = 'dashmap'
 root = '/tmp/dashmaptest'
 
 [profiles.s3]
-access_key_id = 'test_key'
+type = 's3'
 region = 'us-west-1'
 endpoint = 'http://rpi4node3:8333/'
 secret_access_key = 'test_secret'
-type = 's3'
+access_key_id = 'test_key'
 bucket = 'test'
+
+[profiles.rock]
+type = 'rocksdb'
+datadir = '/tmp/opendal/rocksdb'
 
 [profiles.sled]
 datadir = '/tmp/opendal/sled'
