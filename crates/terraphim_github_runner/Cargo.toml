@@ -27,7 +27,7 @@ anyhow.workspace = true
 log.workspace = true
 
 # Concurrent data structures
-dashmap = "5.5"
+dashmap = "6.1"
 
 # HTTP client for Firecracker API
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
