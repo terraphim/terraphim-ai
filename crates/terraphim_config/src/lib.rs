@@ -273,6 +273,8 @@ pub enum ServiceType {
     GrepApp,
     /// Use AI coding assistant session logs (Claude Code, OpenCode, Cursor, Aider, Codex)
     AiAssistant,
+    /// Use Quickwit search engine for log and observability data indexing
+    Quickwit,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
