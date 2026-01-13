@@ -1,7 +1,7 @@
 //! Native Claude Code connector
 //!
 //! A lightweight parser for Claude Code JSONL session files
-//! that works without the full claude-log-analyzer dependency.
+//! that works without the full terraphim-session-analyzer dependency.
 
 use super::{ConnectorStatus, ImportOptions, SessionConnector};
 use crate::model::{ContentBlock, Message, MessageRole, Session, SessionMetadata};

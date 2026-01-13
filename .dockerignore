@@ -17,7 +17,8 @@ examples/
 # Dependencies and caches
 node_modules/
 target/
-Cargo.lock
+# Note: Cargo.lock is needed for reproducible Docker builds
+# Cargo.lock
 
 # Development and test files
 tests/
@@ -119,7 +120,8 @@ perf.data
 # Rust-specific
 rust-toolchain
 **/*.rs.bk
-Cargo.lock
+# Note: Cargo.lock is needed for reproducible builds in Docker
+# Cargo.lock
 
 # WASM specific
 wasm-pack.log
@@ -130,14 +132,16 @@ pkg/
 src-tauri/target/
 src-tauri/Cargo.lock
 
-# Desktop frontend (handled separately)
-desktop/src/
-desktop/public/
+# Desktop frontend
+# Note: src/ and public/ are needed for frontend builds in Docker
+# desktop/src/
+# desktop/public/
 !desktop/dist/
 desktop/node_modules/
 desktop/.svelte-kit/
 desktop/package-lock.json
-desktop/yarn.lock
+# Note: yarn.lock is needed for reproducible builds
+# desktop/yarn.lock
 
 # Exclude temporary directories from workflows
 .github/workflows/backup/

@@ -110,7 +110,7 @@ impl LogseqService {
 #[cached]
 fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
     let mut thesaurus = Thesaurus::new(name);
-    let mut current_concept: Option<Concept> = None;
+    let mut current_concept: Option<ConceptWithDisplay> = None;
     let mut existing_paths: HashSet<PathBuf> = HashSet::new();
     for message in messages {
         match message {
@@ -123,14 +123,14 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                     continue;
                 }
                 existing_paths.insert(path.clone());
-                let concept = match concept_from_path(path) {
-                    Ok(concept) => concept,
+                let concept_with_display = match concept_from_path(path) {
+                    Ok(c) => c,
                     Err(e) => {
                         log::info!("Failed to get concept from path: {:?}. Skipping", e);
                         continue;
                     }
                 };
-                current_concept = Some(concept);
+                current_concept = Some(concept_with_display);
             }
             Message::Match(message) => {
                 if message.path.is_none() {
@@ -156,11 +156,13 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                     .map(|s| s.trim().to_string())
                     .filter(|s| !s.is_empty())
                     .collect();
-                let concept = match current_concept {
-                    Some(ref concept) => {
-                        let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
-                        thesaurus.insert(concept.value.clone(), nterm.clone());
-                        concept
+                let concept_with_display = match current_concept {
+                    Some(ref cwd) => {
+                        // Create NormalizedTerm with display_value preserving original case
+                        let nterm = NormalizedTerm::new(cwd.concept.id, cwd.concept.value.clone())
+                            .with_display_value(cwd.display_name.clone());
+                        thesaurus.insert(cwd.concept.value.clone(), nterm.clone());
+                        cwd
                     }
                     None => {
                         log::warn!("Error: No concept found. Skipping");
@@ -168,7 +170,12 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
                     }
                 };
                 for synonym in synonyms {
-                    let nterm = NormalizedTerm::new(concept.id, concept.value.clone());
+                    // Synonyms also get the same display_value (the concept's original name)
+                    let nterm = NormalizedTerm::new(
+                        concept_with_display.concept.id,
+                        concept_with_display.concept.value.clone(),
+                    )
+                    .with_display_value(concept_with_display.display_name.clone());
                     thesaurus.insert(NormalizedTermValue::new(synonym), nterm.clone());
                 }
             }
@@ -178,12 +185,23 @@ fn index_inner(name: String, messages: Vec<Message>) -> Thesaurus {
     thesaurus
 }
 
-fn concept_from_path(path: PathBuf) -> Result<Concept> {
+/// A concept with its original display name preserved.
+/// The concept value is normalized (lowercase), but display_name preserves original case.
+struct ConceptWithDisplay {
+    concept: Concept,
+    display_name: String,
+}
+
+fn concept_from_path(path: PathBuf) -> Result<ConceptWithDisplay> {
     let stem = path.file_stem().ok_or(BuilderError::Indexation(format!(
         "No file stem in path {path:?}"
     )))?;
-    let concept_str = stem.to_string_lossy().to_string();
-    Ok(Concept::from(concept_str))
+    let original_name = stem.to_string_lossy().to_string();
+    let concept = Concept::from(original_name.clone());
+    Ok(ConceptWithDisplay {
+        concept,
+        display_name: original_name,
+    })
 }
 
 #[derive(Clone, Debug, Deserialize, PartialEq, Eq, Hash)]

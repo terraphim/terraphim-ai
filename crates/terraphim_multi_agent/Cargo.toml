@@ -22,7 +22,7 @@ anyhow = { workspace = true }
 log = { workspace = true }
 
 # Direct HTTP client approach (like Goose) for LLM communication
-reqwest = { version = "0.12", features = ["json", "stream"] }
+reqwest = { version = "0.12", features = ["json", "stream", "rustls-tls"], default-features = false }
 
 # Multi-provider generative AI client (using terraphim fork with OpenRouter support)
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }

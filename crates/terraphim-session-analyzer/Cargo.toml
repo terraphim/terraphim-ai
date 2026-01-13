@@ -1,0 +1,95 @@
+[package]
+name = "terraphim-session-analyzer"
+version = "1.4.10"
+edition = "2021"
+authors = ["Zestic AI Development Team"]
+description = "Analyze AI coding assistant session logs to identify agent usage patterns"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+license = "Apache-2.0"
+keywords = ["terraphim", "ai", "session-analysis", "log-analysis", "agent"]
+readme = "../../README.md"
+
+[[bin]]
+name = "cla"
+path = "src/main.rs"
+
+[[bin]]
+name = "tsa"
+path = "src/main.rs"
+
+[features]
+default = []
+
+# Optional: Terraphim knowledge graph integration
+terraphim = [
+    "dep:terraphim_automata",
+    "dep:terraphim_types",
+    "dep:terraphim_config",
+]
+
+# Optional: Multi-agent session connectors (Cursor, Aider, etc.)
+connectors = ["dep:rusqlite"]
+
+# All features
+full = ["terraphim", "connectors"]
+
+[dependencies]
+# Core dependencies
+clap = { version = "4.5", features = ["derive", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Time handling (same as charm projects)
+jiff = { version = "0.1", features = ["serde"] }
+
+# Data processing
+regex = "1.10"
+lazy_static = "1.4"
+indexmap = { version = "2.2", features = ["serde"] }
+aho-corasick = "1.1"
+shell-words = "1.1"
+toml = "0.8"
+
+# Terminal UI
+colored = "2.1"
+indicatif = "0.17"
+tabled = "0.15"
+dialoguer = "0.12"
+
+# Parallel processing
+rayon = "1.8"
+
+# File handling
+walkdir = "2.4"
+glob = "0.3"
+home = "0.5"
+
+# Report generation
+handlebars = "5.1"
+csv = "1.3"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Feature-gated Terraphim dependencies (sibling crates in workspace)
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", optional = true }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0", optional = true }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0", optional = true }
+
+# Feature-gated connector dependencies
+rusqlite = { version = "0.32", features = ["bundled"], optional = true }
+
+# Unix-specific for terminal detection
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+criterion = "0.8"
+insta = "1.34"
+tempfile = "3.8"
+proptest = "1.4"

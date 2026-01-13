@@ -4,7 +4,7 @@
 
 Terraphim AI is a privacy-first, locally-running AI assistant featuring multi-agent systems, knowledge graph intelligence, and secure code execution in Firecracker microVMs. The project combines Rust-based backend services with vanilla JavaScript frontends, emphasizing security, performance, and production-ready architecture.
 
-**Current Status**: v1.0.0 RELEASED - Production-ready with comprehensive multi-language package ecosystem
+**Current Status**: v1.4.0 RELEASED - Production-ready with comprehensive multi-language package ecosystem
 **Primary Technologies**: Rust (async/tokio), Svelte/Vanilla JS, Firecracker VMs, OpenRouter/Ollama LLMs, NAPI, PyO3
 **Test Coverage**: 99+ comprehensive tests with 59 passing in main workspace
 
@@ -460,6 +460,17 @@ cd desktop && yarn run check
    - LLM-to-Firecracker integration complete
    - Code intelligence and security validation
    - Multi-language support operational
+
+### Recent Bug Fixes (2026-01-04) ✅
+
+**Issue #394: Empty Pattern Bug in Text Replacement**
+- **Problem**: Empty patterns in thesaurus caused spurious text insertions between every character
+- **Symptom**: `npm install express` → `bun install exmatching...pmatching...`
+- **Root Cause**: Aho-Corasick empty patterns match at every position (index 0, 1, 2, ...)
+- **Fix**: Added `MIN_PATTERN_LENGTH` (2) constant to filter invalid patterns
+- **Files Changed**: `crates/terraphim_automata/src/matcher.rs`
+- **Tests Added**: 6 comprehensive regression tests
+- **PR**: #396
 
 ### In Progress/Pending 🔄
 

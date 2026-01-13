@@ -27,7 +27,7 @@ After implementation:
 
 ### Component Changes
 
-**Query Parser (crates/claude-log-analyzer/src/kg/query.rs)**
+**Query Parser (crates/terraphim-session-analyzer/src/kg/query.rs)**
 - Change from case-insensitive to case-sensitive keyword matching
 - Only exact lowercase "and", "or", "not" are treated as operators
 - All other variations ("AND", "Or", "NOT") become concepts
@@ -44,7 +44,7 @@ After implementation:
 
 | File/Module | Action | Before | After | Dependencies |
 |-------------|--------|--------|-------|--------------|
-| `crates/claude-log-analyzer/src/kg/query.rs:69-76` | Modify | Case-insensitive keyword matching via `to_lowercase()` | Case-sensitive exact match | None |
+| `crates/terraphim-session-analyzer/src/kg/query.rs:69-76` | Modify | Case-insensitive keyword matching via `to_lowercase()` | Case-sensitive exact match | None |
 | `Earthfile:120` | Modify | Missing `terraphim_ai_nodejs` | Include `terraphim_ai_nodejs` in COPY | None |
 | `Earthfile:162` | Modify | Missing `terraphim_ai_nodejs` | Include `terraphim_ai_nodejs` in COPY | None |
 

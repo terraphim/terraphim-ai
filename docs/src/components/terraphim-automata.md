@@ -149,6 +149,35 @@ let html_links = matcher::replace_matches(text, thesaurus, Format::Html)?;
 let markdown_links = matcher::replace_matches(text, thesaurus, Format::Markdown)?;
 ```
 
+### Pattern Validation (Important!)
+
+Both `find_matches` and `replace_matches` automatically filter invalid patterns to prevent issues:
+
+```rust
+/// Minimum pattern length to prevent spurious matches.
+/// Patterns shorter than this are filtered out to avoid:
+/// - Empty patterns matching at every character position
+/// - Single-character patterns causing excessive matches
+const MIN_PATTERN_LENGTH: usize = 2;
+```
+
+**Why this matters**: Empty patterns in Aho-Corasick automata match at every position (index 0, 1, 2, ...), causing spurious text insertions between every character.
+
+**Example of the bug (now fixed)**:
+- Input: `npm install express`
+- With empty pattern: `bun install exmatching...pmatching...` (broken!)
+- With filtering: `bun install express` (correct!)
+
+**Automatic filtering includes**:
+- Empty strings (`""`)
+- Single characters (`"a"`, `"x"`)
+- Whitespace-only strings (`"   "`)
+
+Invalid patterns are logged as warnings for debugging:
+```
+WARN: Skipping invalid pattern: "" (length 0 < 2)
+```
+
 ### Format Options
 ```rust
 pub enum Format {
