@@ -1,16 +1,15 @@
 //! OpenCode Session Connector
 //!
-//! Parses session logs from OpenCode AI coding assistant (`~/.opencode/`).
+//! Parses session logs from OpenCode AI coding assistant.
 //!
 //! ## Format
 //!
-//! OpenCode stores sessions as JSONL files, similar to Claude Code.
-//! Sessions are stored in `~/.opencode/sessions/` with JSONL format.
+//! OpenCode stores prompt history in `~/.local/state/opencode/prompt-history.jsonl`
+//! with entries containing `input`, `parts`, and `mode` fields.
 
 use anyhow::Result;
 use serde::Deserialize;
 use std::path::PathBuf;
-use walkdir::WalkDir;
 
 use super::{
     ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector,
@@ -20,27 +19,18 @@ use super::{
 #[derive(Debug, Default)]
 pub struct OpenCodeConnector;
 
-/// OpenCode session entry (JSONL format)
+/// OpenCode prompt history entry (JSONL format)
 #[derive(Debug, Clone, Deserialize)]
 struct OpenCodeEntry {
-    #[serde(rename = "sessionId", default)]
-    session_id: Option<String>,
+    /// User input prompt
     #[serde(default)]
-    timestamp: Option<String>,
+    input: Option<String>,
+    /// Additional parts (usually empty)
     #[serde(default)]
-    cwd: Option<String>,
+    parts: Vec<serde_json::Value>,
+    /// Mode (e.g., "normal")
     #[serde(default)]
-    message: Option<OpenCodeMessage>,
-    #[serde(rename = "type", default)]
-    #[allow(dead_code)] // Required for deserializing "type" field
-    entry_type: Option<String>,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-struct OpenCodeMessage {
-    role: String,
-    #[serde(default)]
-    content: serde_json::Value,
+    mode: Option<String>,
 }
 
 impl SessionConnector for OpenCodeConnector {
@@ -54,15 +44,15 @@ impl SessionConnector for OpenCodeConnector {
 
     fn detect(&self) -> ConnectorStatus {
         if let Some(path) = self.default_path() {
-            if path.exists() {
-                let count = WalkDir::new(&path)
-                    .into_iter()
-                    .filter_map(|e| e.ok())
-                    .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
-                    .count();
+            let history_file = path.join("prompt-history.jsonl");
+            if history_file.exists() {
+                // Count lines in prompt history as session estimate
+                let count = std::fs::read_to_string(&history_file)
+                    .map(|c| c.lines().filter(|l| !l.trim().is_empty()).count())
+                    .unwrap_or(0);
                 ConnectorStatus::Available {
                     path,
-                    sessions_estimate: Some(count),
+                    sessions_estimate: Some(if count > 0 { 1 } else { 0 }),
                 }
             } else {
                 ConnectorStatus::NotFound
@@ -73,7 +63,8 @@ impl SessionConnector for OpenCodeConnector {
     }
 
     fn default_path(&self) -> Option<PathBuf> {
-        home::home_dir().map(|h| h.join(".opencode"))
+        // OpenCode stores state in ~/.local/state/opencode/
+        home::home_dir().map(|h| h.join(".local").join("state").join("opencode"))
     }
 
     fn import(&self, options: &ImportOptions) -> Result<Vec<NormalizedSession>> {
@@ -83,124 +74,63 @@ impl SessionConnector for OpenCodeConnector {
             .or_else(|| self.default_path())
             .ok_or_else(|| anyhow::anyhow!("No path specified and default not found"))?;
 
-        let mut sessions = Vec::new();
-        let mut session_map: std::collections::HashMap<String, Vec<(String, OpenCodeEntry)>> =
-            std::collections::HashMap::new();
-
-        // Find all JSONL files
-        for entry in WalkDir::new(&path)
-            .into_iter()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "jsonl"))
-        {
-            let file_path = entry.path();
-            if let Ok(content) = std::fs::read_to_string(file_path) {
-                for line in content.lines() {
-                    if line.trim().is_empty() {
-                        continue;
-                    }
-                    if let Ok(entry) = serde_json::from_str::<OpenCodeEntry>(line) {
-                        if let Some(session_id) = &entry.session_id {
-                            session_map
-                                .entry(session_id.clone())
-                                .or_default()
-                                .push((file_path.to_string_lossy().to_string(), entry));
-                        }
-                    }
-                }
-            }
+        let history_file = path.join("prompt-history.jsonl");
+        if !history_file.exists() {
+            return Ok(Vec::new());
         }
 
-        // Convert to normalized sessions
-        for (session_id, entries) in session_map {
-            if let Some(limit) = options.limit {
-                if sessions.len() >= limit {
-                    break;
-                }
+        let content = std::fs::read_to_string(&history_file)?;
+        let mut messages: Vec<NormalizedMessage> = Vec::new();
+
+        for (idx, line) in content.lines().enumerate() {
+            if line.trim().is_empty() {
+                continue;
             }
-
-            let source_path = entries
-                .first()
-                .map(|(p, _)| PathBuf::from(p))
-                .unwrap_or_default();
-
-            let mut messages: Vec<NormalizedMessage> = Vec::new();
-            let mut started_at: Option<jiff::Timestamp> = None;
-            let mut ended_at: Option<jiff::Timestamp> = None;
-            let mut cwd: Option<String> = None;
-
-            for (idx, (_path, entry)) in entries.iter().enumerate() {
-                // Track timestamps
-                if let Some(ts) = &entry.timestamp {
-                    let parsed = parse_timestamp(ts);
-                    if started_at.is_none() {
-                        started_at = parsed;
-                    }
-                    ended_at = parsed;
-                }
-
-                // Track cwd
-                if cwd.is_none() {
-                    cwd = entry.cwd.clone();
-                }
-
-                // Convert message
-                if let Some(msg) = &entry.message {
-                    let content = extract_content(&msg.content);
-                    if !content.is_empty() {
+            if let Ok(entry) = serde_json::from_str::<OpenCodeEntry>(line) {
+                if let Some(input) = entry.input {
+                    if !input.is_empty() {
                         messages.push(NormalizedMessage {
                             idx,
-                            role: msg.role.clone(),
+                            role: "user".to_string(),
                             author: None,
-                            content,
-                            created_at: entry.timestamp.as_ref().and_then(|t| parse_timestamp(t)),
-                            extra: serde_json::Value::Null,
+                            content: input,
+                            created_at: None,
+                            extra: serde_json::json!({
+                                "mode": entry.mode,
+                                "parts": entry.parts,
+                            }),
                         });
                     }
                 }
             }
+        }
 
-            if !messages.is_empty() {
-                sessions.push(NormalizedSession {
-                    source: "opencode".to_string(),
-                    external_id: session_id,
-                    title: cwd.clone(),
-                    source_path,
-                    started_at,
-                    ended_at,
-                    messages,
-                    metadata: serde_json::json!({
-                        "cwd": cwd,
-                    }),
-                });
+        // Apply limit if specified
+        if let Some(limit) = options.limit {
+            if limit > 0 {
+                messages.truncate(limit);
             }
         }
 
-        Ok(sessions)
-    }
-}
+        if messages.is_empty() {
+            return Ok(Vec::new());
+        }
 
-fn parse_timestamp(ts: &str) -> Option<jiff::Timestamp> {
-    // Try ISO 8601 format
-    jiff::Timestamp::strptime("%Y-%m-%dT%H:%M:%S%.fZ", ts)
-        .ok()
-        .or_else(|| jiff::Timestamp::strptime("%Y-%m-%dT%H:%M:%S", ts).ok())
-}
+        // OpenCode stores all prompts in a single file, so we create one session
+        let session = NormalizedSession {
+            source: "opencode".to_string(),
+            external_id: "prompt-history".to_string(),
+            title: Some("OpenCode Prompt History".to_string()),
+            source_path: history_file,
+            started_at: None,
+            ended_at: None,
+            messages,
+            metadata: serde_json::json!({
+                "type": "prompt-history",
+            }),
+        };
 
-fn extract_content(value: &serde_json::Value) -> String {
-    match value {
-        serde_json::Value::String(s) => s.clone(),
-        serde_json::Value::Array(arr) => arr
-            .iter()
-            .filter_map(|item| {
-                item.get("text")
-                    .and_then(|t| t.as_str())
-                    .or_else(|| item.get("content").and_then(|t| t.as_str()))
-                    .map(|text| text.to_string())
-            })
-            .collect::<Vec<_>>()
-            .join("\n"),
-        _ => String::new(),
+        Ok(vec![session])
     }
 }
 
@@ -217,9 +147,22 @@ mod tests {
 
     #[test]
     fn test_parse_entry() {
-        let json = r#"{"sessionId":"test-123","timestamp":"2025-01-15T10:30:00.000Z","cwd":"/home/user/project","message":{"role":"user","content":"Hello"}}"#;
+        let json = r#"{"input":"use ask user tool to ask all questions one by one","parts":[],"mode":"normal"}"#;
         let entry: OpenCodeEntry = serde_json::from_str(json).unwrap();
-        assert_eq!(entry.session_id, Some("test-123".to_string()));
-        assert_eq!(entry.message.unwrap().role, "user");
+        assert_eq!(
+            entry.input,
+            Some("use ask user tool to ask all questions one by one".to_string())
+        );
+        assert_eq!(entry.mode, Some("normal".to_string()));
+        assert!(entry.parts.is_empty());
+    }
+
+    #[test]
+    fn test_default_path() {
+        let connector = OpenCodeConnector;
+        let path = connector.default_path();
+        assert!(path.is_some());
+        let path = path.unwrap();
+        assert!(path.ends_with(".local/state/opencode"));
     }
 }
