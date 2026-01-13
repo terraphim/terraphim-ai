@@ -44,8 +44,6 @@ mod kg_protocol_resolution_test {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
             llm_router_enabled: false,
             llm_router_config: None,
         };
@@ -187,8 +185,6 @@ mod kg_protocol_resolution_test {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
             llm_router_enabled: false,
             llm_router_config: None,
         };

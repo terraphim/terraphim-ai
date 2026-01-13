@@ -4,7 +4,6 @@
 //! terraphim-llm-proxy service running on port 3456. This provides
 //! service mode routing without embedding proxy routing logic in main codebase.
 
-use std::sync::Arc;
 use async_trait::async_trait;
 use serde_json::{json, Value};
 use log::{debug, error, warn};
@@ -23,6 +22,7 @@ pub struct ProxyClientConfig {
     /// Request timeout (default: 60 seconds)
     pub timeout_secs: u64,
     /// Enable request/response logging
+    #[allow(dead_code)]
     pub log_requests: bool,
 }
 
@@ -61,11 +61,13 @@ impl ProxyLlmClient {
     }
 
     /// Check if external proxy mode is active
+    #[allow(dead_code)]
     pub fn is_proxy_mode(&self) -> bool {
         true
     }
 
-    /// Get client name for logging
+    /// Get client name for logging (inherent method for tests)
+    #[allow(dead_code)]
     pub fn name(&self) -> &'static str {
         "external_proxy_llm"
     }
@@ -290,7 +292,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_summarize_request_format() {
-        let client = ProxyLlmClient::new(ProxyClientConfig::default());
+        let _client = ProxyLlmClient::new(ProxyClientConfig::default());
 
         let opts = SummarizeOptions {
             max_length: 500,
@@ -317,14 +319,14 @@ mod tests {
 
     #[tokio::test]
     async fn test_chat_request_format() {
-        let client = ProxyLlmClient::new(ProxyClientConfig::default());
+        let _client = ProxyLlmClient::new(ProxyClientConfig::default());
 
         let messages = vec![
             json!({"role": "system", "content": "You are helpful"}),
             json!({"role": "user", "content": "Hello"}),
         ];
 
-        let opts = ChatOptions {
+        let _opts = ChatOptions {
             temperature: Some(0.5),
             max_tokens: Some(100),
         };

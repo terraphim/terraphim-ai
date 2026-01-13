@@ -61,8 +61,6 @@ mod tests {
                     llm_router_enabled: false,
                     llm_router_config: None,
                     extra: AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
                 },
             )
             .default_role("Engineer")
