@@ -60,8 +60,11 @@ tempfile = "3.23"
 [features]
 default = []
 # NOTE: atomic and grepapp features disabled for crates.io publishing (dependencies not published yet)
+# Placeholder features - when dependencies are published, change to:
 # atomic = ["dep:terraphim_atomic_client"]
 # grepapp = ["dep:grepapp_haystack"]
+atomic = []
+grepapp = []
 # Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
 ai-assistant = ["terraphim-session-analyzer", "jiff", "home"]
 # Enable openrouter integration
