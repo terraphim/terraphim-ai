@@ -1284,6 +1284,8 @@ impl FromStr for ReplCommand {
 impl ReplCommand {
     /// Get available commands based on compiled features
     pub fn available_commands() -> Vec<&'static str> {
+        // Allow unused_mut because mut is conditionally needed based on features
+        #[allow(unused_mut)]
         let mut commands = vec![
             "search", "config", "role", "graph", "vm", "robot", "help", "quit", "exit", "clear",
         ];
