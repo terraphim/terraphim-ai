@@ -19,30 +19,40 @@ use patterns::{load_all_patterns, AhoCorasickMatcher, PatternMatcher};
 use reporter::Reporter;
 
 #[derive(Parser)]
-#[command(name = "claude-log-analyzer")]
+#[command(name = "terraphim-session-analyzer")]
 #[command(
     version,
-    about = "Analyze Claude session logs to identify AI agent usage"
+    about = "Analyze AI coding assistant session logs to identify agent usage patterns"
 )]
 #[command(long_about = r#"
-Claude Log Analyzer (cla) - Analyze Claude session logs to identify AI agent usage
+Terraphim Session Analyzer (tsa/cla) - Analyze AI coding assistant session logs
 
-This tool parses Claude Code session logs from $HOME/.claude/projects/ (by default)
-and identifies which AI agents were used to build specific documents.
+Supported AI assistants:
+  - Claude Code    ($HOME/.claude/projects/)
+  - OpenCode       ($HOME/.opencode/)
+  - Cursor         ($HOME/.cursor/)
+  - Aider          ($HOME/.aider.chat.history.md)
+  - Codex          ($HOME/.codex/)
+
+This tool parses session logs and identifies which AI agents were used,
+tool usage patterns, and development insights.
 
 Examples:
-  cla analyze                                          # Analyze all sessions
-  cla analyze --target "STATUS_IMPLEMENTATION.md"     # Find specific file
-  cla list                                            # List available sessions
-  cla analyze --format json --output report.json     # Export to JSON
+  tsa analyze                                          # Analyze all sessions
+  tsa analyze --target "STATUS_IMPLEMENTATION.md"     # Find specific file
+  tsa list                                            # List available sessions
+  tsa tools --show-chains                             # Show tool usage patterns
+  tsa analyze --format json --output report.json     # Export to JSON
+
+Aliases: tsa (new), cla (legacy)
 "#)]
 struct Cli {
     /// Use verbose output
     #[arg(short, long, global = true)]
     verbose: bool,
 
-    /// Session directory (defaults to $HOME/.claude/projects)
-    #[arg(short = 'd', long, env = "CLAUDE_SESSION_DIR", global = true)]
+    /// Session directory (defaults to auto-detect from supported AI assistants)
+    #[arg(short = 'd', long, env = "TSA_SESSION_DIR", global = true)]
     session_dir: Option<PathBuf>,
 
     /// Disable colored output
@@ -57,7 +67,7 @@ struct Cli {
 enum Commands {
     /// Analyze sessions to identify agent usage
     Analyze {
-        /// Session file or directory to analyze (defaults to $HOME/.claude/projects)
+        /// Session file or directory to analyze (auto-detects AI assistant directories)
         path: Option<String>,
 
         /// Target file to track (e.g., "STATUS_IMPLEMENTATION.md")
@@ -107,7 +117,7 @@ enum Commands {
 
     /// Watch for new sessions in real-time
     Watch {
-        /// Directory to watch (defaults to $HOME/.claude/projects)
+        /// Directory to watch (auto-detects AI assistant directories)
         path: Option<String>,
 
         /// Refresh interval in seconds
