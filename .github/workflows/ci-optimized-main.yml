@@ -1,9 +1,11 @@
 name: CI Optimized Main Branch
 
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
 on:
   push:
     branches: [main, develop]
-    tags: ["*.*.*"]
+    # Disabled tag trigger - release-comprehensive.yml handles releases
+    # tags: ["*.*.*"]
   workflow_dispatch:
     inputs:
       build-release:

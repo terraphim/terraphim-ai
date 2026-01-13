@@ -1,8 +1,12 @@
 name: Release
+
+# DISABLED: This workflow has been superseded by release-comprehensive.yml
+# Use workflow_dispatch only for manual testing
 on:
-  push:
-    tags:
-      - "v[0-9]+.[0-9]+.[0-9]+"
+  # Disabled tag trigger - release-comprehensive.yml handles releases
+  # push:
+  #   tags:
+  #     - "v[0-9]+.[0-9]+.[0-9]+"
   workflow_dispatch:
     inputs:
       version:
@@ -121,6 +125,17 @@ jobs:
             target
           key: release-test-${{ hashFiles('**/Cargo.lock') }}
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Build frontend assets
+        working-directory: ./desktop
+        run: |
+          yarn install --frozen-lockfile
+          yarn build
+
       - name: Run tests
         run: |
           # Run tests for core packages only (avoid Tauri desktop)
@@ -208,8 +223,8 @@ jobs:
         if: "!matrix.use_cross"
         working-directory: ./desktop
         run: |
-          npm ci
-          npm run build
+          yarn install --frozen-lockfile
+          yarn build
 
       - name: Build server binary (native)
         if: "!matrix.use_cross"
@@ -220,16 +235,13 @@ jobs:
 
       - name: Build TUI/CLI binary
         run: |
-          # Cross builds need --no-default-features to avoid sqlite (rusqlite requires C compilation)
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent \
-            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+            --target ${{ matrix.target }} -p terraphim_agent --bin terraphim-agent
 
       - name: Build CLI binary
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli \
-            ${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+            --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
 
       - name: Create archive
         run: |
@@ -326,9 +338,9 @@ jobs:
         run: npm install -g @napi-rs/cli
 
       - name: Build WASM package
-        working-directory: crates/terraphim_automata
+        working-directory: crates/terraphim_automata/wasm-test
         run: |
-          wasm-pack build --target web --release --out-dir ../../terraphim_ai_nodejs/pkg
+          wasm-pack build --target web --release --out-dir ../../../terraphim_ai_nodejs/pkg
 
       - name: Prepare npm package
         working-directory: terraphim_ai_nodejs

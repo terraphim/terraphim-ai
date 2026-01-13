@@ -30,6 +30,4 @@ tempfile = "3.14"
 [build-dependencies]
 napi-build = "2.0.1"
 
-[profile.release]
-lto = true
-strip = "symbols"
+# NOTE: Profile configuration moved to workspace Cargo.toml for consistency

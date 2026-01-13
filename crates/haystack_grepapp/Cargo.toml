@@ -10,7 +10,7 @@ repository = "https://github.com/terraphim/terraphim-ai"
 [dependencies]
 haystack_core = { path = "../haystack_core" }
 terraphim_types = { path = "../terraphim_types" }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 tokio = { version = "1.0", features = ["full"] }
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"

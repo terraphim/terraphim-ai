@@ -67,6 +67,7 @@ fn create_large_thesaurus(size: usize) -> Thesaurus {
             let normalized_term = NormalizedTerm {
                 id: (i * 8 + j) as u64 + 1,
                 value: NormalizedTermValue::from(term.clone()),
+                display_value: None,
                 url: Some(format!("https://example.com/{}", term.replace('_', "-"))),
             };
             thesaurus.insert(NormalizedTermValue::from(term), normalized_term);
