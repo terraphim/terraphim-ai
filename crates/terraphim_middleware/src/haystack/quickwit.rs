@@ -1,14 +1,14 @@
-use crate::Result;
 use crate::indexer::IndexMiddleware;
+use crate::Result;
 use reqwest::Client;
 use serde::Deserialize;
 use terraphim_config::Haystack;
+use terraphim_persistence::Persistable;
 use terraphim_types::Index;
 
 /// Response structure from Quickwit search API
-/// Corresponds to GET /v1/{index}/search response
+/// Corresponds to GET /api/v1/{index}/search response
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct QuickwitSearchResponse {
     num_hits: u64,
     hits: Vec<serde_json::Value>,
@@ -18,7 +18,7 @@ struct QuickwitSearchResponse {
 }
 
 /// Index metadata from Quickwit indexes listing
-/// Corresponds to GET /v1/indexes response items
+/// Corresponds to GET /api/v1/indexes response items
 #[derive(Debug, Deserialize, Clone)]
 struct QuickwitIndexInfo {
     index_id: String,
@@ -26,7 +26,6 @@ struct QuickwitIndexInfo {
 
 /// Configuration parsed from Haystack extra_parameters
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct QuickwitConfig {
     auth_token: Option<String>,
     auth_username: Option<String>,
@@ -162,13 +161,15 @@ impl QuickwitHaystackIndexer {
         config: &QuickwitConfig,
     ) -> reqwest::RequestBuilder {
         // Priority 1: Bearer token
-        if let Some(token) = &config.auth_token {
+        if let Some(ref token) = config.auth_token {
             // Token should already include "Bearer " prefix
             return request.header("Authorization", token);
         }
 
         // Priority 2: Basic auth (username + password)
-        if let (Some(username), Some(password)) = (&config.auth_username, &config.auth_password) {
+        if let (Some(ref username), Some(ref password)) =
+            (&config.auth_username, &config.auth_password)
+        {
             return request.basic_auth(username, Some(password));
         }
 
@@ -413,8 +414,6 @@ impl QuickwitHaystackIndexer {
     /// Normalize document ID for persistence layer
     /// Follows pattern from QueryRsHaystackIndexer
     fn normalize_document_id(&self, index_name: &str, doc_id: &str) -> String {
-        use terraphim_persistence::Persistable;
-
         let original_id = format!("quickwit_{}_{}", index_name, doc_id);
 
         // Use Persistable trait to normalize the ID
