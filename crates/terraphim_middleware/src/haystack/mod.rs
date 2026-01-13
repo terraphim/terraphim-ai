@@ -8,6 +8,7 @@ pub mod grep_app;
 pub mod mcp;
 pub mod perplexity;
 pub mod query_rs;
+pub mod quickwit;
 #[cfg(feature = "ai-assistant")]
 pub use ai_assistant::AiAssistantHaystackIndexer;
 #[cfg(feature = "atomic")]
@@ -18,3 +19,4 @@ pub use grep_app::GrepAppHaystackIndexer;
 pub use mcp::McpHaystackIndexer;
 pub use perplexity::PerplexityHaystackIndexer;
 pub use query_rs::QueryRsHaystackIndexer;
+pub use quickwit::QuickwitHaystackIndexer;
