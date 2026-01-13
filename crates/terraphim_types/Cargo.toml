@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_types"
-version = "1.3.0"
+version = "1.4.10"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Core types crate for Terraphim AI"
@@ -30,7 +30,7 @@ uuid = { version = "1.19.0", features = ["v4", "serde"] }
 
 # WASM-compatible uuid with js feature for random generation
 [target.'cfg(target_arch = "wasm32")'.dependencies.uuid]
-version = "1.19.0"
+version = "1.4.10"
 features = ["v4", "serde", "js"]
 
 # WASM-specific dependencies

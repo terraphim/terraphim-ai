@@ -260,7 +260,10 @@ mod tests {
 
         // Should fail at max depth
         let result = tracker.push_recursion();
-        assert!(matches!(result, Err(RlmError::RecursionDepthExceeded { .. })));
+        assert!(matches!(
+            result,
+            Err(RlmError::RecursionDepthExceeded { .. })
+        ));
     }
 
     #[test]

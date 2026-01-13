@@ -1,6 +1,6 @@
-# Claude Log Analyzer (cla)
+# Terraphim Session Analyzer (tsa/cla)
 
-A powerful Rust-based CLI tool for analyzing Claude Code session logs to identify AI agent usage patterns, tool chains, and development insights.
+A powerful Rust-based CLI tool for analyzing AI coding assistant session logs to identify agent usage patterns, tool chains, and development insights. Supports Claude Code, Cursor, Aider, Codex, and OpenCode.
 
 ## Features
 
@@ -18,9 +18,12 @@ A powerful Rust-based CLI tool for analyzing Claude Code session logs to identif
 ### Installation
 
 ```bash
-# Clone the repository
-git clone https://github.com/zestic-ai/claude-log-analyzer.git
-cd claude-log-analyzer
+# Install from crates.io
+cargo install terraphim-session-analyzer
+
+# Or build from source
+git clone https://github.com/terraphim/terraphim-ai.git
+cd terraphim-ai
 
 # Build the release binary
 cargo build --release --features terraphim

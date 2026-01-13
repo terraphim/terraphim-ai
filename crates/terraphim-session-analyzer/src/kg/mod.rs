@@ -12,8 +12,8 @@
 //! ## Example
 //!
 //! ```rust,ignore
-//! use claude_log_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch};
-//! use claude_log_analyzer::kg::QueryNode;
+//! use terraphim_session_analyzer::kg::{KnowledgeGraphBuilder, KnowledgeGraphSearch};
+//! use terraphim_session_analyzer::kg::QueryNode;
 //!
 //! # fn main() -> anyhow::Result<()> {
 //! // Build knowledge graph from tool invocations

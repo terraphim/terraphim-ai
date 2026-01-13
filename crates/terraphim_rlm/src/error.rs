@@ -105,7 +105,9 @@ pub enum RlmError {
     BackendInitFailed { backend: String, message: String },
 
     /// VM pool exhausted (all VMs busy, no overflow capacity).
-    #[error("VM pool exhausted: all {pool_size} VMs busy, overflow at capacity ({overflow_count}/{max_overflow})")]
+    #[error(
+        "VM pool exhausted: all {pool_size} VMs busy, overflow at capacity ({overflow_count}/{max_overflow})"
+    )]
     PoolExhausted {
         pool_size: u32,
         overflow_count: u32,

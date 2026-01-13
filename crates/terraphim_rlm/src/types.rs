@@ -346,9 +346,7 @@ impl CommandHistory {
 
     /// Get the last successful command index.
     pub fn last_successful_index(&self) -> Option<usize> {
-        self.entries
-            .iter()
-            .rposition(|e| e.success)
+        self.entries.iter().rposition(|e| e.success)
     }
 
     /// Get commands since the last checkpoint.

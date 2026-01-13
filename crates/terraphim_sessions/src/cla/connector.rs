@@ -1,6 +1,6 @@
-//! CLA-based session connectors
+//! TSA-based session connectors
 //!
-//! These connectors wrap claude-log-analyzer's connectors
+//! These connectors wrap terraphim-session-analyzer's connectors
 //! to provide enhanced parsing capabilities.
 
 use super::from_normalized_session;
@@ -8,18 +8,18 @@ use crate::connector::{ConnectorStatus, ImportOptions, SessionConnector};
 use crate::model::Session;
 use anyhow::Result;
 use async_trait::async_trait;
-use claude_log_analyzer::connectors::{
+use std::path::PathBuf;
+use terraphim_session_analyzer::connectors::{
     ImportOptions as ClaImportOptions, SessionConnector as ClaSessionConnector,
 };
-use std::path::PathBuf;
 
-/// CLA-powered Claude Code connector
+/// TSA-powered Claude Code connector
 ///
-/// Uses claude-log-analyzer for enhanced parsing with agent attribution,
+/// Uses terraphim-session-analyzer for enhanced parsing with agent attribution,
 /// tool tracking, and detailed analytics.
 #[derive(Debug, Default)]
 pub struct ClaClaudeConnector {
-    inner: claude_log_analyzer::connectors::ClaudeCodeConnector,
+    inner: terraphim_session_analyzer::connectors::ClaudeCodeConnector,
 }
 
 #[async_trait]
@@ -34,15 +34,19 @@ impl SessionConnector for ClaClaudeConnector {
 
     fn detect(&self) -> ConnectorStatus {
         match self.inner.detect() {
-            claude_log_analyzer::connectors::ConnectorStatus::Available {
+            terraphim_session_analyzer::connectors::ConnectorStatus::Available {
                 path,
                 sessions_estimate,
             } => ConnectorStatus::Available {
                 path,
                 sessions_estimate,
             },
-            claude_log_analyzer::connectors::ConnectorStatus::NotFound => ConnectorStatus::NotFound,
-            claude_log_analyzer::connectors::ConnectorStatus::Error(e) => ConnectorStatus::Error(e),
+            terraphim_session_analyzer::connectors::ConnectorStatus::NotFound => {
+                ConnectorStatus::NotFound
+            }
+            terraphim_session_analyzer::connectors::ConnectorStatus::Error(e) => {
+                ConnectorStatus::Error(e)
+            }
         }
     }
 
@@ -56,7 +60,7 @@ impl SessionConnector for ClaClaudeConnector {
         // CLA import is synchronous, wrap in blocking task
         // Create a new connector inside the blocking task since it's stateless
         let sessions = tokio::task::spawn_blocking(move || {
-            let connector = claude_log_analyzer::connectors::ClaudeCodeConnector;
+            let connector = terraphim_session_analyzer::connectors::ClaudeCodeConnector;
             connector.import(&cla_options)
         })
         .await??;
@@ -71,13 +75,13 @@ impl SessionConnector for ClaClaudeConnector {
 /// CLA-powered Cursor IDE connector
 ///
 /// Uses claude-log-analyzer's Cursor connector for SQLite parsing.
-#[cfg(feature = "cla-full")]
+#[cfg(feature = "tsa-full")]
 #[derive(Debug, Default)]
 pub struct ClaCursorConnector {
-    inner: claude_log_analyzer::connectors::cursor::CursorConnector,
+    inner: terraphim_session_analyzer::connectors::cursor::CursorConnector,
 }
 
-#[cfg(feature = "cla-full")]
+#[cfg(feature = "tsa-full")]
 #[async_trait]
 impl SessionConnector for ClaCursorConnector {
     fn source_id(&self) -> &str {
@@ -90,15 +94,19 @@ impl SessionConnector for ClaCursorConnector {
 
     fn detect(&self) -> ConnectorStatus {
         match self.inner.detect() {
-            claude_log_analyzer::connectors::ConnectorStatus::Available {
+            terraphim_session_analyzer::connectors::ConnectorStatus::Available {
                 path,
                 sessions_estimate,
             } => ConnectorStatus::Available {
                 path,
                 sessions_estimate,
             },
-            claude_log_analyzer::connectors::ConnectorStatus::NotFound => ConnectorStatus::NotFound,
-            claude_log_analyzer::connectors::ConnectorStatus::Error(e) => ConnectorStatus::Error(e),
+            terraphim_session_analyzer::connectors::ConnectorStatus::NotFound => {
+                ConnectorStatus::NotFound
+            }
+            terraphim_session_analyzer::connectors::ConnectorStatus::Error(e) => {
+                ConnectorStatus::Error(e)
+            }
         }
     }
 
@@ -112,7 +120,7 @@ impl SessionConnector for ClaCursorConnector {
         // CLA import is synchronous, wrap in blocking task
         // Create a new connector inside the blocking task since it's stateless
         let sessions = tokio::task::spawn_blocking(move || {
-            let connector = claude_log_analyzer::connectors::cursor::CursorConnector;
+            let connector = terraphim_session_analyzer::connectors::cursor::CursorConnector;
             connector.import(&cla_options)
         })
         .await??;
@@ -135,12 +143,12 @@ fn to_cla_options(options: &ImportOptions) -> ClaImportOptions {
     }
 }
 
-// Placeholder for when cla-full is not enabled
-#[cfg(not(feature = "cla-full"))]
+// Placeholder for when tsa-full is not enabled
+#[cfg(not(feature = "tsa-full"))]
 #[derive(Debug, Default)]
 pub struct ClaCursorConnector;
 
-#[cfg(not(feature = "cla-full"))]
+#[cfg(not(feature = "tsa-full"))]
 #[async_trait]
 impl SessionConnector for ClaCursorConnector {
     fn source_id(&self) -> &str {
@@ -148,11 +156,11 @@ impl SessionConnector for ClaCursorConnector {
     }
 
     fn display_name(&self) -> &str {
-        "Cursor IDE (requires cla-full feature)"
+        "Cursor IDE (requires tsa-full feature)"
     }
 
     fn detect(&self) -> ConnectorStatus {
-        ConnectorStatus::Error("Cursor support requires cla-full feature".to_string())
+        ConnectorStatus::Error("Cursor support requires tsa-full feature".to_string())
     }
 
     fn default_path(&self) -> Option<PathBuf> {
@@ -160,7 +168,7 @@ impl SessionConnector for ClaCursorConnector {
     }
 
     async fn import(&self, _options: &ImportOptions) -> Result<Vec<Session>> {
-        anyhow::bail!("Cursor support requires cla-full feature")
+        anyhow::bail!("Cursor support requires tsa-full feature")
     }
 }
 
@@ -175,7 +183,7 @@ mod tests {
         assert_eq!(connector.display_name(), "Claude Code (CLA)");
     }
 
-    #[cfg(feature = "cla-full")]
+    #[cfg(feature = "tsa-full")]
     #[test]
     fn test_cla_cursor_connector() {
         let connector = ClaCursorConnector::default();
