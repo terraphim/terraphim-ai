@@ -1,0 +1,24 @@
+{
+  "name": "Quickwit Production Logs",
+  "shortname": "QuickwitProd",
+  "relevance_function": "BM25",
+  "theme": "observability",
+  "haystacks": [
+    {
+      "location": "https://logs.terraphim.cloud/api",
+      "service": "Quickwit",
+      "read_only": true,
+      "fetch_content": false,
+      "extra_parameters": {
+        "auth_username": "cloudflare",
+        "auth_password": "USE_ENV_VAR_OR_1PASSWORD",
+        "index_filter": "workers-*",
+        "max_hits": "100",
+        "sort_by": "-timestamp"
+      }
+    }
+  ],
+  "llm_enabled": false,
+  "llm_auto_summarize": false,
+  "llm_chat_enabled": false
+}
