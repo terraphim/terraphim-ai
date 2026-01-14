@@ -21,7 +21,14 @@ pub mod openrouter;
 pub mod llm;
 
 // LLM proxy service for unified provider management
+
+// LLM Proxy service\npub mod proxy_client;
+// LLM Router configuration integration\n
+
 pub mod llm_proxy;
+
+
+// LLM Router configuration integration\n
 
 // Centralized HTTP client creation and configuration
 pub mod http_client;
@@ -2810,6 +2817,8 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         };
         config.roles.insert(role_name.clone(), role);
 
@@ -2872,6 +2881,8 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         };
         config.roles.insert(role_name.clone(), role);
 
@@ -2988,6 +2999,8 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         };
         config.roles.insert(role_name.clone(), role);
 
@@ -3104,6 +3117,8 @@ mod tests {
             llm_chat_model: None,
             llm_context_window: None,
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         };
         config.roles.insert(role_name.clone(), role);
 

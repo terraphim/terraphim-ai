@@ -8729,7 +8729,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-session-analyzer"
-version = "1.4.10"
+version = "1.4.11"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -9244,6 +9244,7 @@ dependencies = [
  "dotenvy",
  "env_logger 0.11.8",
  "futures",
+ "grepapp_haystack",
  "home",
  "html2md",
  "jiff 0.1.29",

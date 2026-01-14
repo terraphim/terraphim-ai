@@ -85,6 +85,8 @@ This fresh content should trigger real LLM summarization since it's unique with 
             fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 

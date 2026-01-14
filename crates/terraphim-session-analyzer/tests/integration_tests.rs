@@ -705,13 +705,13 @@ mod cli_tests {
     #[test]
     fn test_cli_help_command() {
         let output = Command::new("cargo")
-            .args(["run", "--bin", "cla", "--", "--help"])
+            .args(["run", "--bin", "tsa", "--", "--help"])
             .output()
             .expect("Failed to execute CLI help command");
 
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout).unwrap();
-        assert!(stdout.contains("Claude Log Analyzer"));
+        assert!(stdout.contains("Terraphim Session Analyzer"));
         assert!(stdout.contains("analyze"));
         assert!(stdout.contains("list"));
     }
@@ -719,13 +719,13 @@ mod cli_tests {
     #[test]
     fn test_cli_version_command() {
         let output = Command::new("cargo")
-            .args(["run", "--bin", "cla", "--", "--version"])
+            .args(["run", "--bin", "tsa", "--", "--version"])
             .output()
             .expect("Failed to execute CLI version command");
 
         assert!(output.status.success());
         let stdout = String::from_utf8(output.stdout).unwrap();
-        assert!(stdout.contains("claude-log-analyzer"));
+        assert!(stdout.contains("terraphim-session-analyzer"));
     }
 
     #[test]
