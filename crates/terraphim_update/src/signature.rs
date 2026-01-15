@@ -58,9 +58,10 @@ pub enum VerificationResult {
 /// (as GZIP comment for .tar.gz files), not in separate signature files.
 ///
 /// # Arguments
-/// * `archive_path` - Path to the .tar.gz archive file to verify
+/// * `archive_path` - Path to .tar.gz archive file to verify
 /// * `public_key` - Optional public key for verification (base64-encoded).
-///                  If None, uses the embedded public key.
+///
+///  If None, uses the embedded public key.
 ///
 /// # Returns
 /// * `Ok(VerificationResult)` - Result of verification
@@ -124,28 +125,17 @@ pub fn verify_archive_signature(
     let verifying_key = zipsign_api::verify::collect_keys(std::iter::once(Ok(key_array)))
         .context("Failed to parse public key")?;
 
-    // Read signatures from the archive (embedded as GZIP comment)
+    // Get the context (file name) for signature verification
+    // zipsign uses the file name as context/salt by default
+    let context: Option<Vec<u8>> = archive_path
+        .file_name()
+        .map(|n| n.to_string_lossy().as_bytes().to_vec());
+
+    // Verify the .tar.gz archive signature using verify_tar
+    // This function handles the tar.gz format with embedded signatures correctly
     let mut cursor = Cursor::new(archive_bytes);
-    let signatures = zipsign_api::verify::read_signatures(&mut cursor);
-
-    let signatures = match signatures {
-        Ok(sigs) => sigs,
-        Err(e) => {
-            return Ok(VerificationResult::Invalid {
-                reason: format!("Failed to read signatures: {}", e),
-            });
-        }
-    };
-
-    if signatures.is_empty() {
-        warn!("No signatures found in archive");
-        return Ok(VerificationResult::MissingSignature);
-    }
-
-    // Verify the .tar.gz archive signature
-    // Create cursor again for verification (need to seek back)
-    let mut cursor = Cursor::new(fs::read(archive_path)?);
-    match zipsign_api::verify::verify_tar(&mut cursor, &verifying_key, None) {
+    let context_ref: Option<&[u8]> = context.as_deref();
+    match zipsign_api::verify::verify_tar(&mut cursor, &verifying_key, context_ref) {
         Ok(_index) => {
             info!("Signature verification passed for {:?}", archive_path);
             Ok(VerificationResult::Valid)

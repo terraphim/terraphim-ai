@@ -27,7 +27,6 @@ pub mod llm;
 
 pub mod llm_proxy;
 
-
 // LLM Router configuration integration\n
 
 // Centralized HTTP client creation and configuration

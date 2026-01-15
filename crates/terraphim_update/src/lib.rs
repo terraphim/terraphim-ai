@@ -438,7 +438,7 @@ impl TerraphimUpdater {
                     return Ok(UpdateStatus::Failed(format!(
                         "Failed to get release info: {}",
                         e
-                    )))
+                    )));
                 }
             };
 
@@ -457,7 +457,7 @@ impl TerraphimUpdater {
                 return Ok(UpdateStatus::Failed(format!(
                     "Failed to download archive: {}",
                     e
-                )))
+                )));
             }
         };
 
@@ -527,6 +527,7 @@ impl TerraphimUpdater {
         let release = updater.get_latest_release()?;
 
         // Check if the latest version is actually newer
+        #[allow(clippy::needless_borrow)]
         if !bump_is_greater(&current_version, &release.version)? {
             return Err(anyhow!(
                 "Current version {} is up to date with {}",
@@ -642,7 +643,8 @@ impl TerraphimUpdater {
 
         for i in 0..archive.len() {
             let mut file = archive.by_index(i)?;
-            let outpath = target_dir.join(file.mangled_name().to_path_buf());
+            #[allow(clippy::needless_borrows_for_generic_args)]
+            let outpath = target_dir.join(file.mangled_name());
 
             if file.name().ends_with('/') {
                 fs::create_dir_all(&outpath)?;

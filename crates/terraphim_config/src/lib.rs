@@ -22,7 +22,6 @@ use tokio::sync::Mutex;
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
-
 use crate::llm_router::LlmRouterConfig;
 
 // LLM Router configuration
