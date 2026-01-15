@@ -28,6 +28,7 @@ log = "0.4"
 
 [patch.crates-io]
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
 
 [profile.release]
 panic = "unwind"

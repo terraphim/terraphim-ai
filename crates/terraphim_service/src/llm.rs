@@ -123,7 +123,7 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
                 return client;
             }
             "openrouter" => {
-                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role))
+                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role));
             }
             _ => {}
         }
@@ -169,7 +169,10 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
                     return Some(Arc::new(RoutedLlmClient::new(static_client, router_config))
                         as Arc<dyn LlmClient>);
                 }
-                log::warn!("🛣️  Library routing enabled but no static LLM client could be built for role: {}", role.name);
+                log::warn!(
+                    "🛣️  Library routing enabled but no static LLM client could be built for role: {}",
+                    role.name
+                );
             }
             RouterMode::Service => {
                 // Service mode: use external HTTP proxy client

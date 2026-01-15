@@ -1304,12 +1304,17 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
     let api = ApiClient::new(
         std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
     );
-    let rt = Runtime::new()?;
+
+    // Use the existing runtime handle instead of creating a new one
+    // This prevents panic from nested runtime creation
+    let handle = tokio::runtime::Handle::try_current()
+        .map_err(|_| anyhow::anyhow!("No tokio runtime context available"))?;
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+    if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
         current_role = cfg.config.selected_role.to_string();
-        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
+        if let Ok(rg) = handle.block_on(async { api.rolegraph(Some(current_role.as_str())).await })
+        {
             terms = rg.nodes.into_iter().map(|n| n.label).collect();
         }
     }
@@ -1407,7 +1412,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 let api = api.clone();
                                 let role = current_role.clone();
                                 if !query.is_empty() {
-                                    if let Ok((lines, docs)) = rt.block_on(async move {
+                                    if let Ok((lines, docs)) = handle.block_on(async move {
                                         let q = SearchQuery {
                                             search_term: NormalizedTermValue::from(query.as_str()),
                                             search_terms: None,
@@ -1455,7 +1460,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 if !query.is_empty() {
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
+                                    if let Ok(autocomplete_resp) = handle.block_on(async move {
                                         api.get_autocomplete(&role, query).await
                                     }) {
                                         suggestions = autocomplete_resp
@@ -1470,7 +1475,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                             KeyCode::Char('r') => {
                                 // Switch role
                                 let api = api.clone();
-                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+                                if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
                                     let roles: Vec<String> =
                                         cfg.config.roles.keys().map(|k| k.to_string()).collect();
                                     if !roles.is_empty() {
@@ -1480,7 +1485,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                             let next_idx = (current_idx + 1) % roles.len();
                                             current_role = roles[next_idx].clone();
                                             // Update terms for new role
-                                            if let Ok(rg) = rt.block_on(async {
+                                            if let Ok(rg) = handle.block_on(async {
                                                 api.rolegraph(Some(&current_role)).await
                                             }) {
                                                 terms =
@@ -1496,7 +1501,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
+                                    if let Ok(summary) = handle.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {
@@ -1531,7 +1536,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
+                                    if let Ok(summary) = handle.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {

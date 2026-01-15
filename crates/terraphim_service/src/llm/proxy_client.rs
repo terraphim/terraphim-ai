@@ -184,7 +184,7 @@ impl LlmClient for ProxyLlmClient {
                 return Err(crate::ServiceError::Config(format!(
                     "Failed to read: {}",
                     e
-                )))
+                )));
             }
         };
 
@@ -255,7 +255,7 @@ impl LlmClient for ProxyLlmClient {
                 return Err(crate::ServiceError::Config(format!(
                     "Failed to read: {}",
                     e
-                )))
+                )));
             }
         };
 
