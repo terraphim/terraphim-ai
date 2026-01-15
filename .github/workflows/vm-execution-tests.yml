@@ -4,6 +4,7 @@ name: VM Execution Tests
 # Firecracker is Linux-only - these tests will not work on macOS/Windows
 # The scratchpad/firecracker-rust directory is gitignored (experimental code)
 # Tests will skip gracefully if the directory is not present
+# Triggered manually for adaptive concurrency testing
 
 on:
   push:
