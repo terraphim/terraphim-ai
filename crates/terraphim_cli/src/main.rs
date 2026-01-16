@@ -110,6 +110,18 @@ enum Commands {
         /// Shell to generate completions for
         shell: Shell,
     },
+
+    /// Check for available updates
+    CheckUpdate,
+
+    /// Update to latest version if available
+    Update,
+
+    /// Rollback to a previous version
+    Rollback {
+        /// Version to rollback to
+        version: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -225,6 +237,9 @@ async fn main() -> Result<()> {
         }) => handle_replace(&service, text, link_format, role).await,
         Some(Commands::Find { text, role }) => handle_find(&service, text, role).await,
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
+        Some(Commands::CheckUpdate) => handle_check_update().await,
+        Some(Commands::Update) => handle_update().await,
+        Some(Commands::Rollback { version }) => handle_rollback(&version).await,
         Some(Commands::Completions { .. }) => unreachable!(), // Handled above
         None => {
             eprintln!("No command specified. Use --help for usage information.");
@@ -453,6 +468,115 @@ async fn handle_thesaurus(
     };
 
     Ok(serde_json::to_value(result)?)
+}
+
+async fn handle_check_update() -> Result<serde_json::Value> {
+    let current_version = env!("CARGO_PKG_VERSION");
+    let bin_name = "terraphim-cli";
+
+    let status = terraphim_update::check_for_updates_auto(bin_name, current_version).await?;
+
+    match status {
+        terraphim_update::UpdateStatus::Available {
+            ref current_version,
+            ref latest_version,
+        } => {
+            let result = serde_json::json!({
+                "update_available": true,
+                "current_version": current_version,
+                "latest_version": latest_version,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+        terraphim_update::UpdateStatus::UpToDate(ref version) => {
+            let result = serde_json::json!({
+                "update_available": false,
+                "current_version": version,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+        terraphim_update::UpdateStatus::Failed(ref error) => {
+            let result = serde_json::json!({
+                "update_available": false,
+                "error": error,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+        terraphim_update::UpdateStatus::Updated { .. } => {
+            let result = serde_json::json!({
+                "update_available": false,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+    }
+}
+
+async fn handle_update() -> Result<serde_json::Value> {
+    let bin_name = "terraphim-cli";
+
+    let status = terraphim_update::update_binary(bin_name).await?;
+
+    match status {
+        terraphim_update::UpdateStatus::Updated {
+            ref from_version,
+            ref to_version,
+        } => {
+            let result = serde_json::json!({
+                "updated": true,
+                "from_version": from_version,
+                "to_version": to_version,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+        terraphim_update::UpdateStatus::UpToDate(ref version) => {
+            let result = serde_json::json!({
+                "updated": false,
+                "current_version": version,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+        terraphim_update::UpdateStatus::Available {
+            ref current_version,
+            ref latest_version,
+        } => {
+            let result = serde_json::json!({
+                "updated": false,
+                "current_version": current_version,
+                "latest_version": latest_version,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+        terraphim_update::UpdateStatus::Failed(ref error) => {
+            let result = serde_json::json!({
+                "updated": false,
+                "error": error,
+                "message": status.to_string(),
+            });
+            Ok(result)
+        }
+    }
+}
+
+async fn handle_rollback(version: &str) -> Result<serde_json::Value> {
+    let bin_name = "terraphim-cli";
+    let current_exe = std::env::current_exe()?;
+    let backup_path = current_exe.with_extension(format!("bak-{}", version));
+
+    terraphim_update::rollback(&backup_path, &current_exe)?;
+
+    let result = serde_json::json!({
+        "rolled_back": true,
+        "version": version,
+        "message": format!("Successfully rolled back {} to version {}", bin_name, version),
+    });
+    Ok(result)
 }
 
 /// Format JSON as human-readable text (for --format text)
