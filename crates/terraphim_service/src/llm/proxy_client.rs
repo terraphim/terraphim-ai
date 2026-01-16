@@ -5,14 +5,14 @@
 //! service mode routing without embedding proxy routing logic in main codebase.
 
 use async_trait::async_trait;
-use serde_json::{json, Value};
 use log::{debug, error, warn};
+use serde_json::{json, Value};
 use tokio::time::Duration;
 
-use crate::Result as ServiceResult;
+use super::ChatOptions;
 use super::LlmClient;
 use super::SummarizeOptions;
-use super::ChatOptions;
+use crate::Result as ServiceResult;
 
 /// External LLM proxy client configuration
 #[derive(Debug, Clone)]
@@ -86,7 +86,7 @@ impl LlmClient for ProxyLlmClient {
             "model": "auto",
             "messages": [{
                 "role": "user",
-                "content": format!("Please summarize the following in {} characters or less:\n\n{}", 
+                "content": format!("Please summarize the following in {} characters or less:\n\n{}",
                     opts.max_length, content)
             }],
             "max_tokens": opts.max_length.min(1024),
@@ -103,9 +103,10 @@ impl LlmClient for ProxyLlmClient {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Proxy summarization request failed: {}", e);
-                return Err(crate::ServiceError::Config(
-                    format!("Failed to connect to proxy: {}", e)
-                ));
+                return Err(crate::ServiceError::Config(format!(
+                    "Failed to connect to proxy: {}",
+                    e
+                )));
             }
         };
 
@@ -113,18 +114,20 @@ impl LlmClient for ProxyLlmClient {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             error!("Proxy returned error {}: {}", status, text);
-            return Err(crate::ServiceError::Config(
-                format!("Proxy returned error: {} - {}", status, text)
-            ));
+            return Err(crate::ServiceError::Config(format!(
+                "Proxy returned error: {} - {}",
+                status, text
+            )));
         }
 
         let text = match response.text().await {
             Ok(t) => t,
             Err(e) => {
                 error!("Failed to read response text: {}", e);
-                return Err(crate::ServiceError::Config(
-                    format!("Failed to read proxy response: {}", e)
-                ));
+                return Err(crate::ServiceError::Config(format!(
+                    "Failed to read proxy response: {}",
+                    e
+                )));
             }
         };
 
@@ -160,22 +163,29 @@ impl LlmClient for ProxyLlmClient {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Get models request failed: {}", e);
-                return Err(crate::ServiceError::Config(
-                    format!("Failed to connect to proxy: {}", e)
-                ));
+                return Err(crate::ServiceError::Config(format!(
+                    "Failed to connect to proxy: {}",
+                    e
+                )));
             }
         };
 
         if !response.status().is_success() {
             let status = response.status();
-            return Err(crate::ServiceError::Config(
-                format!("Proxy returned error: {}", status)
-            ));
+            return Err(crate::ServiceError::Config(format!(
+                "Proxy returned error: {}",
+                status
+            )));
         }
 
         let text = match response.text().await {
             Ok(t) => t,
-            Err(e) => return Err(crate::ServiceError::Config(format!("Failed to read: {}", e))),
+            Err(e) => {
+                return Err(crate::ServiceError::Config(format!(
+                    "Failed to read: {}",
+                    e
+                )));
+            }
         };
 
         match serde_json::from_str::<Value>(&text) {
@@ -222,9 +232,10 @@ impl LlmClient for ProxyLlmClient {
             Ok(resp) => resp,
             Err(e) => {
                 error!("Proxy chat request failed: {}", e);
-                return Err(crate::ServiceError::Config(
-                    format!("Failed to connect to proxy: {}", e)
-                ));
+                return Err(crate::ServiceError::Config(format!(
+                    "Failed to connect to proxy: {}",
+                    e
+                )));
             }
         };
 
@@ -232,14 +243,20 @@ impl LlmClient for ProxyLlmClient {
             let status = response.status();
             let text = response.text().await.unwrap_or_default();
             error!("Proxy returned error {}: {}", status, text);
-            return Err(crate::ServiceError::Config(
-                format!("Proxy returned error: {} - {}", status, text)
-            ));
+            return Err(crate::ServiceError::Config(format!(
+                "Proxy returned error: {} - {}",
+                status, text
+            )));
         }
 
         let text = match response.text().await {
             Ok(t) => t,
-            Err(e) => return Err(crate::ServiceError::Config(format!("Failed to read: {}", e))),
+            Err(e) => {
+                return Err(crate::ServiceError::Config(format!(
+                    "Failed to read: {}",
+                    e
+                )));
+            }
         };
 
         match serde_json::from_str::<Value>(&text) {
@@ -294,9 +311,7 @@ mod tests {
     async fn test_summarize_request_format() {
         let _client = ProxyLlmClient::new(ProxyClientConfig::default());
 
-        let opts = SummarizeOptions {
-            max_length: 500,
-        };
+        let opts = SummarizeOptions { max_length: 500 };
 
         let content = "This is a test document that needs to be summarized. ".repeat(10);
 
@@ -305,7 +320,7 @@ mod tests {
             "model": "auto",
             "messages": [{
                 "role": "user",
-                "content": format!("Please summarize the following in {} characters or less:\n\n{}", 
+                "content": format!("Please summarize the following in {} characters or less:\n\n{}",
                     opts.max_length, content)
             }],
             "max_tokens": 500,

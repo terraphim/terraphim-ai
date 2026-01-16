@@ -4,17 +4,17 @@ use ahash::AHashMap;
 use serde_json::Value;
 
 #[cfg(feature = "llm_router")]
-use crate::llm::routed_adapter::RoutedLlmClient;
+pub use self::router_config::{MergedRouterConfig, RouterMode};
 #[cfg(feature = "llm_router")]
 use crate::llm::proxy_client::ProxyLlmClient;
 #[cfg(feature = "llm_router")]
-pub use self::router_config::{MergedRouterConfig, RouterMode};
+use crate::llm::routed_adapter::RoutedLlmClient;
+#[cfg(feature = "llm_router")]
+mod proxy_client;
 #[cfg(feature = "llm_router")]
 mod routed_adapter;
 #[cfg(feature = "llm_router")]
 mod router_config;
-#[cfg(feature = "llm_router")]
-mod proxy_client;
 
 use crate::Result as ServiceResult;
 
@@ -123,7 +123,7 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
                 return client;
             }
             "openrouter" => {
-                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role))
+                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role));
             }
             _ => {}
         }
@@ -144,8 +144,11 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
             #[cfg(feature = "llm_router")]
             if role.llm_router_enabled {
                 log::info!("🛣️  Intelligent routing enabled for role: {}", role.name);
-                let router_config = MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
-                return Some(Arc::new(RoutedLlmClient::new(client, router_config)) as Arc<dyn LlmClient>);
+                let router_config =
+                    MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
+                return Some(
+                    Arc::new(RoutedLlmClient::new(client, router_config)) as Arc<dyn LlmClient>
+                );
             }
             return Some(client);
         }
@@ -160,10 +163,16 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
         match router_config.mode {
             RouterMode::Library => {
                 // Library mode: wrap static client with in-process routing
-                if let Some(static_client) = build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role)) {
-                    return Some(Arc::new(RoutedLlmClient::new(static_client, router_config)) as Arc<dyn LlmClient>);
+                if let Some(static_client) =
+                    build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role))
+                {
+                    return Some(Arc::new(RoutedLlmClient::new(static_client, router_config))
+                        as Arc<dyn LlmClient>);
                 }
-                log::warn!("🛣️  Library routing enabled but no static LLM client could be built for role: {}", role.name);
+                log::warn!(
+                    "🛣️  Library routing enabled but no static LLM client could be built for role: {}",
+                    role.name
+                );
             }
             RouterMode::Service => {
                 // Service mode: use external HTTP proxy client
@@ -580,8 +589,8 @@ fn build_ollama_from_role(_role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
 #[cfg(test)]
 mod llm_router_tests {
     use super::*;
-    use terraphim_config::Role;
     use ahash::AHashMap;
+    use terraphim_config::Role;
 
     fn create_test_role() -> Role {
         Role {
@@ -610,7 +619,8 @@ mod llm_router_tests {
     #[cfg(feature = "llm_router")]
     async fn test_routing_disabled_returns_static_client() {
         let mut role = create_test_role();
-        role.extra.insert("llm_model".to_string(), serde_json::json!("llama3.1"));
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
         let client = build_llm_from_role(&role);
         // When llm_router_enabled is false, should return static Ollama client
         assert!(client.is_some());
@@ -623,7 +633,8 @@ mod llm_router_tests {
     async fn test_routing_enabled_returns_routed_client() {
         let mut role = create_test_role();
         role.llm_router_enabled = true;
-        role.extra.insert("llm_model".to_string(), serde_json::json!("llama3.1"));
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
 
         let client = build_llm_from_role(&role);
         assert!(client.is_some());

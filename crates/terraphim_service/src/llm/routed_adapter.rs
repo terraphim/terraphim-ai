@@ -56,20 +56,22 @@ impl LlmClient for RoutedLlmClient {
         self.client.as_ref().summarize(content, opts).await
     }
 
-    async fn chat_completion(&self, messages: Vec<serde_json::Value>, opts: ChatOptions) -> ServiceResult<String> {
+    async fn chat_completion(
+        &self,
+        messages: Vec<serde_json::Value>,
+        opts: ChatOptions,
+    ) -> ServiceResult<String> {
         debug!("Chat - routing {}", self.is_routing_enabled());
         self.client.as_ref().chat_completion(messages, opts).await
     }
 
     async fn list_models(&self) -> ServiceResult<Vec<String>> {
-        info!("Get models - routing {}, static {}", 
-            self.is_routing_enabled(), 
-            !self.is_routing_enabled());
-        
+        info!(
+            "Get models - routing {}, static {}",
+            self.is_routing_enabled(),
+            !self.is_routing_enabled()
+        );
+
         self.client.as_ref().list_models().await
     }
-
-    
 }
-
-

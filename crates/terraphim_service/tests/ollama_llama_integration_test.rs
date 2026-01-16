@@ -171,8 +171,8 @@ async fn test_role_based_llm_config(base_url: &str) {
             kg: None,
             haystacks: vec![],
             extra: AHashMap::new(),
-        llm_router_enabled: false,
-        llm_router_config: None,
+            llm_router_enabled: false,
+            llm_router_config: None,
             ..Default::default()
         };
 

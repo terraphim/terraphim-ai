@@ -1370,7 +1370,9 @@ impl ReplHandler {
                             println!("⚡ Execute on default VM");
                             println!("Language: {}", language.cyan());
                             println!("Code: {}", code.yellow());
-                            println!("💡 Default VM execution not yet implemented. Please specify a VM ID with --vm-id");
+                            println!(
+                                "💡 Default VM execution not yet implemented. Please specify a VM ID with --vm-id"
+                            );
                         }
                     } else {
                         println!("❌ API client not available");
@@ -1404,7 +1406,9 @@ impl ReplHandler {
                         } else {
                             println!("🤖 Agent: {} on default VM", agent_id.green());
                             println!("Task: {}", task.yellow());
-                            println!("💡 Default VM agent execution not yet implemented. Please specify a VM ID with --vm-id");
+                            println!(
+                                "💡 Default VM agent execution not yet implemented. Please specify a VM ID with --vm-id"
+                            );
                         }
                     } else {
                         println!("❌ API client not available");
