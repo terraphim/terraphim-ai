@@ -552,7 +552,8 @@ impl SummarizationWorker {
                 if !existing_summary.trim().is_empty() && existing_summary.len() >= 50 {
                     log::info!(
                         "Worker bypassing LLM: Using existing description as summary for document '{}' (length: {})",
-                        task.document.id, existing_summary.len()
+                        task.document.id,
+                        existing_summary.len()
                     );
                     return Ok(existing_summary.clone());
                 }
@@ -562,7 +563,8 @@ impl SummarizationWorker {
             if let Some(existing_summary) = &task.document.summarization {
                 log::info!(
                     "Worker bypassing LLM: Using cached summarization for document '{}' (length: {})",
-                    task.document.id, existing_summary.len()
+                    task.document.id,
+                    existing_summary.len()
                 );
                 return Ok(existing_summary.clone());
             }

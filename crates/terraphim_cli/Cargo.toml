@@ -22,6 +22,7 @@ terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
+terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 
 # CLI framework
 clap = { version = "4.5", features = ["derive", "cargo", "env"] }

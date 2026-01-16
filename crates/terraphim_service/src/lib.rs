@@ -27,7 +27,6 @@ pub mod llm;
 
 pub mod llm_proxy;
 
-
 // LLM Router configuration integration\n
 
 // Centralized HTTP client creation and configuration
@@ -168,7 +167,10 @@ impl TerraphimService {
                                             log::debug!("Reloaded thesaurus from persistence");
                                         }
                                         Err(e) => {
-                                            log::warn!("Failed to reload thesaurus from persistence, using in-memory version: {:?}", e);
+                                            log::warn!(
+                                                "Failed to reload thesaurus from persistence, using in-memory version: {:?}",
+                                                e
+                                            );
                                         }
                                     }
                                 }
@@ -210,20 +212,31 @@ impl TerraphimService {
                                         // Save thesaurus to persistence to ensure it's available for future loads
                                         match thesaurus.save().await {
                                             Ok(_) => {
-                                                log::info!("Fallback thesaurus for role `{}` saved to persistence", role_name);
+                                                log::info!(
+                                                    "Fallback thesaurus for role `{}` saved to persistence",
+                                                    role_name
+                                                );
                                                 // Reload from persistence to get canonical version
                                                 match thesaurus.load().await {
                                                     Ok(persisted_thesaurus) => {
                                                         thesaurus = persisted_thesaurus;
-                                                        log::debug!("Reloaded fallback thesaurus from persistence");
+                                                        log::debug!(
+                                                            "Reloaded fallback thesaurus from persistence"
+                                                        );
                                                     }
                                                     Err(e) => {
-                                                        log::warn!("Failed to reload fallback thesaurus from persistence, using in-memory version: {:?}", e);
+                                                        log::warn!(
+                                                            "Failed to reload fallback thesaurus from persistence, using in-memory version: {:?}",
+                                                            e
+                                                        );
                                                     }
                                                 }
                                             }
                                             Err(e) => {
-                                                log::warn!("Failed to save fallback thesaurus to persistence: {:?}", e);
+                                                log::warn!(
+                                                    "Failed to save fallback thesaurus to persistence: {:?}",
+                                                    e
+                                                );
                                             }
                                         }
 
@@ -295,11 +308,17 @@ impl TerraphimService {
                                     // Reload from persistence to get canonical version
                                     match thesaurus.load().await {
                                         Ok(persisted_thesaurus) => {
-                                            log::info!("Reloaded local KG thesaurus from persistence: {} entries", persisted_thesaurus.len());
+                                            log::info!(
+                                                "Reloaded local KG thesaurus from persistence: {} entries",
+                                                persisted_thesaurus.len()
+                                            );
                                             thesaurus = persisted_thesaurus;
                                         }
                                         Err(e) => {
-                                            log::warn!("Failed to reload local KG thesaurus from persistence, using in-memory version: {:?}", e);
+                                            log::warn!(
+                                                "Failed to reload local KG thesaurus from persistence, using in-memory version: {:?}",
+                                                e
+                                            );
                                         }
                                     }
                                 }
@@ -337,7 +356,10 @@ impl TerraphimService {
                         }
                     }
                 } else {
-                    log::warn!("Role {} is configured for TerraphimGraph but has neither automata_path nor knowledge_graph_local defined.", role_name);
+                    log::warn!(
+                        "Role {} is configured for TerraphimGraph but has neither automata_path nor knowledge_graph_local defined.",
+                        role_name
+                    );
                     if let Some(kg_local) = &kg.knowledge_graph_local {
                         // Build thesaurus from local KG files during startup
                         log::info!(
@@ -359,20 +381,31 @@ impl TerraphimService {
                                 // Save thesaurus to persistence to ensure it's available for future loads
                                 match thesaurus.save().await {
                                     Ok(_) => {
-                                        log::info!("No-automata thesaurus for role `{}` saved to persistence", role_name);
+                                        log::info!(
+                                            "No-automata thesaurus for role `{}` saved to persistence",
+                                            role_name
+                                        );
                                         // Reload from persistence to get canonical version
                                         match thesaurus.load().await {
                                             Ok(persisted_thesaurus) => {
                                                 thesaurus = persisted_thesaurus;
-                                                log::debug!("Reloaded no-automata thesaurus from persistence");
+                                                log::debug!(
+                                                    "Reloaded no-automata thesaurus from persistence"
+                                                );
                                             }
                                             Err(e) => {
-                                                log::warn!("Failed to reload no-automata thesaurus from persistence, using in-memory version: {:?}", e);
+                                                log::warn!(
+                                                    "Failed to reload no-automata thesaurus from persistence, using in-memory version: {:?}",
+                                                    e
+                                                );
                                             }
                                         }
                                     }
                                     Err(e) => {
-                                        log::warn!("Failed to save no-automata thesaurus to persistence: {:?}", e);
+                                        log::warn!(
+                                            "Failed to save no-automata thesaurus to persistence: {:?}",
+                                            e
+                                        );
                                     }
                                 }
 
@@ -773,14 +806,19 @@ impl TerraphimService {
                                     );
                                 }
                             } else {
-                                log::warn!("⚠️ No KG links found in processed content despite successful replacement");
+                                log::warn!(
+                                    "⚠️ No KG links found in processed content despite successful replacement"
+                                );
                             }
 
                             document.body = processed_content;
                         }
                         Err(e) => {
-                            log::warn!("Failed to convert processed content to UTF-8 for document '{}': {:?}",
-                                      document.title, e);
+                            log::warn!(
+                                "Failed to convert processed content to UTF-8 for document '{}': {:?}",
+                                document.title,
+                                e
+                            );
                         }
                     }
                 }
@@ -1344,19 +1382,25 @@ impl TerraphimService {
                                 if !persisted_doc.body.is_empty() && !role.terraphim_it {
                                     log::debug!(
                                         "Updated body from persistence for Atomic document '{}' (role: '{}', terraphim_it: {})",
-                                        document.title, role.name, role.terraphim_it
+                                        document.title,
+                                        role.name,
+                                        role.terraphim_it
                                     );
                                     document.body = persisted_doc.body;
                                 } else if role.terraphim_it {
                                     log::debug!(
                                         "Keeping search result body for Atomic document '{}' because role '{}' uses KG preprocessing (terraphim_it=true)",
-                                        document.title, role.name
+                                        document.title,
+                                        role.name
                                     );
                                 }
                             }
                             Err(_) => {
                                 // Not in persistence - save this Atomic Data document for future queries
-                                log::debug!("Caching Atomic Data document '{}' to persistence for future queries", document.title);
+                                log::debug!(
+                                    "Caching Atomic Data document '{}' to persistence for future queries",
+                                    document.title
+                                );
 
                                 // Save in background to avoid blocking the response
                                 let doc_to_save = document.clone();
@@ -1400,7 +1444,10 @@ impl TerraphimService {
                             };
                             if let Ok(persisted_doc) = placeholder.load().await {
                                 if let Some(better_description) = persisted_doc.description {
-                                    log::debug!("Replaced ripgrep description for '{}' with persistence description", document.title);
+                                    log::debug!(
+                                        "Replaced ripgrep description for '{}' with persistence description",
+                                        document.title
+                                    );
                                     document.description = Some(better_description);
                                 }
                             } else {
@@ -1414,7 +1461,11 @@ impl TerraphimService {
                                 };
                                 if let Ok(persisted_doc) = normalized_placeholder.load().await {
                                     if let Some(better_description) = persisted_doc.description {
-                                        log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized from title: {})", document.title, normalized_id);
+                                        log::debug!(
+                                            "Replaced ripgrep description for '{}' with persistence description (normalized from title: {})",
+                                            document.title,
+                                            normalized_id
+                                        );
                                         document.description = Some(better_description);
                                     }
                                 } else {
@@ -1427,11 +1478,21 @@ impl TerraphimService {
                                     if let Ok(persisted_doc) = md_placeholder.load().await {
                                         if let Some(better_description) = persisted_doc.description
                                         {
-                                            log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized with md: {})", document.title, normalized_id_with_md);
+                                            log::debug!(
+                                                "Replaced ripgrep description for '{}' with persistence description (normalized with md: {})",
+                                                document.title,
+                                                normalized_id_with_md
+                                            );
                                             document.description = Some(better_description);
                                         }
                                     } else {
-                                        log::debug!("No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')", document.title, document.id, normalized_id, normalized_id_with_md);
+                                        log::debug!(
+                                            "No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')",
+                                            document.title,
+                                            document.id,
+                                            normalized_id,
+                                            normalized_id_with_md
+                                        );
                                     }
                                 }
                             }
@@ -1548,7 +1609,11 @@ impl TerraphimService {
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_llm_config() && role.llm_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} BM25 search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} BM25 search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
@@ -1642,7 +1707,11 @@ impl TerraphimService {
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_llm_config() && role.llm_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} BM25F search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} BM25F search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
@@ -1736,7 +1805,11 @@ impl TerraphimService {
                 // Apply OpenRouter AI summarization if enabled for this role and auto-summarize is on
                 #[cfg(feature = "openrouter")]
                 if role.has_llm_config() && role.llm_auto_summarize {
-                    log::debug!("Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'", docs_ranked.len(), role.name);
+                    log::debug!(
+                        "Applying OpenRouter AI summarization to {} BM25Plus search results for role '{}'",
+                        docs_ranked.len(),
+                        role.name
+                    );
                     docs_ranked = self
                         .enhance_descriptions_with_ai(docs_ranked, &role)
                         .await?;
@@ -1815,7 +1888,10 @@ impl TerraphimService {
                     for doc in &all_haystack_docs {
                         // Only index documents that aren't already in the rolegraph
                         if !rolegraph.has_document(&doc.id) && !doc.body.is_empty() {
-                            log::debug!("Indexing new document '{}' into rolegraph for TerraphimGraph search", doc.id);
+                            log::debug!(
+                                "Indexing new document '{}' into rolegraph for TerraphimGraph search",
+                                doc.id
+                            );
                             rolegraph.insert_document(&doc.id, doc.clone());
 
                             // Save document to persistence to ensure it's available for kg_search
@@ -1895,7 +1971,10 @@ impl TerraphimService {
                                         );
                                     }
                                 } else {
-                                    log::warn!("Document '{}' still has empty body after loading from persistence", document.id);
+                                    log::warn!(
+                                        "Document '{}' still has empty body after loading from persistence",
+                                        document.id
+                                    );
                                 }
                             }
                             Err(e) => {
@@ -1934,7 +2013,11 @@ impl TerraphimService {
 
                                             // Save to persistence for future use
                                             if let Err(e) = full_doc.save().await {
-                                                log::warn!("Failed to save document '{}' to persistence: {}", document.id, e);
+                                                log::warn!(
+                                                    "Failed to save document '{}' to persistence: {}",
+                                                    document.id,
+                                                    e
+                                                );
                                             }
 
                                             // Re-index into rolegraph
@@ -1944,7 +2027,10 @@ impl TerraphimService {
                                                 let mut rolegraph = rolegraph_sync.lock().await;
                                                 rolegraph.insert_document(&document.id, full_doc);
                                                 need_reindexing = true;
-                                                log::debug!("Re-indexed document '{}' into rolegraph from file", document.id);
+                                                log::debug!(
+                                                    "Re-indexed document '{}' into rolegraph from file",
+                                                    document.id
+                                                );
                                             }
                                         }
                                         Err(file_e) => {
@@ -2048,19 +2134,25 @@ impl TerraphimService {
                                 if !persisted_doc.body.is_empty() && !role.terraphim_it {
                                     log::debug!(
                                         "Updated body from persistence for Atomic document '{}' (role: '{}', terraphim_it: {})",
-                                        document.title, role.name, role.terraphim_it
+                                        document.title,
+                                        role.name,
+                                        role.terraphim_it
                                     );
                                     document.body = persisted_doc.body;
                                 } else if role.terraphim_it {
                                     log::debug!(
                                         "Keeping search result body for Atomic document '{}' because role '{}' uses KG preprocessing (terraphim_it=true)",
-                                        document.title, role.name
+                                        document.title,
+                                        role.name
                                     );
                                 }
                             }
                             Err(_) => {
                                 // Not in persistence - save this Atomic Data document for future queries
-                                log::debug!("Caching Atomic Data document '{}' to persistence for future queries", document.title);
+                                log::debug!(
+                                    "Caching Atomic Data document '{}' to persistence for future queries",
+                                    document.title
+                                );
 
                                 // Save in background to avoid blocking the response
                                 let doc_to_save = document.clone();
@@ -2088,7 +2180,10 @@ impl TerraphimService {
                         };
                         if let Ok(persisted_doc) = placeholder.load().await {
                             if let Some(better_description) = persisted_doc.description {
-                                log::debug!("Replaced ripgrep description for '{}' with persistence description", document.title);
+                                log::debug!(
+                                    "Replaced ripgrep description for '{}' with persistence description",
+                                    document.title
+                                );
                                 document.description = Some(better_description);
                             }
                         } else {
@@ -2102,7 +2197,11 @@ impl TerraphimService {
                             };
                             if let Ok(persisted_doc) = normalized_placeholder.load().await {
                                 if let Some(better_description) = persisted_doc.description {
-                                    log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized from title: {})", document.title, normalized_id);
+                                    log::debug!(
+                                        "Replaced ripgrep description for '{}' with persistence description (normalized from title: {})",
+                                        document.title,
+                                        normalized_id
+                                    );
                                     document.description = Some(better_description);
                                 }
                             } else {
@@ -2114,11 +2213,21 @@ impl TerraphimService {
                                 };
                                 if let Ok(persisted_doc) = md_placeholder.load().await {
                                     if let Some(better_description) = persisted_doc.description {
-                                        log::debug!("Replaced ripgrep description for '{}' with persistence description (normalized with md: {})", document.title, normalized_id_with_md);
+                                        log::debug!(
+                                            "Replaced ripgrep description for '{}' with persistence description (normalized with md: {})",
+                                            document.title,
+                                            normalized_id_with_md
+                                        );
                                         document.description = Some(better_description);
                                     }
                                 } else {
-                                    log::debug!("No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')", document.title, document.id, normalized_id, normalized_id_with_md);
+                                    log::debug!(
+                                        "No persistence document found for '{}' (tried ID: '{}', normalized: '{}', with md: '{}')",
+                                        document.title,
+                                        document.id,
+                                        normalized_id,
+                                        normalized_id_with_md
+                                    );
                                 }
                             }
                         }
@@ -2358,7 +2467,10 @@ impl TerraphimService {
                         documents.push(loaded_doc);
                     }
                     Err(_) => {
-                        log::warn!("Atomic Data document '{}' not found in persistence - this may indicate the document hasn't been cached yet", doc_id);
+                        log::warn!(
+                            "Atomic Data document '{}' not found in persistence - this may indicate the document hasn't been cached yet",
+                            doc_id
+                        );
                         // Skip this document for now - it will be cached when accessed through search
                         // In a production system, you might want to fetch it from the Atomic Server here
                     }
@@ -2376,8 +2488,13 @@ impl TerraphimService {
 
                         // Check if this might be a hash-based ID from old ripgrep documents
                         if Self::is_hash_based_id(doc_id) {
-                            log::debug!("Document ID '{}' appears to be hash-based (legacy document), skipping for now", doc_id);
-                            log::info!("💡 Hash-based document IDs are deprecated. This document will be re-indexed with normalized IDs on next haystack search.");
+                            log::debug!(
+                                "Document ID '{}' appears to be hash-based (legacy document), skipping for now",
+                                doc_id
+                            );
+                            log::info!(
+                                "💡 Hash-based document IDs are deprecated. This document will be re-indexed with normalized IDs on next haystack search."
+                            );
                             // Skip legacy hash-based documents - they will be re-indexed with proper normalized IDs
                             // when the haystack is searched again
                         }
@@ -2576,11 +2693,17 @@ impl TerraphimService {
         // Log role selection with terraphim_it status
         if let Some(role) = current_config.roles.get(&role_name) {
             if role.terraphim_it {
-                log::info!("🎯 Selected role '{}' → terraphim_it: ✅ ENABLED (KG preprocessing will be applied)", role_name);
+                log::info!(
+                    "🎯 Selected role '{}' → terraphim_it: ✅ ENABLED (KG preprocessing will be applied)",
+                    role_name
+                );
                 if role.kg.is_some() {
                     log::info!("📚 KG configuration: Available for role '{}'", role_name);
                 } else {
-                    log::warn!("⚠️ KG configuration: Missing for role '{}' (terraphim_it enabled but no KG)", role_name);
+                    log::warn!(
+                        "⚠️ KG configuration: Missing for role '{}' (terraphim_it enabled but no KG)",
+                        role_name
+                    );
                 }
             } else {
                 log::info!(
@@ -2643,6 +2766,7 @@ impl TerraphimService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use terraphim_config::ConfigBuilder;
     use terraphim_types::NormalizedTermValue;
 
@@ -2677,8 +2801,7 @@ mod tests {
     #[tokio::test]
     async fn test_ensure_thesaurus_loaded_terraphim_engineer() {
         // Create a fresh config with correct KG path for testing
-        let project_root =
-            std::env::current_dir().unwrap_or_else(|_| std::path::PathBuf::from("."));
+        let project_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
         let kg_path = project_root.join("docs/src/kg");
 
         // Skip test gracefully if KG directory doesn't exist
@@ -3059,7 +3182,9 @@ mod tests {
 
         match placeholder.load().await {
             Ok(loaded_doc) => {
-                log::info!("✅ Successfully loaded Atomic Data document from persistence in KG term search context");
+                log::info!(
+                    "✅ Successfully loaded Atomic Data document from persistence in KG term search context"
+                );
                 assert_eq!(loaded_doc.title, atomic_doc.title);
                 assert_eq!(loaded_doc.body, atomic_doc.body);
             }

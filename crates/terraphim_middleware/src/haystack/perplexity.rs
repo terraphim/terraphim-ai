@@ -1,5 +1,4 @@
-use crate::indexer::IndexMiddleware;
-use crate::Result;
+use crate::{indexer::IndexMiddleware, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
