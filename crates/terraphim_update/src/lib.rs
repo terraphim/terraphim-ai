@@ -12,7 +12,8 @@ pub mod scheduler;
 pub mod signature;
 pub mod state;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
+use base64::Engine;
 use self_update::cargo_crate_version;
 use self_update::version::bump_is_greater;
 use std::fmt;
@@ -42,49 +43,30 @@ pub enum UpdateStatus {
 
 /// Compare two version strings to determine if the first is newer than the second
 /// Static version that can be called from blocking contexts
-fn is_newer_version_static(version1: &str, version2: &str) -> bool {
-    // Simple version comparison - in production you might want to use semver crate
-    let v1_parts: Vec<u32> = version1
-        .trim_start_matches('v')
-        .split('.')
-        .take(3)
-        .map(|s| s.parse().unwrap_or(0))
-        .collect();
+/// Uses semver crate for proper semantic versioning comparison
+fn is_newer_version_static(version1: &str, version2: &str) -> Result<bool, anyhow::Error> {
+    use semver::Version;
 
-    let v2_parts: Vec<u32> = version2
-        .trim_start_matches('v')
-        .split('.')
-        .take(3)
-        .map(|s| s.parse().unwrap_or(0))
-        .collect();
+    let v1 = Version::parse(version1.trim_start_matches('v'))
+        .map_err(|e| anyhow::anyhow!("Invalid version '{}': {}", version1, e))?;
 
-    // Pad with zeros if needed
-    let v1 = [
-        v1_parts.first().copied().unwrap_or(0),
-        v1_parts.get(1).copied().unwrap_or(0),
-        v1_parts.get(2).copied().unwrap_or(0),
-    ];
+    let v2 = Version::parse(version2.trim_start_matches('v'))
+        .map_err(|e| anyhow::anyhow!("Invalid version '{}': {}", version2, e))?;
 
-    let v2 = [
-        v2_parts.first().copied().unwrap_or(0),
-        v2_parts.get(1).copied().unwrap_or(0),
-        v2_parts.get(2).copied().unwrap_or(0),
-    ];
-
-    v1 > v2
+    Ok(v1 > v2)
 }
 
 impl fmt::Display for UpdateStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             UpdateStatus::UpToDate(version) => {
-                write!(f, "✅ Already running latest version: {}", version)
+                write!(f, "[OK] Already running latest version: {}", version)
             }
             UpdateStatus::Updated {
                 from_version,
                 to_version,
             } => {
-                write!(f, "🚀 Updated from {} to {}", from_version, to_version)
+                write!(f, "Updated: from {} to {}", from_version, to_version)
             }
             UpdateStatus::Available {
                 current_version,
@@ -92,12 +74,12 @@ impl fmt::Display for UpdateStatus {
             } => {
                 write!(
                     f,
-                    "📦 Update available: {} → {}",
+                    "Update available: {} → {}",
                     current_version, latest_version
                 )
             }
             UpdateStatus::Failed(error) => {
-                write!(f, "❌ Update failed: {}", error)
+                write!(f, "[ERROR] Update failed: {}", error)
             }
         }
     }
@@ -185,16 +167,18 @@ impl TerraphimUpdater {
                         Ok(release) => {
                             let latest_version = release.version.clone();
 
-                            // Simple version comparison
-                            if is_newer_version_static(&latest_version, &current_version) {
-                                Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
-                                    current_version,
-                                    latest_version,
-                                })
-                            } else {
-                                Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(
-                                    current_version,
-                                ))
+                            // Compare versions using semver
+                            match is_newer_version_static(&latest_version, &current_version) {
+                                Ok(true) => {
+                                    Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
+                                        current_version,
+                                        latest_version,
+                                    })
+                                }
+                                Ok(false) => Ok::<UpdateStatus, anyhow::Error>(
+                                    UpdateStatus::UpToDate(current_version),
+                                ),
+                                Err(e) => Err(e),
                             }
                         }
                         Err(e) => Ok(UpdateStatus::Failed(format!("Check failed: {}", e))),
@@ -265,16 +249,34 @@ impl TerraphimUpdater {
         let current_version = self.config.current_version.clone();
         let show_progress = self.config.show_progress;
 
+        // Decode the embedded public key for signature verification
+        let key_bytes = base64::engine::general_purpose::STANDARD
+            .decode(signature::get_embedded_public_key())
+            .context("Failed to decode public key")?;
+
+        // Convert to array (must be exactly 32 bytes for Ed25519)
+        if key_bytes.len() != 32 {
+            return Err(anyhow!(
+                "Invalid public key length: {} bytes (expected 32)",
+                key_bytes.len()
+            ));
+        }
+        let mut key_array = [0u8; 32];
+        key_array.copy_from_slice(&key_bytes);
+
         // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
-            match self_update::backends::github::Update::configure()
+            // Build the updater with signature verification enabled
+            let builder_result = self_update::backends::github::Update::configure()
                 .repo_owner(&repo_owner)
                 .repo_name(&repo_name)
                 .bin_name(&bin_name)
                 .current_version(&current_version)
                 .show_download_progress(show_progress)
-                .build()
-            {
+                .verifying_keys(vec![key_array]) // Enable signature verification
+                .build();
+
+            match builder_result {
                 Ok(updater) => match updater.update() {
                     Ok(status) => match status {
                         self_update::Status::UpToDate(version) => {
@@ -805,15 +807,17 @@ pub async fn check_for_updates_auto(bin_name: &str, current_version: &str) -> Re
                     Ok(release) => {
                         let latest_version = release.version.clone();
 
-                        if is_newer_version_static(&latest_version, &current_version) {
-                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
+                        match is_newer_version_static(&latest_version, &current_version) {
+                            Ok(true) => {
+                                Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
+                                    current_version,
+                                    latest_version,
+                                })
+                            }
+                            Ok(false) => Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(
                                 current_version,
-                                latest_version,
-                            })
-                        } else {
-                            Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(
-                                current_version,
-                            ))
+                            )),
+                            Err(e) => Err(e),
                         }
                     }
                     Err(e) => Ok(UpdateStatus::Failed(format!("Check failed: {}", e))),
@@ -1207,20 +1211,20 @@ mod tests {
     #[test]
     fn test_is_newer_version_static() {
         // Test basic comparisons
-        assert!(is_newer_version_static("2.0.0", "1.0.0"));
-        assert!(is_newer_version_static("1.1.0", "1.0.0"));
-        assert!(is_newer_version_static("1.0.1", "1.0.0"));
+        assert!(is_newer_version_static("2.0.0", "1.0.0").unwrap());
+        assert!(is_newer_version_static("1.1.0", "1.0.0").unwrap());
+        assert!(is_newer_version_static("1.0.1", "1.0.0").unwrap());
 
         // Test equal versions
-        assert!(!is_newer_version_static("1.0.0", "1.0.0"));
+        assert!(!is_newer_version_static("1.0.0", "1.0.0").unwrap());
 
         // Test older versions
-        assert!(!is_newer_version_static("1.0.0", "2.0.0"));
-        assert!(!is_newer_version_static("1.0.0", "1.1.0"));
+        assert!(!is_newer_version_static("1.0.0", "2.0.0").unwrap());
+        assert!(!is_newer_version_static("1.0.0", "1.1.0").unwrap());
 
         // Test with v prefix
-        assert!(is_newer_version_static("v2.0.0", "v1.0.0"));
-        assert!(!is_newer_version_static("v1.0.0", "v2.0.0"));
+        assert!(is_newer_version_static("v2.0.0", "v1.0.0").unwrap());
+        assert!(!is_newer_version_static("v1.0.0", "v2.0.0").unwrap());
     }
 
     #[test]

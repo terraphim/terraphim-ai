@@ -4,9 +4,7 @@
 //! functionality including unit tests, integration tests, and edge cases.
 
 use base64::Engine;
-use flate2::write::GzEncoder;
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use tempfile::TempDir;
@@ -224,10 +222,15 @@ fn test_verify_signature_detailed_nonexistent() {
 fn test_verify_with_self_update() {
     let temp_file = tempfile::NamedTempFile::new().unwrap();
 
-    let result =
-        verify_with_self_update("terraphim", "1.0.0", temp_file.path(), "test-key").unwrap();
+    // Use a valid 32-byte base64-encoded test key (not a real signing key)
+    // This key is just for testing the verification function works
+    let test_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; // 32 bytes of zeros, base64-encoded
 
-    assert_eq!(result, VerificationResult::Valid);
+    let result =
+        verify_with_self_update("terraphim", "1.0.0", temp_file.path(), Some(test_key)).unwrap();
+
+    // Unsigned file should be rejected with Invalid result
+    assert!(matches!(result, VerificationResult::Invalid { .. }));
 }
 
 #[test]
@@ -236,7 +239,7 @@ fn test_verify_with_self_update_missing_binary() {
         "terraphim",
         "1.0.0",
         Path::new("/nonexistent/binary"),
-        "test-key",
+        Some("test-key"),
     );
 
     assert!(result.is_err());

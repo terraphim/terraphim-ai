@@ -231,7 +231,7 @@ fn test_update_history_persistence() {
     };
 
     // Add some check entries
-    for i in 0..5 {
+    for _i in 0..5 {
         let entry = UpdateCheckEntry {
             timestamp: jiff::Timestamp::now(),
             result: UpdateCheckResult::UpToDate,
