@@ -74,7 +74,7 @@ impl SessionManager {
         self.sessions
             .get(session_id)
             .map(|r| r.clone())
-            .ok_or_else(|| RlmError::SessionNotFound {
+            .ok_or(RlmError::SessionNotFound {
                 session_id: *session_id,
             })
     }
@@ -88,7 +88,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
@@ -130,7 +130,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
@@ -184,7 +184,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
@@ -219,7 +219,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
@@ -251,7 +251,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
@@ -264,7 +264,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
@@ -289,7 +289,7 @@ impl SessionManager {
         let mut session =
             self.sessions
                 .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
+                .ok_or(RlmError::SessionNotFound {
                     session_id: *session_id,
                 })?;
 
