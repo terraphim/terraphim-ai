@@ -116,7 +116,6 @@ fn test_permission_failure_scenarios() {
 
     #[cfg(unix)]
     {
-        use std::os::unix::fs::PermissionsExt;
         let mut perms = fs::metadata(&readonly_dir)
             .expect("Failed to get metadata")
             .permissions();
@@ -425,7 +424,7 @@ fn test_concurrent_update_attempts() {
             .expect("Failed to write update");
 
             // Try to copy to main binary (may fail due to race)
-            if fs::copy(&temp_file, &temp_dir.path().join("terraphim_concurrent")).is_ok() {
+            if fs::copy(&temp_file, temp_dir.path().join("terraphim_concurrent")).is_ok() {
                 let mut count = update_count.lock().unwrap();
                 *count += 1;
             }
