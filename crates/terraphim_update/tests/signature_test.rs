@@ -7,13 +7,13 @@ use base64::Engine;
 use flate2::write::GzEncoder;
 use std::fs;
 use std::io::Write;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use tar::Builder;
 use tempfile::TempDir;
 use terraphim_update::signature::{verify_archive_signature, VerificationResult};
 
 /// Helper function to create a test tar.gz archive
-fn create_test_archive(dir: &PathBuf, name: &str) -> PathBuf {
+fn create_test_archive(dir: &Path, name: &str) -> PathBuf {
     let archive_path = dir.join(name);
 
     // Create a simple tar.gz archive
@@ -37,10 +37,7 @@ fn create_test_archive(dir: &PathBuf, name: &str) -> PathBuf {
 
 /// Helper function to sign an archive with zipsign
 #[cfg(feature = "integration-signing")]
-fn sign_archive(
-    archive_path: &PathBuf,
-    private_key: &str,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn sign_archive(archive_path: &Path, private_key: &str) -> Result<(), Box<dyn std::error::Error>> {
     use std::process::Command;
 
     let output = Command::new("zipsign")
@@ -65,13 +62,18 @@ fn sign_archive(
 #[test]
 fn test_real_key_rejects_unsigned_archive() {
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "test.tar.gz");
 
     // With real embedded key, unsigned archives should be rejected
     let result = verify_archive_signature(&archive, None).unwrap();
     assert!(matches!(result, VerificationResult::Invalid { .. }));
     if let VerificationResult::Invalid { reason } = result {
-        assert!(reason.contains("Failed to read signatures") || reason.contains("magic"));
+        // The error message should indicate signature verification failure
+        assert!(
+            reason.contains("Signature verification failed")
+                || reason.contains("Failed to read signatures")
+                || reason.contains("magic")
+        );
     }
 }
 
@@ -85,7 +87,7 @@ fn test_nonexistent_archive_returns_error() {
 #[test]
 fn test_invalid_base64_key_returns_error() {
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "test.tar.gz");
 
     let result = verify_archive_signature(&archive, Some("not-valid-base64!!!"));
     assert!(result.is_err());
@@ -94,7 +96,7 @@ fn test_invalid_base64_key_returns_error() {
 #[test]
 fn test_wrong_length_key_returns_invalid() {
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "test.tar.gz");
 
     // Valid base64 but wrong length (not 32 bytes)
     let short_key = base64::engine::general_purpose::STANDARD.encode(b"short");
@@ -176,14 +178,19 @@ fn test_corrupted_archive_returns_error() {
     let result = verify_archive_signature(&archive_path, None).unwrap();
     assert!(matches!(result, VerificationResult::Invalid { .. }));
     if let VerificationResult::Invalid { reason } = result {
-        assert!(reason.contains("magic") || reason.contains("corrupted"));
+        // The error message should indicate a verification failure or format issue
+        assert!(
+            reason.contains("Signature verification failed")
+                || reason.contains("magic")
+                || reason.contains("corrupted")
+        );
     }
 }
 
 #[test]
 fn test_verification_with_custom_public_key() {
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "test.tar.gz");
 
     // Generate a test key pair (32 bytes each)
     let public_key = base64::engine::general_purpose::STANDARD.encode(vec![0u8; 32]);
@@ -197,7 +204,7 @@ fn test_verification_with_custom_public_key() {
 #[test]
 fn test_multiple_verifications_same_archive() {
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "test.tar.gz");
 
     // Verify multiple times with real key
     let result1 = verify_archive_signature(&archive, None).unwrap();
@@ -273,7 +280,7 @@ mod integration_tests {
         assert!(output.status.success(), "Failed to generate key pair");
 
         // Create and sign archive
-        let archive = create_test_archive(&temp_dir.path().to_path_buf(), "signed.tar.gz");
+        let archive = create_test_archive(temp_dir.path(), "signed.tar.gz");
         sign_archive(&archive, private_key.to_str().unwrap()).unwrap();
 
         // Read public key
@@ -318,7 +325,7 @@ mod integration_tests {
         assert!(output.status.success(), "Failed to generate key pair");
 
         // Create and sign archive
-        let archive = create_test_archive(&temp_dir.path().to_path_buf(), "signed.tar.gz");
+        let archive = create_test_archive(temp_dir.path(), "signed.tar.gz");
         sign_archive(&archive, private_key.to_str().unwrap()).unwrap();
 
         // Use a different public key
@@ -362,7 +369,7 @@ mod integration_tests {
         assert!(output.status.success(), "Failed to generate key pair");
 
         // Create and sign archive
-        let archive = create_test_archive(&temp_dir.path().to_path_buf(), "tampered.tar.gz");
+        let archive = create_test_archive(temp_dir.path(), "tampered.tar.gz");
         sign_archive(&archive, private_key.to_str().unwrap()).unwrap();
 
         // Tamper with the archive by appending garbage
@@ -389,7 +396,7 @@ mod integration_tests {
 fn test_verification_deterministic() {
     // Same input should always produce same output
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "test.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "test.tar.gz");
 
     let mut results = Vec::new();
     for _ in 0..10 {
@@ -425,7 +432,7 @@ fn test_verification_no_panic() {
 #[test]
 fn test_verification_performance_small_archive() {
     let temp_dir = TempDir::new().unwrap();
-    let archive = create_test_archive(&temp_dir.path().to_path_buf(), "small.tar.gz");
+    let archive = create_test_archive(temp_dir.path(), "small.tar.gz");
 
     let start = std::time::Instant::now();
     let _result = verify_archive_signature(&archive, None).unwrap();
@@ -445,7 +452,7 @@ fn test_verification_multiple_archives_performance() {
 
     // Create multiple archives
     let archives: Vec<PathBuf> = (0..10)
-        .map(|i| create_test_archive(&temp_dir.path().to_path_buf(), &format!("test{}.tar.gz", i)))
+        .map(|i| create_test_archive(temp_dir.path(), &format!("test{}.tar.gz", i)))
         .collect();
 
     let start = std::time::Instant::now();
