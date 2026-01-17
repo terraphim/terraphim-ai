@@ -45,7 +45,7 @@ default = []
 
 [dev-dependencies]
 tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "test-util"] }
-serial_test = "3.0"
+serial_test = "3.3"
 tempfile = "3.10"
 assert_cmd = "2.0"
 predicates = "3.1"
