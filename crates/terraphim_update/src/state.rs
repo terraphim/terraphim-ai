@@ -166,8 +166,10 @@ mod tests {
     fn test_history_with_check_entries() {
         let _ = delete_update_history();
 
-        let mut history = UpdateHistory::default();
-        history.current_version = "1.0.0".to_string();
+        let mut history = UpdateHistory {
+            current_version: "1.0.0".to_string(),
+            ..Default::default()
+        };
 
         let entry = UpdateCheckEntry {
             timestamp: jiff::Timestamp::now(),
@@ -213,8 +215,10 @@ mod tests {
     fn test_history_with_backups() {
         let _ = delete_update_history();
 
-        let mut history = UpdateHistory::default();
-        history.current_version = "1.0.0".to_string();
+        let mut history = UpdateHistory {
+            current_version: "1.0.0".to_string(),
+            ..Default::default()
+        };
         history.add_backup_version("0.9.0".to_string(), 3);
         history.add_backup_version("0.8.0".to_string(), 3);
 

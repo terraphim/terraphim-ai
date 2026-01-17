@@ -45,3 +45,6 @@ releases/
 
 # Signing keys (NEVER commit private keys)
 keys/
+
+# CodeBuff compiled JavaScript files
+.codebuff/agents/.agents/*.js

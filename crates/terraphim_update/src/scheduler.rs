@@ -379,7 +379,7 @@ mod tests {
         let check_fn = Arc::new(|| Ok(UpdateCheckResult::UpToDate));
         let mut scheduler = UpdateScheduler::new(Arc::new(config), check_fn);
 
-        let mut receiver = scheduler.create_notification_channel().unwrap();
+        let _receiver = scheduler.create_notification_channel().unwrap();
         scheduler.start().await.unwrap();
 
         // Wait for a few checks

@@ -1668,7 +1668,9 @@ impl ReplHandler {
         use comfy_table::modifiers::UTF8_ROUND_CORNERS;
         use comfy_table::presets::UTF8_FULL;
         use comfy_table::{Cell, Table};
-        use terraphim_sessions::{ConnectorStatus, ImportOptions, SessionService};
+        use terraphim_sessions::{
+            ConnectorStatus, ImportOptions, MessageRole, Session, SessionService,
+        };
 
         // Get or create session service
         static SESSION_SERVICE: std::sync::OnceLock<
@@ -2006,7 +2008,7 @@ impl ReplHandler {
                 let keywords = source
                     .messages
                     .iter()
-                    .find(|m| m.role == terraphim_sessions::MessageRole::User)
+                    .find(|m| m.role == MessageRole::User)
                     .map(|m| {
                         m.content
                             .split_whitespace()
@@ -2090,8 +2092,7 @@ impl ReplHandler {
                 }
 
                 // Group sessions by date
-                let mut grouped: HashMap<String, Vec<&terraphim_sessions::Session>> =
-                    HashMap::new();
+                let mut grouped: HashMap<String, Vec<&Session>> = HashMap::new();
 
                 for session in &sessions {
                     let date_key = if let Some(started) = session.started_at {
@@ -2158,7 +2159,7 @@ impl ReplHandler {
                     fmt.cyan()
                 );
 
-                let sessions: Vec<terraphim_sessions::Session> = if let Some(id) = session_id {
+                let sessions: Vec<Session> = if let Some(id) = session_id {
                     if let Some(session) = svc.get_session(&id).await {
                         vec![session]
                     } else {
