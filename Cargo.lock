@@ -4245,6 +4245,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonwebtoken"
+version = "10.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c76e1c7d7df3e34443b3621b459b066a7b79644f059fc8b2db7070c825fd417e"
+dependencies = [
+ "base64 0.22.1",
+ "getrandom 0.2.16",
+ "js-sys",
+ "pem",
+ "serde",
+ "serde_json",
+ "signature",
+ "simple_asn1",
+]
+
+[[package]]
 name = "jwalk"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5271,7 +5287,7 @@ dependencies = [
  "hyper-rustls 0.27.7",
  "hyper-timeout 0.5.2",
  "hyper-util",
- "jsonwebtoken",
+ "jsonwebtoken 9.3.1",
  "once_cell",
  "percent-encoding",
  "pin-project",
@@ -7287,7 +7303,7 @@ dependencies = [
  "http-body-util",
  "hyper-rustls 0.27.7",
  "hyper-util",
- "jsonwebtoken",
+ "jsonwebtoken 9.3.1",
  "salvo_core",
  "serde",
  "serde_json",
@@ -9511,7 +9527,7 @@ dependencies = [
  "clap",
  "hex",
  "hmac",
- "jsonwebtoken",
+ "jsonwebtoken 10.2.0",
  "octocrab",
  "reqwest 0.12.24",
  "salvo",
