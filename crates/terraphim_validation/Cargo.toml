@@ -1,0 +1,102 @@
+[package]
+name = "terraphim_validation"
+version = "0.1.0"
+edition = "2024"
+authors = ["Terraphim AI Team"]
+description = "Release validation system for Terraphim AI"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["validation", "release", "testing", "ci-cd"]
+categories = ["development-tools", "development-tools::testing"]
+
+[dependencies]
+# Core dependencies
+tokio = { workspace = true, features = ["full"] }
+serde = { workspace = true, features = ["derive"] }
+serde_json = { workspace = true }
+uuid = { workspace = true, features = ["v4", "serde"] }
+chrono = { workspace = true, features = ["serde"] }
+async-trait = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+reqwest = { workspace = true, features = ["json"] }
+
+# Terraphim crates for testing
+terraphim_config = { path = "../terraphim_config" }
+terraphim_types = { path = "../terraphim_types" }
+terraphim_server = { path = "../../terraphim_server" }
+
+# Configuration and CLI
+clap = { version = "4.0", features = ["derive", "env"] }
+config = "0.14"
+toml = "0.8"
+env_logger = "0.10"
+
+# HTTP and networking
+axum = "0.7"
+tower = "0.4"
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# Security and validation
+sha2 = "0.10"
+hex = "0.4"
+ring = { version = "0.17", optional = true }
+
+# Testing and assertions
+tempfile = "3.0"
+assert_cmd = "2.0"
+predicates = "3.0"
+urlencoding = "2.1"
+# mockall = "0.12"
+
+# TUI testing dependencies
+regex = "1.10"
+sysinfo = "0.30"
+term_size = "0.3"
+
+ # Additional dependencies for reporting and metadata
+ gethostname = "0.4"
+ os_info = "3.0"
+ rustc_version = "0.4"
+ serde_yaml = "0.9"
+
+ # Desktop UI testing dependencies
+ image = "0.24"
+ dirs = "5.0"
+
+# Docker and container support
+bollard = { version = "0.15", optional = true }
+ahash = "0.8.12"
+axum-test = "18.4.1"
+
+# Platform-specific dependencies
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.28", optional = true }
+
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["winuser", "processenv"], optional = true }
+
+[dev-dependencies]
+tokio-test = "0.4"
+# mockall = "0.12"
+pretty_assertions = "1.0"
+
+[[bin]]
+name = "terraphim-validation"
+path = "src/bin/terraphim-validation.rs"
+
+[[bin]]
+name = "terraphim-tui-tester"
+path = "src/bin/terraphim-tui-tester.rs"
+
+[[bin]]
+name = "terraphim-desktop-ui-tester"
+path = "src/bin/terraphim-desktop-ui-tester.rs"
+
+[features]
+default = ["full"]
+full = ["docker", "security", "performance"]
+docker = ["bollard"]
+security = ["ring"]
+performance = []

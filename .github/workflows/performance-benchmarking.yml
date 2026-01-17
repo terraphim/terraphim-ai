@@ -1,0 +1,264 @@
+name: Performance Benchmarking
+
+on:
+  workflow_dispatch:
+    inputs:
+      iterations:
+        description: 'Number of benchmark iterations'
+        required: false
+        default: '1000'
+        type: string
+      baseline_ref:
+        description: 'Git reference for baseline comparison (branch/tag/commit)'
+        required: false
+        default: 'main'
+        type: string
+  pull_request:
+    paths:
+      - 'crates/terraphim_*/src/**'
+      - 'terraphim_server/src/**'
+      - 'scripts/run-performance-benchmarks.sh'
+      - '.github/workflows/performance-benchmarking.yml'
+  push:
+    branches: [main, develop]
+    paths:
+      - 'crates/terraphim_*/src/**'
+      - 'terraphim_server/src/**'
+      - 'scripts/run-performance-benchmarks.sh'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  performance-benchmarks:
+    name: Performance Benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0  # Fetch full history for baseline comparison
+
+    - name: Set up Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache Rust dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl jq bc wrk
+
+    - name: Download baseline (if comparing)
+      if: github.event.inputs.baseline_ref || github.event_name == 'pull_request'
+      run: |
+        if [ "${{ github.event.inputs.baseline_ref }}" != "" ]; then
+          BASELINE_REF="${{ github.event.inputs.baseline_ref }}"
+        elif [ "${{ github.event_name }}" == "pull_request" ]; then
+          BASELINE_REF="${{ github.event.pull_request.base.ref }}"
+        else
+          BASELINE_REF="main"
+        fi
+
+        echo "Downloading baseline from ref: $BASELINE_REF"
+
+        # Download baseline results from previous run
+        # This assumes you have baseline results stored as artifacts or in a separate repo
+
+        # For now, create an empty baseline if none exists
+        mkdir -p benchmark-results
+        echo '{"timestamp":"2024-01-01T00:00:00Z","results":{}}' > benchmark-results/baseline.json
+
+    - name: Start Terraphim server
+      run: |
+        # Build and start the server in background
+        cargo build --release --package terraphim_server
+        ./target/release/terraphim_server &
+        SERVER_PID=$!
+
+        # Wait for server to start
+        for i in {1..30}; do
+          if curl -s http://localhost:3000/health > /dev/null; then
+            echo "Server started successfully"
+            break
+          fi
+          sleep 2
+        done
+
+        # Store PID for cleanup
+        echo $SERVER_PID > server.pid
+
+    - name: Run performance benchmarks
+      run: |
+        # Set environment variables
+        export TERRAPHIM_BENCH_ITERATIONS="${{ github.event.inputs.iterations || '1000' }}"
+        export TERRAPHIM_SERVER_URL="http://localhost:3000"
+
+        # Make script executable
+        chmod +x scripts/run-performance-benchmarks.sh
+
+        # Run benchmarks
+        ./scripts/run-performance-benchmarks.sh --verbose
+
+    - name: Stop Terraphim server
+      if: always()
+      run: |
+        if [ -f server.pid ]; then
+          kill $(cat server.pid) || true
+          rm server.pid
+        fi
+
+    - name: Upload benchmark results
+      uses: actions/upload-artifact@v4
+      if: always()
+      with:
+        name: benchmark-results-${{ github.run_id }}
+        path: benchmark-results/
+        retention-days: 30
+
+    - name: Generate performance report
+      if: always()
+      run: |
+        # Create a summary for GitHub Actions
+        if [ -f "benchmark-results/*/benchmark_report.md" ]; then
+          REPORT_FILE=$(find benchmark-results -name "benchmark_report.md" | head -1)
+          echo "## Performance Benchmark Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          cat $REPORT_FILE >> $GITHUB_STEP_SUMMARY
+        fi
+
+    - name: Check performance gates
+      run: |
+        # Check if benchmark results meet performance requirements
+        if [ -f "benchmark-results/*/benchmark_results.json" ]; then
+          RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+
+          # Extract SLO compliance percentage
+          SLO_COMPLIANCE=$(jq -r '.slo_compliance.overall_compliance // 0' "$RESULTS_FILE")
+
+          echo "SLO Compliance: ${SLO_COMPLIANCE}%"
+
+          # Set output for other jobs
+          echo "slo-compliance=${SLO_COMPLIANCE}" >> $GITHUB_OUTPUT
+
+          # Check critical violations
+          CRITICAL_VIOLATIONS=$(jq -r '.slo_compliance.critical_violations | length' "$RESULTS_FILE")
+
+          if [ "$CRITICAL_VIOLATIONS" -gt 0 ]; then
+            echo "❌ Critical performance violations detected!"
+            jq -r '.slo_compliance.critical_violations[] | "🚨 \(.metric): \(.actual_value) (threshold: \(.threshold_value))"' "$RESULTS_FILE"
+            echo "performance-gates-passed=false" >> $GITHUB_OUTPUT
+            exit 1
+          else
+            echo "✅ All performance gates passed"
+            echo "performance-gates-passed=true" >> $GITHUB_OUTPUT
+          fi
+        else
+          echo "No benchmark results found"
+          echo "slo-compliance=0" >> $GITHUB_OUTPUT
+          echo "performance-gates-passed=false" >> $GITHUB_OUTPUT
+          exit 1
+        fi
+
+    - name: Comment on PR (if applicable)
+      if: github.event_name == 'pull_request' && always()
+      uses: actions/github-script@v7
+      with:
+        script: |
+          const fs = require('fs');
+
+          // Find the benchmark report
+          const reportPath = require('glob').sync('benchmark-results/*/benchmark_report.md')[0];
+
+          if (reportPath && fs.existsSync(reportPath)) {
+            const report = fs.readFileSync(reportPath, 'utf8');
+
+            // Extract key metrics for comment
+            const sloMatch = report.match(/SLO Compliance: (\d+\.?\d*)%/);
+            const sloCompliance = sloMatch ? sloMatch[1] : 'N/A';
+
+            const comment = `## 🚀 Performance Benchmark Results
+
+**SLO Compliance:** ${sloCompliance}%
+
+### Key Findings:
+${report.includes('violations') ? '⚠️ Some performance thresholds were not met' : '✅ All performance requirements satisfied'}
+
+[View full report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+          }
+
+  performance-regression-check:
+    name: Performance Regression Check
+    runs-on: ubuntu-latest
+    needs: performance-benchmarks
+    if: always() && needs.performance-benchmarks.result == 'success'
+
+    steps:
+    - name: Check for regressions
+      run: |
+        # Compare current results with baseline
+        # This is a simplified check - in practice you'd want more sophisticated analysis
+
+        if [ "${{ needs.performance-benchmarks.outputs.performance-gates-passed }}" == "false" ]; then
+          echo "Performance regression detected!"
+          exit 1
+        else
+          echo "No performance regressions detected"
+        fi
+
+  update-baseline:
+    name: Update Performance Baseline
+    runs-on: ubuntu-latest
+    needs: [performance-benchmarks, performance-regression-check]
+    if: github.ref == 'refs/heads/main' && needs.performance-regression-check.result == 'success'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Download benchmark results
+      uses: actions/download-artifact@v4
+      with:
+        name: benchmark-results-${{ github.run_id }}
+
+    - name: Update baseline
+      run: |
+        # Copy latest results as new baseline
+        if [ -f "benchmark-results/*/benchmark_results.json" ]; then
+          RESULTS_FILE=$(find benchmark-results -name "benchmark_results.json" | head -1)
+          cp "$RESULTS_FILE" "benchmark-results/baseline.json"
+          echo "Updated performance baseline"
+        fi
+
+    - name: Commit baseline update
+      run: |
+        git config --global user.name 'github-actions[bot]'
+        git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+        git add benchmark-results/baseline.json
+        git commit -m "chore: update performance baseline
+
+Auto-updated from CI run: ${{ github.run_id }}
+SLO Compliance: ${{ needs.performance-benchmarks.outputs.slo-compliance }}%" || echo "No changes to commit"
+
+        git push origin main</content>
+<parameter name="filePath">.github/workflows/performance-benchmarking.yml
