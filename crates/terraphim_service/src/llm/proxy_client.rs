@@ -95,7 +95,7 @@ impl LlmClient for ProxyLlmClient {
 
         let response = match self
             .http
-            .post(&format!("{}/v1/chat/completions", self.config.base_url))
+            .post(format!("{}/v1/chat/completions", self.config.base_url))
             .json(&request)
             .send()
             .await
@@ -156,7 +156,7 @@ impl LlmClient for ProxyLlmClient {
 
         let response = match self
             .http
-            .get(&format!("{}/v1/models", self.config.base_url))
+            .get(format!("{}/v1/models", self.config.base_url))
             .send()
             .await
         {
@@ -224,7 +224,7 @@ impl LlmClient for ProxyLlmClient {
 
         let response = match self
             .http
-            .post(&format!("{}/v1/chat/completions", self.config.base_url))
+            .post(format!("{}/v1/chat/completions", self.config.base_url))
             .json(&request)
             .send()
             .await

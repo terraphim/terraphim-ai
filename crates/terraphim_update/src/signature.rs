@@ -7,6 +7,7 @@
 
 use anyhow::{anyhow, Context, Result};
 use base64::Engine;
+use chrono::{DateTime, Utc};
 use std::fs;
 use std::io::Cursor;
 use std::path::Path;
@@ -27,12 +28,49 @@ pub use zipsign_api::ZipsignError;
 /// TODO: Replace with actual Terraphim AI public key after key generation
 /// Run: ./scripts/generate-zipsign-keypair.sh
 /// Then add the public key here
-fn get_embedded_public_key() -> &'static str {
+pub fn get_embedded_public_key() -> &'static str {
     // Ed25519 public key for verifying Terraphim AI release signatures
     // Generated: 2025-01-12
     // Key type: Ed25519 (32 bytes, base64-encoded)
     // Fingerprint: Calculate with: echo -n "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4=" | base64 -d | sha256sum
     "1uLjooBMO+HlpKeiD16WOtT3COWeC8J/o2ERmDiEMc4="
+}
+
+/// Metadata for cryptographic keys
+///
+/// This structure provides information about signing keys including
+/// validity periods and key identifiers for future key rotation support.
+#[derive(Debug, Clone)]
+pub struct KeyMetadata {
+    /// Unique identifier for this key
+    pub key_id: String,
+    /// When this key became valid
+    pub valid_from: DateTime<Utc>,
+    /// When this key expires (None = no expiry set)
+    pub valid_until: Option<DateTime<Utc>>,
+    /// Base64-encoded Ed25519 public key
+    pub public_key: String,
+}
+
+/// Get the current active key metadata for Terraphim AI releases
+///
+/// This function provides metadata about the currently active signing key.
+/// In the future, this will support key rotation by maintaining multiple
+/// key metadata entries and selecting based on validity periods.
+///
+/// # Returns
+/// Key metadata structure with key information
+///
+/// # Note
+/// This is a basic implementation for v1.5.0. Full key rotation mechanism
+/// is deferred to a future release. The current key has no expiration date.
+pub fn get_active_key_metadata() -> KeyMetadata {
+    KeyMetadata {
+        key_id: "terraphim-release-key-2025-01".to_string(),
+        valid_from: "2025-01-12T00:00:00Z".parse().unwrap(),
+        valid_until: None, // No expiry set yet
+        public_key: get_embedded_public_key().to_string(),
+    }
 }
 
 /// Result of a signature verification operation
@@ -93,10 +131,12 @@ pub fn verify_archive_signature(
         None => get_embedded_public_key(),
     };
 
-    // Handle placeholder key
+    // Handle placeholder key - SECURITY: Never allow bypassing signature verification
     if key_str.starts_with("TODO:") {
-        warn!("Placeholder public key detected - signature verification disabled");
-        return Ok(VerificationResult::Valid);
+        return Err(anyhow!(
+            "Placeholder public key detected. Signature verification cannot be bypassed. \
+            Configure a real Ed25519 public key in get_embedded_public_key()."
+        ));
     }
 
     // Read the archive file
@@ -151,24 +191,24 @@ pub fn verify_archive_signature(
 
 /// Verify signature using self_update's built-in verification
 ///
-/// This is a more robust version that would integrate with self_update's
-/// signature verification when downloading and installing updates.
+/// This is a convenience wrapper around `verify_archive_signature`.
+/// Note: When using `TerraphimUpdater::update()`, signature verification
+/// is handled automatically by self_update via `.verifying_keys()`.
 ///
 /// # Arguments
 /// * `release_name` - Name of the release (e.g., "terraphim")
 /// * `version` - Version string (e.g., "1.0.0")
-/// * `binary_path` - Path to the binary to verify
-/// * `public_key` - Public key for verification
+/// * `archive_path` - Path to the .tar.gz archive to verify
+/// * `public_key` - Public key for verification (base64-encoded, or None for embedded key)
 ///
 /// # Returns
 /// * `Ok(VerificationResult)` - Result of verification
 /// * `Err(anyhow::Error)` - Error if verification fails
 ///
 /// # Note
-/// This is a placeholder for integrating with self_update's
-/// `signatures` feature. In a real implementation, this would use
-/// self_update's internal signature verification when calling
-/// `updater.download_and_replace()` with signature verification enabled.
+/// The `release_name` and `version` parameters are kept for API compatibility
+/// but are not used in the verification itself. The actual verification uses
+/// the archive filename as context (via zipsign).
 ///
 /// # Example
 /// ```no_run
@@ -178,31 +218,27 @@ pub fn verify_archive_signature(
 /// let result = verify_with_self_update(
 ///     "terraphim",
 ///     "1.0.0",
-///     Path::new("/tmp/terraphim"),
-///     "-----BEGIN PUBLIC KEY-----..."
+///     Path::new("/tmp/terraphim-1.0.0.tar.gz"),
+///     None  // Use embedded public key
 /// ).unwrap();
 /// ```
 pub fn verify_with_self_update(
     _release_name: &str,
     _version: &str,
-    _binary_path: &Path,
-    _public_key: &str,
+    archive_path: &Path,
+    public_key: Option<&str>,
 ) -> Result<VerificationResult> {
     info!(
-        "Verifying signature for {} v{} using self_update",
-        _release_name, _version
+        "Verifying signature for {} v{} at {:?}",
+        _release_name, _version, archive_path
     );
 
-    if !_binary_path.exists() {
-        return Err(anyhow!("Binary file not found"));
+    if !archive_path.exists() {
+        return Err(anyhow!("Archive file not found: {:?}", archive_path));
     }
 
-    debug!(
-        "Release: {} v{}, Binary: {:?}",
-        _release_name, _version, _binary_path
-    );
-
-    Ok(VerificationResult::Valid)
+    // Delegate to our proven signature verification
+    verify_archive_signature(archive_path, public_key)
 }
 
 /// Verify signature with detailed error reporting
@@ -416,10 +452,16 @@ mod tests {
     fn test_verify_with_self_update() {
         let temp_file = tempfile::NamedTempFile::new().unwrap();
 
-        let result =
-            verify_with_self_update("terraphim", "1.0.0", temp_file.path(), "test-key").unwrap();
+        // Use a valid 32-byte base64-encoded test key (not a real signing key)
+        // This key is just for testing the verification function works
+        let test_key = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA="; // 32 bytes of zeros, base64-encoded
 
-        assert_eq!(result, VerificationResult::Valid);
+        let result =
+            verify_with_self_update("terraphim", "1.0.0", temp_file.path(), Some(test_key))
+                .unwrap();
+
+        // Unsigned file should be rejected with Invalid result
+        assert!(matches!(result, VerificationResult::Invalid { .. }));
     }
 
     #[test]
@@ -428,7 +470,7 @@ mod tests {
             "terraphim",
             "1.0.0",
             Path::new("/nonexistent/binary"),
-            "test-key",
+            Some("test-key"),
         );
 
         assert!(result.is_err());
