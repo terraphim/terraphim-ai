@@ -1684,19 +1684,6 @@ dependencies = [
 
 [[package]]
 name = "dashmap"
-version = "5.5.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "978747c1d849a7d2ee5e8adc0159961c48fb7e5db2f06af6723b80123bb53856"
-dependencies = [
- "cfg-if",
- "hashbrown 0.14.5",
- "lock_api",
- "once_cell",
- "parking_lot_core 0.9.12",
-]
-
-[[package]]
-name = "dashmap"
 version = "6.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
@@ -5230,7 +5217,7 @@ dependencies = [
  "bytes",
  "chrono",
  "crc32c",
- "dashmap 6.1.0",
+ "dashmap",
  "futures",
  "getrandom 0.2.16",
  "http 1.4.0",
@@ -8891,7 +8878,7 @@ dependencies = [
  "chrono",
  "clap",
  "config",
- "dashmap 5.5.3",
+ "dashmap",
  "env_logger 0.10.2",
  "fastrand",
  "futures",
@@ -9265,7 +9252,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "dashmap 5.5.3",
+ "dashmap",
  "env_logger 0.11.8",
  "log",
  "reqwest 0.12.24",
@@ -9575,7 +9562,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bollard",
- "dashmap 5.5.3",
+ "dashmap",
  "futures",
  "hyper 1.8.1",
  "hyper-util",
