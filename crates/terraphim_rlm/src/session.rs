@@ -85,12 +85,12 @@ impl SessionManager {
         session_id: &SessionId,
         state: SessionState,
     ) -> RlmResult<()> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.state = state;
         Ok(())
@@ -127,12 +127,12 @@ impl SessionManager {
 
     /// Extend a session's lifetime.
     pub fn extend_session(&self, session_id: &SessionId) -> RlmResult<SessionInfo> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         if !session.can_extend(self.config.max_extensions) {
             return Err(RlmError::MaxExtensionsReached {
@@ -181,12 +181,12 @@ impl SessionManager {
         }
 
         // Update session with VM ID
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.vm_instance_id = Some(vm_instance_id.clone());
         session.state = SessionState::Ready;
@@ -216,12 +216,12 @@ impl SessionManager {
         key: String,
         value: String,
     ) -> RlmResult<()> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.context_variables.insert(key, value);
         Ok(())
@@ -248,12 +248,12 @@ impl SessionManager {
 
     /// Update budget status for a session.
     pub fn update_budget(&self, session_id: &SessionId, budget: BudgetStatus) -> RlmResult<()> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.budget_status = budget;
         Ok(())
@@ -261,12 +261,12 @@ impl SessionManager {
 
     /// Increment recursion depth for a session.
     pub fn increment_recursion_depth(&self, session_id: &SessionId) -> RlmResult<u32> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         let new_depth = session.recursion_depth + 1;
 
@@ -286,12 +286,12 @@ impl SessionManager {
 
     /// Decrement recursion depth for a session.
     pub fn decrement_recursion_depth(&self, session_id: &SessionId) -> RlmResult<u32> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or(RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.recursion_depth = session.recursion_depth.saturating_sub(1);
         session.budget_status.current_recursion_depth = session.recursion_depth;
