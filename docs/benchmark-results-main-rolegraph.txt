@@ -1,0 +1,364 @@
+warning: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim-session-analyzer/Cargo.toml: file `/home/alex/projects/terraphim/terraphim-ai/crates/terraphim-session-analyzer/src/main.rs` found to be present in multiple build targets:
+  * `bin` target `cla`
+  * `bin` target `tsa`
+   Compiling terraphim_rolegraph v1.4.10 (/home/alex/projects/terraphim/terraphim-ai/crates/terraphim_rolegraph)
+    Finished `bench` profile [optimized] target(s) in 8.34s
+     Running unittests src/lib.rs (target/release/deps/terraphim_rolegraph-3c97d33ab842fd50)
+
+running 12 tests
+test tests::test_find_matching_node_idss ... ignored
+test tests::test_find_matching_node_idss_ac_values ... ignored
+test tests::test_graph_stats_serialization ... ignored
+test tests::test_is_all_terms_connected_by_path_false ... ignored
+test tests::test_is_all_terms_connected_by_path_true ... ignored
+test tests::test_rolegraph ... ignored
+test tests::test_rolegraph_serialization ... ignored
+test tests::test_rolegraph_sync_serialization ... ignored
+test tests::test_rolegraph_with_thesaurus_no_node_not_found_errors ... ignored
+test tests::test_serialization_edge_cases ... ignored
+test tests::test_split_paragraphs ... ignored
+test tests::test_terraphim_engineer ... ignored
+
+test result: ok. 0 passed; 0 failed; 12 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running benches/throughput.rs (target/release/deps/throughput-aadeb221a7f5c9da)
+Gnuplot not found, using plotters backend
+Benchmarking find_matching_node_idss/find_matching_node_idss/1
+Benchmarking find_matching_node_idss/find_matching_node_idss/1: Warming up for 3.0000 s
+Benchmarking find_matching_node_idss/find_matching_node_idss/1: Collecting 100 samples in estimated 5.0029 s (3.2M iterations)
+Benchmarking find_matching_node_idss/find_matching_node_idss/1: Analyzing
+find_matching_node_idss/find_matching_node_idss/1
+                        time:   [1.5730 µs 1.6206 µs 1.6737 µs]
+                        change: [+2.5755% +4.8065% +7.6390%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 28 outliers among 100 measurements (28.00%)
+  6 (6.00%) low mild
+  7 (7.00%) high mild
+  15 (15.00%) high severe
+
+Benchmarking find_matching_node_idss/find_matching_node_idss/10
+Benchmarking find_matching_node_idss/find_matching_node_idss/10: Warming up for 3.0000 s
+Benchmarking find_matching_node_idss/find_matching_node_idss/10: Collecting 100 samples in estimated 5.0070 s (348k iterations)
+Benchmarking find_matching_node_idss/find_matching_node_idss/10: Analyzing
+find_matching_node_idss/find_matching_node_idss/10
+                        time:   [14.859 µs 15.190 µs 15.596 µs]
+                        change: [−0.2163% +1.6840% +4.1989%] (p = 0.16 > 0.05)
+                        No change in performance detected.
+Found 27 outliers among 100 measurements (27.00%)
+  7 (7.00%) low severe
+  4 (4.00%) high mild
+  16 (16.00%) high severe
+
+Benchmarking find_matching_node_idss/find_matching_node_idss/100
+Benchmarking find_matching_node_idss/find_matching_node_idss/100: Warming up for 3.0000 s
+Benchmarking find_matching_node_idss/find_matching_node_idss/100: Collecting 100 samples in estimated 5.6176 s (40k iterations)
+Benchmarking find_matching_node_idss/find_matching_node_idss/100: Analyzing
+find_matching_node_idss/find_matching_node_idss/100
+                        time:   [143.34 µs 145.49 µs 148.13 µs]
+                        change: [+0.2738% +1.9080% +3.5628%] (p = 0.04 < 0.05)
+                        Change within noise threshold.
+Found 10 outliers among 100 measurements (10.00%)
+  10 (10.00%) high severe
+
+Benchmarking find_matching_node_idss/find_matching_node_idss/1000
+Benchmarking find_matching_node_idss/find_matching_node_idss/1000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 7.2s, enable flat sampling, or reduce sample count to 50.
+Benchmarking find_matching_node_idss/find_matching_node_idss/1000: Collecting 100 samples in estimated 7.1582 s (5050 iterations)
+Benchmarking find_matching_node_idss/find_matching_node_idss/1000: Analyzing
+find_matching_node_idss/find_matching_node_idss/1000
+                        time:   [1.4242 ms 1.4322 ms 1.4425 ms]
+                        change: [+6.7822% +9.4526% +12.687%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+
+Benchmarking find_matches
+Benchmarking find_matches: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 30.3s, or reduce sample count to 10.
+Benchmarking find_matches: Collecting 100 samples in estimated 30.261 s (100 iterations)
+Benchmarking find_matches: Analyzing
+find_matches            time:   [581.52 ms 771.26 ms 979.19 ms]
+                        change: [+260.24% +397.60% +530.41%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking split_paragraphs
+Benchmarking split_paragraphs: Warming up for 3.0000 s
+Benchmarking split_paragraphs: Collecting 100 samples in estimated 5.0301 s (429k iterations)
+Benchmarking split_paragraphs: Analyzing
+split_paragraphs        time:   [11.507 µs 11.579 µs 11.652 µs]
+                        change: [−2.3275% −1.3408% −0.4084%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+
+Benchmarking parse_document_to_pair
+Benchmarking parse_document_to_pair: Warming up for 3.0000 s
+Benchmarking parse_document_to_pair: Collecting 100 samples in estimated 5.0030 s (1.5M iterations)
+Benchmarking parse_document_to_pair: Analyzing
+parse_document_to_pair  time:   [2.9071 µs 2.9189 µs 2.9324 µs]
+                        change: [+0.2119% +0.7548% +1.2154%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 15 outliers among 100 measurements (15.00%)
+  11 (11.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking throughput/parse_document_to_pair/100
+Benchmarking throughput/parse_document_to_pair/100: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/100: Collecting 100 samples in estimated 5.0070 s (1.7M iterations)
+Benchmarking throughput/parse_document_to_pair/100: Analyzing
+throughput/parse_document_to_pair/100
+                        time:   [2.9025 µs 2.9095 µs 2.9183 µs]
+                        thrpt:  [9.3824 GiB/s 9.4109 GiB/s 9.4335 GiB/s]
+                 change:
+                        time:   [+1.1582% +1.6030% +2.2177%] (p = 0.00 < 0.05)
+                        thrpt:  [−2.1696% −1.5777% −1.1449%]
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  1 (1.00%) high mild
+  3 (3.00%) high severe
+Benchmarking throughput/parse_document_to_pair/1000
+Benchmarking throughput/parse_document_to_pair/1000: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/1000: Collecting 100 samples in estimated 5.0104 s (1.6M iterations)
+Benchmarking throughput/parse_document_to_pair/1000: Analyzing
+throughput/parse_document_to_pair/1000
+                        time:   [2.9115 µs 2.9154 µs 2.9194 µs]
+                        thrpt:  [93.789 GiB/s 93.917 GiB/s 94.045 GiB/s]
+                 change:
+                        time:   [−0.2830% −0.0792% +0.1128%] (p = 0.41 > 0.05)
+                        thrpt:  [−0.1127% +0.0793% +0.2838%]
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+Benchmarking throughput/parse_document_to_pair/2000
+Benchmarking throughput/parse_document_to_pair/2000: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/2000: Collecting 100 samples in estimated 5.0066 s (1.7M iterations)
+Benchmarking throughput/parse_document_to_pair/2000: Analyzing
+throughput/parse_document_to_pair/2000
+                        time:   [2.8785 µs 2.9053 µs 2.9295 µs]
+                        thrpt:  [186.93 GiB/s 188.49 GiB/s 190.24 GiB/s]
+                 change:
+                        time:   [+5.6487% +9.4477% +13.749%] (p = 0.00 < 0.05)
+                        thrpt:  [−12.087% −8.6322% −5.3467%]
+                        Performance has regressed.
+Found 23 outliers among 100 measurements (23.00%)
+  1 (1.00%) low severe
+  1 (1.00%) low mild
+  21 (21.00%) high severe
+Benchmarking throughput/parse_document_to_pair/3000
+Benchmarking throughput/parse_document_to_pair/3000: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/3000: Collecting 100 samples in estimated 5.0135 s (1.7M iterations)
+Benchmarking throughput/parse_document_to_pair/3000: Analyzing
+throughput/parse_document_to_pair/3000
+                        time:   [2.9908 µs 3.0857 µs 3.1933 µs]
+                        thrpt:  [257.23 GiB/s 266.21 GiB/s 274.65 GiB/s]
+                 change:
+                        time:   [+3.7138% +5.4194% +7.3586%] (p = 0.00 < 0.05)
+                        thrpt:  [−6.8542% −5.1408% −3.5808%]
+                        Performance has regressed.
+Found 10 outliers among 100 measurements (10.00%)
+  1 (1.00%) low mild
+  9 (9.00%) high severe
+Benchmarking throughput/parse_document_to_pair/4000
+Benchmarking throughput/parse_document_to_pair/4000: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/4000: Collecting 100 samples in estimated 5.0010 s (1.7M iterations)
+Benchmarking throughput/parse_document_to_pair/4000: Analyzing
+throughput/parse_document_to_pair/4000
+                        time:   [2.9581 µs 3.0456 µs 3.1568 µs]
+                        thrpt:  [346.94 GiB/s 359.61 GiB/s 370.25 GiB/s]
+                 change:
+                        time:   [+3.4169% +4.5620% +6.2351%] (p = 0.00 < 0.05)
+                        thrpt:  [−5.8691% −4.3630% −3.3040%]
+                        Performance has regressed.
+Found 16 outliers among 100 measurements (16.00%)
+  3 (3.00%) low severe
+  4 (4.00%) low mild
+  4 (4.00%) high mild
+  5 (5.00%) high severe
+Benchmarking throughput/parse_document_to_pair/5000
+Benchmarking throughput/parse_document_to_pair/5000: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/5000: Collecting 100 samples in estimated 5.0072 s (1.7M iterations)
+Benchmarking throughput/parse_document_to_pair/5000: Analyzing
+throughput/parse_document_to_pair/5000
+                        time:   [2.8894 µs 2.8974 µs 2.9073 µs]
+                        thrpt:  [470.90 GiB/s 472.51 GiB/s 473.81 GiB/s]
+                 change:
+                        time:   [+0.5410% +1.2964% +2.1313%] (p = 0.00 < 0.05)
+                        thrpt:  [−2.0868% −1.2798% −0.5381%]
+                        Change within noise threshold.
+Found 18 outliers among 100 measurements (18.00%)
+  2 (2.00%) low severe
+  16 (16.00%) high severe
+Benchmarking throughput/parse_document_to_pair/10000
+Benchmarking throughput/parse_document_to_pair/10000: Warming up for 3.0000 s
+Benchmarking throughput/parse_document_to_pair/10000: Collecting 100 samples in estimated 5.0034 s (1.6M iterations)
+Benchmarking throughput/parse_document_to_pair/10000: Analyzing
+throughput/parse_document_to_pair/10000
+                        time:   [2.8750 µs 2.8814 µs 2.8892 µs]
+                        thrpt:  [947.69 GiB/s 950.25 GiB/s 952.38 GiB/s]
+                 change:
+                        time:   [+0.4971% +0.7274% +0.9938%] (p = 0.00 < 0.05)
+                        thrpt:  [−0.9840% −0.7221% −0.4946%]
+                        Change within noise threshold.
+Found 2 outliers among 100 measurements (2.00%)
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking throughput_corpus/parse_document_to_pair/72
+Benchmarking throughput_corpus/parse_document_to_pair/72: Warming up for 3.0000 s
+Benchmarking throughput_corpus/parse_document_to_pair/72: Collecting 100 samples in estimated 5.0022 s (7.8M iterations)
+Benchmarking throughput_corpus/parse_document_to_pair/72: Analyzing
+throughput_corpus/parse_document_to_pair/72
+                        time:   [615.34 ns 619.36 ns 623.92 ns]
+                        thrpt:  [110.05 MiB/s 110.86 MiB/s 111.59 MiB/s]
+                 change:
+                        time:   [−0.4999% +0.0205% +0.5862%] (p = 0.95 > 0.05)
+                        thrpt:  [−0.5828% −0.0205% +0.5024%]
+                        No change in performance detected.
+Found 13 outliers among 100 measurements (13.00%)
+  7 (7.00%) high mild
+  6 (6.00%) high severe
+Benchmarking throughput_corpus/parse_document_to_pair/73
+Benchmarking throughput_corpus/parse_document_to_pair/73: Warming up for 3.0000 s
+Benchmarking throughput_corpus/parse_document_to_pair/73: Collecting 100 samples in estimated 5.0030 s (7.5M iterations)
+Benchmarking throughput_corpus/parse_document_to_pair/73: Analyzing
+throughput_corpus/parse_document_to_pair/73
+                        time:   [646.07 ns 658.94 ns 673.74 ns]
+                        thrpt:  [103.33 MiB/s 105.65 MiB/s 107.76 MiB/s]
+                 change:
+                        time:   [+3.7347% +4.9016% +6.1275%] (p = 0.00 < 0.05)
+                        thrpt:  [−5.7738% −4.6725% −3.6002%]
+                        Performance has regressed.
+Found 14 outliers among 100 measurements (14.00%)
+  3 (3.00%) high mild
+  11 (11.00%) high severe
+Benchmarking throughput_corpus/parse_document_to_pair/74
+Benchmarking throughput_corpus/parse_document_to_pair/74: Warming up for 3.0000 s
+Benchmarking throughput_corpus/parse_document_to_pair/74: Collecting 100 samples in estimated 5.0025 s (7.6M iterations)
+Benchmarking throughput_corpus/parse_document_to_pair/74: Analyzing
+throughput_corpus/parse_document_to_pair/74
+                        time:   [636.64 ns 641.40 ns 646.93 ns]
+                        thrpt:  [109.09 MiB/s 110.03 MiB/s 110.85 MiB/s]
+                 change:
+                        time:   [+1.0307% +1.5920% +2.2068%] (p = 0.00 < 0.05)
+                        thrpt:  [−2.1592% −1.5671% −1.0202%]
+                        Performance has regressed.
+Found 3 outliers among 100 measurements (3.00%)
+  1 (1.00%) high mild
+  2 (2.00%) high severe
+Benchmarking throughput_corpus/parse_document_to_pair/75
+Benchmarking throughput_corpus/parse_document_to_pair/75: Warming up for 3.0000 s
+Benchmarking throughput_corpus/parse_document_to_pair/75: Collecting 100 samples in estimated 5.0020 s (7.5M iterations)
+Benchmarking throughput_corpus/parse_document_to_pair/75: Analyzing
+throughput_corpus/parse_document_to_pair/75
+                        time:   [669.06 ns 710.13 ns 755.19 ns]
+                        thrpt:  [94.712 MiB/s 100.72 MiB/s 106.91 MiB/s]
+                 change:
+                        time:   [+2.9421% +5.7810% +8.5862%] (p = 0.00 < 0.05)
+                        thrpt:  [−7.9073% −5.4651% −2.8580%]
+                        Performance has regressed.
+Found 13 outliers among 100 measurements (13.00%)
+  4 (4.00%) high mild
+  9 (9.00%) high severe
+Benchmarking throughput_corpus/parse_document_to_pair/76
+Benchmarking throughput_corpus/parse_document_to_pair/76: Warming up for 3.0000 s
+Benchmarking throughput_corpus/parse_document_to_pair/76: Collecting 100 samples in estimated 5.0028 s (7.6M iterations)
+Benchmarking throughput_corpus/parse_document_to_pair/76: Analyzing
+throughput_corpus/parse_document_to_pair/76
+                        time:   [654.39 ns 685.08 ns 719.85 ns]
+                        thrpt:  [100.69 MiB/s 105.80 MiB/s 110.76 MiB/s]
+                 change:
+                        time:   [+2.4374% +4.8945% +7.6953%] (p = 0.00 < 0.05)
+                        thrpt:  [−7.1454% −4.6661% −2.3794%]
+                        Performance has regressed.
+Found 12 outliers among 100 measurements (12.00%)
+  2 (2.00%) low severe
+  1 (1.00%) high mild
+  9 (9.00%) high severe
+
+Benchmarking query throughput/query/1
+Benchmarking query throughput/query/1: Warming up for 3.0000 s
+Benchmarking query throughput/query/1: Collecting 100 samples in estimated 5.0038 s (5.5M iterations)
+Benchmarking query throughput/query/1: Analyzing
+query throughput/query/1
+                        time:   [897.73 ns 930.51 ns 970.01 ns]
+                        thrpt:  [40.310 MiB/s 42.021 MiB/s 43.555 MiB/s]
+                 change:
+                        time:   [−1.1961% +0.0572% +1.7901%] (p = 0.95 > 0.05)
+                        thrpt:  [−1.7586% −0.0572% +1.2106%]
+                        No change in performance detected.
+Found 14 outliers among 100 measurements (14.00%)
+  4 (4.00%) low severe
+  5 (5.00%) high mild
+  5 (5.00%) high severe
+Benchmarking query throughput/query/10
+Benchmarking query throughput/query/10: Warming up for 3.0000 s
+Benchmarking query throughput/query/10: Collecting 100 samples in estimated 5.0296 s (550k iterations)
+Benchmarking query throughput/query/10: Analyzing
+query throughput/query/10
+                        time:   [9.0991 µs 9.1277 µs 9.1552 µs]
+                        thrpt:  [42.709 MiB/s 42.837 MiB/s 42.972 MiB/s]
+                 change:
+                        time:   [+0.5324% +1.1042% +1.7038%] (p = 0.00 < 0.05)
+                        thrpt:  [−1.6752% −1.0921% −0.5296%]
+                        Change within noise threshold.
+Found 9 outliers among 100 measurements (9.00%)
+  6 (6.00%) low severe
+  1 (1.00%) low mild
+  1 (1.00%) high mild
+  1 (1.00%) high severe
+Benchmarking query throughput/query/100
+Benchmarking query throughput/query/100: Warming up for 3.0000 s
+Benchmarking query throughput/query/100: Collecting 100 samples in estimated 5.5108 s (45k iterations)
+Benchmarking query throughput/query/100: Analyzing
+query throughput/query/100
+                        time:   [113.36 µs 113.74 µs 114.22 µs]
+                        thrpt:  [34.232 MiB/s 34.378 MiB/s 34.492 MiB/s]
+                 change:
+                        time:   [+0.1822% +0.7147% +1.4363%] (p = 0.01 < 0.05)
+                        thrpt:  [−1.4159% −0.7096% −0.1819%]
+                        Change within noise threshold.
+Found 6 outliers among 100 measurements (6.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  2 (2.00%) high severe
+Benchmarking query throughput/query/1000
+Benchmarking query throughput/query/1000: Warming up for 3.0000 s
+Benchmarking query throughput/query/1000: Collecting 100 samples in estimated 5.0524 s (1100 iterations)
+Benchmarking query throughput/query/1000: Analyzing
+query throughput/query/1000
+                        time:   [4.3309 ms 4.3331 ms 4.3356 ms]
+                        thrpt:  [9.0185 MiB/s 9.0237 MiB/s 9.0284 MiB/s]
+                 change:
+                        time:   [−1.1114% −0.6368% −0.3477%] (p = 0.00 < 0.05)
+                        thrpt:  [+0.3490% +0.6409% +1.1239%]
+                        Change within noise threshold.
+Found 12 outliers among 100 measurements (12.00%)
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  6 (6.00%) high severe
+
+Benchmarking query_response
+Benchmarking query_response: Warming up for 3.0000 s
+Benchmarking query_response: Collecting 100 samples in estimated 5.0023 s (5.3M iterations)
+Benchmarking query_response: Analyzing
+query_response          time:   [878.25 ns 881.78 ns 886.09 ns]
+                        change: [−0.3809% −0.1083% +0.1582%] (p = 0.44 > 0.05)
+                        No change in performance detected.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low severe
+  1 (1.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking is_all_terms_connected_by_path
+Benchmarking is_all_terms_connected_by_path: Warming up for 3.0000 s
+Benchmarking is_all_terms_connected_by_path: Collecting 100 samples in estimated 5.0009 s (14M iterations)
+Benchmarking is_all_terms_connected_by_path: Analyzing
+is_all_terms_connected_by_path
+                        time:   [344.11 ns 344.44 ns 344.82 ns]
+                        change: [+1.6758% +1.8430% +2.0148%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe

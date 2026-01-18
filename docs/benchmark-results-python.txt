@@ -1,0 +1,100 @@
+============================= test session starts ==============================
+platform linux -- Python 3.13.6, pytest-9.0.2, pluggy-1.6.0 -- /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_automata_py/.venv/bin/python3
+cachedir: .pytest_cache
+benchmark: 5.2.3 (defaults: timer=time.perf_counter disable_gc=False min_rounds=5 min_time=0.000005 max_time=1.0 calibration_precision=10 warmup=False warmup_iterations=100000)
+rootdir: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim_automata_py
+configfile: pyproject.toml
+plugins: cov-7.0.0, benchmark-5.2.3
+collecting ... collected 40 items
+
+python/benchmarks/benchmark_autocomplete.py::TestIndexBuilding::test_build_small_index PASSED [  2%]
+python/benchmarks/benchmark_autocomplete.py::TestIndexBuilding::test_build_medium_index PASSED [  5%]
+python/benchmarks/benchmark_autocomplete.py::TestIndexBuilding::test_build_large_index PASSED [  7%]
+python/benchmarks/benchmark_autocomplete.py::TestPrefixSearch::test_search_small_index PASSED [ 10%]
+python/benchmarks/benchmark_autocomplete.py::TestPrefixSearch::test_search_medium_index PASSED [ 12%]
+python/benchmarks/benchmark_autocomplete.py::TestPrefixSearch::test_search_large_index PASSED [ 15%]
+python/benchmarks/benchmark_autocomplete.py::TestPrefixSearch::test_search_with_many_results PASSED [ 17%]
+python/benchmarks/benchmark_autocomplete.py::TestPrefixSearch::test_search_no_results PASSED [ 20%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_jaro_winkler_small PASSED [ 22%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_jaro_winkler_medium PASSED [ 25%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_jaro_winkler_large PASSED [ 27%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_levenshtein_small PASSED [ 30%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_levenshtein_medium PASSED [ 32%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_levenshtein_large PASSED [ 35%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_high_threshold PASSED [ 37%]
+python/benchmarks/benchmark_autocomplete.py::TestFuzzySearch::test_fuzzy_search_low_threshold PASSED [ 40%]
+python/benchmarks/benchmark_autocomplete.py::TestSearchPatterns::test_short_prefix PASSED [ 42%]
+python/benchmarks/benchmark_autocomplete.py::TestSearchPatterns::test_medium_prefix PASSED [ 45%]
+python/benchmarks/benchmark_autocomplete.py::TestSearchPatterns::test_long_prefix PASSED [ 47%]
+python/benchmarks/benchmark_autocomplete.py::TestSearchPatterns::test_exact_match PASSED [ 50%]
+python/benchmarks/benchmark_matcher.py::TestFindMatches::test_find_matches_small_text PASSED [ 52%]
+python/benchmarks/benchmark_matcher.py::TestFindMatches::test_find_matches_medium_text PASSED [ 55%]
+python/benchmarks/benchmark_matcher.py::TestFindMatches::test_find_matches_large_text PASSED [ 57%]
+python/benchmarks/benchmark_matcher.py::TestFindMatches::test_find_matches_with_positions PASSED [ 60%]
+python/benchmarks/benchmark_matcher.py::TestFindMatches::test_find_matches_without_positions PASSED [ 62%]
+python/benchmarks/benchmark_matcher.py::TestFindMatches::test_find_matches_many_terms PASSED [ 65%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_markdown_small PASSED [ 67%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_markdown_medium PASSED [ 70%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_markdown_large PASSED [ 72%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_html_medium PASSED [ 75%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_wiki_medium PASSED [ 77%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_plain_medium PASSED [ 80%]
+python/benchmarks/benchmark_matcher.py::TestReplaceWithLinks::test_replace_many_terms PASSED [ 82%]
+python/benchmarks/benchmark_matcher.py::TestExtractParagraphs::test_extract_paragraphs_small PASSED [ 85%]
+python/benchmarks/benchmark_matcher.py::TestExtractParagraphs::test_extract_paragraphs_medium PASSED [ 87%]
+python/benchmarks/benchmark_matcher.py::TestExtractParagraphs::test_extract_paragraphs_large PASSED [ 90%]
+python/benchmarks/benchmark_matcher.py::TestExtractParagraphs::test_extract_paragraphs_many_terms PASSED [ 92%]
+python/benchmarks/benchmark_matcher.py::TestComplexScenarios::test_full_workflow_small PASSED [ 95%]
+python/benchmarks/benchmark_matcher.py::TestComplexScenarios::test_full_workflow_medium PASSED [ 97%]
+python/benchmarks/benchmark_matcher.py::TestComplexScenarios::test_repeated_matching PASSED [100%]
+
+
+----------------------------------------------------------------------------------------------------------------------- benchmark: 40 tests ------------------------------------------------------------------------------------------------------------------------
+Name (time in ns)                                      Min                         Max                        Mean                    StdDev                      Median                       IQR            Outliers             OPS            Rounds  Iterations
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+test_search_no_results                            364.6999 (1.0)            1,035.9001 (1.0)              375.8585 (1.0)             27.2639 (1.0)              372.0999 (1.0)              3.3002 (1.0)     2065;8818  2,660,575.5095 (1.0)      124751          20
+test_long_prefix                                2,389.9993 (6.55)       3,019,644.0021 (>1000.0)        4,461.4301 (11.87)       29,078.0910 (>1000.0)        4,213.9982 (11.32)          576.9980 (174.84)    13;5855    224,143.3736 (0.08)      68573           1
+test_exact_match                                2,725.9994 (7.47)       3,018,351.9993 (>1000.0)        4,816.5432 (12.81)       17,979.9724 (659.48)         4,805.9992 (12.92)          454.0016 (137.57)    13;3546    207,617.7778 (0.08)      56517           1
+test_search_small_index                         6,672.9990 (18.30)         74,232.9976 (71.66)          8,985.8234 (23.91)        1,045.9044 (38.36)          8,925.9993 (23.99)          227.9994 (69.09)   2174;2874    111,286.4067 (0.04)      51262           1
+test_short_prefix                               8,613.0021 (23.62)        184,851.0001 (178.44)         9,261.9978 (24.64)        1,525.4943 (55.95)          8,988.9982 (24.16)          129.9995 (39.39)   1858;3683    107,968.0670 (0.04)      44262           1
+test_search_medium_index                        8,672.9997 (23.78)         34,418.0007 (33.23)          9,244.9460 (24.60)          941.7967 (34.54)          9,125.9972 (24.53)          268.9994 (81.51)   1571;1834    108,167.2079 (0.04)      54034           1
+test_search_large_index                         8,701.0012 (23.86)        173,858.9999 (167.83)        13,388.2900 (35.62)        2,713.5796 (99.53)         13,503.0023 (36.29)        1,637.0032 (496.03)  5680;5360     74,692.1379 (0.03)      30375           1
+test_medium_prefix                              8,736.0022 (23.95)         26,275.0000 (25.36)          9,385.1345 (24.97)        1,427.9444 (52.37)          9,023.9992 (24.25)          136.0022 (41.21)   2896;4626    106,551.4829 (0.04)      48805           1
+test_fuzzy_search_levenshtein_small            66,494.0017 (182.33)       257,362.0004 (248.44)        71,702.6882 (190.77)       6,639.6491 (243.53)        70,578.0003 (189.67)         611.0022 (185.14)   498;1178     13,946.4785 (0.01)      10906           1
+test_fuzzy_search_jaro_winkler_small           67,868.0008 (186.09)       245,547.9989 (237.04)        72,598.9080 (193.15)       2,428.0238 (89.06)         72,260.9984 (194.20)         370.7482 (112.34)    473;890     13,774.3119 (0.01)       8791           1
+test_search_with_many_results                  79,002.0022 (216.62)       186,533.0014 (180.07)       103,624.6086 (275.70)      19,647.4372 (720.64)       111,161.0018 (298.74)      37,257.9998 (>1000.0)    2559;1      9,650.2174 (0.00)       5762           1
+test_replace_markdown_small                   140,066.9971 (384.06)       231,527.0031 (223.50)       144,048.3420 (383.25)       6,160.1525 (225.95)       142,797.9987 (383.76)       1,524.0003 (461.79)     84;226      6,942.1139 (0.00)       2228           1
+test_find_matches_small_text                  148,318.0022 (406.69)       342,831.0010 (330.95)       156,958.3561 (417.60)      20,030.8563 (734.70)       151,876.0000 (408.16)       1,953.4991 (591.93)    169;402      6,371.1167 (0.00)       3471           1
+test_extract_paragraphs_small                 168,612.0013 (462.33)       339,247.0026 (327.49)       175,187.0706 (466.10)      14,795.6819 (542.68)       172,182.4992 (462.73)       2,184.9992 (662.08)    155;424      5,708.1838 (0.00)       4790           1
+test_replace_plain_medium                     205,139.0002 (562.49)       853,515.0009 (823.94)       230,382.8124 (612.95)      41,794.8176 (>1000.0)      209,238.5002 (562.32)      10,031.9994 (>1000.0)   911;974      4,340.6016 (0.00)       4346           1
+test_replace_wiki_medium                      205,971.9991 (564.77)       382,167.9966 (368.92)       212,233.0395 (564.66)      11,611.1579 (425.88)       209,696.9984 (563.55)       3,032.5000 (918.89)    150;324      4,711.8017 (0.00)       4305           1
+test_replace_html_medium                      208,692.9999 (572.23)       385,824.0016 (372.45)       214,499.6652 (570.69)      10,893.1017 (399.54)       212,259.9981 (570.44)       2,736.2503 (829.12)    153;323      4,662.0119 (0.00)       4173           1
+test_replace_markdown_medium                  209,358.0006 (574.06)       385,993.0002 (372.62)       222,527.5736 (592.05)      26,620.7582 (976.41)       214,654.0028 (576.87)       6,949.2517 (>1000.0)   268;331      4,493.8251 (0.00)       3989           1
+test_build_small_index                        225,705.0000 (618.88)       435,240.9996 (420.16)       242,674.1407 (645.65)       6,663.8133 (244.42)       242,628.5009 (652.05)       2,847.9990 (862.98)    108;187      4,120.7522 (0.00)       1514           1
+test_find_matches_with_positions              264,880.0000 (726.30)       446,661.0008 (431.18)       279,275.3126 (743.03)       8,684.9424 (318.55)       278,056.4992 (747.26)       3,158.5005 (957.07)    101;148      3,580.6960 (0.00)       3324           1
+test_find_matches_without_positions           265,088.9983 (726.87)       430,255.0005 (415.34)       279,594.5421 (743.88)       8,710.5726 (319.49)       278,489.0003 (748.43)       2,876.0005 (871.46)     87;147      3,576.6077 (0.00)       3372           1
+test_find_matches_medium_text                 266,191.0003 (729.89)       517,635.0023 (499.70)       287,868.6639 (765.90)      34,304.4865 (>1000.0)      279,638.9999 (751.52)       3,953.7472 (>1000.0)   165;361      3,473.8064 (0.00)       3205           1
+test_full_workflow_small                      471,216.0007 (>1000.0)      792,470.0003 (765.01)       484,212.2317 (>1000.0)     23,232.9488 (852.15)       479,106.9987 (>1000.0)      5,012.2517 (>1000.0)    76;220      2,065.2101 (0.00)       1877           1
+test_replace_many_terms                       526,515.0030 (>1000.0)    2,847,536.9982 (>1000.0)      648,957.0426 (>1000.0)    154,585.6912 (>1000.0)      541,309.0003 (>1000.0)    266,963.4996 (>1000.0)     264;2      1,540.9340 (0.00)       1176           1
+test_find_matches_many_terms                  577,893.9994 (>1000.0)      777,394.9983 (750.45)       596,927.5641 (>1000.0)     14,192.5073 (520.56)       595,092.5006 (>1000.0)      4,164.4998 (>1000.0)    54;114      1,675.2451 (0.00)       1640           1
+test_fuzzy_search_levenshtein_medium          633,887.0007 (>1000.0)    1,114,648.9996 (>1000.0)      824,505.4084 (>1000.0)     45,356.9463 (>1000.0)      812,572.9983 (>1000.0)     28,454.5022 (>1000.0)   124;108      1,212.8483 (0.00)       1075           1
+test_fuzzy_search_jaro_winkler_medium         825,559.0001 (>1000.0)    1,237,753.0002 (>1000.0)      881,715.1386 (>1000.0)     31,418.0551 (>1000.0)      871,606.0001 (>1000.0)     13,466.0004 (>1000.0)    93;133      1,134.1531 (0.00)        938           1
+test_replace_markdown_large                   884,983.0010 (>1000.0)    1,032,505.0025 (996.72)       894,335.3489 (>1000.0)     11,633.8145 (426.71)       891,535.9995 (>1000.0)      5,138.9979 (>1000.0)     52;82      1,118.1488 (0.00)       1066           1
+test_find_matches_large_text                1,310,198.0003 (>1000.0)    1,977,522.0026 (>1000.0)    1,415,611.7592 (>1000.0)     46,772.1762 (>1000.0)    1,406,018.5003 (>1000.0)     11,946.5003 (>1000.0)     42;80        706.4084 (0.00)        652           1
+test_extract_paragraphs_medium              1,535,378.0000 (>1000.0)    2,911,405.9980 (>1000.0)    1,568,737.4813 (>1000.0)     98,490.5163 (>1000.0)    1,545,319.4992 (>1000.0)     23,029.9993 (>1000.0)     21;48        637.4553 (0.00)        588           1
+test_build_medium_index                     1,761,495.0011 (>1000.0)    2,382,762.9993 (>1000.0)    1,817,559.8304 (>1000.0)     59,936.9886 (>1000.0)    1,799,527.0027 (>1000.0)     39,557.5007 (>1000.0)     51;46        550.1882 (0.00)        472           1
+test_extract_paragraphs_many_terms          1,844,353.0025 (>1000.0)    2,104,175.9974 (>1000.0)    1,879,094.8859 (>1000.0)     42,352.2400 (>1000.0)    1,859,640.9973 (>1000.0)     32,335.5007 (>1000.0)     70;57        532.1711 (0.00)        525           1
+test_full_workflow_medium                   2,022,533.0009 (>1000.0)    5,093,104.0023 (>1000.0)    2,210,007.9365 (>1000.0)    422,971.4059 (>1000.0)    2,080,101.5016 (>1000.0)     91,900.4979 (>1000.0)     31;56        452.4871 (0.00)        472           1
+test_repeated_matching                      2,632,758.9985 (>1000.0)    4,221,924.9990 (>1000.0)    2,774,698.7768 (>1000.0)    144,659.8849 (>1000.0)    2,730,123.0002 (>1000.0)     50,067.9980 (>1000.0)     25;47        360.3995 (0.00)        345           1
+test_fuzzy_search_high_threshold            5,348,967.9995 (>1000.0)    6,483,831.9995 (>1000.0)    5,564,650.9452 (>1000.0)    163,833.1868 (>1000.0)    5,527,110.9995 (>1000.0)    183,381.9988 (>1000.0)      37;7        179.7058 (0.00)        182           1
+test_fuzzy_search_levenshtein_large         8,676,710.0001 (>1000.0)   10,367,908.0021 (>1000.0)    9,343,826.8492 (>1000.0)    378,771.5425 (>1000.0)    9,293,079.4999 (>1000.0)    505,476.9972 (>1000.0)      34;2        107.0225 (0.00)        106           1
+test_fuzzy_search_low_threshold             8,817,632.9991 (>1000.0)   11,005,667.0019 (>1000.0)    9,179,062.9721 (>1000.0)    291,345.8670 (>1000.0)    9,109,705.5010 (>1000.0)    271,299.9994 (>1000.0)      12;4        108.9436 (0.00)        108           1
+test_fuzzy_search_jaro_winkler_large        8,892,491.9983 (>1000.0)   10,872,095.0011 (>1000.0)    9,285,200.0640 (>1000.0)    324,769.9108 (>1000.0)    9,197,652.9984 (>1000.0)    405,923.9973 (>1000.0)      26;2        107.6983 (0.00)        109           1
+test_build_large_index                     18,587,051.9999 (>1000.0)   25,747,429.0011 (>1000.0)   20,719,901.9998 (>1000.0)  1,253,684.6409 (>1000.0)   20,492,112.9989 (>1000.0)  1,147,990.7498 (>1000.0)       8;4         48.2628 (0.00)         47           1
+test_extract_paragraphs_large             124,681,274.0028 (>1000.0)  128,551,255.9989 (>1000.0)  125,892,119.5003 (>1000.0)  1,490,594.3166 (>1000.0)  125,077,442.5007 (>1000.0)  2,355,000.5026 (>1000.0)       1;0          7.9433 (0.00)          8           1
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+Legend:
+  Outliers: 1 Standard Deviation from Mean; 1.5 IQR (InterQuartile Range) from 1st Quartile and 3rd Quartile.
+  OPS: Operations Per Second, computed as 1 / Mean
+============================= 40 passed in 33.91s ==============================

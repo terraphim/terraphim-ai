@@ -1,0 +1,762 @@
+warning: /home/alex/projects/terraphim/terraphim-ai/crates/terraphim-session-analyzer/Cargo.toml: file `/home/alex/projects/terraphim/terraphim-ai/crates/terraphim-session-analyzer/src/main.rs` found to be present in multiple build targets:
+  * `bin` target `cla`
+  * `bin` target `tsa`
+    Finished `bench` profile [optimized] target(s) in 0.26s
+     Running unittests src/lib.rs (target/release/deps/terraphim_automata-9ce452e6e864ffa9)
+
+running 28 tests
+test autocomplete::tests::test_autocomplete_config ... ignored
+test autocomplete::tests::test_autocomplete_search_basic ... ignored
+test autocomplete::tests::test_autocomplete_search_limits ... ignored
+test autocomplete::tests::test_autocomplete_search_ordering ... ignored
+test autocomplete::tests::test_build_autocomplete_index ... ignored
+test autocomplete::tests::test_fuzzy_autocomplete_search ... ignored
+test autocomplete::tests::test_fuzzy_search_levenshtein_scoring ... ignored
+test autocomplete::tests::test_serialization_roundtrip ... ignored
+test matcher::paragraph_tests::extracts_paragraph_from_term ... ignored
+test matcher::replacement_bug_tests::test_empty_pattern_does_not_cause_spurious_insertions ... ignored
+test matcher::replacement_bug_tests::test_empty_thesaurus_returns_original ... ignored
+test matcher::replacement_bug_tests::test_find_matches_filters_empty_patterns ... ignored
+test matcher::replacement_bug_tests::test_single_char_pattern_is_filtered ... ignored
+test matcher::replacement_bug_tests::test_valid_replacement_still_works ... ignored
+test matcher::replacement_bug_tests::test_whitespace_only_pattern_is_filtered ... ignored
+test tests::test_load_thesaurus_from_file_sync ... ignored
+test tests::test_load_thesaurus_from_json ... ignored
+test tests::test_load_thesaurus_from_json_and_replace ... ignored
+test tests::test_load_thesaurus_from_json_invalid ... ignored
+test url_protector::tests::test_complex_markdown_with_urls ... ignored
+test url_protector::tests::test_contains_urls ... ignored
+test url_protector::tests::test_email_address_protected ... ignored
+test url_protector::tests::test_markdown_link_url_preserved ... ignored
+test url_protector::tests::test_mask_simple_url ... ignored
+test url_protector::tests::test_multiple_urls ... ignored
+test url_protector::tests::test_no_urls ... ignored
+test url_protector::tests::test_restore_urls ... ignored
+test url_protector::tests::test_with_protected_urls ... ignored
+
+test result: ok. 0 passed; 0 failed; 28 ignored; 0 measured; 0 filtered out; finished in 0.00s
+
+     Running benches/autocomplete_bench.rs (target/release/deps/autocomplete_bench-a4089b3cd5598349)
+Gnuplot not found, using plotters backend
+Benchmarking build_index_throughput/build_autocomplete_index/100
+Benchmarking build_index_throughput/build_autocomplete_index/100: Warming up for 3.0000 s
+Benchmarking build_index_throughput/build_autocomplete_index/100: Collecting 100 samples in estimated 6.1629 s (10k iterations)
+Benchmarking build_index_throughput/build_autocomplete_index/100: Analyzing
+build_index_throughput/build_autocomplete_index/100
+                        time:   [622.66 µs 629.87 µs 638.58 µs]
+                        thrpt:  [147.15 MiB/s 149.18 MiB/s 150.91 MiB/s]
+                 change:
+                        time:   [+3.7670% +4.7240% +5.7156%] (p = 0.00 < 0.05)
+                        thrpt:  [−5.4066% −4.5109% −3.6302%]
+                        Performance has regressed.
+Found 5 outliers among 100 measurements (5.00%)
+  1 (1.00%) low mild
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking build_index_throughput/build_autocomplete_index/500
+Benchmarking build_index_throughput/build_autocomplete_index/500: Warming up for 3.0000 s
+Benchmarking build_index_throughput/build_autocomplete_index/500: Collecting 100 samples in estimated 5.0527 s (1500 iterations)
+Benchmarking build_index_throughput/build_autocomplete_index/500: Analyzing
+build_index_throughput/build_autocomplete_index/500
+                        time:   [3.3528 ms 3.3748 ms 3.3968 ms]
+                        thrpt:  [138.28 MiB/s 139.18 MiB/s 140.10 MiB/s]
+                 change:
+                        time:   [−2.7506% −1.6338% −0.7013%] (p = 0.00 < 0.05)
+                        thrpt:  [+0.7063% +1.6609% +2.8284%]
+                        Change within noise threshold.
+Found 10 outliers among 100 measurements (10.00%)
+  1 (1.00%) low severe
+  1 (1.00%) low mild
+  4 (4.00%) high mild
+  4 (4.00%) high severe
+Benchmarking build_index_throughput/build_autocomplete_index/1000
+Benchmarking build_index_throughput/build_autocomplete_index/1000: Warming up for 3.0000 s
+Benchmarking build_index_throughput/build_autocomplete_index/1000: Collecting 100 samples in estimated 5.0025 s (700 iterations)
+Benchmarking build_index_throughput/build_autocomplete_index/1000: Analyzing
+build_index_throughput/build_autocomplete_index/1000
+                        time:   [7.0206 ms 7.1075 ms 7.2070 ms]
+                        thrpt:  [130.35 MiB/s 132.17 MiB/s 133.81 MiB/s]
+                 change:
+                        time:   [−0.7392% +0.4883% +1.8022%] (p = 0.50 > 0.05)
+                        thrpt:  [−1.7703% −0.4860% +0.7447%]
+                        No change in performance detected.
+Found 11 outliers among 100 measurements (11.00%)
+  2 (2.00%) low severe
+  4 (4.00%) high mild
+  5 (5.00%) high severe
+Benchmarking build_index_throughput/build_autocomplete_index/2500
+Benchmarking build_index_throughput/build_autocomplete_index/2500: Warming up for 3.0000 s
+Benchmarking build_index_throughput/build_autocomplete_index/2500: Collecting 100 samples in estimated 6.4454 s (300 iterations)
+Benchmarking build_index_throughput/build_autocomplete_index/2500: Analyzing
+build_index_throughput/build_autocomplete_index/2500
+                        time:   [20.074 ms 20.448 ms 20.881 ms]
+                        thrpt:  [112.47 MiB/s 114.85 MiB/s 116.99 MiB/s]
+                 change:
+                        time:   [+2.8467% +5.0427% +7.2688%] (p = 0.00 < 0.05)
+                        thrpt:  [−6.7762% −4.8006% −2.7679%]
+                        Performance has regressed.
+Found 16 outliers among 100 measurements (16.00%)
+  5 (5.00%) high mild
+  11 (11.00%) high severe
+Benchmarking build_index_throughput/build_autocomplete_index/5000
+Benchmarking build_index_throughput/build_autocomplete_index/5000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 5.7s, or reduce sample count to 80.
+Benchmarking build_index_throughput/build_autocomplete_index/5000: Collecting 100 samples in estimated 5.6812 s (100 iterations)
+Benchmarking build_index_throughput/build_autocomplete_index/5000: Analyzing
+build_index_throughput/build_autocomplete_index/5000
+                        time:   [51.222 ms 52.295 ms 53.402 ms]
+                        thrpt:  [87.953 MiB/s 89.815 MiB/s 91.696 MiB/s]
+                 change:
+                        time:   [+6.8423% +9.3108% +11.643%] (p = 0.00 < 0.05)
+                        thrpt:  [−10.429% −8.5177% −6.4041%]
+                        Performance has regressed.
+Benchmarking build_index_throughput/build_autocomplete_index/10000
+Benchmarking build_index_throughput/build_autocomplete_index/10000: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 16.7s, or reduce sample count to 20.
+Benchmarking build_index_throughput/build_autocomplete_index/10000: Collecting 100 samples in estimated 16.732 s (100 iterations)
+Benchmarking build_index_throughput/build_autocomplete_index/10000: Analyzing
+build_index_throughput/build_autocomplete_index/10000
+                        time:   [129.71 ms 133.47 ms 137.64 ms]
+                        thrpt:  [68.250 MiB/s 70.380 MiB/s 72.422 MiB/s]
+                 change:
+                        time:   [−1.1849% +2.2851% +5.4810%] (p = 0.17 > 0.05)
+                        thrpt:  [−5.1962% −2.2340% +1.1991%]
+                        No change in performance detected.
+Found 15 outliers among 100 measurements (15.00%)
+  12 (12.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking search_throughput/autocomplete_search/single_char
+Benchmarking search_throughput/autocomplete_search/single_char: Warming up for 3.0000 s
+Benchmarking search_throughput/autocomplete_search/single_char: Collecting 100 samples in estimated 5.0048 s (1.0M iterations)
+Benchmarking search_throughput/autocomplete_search/single_char: Analyzing
+search_throughput/autocomplete_search/single_char
+                        time:   [4.7042 µs 4.7875 µs 4.8848 µs]
+                        thrpt:  [199.92 KiB/s 203.98 KiB/s 207.59 KiB/s]
+                 change:
+                        time:   [+8.2615% +10.573% +12.766%] (p = 0.00 < 0.05)
+                        thrpt:  [−11.320% −9.5623% −7.6311%]
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+Benchmarking search_throughput/autocomplete_search/short_prefix
+Benchmarking search_throughput/autocomplete_search/short_prefix: Warming up for 3.0000 s
+Benchmarking search_throughput/autocomplete_search/short_prefix: Collecting 100 samples in estimated 5.0199 s (1.0M iterations)
+Benchmarking search_throughput/autocomplete_search/short_prefix: Analyzing
+search_throughput/autocomplete_search/short_prefix
+                        time:   [4.7878 µs 4.8595 µs 4.9389 µs]
+                        thrpt:  [395.46 KiB/s 401.92 KiB/s 407.94 KiB/s]
+                 change:
+                        time:   [+9.7501% +11.558% +13.936%] (p = 0.00 < 0.05)
+                        thrpt:  [−12.231% −10.360% −8.8839%]
+                        Performance has regressed.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+Benchmarking search_throughput/autocomplete_search/medium_prefix
+Benchmarking search_throughput/autocomplete_search/medium_prefix: Warming up for 3.0000 s
+Benchmarking search_throughput/autocomplete_search/medium_prefix: Collecting 100 samples in estimated 5.0133 s (1.0M iterations)
+Benchmarking search_throughput/autocomplete_search/medium_prefix: Analyzing
+search_throughput/autocomplete_search/medium_prefix
+                        time:   [5.7538 µs 5.8521 µs 5.9611 µs]
+                        thrpt:  [655.29 KiB/s 667.50 KiB/s 678.90 KiB/s]
+                 change:
+                        time:   [+19.285% +22.890% +26.554%] (p = 0.00 < 0.05)
+                        thrpt:  [−20.982% −18.626% −16.167%]
+                        Performance has regressed.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high mild
+Benchmarking search_throughput/autocomplete_search/long_prefix
+Benchmarking search_throughput/autocomplete_search/long_prefix: Warming up for 3.0000 s
+Benchmarking search_throughput/autocomplete_search/long_prefix: Collecting 100 samples in estimated 5.0230 s (848k iterations)
+Benchmarking search_throughput/autocomplete_search/long_prefix: Analyzing
+search_throughput/autocomplete_search/long_prefix
+                        time:   [5.1750 µs 5.3644 µs 5.5754 µs]
+                        thrpt:  [1.1974 MiB/s 1.2444 MiB/s 1.2900 MiB/s]
+                 change:
+                        time:   [+20.094% +23.742% +26.961%] (p = 0.00 < 0.05)
+                        thrpt:  [−21.236% −19.187% −16.732%]
+                        Performance has regressed.
+Benchmarking search_throughput/autocomplete_search/very_long_prefix
+Benchmarking search_throughput/autocomplete_search/very_long_prefix: Warming up for 3.0000 s
+Benchmarking search_throughput/autocomplete_search/very_long_prefix: Collecting 100 samples in estimated 5.0128 s (939k iterations)
+Benchmarking search_throughput/autocomplete_search/very_long_prefix: Analyzing
+search_throughput/autocomplete_search/very_long_prefix
+                        time:   [5.2203 µs 5.3585 µs 5.4973 µs]
+                        thrpt:  [2.7757 MiB/s 2.8476 MiB/s 2.9230 MiB/s]
+                 change:
+                        time:   [+18.994% +21.010% +22.848%] (p = 0.00 < 0.05)
+                        thrpt:  [−18.598% −17.362% −15.963%]
+                        Performance has regressed.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking search_throughput/autocomplete_search/exact_match
+Benchmarking search_throughput/autocomplete_search/exact_match: Warming up for 3.0000 s
+Benchmarking search_throughput/autocomplete_search/exact_match: Collecting 100 samples in estimated 5.0136 s (1.7M iterations)
+Benchmarking search_throughput/autocomplete_search/exact_match: Analyzing
+search_throughput/autocomplete_search/exact_match
+                        time:   [3.0047 µs 3.0272 µs 3.0532 µs]
+                        thrpt:  [10.308 MiB/s 10.396 MiB/s 10.474 MiB/s]
+                 change:
+                        time:   [+2.6447% +3.6275% +4.7720%] (p = 0.00 < 0.05)
+                        thrpt:  [−4.5547% −3.5005% −2.5766%]
+                        Performance has regressed.
+Found 10 outliers among 100 measurements (10.00%)
+  2 (2.00%) low severe
+  3 (3.00%) low mild
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking search_result_limits/search_with_limit/1
+Benchmarking search_result_limits/search_with_limit/1: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/1: Collecting 100 samples in estimated 5.0031 s (5.2M iterations)
+Benchmarking search_result_limits/search_with_limit/1: Analyzing
+search_result_limits/search_with_limit/1
+                        time:   [858.30 ns 865.84 ns 872.23 ns]
+                        change: [−0.3991% +0.1801% +0.7890%] (p = 0.58 > 0.05)
+                        No change in performance detected.
+Found 14 outliers among 100 measurements (14.00%)
+  10 (10.00%) low severe
+  3 (3.00%) low mild
+  1 (1.00%) high mild
+Benchmarking search_result_limits/search_with_limit/5
+Benchmarking search_result_limits/search_with_limit/5: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/5: Collecting 100 samples in estimated 5.0059 s (2.0M iterations)
+Benchmarking search_result_limits/search_with_limit/5: Analyzing
+search_result_limits/search_with_limit/5
+                        time:   [2.1927 µs 2.2154 µs 2.2396 µs]
+                        change: [−0.4362% +1.2565% +3.0186%] (p = 0.15 > 0.05)
+                        No change in performance detected.
+Found 2 outliers among 100 measurements (2.00%)
+  2 (2.00%) high severe
+Benchmarking search_result_limits/search_with_limit/10
+Benchmarking search_result_limits/search_with_limit/10: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/10: Collecting 100 samples in estimated 5.0164 s (975k iterations)
+Benchmarking search_result_limits/search_with_limit/10: Analyzing
+search_result_limits/search_with_limit/10
+                        time:   [4.8186 µs 4.8985 µs 4.9879 µs]
+                        change: [+2.7222% +4.5349% +6.4027%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 10 outliers among 100 measurements (10.00%)
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  3 (3.00%) high severe
+Benchmarking search_result_limits/search_with_limit/25
+Benchmarking search_result_limits/search_with_limit/25: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/25: Collecting 100 samples in estimated 5.0397 s (429k iterations)
+Benchmarking search_result_limits/search_with_limit/25: Analyzing
+search_result_limits/search_with_limit/25
+                        time:   [12.705 µs 13.184 µs 13.665 µs]
+                        change: [+8.6189% +11.199% +14.078%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 7 outliers among 100 measurements (7.00%)
+  5 (5.00%) high mild
+  2 (2.00%) high severe
+Benchmarking search_result_limits/search_with_limit/50
+Benchmarking search_result_limits/search_with_limit/50: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/50: Collecting 100 samples in estimated 5.0911 s (237k iterations)
+Benchmarking search_result_limits/search_with_limit/50: Analyzing
+search_result_limits/search_with_limit/50
+                        time:   [18.898 µs 19.461 µs 20.044 µs]
+                        change: [−9.1602% −7.0301% −4.9410%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 9 outliers among 100 measurements (9.00%)
+  6 (6.00%) low mild
+  3 (3.00%) high mild
+Benchmarking search_result_limits/search_with_limit/100
+Benchmarking search_result_limits/search_with_limit/100: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/100: Collecting 100 samples in estimated 5.0868 s (111k iterations)
+Benchmarking search_result_limits/search_with_limit/100: Analyzing
+search_result_limits/search_with_limit/100
+                        time:   [45.119 µs 46.266 µs 47.496 µs]
+                        change: [+1.1175% +4.0485% +6.8415%] (p = 0.01 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+Benchmarking search_result_limits/search_with_limit/250
+Benchmarking search_result_limits/search_with_limit/250: Warming up for 3.0000 s
+Benchmarking search_result_limits/search_with_limit/250: Collecting 100 samples in estimated 5.2019 s (40k iterations)
+Benchmarking search_result_limits/search_with_limit/250: Analyzing
+search_result_limits/search_with_limit/250
+                        time:   [120.21 µs 122.65 µs 125.26 µs]
+                        change: [+1.1888% +3.6012% +6.0196%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high mild
+
+Benchmarking fuzzy_search_typo_single
+Benchmarking fuzzy_search_typo_single: Warming up for 3.0000 s
+Benchmarking fuzzy_search_typo_single: Collecting 100 samples in estimated 5.3521 s (700 iterations)
+Benchmarking fuzzy_search_typo_single: Analyzing
+fuzzy_search_typo_single
+                        time:   [7.6710 ms 7.7263 ms 7.7855 ms]
+                        change: [+3.3672% +4.2610% +5.2424%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 4 outliers among 100 measurements (4.00%)
+  4 (4.00%) high mild
+
+Benchmarking fuzzy_search_typo_double
+Benchmarking fuzzy_search_typo_double: Warming up for 3.0000 s
+Benchmarking fuzzy_search_typo_double: Collecting 100 samples in estimated 5.3905 s (600 iterations)
+Benchmarking fuzzy_search_typo_double: Analyzing
+fuzzy_search_typo_double
+                        time:   [8.8608 ms 8.9497 ms 9.0743 ms]
+                        change: [+0.8593% +2.1658% +3.6816%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 5 outliers among 100 measurements (5.00%)
+  4 (4.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking fuzzy_search_missing_char
+Benchmarking fuzzy_search_missing_char: Warming up for 3.0000 s
+Benchmarking fuzzy_search_missing_char: Collecting 100 samples in estimated 5.0102 s (1.3M iterations)
+Benchmarking fuzzy_search_missing_char: Analyzing
+fuzzy_search_missing_char
+                        time:   [3.8455 µs 3.9026 µs 3.9741 µs]
+                        change: [+0.0459% +1.1223% +2.4634%] (p = 0.07 > 0.05)
+                        No change in performance detected.
+Found 16 outliers among 100 measurements (16.00%)
+  9 (9.00%) high mild
+  7 (7.00%) high severe
+
+Benchmarking fuzzy_search_extra_char
+Benchmarking fuzzy_search_extra_char: Warming up for 3.0000 s
+Benchmarking fuzzy_search_extra_char: Collecting 100 samples in estimated 5.2720 s (500 iterations)
+Benchmarking fuzzy_search_extra_char: Analyzing
+fuzzy_search_extra_char time:   [10.394 ms 10.468 ms 10.547 ms]
+                        change: [−1.9023% −0.7438% +0.2283%] (p = 0.19 > 0.05)
+                        No change in performance detected.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking fuzzy_algorithm_comparison/levenshtein_transposition
+Benchmarking fuzzy_algorithm_comparison/levenshtein_transposition: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/levenshtein_transposition: Collecting 100 samples in estimated 5.7968 s (500 iterations)
+Benchmarking fuzzy_algorithm_comparison/levenshtein_transposition: Analyzing
+fuzzy_algorithm_comparison/levenshtein_transposition
+                        time:   [11.735 ms 12.092 ms 12.508 ms]
+                        change: [+2.6222% +5.5789% +9.3737%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 8 outliers among 100 measurements (8.00%)
+  8 (8.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_transposition
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_transposition: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_transposition: Collecting 100 samples in estimated 5.2673 s (600 iterations)
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_transposition: Analyzing
+fuzzy_algorithm_comparison/jaro_winkler_transposition
+                        time:   [9.7953 ms 10.221 ms 10.687 ms]
+                        change: [+16.904% +21.828% +27.595%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 14 outliers among 100 measurements (14.00%)
+  13 (13.00%) high mild
+  1 (1.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/levenshtein_missing_char
+Benchmarking fuzzy_algorithm_comparison/levenshtein_missing_char: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/levenshtein_missing_char: Collecting 100 samples in estimated 5.6573 s (500 iterations)
+Benchmarking fuzzy_algorithm_comparison/levenshtein_missing_char: Analyzing
+fuzzy_algorithm_comparison/levenshtein_missing_char
+                        time:   [10.306 ms 10.382 ms 10.475 ms]
+                        change: [−0.3704% +0.5381% +1.5645%] (p = 0.28 > 0.05)
+                        No change in performance detected.
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) high mild
+  3 (3.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_missing_char
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_missing_char: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_missing_char: Collecting 100 samples in estimated 5.1969 s (500 iterations)
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_missing_char: Analyzing
+fuzzy_algorithm_comparison/jaro_winkler_missing_char
+                        time:   [10.607 ms 10.986 ms 11.424 ms]
+                        change: [+2.1667% +6.0665% +9.9215%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 12 outliers among 100 measurements (12.00%)
+  2 (2.00%) high mild
+  10 (10.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/levenshtein_extra_char
+Benchmarking fuzzy_algorithm_comparison/levenshtein_extra_char: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/levenshtein_extra_char: Collecting 100 samples in estimated 5.1501 s (400 iterations)
+Benchmarking fuzzy_algorithm_comparison/levenshtein_extra_char: Analyzing
+fuzzy_algorithm_comparison/levenshtein_extra_char
+                        time:   [13.104 ms 13.567 ms 14.098 ms]
+                        change: [+4.0781% +7.6335% +12.012%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 13 outliers among 100 measurements (13.00%)
+  1 (1.00%) high mild
+  12 (12.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_extra_char
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_extra_char: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_extra_char: Collecting 100 samples in estimated 6.0643 s (500 iterations)
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_extra_char: Analyzing
+fuzzy_algorithm_comparison/jaro_winkler_extra_char
+                        time:   [11.335 ms 11.434 ms 11.540 ms]
+                        change: [−5.3076% −3.5458% −1.7613%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+Benchmarking fuzzy_algorithm_comparison/levenshtein_prefix_match
+Benchmarking fuzzy_algorithm_comparison/levenshtein_prefix_match: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/levenshtein_prefix_match: Collecting 100 samples in estimated 5.0117 s (1.1M iterations)
+Benchmarking fuzzy_algorithm_comparison/levenshtein_prefix_match: Analyzing
+fuzzy_algorithm_comparison/levenshtein_prefix_match
+                        time:   [4.3909 µs 4.4350 µs 4.4804 µs]
+                        change: [+0.9526% +1.5096% +2.1580%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 16 outliers among 100 measurements (16.00%)
+  2 (2.00%) low severe
+  1 (1.00%) low mild
+  6 (6.00%) high mild
+  7 (7.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_prefix_match
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_prefix_match: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_prefix_match: Collecting 100 samples in estimated 5.0075 s (1.1M iterations)
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_prefix_match: Analyzing
+fuzzy_algorithm_comparison/jaro_winkler_prefix_match
+                        time:   [4.4134 µs 4.5978 µs 4.8003 µs]
+                        change: [+1.2169% +3.1575% +5.2530%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 14 outliers among 100 measurements (14.00%)
+  7 (7.00%) high mild
+  7 (7.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/levenshtein_complex_typo
+Benchmarking fuzzy_algorithm_comparison/levenshtein_complex_typo: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/levenshtein_complex_typo: Collecting 100 samples in estimated 6.3529 s (400 iterations)
+Benchmarking fuzzy_algorithm_comparison/levenshtein_complex_typo: Analyzing
+fuzzy_algorithm_comparison/levenshtein_complex_typo
+                        time:   [16.350 ms 16.907 ms 17.565 ms]
+                        change: [−1.0275% +2.7461% +7.2428%] (p = 0.17 > 0.05)
+                        No change in performance detected.
+Found 10 outliers among 100 measurements (10.00%)
+  2 (2.00%) low mild
+  1 (1.00%) high mild
+  7 (7.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_complex_typo
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_complex_typo: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_complex_typo: Collecting 100 samples in estimated 5.9044 s (500 iterations)
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_complex_typo: Analyzing
+fuzzy_algorithm_comparison/jaro_winkler_complex_typo
+                        time:   [12.262 ms 12.701 ms 13.201 ms]
+                        change: [+4.5557% +8.8631% +12.736%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 8 outliers among 100 measurements (8.00%)
+  8 (8.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/levenshtein_word_space
+Benchmarking fuzzy_algorithm_comparison/levenshtein_word_space: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/levenshtein_word_space: Collecting 100 samples in estimated 5.0065 s (300 iterations)
+Benchmarking fuzzy_algorithm_comparison/levenshtein_word_space: Analyzing
+fuzzy_algorithm_comparison/levenshtein_word_space
+                        time:   [17.924 ms 18.645 ms 19.450 ms]
+                        change: [+13.002% +17.419% +22.148%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 13 outliers among 100 measurements (13.00%)
+  3 (3.00%) high mild
+  10 (10.00%) high severe
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_word_space
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_word_space: Warming up for 3.0000 s
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_word_space: Collecting 100 samples in estimated 5.1658 s (400 iterations)
+Benchmarking fuzzy_algorithm_comparison/jaro_winkler_word_space: Analyzing
+fuzzy_algorithm_comparison/jaro_winkler_word_space
+                        time:   [14.075 ms 14.616 ms 15.225 ms]
+                        change: [+13.605% +18.597% +24.143%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 10 outliers among 100 measurements (10.00%)
+  3 (3.00%) high mild
+  7 (7.00%) high severe
+
+Benchmarking serialization_throughput/serialize_index/100
+Benchmarking serialization_throughput/serialize_index/100: Warming up for 3.0000 s
+Benchmarking serialization_throughput/serialize_index/100: Collecting 100 samples in estimated 5.3937 s (25k iterations)
+Benchmarking serialization_throughput/serialize_index/100: Analyzing
+serialization_throughput/serialize_index/100
+                        time:   [216.37 µs 218.72 µs 221.42 µs]
+                        change: [+2.9930% +3.7485% +4.6301%] (p = 0.00 < 0.05)
+                        Performance has regressed.
+Found 12 outliers among 100 measurements (12.00%)
+  7 (7.00%) high mild
+  5 (5.00%) high severe
+Benchmarking serialization_throughput/deserialize_index/100
+Benchmarking serialization_throughput/deserialize_index/100: Warming up for 3.0000 s
+Benchmarking serialization_throughput/deserialize_index/100: Collecting 100 samples in estimated 5.5008 s (20k iterations)
+Benchmarking serialization_throughput/deserialize_index/100: Analyzing
+serialization_throughput/deserialize_index/100
+                        time:   [249.97 µs 251.49 µs 253.48 µs]
+                        thrpt:  [466.23 MiB/s 469.91 MiB/s 472.77 MiB/s]
+                 change:
+                        time:   [−0.9251% +0.3487% +1.7610%] (p = 0.60 > 0.05)
+                        thrpt:  [−1.7305% −0.3475% +0.9338%]
+                        No change in performance detected.
+Found 11 outliers among 100 measurements (11.00%)
+  1 (1.00%) low severe
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  4 (4.00%) high severe
+Benchmarking serialization_throughput/serialize_index/500
+Benchmarking serialization_throughput/serialize_index/500: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.0s, enable flat sampling, or reduce sample count to 60.
+Benchmarking serialization_throughput/serialize_index/500: Collecting 100 samples in estimated 6.0406 s (5050 iterations)
+Benchmarking serialization_throughput/serialize_index/500: Analyzing
+serialization_throughput/serialize_index/500
+                        time:   [1.1044 ms 1.1122 ms 1.1185 ms]
+                        thrpt:  [105.65 MiB/s 106.26 MiB/s 107.00 MiB/s]
+                 change:
+                        time:   [−1.6483% −1.0087% −0.4678%] (p = 0.00 < 0.05)
+                        thrpt:  [+0.4700% +1.0190% +1.6759%]
+                        Change within noise threshold.
+Found 9 outliers among 100 measurements (9.00%)
+  3 (3.00%) low severe
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+Benchmarking serialization_throughput/deserialize_index/500
+Benchmarking serialization_throughput/deserialize_index/500: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.9s, enable flat sampling, or reduce sample count to 60.
+Benchmarking serialization_throughput/deserialize_index/500: Collecting 100 samples in estimated 6.8900 s (5050 iterations)
+Benchmarking serialization_throughput/deserialize_index/500: Analyzing
+serialization_throughput/deserialize_index/500
+                        time:   [1.3307 ms 1.3791 ms 1.4361 ms]
+                        thrpt:  [410.63 MiB/s 427.59 MiB/s 443.15 MiB/s]
+                 change:
+                        time:   [−0.6931% +1.0767% +3.7829%] (p = 0.33 > 0.05)
+                        thrpt:  [−3.6450% −1.0652% +0.6980%]
+                        No change in performance detected.
+Found 22 outliers among 100 measurements (22.00%)
+  8 (8.00%) low severe
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  8 (8.00%) high severe
+Benchmarking serialization_throughput/serialize_index/1000
+Benchmarking serialization_throughput/serialize_index/1000: Warming up for 3.0000 s
+Benchmarking serialization_throughput/serialize_index/1000: Collecting 100 samples in estimated 5.2023 s (2300 iterations)
+Benchmarking serialization_throughput/serialize_index/1000: Analyzing
+serialization_throughput/serialize_index/1000
+                        time:   [2.2875 ms 2.3369 ms 2.3934 ms]
+                        thrpt:  [246.38 MiB/s 252.34 MiB/s 257.79 MiB/s]
+                 change:
+                        time:   [+2.2198% +4.7615% +7.3235%] (p = 0.00 < 0.05)
+                        thrpt:  [−6.8238% −4.5451% −2.1716%]
+                        Performance has regressed.
+Found 15 outliers among 100 measurements (15.00%)
+  15 (15.00%) high severe
+Benchmarking serialization_throughput/deserialize_index/1000
+Benchmarking serialization_throughput/deserialize_index/1000: Warming up for 3.0000 s
+Benchmarking serialization_throughput/deserialize_index/1000: Collecting 100 samples in estimated 5.2465 s (1900 iterations)
+Benchmarking serialization_throughput/deserialize_index/1000: Analyzing
+serialization_throughput/deserialize_index/1000
+                        time:   [2.7994 ms 2.8758 ms 2.9626 ms]
+                        thrpt:  [397.99 MiB/s 410.01 MiB/s 421.19 MiB/s]
+                 change:
+                        time:   [+5.1462% +7.7948% +11.013%] (p = 0.00 < 0.05)
+                        thrpt:  [−9.9208% −7.2311% −4.8944%]
+                        Performance has regressed.
+Found 19 outliers among 100 measurements (19.00%)
+  1 (1.00%) low severe
+  2 (2.00%) high mild
+  16 (16.00%) high severe
+Benchmarking serialization_throughput/serialize_index/2500
+Benchmarking serialization_throughput/serialize_index/2500: Warming up for 3.0000 s
+Benchmarking serialization_throughput/serialize_index/2500: Collecting 100 samples in estimated 5.3462 s (900 iterations)
+Benchmarking serialization_throughput/serialize_index/2500: Analyzing
+serialization_throughput/serialize_index/2500
+                        time:   [6.0918 ms 6.2741 ms 6.4895 ms]
+                        thrpt:  [181.69 MiB/s 187.93 MiB/s 193.55 MiB/s]
+                 change:
+                        time:   [−2.2825% +0.6538% +4.3757%] (p = 0.71 > 0.05)
+                        thrpt:  [−4.1923% −0.6496% +2.3358%]
+                        No change in performance detected.
+Found 18 outliers among 100 measurements (18.00%)
+  5 (5.00%) high mild
+  13 (13.00%) high severe
+Benchmarking serialization_throughput/deserialize_index/2500
+Benchmarking serialization_throughput/deserialize_index/2500: Warming up for 3.0000 s
+Benchmarking serialization_throughput/deserialize_index/2500: Collecting 100 samples in estimated 5.3870 s (700 iterations)
+Benchmarking serialization_throughput/deserialize_index/2500: Analyzing
+serialization_throughput/deserialize_index/2500
+                        time:   [7.8154 ms 8.0588 ms 8.3446 ms]
+                        thrpt:  [353.19 MiB/s 365.72 MiB/s 377.11 MiB/s]
+                 change:
+                        time:   [−0.9857% +2.0346% +6.2048%] (p = 0.25 > 0.05)
+                        thrpt:  [−5.8423% −1.9940% +0.9955%]
+                        No change in performance detected.
+Found 15 outliers among 100 measurements (15.00%)
+  15 (15.00%) high severe
+Benchmarking serialization_throughput/serialize_index/5000
+Benchmarking serialization_throughput/serialize_index/5000: Warming up for 3.0000 s
+Benchmarking serialization_throughput/serialize_index/5000: Collecting 100 samples in estimated 5.9127 s (400 iterations)
+Benchmarking serialization_throughput/serialize_index/5000: Analyzing
+serialization_throughput/serialize_index/5000
+                        time:   [15.271 ms 15.671 ms 16.170 ms]
+                        thrpt:  [182.26 MiB/s 188.06 MiB/s 193.00 MiB/s]
+                 change:
+                        time:   [−5.3464% −2.6235% +0.6285%] (p = 0.07 > 0.05)
+                        thrpt:  [−0.6246% +2.6942% +5.6484%]
+                        No change in performance detected.
+Found 17 outliers among 100 measurements (17.00%)
+  6 (6.00%) high mild
+  11 (11.00%) high severe
+Benchmarking serialization_throughput/deserialize_index/5000
+Benchmarking serialization_throughput/deserialize_index/5000: Warming up for 3.0000 s
+Benchmarking serialization_throughput/deserialize_index/5000: Collecting 100 samples in estimated 6.3503 s (300 iterations)
+Benchmarking serialization_throughput/deserialize_index/5000: Analyzing
+serialization_throughput/deserialize_index/5000
+                        time:   [21.621 ms 21.832 ms 22.059 ms]
+                        thrpt:  [267.19 MiB/s 269.97 MiB/s 272.61 MiB/s]
+                 change:
+                        time:   [−8.3743% −7.4151% −6.3422%] (p = 0.00 < 0.05)
+                        thrpt:  [+6.7717% +8.0090% +9.1397%]
+                        Performance has improved.
+Found 3 outliers among 100 measurements (3.00%)
+  3 (3.00%) high mild
+
+Benchmarking memory_scaling/memory_efficient_build/100
+Benchmarking memory_scaling/memory_efficient_build/100: Warming up for 3.0000 s
+Benchmarking memory_scaling/memory_efficient_build/100: Collecting 100 samples in estimated 6.9557 s (10k iterations)
+Benchmarking memory_scaling/memory_efficient_build/100: Analyzing
+memory_scaling/memory_efficient_build/100
+                        time:   [688.46 µs 689.50 µs 690.70 µs]
+                        thrpt:  [27.615 MiB/s 27.663 MiB/s 27.704 MiB/s]
+                 change:
+                        time:   [−0.8167% −0.4808% −0.1322%] (p = 0.01 < 0.05)
+                        thrpt:  [+0.1324% +0.4831% +0.8235%]
+                        Change within noise threshold.
+Found 4 outliers among 100 measurements (4.00%)
+  2 (2.00%) high mild
+  2 (2.00%) high severe
+Benchmarking memory_scaling/memory_efficient_build/500
+Benchmarking memory_scaling/memory_efficient_build/500: Warming up for 3.0000 s
+Benchmarking memory_scaling/memory_efficient_build/500: Collecting 100 samples in estimated 5.0042 s (1500 iterations)
+Benchmarking memory_scaling/memory_efficient_build/500: Analyzing
+memory_scaling/memory_efficient_build/500
+                        time:   [3.3315 ms 3.3423 ms 3.3606 ms]
+                        thrpt:  [28.378 MiB/s 28.533 MiB/s 28.626 MiB/s]
+                 change:
+                        time:   [−0.9026% −0.4783% +0.0952%] (p = 0.06 > 0.05)
+                        thrpt:  [−0.0951% +0.4806% +0.9108%]
+                        No change in performance detected.
+Found 1 outliers among 100 measurements (1.00%)
+  1 (1.00%) high severe
+Benchmarking memory_scaling/memory_efficient_build/1000
+Benchmarking memory_scaling/memory_efficient_build/1000: Warming up for 3.0000 s
+Benchmarking memory_scaling/memory_efficient_build/1000: Collecting 100 samples in estimated 5.6354 s (800 iterations)
+Benchmarking memory_scaling/memory_efficient_build/1000: Analyzing
+memory_scaling/memory_efficient_build/1000
+                        time:   [6.9552 ms 6.9924 ms 7.0482 ms]
+                        thrpt:  [27.062 MiB/s 27.277 MiB/s 27.423 MiB/s]
+                 change:
+                        time:   [+0.1625% +0.8289% +1.6378%] (p = 0.02 < 0.05)
+                        thrpt:  [−1.6114% −0.8221% −0.1622%]
+                        Change within noise threshold.
+Found 4 outliers among 100 measurements (4.00%)
+  3 (3.00%) high mild
+  1 (1.00%) high severe
+Benchmarking memory_scaling/memory_efficient_build/2500
+Benchmarking memory_scaling/memory_efficient_build/2500: Warming up for 3.0000 s
+Benchmarking memory_scaling/memory_efficient_build/2500: Collecting 100 samples in estimated 5.4764 s (300 iterations)
+Benchmarking memory_scaling/memory_efficient_build/2500: Analyzing
+memory_scaling/memory_efficient_build/2500
+                        time:   [18.054 ms 18.300 ms 18.618 ms]
+                        thrpt:  [25.611 MiB/s 26.056 MiB/s 26.412 MiB/s]
+                 change:
+                        time:   [−5.3072% −3.9739% −2.2115%] (p = 0.00 < 0.05)
+                        thrpt:  [+2.2615% +4.1384% +5.6046%]
+                        Performance has improved.
+Found 19 outliers among 100 measurements (19.00%)
+  3 (3.00%) high mild
+  16 (16.00%) high severe
+
+Benchmarking concurrent_search_10_threads
+Benchmarking concurrent_search_10_threads: Warming up for 3.0000 s
+Benchmarking concurrent_search_10_threads: Collecting 100 samples in estimated 5.0635 s (35k iterations)
+Benchmarking concurrent_search_10_threads: Analyzing
+concurrent_search_10_threads
+                        time:   [141.50 µs 142.36 µs 143.07 µs]
+                        change: [−2.7621% −2.0177% −1.0884%] (p = 0.00 < 0.05)
+                        Performance has improved.
+Found 15 outliers among 100 measurements (15.00%)
+  7 (7.00%) low severe
+  2 (2.00%) low mild
+  4 (4.00%) high mild
+  2 (2.00%) high severe
+
+Benchmarking typing_pattern_0
+Benchmarking typing_pattern_0: Warming up for 3.0000 s
+Benchmarking typing_pattern_0: Collecting 100 samples in estimated 5.1237 s (172k iterations)
+Benchmarking typing_pattern_0: Analyzing
+typing_pattern_0        time:   [29.758 µs 29.771 µs 29.788 µs]
+                        change: [+0.0680% +0.4332% +0.7362%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 10 outliers among 100 measurements (10.00%)
+  6 (6.00%) high mild
+  4 (4.00%) high severe
+
+Benchmarking typing_pattern_1
+Benchmarking typing_pattern_1: Warming up for 3.0000 s
+Benchmarking typing_pattern_1: Collecting 100 samples in estimated 5.0025 s (146k iterations)
+Benchmarking typing_pattern_1: Analyzing
+typing_pattern_1        time:   [34.244 µs 34.263 µs 34.287 µs]
+                        change: [−1.5827% −0.8085% −0.3072%] (p = 0.01 < 0.05)
+                        Change within noise threshold.
+Found 10 outliers among 100 measurements (10.00%)
+  7 (7.00%) high mild
+  3 (3.00%) high severe
+
+Benchmarking typing_pattern_2
+Benchmarking typing_pattern_2: Warming up for 3.0000 s
+Benchmarking typing_pattern_2: Collecting 100 samples in estimated 5.0060 s (328k iterations)
+Benchmarking typing_pattern_2: Analyzing
+typing_pattern_2        time:   [15.133 µs 15.307 µs 15.552 µs]
+                        change: [−1.2323% −0.4132% +0.5767%] (p = 0.43 > 0.05)
+                        No change in performance detected.
+Found 14 outliers among 100 measurements (14.00%)
+  4 (4.00%) low severe
+  3 (3.00%) high mild
+  7 (7.00%) high severe
+
+Benchmarking typing_pattern_3
+Benchmarking typing_pattern_3: Warming up for 3.0000 s
+Benchmarking typing_pattern_3: Collecting 100 samples in estimated 5.1044 s (167k iterations)
+Benchmarking typing_pattern_3: Analyzing
+typing_pattern_3        time:   [30.456 µs 30.478 µs 30.499 µs]
+                        change: [+0.6843% +1.3117% +2.0121%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 3 outliers among 100 measurements (3.00%)
+  2 (2.00%) high mild
+  1 (1.00%) high severe
+
+Benchmarking autocomplete_vs_matcher/autocomplete_search
+Benchmarking autocomplete_vs_matcher/autocomplete_search: Warming up for 3.0000 s
+Benchmarking autocomplete_vs_matcher/autocomplete_search: Collecting 100 samples in estimated 5.0053 s (1.2M iterations)
+Benchmarking autocomplete_vs_matcher/autocomplete_search: Analyzing
+autocomplete_vs_matcher/autocomplete_search
+                        time:   [3.9393 µs 4.0128 µs 4.0706 µs]
+                        change: [+0.6698% +1.3442% +2.0269%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 7 outliers among 100 measurements (7.00%)
+  2 (2.00%) low severe
+  5 (5.00%) high severe
+Benchmarking autocomplete_vs_matcher/aho_corasick_matcher
+Benchmarking autocomplete_vs_matcher/aho_corasick_matcher: Warming up for 3.0000 s
+
+Warning: Unable to complete 100 samples in 5.0s. You may wish to increase target time to 6.1s, enable flat sampling, or reduce sample count to 60.
+Benchmarking autocomplete_vs_matcher/aho_corasick_matcher: Collecting 100 samples in estimated 6.1010 s (5050 iterations)
+Benchmarking autocomplete_vs_matcher/aho_corasick_matcher: Analyzing
+autocomplete_vs_matcher/aho_corasick_matcher
+                        time:   [1.1916 ms 1.1926 ms 1.1939 ms]
+                        change: [−0.1225% +0.2288% +0.5789%] (p = 0.21 > 0.05)
+                        No change in performance detected.
+Found 10 outliers among 100 measurements (10.00%)
+  4 (4.00%) high mild
+  6 (6.00%) high severe
+
+Benchmarking extract_paragraphs_from_automata_small_text
+Benchmarking extract_paragraphs_from_automata_small_text: Warming up for 3.0000 s
+Benchmarking extract_paragraphs_from_automata_small_text: Collecting 100 samples in estimated 5.0433 s (328k iterations)
+Benchmarking extract_paragraphs_from_automata_small_text: Analyzing
+extract_paragraphs_from_automata_small_text
+                        time:   [15.295 µs 15.299 µs 15.305 µs]
+                        change: [−0.8416% −0.6522% −0.5035%] (p = 0.00 < 0.05)
+                        Change within noise threshold.
+Found 7 outliers among 100 measurements (7.00%)
+  4 (4.00%) high mild
+  3 (3.00%) high severe
