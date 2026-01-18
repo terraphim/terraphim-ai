@@ -238,10 +238,23 @@ impl Default for ConversationService {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serial_test::serial;
     use terraphim_persistence::DeviceStorage;
     use terraphim_types::ChatMessage;
 
+    /// Helper function to clean up all conversations before a test
+    async fn cleanup_conversations(service: &ConversationService) {
+        let all = service
+            .list_conversations(ConversationFilter::default())
+            .await
+            .unwrap_or_default();
+        for conv in all {
+            let _ = service.delete_conversation(&conv.id).await;
+        }
+    }
+
     #[tokio::test]
+    #[serial]
     async fn test_create_and_get_conversation() {
         // Initialize memory-only storage for testing
         let _ = DeviceStorage::init_memory_only().await.unwrap();
@@ -264,6 +277,9 @@ mod tests {
         let _ = DeviceStorage::init_memory_only().await.unwrap();
 
         let service = ConversationService::new();
+
+        // Clean up any existing conversations first
+        cleanup_conversations(&service).await;
 
         // Create conversations with different roles
         service
@@ -298,11 +314,15 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_search_conversations() {
         // Initialize memory-only storage for testing
         let _ = DeviceStorage::init_memory_only().await.unwrap();
 
         let service = ConversationService::new();
+
+        // Clean up any existing conversations first
+        cleanup_conversations(&service).await;
 
         service
             .create_conversation("Machine Learning".to_string(), RoleName::new("Test"))
@@ -319,6 +339,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[serial]
     async fn test_export_import_conversation() {
         // Initialize memory-only storage for testing
         let _ = DeviceStorage::init_memory_only().await.unwrap();
@@ -353,6 +374,9 @@ mod tests {
         let _ = DeviceStorage::init_memory_only().await.unwrap();
 
         let service = ConversationService::new();
+
+        // Clean up any existing conversations first
+        cleanup_conversations(&service).await;
 
         let mut conv1 = service
             .create_conversation("Test 1".to_string(), RoleName::new("Role A"))
