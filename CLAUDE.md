@@ -639,6 +639,101 @@ The system uses role-based configuration with multiple backends:
 - **Atlassian**: Confluence and Jira integration
 - **Discourse**: Forum integration
 - **JMAP**: Email integration
+- **Quickwit**: Cloud-native search engine for log and observability data with hybrid index discovery
+
+### Quickwit Haystack Integration
+
+Quickwit provides powerful log and observability data search capabilities for Terraphim AI.
+
+**Key Features:**
+- **Hybrid Index Discovery**: Choose explicit (fast) or auto-discovery (convenient) modes
+- **Dual Authentication**: Bearer token and Basic Auth support
+- **Glob Pattern Filtering**: Filter auto-discovered indexes with patterns
+- **Graceful Error Handling**: Network failures never crash searches
+- **Production Ready**: Based on try_search deployment at logs.terraphim.cloud
+
+**Configuration Modes:**
+
+1. **Explicit Index (Production - Fast)**
+   ```json
+   {
+     "location": "http://localhost:7280",
+     "service": "Quickwit",
+     "extra_parameters": {
+       "default_index": "workers-logs",
+       "max_hits": "100"
+     }
+   }
+   ```
+   - Performance: ~100ms (1 API call)
+   - Best for: Production monitoring, known indexes
+
+2. **Auto-Discovery (Exploration - Convenient)**
+   ```json
+   {
+     "location": "http://localhost:7280",
+     "service": "Quickwit",
+     "extra_parameters": {
+       "max_hits": "50"
+     }
+   }
+   ```
+   - Performance: ~300-500ms (N+1 API calls)
+   - Best for: Exploring unfamiliar instances
+
+3. **Filtered Discovery (Balanced)**
+   ```json
+   {
+     "location": "https://logs.terraphim.cloud/api",
+     "service": "Quickwit",
+     "extra_parameters": {
+       "auth_username": "cloudflare",
+       "auth_password": "${QUICKWIT_PASSWORD}",
+       "index_filter": "workers-*",
+       "max_hits": "100"
+     }
+   }
+   ```
+   - Performance: ~200-400ms (depends on matches)
+   - Best for: Multi-service monitoring with control
+
+**Authentication Examples:**
+```bash
+# Bearer token
+export QUICKWIT_TOKEN="Bearer abc123"
+
+# Basic auth with 1Password
+export QUICKWIT_PASSWORD=$(op read "op://Private/Quickwit/password")
+
+# Start agent
+terraphim-agent --config quickwit_production_config.json
+```
+
+**Query Syntax:**
+```bash
+# Simple text search
+/search error
+
+# Field-specific
+/search "level:ERROR"
+/search "service:api-server"
+
+# Boolean operators
+/search "error AND database"
+/search "level:ERROR OR level:WARN"
+
+# Time ranges
+/search "timestamp:[2024-01-01 TO 2024-01-31]"
+
+# Combined
+/search "level:ERROR AND service:api AND timestamp:[2024-01-13T10:00:00Z TO *]"
+```
+
+**Documentation:**
+- User Guide: `docs/quickwit-integration.md`
+- Example: `examples/quickwit-log-search.md`
+- Skill: `skills/quickwit-search/skill.md`
+- Configs: `terraphim_server/default/quickwit_*.json`
 
 ## Firecracker Integration
 
@@ -945,7 +1040,7 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
   "haystacks": [
     {
       "name": "Haystack Name",
-      "service": "Ripgrep|AtomicServer|QueryRs|MCP",
+      "service": "Ripgrep|AtomicServer|QueryRs|MCP|Quickwit",
       "extra_parameters": {}
     }
   ]
