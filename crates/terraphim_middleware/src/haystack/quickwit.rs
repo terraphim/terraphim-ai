@@ -3,12 +3,12 @@ use crate::Result;
 use reqwest::Client;
 use serde::Deserialize;
 use terraphim_config::Haystack;
-use terraphim_persistence::Persistable;
 use terraphim_types::Index;
 
 /// Response structure from Quickwit search API
 /// Corresponds to GET /v1/{index}/search response
 #[derive(Debug, Deserialize)]
+#[allow(dead_code)]
 struct QuickwitSearchResponse {
     num_hits: u64,
     hits: Vec<serde_json::Value>,
@@ -26,6 +26,7 @@ struct QuickwitIndexInfo {
 
 /// Configuration parsed from Haystack extra_parameters
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct QuickwitConfig {
     auth_token: Option<String>,
     auth_username: Option<String>,
@@ -458,6 +459,7 @@ impl QuickwitHaystackIndexer {
 
     /// Redact authentication token for safe logging
     /// Shows only first 4 characters
+    #[allow(dead_code)]
     fn redact_token(&self, token: &str) -> String {
         if token.len() <= 4 {
             "***".to_string()
