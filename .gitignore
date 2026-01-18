@@ -48,3 +48,6 @@ keys/
 
 # CodeBuff compiled JavaScript files
 .codebuff/agents/.agents/*.js
+
+# Working documents
+.docs/
