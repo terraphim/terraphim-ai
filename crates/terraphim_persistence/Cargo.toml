@@ -40,7 +40,7 @@ tempfile = "3.23.0"
 terraphim_config = { path = "../terraphim_config" }
 terraphim_multi_agent = { path = "../terraphim_multi_agent" }
 temp-env = "0.3.6"
-serial_test = "3.1.1"
+serial_test = "3.3.1"
 tokio = { version = "1", features = ["full"] }
 test-env-log = "0.2"
 

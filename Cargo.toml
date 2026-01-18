@@ -2,11 +2,11 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py", "crates/terraphim_rlm"]  # Experimental crates with incomplete API implementations
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py", "crates/terraphim_validation"]  # Experimental crates with incomplete API implementations
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.4.10"
+version = "1.5.0"
 edition = "2024"
 
 [workspace.dependencies]
@@ -28,6 +28,7 @@ log = "0.4"
 
 [patch.crates-io]
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
+self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
 
 [profile.release]
 panic = "unwind"

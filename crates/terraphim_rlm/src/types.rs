@@ -50,9 +50,10 @@ impl std::fmt::Display for SessionId {
 }
 
 /// Current state of an RLM session.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum SessionState {
     /// Session is being initialized.
+    #[default]
     Initializing,
     /// Session is ready for commands.
     Ready,
@@ -64,12 +65,6 @@ pub enum SessionState {
     Terminated,
     /// Session has expired due to timeout.
     Expired,
-}
-
-impl Default for SessionState {
-    fn default() -> Self {
-        Self::Initializing
-    }
 }
 
 /// Information about an active session.

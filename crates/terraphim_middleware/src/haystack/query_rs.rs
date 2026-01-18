@@ -1,5 +1,4 @@
-use crate::indexer::IndexMiddleware;
-use crate::Result;
+use crate::{indexer::IndexMiddleware, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use scraper::{Html, Selector};
@@ -282,7 +281,10 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                             let mut fresh_doc = cached_doc;
                             fresh_doc.summarization = None;
                             fresh_doc.description = None;
-                            log::debug!("Cleared existing summaries from cached document '{}' for fresh AI summarization", fresh_doc.id);
+                            log::debug!(
+                                "Cleared existing summaries from cached document '{}' for fresh AI summarization",
+                                fresh_doc.id
+                            );
                             fresh_doc
                         } else {
                             doc
@@ -325,9 +327,9 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                     match enhanced_doc.save().await {
                         Ok(_) => {
                             log::warn!(
-                            "QueryRs: Successfully saved document '{}' to persistence for summarization",
-                            enhanced_doc.id
-                        );
+                                "QueryRs: Successfully saved document '{}' to persistence for summarization",
+                                enhanced_doc.id
+                            );
                         }
                         Err(e) => {
                             log::error!(
@@ -405,9 +407,13 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                 "QueryRs processing complete: {} documents, {} unique URLs fetched (fetch: {} successful, {} failed, {} skipped) | (cache: {} search hits, {} search misses, {} doc hits, {} doc misses)",
                 enhanced_documents.len(),
                 unique_urls_fetched,
-                fetch_stats.successful, fetch_stats.failed, fetch_stats.skipped,
-                persistence_stats.cache_hits, persistence_stats.cache_misses,
-                persistence_stats.document_cache_hits, persistence_stats.document_cache_misses
+                fetch_stats.successful,
+                fetch_stats.failed,
+                fetch_stats.skipped,
+                persistence_stats.cache_hits,
+                persistence_stats.cache_misses,
+                persistence_stats.document_cache_hits,
+                persistence_stats.document_cache_misses
             );
 
             // Convert to Index format
@@ -454,8 +460,11 @@ impl QueryRsHaystackIndexer {
             || original_id.is_empty();
 
         if is_malformed {
-            log::warn!("Detected potentially malformed document ID: '{}' (from '{}'). Applying additional normalization.",
-                      normalized_id, original_id);
+            log::warn!(
+                "Detected potentially malformed document ID: '{}' (from '{}'). Applying additional normalization.",
+                normalized_id,
+                original_id
+            );
 
             // Apply additional cleaning for legacy compatibility
             return self.apply_legacy_id_cleanup(original_id);
