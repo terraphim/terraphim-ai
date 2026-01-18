@@ -221,6 +221,10 @@ impl ReplHandler {
             println!("  {} - Show thesaurus", "/thesaurus".yellow());
         }
 
+        println!(
+            "  {} - Manage updates (check, install, rollback, list)",
+            "/update <subcommand>".yellow()
+        );
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
     }
