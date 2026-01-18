@@ -253,6 +253,32 @@ fuzzy_results = ta.fuzzy_autocomplete_search(index, "machin", min_distance=0.8)
 print(f"Fuzzy results: {len(fuzzy_results)}")
 ```
 
+### 📊 Quickwit Log Search
+```bash
+# Search application logs with Quickwit integration
+terraphim-agent --config terraphim_server/default/quickwit_engineer_config.json
+
+# In REPL, search for errors
+> /search "level:ERROR"
+
+# Time-based search
+> /search "timestamp:[2024-01-13T10:00:00Z TO *]"
+
+# Multi-field search
+> /search "service:api-server AND (error OR timeout)"
+
+# Auto-discovery mode (searches all indexes)
+terraphim-agent --config terraphim_server/default/quickwit_autodiscovery_config.json
+> /search error
+
+# With authentication (production)
+export QUICKWIT_PASSWORD=$(op read "op://Private/Quickwit/password")
+terraphim-agent --config terraphim_server/default/quickwit_production_config.json
+> /search "database connection failed"
+```
+
+**Complete Example:** See [examples/quickwit-log-search.md](examples/quickwit-log-search.md) for incident investigation walkthrough.
+
 ## 🆕 v1.0.0 Features
 
 ### 🔍 Enhanced Search Capabilities
