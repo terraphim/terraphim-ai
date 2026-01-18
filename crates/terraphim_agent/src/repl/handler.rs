@@ -2,7 +2,9 @@
 
 #[cfg(feature = "repl-sessions")]
 use super::commands::SessionsSubcommand;
-use super::commands::{ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand};
+use super::commands::{
+    ConfigSubcommand, ReplCommand, RobotSubcommand, RoleSubcommand, UpdateSubcommand,
+};
 use crate::{client::ApiClient, service::TuiService};
 
 // Import robot module types
@@ -219,6 +221,10 @@ impl ReplHandler {
             println!("  {} - Show thesaurus", "/thesaurus".yellow());
         }
 
+        println!(
+            "  {} - Manage updates (check, install, rollback, list)",
+            "/update <subcommand>".yellow()
+        );
         println!("  {} - Show help", "/help [command]".yellow());
         println!("  {} - Exit REPL", "/quit".yellow());
     }
@@ -317,6 +323,10 @@ impl ReplHandler {
             #[cfg(feature = "repl-sessions")]
             ReplCommand::Sessions { subcommand } => {
                 self.handle_sessions(subcommand).await?;
+            }
+
+            ReplCommand::Update { subcommand } => {
+                self.handle_update(subcommand).await?;
             }
         }
 
@@ -1662,13 +1672,132 @@ impl ReplHandler {
         Ok(())
     }
 
+    /// Handle update management commands
+    async fn handle_update(&mut self, subcommand: UpdateSubcommand) -> Result<()> {
+        use terraphim_update::{
+            check_for_updates_auto, rollback::BackupManager, update_binary, UpdateStatus,
+        };
+
+        // Get the current binary name and version
+        let bin_name = env!("CARGO_PKG_NAME");
+        let current_version = env!("CARGO_PKG_VERSION");
+
+        match subcommand {
+            UpdateSubcommand::Check => {
+                println!("Checking for updates...");
+                match check_for_updates_auto(bin_name, current_version).await {
+                    Ok(status) => {
+                        println!("{}", status);
+                    }
+                    Err(e) => {
+                        println!("Failed to check for updates: {}", e);
+                    }
+                }
+            }
+            UpdateSubcommand::Install => {
+                println!("Checking for updates and installing if available...");
+                match update_binary(bin_name).await {
+                    Ok(status) => match status {
+                        UpdateStatus::Updated {
+                            from_version,
+                            to_version,
+                        } => {
+                            println!(
+                                "Successfully updated from {} to {}",
+                                from_version, to_version
+                            );
+                            println!("Please restart the application to use the new version.");
+                        }
+                        UpdateStatus::UpToDate(version) => {
+                            println!("Already running the latest version: {}", version);
+                        }
+                        UpdateStatus::Available {
+                            current_version,
+                            latest_version,
+                        } => {
+                            println!(
+                                "Update available: {} -> {} (installation pending)",
+                                current_version, latest_version
+                            );
+                        }
+                        UpdateStatus::Failed(error) => {
+                            println!("Update failed: {}", error);
+                        }
+                    },
+                    Err(e) => {
+                        println!("Failed to update: {}", e);
+                    }
+                }
+            }
+            UpdateSubcommand::Rollback { version } => {
+                println!("Rolling back to version {}...", version);
+
+                // Get backup directory (use standard location)
+                let backup_dir = dirs::data_local_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join("terraphim")
+                    .join("backups");
+
+                match BackupManager::new(backup_dir, 3) {
+                    Ok(manager) => {
+                        // Get current executable path as target
+                        let target_path = std::env::current_exe()
+                            .unwrap_or_else(|_| std::path::PathBuf::from(bin_name));
+
+                        match manager.rollback_to_version(&version, &target_path) {
+                            Ok(()) => {
+                                println!("Successfully rolled back to version {}", version);
+                                println!("Please restart the application.");
+                            }
+                            Err(e) => {
+                                println!("Rollback failed: {}", e);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Failed to initialize backup manager: {}", e);
+                    }
+                }
+            }
+            UpdateSubcommand::List => {
+                println!("Available backup versions:");
+
+                // Get backup directory
+                let backup_dir = dirs::data_local_dir()
+                    .unwrap_or_else(|| std::path::PathBuf::from("."))
+                    .join("terraphim")
+                    .join("backups");
+
+                match BackupManager::new(backup_dir, 3) {
+                    Ok(manager) => {
+                        let versions = manager.list_backups();
+                        if versions.is_empty() {
+                            println!("  No backups available.");
+                        } else {
+                            for (i, version) in versions.iter().enumerate() {
+                                println!("  {}. {}", i + 1, version);
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        println!("Failed to list backups: {}", e);
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     #[cfg(feature = "repl-sessions")]
     async fn handle_sessions(&mut self, subcommand: SessionsSubcommand) -> Result<()> {
         use colored::Colorize;
         use comfy_table::modifiers::UTF8_ROUND_CORNERS;
         use comfy_table::presets::UTF8_FULL;
         use comfy_table::{Cell, Table};
-        use terraphim_sessions::{ConnectorStatus, ImportOptions, SessionService};
+        use terraphim_sessions::{
+            ConnectorStatus, ImportOptions, MessageRole, Session, SessionService,
+        };
 
         // Get or create session service
         static SESSION_SERVICE: std::sync::OnceLock<
@@ -2006,7 +2135,7 @@ impl ReplHandler {
                 let keywords = source
                     .messages
                     .iter()
-                    .find(|m| m.role == terraphim_sessions::MessageRole::User)
+                    .find(|m| m.role == MessageRole::User)
                     .map(|m| {
                         m.content
                             .split_whitespace()
@@ -2090,8 +2219,7 @@ impl ReplHandler {
                 }
 
                 // Group sessions by date
-                let mut grouped: HashMap<String, Vec<&terraphim_sessions::Session>> =
-                    HashMap::new();
+                let mut grouped: HashMap<String, Vec<&Session>> = HashMap::new();
 
                 for session in &sessions {
                     let date_key = if let Some(started) = session.started_at {
@@ -2158,7 +2286,7 @@ impl ReplHandler {
                     fmt.cyan()
                 );
 
-                let sessions: Vec<terraphim_sessions::Session> = if let Some(id) = session_id {
+                let sessions: Vec<Session> = if let Some(id) = session_id {
                     if let Some(session) = svc.get_session(&id).await {
                         vec![session]
                     } else {

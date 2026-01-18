@@ -218,7 +218,7 @@ impl LlmProxyClient {
             _ => {
                 return Err(LlmProxyError::UnsupportedProvider {
                     provider: provider.to_string(),
-                })
+                });
             }
         };
 

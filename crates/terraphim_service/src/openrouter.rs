@@ -174,8 +174,7 @@ impl OpenRouterService {
         // Create the prompt for summarization
         let prompt = format!(
             "Please provide a concise and informative summary of the following article content. The summary should be approximately {} characters long and capture the main ideas, key points, and essential information. Focus on being clear and helpful to someone browsing search results.\n\nArticle content:\n{}",
-            max_length,
-            truncated_content
+            max_length, truncated_content
         );
 
         // Prepare the API request

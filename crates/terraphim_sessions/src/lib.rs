@@ -5,8 +5,8 @@
 //!
 //! ## Features
 //!
-//! - `claude-log-analyzer`: Enable CLA integration for enhanced Claude Code parsing
-//! - `cla-full`: CLA with Cursor connector support
+//! - `terraphim-session-analyzer`: Enable TSA integration for enhanced Claude Code parsing
+//! - `tsa-full`: TSA with Cursor connector support
 //! - `enrichment`: Enable knowledge graph enrichment via terraphim
 //! - `full`: All features enabled
 //!
@@ -31,7 +31,7 @@ pub mod connector;
 pub mod model;
 pub mod service;
 
-#[cfg(feature = "claude-log-analyzer")]
+#[cfg(feature = "terraphim-session-analyzer")]
 pub mod cla;
 
 #[cfg(feature = "enrichment")]

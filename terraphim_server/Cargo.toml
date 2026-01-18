@@ -34,7 +34,7 @@ serde = { version = "1.0.149", features = ["derive"] }
 serde_json = "1.0.108"
 tokio = { version = "1.35.1", features = ["full"] }
 tokio-stream = { version = "0.1.14", features = ["sync"] }
-tower-http = { version = "0.6.1", features = ["cors", "fs", "trace"] }
+tower-http = { version = "0.6.8", features = ["cors", "fs", "trace"] }
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 mime_guess = "2.0.4"
 tower = { version = "0.5.2", features = ["util"] }
@@ -62,7 +62,7 @@ redis = ["terraphim_persistence/services-redis"]
 full-db = ["sqlite", "rocksdb", "redis"]
 
 [dev-dependencies]
-serial_test = "3.0.0"
+serial_test = "3.3.1"
 terraphim_agent = { path = "../crates/terraphim_agent", version = "1.0.0" }
 tempfile = "3.23.0"
 urlencoding = "2.1.3"
