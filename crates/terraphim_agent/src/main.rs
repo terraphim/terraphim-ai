@@ -31,12 +31,32 @@ mod repl;
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
-use terraphim_update::{check_for_updates, update_binary};
+use terraphim_update::{check_for_updates, check_for_updates_startup, update_binary};
 
 #[derive(clap::ValueEnum, Debug, Clone)]
 enum LogicalOperatorCli {
     And,
     Or,
+}
+
+/// Show helpful usage information when run without a TTY
+fn show_usage_info() {
+    println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
+    println!();
+    println!("Interactive Mode (requires TTY):");
+    println!("  terraphim-agent              # Start REPL or TUI");
+    println!("  terraphim-agent repl         # Explicit REPL mode");
+    println!();
+    println!("Common Commands:");
+    println!("  search <query>               # Search documents");
+    println!("  roles list                   # List available roles");
+    println!("  config show                  # Show configuration");
+    println!("  replace <text>               # Replace terms using thesaurus");
+    println!("  validate <text>              # Validate against knowledge graph");
+    println!();
+    println!("For more information:");
+    println!("  terraphim-agent --help       # Show full help");
+    println!("  terraphim-agent help         # Show command-specific help");
 }
 
 impl From<LogicalOperatorCli> for LogicalOperator {
@@ -271,21 +291,42 @@ enum ConfigSub {
 }
 
 fn main() -> Result<()> {
-    // tokio runtime for subcommands; interactive mode runs sync loop and spawns async tasks if needed
-    let rt = Runtime::new()?;
     let cli = Cli::parse();
+
+    // Check for updates on startup (non-blocking, logs warning on failure)
+    let rt = Runtime::new()?;
+    rt.block_on(async {
+        if let Err(e) = check_for_updates_startup("terraphim-agent").await {
+            eprintln!("Update check failed: {}", e);
+        }
+    });
 
     match cli.command {
         Some(Command::Interactive) | None => {
+            // Check if we're in a TTY for interactive mode (both stdout and stdin required)
+            use atty::Stream;
+            if !atty::is(Stream::Stdout) {
+                show_usage_info();
+                std::process::exit(0);
+            }
+
+            if !atty::is(Stream::Stdin) {
+                show_usage_info();
+                std::process::exit(0);
+            }
+
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
+                // Create runtime locally to avoid nesting with ui_loop's runtime
+                let rt = Runtime::new()?;
                 rt.block_on(run_tui_offline_mode(cli.transparent))
             }
         }
 
         #[cfg(feature = "repl")]
         Some(Command::Repl { server, server_url }) => {
+            let rt = Runtime::new()?;
             if server {
                 rt.block_on(repl::run_repl_server_mode(&server_url))
             } else {
@@ -294,6 +335,7 @@ fn main() -> Result<()> {
         }
 
         Some(command) => {
+            let rt = Runtime::new()?;
             if cli.server {
                 rt.block_on(run_server_command(command, &cli.server_url))
             } else {
@@ -1190,23 +1232,64 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
 }
 
 fn run_tui(transparent: bool) -> Result<()> {
-    enable_raw_mode()?;
-    let mut stdout = io::stdout();
-    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    // Attempt to set up terminal for TUI
+    let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
-    let mut terminal = Terminal::new(backend)?;
 
-    let res = ui_loop(&mut terminal, transparent);
+    // Try to enter raw mode and alternate screen
+    // These operations can fail in non-interactive environments
+    match enable_raw_mode() {
+        Ok(()) => {
+            // Successfully entered raw mode, proceed with TUI setup
+            let mut stdout = io::stdout();
+            if let Err(e) = execute!(stdout, EnterAlternateScreen, EnableMouseCapture) {
+                // Clean up raw mode before returning error
+                let _ = disable_raw_mode();
+                return Err(anyhow::anyhow!(
+                    "Failed to initialize terminal for interactive mode: {}. \
+                     Try using 'repl' mode instead: terraphim-agent repl",
+                    e
+                ));
+            }
 
-    disable_raw_mode()?;
-    execute!(
-        terminal.backend_mut(),
-        LeaveAlternateScreen,
-        DisableMouseCapture
-    )?;
-    terminal.show_cursor()?;
+            let mut terminal = match Terminal::new(backend) {
+                Ok(t) => t,
+                Err(e) => {
+                    // Clean up before returning
+                    let _ = execute!(io::stdout(), LeaveAlternateScreen, DisableMouseCapture);
+                    let _ = disable_raw_mode();
+                    return Err(anyhow::anyhow!(
+                        "Failed to create terminal: {}. \
+                         Try using 'repl' mode instead: terraphim-agent repl",
+                        e
+                    ));
+                }
+            };
 
-    res
+            let res = ui_loop(&mut terminal, transparent);
+
+            // Always clean up terminal state
+            let _ = disable_raw_mode();
+            let _ = execute!(
+                terminal.backend_mut(),
+                LeaveAlternateScreen,
+                DisableMouseCapture
+            );
+            let _ = terminal.show_cursor();
+
+            res
+        }
+        Err(e) => {
+            // Failed to enter raw mode - not a TTY
+            Err(anyhow::anyhow!(
+                "Terminal does not support raw mode (not a TTY?). \
+                 Interactive mode requires a terminal. \
+                 Try using 'repl' mode instead: terraphim-agent repl. \
+                 Error: {}",
+                e
+            ))
+        }
+    }
 }
 
 fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: bool) -> Result<()> {
@@ -1221,12 +1304,17 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
     let api = ApiClient::new(
         std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
     );
-    let rt = Runtime::new()?;
+
+    // Use the existing runtime handle instead of creating a new one
+    // This prevents panic from nested runtime creation
+    let handle = tokio::runtime::Handle::try_current()
+        .map_err(|_| anyhow::anyhow!("No tokio runtime context available"))?;
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+    if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
         current_role = cfg.config.selected_role.to_string();
-        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
+        if let Ok(rg) = handle.block_on(async { api.rolegraph(Some(current_role.as_str())).await })
+        {
             terms = rg.nodes.into_iter().map(|n| n.label).collect();
         }
     }
@@ -1324,7 +1412,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 let api = api.clone();
                                 let role = current_role.clone();
                                 if !query.is_empty() {
-                                    if let Ok((lines, docs)) = rt.block_on(async move {
+                                    if let Ok((lines, docs)) = handle.block_on(async move {
                                         let q = SearchQuery {
                                             search_term: NormalizedTermValue::from(query.as_str()),
                                             search_terms: None,
@@ -1372,7 +1460,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                 if !query.is_empty() {
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
+                                    if let Ok(autocomplete_resp) = handle.block_on(async move {
                                         api.get_autocomplete(&role, query).await
                                     }) {
                                         suggestions = autocomplete_resp
@@ -1387,7 +1475,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                             KeyCode::Char('r') => {
                                 // Switch role
                                 let api = api.clone();
-                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+                                if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
                                     let roles: Vec<String> =
                                         cfg.config.roles.keys().map(|k| k.to_string()).collect();
                                     if !roles.is_empty() {
@@ -1397,7 +1485,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                             let next_idx = (current_idx + 1) % roles.len();
                                             current_role = roles[next_idx].clone();
                                             // Update terms for new role
-                                            if let Ok(rg) = rt.block_on(async {
+                                            if let Ok(rg) = handle.block_on(async {
                                                 api.rolegraph(Some(&current_role)).await
                                             }) {
                                                 terms =
@@ -1413,7 +1501,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
+                                    if let Ok(summary) = handle.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {
@@ -1448,7 +1536,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
+                                    if let Ok(summary) = handle.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {

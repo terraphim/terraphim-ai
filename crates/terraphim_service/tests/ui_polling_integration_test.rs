@@ -142,6 +142,8 @@ This document provides a comprehensive foundation for async Rust programming.
             fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 

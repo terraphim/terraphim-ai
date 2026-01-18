@@ -8,17 +8,17 @@ license = "MIT"
 [features]
 default = []
 
-# Enable claude-log-analyzer integration for enhanced parsing
-claude-log-analyzer = ["dep:claude-log-analyzer"]
+# Enable terraphim-session-analyzer integration for enhanced parsing
+terraphim-session-analyzer = ["dep:terraphim-session-analyzer"]
 
-# Enable full CLA features including Cursor support
-cla-full = ["claude-log-analyzer", "claude-log-analyzer/connectors"]
+# Enable full TSA features including Cursor support
+tsa-full = ["terraphim-session-analyzer", "terraphim-session-analyzer/connectors"]
 
 # Enable terraphim knowledge graph enrichment
 enrichment = ["terraphim_automata", "terraphim_rolegraph", "terraphim_types"]
 
 # All features
-full = ["cla-full", "enrichment"]
+full = ["tsa-full", "enrichment"]
 
 [dependencies]
 # Core dependencies
@@ -39,8 +39,8 @@ jiff = { version = "0.1", features = ["serde"] }
 walkdir = "2.4"
 dirs = "5.0"
 
-# Feature-gated: Claude Log Analyzer
-claude-log-analyzer = { path = "../claude-log-analyzer", optional = true }
+# Feature-gated: Terraphim Session Analyzer
+terraphim-session-analyzer = { path = "../terraphim-session-analyzer", optional = true }
 
 # Feature-gated: Terraphim enrichment
 terraphim_automata = { path = "../terraphim_automata", optional = true }

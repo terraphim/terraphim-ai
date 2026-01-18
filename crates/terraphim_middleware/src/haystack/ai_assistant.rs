@@ -1,6 +1,6 @@
 //! AI Assistant Session Haystack
 //!
-//! Indexes session logs from AI coding assistants using the claude-log-analyzer
+//! Indexes session logs from AI coding assistants using the terraphim-session-analyzer
 //! connector system. Supports:
 //! - Claude Code (JSONL) - `~/.claude/projects/`
 //! - OpenCode (JSONL) - `~/.opencode/`
@@ -13,11 +13,11 @@
 
 use crate::indexer::IndexMiddleware;
 use crate::Result;
-use claude_log_analyzer::connectors::{
-    ConnectorRegistry, ImportOptions, NormalizedMessage, NormalizedSession,
-};
 use std::path::PathBuf;
 use terraphim_config::Haystack;
+use terraphim_session_analyzer::connectors::{
+    ConnectorRegistry, ImportOptions, NormalizedMessage, NormalizedSession,
+};
 use terraphim_types::{Document, Index};
 
 /// Valid connector names for error messages

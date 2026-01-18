@@ -2,10 +2,10 @@
 
 ## 1. Problem Restatement and Scope
 
-**Problem**: The `claude-log-analyzer` crate provides rich analysis of Claude Code session logs but is currently not integrated into Terraphim's search infrastructure. Users cannot search across their Claude session history to find past conversations, agent decisions, or file modifications.
+**Problem**: The `terraphim-session-analyzer` crate provides rich analysis of Claude Code session logs but is currently not integrated into Terraphim's search infrastructure. Users cannot search across their Claude session history to find past conversations, agent decisions, or file modifications.
 
 **IN Scope**:
-- Implement `claude-log-analyzer` as a searchable haystack in Terraphim
+- Implement `terraphim-session-analyzer` as a searchable haystack in Terraphim
 - Index session metadata, agent invocations, file operations, and tool usage
 - Use `terraphim_automata` for efficient text matching and concept extraction
 - Follow existing haystack patterns (Ripgrep, MCP, QueryRs)
@@ -57,7 +57,7 @@ terraphim_middleware
 terraphim_config
 └── lib.rs (add ClaudeLogAnalyzer to ServiceType enum)
 
-claude-log-analyzer
+terraphim-session-analyzer
 └── (no changes - use as library)
 ```
 
@@ -116,7 +116,7 @@ claude-log-analyzer
    }
    ```
 
-3. **Use Existing Parser**: `claude-log-analyzer` already parses sessions perfectly
+3. **Use Existing Parser**: `terraphim-session-analyzer` already parses sessions perfectly
 
 ## 7. Questions for Human Reviewer
 
@@ -142,7 +142,7 @@ claude-log-analyzer
 use crate::{indexer::IndexMiddleware, Result};
 use terraphim_config::Haystack;
 use terraphim_types::{Document, Index};
-use claude_log_analyzer::{Analyzer, SessionAnalysis};
+use terraphim_session_analyzer::{Analyzer, SessionAnalysis};
 
 pub struct ClaudeLogAnalyzerHaystackIndexer;
 
@@ -157,7 +157,7 @@ impl IndexMiddleware for ClaudeLogAnalyzerHaystackIndexer {
             // 1. Get session directory from haystack.location
             let session_dir = expand_path(&haystack.location);
 
-            // 2. Parse sessions using claude-log-analyzer
+            // 2. Parse sessions using terraphim-session-analyzer
             let analyzer = Analyzer::from_directory(&session_dir)?;
             let analyses = analyzer.analyze(None)?;
 
@@ -194,7 +194,7 @@ fn agent_to_document(agent: &AgentInvocation, session: &SessionAnalysis) -> Docu
 
 1. Add `ClaudeLogAnalyzer` to `ServiceType` enum in `terraphim_config`
 2. Create `claude_analyzer.rs` in `terraphim_middleware/src/haystack/`
-3. Add dependency on `claude-log-analyzer` crate
+3. Add dependency on `terraphim-session-analyzer` crate
 4. Implement `IndexMiddleware` following MCP pattern
 5. Add to `search_haystacks()` match statement
 6. Write integration tests

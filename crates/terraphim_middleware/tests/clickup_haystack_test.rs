@@ -43,6 +43,8 @@ async fn clickup_live_search_returns_documents() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
@@ -92,6 +94,8 @@ async fn clickup_live_search_work_term() {
                 .with_extra_parameter("subtasks".into(), "true".into()),
         ],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
