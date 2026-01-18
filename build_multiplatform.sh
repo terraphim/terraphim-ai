@@ -20,7 +20,8 @@ build_target() {
     cargo build --release --target $TARGET \
         --package terraphim_server \
         --package terraphim_mcp_server \
-        --package terraphim_tui 2>/dev/null
+        --package terraphim_agent \
+        --package terraphim-cli 2>/dev/null
 
     if [ $? -eq 0 ]; then
         echo "✅ Built successfully for $TARGET"
@@ -32,11 +33,13 @@ build_target() {
         if [ "$OS" = "windows" ]; then
             cp target/$TARGET/release/terraphim_server.exe releases/v1.0.2/$OS/$ARCH/ 2>/dev/null || cp target/$TARGET/release/terraphim_server releases/v1.0.2/$OS/$ARCH/terraphim_server.exe 2>/dev/null
             cp target/$TARGET/release/terraphim_mcp_server.exe releases/v1.0.2/$OS/$ARCH/ 2>/dev/null || cp target/$TARGET/release/terraphim_mcp_server releases/v1.0.2/$OS/$ARCH/terraphim_mcp_server.exe 2>/dev/null
-            cp target/$TARGET/release/terraphim-tui.exe releases/v1.0.2/$OS/$ARCH/ 2>/dev/null || cp target/$TARGET/release/terraphim-tui releases/v1.0.2/$OS/$ARCH/terraphim-tui.exe 2>/dev/null
+            cp target/$TARGET/release/terraphim-agent.exe releases/v1.0.2/$OS/$ARCH/ 2>/dev/null || cp target/$TARGET/release/terraphim-agent releases/v1.0.2/$OS/$ARCH/terraphim-agent.exe 2>/dev/null
+            cp target/$TARGET/release/terraphim-cli.exe releases/v1.0.2/$OS/$ARCH/ 2>/dev/null || cp target/$TARGET/release/terraphim-cli releases/v1.0.2/$OS/$ARCH/terraphim-cli.exe 2>/dev/null
         else
             cp target/$TARGET/release/terraphim_server releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
             cp target/$TARGET/release/terraphim_mcp_server releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
-            cp target/$TARGET/release/terraphim-tui releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
+            cp target/$TARGET/release/terraphim-agent releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
+            cp target/$TARGET/release/terraphim-cli releases/v1.0.2/$OS/$ARCH/ 2>/dev/null
         fi
 
         # Create tar.gz archive for Unix systems
@@ -63,7 +66,8 @@ echo "------------------------------------------------"
 cargo build --release \
     --package terraphim_server \
     --package terraphim_mcp_server \
-    --package terraphim_tui
+    --package terraphim_agent \
+    --package terraphim-cli
 
 # Detect current platform and save native binaries
 if [[ "$OSTYPE" == "darwin"* ]]; then
@@ -72,13 +76,15 @@ if [[ "$OSTYPE" == "darwin"* ]]; then
         mkdir -p releases/v1.0.2/macos/aarch64
         cp target/release/terraphim_server releases/v1.0.2/macos/aarch64/
         cp target/release/terraphim_mcp_server releases/v1.0.2/macos/aarch64/
-        cp target/release/terraphim-tui releases/v1.0.2/macos/aarch64/
+        cp target/release/terraphim-agent releases/v1.0.2/macos/aarch64/
+        cp target/release/terraphim-cli releases/v1.0.2/macos/aarch64/
         echo "✅ Saved native macOS ARM64 binaries"
     else
         mkdir -p releases/v1.0.2/macos/x86_64
         cp target/release/terraphim_server releases/v1.0.2/macos/x86_64/
         cp target/release/terraphim_mcp_server releases/v1.0.2/macos/x86_64/
-        cp target/release/terraphim-tui releases/v1.0.2/macos/x86_64/
+        cp target/release/terraphim-agent releases/v1.0.2/macos/x86_64/
+        cp target/release/terraphim-cli releases/v1.0.2/macos/x86_64/
         echo "✅ Saved native macOS x86_64 binaries"
     fi
 fi
@@ -132,9 +138,13 @@ if [ -f "releases/v1.0.2/macos/x86_64/terraphim_server" ] && [ -f "releases/v1.0
         releases/v1.0.2/macos/aarch64/terraphim_mcp_server \
         -output releases/v1.0.2/macos/universal/terraphim_mcp_server
     lipo -create \
-        releases/v1.0.2/macos/x86_64/terraphim-tui \
-        releases/v1.0.2/macos/aarch64/terraphim-tui \
-        -output releases/v1.0.2/macos/universal/terraphim-tui
+        releases/v1.0.2/macos/x86_64/terraphim-agent \
+        releases/v1.0.2/macos/aarch64/terraphim-agent \
+        -output releases/v1.0.2/macos/universal/terraphim-agent
+    lipo -create \
+        releases/v1.0.2/macos/x86_64/terraphim-cli \
+        releases/v1.0.2/macos/aarch64/terraphim-cli \
+        -output releases/v1.0.2/macos/universal/terraphim-cli
 
     cd releases/v1.0.2/macos/universal
     tar -czf ../terraphim-ai-v1.0.2-macos-universal.tar.gz *

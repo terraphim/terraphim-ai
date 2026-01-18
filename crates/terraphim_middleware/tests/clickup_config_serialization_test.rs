@@ -23,6 +23,8 @@ fn role_with_clickup_haystack_is_valid() {
         kg: None,
         haystacks: vec![Haystack::new("clickup".into(), ServiceType::ClickUp, true)],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
     let json = serde_json::to_string(&role).unwrap();

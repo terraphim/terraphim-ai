@@ -571,7 +571,7 @@ $ terraphim-agent robot search "async database" --format json --max-results 3
 - [x] Self-documentation API (`CapabilitiesDoc`, `CommandDoc`)
 
 ### Phase 2 (Session Search)
-- [x] Claude Code connector (via `claude-log-analyzer` integration)
+- [x] Claude Code connector (via `terraphim-session-analyzer` integration)
 - [x] Cursor SQLite connector (via CLA `CursorConnector`)
 - [x] Basic session commands (`/sessions sources|import|list|search|stats|show`)
 - [x] Feature-gated architecture (`terraphim_sessions` crate)

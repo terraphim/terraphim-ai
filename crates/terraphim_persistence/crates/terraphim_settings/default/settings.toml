@@ -1,0 +1,31 @@
+server_hostname = "127.0.0.1:8000"
+api_endpoint="http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+default_data_path = "${TERRAPHIM_DATA_PATH:-~/.terraphim}"
+
+# 3-tier non-locking storage configuration for local development
+# - Memory: Ultra-fast cache for hot data
+# - SQLite: Persistent storage with concurrent access (WAL mode)
+# - DashMap: Development fallback with file persistence
+
+# Primary - Ultra-fast in-memory cache
+[profiles.memory]
+type = "memory"
+
+# Secondary - Persistent with excellent concurrency (WAL mode)
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
+connection_string = "/tmp/terraphim_sqlite/terraphim.db"
+table = "terraphim_kv"
+
+# Tertiary - Development fallback with concurrent access
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/terraphim_dashmap"  # Directory auto-created
+
+# ReDB disabled for local development to avoid database locking issues
+# [profiles.redb]
+# type = "redb"
+# datadir = "/tmp/terraphim_redb/local_dev.redb"
+# table = "terraphim"

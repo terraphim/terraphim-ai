@@ -379,6 +379,8 @@ impl TestConfiguration {
             theme: "default".to_string(),
             haystacks: vec![],
             extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
             terraphim_it: false,
             ..Default::default()
         }

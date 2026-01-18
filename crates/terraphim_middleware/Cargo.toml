@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_middleware"
-version = "1.3.0"
+version = "1.4.10"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim middleware for searching haystacks"
@@ -18,10 +18,10 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", features = ["tokio-runtime"] }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
-# NOTE: terraphim_atomic_client and grepapp_haystack are commented out for crates.io publishing (not published yet)
+# NOTE: Atomic Data Server commented out for crates.io publishing (not published yet)
 # terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
-# grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
-claude-log-analyzer = { path = "../claude-log-analyzer", version = "1.0.0", features = ["connectors"], optional = true }
+grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
+terraphim-session-analyzer = { path = "../terraphim-session-analyzer", version = "1.0.0", features = ["connectors"], optional = true }
 jiff = { version = "0.1", optional = true }
 home = { version = "0.5", optional = true }
 
@@ -50,7 +50,7 @@ terraphim_settings = { path = "../terraphim_settings" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
 test-log = { version = "0.2.19", features = ["trace"] }
-serial_test = "3.0"
+serial_test = "3.3"
 uuid = { version = "1.19.0", features = ["v4"] }
 dotenvy = "0.15.7"
 walkdir = "2.4.0"
@@ -59,10 +59,11 @@ tempfile = "3.23"
 
 [features]
 default = []
-# NOTE: Features below are disabled for crates.io publishing (dependencies not published yet)
-# atomic = ["terraphim_atomic_client"]
-# grepapp = ["grepapp_haystack"]
-# ai-assistant = ["claude-log-analyzer", "jiff", "home"]
+# NOTE: atomic feature disabled for crates.io publishing (dependency not published yet)
+# atomic = ["dep:terraphim_atomic_client"]
+grepapp = ["dep:grepapp_haystack"]
+# Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
+ai-assistant = ["terraphim-session-analyzer", "jiff", "home"]
 # Enable openrouter integration
 openrouter = ["terraphim_config/openrouter"]
 # Enable SSE-based MCP client probing
@@ -71,5 +72,3 @@ mcp-sse = ["reqwest-eventsource"]
 mcp = ["mcp-sse"]
 # Optional: use rust-sdk for full protocol clients
 mcp-rust-sdk = ["mcp-sse", "mcp-client", "mcp-spec", "rmcp"]
-# Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
-ai-assistant = ["claude-log-analyzer", "jiff", "home"]

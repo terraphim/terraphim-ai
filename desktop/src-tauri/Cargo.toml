@@ -56,7 +56,7 @@ schemars = { version = "0.8.22", features = ["derive"] }
 tsify = { version = "0.5", features = ["js"] }
 wasm-bindgen = "0.2"
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 ulid = "1.1.2"
@@ -65,7 +65,7 @@ lru = "0.16"
 
 [dev-dependencies]
 tokio-test = "0.4.4"
-serial_test = "3.1.1"
+serial_test = "3.3.1"
 tempfile = "3.23.0"
 mockall = "0.14.0"
 

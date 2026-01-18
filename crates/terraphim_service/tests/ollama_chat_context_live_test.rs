@@ -320,6 +320,8 @@ fn create_ollama_live_role(base_url: &str) -> terraphim_config::Role {
         llm_chat_model: Some("gemma3:270m".to_string()),
         llm_context_window: None,
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
     };
 
     // Configure for Ollama
