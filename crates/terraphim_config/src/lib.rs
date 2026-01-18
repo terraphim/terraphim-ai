@@ -22,6 +22,11 @@ use tokio::sync::Mutex;
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
+use crate::llm_router::LlmRouterConfig;
+
+// LLM Router configuration
+pub mod llm_router;
+
 pub type Result<T> = std::result::Result<T, TerraphimConfigError>;
 
 use opendal::Result as OpendalResult;
@@ -212,6 +217,12 @@ pub struct Role {
     #[schemars(skip)]
     #[cfg_attr(feature = "typescript", tsify(type = "Record<string, unknown>"))]
     pub extra: AHashMap<String, Value>,
+    /// Enable intelligent LLM routing with 6-phase architecture
+    #[serde(default)]
+    pub llm_router_enabled: bool,
+    /// Configuration for intelligent routing behavior
+    #[serde(default)]
+    pub llm_router_config: Option<LlmRouterConfig>,
 }
 
 impl Role {
@@ -234,6 +245,8 @@ impl Role {
             llm_chat_model: None,
             llm_context_window: default_context_window(),
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
         }
     }
 

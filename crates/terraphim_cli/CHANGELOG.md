@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **Auto-update commands**:
+  - `check-update`: Check for available updates from GitHub Releases
+  - `update`: Update to latest version automatically
+  - `rollback <version>`: Rollback to a previous version from backup
+- **terraphim_update integration**: Added dependency on terraphim_update crate for self-update functionality
+- **Update status JSON**: Structured JSON output for update operations
+
 ## [1.0.0] - 2025-01-25
 
 ### Added
