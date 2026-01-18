@@ -144,8 +144,8 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run unit and integration tests
-          cargo test --release --target ${{ matrix.target }} --workspace --all-features
+          # Run unit and integration tests (exclude integration-signing which requires zipsign CLI)
+          cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures"
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4

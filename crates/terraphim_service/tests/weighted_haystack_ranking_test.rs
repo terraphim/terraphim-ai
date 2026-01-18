@@ -63,6 +63,8 @@ async fn test_weighted_haystack_ranking() {
         kg: None,
         haystacks: vec![high_weight_haystack, low_weight_haystack],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
     roles.insert(RoleName::from("Test Role"), test_role);
@@ -161,6 +163,8 @@ async fn test_default_weight_handling() {
             fetch_content: false,
         }],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
     roles.insert(RoleName::from("Test Role"), test_role);

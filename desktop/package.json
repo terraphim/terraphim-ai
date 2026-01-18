@@ -1,7 +1,7 @@
 {
 	"name": "terraphim-search-ui",
 	"private": true,
-	"version": "1.0.0",
+	"version": "1.5.0",
 	"type": "module",
 	"engines": {
 		"node": ">=18.0.0",
@@ -58,7 +58,7 @@
 		"postinstall": "patch-package"
 	},
 	"devDependencies": {
-		"@playwright/test": "^1.44.1",
+		"@playwright/test": "^1.57.0",
 		"@sveltejs/vite-plugin-svelte": "^4.0.0",
 		"@tauri-apps/cli": "^1.6.3",
 		"@testing-library/jest-dom": "^6.9.1",
@@ -66,7 +66,7 @@
 		"@testing-library/user-event": "^14.5.2",
 		"@tsconfig/svelte": "^5.0.6",
 		"@types/d3": "^7.4.3",
-		"@types/node": "^24.10.2",
+		"@types/node": "^25.0.9",
 		"@vitest/coverage-v8": "^1.6.0",
 		"@vitest/ui": "^1.6.0",
 		"dotenv": "^16.4.5",
@@ -76,8 +76,8 @@
 		"postcss-load-config": "^6.0.1",
 		"sass": "^1.95.0",
 		"selenium-webdriver": "^4.21.0",
-		"svelte": "^5.45.3",
-		"svelte-check": "^4.3.4",
+		"svelte": "^5.46.4",
+		"svelte-check": "^4.3.5",
 		"svelte-preprocess": "^6.0.3",
 		"svelte-typeahead": "^4.4.1",
 		"tslib": "^2.8.1",
@@ -86,7 +86,7 @@
 		"vitest": "^1.6.0"
 	},
 	"optionalDependencies": {
-		"@playwright/test": "^1.44.1",
+		"@playwright/test": "^1.57.0",
 		"@testing-library/user-event": "^14.5.2",
 		"@types/d3": "^7.4.3",
 		"@vitest/coverage-v8": "^1.6.0",

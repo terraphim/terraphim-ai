@@ -57,7 +57,7 @@ repl-web = []       # Web operations
 
 [dev-dependencies]
 tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "test-util"] }
-serial_test = "3.0"
+serial_test = "3.3"
 tempfile = "3.10"
 
 # NOTE: Profile configuration moved to workspace Cargo.toml for consistency

@@ -59,6 +59,8 @@ async fn e2e_search_auto_summarize_with_ollama() {
             fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
     role.extra

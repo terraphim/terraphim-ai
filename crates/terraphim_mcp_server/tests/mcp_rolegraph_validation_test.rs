@@ -107,6 +107,8 @@ async fn create_terraphim_engineer_config() -> Result<String> {
         llm_chat_system_prompt: None,
         llm_chat_model: None,
         llm_context_window: Some(4096),
+        llm_router_enabled: false,
+        llm_router_config: None,
         extra: ahash::AHashMap::new(),
     };
 

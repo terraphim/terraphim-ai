@@ -103,6 +103,7 @@ impl FirecrackerExecutor {
     /// Initialize the VM pool.
     ///
     /// This is called lazily on first execution to avoid startup overhead.
+    #[allow(dead_code)]
     async fn ensure_pool(&mut self) -> Result<Arc<VmPoolManager>, RlmError> {
         if let Some(ref pool) = self.pool_manager {
             return Ok(Arc::clone(pool));

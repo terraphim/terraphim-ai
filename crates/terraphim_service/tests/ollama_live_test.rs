@@ -35,6 +35,8 @@ async fn live_ollama_summarize_deepseek_coder() {
         kg: None,
         haystacks: vec![],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
     role.extra

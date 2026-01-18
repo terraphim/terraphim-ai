@@ -1,7 +1,5 @@
 #[cfg(feature = "ai-assistant")]
 pub mod ai_assistant;
-#[cfg(feature = "atomic")]
-pub mod atomic;
 pub mod clickup;
 #[cfg(feature = "grepapp")]
 pub mod grep_app;
@@ -11,8 +9,6 @@ pub mod query_rs;
 pub mod quickwit;
 #[cfg(feature = "ai-assistant")]
 pub use ai_assistant::AiAssistantHaystackIndexer;
-#[cfg(feature = "atomic")]
-pub use atomic::AtomicHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
 #[cfg(feature = "grepapp")]
 pub use grep_app::GrepAppHaystackIndexer;
