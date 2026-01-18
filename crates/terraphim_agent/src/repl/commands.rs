@@ -91,6 +91,11 @@ pub enum ReplCommand {
         subcommand: SessionsSubcommand,
     },
 
+    // Update management commands (always available)
+    Update {
+        subcommand: UpdateSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -110,6 +115,19 @@ pub enum RobotSubcommand {
     Examples { command: Option<String> },
     /// List exit codes
     ExitCodes,
+}
+
+/// Subcommands for update management
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdateSubcommand {
+    /// Check if updates are available
+    Check,
+    /// Install available updates
+    Install,
+    /// Rollback to a previous version
+    Rollback { version: String },
+    /// List available backup versions
+    List,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1314,6 +1332,40 @@ impl FromStr for ReplCommand {
                 "Sessions feature not enabled. Rebuild with --features repl-sessions"
             )),
 
+            "update" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!(
+                        "Update command requires a subcommand (check | install | rollback <version> | list)"
+                    ));
+                }
+
+                match parts[1] {
+                    "check" => Ok(ReplCommand::Update {
+                        subcommand: UpdateSubcommand::Check,
+                    }),
+                    "install" => Ok(ReplCommand::Update {
+                        subcommand: UpdateSubcommand::Install,
+                    }),
+                    "rollback" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Update rollback requires a version"));
+                        }
+                        Ok(ReplCommand::Update {
+                            subcommand: UpdateSubcommand::Rollback {
+                                version: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    "list" => Ok(ReplCommand::Update {
+                        subcommand: UpdateSubcommand::List,
+                    }),
+                    _ => Err(anyhow!(
+                        "Unknown update subcommand: {}. Use: check, install, rollback <version>, list",
+                        parts[1]
+                    )),
+                }
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -1337,7 +1389,8 @@ impl ReplCommand {
     #[allow(unused_mut)]
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "vm", "robot", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "vm", "robot", "update", "help", "quit", "exit",
+            "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
@@ -1392,6 +1445,9 @@ impl ReplCommand {
             ),
             "robot" => Some(
                 "/robot <subcommand> - AI agent self-documentation (capabilities, schemas [cmd], examples [cmd], exit-codes)",
+            ),
+            "update" => Some(
+                "/update <subcommand> - Manage updates (check, install, rollback <version>, list)",
             ),
 
             #[cfg(feature = "repl-file")]
@@ -1498,5 +1554,70 @@ mod tests {
                 command: Some("search".to_string())
             }
         );
+    }
+
+    #[test]
+    fn test_update_command_parsing() {
+        // Test update check
+        let cmd = "/update check".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::Check
+            }
+        );
+
+        // Test update install
+        let cmd = "/update install".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::Install
+            }
+        );
+
+        // Test update rollback with version
+        let cmd = "/update rollback 1.0.0".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::Rollback {
+                    version: "1.0.0".to_string()
+                }
+            }
+        );
+
+        // Test update list
+        let cmd = "/update list".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::List
+            }
+        );
+    }
+
+    #[test]
+    fn test_update_command_errors() {
+        // Test update without subcommand
+        let result = "/update".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires a subcommand"));
+
+        // Test update rollback without version
+        let result = "/update rollback".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires a version"));
+
+        // Test unknown update subcommand
+        let result = "/update unknown".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown update"));
     }
 }
