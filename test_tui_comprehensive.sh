@@ -19,7 +19,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Test configuration
-TUI_PACKAGE="terraphim_tui"
+TUI_PACKAGE="terraphim_agent"
 SERVER_PACKAGE="terraphim_server"
 TEST_TIMEOUT=30
 CLEANUP_ON_EXIT=true
@@ -77,11 +77,11 @@ trap cleanup EXIT
 
 # Test helper functions
 run_tui_offline() {
-    timeout ${TEST_TIMEOUT} cargo run -p ${TUI_PACKAGE} -- "$@" 2>&1
+    timeout ${TEST_TIMEOUT} cargo run -p ${TUI_PACKAGE} --features repl-interactive -- "$@" 2>&1
 }
 
 run_tui_server() {
-    timeout ${TEST_TIMEOUT} cargo run -p ${TUI_PACKAGE} -- --server --server-url "$1" "${@:2}" 2>&1
+    timeout ${TEST_TIMEOUT} cargo run -p ${TUI_PACKAGE} --features repl-interactive -- --server --server-url "$1" "${@:2}" 2>&1
 }
 
 start_test_server() {
@@ -526,7 +526,7 @@ main() {
 
     # Ensure we can build the TUI first
     log_info "Building TUI package..."
-    if ! cargo build -p ${TUI_PACKAGE}; then
+    if ! cargo build -p ${TUI_PACKAGE} --features repl-interactive; then
         log_error "Failed to build TUI package"
         exit 1
     fi

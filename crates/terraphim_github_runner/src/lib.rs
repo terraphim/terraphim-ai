@@ -62,8 +62,8 @@ pub use session::{
     VmProvider,
 };
 pub use workflow::{
-    CommandExecutor, CommandResult, MockCommandExecutor, ParsedWorkflow, WorkflowExecutor,
-    WorkflowExecutorConfig, WorkflowParser, WorkflowStep,
+    CommandExecutor, CommandResult, MockCommandExecutor, ParsedWorkflow, SimulatedVmExecutor,
+    VmCommandExecutor, WorkflowExecutor, WorkflowExecutorConfig, WorkflowParser, WorkflowStep,
 };
 
 #[cfg(feature = "github-runner")]

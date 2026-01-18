@@ -4,7 +4,7 @@
 # ============================================
 # Stage 1: Base Builder
 # ============================================
-FROM rust:1.87.0-slim as base-builder
+FROM rust:1.92.0-slim as base-builder
 
 # Set environment variables
 ENV CARGO_TERM_COLOR=always \

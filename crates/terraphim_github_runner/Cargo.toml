@@ -27,7 +27,10 @@ anyhow.workspace = true
 log.workspace = true
 
 # Concurrent data structures
-dashmap = "5.5"
+dashmap = "6.1"
+
+# HTTP client for Firecracker API
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
 
 # Internal dependencies (feature-gated)
 terraphim_multi_agent = { path = "../terraphim_multi_agent", optional = true }
@@ -47,3 +50,4 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph" }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["test-util", "macros"] }
+env_logger = "0.11"

@@ -10,7 +10,7 @@ This guide addresses the CI/CD infrastructure issues resolved in GitHub Issue #3
 
 **Problem**: Workflow changes weren't taking effect due to caching
 **Root Cause**: GitHub Actions was using cached workflow versions
-**Solution**: 
+**Solution**:
 - Rename workflow to force cache invalidation (`Deploy Documentation to Cloudflare Pages v2`)
 - Add cleanup steps for build directories
 - Use `workflow_dispatch` for testing

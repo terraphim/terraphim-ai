@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_agent"
-version = "1.2.3"
+version = "1.4.10"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim AI Agent CLI - Command-line interface with interactive REPL and ASCII graph visualization"
@@ -12,23 +12,32 @@ license = "Apache-2.0"
 readme = "../../README.md"
 
 [features]
-default = []
+default = ["repl-interactive"]
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
-repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-sessions"]
+repl-interactive = ["repl", "dep:atty"]
+# NOTE: repl-sessions removed from repl-full for crates.io publishing (terraphim_sessions not published yet)
+repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-interactive"]
 repl-chat = ["repl"]  # Chat functionality
 repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
 repl-web = ["repl"]   # Web operations and configuration
-repl-sessions = ["repl", "dep:terraphim_sessions"]  # Session history search
+# NOTE: repl-sessions feature exists but dependency disabled for crates.io publishing
+# (terraphim_sessions not published yet). Feature is valid but non-functional until dependency added.
+# repl-sessions = ["repl"]  # Session history search (stub - requires terraphim_sessions when published)
+
+[lints.rust]
+# Allow cfg(feature = "repl-sessions") even though feature is commented out
+# This will be removed once terraphim_sessions is published to crates.io
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(feature, values(\"repl-sessions\"))"] }
 
 [dependencies]
 anyhow = "1.0"
 thiserror = "1.0"
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-ratatui = "0.28"
-crossterm = "0.27"
+ratatui = "0.30"
+crossterm = "0.29"
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
@@ -48,7 +57,7 @@ walkdir = "2.0"
 async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 strsim = "0.11"  # For edit distance / fuzzy matching in forgiving CLI
-uuid = { version = "1.0", features = ["v4", "serde"] }
+uuid = { version = "1.19", features = ["v4", "serde"] }
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "17.0", optional = true }
@@ -56,6 +65,7 @@ colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
 indicatif = { version = "0.18", optional = true }
 dirs = { version = "5.0", optional = true }
+atty = { version = "0.2", optional = true }
 
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
@@ -65,11 +75,12 @@ terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
 terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
 terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
-terraphim_hooks = { path = "../terraphim_hooks", version = "1.2.3" }
-terraphim_sessions = { path = "../terraphim_sessions", version = "0.1.0", optional = true, features = ["cla-full"] }
+terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
+# NOTE: terraphim_sessions commented out for crates.io publishing (not published yet)
+# terraphim_sessions = { path = "../terraphim_sessions", version = "0.1.0", optional = true, features = ["cla-full"] }
 
 [dev-dependencies]
-serial_test = "3.0"
+serial_test = "3.3"
 futures = "0.3"
 portpicker = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }

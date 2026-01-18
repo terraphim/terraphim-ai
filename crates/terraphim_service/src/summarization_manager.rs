@@ -464,6 +464,8 @@ mod tests {
                 );
                 extra
             },
+            llm_router_enabled: false,
+            llm_router_config: None,
         }
     }
 
