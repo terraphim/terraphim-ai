@@ -14,6 +14,7 @@ terraphim-grep/
 artifact/
 nohup.out
 .cargo/
+!.cargo/audit.toml
 localsearch/
 # Local Netlify folder
 .netlify/
