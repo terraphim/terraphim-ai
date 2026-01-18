@@ -1,0 +1,63 @@
+[package]
+name = "terraphim_rlm"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim AI Team"]
+description = "Recursive Language Model (RLM) orchestration for Terraphim AI"
+license = "MIT"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["rlm", "llm", "code-execution", "firecracker", "ai"]
+categories = ["development-tools", "asynchronous"]
+
+[dependencies]
+# Workspace dependencies
+tokio.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+ulid = { version = "1.1", features = ["serde"] }
+jiff = { version = "0.2", features = ["serde"] }
+async-trait.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
+log.workspace = true
+
+# Terraphim crates
+terraphim_firecracker = { package = "terraphim-firecracker", path = "../../terraphim_firecracker" }
+terraphim_service = { path = "../terraphim_service", optional = true }
+terraphim_automata = { path = "../terraphim_automata", optional = true }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
+
+# Async utilities
+tokio-util = "0.7"
+futures = "0.3"
+
+# HTTP for LLM bridge
+hyper = { version = "1.0", features = ["server", "http1"], optional = true }
+hyper-util = { version = "0.1", features = ["tokio"], optional = true }
+
+# Alternative execution backends
+bollard = { version = "0.18", optional = true }
+reqwest = { workspace = true, optional = true }
+
+# DNS security
+trust-dns-resolver = { version = "0.23", optional = true }
+
+# Utilities
+parking_lot = "0.12"
+dashmap = "6.1"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
+test-log = "0.2"
+
+[features]
+default = ["full"]
+full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security"]
+llm = ["dep:terraphim_service"]
+kg-validation = ["dep:terraphim_automata"]
+supervision = ["dep:terraphim_agent_supervisor"]
+llm-bridge = ["dep:hyper", "dep:hyper-util"]
+docker-backend = ["dep:bollard"]
+e2b-backend = ["dep:reqwest"]
+dns-security = ["dep:trust-dns-resolver"]

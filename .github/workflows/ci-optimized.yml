@@ -1,10 +1,12 @@
 name: CI Optimized (Docker Layer Reuse)
 
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
 on:
   push:
     branches: [main, CI_migration, ci-optimized]
-    tags:
-      - "*.*.*"
+    # Disabled tag trigger - release-comprehensive.yml handles releases
+    # tags:
+    #   - "*.*.*"
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:

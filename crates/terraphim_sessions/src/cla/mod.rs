@@ -1,14 +1,14 @@
-//! Claude Log Analyzer Integration
+//! Terraphim Session Analyzer Integration
 //!
 //! This module provides enhanced session import capabilities
-//! when the `claude-log-analyzer` feature is enabled.
+//! when the `terraphim-session-analyzer` feature is enabled.
 
 mod connector;
 
 pub use connector::{ClaClaudeConnector, ClaCursorConnector};
 
 use crate::model::{ContentBlock, Message, MessageRole, Session, SessionMetadata};
-use claude_log_analyzer::connectors::{NormalizedMessage, NormalizedSession};
+use terraphim_session_analyzer::connectors::{NormalizedMessage, NormalizedSession};
 
 /// Convert a CLA NormalizedSession to our Session type
 pub(crate) fn from_normalized_session(ns: NormalizedSession, prefix: &str) -> Session {

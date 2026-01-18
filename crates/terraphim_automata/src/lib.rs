@@ -38,11 +38,11 @@
 //! let mut thesaurus = Thesaurus::new("programming".to_string());
 //! thesaurus.insert(
 //!     NormalizedTermValue::from("rust"),
-//!     NormalizedTerm { id: 1, value: NormalizedTermValue::from("rust"), url: None }
+//!     NormalizedTerm::new(1, NormalizedTermValue::from("rust"))
 //! );
 //! thesaurus.insert(
 //!     NormalizedTermValue::from("rust async"),
-//!     NormalizedTerm { id: 2, value: NormalizedTermValue::from("rust async"), url: None }
+//!     NormalizedTerm::new(2, NormalizedTermValue::from("rust async"))
 //! );
 //!
 //! // Build autocomplete index
@@ -109,6 +109,7 @@ pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
 pub mod matcher;
+pub mod url_protector;
 
 pub use autocomplete::{
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,

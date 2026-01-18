@@ -37,7 +37,7 @@ terraphim_mcp_server = { path = "../../crates/terraphim_mcp_server", version = "
 rmcp = { version = "0.9.0", features = ["server"] }
 serde_json_any_key = "2.0.0"
 anyhow = "1.0.81"
-log = "0.4.21"
+log = "0.4.29"
 env_logger = "0.11.8"
 portpicker = "0.1.1"
 serde = { version = "1.0.197", features = ["derive"] }
@@ -56,7 +56,7 @@ schemars = { version = "0.8.22", features = ["derive"] }
 tsify = { version = "0.5", features = ["js"] }
 wasm-bindgen = "0.2"
 tracing = "0.1.40"
-tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
+tracing-subscriber = { version = "0.3.22", features = ["env-filter"] }
 tracing-appender = "0.2.3"
 tracing-log = "0.2"
 ulid = "1.1.2"
@@ -65,7 +65,7 @@ lru = "0.16"
 
 [dev-dependencies]
 tokio-test = "0.4.4"
-serial_test = "3.1.1"
+serial_test = "3.3.1"
 tempfile = "3.23.0"
 mockall = "0.14.0"
 

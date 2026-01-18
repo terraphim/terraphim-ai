@@ -124,14 +124,14 @@ Terraphim is built as a modular Rust project with multiple crates, each serving 
 - Export to JSON/Markdown
 
 **Feature Flags**:
-- `claude-log-analyzer` - Enhanced Claude Code parsing via CLA
+- `terraphim-session-analyzer` - Enhanced Claude Code parsing via CLA
 - `cla-full` - CLA with Cursor connector support
 - `enrichment` - Knowledge graph concept matching
 - `full` - All features enabled
 
 **Dependencies**: tokio, serde, terraphim_automata (optional)
 
-### claude-log-analyzer
+### terraphim-session-analyzer
 **Purpose**: Parse and analyze Claude Code session logs
 **Key Features**:
 - JSONL session log parsing from `~/.claude/projects/`

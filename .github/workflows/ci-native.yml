@@ -1,10 +1,12 @@
 name: CI Native (GitHub Actions + Docker Buildx)
 
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
 on:
   push:
     branches: [main, CI_migration]
-    tags:
-      - "*.*.*"
+    # Disabled tag trigger - release-comprehensive.yml handles releases
+    # tags:
+    #   - "*.*.*"
   pull_request:
     types: [opened, synchronize, reopened]
   workflow_dispatch:
@@ -46,13 +48,13 @@ jobs:
         run: |
           rm -rf target || true
           mkdir -p target
-        
+
       - name: Generate cache key
         id: cache
         run: |
           HASH=$(sha256sum Cargo.lock 2>/dev/null | cut -d' ' -f1 || echo "no-lock")
           echo "key=v1-${HASH:0:16}" >> $GITHUB_OUTPUT
-      
+
       - name: Set Ubuntu versions
         id: ubuntu
         run: |
@@ -61,7 +63,7 @@ jobs:
           else
             echo 'versions=["22.04"]' >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Set Rust targets
         id: targets
         run: |
@@ -70,7 +72,7 @@ jobs:
           else
             echo 'targets=["x86_64-unknown-linux-gnu"]' >> $GITHUB_OUTPUT
           fi
-      
+
   lint-and-format:
     runs-on: [self-hosted, Linux, X64]
     timeout-minutes: 30
@@ -117,7 +119,7 @@ jobs:
             libayatana-appindicator3-dev 2>/dev/null || \
           sudo apt-get install -yqq --no-install-recommends \
             libappindicator3-dev || true
-      
+
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
         with:

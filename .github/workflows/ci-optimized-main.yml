@@ -1,9 +1,11 @@
 name: CI Optimized Main Branch
 
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
 on:
   push:
     branches: [main, develop]
-    tags: ["*.*.*"]
+    # Disabled tag trigger - release-comprehensive.yml handles releases
+    # tags: ["*.*.*"]
   workflow_dispatch:
     inputs:
       build-release:
@@ -163,7 +165,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
       - name: Optimized Cargo Cache
@@ -241,12 +243,12 @@ jobs:
         run: |
           echo "=== Running Tests ===" >> $GITHUB_STEP_SUMMARY
 
-          # Run unit and integration tests (skip RocksDB tests for speed)
-          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --test-threads=4 --skip rocksdb
+          # Run unit and integration tests
+          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --test-threads=4
 
           # Run specific critical tests
-          cargo test --release --package terraphim_service --target ${{ matrix.target }} -- --skip rocksdb
-          cargo test --release --package terraphim_middleware --target ${{ matrix.target }} -- --skip rocksdb
+          cargo test --release --package terraphim_service --target ${{ matrix.target }}
+          cargo test --release --package terraphim_middleware --target ${{ matrix.target }}
 
       - name: Upload Build Artifacts
         uses: actions/upload-artifact@v4
@@ -277,14 +279,6 @@ jobs:
           name: deb-packages
           path: target/${{ matrix.target }}/debian/*.deb
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
-
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
-          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
 
   # Build Summary and Performance Report
   build-summary:
@@ -350,12 +344,6 @@ jobs:
           # Final system cleanup
           docker system prune -f --volumes --filter "until=6h" || true
           docker buildx prune -f --keep-storage=5G --filter "until=6h" || true
-
-          # Workspace cleanup
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
-          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
 
           # Report final system state
           FINAL_STORAGE=$(docker system df --format "{{.Size}}" | head -1)

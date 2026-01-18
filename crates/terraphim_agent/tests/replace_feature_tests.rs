@@ -100,8 +100,8 @@ mod tests {
             .expect("Failed to perform replacement");
 
         assert!(
-            result.contains("bun_install"),
-            "Expected 'bun_install' in output, got: {}",
+            result.contains("bun install"),
+            "Expected 'bun install' in output, got: {}",
             result
         );
     }
@@ -113,8 +113,8 @@ mod tests {
             .expect("Failed to perform replacement");
 
         assert!(
-            result.contains("bun_install"),
-            "Expected 'bun_install' in output, got: {}",
+            result.contains("bun install"),
+            "Expected 'bun install' in output, got: {}",
             result
         );
     }
@@ -181,5 +181,203 @@ bun install
 "#;
         let clean = extract_clean_output(raw_output);
         assert_eq!(clean, "bun install");
+    }
+
+    // ============================================================
+    // Issue #394 Tests: Case Preservation and URL Protection
+    // ============================================================
+
+    /// Test that URLs are protected from replacement
+    #[tokio::test]
+    async fn test_url_protection_plain_url() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        thesaurus.insert(
+            NormalizedTermValue::from("example"),
+            NormalizedTerm::new(1, NormalizedTermValue::from("example"))
+                .with_display_value("REPLACED".to_string()),
+        );
+
+        let text = "Visit https://example.com for more info";
+        let result = terraphim_automata::replace_matches(
+            text,
+            thesaurus,
+            terraphim_automata::LinkType::PlainText,
+        )
+        .expect("Replacement should succeed");
+        let result_str = String::from_utf8(result).expect("Valid UTF-8");
+
+        // URL should remain unchanged
+        assert!(
+            result_str.contains("https://example.com"),
+            "URL should be protected, got: {}",
+            result_str
+        );
+    }
+
+    /// Test that markdown link URLs are protected while display text is replaced
+    #[tokio::test]
+    async fn test_url_protection_markdown_link() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        thesaurus.insert(
+            NormalizedTermValue::from("claude"),
+            NormalizedTerm::new(1, NormalizedTermValue::from("claude"))
+                .with_display_value("Terraphim".to_string()),
+        );
+
+        let text = "[Claude](https://claude.ai/code)";
+        let result = terraphim_automata::replace_matches(
+            text,
+            thesaurus,
+            terraphim_automata::LinkType::PlainText,
+        )
+        .expect("Replacement should succeed");
+        let result_str = String::from_utf8(result).expect("Valid UTF-8");
+
+        // URL should be preserved
+        assert!(
+            result_str.contains("https://claude.ai/code"),
+            "Markdown link URL should be protected, got: {}",
+            result_str
+        );
+        // Display text should be replaced
+        assert!(
+            result_str.contains("Terraphim"),
+            "Display text should be replaced, got: {}",
+            result_str
+        );
+    }
+
+    /// Test that email addresses are protected from replacement
+    #[tokio::test]
+    async fn test_url_protection_email() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        thesaurus.insert(
+            NormalizedTermValue::from("anthropic"),
+            NormalizedTerm::new(1, NormalizedTermValue::from("anthropic"))
+                .with_display_value("Company".to_string()),
+        );
+
+        let text = "Contact noreply@anthropic.com for help";
+        let result = terraphim_automata::replace_matches(
+            text,
+            thesaurus,
+            terraphim_automata::LinkType::PlainText,
+        )
+        .expect("Replacement should succeed");
+        let result_str = String::from_utf8(result).expect("Valid UTF-8");
+
+        // Email should remain unchanged
+        assert!(
+            result_str.contains("noreply@anthropic.com"),
+            "Email should be protected, got: {}",
+            result_str
+        );
+    }
+
+    /// Test that display_value preserves case in replacement output
+    #[tokio::test]
+    async fn test_case_preservation_with_display_value() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        // Simulate what happens when building thesaurus from "Terraphim AI.md"
+        thesaurus.insert(
+            NormalizedTermValue::from("claude code"), // lowercase key for matching
+            NormalizedTerm::new(1, NormalizedTermValue::from("terraphim ai"))
+                .with_display_value("Terraphim AI".to_string()), // Original case preserved
+        );
+
+        let text = "Using Claude Code for development";
+        let result = terraphim_automata::replace_matches(
+            text,
+            thesaurus,
+            terraphim_automata::LinkType::PlainText,
+        )
+        .expect("Replacement should succeed");
+        let result_str = String::from_utf8(result).expect("Valid UTF-8");
+
+        // Should use display_value with proper case
+        assert!(
+            result_str.contains("Terraphim AI"),
+            "Should preserve case from display_value, got: {}",
+            result_str
+        );
+        // Should NOT contain lowercase version
+        assert!(
+            !result_str.contains("terraphim ai"),
+            "Should not output lowercase, got: {}",
+            result_str
+        );
+    }
+
+    /// Test fallback to normalized value when display_value is None
+    #[tokio::test]
+    async fn test_fallback_when_no_display_value() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        // NormalizedTerm without display_value (backward compatibility)
+        thesaurus.insert(
+            NormalizedTermValue::from("foo"),
+            NormalizedTerm::new(1, NormalizedTermValue::from("bar")), // No display_value
+        );
+
+        let text = "Replace foo here";
+        let result = terraphim_automata::replace_matches(
+            text,
+            thesaurus,
+            terraphim_automata::LinkType::PlainText,
+        )
+        .expect("Replacement should succeed");
+        let result_str = String::from_utf8(result).expect("Valid UTF-8");
+
+        // Should fallback to normalized value
+        assert!(
+            result_str.contains("bar"),
+            "Should fallback to normalized value, got: {}",
+            result_str
+        );
+    }
+
+    /// Test combined case preservation and URL protection (issue #394 example)
+    #[tokio::test]
+    async fn test_issue_394_combined_scenario() {
+        use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+
+        let mut thesaurus = Thesaurus::new("test".to_string());
+        thesaurus.insert(
+            NormalizedTermValue::from("claude code"),
+            NormalizedTerm::new(1, NormalizedTermValue::from("terraphim ai"))
+                .with_display_value("Terraphim AI".to_string()),
+        );
+
+        // This is the exact example from issue #394
+        let text = "Generated with [Claude Code](https://claude.ai/claude-code)";
+        let result = terraphim_automata::replace_matches(
+            text,
+            thesaurus,
+            terraphim_automata::LinkType::PlainText,
+        )
+        .expect("Replacement should succeed");
+        let result_str = String::from_utf8(result).expect("Valid UTF-8");
+
+        // Display text should be replaced with proper case
+        assert!(
+            result_str.contains("Terraphim AI"),
+            "Display text should use proper case, got: {}",
+            result_str
+        );
+        // URL should NOT be modified
+        assert!(
+            result_str.contains("https://claude.ai/claude-code"),
+            "URL should be protected, got: {}",
+            result_str
+        );
     }
 }
