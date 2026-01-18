@@ -48,6 +48,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                llm_router_enabled: false,
+                llm_router_config: None,
                 extra: {
                     let mut extra = AHashMap::new();
 
@@ -142,6 +144,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                llm_router_enabled: false,
+                llm_router_config: None,
             },
         )
         .add_role(
@@ -177,6 +181,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                llm_router_enabled: false,
+                llm_router_config: None,
             },
         )
         .build()
@@ -218,6 +224,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                llm_router_enabled: false,
+                llm_router_config: None,
             },
         )
         .build()
@@ -266,6 +274,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                llm_router_enabled: false,
+                llm_router_config: None,
             },
         )
         .build()
@@ -423,6 +433,8 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 llm_chat_system_prompt: None,
                 llm_chat_model: None,
                 llm_context_window: Some(32768),
+                llm_router_enabled: false,
+                llm_router_config: None,
             },
         )
         .build()?;

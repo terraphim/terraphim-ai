@@ -22,15 +22,21 @@ repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
 repl-web = ["repl"]   # Web operations and configuration
-# NOTE: repl-sessions disabled for crates.io publishing (terraphim_sessions not published yet)
-# repl-sessions = ["repl", "dep:terraphim_sessions"]  # Session history search
+# NOTE: repl-sessions feature exists but dependency disabled for crates.io publishing
+# (terraphim_sessions not published yet). Feature is valid but non-functional until dependency added.
+# repl-sessions = ["repl"]  # Session history search (stub - requires terraphim_sessions when published)
+
+[lints.rust]
+# Allow cfg(feature = "repl-sessions") even though feature is commented out
+# This will be removed once terraphim_sessions is published to crates.io
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(feature, values(\"repl-sessions\"))"] }
 
 [dependencies]
 anyhow = "1.0"
 thiserror = "1.0"
 clap = { version = "4", features = ["derive"] }
 tokio = { version = "1", features = ["full"] }
-ratatui = "0.28"
+ratatui = "0.30"
 crossterm = "0.29"
 futures = "0.3"
 serde = { version = "1.0", features = ["derive"] }
@@ -74,7 +80,7 @@ terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
 # terraphim_sessions = { path = "../terraphim_sessions", version = "0.1.0", optional = true, features = ["cla-full"] }
 
 [dev-dependencies]
-serial_test = "3.0"
+serial_test = "3.3"
 futures = "0.3"
 portpicker = "0.1"
 reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
