@@ -14,6 +14,7 @@ terraphim-grep/
 artifact/
 nohup.out
 .cargo/
+!.cargo/audit.toml
 localsearch/
 # Local Netlify folder
 .netlify/
@@ -48,3 +49,6 @@ keys/
 
 # CodeBuff compiled JavaScript files
 .codebuff/agents/.agents/*.js
+
+# Working documents
+.docs/

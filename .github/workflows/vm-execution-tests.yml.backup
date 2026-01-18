@@ -4,7 +4,6 @@ name: VM Execution Tests
 # Firecracker is Linux-only - these tests will not work on macOS/Windows
 # The scratchpad/firecracker-rust directory is gitignored (experimental code)
 # Tests will skip gracefully if the directory is not present
-# Triggered manually for adaptive concurrency testing
 
 on:
   push:
@@ -21,7 +20,6 @@ on:
       - 'scratchpad/firecracker-rust/**'
       - 'scripts/test-vm-execution.sh'
       - '.github/workflows/vm-execution-tests.yml'
-  workflow_dispatch:  # Allow manual triggering
 
 env:
   CARGO_TERM_COLOR: always
@@ -96,47 +94,18 @@ jobs:
     runs-on: [self-hosted, linux, x64]
     timeout-minutes: 15
 
-    # NOTE: No services block - we check for existing Redis on self-hosted runner
-    # and only start a container if none is available
+    services:
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
 
     steps:
-    - name: Check for existing Redis
-      id: redis_check
-      run: |
-        if redis-cli -h 127.0.0.1 -p 6379 ping 2>/dev/null | grep -q PONG; then
-          echo "Redis is available on localhost:6379"
-          echo "redis_available=true" >> $GITHUB_OUTPUT
-          echo "redis_host=127.0.0.1" >> $GITHUB_OUTPUT
-          echo "redis_port=6379" >> $GITHUB_OUTPUT
-          echo "redis_started=false" >> $GITHUB_OUTPUT
-        else
-          echo "No Redis found, will start container on port 6380"
-          echo "redis_available=false" >> $GITHUB_OUTPUT
-          echo "redis_host=127.0.0.1" >> $GITHUB_OUTPUT
-          echo "redis_port=6380" >> $GITHUB_OUTPUT
-          echo "redis_started=true" >> $GITHUB_OUTPUT
-        fi
-
-    - name: Start Redis container (if needed)
-      if: steps.redis_check.outputs.redis_available == 'false'
-      run: |
-        docker run -d --name ci-redis-${{ github.run_id }} \
-          -p 6380:6379 \
-          --health-cmd "redis-cli ping" \
-          --health-interval 10s \
-          --health-timeout 5s \
-          --health-retries 5 \
-          redis:7-alpine
-        # Wait for Redis to be healthy
-        for i in {1..30}; do
-          if redis-cli -h 127.0.0.1 -p 6380 ping 2>/dev/null | grep -q PONG; then
-            echo "Redis container is ready"
-            break
-          fi
-          echo "Waiting for Redis container... ($i/30)"
-          sleep 2
-        done
-
     - name: Checkout code
       uses: actions/checkout@v6
 
@@ -203,10 +172,6 @@ jobs:
 
     - name: Run integration tests
       if: steps.check_fcctl.outputs.exists == 'true'
-      env:
-        REDIS_HOST: ${{ steps.redis_check.outputs.redis_host }}
-        REDIS_PORT: ${{ steps.redis_check.outputs.redis_port }}
-        REDIS_URL: redis://${{ steps.redis_check.outputs.redis_host }}:${{ steps.redis_check.outputs.redis_port }}
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo test llm_api_tests \
@@ -215,10 +180,6 @@ jobs:
 
     - name: Run HTTP API security tests
       if: steps.check_fcctl.outputs.exists == 'true'
-      env:
-        REDIS_HOST: ${{ steps.redis_check.outputs.redis_host }}
-        REDIS_PORT: ${{ steps.redis_check.outputs.redis_port }}
-        REDIS_URL: redis://${{ steps.redis_check.outputs.redis_host }}:${{ steps.redis_check.outputs.redis_port }}
       run: |
         cd scratchpad/firecracker-rust/fcctl-web
         cargo test security_tests \
@@ -235,12 +196,6 @@ jobs:
         if [ -n "${FCCTL_WEB_PID:-}" ]; then
           kill $FCCTL_WEB_PID || true
         fi
-
-    - name: Stop Redis container (if started)
-      if: always() && steps.redis_check.outputs.redis_started == 'true'
-      run: |
-        docker stop ci-redis-${{ github.run_id }} || true
-        docker rm ci-redis-${{ github.run_id }} || true
 
   websocket-tests:
     name: WebSocket Tests
@@ -728,7 +683,7 @@ jobs:
           -o target/coverage/
 
     - name: Upload coverage to GitHub Pages
-      uses: peaceiris/actions-gh-pages@v4
+      uses: peaceiris/actions-gh-pages@v3
       if: github.ref == 'refs/heads/main'
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
