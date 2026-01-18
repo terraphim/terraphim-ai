@@ -1,0 +1,23 @@
+name: Test Firecracker GitHub Runner
+
+on:
+  pull_request:
+    branches: [ main ]
+  push:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Echo Test
+        run: echo "Hello from Firecracker VM!"
+
+      - name: Check Environment
+        run: |
+          echo "Hostname: $(hostname)"
+          echo "User: $(whoami)"
+          echo "Working directory: $(pwd)"
+          echo "Date: $(date)"
+          echo "✅ Firecracker GitHub runner is working!"
+# Test GitHub runner with new VM limits

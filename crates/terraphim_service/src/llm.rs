@@ -3,6 +3,19 @@ use std::sync::Arc;
 use ahash::AHashMap;
 use serde_json::Value;
 
+#[cfg(feature = "llm_router")]
+pub use self::router_config::{MergedRouterConfig, RouterMode};
+#[cfg(feature = "llm_router")]
+use crate::llm::proxy_client::ProxyLlmClient;
+#[cfg(feature = "llm_router")]
+use crate::llm::routed_adapter::RoutedLlmClient;
+#[cfg(feature = "llm_router")]
+mod proxy_client;
+#[cfg(feature = "llm_router")]
+mod routed_adapter;
+#[cfg(feature = "llm_router")]
+mod router_config;
+
 use crate::Result as ServiceResult;
 
 #[derive(Clone, Debug)]
@@ -110,7 +123,7 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
                 return client;
             }
             "openrouter" => {
-                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role))
+                return build_openrouter_from_role(role).or_else(|| build_ollama_from_role(role));
             }
             _ => {}
         }
@@ -127,7 +140,51 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
         log::debug!("Found Ollama hints in extra");
         if let Some(client) = build_ollama_from_role(role) {
             log::debug!("Built Ollama client from hints");
+            // Wrap with RoutedLlmClient if llm_router is enabled
+            #[cfg(feature = "llm_router")]
+            if role.llm_router_enabled {
+                log::info!("🛣️  Intelligent routing enabled for role: {}", role.name);
+                let router_config =
+                    MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
+                return Some(
+                    Arc::new(RoutedLlmClient::new(client, router_config)) as Arc<dyn LlmClient>
+                );
+            }
             return Some(client);
+        }
+    }
+
+    // Check if intelligent routing is enabled at the role level
+    #[cfg(feature = "llm_router")]
+    if role.llm_router_enabled {
+        log::info!("🛣️  Intelligent routing enabled for role: {}", role.name);
+        let router_config = MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
+
+        match router_config.mode {
+            RouterMode::Library => {
+                // Library mode: wrap static client with in-process routing
+                if let Some(static_client) =
+                    build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role))
+                {
+                    return Some(Arc::new(RoutedLlmClient::new(static_client, router_config))
+                        as Arc<dyn LlmClient>);
+                }
+                log::warn!(
+                    "🛣️  Library routing enabled but no static LLM client could be built for role: {}",
+                    role.name
+                );
+            }
+            RouterMode::Service => {
+                // Service mode: use external HTTP proxy client
+                let proxy_url = router_config.get_proxy_url();
+                log::info!("🛣️  Service mode routing to: {}", proxy_url);
+                let proxy_config = crate::llm::proxy_client::ProxyClientConfig {
+                    base_url: proxy_url,
+                    timeout_secs: 60,
+                    log_requests: true,
+                };
+                return Some(Arc::new(ProxyLlmClient::new(proxy_config)) as Arc<dyn LlmClient>);
+            }
         }
     }
 
@@ -527,4 +584,70 @@ fn build_ollama_from_nested_extra(
 #[cfg(not(feature = "ollama"))]
 fn build_ollama_from_role(_role: &terraphim_config::Role) -> Option<Arc<dyn LlmClient>> {
     None
+}
+
+#[cfg(test)]
+mod llm_router_tests {
+    use super::*;
+    use ahash::AHashMap;
+    use terraphim_config::Role;
+
+    fn create_test_role() -> Role {
+        Role {
+            name: "test-role".into(),
+            shortname: None,
+            relevance_function: terraphim_types::RelevanceFunction::TitleScorer,
+            terraphim_it: false,
+            theme: "default".to_string(),
+            kg: None,
+            haystacks: vec![],
+            llm_enabled: false,
+            llm_api_key: None,
+            llm_model: None,
+            llm_auto_summarize: false,
+            llm_chat_enabled: false,
+            llm_chat_system_prompt: None,
+            llm_chat_model: None,
+            llm_context_window: None,
+            extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
+        }
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "llm_router")]
+    async fn test_routing_disabled_returns_static_client() {
+        let mut role = create_test_role();
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
+        let client = build_llm_from_role(&role);
+        // When llm_router_enabled is false, should return static Ollama client
+        assert!(client.is_some());
+        // Client name should be "ollama" when routing disabled
+        assert_eq!(client.unwrap().name(), "ollama");
+    }
+
+    #[tokio::test]
+    #[cfg(feature = "llm_router")]
+    async fn test_routing_enabled_returns_routed_client() {
+        let mut role = create_test_role();
+        role.llm_router_enabled = true;
+        role.extra
+            .insert("llm_model".to_string(), serde_json::json!("llama3.1"));
+
+        let client = build_llm_from_role(&role);
+        assert!(client.is_some());
+        // Client name should be "routed_llm" when routing enabled
+        assert_eq!(client.unwrap().name(), "routed_llm");
+    }
+
+    #[tokio::test]
+    #[cfg(not(feature = "llm_router"))]
+    async fn test_without_llm_router_feature() {
+        let role = create_test_role();
+        let client = build_llm_from_role(&role);
+        // Without feature, should still build static client if configured
+        assert!(client.is_some());
+    }
 }

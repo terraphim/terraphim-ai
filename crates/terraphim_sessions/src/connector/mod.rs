@@ -40,7 +40,7 @@ pub struct ImportOptions {
     pub path: Option<PathBuf>,
     /// Only import sessions after this timestamp
     pub since: Option<jiff::Timestamp>,
-    /// Only import sessions before this timestamp  
+    /// Only import sessions before this timestamp
     pub until: Option<jiff::Timestamp>,
     /// Maximum sessions to import
     pub limit: Option<usize>,
@@ -100,18 +100,19 @@ pub struct ConnectorRegistry {
 impl ConnectorRegistry {
     /// Create a new registry with all available connectors
     #[must_use]
+    #[allow(clippy::vec_init_then_push)] // Feature-gated conditional pushes prevent using vec![]
     pub fn new() -> Self {
         let mut connectors: Vec<Box<dyn SessionConnector>> = Vec::new();
 
         // Add native Claude Code connector (always available)
         connectors.push(Box::new(NativeClaudeConnector));
 
-        // Add CLA-based connectors if feature enabled
-        #[cfg(feature = "claude-log-analyzer")]
+        // Add TSA-based connectors if feature enabled
+        #[cfg(feature = "terraphim-session-analyzer")]
         {
             connectors.push(Box::new(crate::cla::ClaClaudeConnector::default()));
 
-            #[cfg(feature = "cla-full")]
+            #[cfg(feature = "tsa-full")]
             connectors.push(Box::new(crate::cla::ClaCursorConnector::default()));
         }
 

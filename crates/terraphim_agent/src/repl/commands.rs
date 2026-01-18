@@ -91,6 +91,11 @@ pub enum ReplCommand {
         subcommand: SessionsSubcommand,
     },
 
+    // Update management commands (always available)
+    Update {
+        subcommand: UpdateSubcommand,
+    },
+
     // Utility commands
     Help {
         command: Option<String>,
@@ -110,6 +115,19 @@ pub enum RobotSubcommand {
     Examples { command: Option<String> },
     /// List exit codes
     ExitCodes,
+}
+
+/// Subcommands for update management
+#[derive(Debug, Clone, PartialEq)]
+pub enum UpdateSubcommand {
+    /// Check if updates are available
+    Check,
+    /// Install available updates
+    Install,
+    /// Rollback to a previous version
+    Rollback { version: String },
+    /// List available backup versions
+    List,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -705,7 +723,11 @@ impl FromStr for ReplCommand {
                         }
                         let url = parts[2].to_string();
                         Ok(ReplCommand::Web {
-                            subcommand: WebSubcommand::Post { url, body: String::new(), headers: None },
+                            subcommand: WebSubcommand::Post {
+                                url,
+                                body: String::new(),
+                                headers: None,
+                            },
                         })
                     }
                     "scrape" => {
@@ -714,7 +736,11 @@ impl FromStr for ReplCommand {
                         }
                         let url = parts[2].to_string();
                         Ok(ReplCommand::Web {
-                            subcommand: WebSubcommand::Scrape { url, selector: None, wait_for_element: None },
+                            subcommand: WebSubcommand::Scrape {
+                                url,
+                                selector: None,
+                                wait_for_element: None,
+                            },
                         })
                     }
                     "screenshot" => {
@@ -723,7 +749,12 @@ impl FromStr for ReplCommand {
                         }
                         let url = parts[2].to_string();
                         Ok(ReplCommand::Web {
-                            subcommand: WebSubcommand::Screenshot { url, width: None, height: None, full_page: None },
+                            subcommand: WebSubcommand::Screenshot {
+                                url,
+                                width: None,
+                                height: None,
+                                full_page: None,
+                            },
                         })
                     }
                     "pdf" => {
@@ -732,7 +763,10 @@ impl FromStr for ReplCommand {
                         }
                         let url = parts[2].to_string();
                         Ok(ReplCommand::Web {
-                            subcommand: WebSubcommand::Pdf { url, page_size: None },
+                            subcommand: WebSubcommand::Pdf {
+                                url,
+                                page_size: None,
+                            },
                         })
                     }
                     "form" => {
@@ -741,7 +775,10 @@ impl FromStr for ReplCommand {
                         }
                         let url = parts[2].to_string();
                         Ok(ReplCommand::Web {
-                            subcommand: WebSubcommand::Form { url, form_data: std::collections::HashMap::new() },
+                            subcommand: WebSubcommand::Form {
+                                url,
+                                form_data: std::collections::HashMap::new(),
+                            },
                         })
                     }
                     "api" => {
@@ -750,7 +787,11 @@ impl FromStr for ReplCommand {
                         }
                         let endpoint = parts[2].to_string();
                         Ok(ReplCommand::Web {
-                            subcommand: WebSubcommand::Api { endpoint, method: "GET".to_string(), data: None },
+                            subcommand: WebSubcommand::Api {
+                                endpoint,
+                                method: "GET".to_string(),
+                                data: None,
+                            },
                         })
                     }
                     "status" => {
@@ -773,7 +814,11 @@ impl FromStr for ReplCommand {
                     }
                     "history" => {
                         let limit = if parts.len() > 2 {
-                            Some(parts[2].parse::<usize>().map_err(|_| anyhow!("Invalid limit"))?)
+                            Some(
+                                parts[2]
+                                    .parse::<usize>()
+                                    .map_err(|_| anyhow!("Invalid limit"))?,
+                            )
                         } else {
                             None
                         };
@@ -790,7 +835,9 @@ impl FromStr for ReplCommand {
                                 "show" => WebConfigSubcommand::Show,
                                 "set" => {
                                     if parts.len() < 5 {
-                                        return Err(anyhow!("Web config set requires key and value"));
+                                        return Err(anyhow!(
+                                            "Web config set requires key and value"
+                                        ));
                                     }
                                     WebConfigSubcommand::Set {
                                         key: parts[3].to_string(),
@@ -885,7 +932,11 @@ impl FromStr for ReplCommand {
                         }
 
                         Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Execute { code, language, vm_id },
+                            subcommand: VmSubcommand::Execute {
+                                code,
+                                language,
+                                vm_id,
+                            },
                         })
                     }
                     "agent" => {
@@ -922,7 +973,11 @@ impl FromStr for ReplCommand {
                         }
 
                         Ok(ReplCommand::Vm {
-                            subcommand: VmSubcommand::Agent { agent_id, task, vm_id },
+                            subcommand: VmSubcommand::Agent {
+                                agent_id,
+                                task,
+                                vm_id,
+                            },
                         })
                     }
                     "tasks" => {
@@ -967,7 +1022,9 @@ impl FromStr for ReplCommand {
                                         if let Ok(refresh_val) = parts[i + 1].parse::<u32>() {
                                             refresh = Some(refresh_val);
                                         } else {
-                                            return Err(anyhow!("--refresh must be a positive integer"));
+                                            return Err(anyhow!(
+                                                "--refresh must be a positive integer"
+                                            ));
                                         }
                                         i += 2;
                                     } else {
@@ -1156,14 +1213,18 @@ impl FromStr for ReplCommand {
                         }
                         let session_id = parts[2].to_string();
                         let min_shared = if parts.len() > 3 {
-                            parts.iter().position(|&p| p == "--min").and_then(|i| {
-                                parts.get(i + 1).and_then(|v| v.parse().ok())
-                            })
+                            parts
+                                .iter()
+                                .position(|&p| p == "--min")
+                                .and_then(|i| parts.get(i + 1).and_then(|v| v.parse().ok()))
                         } else {
                             None
                         };
                         Ok(ReplCommand::Sessions {
-                            subcommand: SessionsSubcommand::Related { session_id, min_shared },
+                            subcommand: SessionsSubcommand::Related {
+                                session_id,
+                                min_shared,
+                            },
                         })
                     }
                     "timeline" => {
@@ -1178,7 +1239,9 @@ impl FromStr for ReplCommand {
                                         group_by = Some(parts[i + 1].to_string());
                                         i += 2;
                                     } else {
-                                        return Err(anyhow!("--group-by requires a value (day, week, month)"));
+                                        return Err(anyhow!(
+                                            "--group-by requires a value (day, week, month)"
+                                        ));
                                     }
                                 }
                                 "--limit" => {
@@ -1214,7 +1277,9 @@ impl FromStr for ReplCommand {
                                         format = Some(parts[i + 1].to_string());
                                         i += 2;
                                     } else {
-                                        return Err(anyhow!("--format requires a value (json, markdown)"));
+                                        return Err(anyhow!(
+                                            "--format requires a value (json, markdown)"
+                                        ));
                                     }
                                 }
                                 "--output" | "-o" => {
@@ -1238,7 +1303,11 @@ impl FromStr for ReplCommand {
                         }
 
                         Ok(ReplCommand::Sessions {
-                            subcommand: SessionsSubcommand::Export { format, output, session_id },
+                            subcommand: SessionsSubcommand::Export {
+                                format,
+                                output,
+                                session_id,
+                            },
                         })
                     }
                     "enrich" => {
@@ -1263,6 +1332,40 @@ impl FromStr for ReplCommand {
                 "Sessions feature not enabled. Rebuild with --features repl-sessions"
             )),
 
+            "update" => {
+                if parts.len() < 2 {
+                    return Err(anyhow!(
+                        "Update command requires a subcommand (check | install | rollback <version> | list)"
+                    ));
+                }
+
+                match parts[1] {
+                    "check" => Ok(ReplCommand::Update {
+                        subcommand: UpdateSubcommand::Check,
+                    }),
+                    "install" => Ok(ReplCommand::Update {
+                        subcommand: UpdateSubcommand::Install,
+                    }),
+                    "rollback" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Update rollback requires a version"));
+                        }
+                        Ok(ReplCommand::Update {
+                            subcommand: UpdateSubcommand::Rollback {
+                                version: parts[2].to_string(),
+                            },
+                        })
+                    }
+                    "list" => Ok(ReplCommand::Update {
+                        subcommand: UpdateSubcommand::List,
+                    }),
+                    _ => Err(anyhow!(
+                        "Unknown update subcommand: {}. Use: check, install, rollback <version>, list",
+                        parts[1]
+                    )),
+                }
+            }
+
             "help" => {
                 let command = if parts.len() > 1 {
                     Some(parts[1].to_string())
@@ -1283,9 +1386,11 @@ impl FromStr for ReplCommand {
 
 impl ReplCommand {
     /// Get available commands based on compiled features
+    #[allow(unused_mut)]
     pub fn available_commands() -> Vec<&'static str> {
         let mut commands = vec![
-            "search", "config", "role", "graph", "vm", "robot", "help", "quit", "exit", "clear",
+            "search", "config", "role", "graph", "vm", "robot", "update", "help", "quit", "exit",
+            "clear",
         ];
 
         #[cfg(feature = "repl-chat")]
@@ -1325,7 +1430,9 @@ impl ReplCommand {
     /// Get command description for help system
     pub fn get_command_help(command: &str) -> Option<&'static str> {
         match command {
-            "search" => Some("/search <query> [--role <role>] [--limit <n>] [--semantic] [--concepts] - Search documents"),
+            "search" => Some(
+                "/search <query> [--role <role>] [--limit <n>] [--semantic] [--concepts] - Search documents",
+            ),
             "config" => Some("/config show | set <key> <value> - Manage configuration"),
             "role" => Some("/role list | select <name> - Manage roles"),
             "graph" => Some("/graph [--top-k <n>] - Show knowledge graph"),
@@ -1333,14 +1440,23 @@ impl ReplCommand {
             "quit" | "q" => Some("/quit, /q - Exit REPL"),
             "exit" => Some("/exit - Exit REPL"),
             "clear" => Some("/clear - Clear screen"),
-            "vm" => Some("/vm <subcommand> [args] - VM management (list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor)"),
-            "robot" => Some("/robot <subcommand> - AI agent self-documentation (capabilities, schemas [cmd], examples [cmd], exit-codes)"),
+            "vm" => Some(
+                "/vm <subcommand> [args] - VM management (list, pool, status, metrics, execute, agent, tasks, allocate, release, monitor)",
+            ),
+            "robot" => Some(
+                "/robot <subcommand> - AI agent self-documentation (capabilities, schemas [cmd], examples [cmd], exit-codes)",
+            ),
+            "update" => Some(
+                "/update <subcommand> - Manage updates (check, install, rollback <version>, list)",
+            ),
 
             #[cfg(feature = "repl-file")]
             "file" => Some("/file <subcommand> [args] - File operations (search, list, info)"),
 
             #[cfg(feature = "repl-web")]
-            "web" => Some("/web <subcommand> [args] - Web operations (get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config)"),
+            "web" => Some(
+                "/web <subcommand> [args] - Web operations (get, post, scrape, screenshot, pdf, form, api, status, cancel, history, config)",
+            ),
 
             #[cfg(feature = "repl-chat")]
             "chat" => Some("/chat [message] - Interactive chat with AI"),
@@ -1359,7 +1475,9 @@ impl ReplCommand {
             "thesaurus" => Some("/thesaurus [--role <role>] - Show thesaurus entries"),
 
             #[cfg(feature = "repl-sessions")]
-            "sessions" => Some("/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, concepts, related, timeline, export, enrich)"),
+            "sessions" => Some(
+                "/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, concepts, related, timeline, export, enrich)",
+            ),
 
             _ => None,
         }
@@ -1436,5 +1554,70 @@ mod tests {
                 command: Some("search".to_string())
             }
         );
+    }
+
+    #[test]
+    fn test_update_command_parsing() {
+        // Test update check
+        let cmd = "/update check".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::Check
+            }
+        );
+
+        // Test update install
+        let cmd = "/update install".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::Install
+            }
+        );
+
+        // Test update rollback with version
+        let cmd = "/update rollback 1.0.0".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::Rollback {
+                    version: "1.0.0".to_string()
+                }
+            }
+        );
+
+        // Test update list
+        let cmd = "/update list".parse::<ReplCommand>().unwrap();
+        assert_eq!(
+            cmd,
+            ReplCommand::Update {
+                subcommand: UpdateSubcommand::List
+            }
+        );
+    }
+
+    #[test]
+    fn test_update_command_errors() {
+        // Test update without subcommand
+        let result = "/update".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires a subcommand"));
+
+        // Test update rollback without version
+        let result = "/update rollback".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires a version"));
+
+        // Test unknown update subcommand
+        let result = "/update unknown".parse::<ReplCommand>();
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Unknown update"));
     }
 }

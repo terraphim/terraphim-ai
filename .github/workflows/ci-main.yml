@@ -1,8 +1,11 @@
 name: CI Main Branch
+
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
 on:
   push:
     branches: [main, develop]
-    tags: ["*.*.*"]
+    # Disabled tag trigger - release-comprehensive.yml handles releases
+    # tags: ["*.*.*"]
   workflow_dispatch:
     inputs:
       build-release:
@@ -64,7 +67,7 @@ jobs:
       - name: Generate cache key
         id: cache
         run: |
-          CACHE_KEY="v2-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/yarn.lock', '.github/rust-toolchain.toml') }}"
+          CACHE_KEY="v2-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/package-lock.json', '.github/rust-toolchain.toml') }}"
           echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
 
       - name: Generate build matrix
@@ -97,7 +100,7 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
       - name: Cache Cargo registry and dependencies (self-hosted)
@@ -141,8 +144,8 @@ jobs:
 
       - name: Run tests
         run: |
-          # Run unit and integration tests (skip RocksDB tests for speed)
-          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --skip rocksdb
+          # Run unit and integration tests (exclude integration-signing which requires zipsign CLI)
+          cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures"
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
@@ -176,14 +179,6 @@ jobs:
           path: target/${{ matrix.target }}/debian/*.deb
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
 
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
-          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
-
   # Frontend build
   frontend-build:
     name: Frontend Build
@@ -199,12 +194,12 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'yarn'
-          cache-dependency-path: desktop/yarn.lock
+          cache: 'npm'
+          cache-dependency-path: desktop/package-lock.json
 
       - name: Install dependencies
         working-directory: desktop
-        run: yarn install --frozen-lockfile
+        run: npm ci
 
       - name: Cache node_modules
         uses: actions/cache@v4
@@ -218,7 +213,7 @@ jobs:
       - name: Build frontend
         working-directory: desktop
         run: |
-          yarn build
+          npm run build
 
           # Show build artifacts
           ls -la dist/
@@ -230,12 +225,6 @@ jobs:
           name: frontend-dist
           path: desktop/dist/
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
-
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
 
   # WASM build
   wasm-build:
@@ -251,7 +240,6 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain-file: .github/rust-toolchain.toml
           targets: wasm32-unknown-unknown
 
       - name: Install wasm-pack
@@ -277,13 +265,6 @@ jobs:
           name: wasm-package
           path: crates/terraphim_automata/wasm-test/pkg/
           retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
-
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo rm -rf "${WORKDIR}/crates/terraphim_automata/wasm-test/pkg" || true
 
   # Docker image build
   docker-build:
@@ -344,13 +325,6 @@ jobs:
           cache-to: type=gha,mode=max
           platforms: linux/amd64
 
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo rm -rf "${WORKDIR}/desktop/dist" || true
-
   # Integration tests
   integration-tests:
     name: Integration Tests
@@ -402,13 +376,6 @@ jobs:
           # Clean up
           kill $SERVER_PID 2>/dev/null || true
 
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo rm -rf "${WORKDIR}/desktop/dist" || true
-
   # Security scanning
   security-scan:
     name: Security Scan
@@ -423,8 +390,6 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
-        with:
-          toolchain-file: .github/rust-toolchain.toml
 
       - name: Run cargo audit
         run: |
@@ -435,12 +400,6 @@ jobs:
         run: |
           cargo install cargo-deny
           cargo deny check
-
-      - name: Post-run cleanup
-        if: success()
-        run: |
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/target" || true
 
   # Build summary
   build-summary:

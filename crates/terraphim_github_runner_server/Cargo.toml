@@ -1,0 +1,58 @@
+[package]
+name = "terraphim_github_runner_server"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Web framework
+salvo = { version = "0.74.3" }
+tokio = { version = "1.36", features = ["full"] }
+
+# GitHub integration
+octocrab = "0.42.1"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Webhook verification
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+subtle = "2.6"
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# CLI
+clap = { version = "4.5", features = ["derive"] }
+
+# HTTP client (for Firecracker API)
+reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-features = false }
+
+# Time handling
+chrono = "0.4"
+
+# UUID
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Async traits
+async-trait = "0.1"
+
+# Internal crates
+terraphim_github_runner = { path = "../terraphim_github_runner" }
+terraphim_service = { path = "../terraphim_service" }
+terraphim_config = { path = "../terraphim_config" }
+
+[features]
+default = []
+ollama = ["terraphim_service/ollama"]
+openrouter = ["terraphim_service/openrouter"]
+
+[dev-dependencies]
+salvo = { version = "0.74.3", features = ["test"] }

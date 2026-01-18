@@ -101,6 +101,8 @@ This document is intentionally long to trigger automatic summarization in the Te
             fetch_content: false,
         }],
         extra: ahash::AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 

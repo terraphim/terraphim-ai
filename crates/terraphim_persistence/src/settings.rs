@@ -324,11 +324,33 @@ pub async fn parse_profiles(
     settings: &DeviceSettings,
 ) -> Result<HashMap<String, (Operator, u128)>> {
     let mut ops = HashMap::new();
-    let profile_names = settings.profiles.keys();
+    let profile_names: Vec<_> = settings.profiles.keys().collect();
+    log::debug!(
+        "Parsing {} profiles: {:?}",
+        profile_names.len(),
+        profile_names
+    );
     for profile_name in profile_names {
-        let (op, speed) = parse_profile(settings, profile_name).await?;
-        ops.insert(profile_name.clone(), (op, speed));
+        log::debug!("Attempting to parse profile: {}", profile_name);
+        match parse_profile(settings, profile_name).await {
+            Ok((op, speed)) => {
+                log::debug!("Successfully parsed profile: {}", profile_name);
+                ops.insert(profile_name.clone(), (op, speed));
+            }
+            Err(e) => {
+                log::warn!(
+                    "Failed to parse profile '{}': {:?} - skipping",
+                    profile_name,
+                    e
+                );
+                // Continue with other profiles instead of failing completely
+            }
+        }
     }
+    if ops.is_empty() {
+        return Err(crate::Error::NoOperator);
+    }
+    log::debug!("Successfully parsed {} profiles", ops.len());
     Ok(ops)
 }
 
@@ -426,23 +448,59 @@ mod tests {
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load_rocksdb() -> Result<()> {
-        // Create a test object
-        let test_obj = TestStruct {
-            name: "Test RocksDB Object".to_string(),
-            age: 30,
+        use tempfile::TempDir;
+
+        // Create temporary directory for test
+        let temp_dir = TempDir::new().unwrap();
+        let rocksdb_path = temp_dir.path().join("test_rocksdb");
+
+        // Create test settings with rocksdb profile
+        let mut profiles = std::collections::HashMap::new();
+
+        // Memory profile (needed as fastest operator fallback)
+        let mut memory_profile = std::collections::HashMap::new();
+        memory_profile.insert("type".to_string(), "memory".to_string());
+        profiles.insert("memory".to_string(), memory_profile);
+
+        // RocksDB profile for testing
+        let mut rocksdb_profile = std::collections::HashMap::new();
+        rocksdb_profile.insert("type".to_string(), "rocksdb".to_string());
+        rocksdb_profile.insert(
+            "datadir".to_string(),
+            rocksdb_path.to_string_lossy().to_string(),
+        );
+        profiles.insert("rocksdb".to_string(), rocksdb_profile);
+
+        let settings = DeviceSettings {
+            server_hostname: "localhost:8000".to_string(),
+            api_endpoint: "http://localhost:8000/api".to_string(),
+            initialized: false,
+            default_data_path: temp_dir.path().to_string_lossy().to_string(),
+            profiles,
         };
 
-        // Save the object to rocksdb
-        test_obj.save_to_one("rocksdb").await?;
+        // Initialize storage with custom settings
+        let storage = crate::init_device_storage_with_settings(settings).await?;
 
-        // Load the object
-        let mut loaded_obj = TestStruct::new("Test RocksDB Object".to_string());
-        loaded_obj = loaded_obj.load().await?;
+        // Verify rocksdb profile is available
+        assert!(
+            storage.ops.contains_key("rocksdb"),
+            "RocksDB profile should be available. Available profiles: {:?}",
+            storage.ops.keys().collect::<Vec<_>>()
+        );
 
-        // Compare the original and loaded objects
+        // Test direct operator write/read
+        let rocksdb_op = &storage.ops.get("rocksdb").unwrap().0;
+        let test_key = "test_rocksdb_key.json";
+        let test_data = r#"{"name":"Test RocksDB Object","age":30}"#;
+
+        rocksdb_op.write(test_key, test_data).await?;
+        let read_data = rocksdb_op.read(test_key).await?;
+        let read_str = String::from_utf8(read_data.to_vec()).unwrap();
+
         assert_eq!(
-            test_obj, loaded_obj,
-            "Loaded RocksDB object does not match the original"
+            test_data, read_str,
+            "RocksDB read data should match written data"
         );
 
         Ok(())

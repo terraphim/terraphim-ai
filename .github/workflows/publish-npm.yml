@@ -1,4 +1,4 @@
-name: Publish Node.js Package to npm
+name: Publish Node.js Package to GitHub Packages
 
 on:
   workflow_dispatch:
@@ -316,7 +316,7 @@ jobs:
           if-no-files-found: error
 
   publish:
-    name: Publish to npm
+    name: Publish to GitHub Packages
     runs-on: [self-hosted, Linux, X64]
     needs: [test-universal, test-macos]
     environment: production
@@ -328,41 +328,14 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@terraphim'
           cache: 'yarn'
           cache-dependency-path: terraphim_ai_nodejs/yarn.lock
 
       - name: Install dependencies
         working-directory: terraphim_ai_nodejs
         run: yarn install --frozen-lockfile
-
-      - name: Install 1Password CLI
-        run: |
-          curl -sSf https://downloads.1password.com/linux/keys/1password.asc | \
-            gpg --dearmor --output /usr/share/keyrings/1password-archive-keyring.gpg
-          echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" | \
-            sudo tee /etc/apt/sources.list.d/1password.list
-          sudo apt update && sudo apt install op -y
-
-      - name: Authenticate with 1Password
-        run: |
-          echo "${{ secrets.OP_SERVICE_ACCOUNT_TOKEN }}" | op account add --service-account-token
-
-      - name: Get npm token from 1Password
-        id: token
-        run: |
-          TOKEN=$(op read "op://TerraphimPlatform/npm.token/token" || echo "")
-          if [[ -z "$TOKEN" ]]; then
-            echo "⚠️  npm token not found in 1Password, checking GitHub secrets"
-            TOKEN="${{ secrets.NPM_TOKEN }}"
-          fi
-
-          if [[ -z "$TOKEN" ]]; then
-            echo "❌ No npm token available"
-            exit 1
-          fi
-
-          echo "token=$TOKEN" >> $GITHUB_OUTPUT
-          echo "✅ npm token retrieved successfully"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -397,14 +370,16 @@ jobs:
             npm version ${{ inputs.version }} --no-git-tag-version
           fi
 
-      - name: Configure npm for publishing
+      - name: Configure npm for GitHub Packages
         working-directory: terraphim_ai_nodejs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "//registry.npmjs.org/:_authToken=${{ steps.token.outputs.token }}" > ~/.npmrc
-          npm config set provenance true
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.GITHUB_TOKEN }}" > ~/.npmrc
+          echo "@terraphim:registry=https://npm.pkg.github.com" >> ~/.npmrc
 
           # Show current package info
-          echo "📋 Package information:"
+          echo "Package information:"
           npm pack --dry-run | head -20
 
       - name: Determine publishing strategy
@@ -437,40 +412,45 @@ jobs:
           echo "npm_tag=$NPM_TAG" >> $GITHUB_OUTPUT
           echo "🎯 Publishing strategy: $VERSION_TYPE -> $NPM_TAG"
 
-      - name: Publish to npm
+      - name: Publish to GitHub Packages
         working-directory: terraphim_ai_nodejs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           if [[ "${{ inputs.dry_run }}" == "true" ]]; then
-            echo "🧪 Dry run mode - checking package only"
+            echo "Dry run mode - checking package only"
             npm publish --dry-run --access public --tag ${{ steps.strategy.outputs.npm_tag }}
           else
-            echo "🚀 Publishing @terraphim/autocomplete to npm"
+            echo "Publishing @terraphim/autocomplete to GitHub Packages"
+            echo "Registry: https://npm.pkg.github.com"
             echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
 
-            # Publish with appropriate tag
+            # Publish to GitHub Packages
             npm publish --access public --tag ${{ steps.strategy.outputs.npm_tag }}
 
-            echo "✅ Package published successfully!"
+            echo "Package published successfully!"
+            echo "Install with: npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"
           fi
 
       - name: Verify published package
         if: inputs.dry_run != 'true'
         working-directory: terraphim_ai_nodejs
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "🔍 Verifying published package..."
+          echo "Verifying published package..."
 
-          # Wait a moment for npm to update
-          sleep 30
+          # Wait a moment for registry to update
+          sleep 10
 
           # Check if package is available
           PACKAGE_NAME="@terraphim/autocomplete"
           PACKAGE_VERSION=$(node -p "require('./package.json').version")
 
           echo "Checking: $PACKAGE_NAME@$PACKAGE_VERSION"
-          npm view $PACKAGE_NAME@$PACKAGE_VERSION || echo "⚠️  Package not immediately visible (may take a few minutes)"
+          npm view $PACKAGE_NAME@$PACKAGE_VERSION --registry=https://npm.pkg.github.com || echo "Package not immediately visible (may take a few minutes)"
 
-          echo "📊 Package info:"
-          npm view $PACKAGE_NAME || echo "⚠️  General package info not available yet"
+          echo "GitHub Packages URL: https://github.com/terraphim/terraphim-ai/packages"
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != 'true'
@@ -487,25 +467,25 @@ jobs:
             **Version**: ${{ steps.strategy.outputs.version_type }}
             **Tag**: ${{ steps.strategy.outputs.npm_tag }}
 
-            ### 🚀 Installation
+            ### Installation
             ```bash
-            npm install @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }}
+            npm install @terraphim/autocomplete@${{ steps.strategy.outputs.npm_tag }} --registry=https://npm.pkg.github.com
             ```
 
-            ### ✨ Features
+            ### Features
             - **Autocomplete**: Fast prefix search with scoring
             - **Knowledge Graph**: Semantic connectivity analysis
             - **Native Performance**: Rust backend with NAPI bindings
             - **Cross-Platform**: Linux, macOS, Windows support
             - **TypeScript**: Auto-generated type definitions
 
-            ### 📊 Performance
+            ### Performance
             - **Autocomplete Index**: ~749 bytes
             - **Knowledge Graph**: ~856 bytes
             - **Native Library**: ~10MB (optimized for production)
 
-            ### 🔗 Links
-            - [npm package](https://www.npmjs.com/package/@terraphim/autocomplete)
+            ### Links
+            - [GitHub Package](https://github.com/terraphim/terraphim-ai/packages)
             - [Documentation](https://github.com/terraphim/terraphim-ai/tree/main/terraphim_ai_nodejs)
 
             ---
@@ -515,8 +495,13 @@ jobs:
 
       - name: Notify on success
         if: inputs.dry_run != 'true'
+        working-directory: terraphim_ai_nodejs
         run: |
-          echo "🎉 npm publishing workflow completed successfully!"
-          echo "📦 Package: @terraphim/autocomplete"
-          echo "🏷️  Tag: ${{ steps.strategy.outputs.npm_tag }}"
-          echo "📋 Version: $(node -p "require('./package.json').version")"
+          echo "Publishing workflow completed successfully!"
+          echo "Package: @terraphim/autocomplete"
+          echo "Registry: GitHub Packages (npm.pkg.github.com)"
+          echo "Tag: ${{ steps.strategy.outputs.npm_tag }}"
+          echo "Version: $(node -p "require('./package.json').version")"
+          echo ""
+          echo "Install with:"
+          echo "  npm install @terraphim/autocomplete --registry=https://npm.pkg.github.com"

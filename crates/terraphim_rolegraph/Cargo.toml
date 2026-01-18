@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_rolegraph"
-version = "1.2.3"
+version = "1.4.10"
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim rolegraph module, which provides role handling for Terraphim AI."
@@ -19,7 +19,7 @@ ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"
 itertools = "0.14.0"
 lazy_static = "1.4.0"
-log = "0.4.20"
+log = "0.4.29"
 memoize = "0.5.1"
 regex = "1.8.3"
 serde = { version = "1.0.192", features = ["derive"] }
@@ -35,4 +35,4 @@ name = "throughput"
 harness = false
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.8"

@@ -3173,3 +3173,670 @@ if json {
 **Phase E**: Updated documentation and install scripts
 
 All features are local-first, sub-200ms latency, backward compatible.
+
+---
+
+## CI/CD Release Workflow Fixes - 2025-12-31
+
+### Pattern: GitHub Actions Job Dependencies with `if: always()`
+
+**Context:** Matrix jobs where some variants fail shouldn't block downstream jobs that only need specific successful variants.
+
+**What We Learned:**
+- GitHub Actions `needs:` requires ALL dependent jobs to succeed by default
+- Using `if: always()` allows the job to run regardless of dependency status
+- Combine with result checks: `if: always() && needs.job.result == 'success'`
+- This pattern enables partial releases when some platforms fail
+
+**Implementation:**
+```yaml
+# BAD: Skipped if ANY build-binaries job fails
+create-universal-macos:
+  needs: build-binaries
+  # Job skipped because Windows build failed
+
+# GOOD: Runs if job itself can proceed
+create-universal-macos:
+  needs: build-binaries
+  if: always()  # Always attempt to run
+
+sign-and-notarize:
+  needs: create-universal-macos
+  if: always() && needs.create-universal-macos.result == 'success'
+```
+
+**When to Apply:** Any workflow with matrix builds where partial success is acceptable.
+
+### Pattern: Cross-Platform Binary Detection in Release Workflows
+
+**Context:** Need to copy binaries from artifacts to release, but `-executable` flag doesn't work across platforms.
+
+**What We Learned:**
+- `find -executable` checks Unix executable bit, which is lost when downloading artifacts on different platforms
+- macOS binaries downloaded on Linux runner lose their executable bit
+- Use explicit filename patterns instead of permission-based detection
+
+**Implementation:**
+```bash
+# BAD: Relies on executable permission
+find binaries-* -type f -executable
+
+# GOOD: Uses filename patterns
+find binaries-* -type f \( -name "terraphim*" -o -name "*.exe" \)
+```
+
+**When to Apply:** Any cross-platform release workflow that downloads artifacts on a different OS.
+
+### Pattern: Self-Hosted Runner Cleanup
+
+**Context:** Self-hosted runners accumulate artifacts from previous runs that can cause conflicts.
+
+**What We Learned:**
+- Temporary keychains from signing can remain on disk
+- Old build artifacts may interfere with new builds
+- Add cleanup step at start of jobs using self-hosted runners
+
+**Implementation:**
+```yaml
+- name: Cleanup self-hosted runner
+  if: contains(matrix.os, 'self-hosted')
+  run: |
+    find /tmp -name "*.keychain-db" -mmin +60 -delete 2>/dev/null || true
+    find /tmp -name "signing.keychain*" -delete 2>/dev/null || true
+    rm -rf ~/actions-runner/_work/*/target/release/*.zip 2>/dev/null || true
+```
+
+**When to Apply:** Any workflow using self-hosted runners, especially for signing operations.
+
+### Pattern: 1Password CLI for CI/CD Secrets
+
+**Context:** Need to securely inject signing credentials without exposing in workflow files.
+
+**What We Learned:**
+- Use `op read` for individual secrets: `op read 'op://Vault/Item/Field'`
+- Use `op inject` for template files: `op inject -i template.json -o output.json`
+- Use `op run --env-file` for environment-based secrets
+- Always use `--no-newline` flag when reading secrets for environment variables
+
+**Implementation:**
+```yaml
+# Read individual secrets
+- run: |
+    echo "APPLE_ID=$(op read 'op://TerraphimPlatform/apple.developer.credentials/username' --no-newline)" >> $GITHUB_ENV
+
+# Inject into template
+- run: |
+    op inject --force -i tauri.conf.json.template -o tauri.conf.json
+
+# Run with injected environment
+- run: |
+    op run --env-file=.env.ci -- yarn tauri build
+```
+
+**When to Apply:** Any CI/CD workflow requiring secrets that should be centrally managed.
+
+### Debugging Insight: Iterative Tag Testing
+
+**What We Learned:**
+- Create test tags (e.g., `v0.0.9-signing-test`) for rapid iteration
+- Each tag triggers full workflow, revealing different failure modes
+- Clean up test releases after validation
+
+**Testing Approach:**
+```bash
+# Create test tag
+git tag v0.0.X-signing-test
+git push origin v0.0.X-signing-test
+
+# Monitor
+gh run watch <run_id>
+
+# Check results
+gh release view v0.0.X-signing-test --json assets
+
+# Cleanup (when done)
+gh release delete v0.0.X-signing-test --yes
+git push origin :refs/tags/v0.0.X-signing-test
+```
+
+### Critical Success Factors
+
+1. **Verify 1Password integration first** - All credentials should come from vault, not workflow secrets
+2. **Test job dependencies with partial failures** - Don't assume all matrix jobs will succeed
+3. **Use explicit file matching** - Permission-based detection fails across platforms
+4. **Clean self-hosted runners** - Previous run artifacts can cause subtle failures
+5. **Iterative testing with tags** - Faster feedback than waiting for production release
+
+### What We Shipped
+
+| Fix | Commit | Impact |
+|-----|--------|--------|
+| Job dependency fix | `bf8551f2` | Signing runs even when cross-builds fail |
+| Asset preparation fix | `086aefa6` | macOS binaries included in releases |
+| Runner cleanup | `ea4027bd` | Prevents signing conflicts |
+| Tauri v1 standardization | `c070ef70`, `a19ed7fb` | Consistent GTK and CLI versions |
+
+All fixes verified with v0.0.11-signing-test release containing signed macOS universal binaries.
+
+---
+
+## CI/CD and PR Triage Session - 2025-12-31
+
+### Pattern: Disciplined Design for Closed PRs
+
+**Context:** Large PRs with conflicts need fresh implementation, not rebasing.
+
+**What We Learned:**
+- PRs older than 4-6 weeks often have significant conflicts
+- Extract valuable features into design plans rather than attempting complex rebases
+- Create GitHub issues linking to design documents for tracking
+- Use disciplined-design skill to create structured implementation plans
+
+**Implementation:**
+```bash
+# Close PR with design plan reference
+gh pr close $PR --comment "See .docs/plans/feature-design.md for fresh implementation"
+
+# Create tracking issue
+gh issue create --title "feat: Implement X" --body "See design plan..."
+```
+
+**When to Apply:** PRs with 50+ files, 4+ weeks old, or CONFLICTING status.
+
+### Pattern: Feature Flags for Cross-Compilation
+
+**Context:** Cross-compiled binaries fail when dependencies require C compilation.
+
+**What We Learned:**
+- `rusqlite` and similar C-binding crates fail on musl/ARM cross-compilation
+- Use `--no-default-features` to exclude problematic dependencies
+- Create feature sets for different build targets (native vs cross)
+- The `memory` and `dashmap` features provide pure-Rust alternatives
+
+**Implementation:**
+```yaml
+# In GitHub Actions workflow
+${{ matrix.use_cross && '--no-default-features --features memory,dashmap' || '' }}
+```
+
+**When to Apply:** Any cross-compilation workflow using `cross` tool.
+
+### Pattern: Webkit Version Fallback for Tauri
+
+**Context:** Tauri v1 requires webkit 4.0, but newer Ubuntu versions only have 4.1.
+
+**What We Learned:**
+- Ubuntu 24.04 dropped webkit 4.0 packages
+- Tauri v1 is incompatible with webkit 4.1 (uses different API)
+- Implement fallback: try 4.1 first, fall back to 4.0
+- Or simply exclude Ubuntu 24.04 from Tauri v1 matrix
+
+**Implementation:**
+```bash
+sudo apt-get install -yqq libwebkit2gtk-4.1-dev 2>/dev/null || \
+sudo apt-get install -yqq libwebkit2gtk-4.0-dev
+```
+
+**When to Apply:** Any Tauri v1 builds on Ubuntu runners.
+
+### Pattern: PR Triage Categories
+
+**Context:** 30 open PRs need systematic triage.
+
+**What We Learned:**
+- Categorize PRs: merge (safe), close (stale/superseded), defer (risky)
+- Dependabot PRs: check for major version bumps (breaking changes)
+- Feature PRs: check CI status before merging
+- Create design plans for valuable but conflicting PRs
+
+**Categories:**
+| Category | Criteria | Action |
+|----------|----------|--------|
+| Merge | Low-risk, passing CI | `gh pr merge` |
+| Close | Stale, superseded, conflicts | `gh pr close` with comment |
+| Defer | Major version, risky | Close with explanation |
+| Design | Valuable but complex | Create plan, close PR |
+
+**When to Apply:** Any PR backlog cleanup session.
+
+### Pattern: GitHub Actions `if: always()` for Partial Success
+
+**Context:** Signing jobs skipped when unrelated builds failed.
+
+**What We Learned:**
+- `needs:` requires ALL dependent jobs to succeed by default
+- Use `if: always()` to run regardless of dependency status
+- Combine with result checks: `if: always() && needs.job.result == 'success'`
+- Enables releasing whatever was built successfully
+
+**Implementation:**
+```yaml
+create-universal-macos:
+  needs: build-binaries
+  if: always()  # Run even if some builds failed
+
+sign-and-notarize:
+  needs: create-universal-macos
+  if: always() && needs.create-universal-macos.result == 'success'
+```
+
+**When to Apply:** Any workflow with matrix builds where partial success is acceptable.
+
+### Critical Success Factors
+
+1. **Design before implementation** - Use disciplined-design skill for complex features
+2. **Categorize PRs systematically** - Don't try to review 30 PRs sequentially
+3. **Create tracking issues** - Link design plans to GitHub issues
+4. **Test CI fixes with tags** - Use `v0.0.X-test` tags for rapid iteration
+5. **Document in .docs/plans/** - Keep design documents in version control
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| PRs Processed | 27 |
+| PRs Merged | 13 |
+| PRs Closed | 11 |
+| Design Plans Created | 2 |
+| GitHub Issues Created | 2 |
+| CI Fixes Applied | 4 |
+
+---
+
+## LLM Router Integration - 2026-01-04
+
+### Context: Multi-Phase Feature Implementation with Disciplined Development
+
+**Feature:** LLM Router with dual-mode support (Library/Service) for intelligent LLM selection across multiple providers.
+
+**Architecture:**
+- **Library Mode**: In-process routing via `RoutedLlmClient` wrapping static LLM client
+- **Service Mode**: HTTP proxy client (`ProxyLlmClient`) forwarding to external `terraphim-llm-proxy` service
+
+### Pattern 1: Feature-Gated Module Organization
+
+**What We Learned:**
+- Feature flags (`#[cfg(feature = "llm_router")]`) keep production builds clean
+- Module declarations must come BEFORE imports in Rust
+- Submodules need proper parent module declarations
+
+**Implementation:**
+```rust
+// In llm.rs - order matters!
+#[cfg(feature = "llm_router")]
+mod routed_adapter;
+#[cfg(feature = "llm_router")]
+mod router_config;
+#[cfg(feature = "llm_router")]
+mod proxy_client;
+
+#[cfg(feature = "llm_router")]
+use crate::llm::routed_adapter::RoutedLlmClient;
+#[cfg(feature = "llm_router")]
+use crate::llm::proxy_client::ProxyLlmClient;
+```
+
+**When to Apply:** Any optional feature with significant code volume.
+
+### Pattern 2: Configuration Re-export for Public API
+
+**What We Learned:**
+- Private imports in submodules need `pub use` to become public
+- `RouterMode` was imported privately in `router_config.rs` causing "private enum" errors
+- Solution: Change `use` to `pub use` in the re-export module
+
+**Implementation:**
+```rust
+// router_config.rs - use becomes pub use
+pub use terraphim_config::llm_router::{LlmRouterConfig, RouterMode, RouterStrategy};
+```
+
+**When to Apply:** Configuration types that need to be accessible from parent modules.
+
+### Pattern 3: Test File Updates for Struct Schema Changes
+
+**What We Learned:**
+- Adding fields to a struct requires updating ALL test initializations
+- Use systematic tools (Python scripts, sed) for bulk updates
+- Risk of duplicates when running fix scripts multiple times
+- Better to restore files and re-run once cleanly
+
+**Implementation:**
+```python
+# Pattern for bulk Role struct updates
+def fix_role_fields(content):
+    pattern = r'(extra:\s*(?:ahash::)?AHashMap::new\(\),)'
+    replacement = r'\1\n        llm_router_enabled: false,\n        llm_router_config: None,'
+    return re.sub(pattern, replacement, content)
+```
+
+**Anti-pattern:** Running fix scripts multiple times creates duplicate field declarations.
+
+**When to Apply:** Any struct schema change affecting test files across multiple crates.
+
+### Pattern 4: ServiceError Variant Selection
+
+**What We Learned:**
+- `ServiceError::Network` and `ServiceError::Parsing` don't exist in this crate
+- Available variants: `Middleware`, `OpenDal`, `Persistence`, `Config`, `OpenRouter`, `Common`
+- Use `ServiceError::Config(String)` for proxy connection failures
+
+**Implementation:**
+```rust
+// Before (doesn't compile)
+return Err(crate::ServiceError::Network(format!("Failed to connect: {}", e)));
+
+// After
+return Err(crate::ServiceError::Config(format!("Failed to connect: {}", e)));
+```
+
+**When to Apply:** Error handling when adding new error scenarios.
+
+### Pattern 5: Submodule Import Paths in Rust
+
+**What We Learned:**
+- `proxy_client.rs` is a submodule of `llm.rs`
+- Use `super::` to access parent module items (not `super::llm::`)
+- Parent module types are directly accessible: `LlmClient`, `SummarizeOptions`, `ChatOptions`
+
+**Implementation:**
+```rust
+// proxy_client.rs - correct imports
+use super::LlmClient;
+use super::SummarizeOptions;
+use super::ChatOptions;
+
+// NOT super::llm::LlmClient
+```
+
+**When to Apply:** Any nested module structure in Rust.
+
+### Pattern 6: JSON Serialization Test Assertions
+
+**What We Learned:**
+- `serde_json::to_string()` doesn't add spaces after colons
+- `"model":"auto"` not `"model": "auto"`
+- Test assertions must match actual serialization format
+
+**Implementation:**
+```rust
+// Before (fails)
+assert!(json_str.contains("\"model\": \"auto\""));
+
+// After (passes)
+assert!(json_str.contains("\"model\":\"auto\""));
+```
+
+**When to Apply:** Any tests checking JSON string format.
+
+### Pattern 7: Default Trait for Configuration Structs
+
+**What We Learned:**
+- `#[derive(Default)]` conflicts with manual `impl Default`
+- Must choose one approach
+- Manual implementation allows setting custom defaults (like port 3456)
+
+**Implementation:**
+```rust
+// Before - derive conflict
+#[derive(Debug, Clone, Default)]
+pub struct ProxyClientConfig { ... }
+
+// After - manual impl without derive
+#[derive(Debug, Clone)]
+pub struct ProxyClientConfig { ... }
+
+impl Default for ProxyClientConfig {
+    fn default() -> Self {
+        Self {
+            base_url: "http://127.0.0.1:3456".to_string(),
+            timeout_secs: 60,
+            log_requests: false,
+        }
+    }
+}
+```
+
+**When to Apply:** Configuration structs needing custom defaults.
+
+### Pattern 8: Mode-Based Client Selection
+
+**What We Learned:**
+- Use Rust `match` for conditional client creation based on config
+- Library mode: wrap existing client with routing adapter
+- Service mode: create HTTP proxy client
+
+**Implementation:**
+```rust
+match router_config.mode {
+    RouterMode::Library => {
+        if let Some(static_client) = build_ollama_from_role(role) {
+            return Some(Arc::new(RoutedLlmClient::new(static_client, router_config)));
+        }
+    }
+    RouterMode::Service => {
+        let proxy_url = router_config.get_proxy_url();
+        let proxy_config = ProxyClientConfig {
+            base_url: proxy_url,
+            timeout_secs: 60,
+            log_requests: true,
+        };
+        return Some(Arc::new(ProxyLlmClient::new(proxy_config)));
+    }
+}
+```
+
+**When to Apply:** Feature toggle patterns with different implementations per toggle.
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| Implementation Steps | 5 |
+| Files Modified | 24 |
+| Test Files Updated | 14 |
+| Lines Added | ~200 |
+| Test Results | 118 passed, 5 unrelated failures |
+
+### Critical Success Factors
+
+1. **Incremental validation**: Run tests after each fix to catch issues early
+2. **Systematic updates**: Use scripts for bulk file updates, avoid manual editing
+3. **Clean restores**: When scripts create duplicates, restore and re-run cleanly
+4. **Build verification**: Run `cargo build --features llm_router` before tests
+5. **Pre-existing failures**: Document unrelated test failures separately
+
+---
+
+## LLM Router Integration: Test Management Patterns
+
+### Date: 2026-01-13 - CI-Compatible Integration Tests
+
+#### Pattern 1: Ignoring Tests for CI with Local Execution
+
+**Context**: Integration test `test_ai_summarization_uniqueness` requires running Ollama and a free port 8000, which CI environments don't provide.
+
+**What We Learned**:
+- **Use `#[ignore = "message"]`**: Provides clear reason in test output
+- **Document run command**: Add comment showing how to run locally
+- **Keep tests valuable**: Don't delete tests just because CI can't run them
+
+**Implementation**:
+```rust
+/// Test that validates AI summaries are unique per document and role
+/// Run locally with: cargo test -p terraphim_middleware test_name -- --ignored
+#[tokio::test]
+#[ignore = "Requires running Ollama and configured haystacks - run locally with --ignored"]
+async fn test_ai_summarization_uniqueness() {
+    // Test implementation...
+}
+```
+
+**When to Apply**: Any test requiring external services (databases, LLMs, APIs, specific ports)
+
+**Anti-pattern to Avoid**: Deleting tests because they don't work in CI
+
+#### Pattern 2: Workspace Path Resolution in Tests
+
+**Context**: Test needed to find workspace root to build and run server binary.
+
+**What We Learned**:
+- **Don't use "."**: Current directory varies based on how test is run
+- **Use `CARGO_MANIFEST_DIR`**: Compile-time constant, always correct
+- **Navigate up from crate dir**: `crate/tests/` -> `crate/` -> `workspace/`
+
+**Implementation**:
+```rust
+// WRONG: Unreliable, depends on cwd
+let workspace = PathBuf::from(".");
+
+// CORRECT: Always works
+let workspace_root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+    .parent() // crates/
+    .and_then(|p| p.parent()) // workspace root
+    .map(|p| p.to_path_buf())
+    .unwrap_or_else(|| std::path::PathBuf::from("."));
+```
+
+**When to Apply**: Any test that needs to reference workspace-level paths (configs, binaries, fixtures)
+
+#### Pattern 3: Cargo Build Commands for Workspace Members
+
+**Context**: Test was using wrong cargo command to build server binary.
+
+**What We Learned**:
+- **`--bin` is for binaries in current package**: Not for workspace members
+- **`-p <package>` selects workspace member**: Works for both libs and bins
+- **Default-run binary is still built**: No need to specify binary name
+
+**Implementation**:
+```bash
+# WRONG: Error "no bin target named 'terraphim_server' in default-run packages"
+cargo build --release --bin terraphim_server
+
+# CORRECT: Build the package (includes its default-run binary)
+cargo build --release -p terraphim_server
+```
+
+**When to Apply**: Building any workspace member binary from tests or scripts
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| Test files fixed | 1 |
+| Commits pushed | 2 |
+| Patterns documented | 3 |
+| CI compatibility | Achieved |
+
+---
+
+## Session Analyzer: Crate Rename and Multi-Assistant Support
+
+### Date: 2026-01-13 - OpenCode Connector Fix and crates.io Publishing
+
+#### Pattern 1: Verify Actual File Locations Before Implementation
+
+**Context**: OpenCode connector was looking in `~/.opencode/` but actual data is at `~/.local/state/opencode/`.
+
+**What We Learned**:
+- **Check actual installations**: Don't assume directory locations, verify with `ls`
+- **Read actual data formats**: Don't assume JSONL schema matches other tools
+- **XDG Base Directory Spec**: Many tools use `~/.local/state/` for state data
+
+**Implementation**:
+```rust
+// WRONG: Assumed location based on tool name
+fn default_path(&self) -> Option<PathBuf> {
+    home::home_dir().map(|h| h.join(".opencode"))
+}
+
+// CORRECT: Actual location following XDG spec
+fn default_path(&self) -> Option<PathBuf> {
+    home::home_dir().map(|h| h.join(".local").join("state").join("opencode"))
+}
+```
+
+**When to Apply**: Any connector or integration with external tools
+
+**Anti-pattern to Avoid**: Implementing parsers based on assumed formats without checking actual data
+
+#### Pattern 2: 1Password CLI Authentication for Scripts
+
+**Context**: Publishing to crates.io required token from 1Password, but `op signin` doesn't work in scripts.
+
+**What We Learned**:
+- **Interactive signin doesn't work**: `eval $(op signin)` prompts for GUI/biometrics
+- **Account-specific scripts exist**: `~/op_zesticai_non_prod.sh` handles auth
+- **Pattern for token export**: Source script, then use `op read`
+
+**Implementation**:
+```bash
+# WRONG: Prompts for interactive authentication
+eval $(op signin)
+op read "op://TerraphimPlatform/crates.io.token/token"
+
+# CORRECT: Use account-specific auth script
+source ~/op_zesticai_non_prod.sh
+export CARGO_REGISTRY_TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
+cargo publish -p crate-name --allow-dirty
+```
+
+**When to Apply**: Any script needing 1Password secrets (crates.io, npm, pypi tokens)
+
+#### Pattern 3: publish-crates.sh Side Effects
+
+**Context**: Script updated ALL workspace crates when publishing single crate with `-c` flag.
+
+**What We Learned**:
+- **Version flag affects all crates**: `-v 1.4.11` updates entire workspace
+- **Side effects leave uncommitted changes**: Check `git status` after running
+- **Manual publish may be cleaner**: Direct `cargo publish` avoids side effects
+
+**Implementation**:
+```bash
+# This creates side effects (updates ALL crate versions):
+./scripts/publish-crates.sh -c terraphim-session-analyzer -v 1.4.11
+
+# Cleaner approach for single crate:
+# 1. Manually update version in Cargo.toml
+# 2. Commit the change
+# 3. Publish directly:
+source ~/op_zesticai_non_prod.sh
+export CARGO_REGISTRY_TOKEN=$(op read "op://TerraphimPlatform/crates.io.token/token")
+cargo publish -p terraphim-session-analyzer --allow-dirty
+```
+
+**When to Apply**: Publishing individual crates vs full workspace releases
+
+#### Pattern 4: Deprecating crates.io Packages
+
+**Context**: Needed to deprecate old `claude-log-analyzer` crate after rename.
+
+**What We Learned**:
+- **Use `cargo yank`**: Marks versions as unavailable but doesn't delete
+- **Yank all versions**: Each version must be yanked individually
+- **Existing installs still work**: Yanking only prevents new installations
+
+**Implementation**:
+```bash
+# Yank all versions of deprecated crate
+cargo yank --version 1.4.10 claude-log-analyzer
+cargo yank --version 1.4.8 claude-log-analyzer
+cargo yank --version 1.4.7 claude-log-analyzer
+
+# Verify yanking worked
+curl -s "https://crates.io/api/v1/crates/claude-log-analyzer/versions" | jq '.versions[] | "\(.num) yanked: \(.yanked)"'
+```
+
+**When to Apply**: Renaming crates, deprecating old packages, removing security vulnerabilities
+
+### Session Metrics
+
+| Metric | Value |
+|--------|-------|
+| Crate versions yanked | 3 |
+| New version published | 1 (v1.4.11) |
+| Files fixed | 2 |
+| Tests passing | 325 |
+| Patterns documented | 4 |

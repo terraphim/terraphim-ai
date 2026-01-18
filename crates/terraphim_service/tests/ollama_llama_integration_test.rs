@@ -74,6 +74,8 @@ async fn test_direct_llm_client(base_url: &str) {
         kg: None,
         haystacks: vec![],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
@@ -169,6 +171,8 @@ async fn test_role_based_llm_config(base_url: &str) {
             kg: None,
             haystacks: vec![],
             extra: AHashMap::new(),
+            llm_router_enabled: false,
+            llm_router_config: None,
             ..Default::default()
         };
 
@@ -261,6 +265,8 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
             fetch_content: false,
         }],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
@@ -347,6 +353,8 @@ async fn test_model_listing(base_url: &str) {
         kg: None,
         haystacks: vec![],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
@@ -402,6 +410,8 @@ async fn ollama_llama_length_constraint_test() {
         kg: None,
         haystacks: vec![],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 
@@ -473,6 +483,8 @@ async fn ollama_llama_performance_test() {
         kg: None,
         haystacks: vec![],
         extra: AHashMap::new(),
+        llm_router_enabled: false,
+        llm_router_config: None,
         ..Default::default()
     };
 

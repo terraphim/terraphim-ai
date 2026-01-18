@@ -536,6 +536,7 @@ impl MarkdownCommandParser {
                 NormalizedTerm {
                     id: term_id,
                     value: normalized_term.clone(),
+                    display_value: None,
                     url: Some(format!("learned-term:{}", term)),
                 },
             );
@@ -1255,6 +1256,7 @@ The service requires proper database configuration and SSL certificates for secu
             NormalizedTerm {
                 id: 1,
                 value: NormalizedTermValue::from("database"),
+                display_value: None,
                 url: Some("concept:database".to_string()),
             },
         );
@@ -1264,6 +1266,7 @@ The service requires proper database configuration and SSL certificates for secu
             NormalizedTerm {
                 id: 2,
                 value: NormalizedTermValue::from("kubernetes"),
+                display_value: None,
                 url: Some("concept:kubernetes".to_string()),
             },
         );

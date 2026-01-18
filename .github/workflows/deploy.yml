@@ -126,40 +126,14 @@ jobs:
           docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest || \
           echo "Docker image not found, will build from source"
 
-      - name: Build from source if needed
+      - name: Install Rust toolchain
         if: steps.download.outcome == 'failure'
-        run: |
-          echo "Building from source since artifacts not found"
-
-          # Install Rust toolchain
-          uses: dtolnay/rust-toolchain@stable
-          with:
-            toolchain-file: .github/rust-toolchain.toml
-
-      - name: Cache Cargo (self-hosted)
-        uses: actions/cache@v4
+        uses: dtolnay/rust-toolchain@stable
         with:
-          path: |
-            /opt/cargo-cache/registry
-            /opt/cargo-cache/git
-            ~/.cargo/registry
-            ~/.cargo/git
-            target
-          key: deploy-build-${{ needs.validate.outputs.version }}-${{ hashFiles('**/Cargo.lock') }}
-        env:
-          CARGO_HOME: /opt/cargo-cache
-
-      - name: Build from source if needed
-        if: steps.download.outcome == 'failure'
-        run: |
-          echo "Building from source since artifacts not found"
-
-          # Install Rust toolchain
-          uses: dtolnay/rust-toolchain@stable
-          with:
-            toolchain-file: .github/rust-toolchain.toml
+          components: rustfmt, clippy
 
       - name: Cache Cargo (self-hosted)
+        if: steps.download.outcome == 'failure'
         uses: actions/cache@v4
         with:
           path: |

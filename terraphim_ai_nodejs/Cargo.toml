@@ -24,9 +24,10 @@ tokio = { version = "1.40.0", features = ["full"] }
 ahash = "0.8.12"
 serde = { version = "1.0.128", features = ["derive"] }
 
+[dev-dependencies]
+tempfile = "3.14"
+
 [build-dependencies]
 napi-build = "2.0.1"
 
-[profile.release]
-lto = true
-strip = "symbols"
+# NOTE: Profile configuration moved to workspace Cargo.toml for consistency

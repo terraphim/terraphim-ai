@@ -58,6 +58,8 @@ mod tests {
                     llm_chat_system_prompt: None,
                     llm_chat_model: None,
                     llm_context_window: None,
+                    llm_router_enabled: false,
+                    llm_router_config: None,
                     extra: AHashMap::new(),
                 },
             )
