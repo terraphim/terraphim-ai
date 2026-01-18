@@ -9511,7 +9511,6 @@ dependencies = [
  "clap",
  "hex",
  "hmac",
- "jsonwebtoken",
  "octocrab",
  "reqwest 0.12.24",
  "salvo",
