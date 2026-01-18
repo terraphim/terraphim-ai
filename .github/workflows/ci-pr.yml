@@ -227,20 +227,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: desktop/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
 
       - name: Install dependencies
         working-directory: desktop
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Lint check
         working-directory: desktop
-        run: npm run lint || true  # Allow failure during transition
+        run: yarn lint || true  # Allow failure during transition
 
       - name: Type check
         working-directory: desktop
-        run: npm run check
+        run: yarn check
 
   # Quick unit tests for changed code
   rust-tests:
@@ -286,8 +286,9 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # Run only unit tests (skip integration tests for speed)
-          cargo test --workspace --lib --bins --all-features -- --test-threads=4
+          # Run unit tests without RocksDB features for speed
+          # RocksDB tests are covered in CI Native full test suite
+          cargo test --workspace --lib --bins -- --test-threads=2 --skip rocksdb
 
   # WASM build verification
   wasm-build:

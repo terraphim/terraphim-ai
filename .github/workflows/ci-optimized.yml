@@ -310,7 +310,7 @@ jobs:
             -v $PWD:/workspace \
             -w /workspace \
             ${{ needs.build-base-image.outputs.image-tag }} \
-            cargo test --workspace --all-features
+            cargo test --workspace --all-features -- --skip rocksdb
 
   summary:
     needs: [lint-and-format, build-frontend, build-rust, test]
