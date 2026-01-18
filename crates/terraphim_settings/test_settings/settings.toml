@@ -7,10 +7,6 @@ default_data_path = '/tmp/terraphim_test'
 type = 'dashmap'
 root = '/tmp/dashmaptest'
 
-[profiles.rock]
-type = 'rocksdb'
-datadir = '/tmp/opendal/rocksdb'
-
 [profiles.s3]
 type = 's3'
 bucket = 'test'
