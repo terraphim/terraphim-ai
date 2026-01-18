@@ -2,6 +2,38 @@
 //!
 //! This module provides standardized logging setup functions for different contexts
 //! (servers, tests, development) to ensure consistent logging behavior across the codebase.
+//!
+//! ## OpenDAL Warning Messages
+//!
+//! When running terraphim-agent or related tools, you may see WARN-level messages like:
+//! ```
+//! [WARN  opendal::services] service=memory name=0x... path=embedded_config.json: read failed NotFound
+//! ```
+//!
+//! These messages are **expected and harmless**. They occur when OpenDAL attempts to read
+//! configuration or thesaurus files that don't exist yet. The system correctly falls back
+//! to default values and continues normal operation.
+//!
+//! ### Suppressing These Warnings
+//!
+//! If you want cleaner logs, you can set the RUST_LOG environment variable:
+//!
+//! ```bash
+//! # Suppress all warnings (including real ones)
+//! RUST_LOG=error terraphim-agent search "test"
+//!
+//! # Suppress only OpenDAL service warnings
+//! RUST_LOG="opendal=error" terraphim-agent search "test"
+//!
+//! # Or use the quieter mode
+//! RUST_LOG=warn terraphim-agent search "test"
+//! ```
+//!
+//! ### Why Can't We Filter These Automatically?
+//!
+//! OpenDAL has its own internal LoggingLayer that logs directly to the Rust log crate.
+//! These logs happen at the OpenDAL level before our application logging configuration
+//! takes effect, so we cannot selectively filter them without modifying OpenDAL's behavior.
 
 /// Logging configuration presets for different use cases
 #[derive(Debug, Clone)]

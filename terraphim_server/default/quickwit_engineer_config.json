@@ -1,0 +1,23 @@
+{
+  "name": "Quickwit Engineer",
+  "shortname": "QuickwitEngineer",
+  "relevance_function": "BM25",
+  "theme": "observability",
+  "haystacks": [
+    {
+      "location": "http://localhost:7280",
+      "service": "Quickwit",
+      "read_only": true,
+      "fetch_content": false,
+      "extra_parameters": {
+        "default_index": "workers-logs",
+        "max_hits": "100",
+        "sort_by": "-timestamp",
+        "timeout_seconds": "10"
+      }
+    }
+  ],
+  "llm_enabled": false,
+  "llm_auto_summarize": false,
+  "llm_chat_enabled": false
+}

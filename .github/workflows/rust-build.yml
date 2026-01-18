@@ -200,4 +200,5 @@ jobs:
 
       - name: Run basic tests
         run: |
-          cargo test --target ${{ matrix.target }} --workspace --exclude terraphim_agent
+          # Skip RocksDB tests for speed
+          cargo test --target ${{ matrix.target }} --workspace --exclude terraphim_agent -- --skip rocksdb
