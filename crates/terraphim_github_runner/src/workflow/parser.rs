@@ -387,6 +387,14 @@ impl WorkflowParser {
     }
 }
 
+impl Clone for WorkflowParser {
+    fn clone(&self) -> Self {
+        Self {
+            llm_client: Arc::clone(&self.llm_client),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
