@@ -1,0 +1,21 @@
+{
+  "name": "Quickwit Multi-Index Explorer",
+  "shortname": "QuickwitExplorer",
+  "relevance_function": "BM25",
+  "theme": "observability",
+  "haystacks": [
+    {
+      "location": "http://localhost:7280",
+      "service": "Quickwit",
+      "read_only": true,
+      "fetch_content": false,
+      "extra_parameters": {
+        "max_hits": "50",
+        "sort_by": "-timestamp"
+      }
+    }
+  ],
+  "llm_enabled": false,
+  "llm_auto_summarize": false,
+  "llm_chat_enabled": false
+}
