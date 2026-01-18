@@ -1,3 +1,195 @@
+# Handover Document - Issue #422 REPL Update Commands
+
+**Date:** 2026-01-18
+**Branch:** `main`
+**Focus:** Implemented `/update` commands in terraphim_agent REPL
+
+---
+
+## 1. Progress Summary
+
+### Tasks Completed This Session
+
+| Task | Status | Details |
+|------|--------|---------|
+| Implement `/update check` | Complete | Checks GitHub Releases for available updates |
+| Implement `/update install` | Complete | Downloads and installs updates with signature verification |
+| Implement `/update rollback <version>` | Complete | Rollback to previous backup version using BackupManager |
+| Implement `/update list` | Complete | Lists available backup versions |
+| Add unit tests | Complete | 2 tests for parsing and error handling |
+| Fix help display | Complete | Added `/update` to `show_available_commands()` |
+| Close Issue #422 | Complete | Automatically closed via commit message |
+
+### Commits (newest first)
+
+```
+22ae01a6 docs: move issue 421 validation report to docs directory
+16aec9ea fix(repl): add update command to help display
+2244811a feat(repl): add update management commands closes #422
+```
+
+### What's Working
+
+| Component | Status |
+|-----------|--------|
+| `/update check` | Shows "Update available: 1.4.10 -> 1.5.0" |
+| `/update list` | Shows "No backups available" (when none exist) |
+| `/update install` | Ready (requires signed releases to fully test) |
+| `/update rollback <version>` | Ready (requires backups) |
+| Error handling | Proper messages for invalid input |
+| Help display | `/update` shows in `/help` output |
+
+### What Needs Attention
+
+| Issue | Priority | Action |
+|-------|----------|--------|
+| Untracked `.docs/` files | Low | Move to `docs/` or add to `.gitignore` |
+| Modified `settings.toml` | Low | Review if change is needed |
+
+---
+
+## 2. Technical Context
+
+### Current State
+
+```bash
+# Current branch
+main
+
+# Recent commits
+22ae01a6 docs: move issue 421 validation report to docs directory
+16aec9ea fix(repl): add update command to help display
+2244811a feat(repl): add update management commands closes #422
+1a44ccce Merge pull request #423 from terraphim/verify-validate-auto-update-20260109
+53d9125d chore(deps): update yarn.lock after @types/node version change
+
+# Modified files (unstaged)
+ M crates/terraphim_settings/test_settings/settings.toml
+
+# Untracked files
+ .docs/design-issue-422-repl-update-commands.md
+ .docs/research-issue-422-repl-update-commands.md
+ .docs/validation-report-issue-420.md
+ .docs/verification-report-issue-420.md
+ .docs/verification-report-issue-421-signature.md
+```
+
+### Key Files Modified
+
+| File | Change |
+|------|--------|
+| `crates/terraphim_agent/src/repl/commands.rs` | Added `UpdateSubcommand` enum, parser logic, help text, unit tests |
+| `crates/terraphim_agent/src/repl/handler.rs` | Added `handle_update()` method, help display |
+| `docs/VALIDATION-REPORT-ISSUE-421.md` | Moved from project root |
+
+---
+
+## 3. Next Steps
+
+### Priority 1: Test `/update install` with Real Releases
+
+```bash
+# Build with REPL features
+cargo build -p terraphim_agent --features repl-full --release
+
+# Run REPL and test
+./target/release/terraphim-agent repl
+/update check
+/update install
+```
+
+### Priority 2: Clean Up Untracked Files
+
+```bash
+# Move design docs to docs/ or delete
+mv .docs/*.md docs/
+# Or add to .gitignore
+echo ".docs/" >> .gitignore
+```
+
+---
+
+## 4. Technical Discoveries
+
+### REPL Command Implementation Pattern
+
+When adding new REPL commands:
+1. Add enum variant to `ReplCommand` in `commands.rs`
+2. Add subcommand enum if needed (e.g., `UpdateSubcommand`)
+3. Add parser logic in `FromStr` implementation
+4. Add handler method in `handler.rs`
+5. Add to `show_available_commands()` for help display
+6. Add unit tests for parsing
+
+### Commit Message Hook Limitation
+
+The `commit-msg` hook validates the ENTIRE commit message against a single-line regex pattern:
+```regex
+^(feat|fix|docs|...)(\([a-zA-Z0-9_-]+\))?: .{1,72}$
+```
+
+This means multi-line commit bodies cause validation to fail. Solutions:
+- Use single-line commit messages only
+- Use separate `-m` flags: `git commit -m "title" -m "body"`
+
+### terraphim_update API
+
+Key functions for update management:
+```rust
+// Check for updates
+check_for_updates_auto(bin_name, current_version).await
+
+// Install updates with signature verification
+update_binary(bin_name).await
+
+// Rollback management
+let manager = BackupManager::new(backup_dir, max_backups)?;
+manager.list_backups();
+manager.rollback_to_version(&version, &target_path)?;
+```
+
+---
+
+## 5. Commands Reference
+
+```bash
+# Build with REPL features
+cargo build -p terraphim_agent --features repl-full --release
+
+# Run REPL
+./target/release/terraphim-agent repl
+
+# Test update commands in REPL
+/update check              # Check for updates
+/update list               # List backup versions
+/update install            # Install available updates
+/update rollback <version> # Rollback to specific version
+
+# Run update command tests
+cargo test -p terraphim_agent test_update
+
+# CLI equivalents
+./target/release/terraphim-agent check-update
+./target/release/terraphim-agent update
+```
+
+---
+
+## 6. Session Statistics
+
+| Metric | Count |
+|--------|-------|
+| Commits pushed | 3 |
+| Issues closed | 1 (#422) |
+| Unit tests added | 2 |
+| Lines added | ~250 |
+
+---
+
+**Handover complete. Issue #422 implemented and closed.**
+
+---
+
 # Handover Document - Session Analyzer Rename and OpenCode Fix
 
 **Date:** 2026-01-13
@@ -221,22 +413,22 @@ cargo yank --version 1.4.10 claude-log-analyzer
    - Installed terraphim-engineering-skills plugin (25 skills)
 
 3. **Created knowledge graph rules**
-   - ~/.config/terraphim/docs/src/kg/bun install.md (npm → bun)
-   - ~/.config/terraphim/docs/src/kg/bunx.md (npx → bunx)
-   - ~/.config/terraphim/docs/src/kg/terraphim_ai.md (Claude Code → Terraphim AI)
+   - ~/.config/terraphim/docs/src/kg/bun install.md (npm -> bun)
+   - ~/.config/terraphim/docs/src/kg/bunx.md (npx -> bunx)
+   - ~/.config/terraphim/docs/src/kg/terraphim_ai.md (Claude Code -> Terraphim AI)
 
 4. **Updated settings.local.json**
    - Added all 27 skill permissions
    - Configured PreToolUse and PostToolUse hooks
 
 5. **Fixed documentation**
-   - Corrected terraphim-skills README.md: bun_install.md → "bun install.md"
+   - Corrected terraphim-skills README.md: bun_install.md -> "bun install.md"
    - Pushed fix upstream to main branch
 
 ### What's Working
 
-- npm → bun replacement in all bash commands
-- npx → bunx replacement in all bash commands
+- npm -> bun replacement in all bash commands
+- npx -> bunx replacement in all bash commands
 - Claude Code/Terraphim AI replacement in commits and PRs
 - Git safety guard blocking destructive commands
 - All 25 terraphim-engineering-skills available
