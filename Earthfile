@@ -56,7 +56,7 @@ install:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
@@ -89,7 +89,7 @@ install-native:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
@@ -221,8 +221,8 @@ test:
   # COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
   # RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 5 && cargo test;
-  # Skip RocksDB tests for speed - they require longer isolation and are covered in full CI
-  RUN cargo test --workspace -- --skip rocksdb
+  # rocksdb feature disabled in CI
+  RUN cargo test --workspace
   #DO rust+CARGO --args="test --offline"
 
 fmt:
@@ -231,7 +231,7 @@ fmt:
 
 lint:
   FROM +workspace-debug
-  RUN cargo clippy --workspace --all-targets --all-features
+  RUN cargo clippy --workspace --all-targets
 
 build-focal:
   FROM ubuntu:20.04
