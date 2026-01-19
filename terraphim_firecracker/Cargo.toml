@@ -4,6 +4,7 @@ version = "0.1.0"
 edition.workspace = true
 authors = ["Terraphim AI Team"]
 description = "Sub-2 second VM boot optimization system for Terraphim AI coding assistant"
+license = "AGPL-3.0-or-later"
 
 [lib]
 name = "terraphim_firecracker"

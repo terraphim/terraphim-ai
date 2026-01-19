@@ -2,6 +2,7 @@
 name = "jmap_client"
 version = "1.0.0"
 edition = "2021"
+license = "MIT"
 
 [dependencies]
 haystack_core = { path = "../haystack_core" }
