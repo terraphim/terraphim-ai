@@ -2416,6 +2416,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37909eebbb50d72f9059c3b6d82c0463f2ff062c9e95845c43a6c9c0355411be"
 
 [[package]]
+name = "fcctl-core"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "base64 0.22.1",
+ "flate2",
+ "hyper 1.8.1",
+ "hyperlocal",
+ "jiff 0.2.16",
+ "libc",
+ "nix 0.29.0",
+ "rand 0.8.5",
+ "redis 0.26.1",
+ "regex",
+ "reqwest 0.11.27",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "tempfile",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+ "uuid",
+]
+
+[[package]]
 name = "fd-lock"
 version = "4.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5338,7 +5365,7 @@ dependencies = [
  "prost",
  "quick-xml 0.38.4",
  "redb",
- "redis",
+ "redis 0.32.7",
  "reqsign",
  "reqwest 0.12.24",
  "rocksdb",
@@ -6568,6 +6595,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8eca1e9d98d5a7e9002d0013e18d5a9b000aee942eb134883a82f06ebffb6c01"
 dependencies = [
  "libc",
+]
+
+[[package]]
+name = "redis"
+version = "0.26.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e902a69d09078829137b4a5d9d082e0490393537badd7c91a3d69d14639e115f"
+dependencies = [
+ "arc-swap",
+ "async-trait",
+ "bytes",
+ "combine",
+ "futures-util",
+ "itoa 1.0.15",
+ "num-bigint",
+ "percent-encoding",
+ "pin-project-lite",
+ "ryu",
+ "sha1_smol",
+ "socket2 0.5.10",
+ "tokio",
+ "tokio-util",
+ "url",
 ]
 
 [[package]]
@@ -9794,6 +9844,7 @@ dependencies = [
  "async-trait",
  "bollard",
  "dashmap",
+ "fcctl-core",
  "futures",
  "hyper 1.8.1",
  "hyper-util",
@@ -9801,13 +9852,16 @@ dependencies = [
  "log",
  "parking_lot 0.12.5",
  "reqwest 0.12.24",
+ "rmcp",
  "serde",
  "serde_json",
  "tempfile",
  "terraphim-firecracker",
  "terraphim_agent_supervisor",
  "terraphim_automata",
+ "terraphim_rolegraph",
  "terraphim_service",
+ "terraphim_types",
  "test-log",
  "thiserror 1.0.69",
  "tokio",
