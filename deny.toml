@@ -1,0 +1,62 @@
+# cargo-deny configuration for cargo-deny 0.19.0+
+# https://embarkstudios.github.io/cargo-deny/
+
+[advisories]
+db-path = "~/.cargo/advisory-dbs"
+db-urls = ["https://github.com/RustSec/advisory-db"]
+# unmaintained uses enum: "all", "workspace", "transitive", "none"
+unmaintained = "workspace"
+yanked = "warn"
+
+# Ignore specific advisories
+ignore = [
+    # idna vulnerability via trust-dns-proto (transitive dep from terraphim_rlm)
+    # Will be fixed when migrating from trust-dns to hickory-dns
+    # TODO: Track migration in GitHub issue
+    "RUSTSEC-2024-0421",
+    # atty unaligned read - transitive dep, only affects Windows with custom allocators
+    "RUSTSEC-2021-0145",
+    # atty unmaintained - used by terraphim_agent, should migrate to std::io::IsTerminal
+    # TODO: Replace atty with is-terminal or std::io::IsTerminal
+    "RUSTSEC-2024-0375",
+    # bincode unmaintained - used by redb persistence backend
+    # TODO: Evaluate alternatives (postcard, rkyv, etc.)
+    "RUSTSEC-2025-0141",
+    # dotenv unmaintained - used by atlassian_haystack
+    # TODO: Replace with dotenvy
+    "RUSTSEC-2021-0141",
+]
+
+[licenses]
+version = 2
+allow = [
+    "MIT", "Apache-2.0", "Apache-2.0 WITH LLVM-exception",
+    "BSD-2-Clause", "BSD-3-Clause", "ISC", "Zlib",
+    "MPL-2.0", "CC0-1.0", "Unicode-3.0", "Unicode-DFS-2016",
+    "BSL-1.0", "0BSD", "OpenSSL",
+    "Unlicense",
+    "GPL-3.0-or-later",
+    "AGPL-3.0-or-later",
+    "CDLA-Permissive-2.0",
+]
+confidence-threshold = 0.8
+
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [{ path = "LICENSE", hash = 0xbd0eed23 }]
+
+[bans]
+multiple-versions = "warn"
+wildcards = "allow"
+
+[sources]
+unknown-registry = "warn"
+unknown-git = "warn"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+
+# Allow specific git sources for our forks
+allow-git = [
+    "https://github.com/terraphim/rust-genai.git",
+    "https://github.com/AlexMikhalev/self_update.git",
+]

@@ -2,6 +2,7 @@
 edition = "2021"
 name = "terraphim_ai_nodejs"
 version = "1.0.0"
+license = "MIT"
 
 [lib]
 name = "terraphim_ai_nodejs"
