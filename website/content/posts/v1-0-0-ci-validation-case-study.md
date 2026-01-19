@@ -37,8 +37,8 @@ The final validation status reported:
 
 ## References
 
-- CI fix plan (mdBook): `docs/src/domains/ci/reports/github-actions-fix-plan.md`
-- Final validation status (mdBook): `docs/src/domains/release/reports/final-validation-status.md`
+- CI fix plan (mdBook): https://docs.terraphim.ai/src/domains/ci/reports/github-actions-fix-plan.html
+- Final validation status (mdBook): https://docs.terraphim.ai/src/domains/release/reports/final-validation-status.html
 - Raw artifacts:
-  - `docs/artifacts/GITHUB_ACTIONS_FIX_PLAN.md`
-  - `docs/artifacts/FINAL_VALIDATION_STATUS.md`
+  - https://docs.terraphim.ai/artifacts/GITHUB_ACTIONS_FIX_PLAN.html
+  - https://docs.terraphim.ai/artifacts/FINAL_VALIDATION_STATUS.html

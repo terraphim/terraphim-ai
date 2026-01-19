@@ -1,7 +1,7 @@
 # Case Study: Knowledge Graph Validation Workflows for Pre/Post-LLM
 
 This case study is the mdBook version of the website post:
-- `website/content/posts/kg-validation-workflows-case-study.md`
+- https://terraphim.ai/posts/kg-validation-workflows-case-study/
 
 It includes the same narrative plus additional technical appendices.
 

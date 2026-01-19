@@ -1,7 +1,7 @@
 # Security Testing Lessons Learned
 
 This case study is the mdBook version of the website post:
-- `website/content/posts/security-testing-lessons-learned.md`
+- https://terraphim.ai/posts/security-testing-lessons-learned/
 
 It includes the same narrative plus additional technical appendices.
 
@@ -73,4 +73,4 @@ flowchart TD
 
 ## References
 
-- Website case study: `website/content/posts/security-testing-lessons-learned.md`
+- Website case study: https://terraphim.ai/posts/security-testing-lessons-learned/

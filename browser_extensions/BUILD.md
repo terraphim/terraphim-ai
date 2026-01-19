@@ -121,7 +121,7 @@ dist/browser-extensions/
 ├── TerraphimAIParseExtension-v1.0.0-source.zip     # Source code archive
 ├── TerraphimAIContext-v0.0.2-chrome.zip            # Chrome Web Store package
 ├── TerraphimAIContext-v0.0.2-source.zip            # Source code archive
-└── RELEASE_NOTES.md                                 # Comprehensive release notes
+└── docs/archive/RELEASE_NOTES.md                    # Comprehensive release notes
 ```
 
 ## Manual Build Steps

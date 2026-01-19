@@ -38,7 +38,7 @@
 1. ✅ **Merged 3 Dependabot PRs** (actions/cache, upload-artifact, codecov)
 2. ✅ **Created Meta-Issue #286** for release tracking
 3. ✅ **Docker UID/GID Configuration** for artifact ownership
-4. ✅ **21 Tracking Documents** generated in `.reports/`
+4. ✅ **21 Tracking Documents** generated in `docs/artifacts/` (migrated from `.reports/`)
 
 ## 🔄 In-Flight Items
 

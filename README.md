@@ -48,7 +48,7 @@ cargo install terraphim-cli     # Automation CLI (8 commands)
 - ⚡ Lightweight (15 MB RAM, 13 MB disk)
 - 🚀 Fast (<200ms operations)
 
-**Learn more**: [Changelog](docs/src/changelog.md) | [Cross-Platform Guide](CROSS_PLATFORM_STATUS.md)
+**Learn more**: [Quickstart](QUICKSTART.md) | [Changelog](https://docs.terraphim.ai/src/changelog.html) | [Cross-Platform Guide](docs/archive/root/CROSS_PLATFORM_STATUS.md)
 
 You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
 
