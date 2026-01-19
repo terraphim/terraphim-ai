@@ -27,7 +27,7 @@ The `terraphim_github_runner` crate provides a complete system for:
 
 ### High-Level Data Flow
 
-```text
+```
 GitHub Webhook -> WorkflowContext -> ParsedWorkflow -> SessionManager
                                               |
                                           Create VM
