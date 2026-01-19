@@ -45,6 +45,7 @@
 ## Testing
 
 - [Testing Overview](./testing/testing-overview.md)
+- [Desktop Testing](./testing/desktop/README.md)
 - [MCP Integration Testing](./testing/mcp-integration-testing.md)
 
 ## Knowledge Graph
@@ -63,6 +64,7 @@
 - [CI/CD](./domains/ci/README.md)
 - [Release](./domains/release/README.md)
 - [Desktop](./domains/desktop/README.md)
+  - [Desktop App](./desktop/README.md)
 
 ## Case Studies
 
