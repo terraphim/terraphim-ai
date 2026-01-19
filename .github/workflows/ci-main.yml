@@ -196,23 +196,24 @@ jobs:
           node-version: '20'
           # Note: cache disabled for self-hosted runners - using actions/cache separately
 
-      - name: Install dependencies
-        working-directory: desktop
-        run: npm ci
-
-      - name: Cache node_modules
+      - name: Cache yarn dependencies
         uses: actions/cache@v4
         with:
-          path: desktop/node_modules
-          key: ${{ needs.setup.outputs.cache-key }}-node-modules
+          path: |
+            desktop/node_modules
+            ~/.cache/yarn
+          key: ${{ runner.os }}-yarn-${{ hashFiles('desktop/yarn.lock') }}
           restore-keys: |
-            ${{ needs.setup.outputs.cache-key }}-node-modules-
-            v2-node-modules-
+            ${{ runner.os }}-yarn-
+
+      - name: Install dependencies
+        working-directory: desktop
+        run: yarn install --frozen-lockfile
 
       - name: Build frontend
         working-directory: desktop
         run: |
-          npm run build
+          yarn build
 
           # Show build artifacts
           ls -la dist/
