@@ -2,9 +2,6 @@ server_hostname = '127.0.0.1:8000'
 api_endpoint = 'http://localhost:8000/api'
 initialized = true
 default_data_path = '/tmp/terraphim_test'
-[profiles.rock]
-datadir = '/tmp/opendal/rocksdb'
-type = 'rocksdb'
 
 [profiles.s3]
 bucket = 'test'
