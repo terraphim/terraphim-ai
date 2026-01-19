@@ -22,7 +22,7 @@ Highlights:
 - CI/CD infrastructure for multi-platform builds
 
 Reference notes (verbatim source):
-- `RELEASE_NOTES_v1.0.0.md`
+- `docs/archive/RELEASE_NOTES_v1.0.0.md`
 
 ### v1.0.2
 
@@ -34,4 +34,4 @@ Highlights:
 - Role switching and search validation
 
 Reference notes (verbatim source):
-- `RELEASE_NOTES_v1.0.2.md`
+- `docs/archive/RELEASE_NOTES_v1.0.2.md`
