@@ -1,6 +1,6 @@
 use serial_test::serial;
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
-use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
+use terraphim_middleware::{RipgrepIndexer, indexer::IndexMiddleware};
 use terraphim_types::{RelevanceFunction, RoleName};
 
 fn create_test_role() -> Role {

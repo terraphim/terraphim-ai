@@ -1,7 +1,11 @@
 [package]
 name = "haystack_core"
-version = "1.0.0"
-edition = "2024"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim"]
+description = "Core traits and types for Terraphim haystack integrations"
+license = "MIT"
+repository = "https://github.com/terraphim/terraphim-ai"
 
 [dependencies]
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }

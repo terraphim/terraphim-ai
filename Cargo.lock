@@ -3038,7 +3038,7 @@ dependencies = [
 
 [[package]]
 name = "grepapp_haystack"
-version = "1.0.0"
+version = "1.5.1"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -3247,7 +3247,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "1.0.0"
+version = "1.5.1"
 dependencies = [
  "terraphim_types",
 ]
@@ -9670,7 +9670,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.4.10"
+version = "1.5.1"
 dependencies = [
  "ahash 0.8.12",
  "async-trait",

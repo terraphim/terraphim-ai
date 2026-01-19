@@ -233,19 +233,19 @@ fn test_before_after_comparison() {
             "Reddit Long URL",
             "https://www.reddit.com/r/rust/comments/1a2b3c4d/incredible_rust_performance_improvements_with_zero_cost_abstractions_detailed_analysis/",
             "Old: reddit_https_www_reddit_com_r_rust_comments_1a2b3c4d_incredible_rust_performance_improvements_with_zero_cost_abstractions_detailed_analysis",
-            "reddit_1a2b3c4d"
+            "reddit_1a2b3c4d",
         ),
         (
             "Documentation URL",
             "https://doc.rust-lang.org/std/collections/hash_map/struct.HashMap.html",
             "Old: std_https_doc_rust_lang_org_std_collections_hash_map_struct_hashmap_html",
-            "doc_std_collections_hash_map_struct_hashmap"
+            "doc_std_collections_hash_map_struct_hashmap",
         ),
         (
             "Docs.rs URL",
             "https://docs.rs/serde_json/1.0.96/serde_json/value/enum.Value.html",
             "Old: docs_rs_https_docs_rs_serde_json_1_0_96_serde_json_value_enum_value_html",
-            "doc_docs_rs_serde_json_1_0_96_serde_json_value_enum_value"
+            "doc_docs_rs_serde_json_1_0_96_serde_json_value_enum_value",
         ),
     ];
 

@@ -5,8 +5,8 @@ use terraphim_persistence::Persistable;
 use terraphim_types::{Document, Index};
 
 use super::IndexMiddleware;
-use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use crate::Result;
+use crate::command::ripgrep::{Data, Message, RipgrepCommand};
 use cached::proc_macro::cached;
 use terraphim_config::Haystack;
 use tokio::fs as tfs;
@@ -265,7 +265,9 @@ impl RipgrepIndexer {
 
                     // We got a context for a different document
                     if document_url != *path {
-                        log::warn!("Context for different document. document_url != path: {document_url:?} != {path:?}");
+                        log::warn!(
+                            "Context for different document. document_url != path: {document_url:?} != {path:?}"
+                        );
                         continue;
                     }
 
@@ -313,8 +315,12 @@ impl RipgrepIndexer {
             };
         }
 
-        log::debug!("Index_inner completed: {} documents processed, {} matches found, {} documents in final index",
-                 document_count, match_count, index.len());
+        log::debug!(
+            "Index_inner completed: {} documents processed, {} matches found, {} documents in final index",
+            document_count,
+            match_count,
+            index.len()
+        );
         index
     }
 }

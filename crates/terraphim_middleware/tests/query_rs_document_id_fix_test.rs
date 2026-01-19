@@ -12,16 +12,32 @@ async fn test_document_id_fix_comprehensive() {
     // Test cases that were causing OpenDAL warnings before the fix
     let problematic_urls = vec![
         // Reddit URLs that used to create extremely long IDs
-        ("https://www.reddit.com/r/rust/comments/abc123/some_title/", "reddit_abc123"),
-        ("https://www.reddit.com/r/rust/comments/xyz789/rust_async_programming_guide/?utm_source=share", "reddit_xyz789"),
-
+        (
+            "https://www.reddit.com/r/rust/comments/abc123/some_title/",
+            "reddit_abc123",
+        ),
+        (
+            "https://www.reddit.com/r/rust/comments/xyz789/rust_async_programming_guide/?utm_source=share",
+            "reddit_xyz789",
+        ),
         // Documentation URLs that used to include full paths
-        ("https://doc.rust-lang.org/std/iter/trait.Iterator.html", "std_std_iter_trait_iterator"),
-        ("https://doc.rust-lang.org/std/collections/struct.HashMap.html", "std_std_collections_struct_hashmap"),
-
+        (
+            "https://doc.rust-lang.org/std/iter/trait.Iterator.html",
+            "std_std_iter_trait_iterator",
+        ),
+        (
+            "https://doc.rust-lang.org/std/collections/struct.HashMap.html",
+            "std_std_collections_struct_hashmap",
+        ),
         // External documentation URLs
-        ("https://docs.rs/serde/latest/serde/", "std_docs_rs_serde_latest_serde"),
-        ("https://docs.rs/tokio/1.0.0/tokio/runtime/", "std_docs_rs_tokio_1_0_0_tokio_runtime"),
+        (
+            "https://docs.rs/serde/latest/serde/",
+            "std_docs_rs_serde_latest_serde",
+        ),
+        (
+            "https://docs.rs/tokio/1.0.0/tokio/runtime/",
+            "std_docs_rs_tokio_1_0_0_tokio_runtime",
+        ),
     ];
 
     for (url, expected_clean_id) in problematic_urls {

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use terraphim_config::{Haystack, ServiceType};
-use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
+use terraphim_middleware::{RipgrepIndexer, indexer::IndexMiddleware};
 
 /// Integration test to demonstrate and validate Ripgrep tag filtering functionality
 #[tokio::test]
@@ -87,7 +87,9 @@ async fn test_ripgrep_tag_filtering_integration() {
     println!("\n🔍 Expected behavior:");
     println!("   - Tag filtering should include --all-match flag");
     println!("   - Only documents containing BOTH search term AND tag should be returned");
-    println!("   - Generated command should be: rg --json --trim -C3 --ignore-case -tmarkdown --all-match --max-count 5 -e 'rust' -e '#rust' path");
+    println!(
+        "   - Generated command should be: rg --json --trim -C3 --ignore-case -tmarkdown --all-match --max-count 5 -e 'rust' -e '#rust' path"
+    );
 }
 
 /// Test different tag filtering scenarios
@@ -249,7 +251,9 @@ async fn demonstrate_command_construction() {
 
     println!("Expected full command: rg {}", full_command.join(" "));
     println!("This should be equivalent to:");
-    println!("  rg --json --trim -C3 --ignore-case -tmarkdown --all-match --max-count 10 -e async -e #rust /path/to/documents");
+    println!(
+        "  rg --json --trim -C3 --ignore-case -tmarkdown --all-match --max-count 10 -e async -e #rust /path/to/documents"
+    );
 
     // Verify key components
     assert!(full_command.contains(&"--all-match".to_string()));
