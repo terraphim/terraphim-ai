@@ -331,10 +331,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        run: cargo install cargo-audit --features=fix
 
       - name: Run security audit
-        run: cargo audit
+        run: |
+          # Fetch fresh advisory database to handle CVSS format updates
+          cargo audit --fetch || true
+          cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
         continue-on-error: true  # Don't fail PR for security advisories
 
   # Job summary
