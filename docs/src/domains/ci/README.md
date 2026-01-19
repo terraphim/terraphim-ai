@@ -15,5 +15,5 @@ This section covers CI pipelines, GitHub Actions, and deployment automation.
 ## Case studies
 
 - [Deployment Lessons: Vanilla JS UI + Caddy + 1Password](./case-studies/deployment-lessons-vanilla-js-caddy.md)
-- [v1.0.0 CI + Validation Case Study](../../../website/content/posts/v1-0-0-ci-validation-case-study.md)
+- [v1.0.0 CI + Validation Case Study](https://terraphim.ai/posts/v1-0-0-ci-validation-case-study/)
 - [Case Studies Index](../../case-studies/README.md)

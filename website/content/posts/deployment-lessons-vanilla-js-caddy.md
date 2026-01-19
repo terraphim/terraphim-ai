@@ -41,5 +41,5 @@ The pattern that scales is runtime injection via `op run`.
 
 ## References
 
-- mdBook (canonical + appendices): `docs/src/domains/ci/case-studies/deployment-lessons-vanilla-js-caddy.md`
-- Source notes: `lessons-learned.md`
+- mdBook (canonical + appendices): https://docs.terraphim.ai/src/domains/ci/case-studies/deployment-lessons-vanilla-js-caddy.html
+- Source notes: `docs/archive/root/lessons-learned.md`

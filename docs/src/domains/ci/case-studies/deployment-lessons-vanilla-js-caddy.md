@@ -1,7 +1,7 @@
 # Deployment Lessons: Vanilla JS UI + Caddy + 1Password
 
 This case study is the mdBook version of the website post:
-- `website/content/posts/deployment-lessons-vanilla-js-caddy.md`
+- https://terraphim.ai/posts/deployment-lessons-vanilla-js-caddy/
 
 It includes the same narrative plus additional technical appendices.
 
@@ -54,4 +54,4 @@ flowchart TD
 
 ## References
 
-- Website case study: `website/content/posts/deployment-lessons-vanilla-js-caddy.md`
+- Website case study: https://terraphim.ai/posts/deployment-lessons-vanilla-js-caddy/
