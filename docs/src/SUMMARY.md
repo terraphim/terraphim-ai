@@ -55,6 +55,26 @@
 - [Bug Reporting Terminology](./kg/bug-reporting.md)
 - [Issue Tracking Terminology](./kg/issue-tracking.md)
 
+## Domains
+
+- [VM](./domains/vm/README.md)
+- [Security](./domains/security/README.md)
+- [CI/CD](./domains/ci/README.md)
+- [Release](./domains/release/README.md)
+- [Desktop](./domains/desktop/README.md)
+
+## Case Studies
+
+- [Case Studies](./case-studies/README.md)
+
+## Artifacts
+
+- [Artifacts](./artifacts/README.md)
+
+## Changelog
+
+- [Changelog](./changelog.md)
+
 ## Deployment
 
 - [Cloudflare Pages Deployment](../CLOUDFLARE_DEPLOYMENT.md)
