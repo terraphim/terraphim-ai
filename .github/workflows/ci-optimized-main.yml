@@ -204,8 +204,8 @@ jobs:
           echo "Build Jobs: $CARGO_BUILD_JOBS" >> $GITHUB_STEP_SUMMARY
           echo "LTO Enabled: $CARGO_PROFILE_RELEASE_LTO" >> $GITHUB_STEP_SUMMARY
 
-          # Build workspace with optimizations
-          cargo build --release --target ${{ matrix.target }} --workspace --all-features
+          # Build workspace with default features (no rocksdb for faster CI)
+          cargo build --release --target ${{ matrix.target }} --workspace
 
           # Build verification and metrics
           BINARY_COUNT=$(find target/${{ matrix.target }}/release -name "terraphim*" -type f | wc -l)
@@ -243,8 +243,8 @@ jobs:
         run: |
           echo "=== Running Tests ===" >> $GITHUB_STEP_SUMMARY
 
-          # Run unit and integration tests
-          cargo test --release --target ${{ matrix.target }} --workspace --all-features -- --test-threads=4
+          # Run unit and integration tests (no rocksdb for faster CI)
+          cargo test --release --target ${{ matrix.target }} --workspace -- --test-threads=4
 
           # Run specific critical tests
           cargo test --release --package terraphim_service --target ${{ matrix.target }}
