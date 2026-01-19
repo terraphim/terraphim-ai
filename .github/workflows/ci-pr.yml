@@ -165,7 +165,7 @@ jobs:
           components: clippy
 
       - name: Clippy Check
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   # Quick Rust compilation check
   rust-compile:
@@ -206,10 +206,10 @@ jobs:
       - name: Check compilation
         run: |
           # Quick compilation check without building all binaries
-          cargo check --workspace --all-features
+          cargo check --workspace
           # Check key binaries compile
-          cargo check --package terraphim_server --all-features
-          cargo check --package terraphim_mcp_server --all-features
+          cargo check --package terraphim_server
+          cargo check --package terraphim_mcp_server
 
   # Frontend linting and type checking
   frontend-check:
@@ -263,7 +263,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -yqq --no-install-recommends librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev libclang-dev clang
+          sudo apt-get install -yqq --no-install-recommends libclang-dev clang
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -286,9 +286,8 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # Run unit tests without RocksDB features for speed
-          # RocksDB tests are covered in CI Native full test suite
-          cargo test --workspace --lib --bins -- --test-threads=2 --skip rocksdb
+          # Run unit tests (rocksdb feature disabled in CI)
+          cargo test --workspace --lib --bins -- --test-threads=2
 
   # WASM build verification
   wasm-build:

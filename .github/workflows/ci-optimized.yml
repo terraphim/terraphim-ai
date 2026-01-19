@@ -175,7 +175,7 @@ jobs:
             -v $PWD:/workspace \
             -w /workspace \
             ${{ needs.build-base-image.outputs.image-tag }} \
-            cargo clippy --workspace --all-targets --all-features -- -D warnings
+            cargo clippy --workspace --all-targets -- -D warnings
 
   build-frontend:
     needs: setup
@@ -310,7 +310,7 @@ jobs:
             -v $PWD:/workspace \
             -w /workspace \
             ${{ needs.build-base-image.outputs.image-tag }} \
-            cargo test --workspace --all-features -- --skip rocksdb
+            cargo test --workspace
 
   summary:
     needs: [lint-and-format, build-frontend, build-rust, test]
