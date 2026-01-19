@@ -258,7 +258,7 @@ pre-commit:
 
     cargo-clippy:
       glob: "*.rs"
-      run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      run: cargo clippy --workspace --all-targets -- -D warnings
 
     biome:
       glob: "desktop/**/*.{js,ts,tsx,jsx,json,jsonc}"

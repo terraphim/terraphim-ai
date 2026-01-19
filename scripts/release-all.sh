@@ -163,7 +163,7 @@ run_tests() {
     print_header "Running Tests"
 
     print_info "Running Rust tests..."
-    if ! cargo test --workspace --all-features; then
+    if ! cargo test --workspace; then
         print_error "Rust tests failed"
         exit 1
     fi

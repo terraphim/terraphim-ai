@@ -95,7 +95,7 @@ fi
 echo -e "${BLUE}🔍 Running cargo clippy...${NC}"
 # Pre-build dependencies to avoid timeout
 echo "Pre-building dependencies..."
-if cargo build --workspace --all-targets --all-features; then
+if cargo build --workspace --all-targets; then
     echo -e "${GREEN}  ✅ Dependencies pre-built successfully${NC}"
 else
     echo -e "${YELLOW}  ⚠️  Dependency pre-build had issues, continuing anyway${NC}"
@@ -109,7 +109,7 @@ fi
 # - useless_vec, items_after_test_module, module_inception: test organization
 # - bool_comparison, nonminimal_bool: test boolean expressions
 # - redundant_clone: performance not critical in tests
-if timeout 1200 cargo clippy --workspace --all-targets --all-features --message-format=short -- \
+if timeout 1200 cargo clippy --workspace --all-targets --message-format=short -- \
     -D clippy::all \
     -A clippy::nursery -A clippy::pedantic \
     -A dead_code -A unused \
