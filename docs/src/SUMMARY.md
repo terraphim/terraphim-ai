@@ -51,6 +51,7 @@
 
 - [Knowledge Graph](./kg/knowledge-graph.md)
 - [Knowledge Graph System](./kg/knowledge-graph-system.md)
+- [KG Case Studies](./kg/case-studies/kg-validation-workflows.md)
 - [Bug Reporting Enhancement](./knowledge-graph-bug-reporting-enhancement.md)
 - [Bug Reporting Terminology](./kg/bug-reporting.md)
 - [Issue Tracking Terminology](./kg/issue-tracking.md)
