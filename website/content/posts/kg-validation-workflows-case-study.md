@@ -32,7 +32,7 @@ Terraphim already had powerful primitives (connectivity checks, fuzzy matching, 
 
 ## References
 
-- mdBook case study + appendices: `docs/src/kg/case-studies/kg-validation-workflows.md`
+- mdBook case study + appendices: https://docs.terraphim.ai/src/kg/case-studies/kg-validation-workflows.html
 - Source materials:
   - `docs/sessions/session-20251228-201509.md`
   - `docs/sessions/research-underutilized-features.md`

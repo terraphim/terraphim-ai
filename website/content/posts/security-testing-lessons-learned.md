@@ -55,5 +55,5 @@ If the code is security-critical, it must be safe under concurrent access patter
 
 ## References
 
-- mdBook (canonical + appendices): `docs/src/domains/security/case-studies/security-testing-lessons-learned.md`
-- Source notes: `lessons-learned-security-testing.md`
+- mdBook (canonical + appendices): https://docs.terraphim.ai/src/domains/security/case-studies/security-testing-lessons-learned.html
+- Source notes: `docs/archive/root/lessons-learned-security-testing.md`

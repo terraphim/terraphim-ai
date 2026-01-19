@@ -6,9 +6,9 @@ To enable signed Tauri releases and auto-updates, you need to add the private ke
 
 ### Steps:
 
-1. **Extract Private Key from `.reports/tauri_keys.txt`**:
-   - Open the file and copy the SECRET KEY (starts with `dW50cnVzdGVkIGNvbW1lbnQ...`)
-   - This is the long base64 string after "Your secret key was generated successfully"
+1. **Extract Private Key reference from `docs/TAURI_KEYS_1PASSWORD.md`**:
+   - Follow the documented 1Password reference path for the Tauri signing key
+   - Do not copy secrets into git-tracked files
 
 2. **Add to GitHub Secrets**:
    ```bash
@@ -31,7 +31,7 @@ To enable signed Tauri releases and auto-updates, you need to add the private ke
 ### Security Notes
 
 - ⚠️ **NEVER commit the private key to git**
-- ⚠️ **Keep `.reports/tauri_keys.txt` secure** - it's gitignored
+- ⚠️ **Do not commit signing keys** (use 1Password references as documented in `docs/TAURI_KEYS_1PASSWORD.md`)
 - ✅ The public key is already configured in `tauri.conf.json`
 - ✅ GitHub workflows will use the secret automatically
 

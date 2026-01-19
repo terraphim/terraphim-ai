@@ -166,7 +166,7 @@ The hook system is built on three crates:
 
 ## Extending the Knowledge Graph
 
-Adding new patterns is simple. Create a markdown file in `docs/src/kg/`:
+Adding new patterns is simple. Create a markdown file in the mdBook source tree under `docs/src/kg/` (published at https://docs.terraphim.ai/src/kg/).
 
 ```markdown
 # pytest

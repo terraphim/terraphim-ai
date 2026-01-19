@@ -14,5 +14,5 @@ This section covers release processes, signing/notarization, and changelog histo
 
 ## Case studies
 
-- [v1.0.0 CI + Validation Case Study](../../../website/content/posts/v1-0-0-ci-validation-case-study.md)
+- [v1.0.0 CI + Validation Case Study](https://terraphim.ai/posts/v1-0-0-ci-validation-case-study/)
 - [Case Studies Index](../../case-studies/README.md)
