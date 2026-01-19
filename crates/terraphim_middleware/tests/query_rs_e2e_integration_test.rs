@@ -342,12 +342,18 @@ async fn test_server_configuration() {
                                                         .get("disable_content_enhancement")
                                                     {
                                                         if disable_enhancement == "true" {
-                                                            println!("✅ disable_content_enhancement is set to true");
+                                                            println!(
+                                                                "✅ disable_content_enhancement is set to true"
+                                                            );
                                                         } else {
-                                                            println!("⚠️  disable_content_enhancement is not set to true");
+                                                            println!(
+                                                                "⚠️  disable_content_enhancement is not set to true"
+                                                            );
                                                         }
                                                     } else {
-                                                        println!("⚠️  disable_content_enhancement parameter not found");
+                                                        println!(
+                                                            "⚠️  disable_content_enhancement parameter not found"
+                                                        );
                                                     }
                                                 } else {
                                                     println!("⚠️  extra_parameters not found");

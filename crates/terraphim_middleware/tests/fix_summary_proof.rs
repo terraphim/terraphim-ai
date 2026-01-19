@@ -13,12 +13,12 @@ fn test_fix_summary_proof() {
         (
             "Reddit Long URL",
             "https://www.reddit.com/r/rust/comments/caffe2_nomnigraph/blackjack_segui_based_node_graph_now_supports_panning_and_zooming_md/",
-            "Before: document_redditmediablackjackseguibasednodegraphnowsupportspanningandzoomingmd.json"
+            "Before: document_redditmediablackjackseguibasednodegraphnowsupportspanningandzoomingmd.json",
         ),
         (
             "Crate with Hyphens",
             "crate-caffe2-nomnigraph",
-            "Before: document_crate_caffe2_nomnigraph.json"
+            "Before: document_crate_caffe2_nomnigraph.json",
         ),
     ];
 

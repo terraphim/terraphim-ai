@@ -180,7 +180,9 @@ The Graph Analysis component works closely with existing graph processing system
         .expect("Failed to write new KG file");
 
     println!("📝 Created new KG file: graph-analysis.md");
-    println!("🔗 New synonyms: data analysis, network analysis, graph processing, relationship mapping, connectivity analysis, terraphim-graph, graph embeddings");
+    println!(
+        "🔗 New synonyms: data analysis, network analysis, graph processing, relationship mapping, connectivity analysis, terraphim-graph, graph embeddings"
+    );
 
     // 7. Rebuild knowledge graph with new content
     println!("\n🔧 Rebuilding knowledge graph with new content...");
