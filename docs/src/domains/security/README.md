@@ -10,4 +10,5 @@ This section covers security testing, hardening, and verification work.
 
 ## Case studies
 
-See: [Case Studies](../../case-studies/README.md)
+- [Security Testing Lessons Learned](./case-studies/security-testing-lessons-learned.md)
+- [Case Studies Index](../../case-studies/README.md)
