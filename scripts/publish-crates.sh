@@ -51,11 +51,24 @@ CRATES=(
   "terraphim_rolegraph"
   "terraphim_hooks"
   "terraphim-session-analyzer"
+  "haystack_core"
+  "grepapp_haystack"
   "terraphim_middleware"
   "terraphim_update"
   "terraphim_service"
   "terraphim_agent"
 )
+
+# Map package names to directory names (for crates where they differ)
+declare -A CRATE_DIR_MAP=(
+  ["grepapp_haystack"]="haystack_grepapp"
+)
+
+# Get directory name for a crate (uses mapping if exists, otherwise crate name)
+get_crate_dir() {
+  local crate="$1"
+  echo "${CRATE_DIR_MAP[$crate]:-$crate}"
+}
 
 # Logging functions
 log_info() {
@@ -171,7 +184,9 @@ update_versions() {
   log_info "Updating crate versions to $VERSION..."
 
   for crate in "${CRATES[@]}"; do
-    local crate_path="crates/$crate/Cargo.toml"
+    local crate_dir
+    crate_dir=$(get_crate_dir "$crate")
+    local crate_path="crates/$crate_dir/Cargo.toml"
 
     if [[ -f "$crate_path" ]]; then
       log_info "Updating $crate to version $VERSION"
@@ -254,9 +269,11 @@ publish_crate() {
 # Get current version of a crate
 get_current_version() {
   local crate="$1"
+  local crate_dir
+  crate_dir=$(get_crate_dir "$crate")
   cargo metadata --format-version 1 --no-deps |
     jq -r ".packages[] | select(.name == \"$crate\") | .version" 2>/dev/null ||
-    grep -A 5 "name = \"$crate\"" "crates/$crate/Cargo.toml" |
+    grep -A 5 "name = \"$crate\"" "crates/$crate_dir/Cargo.toml" |
     grep "^version" | head -1 | cut -d'"' -f2
 }
 
@@ -293,7 +310,9 @@ main() {
 
   # Publish crates
   for crate in "${crates_to_publish[@]}"; do
-    if [[ ! -f "crates/$crate/Cargo.toml" ]]; then
+    local crate_dir
+    crate_dir=$(get_crate_dir "$crate")
+    if [[ ! -f "crates/$crate_dir/Cargo.toml" ]]; then
       log_warning "Crate $crate not found, skipping"
       continue
     fi

@@ -119,8 +119,8 @@ impl Default for GrepAppClient {
 mod tests {
     use super::*;
     use wiremock::{
-        matchers::{method, path, query_param},
         Mock, MockServer, ResponseTemplate,
+        matchers::{method, path, query_param},
     };
 
     #[tokio::test]

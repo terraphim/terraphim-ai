@@ -391,7 +391,9 @@ impl RipgrepCommand {
                             log::info!("Added tag pattern: {}", t);
                         }
                     }
-                    log::info!("🔍 Tag filtering will require search results to contain ALL specified patterns");
+                    log::info!(
+                        "🔍 Tag filtering will require search results to contain ALL specified patterns"
+                    );
                 }
                 "glob" => {
                     // Direct glob pattern

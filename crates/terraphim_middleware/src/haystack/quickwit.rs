@@ -1,5 +1,5 @@
-use crate::indexer::IndexMiddleware;
 use crate::Result;
+use crate::indexer::IndexMiddleware;
 use reqwest::Client;
 use serde::Deserialize;
 use terraphim_config::Haystack;
@@ -162,15 +162,13 @@ impl QuickwitHaystackIndexer {
         config: &QuickwitConfig,
     ) -> reqwest::RequestBuilder {
         // Priority 1: Bearer token
-        if let Some(ref token) = config.auth_token {
+        if let Some(token) = &config.auth_token {
             // Token should already include "Bearer " prefix
             return request.header("Authorization", token);
         }
 
         // Priority 2: Basic auth (username + password)
-        if let (Some(ref username), Some(ref password)) =
-            (&config.auth_username, &config.auth_password)
-        {
+        if let (Some(username), Some(password)) = (&config.auth_username, &config.auth_password) {
             return request.basic_auth(username, Some(password));
         }
 

@@ -1,5 +1,5 @@
-use crate::indexer::IndexMiddleware;
 use crate::Result;
+use crate::indexer::IndexMiddleware;
 use async_trait::async_trait;
 use reqwest::Client;
 use terraphim_config::Haystack;
