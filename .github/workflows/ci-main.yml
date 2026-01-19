@@ -129,8 +129,8 @@ jobs:
 
       - name: Build release binaries
         run: |
-          # Build workspace with all features
-          cargo build --release --target ${{ matrix.target }} --workspace --all-features
+          # Build workspace with default features (no rocksdb for faster CI)
+          cargo build --release --target ${{ matrix.target }} --workspace
 
           # Verify key binaries exist
           ls -la target/${{ matrix.target }}/release/terraphim*
