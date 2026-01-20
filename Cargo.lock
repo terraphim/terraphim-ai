@@ -9078,7 +9078,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-cli"
-version = "1.0.0"
+version = "1.5.1"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -9204,7 +9204,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.4.10"
+version = "1.5.1"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -9843,7 +9843,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.0.0"
+version = "1.5.1"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
