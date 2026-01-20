@@ -81,6 +81,54 @@ impl CliService {
         config.roles.keys().map(|r| r.to_string()).collect()
     }
 
+    /// List all available roles with their shortnames
+    pub async fn list_roles_with_info(&self) -> Vec<(String, Option<String>)> {
+        let config = self.config_state.config.lock().await;
+        config
+            .roles
+            .iter()
+            .map(|(name, role)| (name.to_string(), role.shortname.clone()))
+            .collect()
+    }
+
+    /// Find a role by name or shortname (case-insensitive)
+    pub async fn find_role_by_name_or_shortname(&self, query: &str) -> Option<RoleName> {
+        let config = self.config_state.config.lock().await;
+        let query_lower = query.to_lowercase();
+
+        // First try exact match on name
+        for (name, _role) in config.roles.iter() {
+            if name.to_string().to_lowercase() == query_lower {
+                return Some(name.clone());
+            }
+        }
+
+        // Then try match on shortname
+        for (name, role) in config.roles.iter() {
+            if let Some(ref shortname) = role.shortname {
+                if shortname.to_lowercase() == query_lower {
+                    return Some(name.clone());
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Update the selected role
+    pub async fn update_selected_role(&self, role_name: RoleName) -> Result<()> {
+        let service = self.service.lock().await;
+        service.update_selected_role(role_name).await?;
+        Ok(())
+    }
+
+    /// Save the current configuration
+    pub async fn save_config(&self) -> Result<()> {
+        let config = self.config_state.config.lock().await;
+        config.save().await?;
+        Ok(())
+    }
+
     /// Search documents with a specific role
     pub async fn search(
         &self,

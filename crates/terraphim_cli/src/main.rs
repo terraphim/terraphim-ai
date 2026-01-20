@@ -47,6 +47,18 @@ enum ReplaceMode {
     Synonym,
 }
 
+/// Roles subcommands
+#[derive(Subcommand)]
+enum RolesSub {
+    /// List available roles
+    List,
+    /// Select a role by name or shortname
+    Select {
+        /// Role name or shortname to select
+        name: String,
+    },
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Search for documents
@@ -66,8 +78,11 @@ enum Commands {
     /// Show configuration
     Config,
 
-    /// List available roles
-    Roles,
+    /// Manage roles
+    Roles {
+        #[command(subcommand)]
+        sub: RolesSub,
+    },
 
     /// Show top concepts from knowledge graph
     Graph {
@@ -227,6 +242,26 @@ struct ErrorResult {
     details: Option<String>,
 }
 
+#[derive(Serialize)]
+struct RolesListResult {
+    roles: Vec<RoleInfo>,
+    selected: String,
+}
+
+#[derive(Serialize)]
+struct RoleInfo {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shortname: Option<String>,
+    selected: bool,
+}
+
+#[derive(Serialize)]
+struct RoleSelectResult {
+    selected: String,
+    previous: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -254,7 +289,10 @@ async fn main() -> Result<()> {
             handle_search(&service, query, role, limit).await
         }
         Some(Commands::Config) => handle_config(&service).await,
-        Some(Commands::Roles) => handle_roles(&service).await,
+        Some(Commands::Roles { sub }) => match sub {
+            RolesSub::List => handle_roles_list(&service).await,
+            RolesSub::Select { name } => handle_roles_select(&service, name).await,
+        },
         Some(Commands::Graph { top_k, role }) => handle_graph(&service, top_k, role).await,
         Some(Commands::Replace {
             text,
@@ -354,9 +392,43 @@ async fn handle_config(service: &CliService) -> Result<serde_json::Value> {
     Ok(serde_json::to_value(result)?)
 }
 
-async fn handle_roles(service: &CliService) -> Result<serde_json::Value> {
-    let roles = service.list_roles().await;
-    Ok(serde_json::to_value(roles)?)
+async fn handle_roles_list(service: &CliService) -> Result<serde_json::Value> {
+    let roles_with_info = service.list_roles_with_info().await;
+    let selected_role = service.get_selected_role().await;
+
+    let roles: Vec<RoleInfo> = roles_with_info
+        .into_iter()
+        .map(|(name, shortname)| RoleInfo {
+            selected: name == selected_role.to_string(),
+            name,
+            shortname,
+        })
+        .collect();
+
+    let result = RolesListResult {
+        roles,
+        selected: selected_role.to_string(),
+    };
+    Ok(serde_json::to_value(result)?)
+}
+
+async fn handle_roles_select(service: &CliService, name: String) -> Result<serde_json::Value> {
+    let previous = service.get_selected_role().await.to_string();
+
+    // Find role by name or shortname
+    let role_name = service
+        .find_role_by_name_or_shortname(&name)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Role '{}' not found (checked name and shortname)", name))?;
+
+    service.update_selected_role(role_name.clone()).await?;
+    service.save_config().await?;
+
+    let result = RoleSelectResult {
+        selected: role_name.to_string(),
+        previous,
+    };
+    Ok(serde_json::to_value(result)?)
 }
 
 async fn handle_graph(
