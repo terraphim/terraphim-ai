@@ -11,6 +11,11 @@ rust-version = "1.87"
 name = "terraphim-gpui"
 path = "src/main.rs"
 
+[[example]]
+name = "complete_integration"
+path = "examples/complete_integration.rs"
+required-features = ["legacy-components"]
+
 [lib]
 name = "terraphim_desktop_gpui"
 path = "src/lib.rs"
@@ -29,6 +34,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
+terraphim-markdown-parser = { path = "../terraphim-markdown-parser", version = "1.0.0" }
 
 # Async runtime
 tokio = { version = "1.36", features = ["full"] }
@@ -56,6 +62,7 @@ tokio-util = "0.7"
 # Serialization
 serde = { version = "1.0.197", features = ["derive"] }
 serde_json = "1.0.104"
+serde_yaml = "0.9"
 
 # Logging
 log = "0.4.21"
@@ -73,6 +80,10 @@ lru = "0.12"
 
 # Markdown rendering
 pulldown-cmark = "0.12"
+
+# LSP types for Input completion provider
+lsp-types = "0.97.0"
+ropey = { version = "=2.0.0-beta.1", features = ["simd"] }
 
 # Platform-specific features
 webbrowser = "1.0"
@@ -99,6 +110,9 @@ objc = "0.2"
 [dev-dependencies]
 tokio-test = "0.4.4"
 tempfile = "3.23.0"
+criterion = "0.5"
+tokio = { version = "1.36", features = ["full", "test-util"] }
+serde_json = "1.0.104"
 
 [features]
 default = []
@@ -106,3 +120,5 @@ default = []
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 # Database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
+# Legacy reusable component framework + its heavy integration tests
+legacy-components = []

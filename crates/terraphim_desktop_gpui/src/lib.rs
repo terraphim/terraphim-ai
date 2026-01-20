@@ -9,16 +9,13 @@
 
 // Business logic modules (framework-agnostic)
 pub mod autocomplete;
-// NOTE: The legacy reusable `components` system is currently disabled to
-// reduce the compilation surface while we stabilize the GPUI views. The
-// new GPUI-aligned views use `state::search` and other modules directly.
-// Once the core app is building cleanly we can re-enable this module and
-// incrementally wire the new component abstractions back in.
-// pub mod components;
+#[cfg(feature = "legacy-components")]
+pub mod components;
 pub mod editor;
 pub mod kg_search;
 pub mod models;
 pub mod search_service;
+pub mod slash_command;
 
 // UI layer modules (GPUI-specific)
 pub mod actions;
@@ -29,6 +26,9 @@ pub mod views;
 
 // Utility modules
 pub mod utils;
+
+// Markdown rendering
+pub mod markdown;
 
 // Security modules
 pub mod security;
@@ -43,6 +43,10 @@ pub use kg_search::{KGSearchResult, KGSearchService, KGTerm};
 pub use models::{ChipOperator, ResultItemViewModel, TermChip, TermChipSet};
 pub use search_service::{
     LogicalOperator, ParsedQuery, SearchOptions, SearchResults, SearchService,
+};
+pub use slash_command::{
+    CommandCategory, CommandContext, CommandRegistry, UniversalCommand, UniversalSuggestion,
+    ViewScope,
 };
 
 // Re-export core terraphim types for convenience
