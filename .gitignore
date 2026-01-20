@@ -52,3 +52,6 @@ keys/
 
 # Working documents
 .docs/
+
+# Claude Code working files
+.claude/plans/
