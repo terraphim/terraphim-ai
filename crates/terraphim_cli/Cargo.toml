@@ -47,7 +47,7 @@ default = []
 tokio = { version = "1.42", features = ["rt-multi-thread", "macros", "test-util"] }
 serial_test = "3.3"
 tempfile = "3.10"
-assert_cmd = "2.0"
+assert_cmd = "2.1"
 predicates = "3.1"
 
 # Profile configuration moved to workspace Cargo.toml for consistency
