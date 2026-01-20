@@ -39,7 +39,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       is-release: ${{ steps.version.outputs.is-release }}
       cache-key: ${{ steps.cache.outputs.key }}
-      build-matrix: ${{ steps.matrix.outputs.matrix }}
+      targets: ${{ steps.matrix.outputs.targets }}
       available-memory: ${{ steps.resources.outputs.memory }}
       available-disk: ${{ steps.resources.outputs.disk }}
 
