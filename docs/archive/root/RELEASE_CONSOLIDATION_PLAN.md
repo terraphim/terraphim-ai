@@ -107,8 +107,8 @@ Finished `test` profile [unoptimized + debuginfo] target(s) in 49.91s
 **Existing Documentation:**
 - `releases/v1.0.0/RELEASE_NOTES.md`: Initial release notes
 - `releases/v1.0.0/TAURI_DESKTOP_RELEASE.md`: Desktop app release info
-- `.reports/FINAL_COMPREHENSIVE_STATUS.md`: Status showing 85% completion with blocking issues
-- `.reports/FINAL_VALIDATION_STATUS.md`: Test validation results
+- `docs/artifacts/FINAL_COMPREHENSIVE_STATUS.md`: Status showing 85% completion with blocking issues
+- `docs/artifacts/FINAL_VALIDATION_STATUS.md`: Test validation results
 
 **Key Findings from Reports:**
 - 162/162 tests passing for core components

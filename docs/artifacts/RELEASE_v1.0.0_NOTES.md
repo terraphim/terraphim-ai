@@ -41,7 +41,7 @@ docker-compose up -d
 
 This release includes signed updates. The desktop app will automatically check for and download updates.
 
-**For maintainers**: To sign future releases, set the `TAURI_PRIVATE_KEY` GitHub secret with the value from `.reports/tauri_keys.txt` (private key).
+**For maintainers**: To sign future releases, set the `TAURI_PRIVATE_KEY` GitHub secret with the value referenced in `docs/TAURI_KEYS_1PASSWORD.md` (private key).
 
 ## 🔧 Configuration
 

@@ -85,13 +85,11 @@ TAURI_PRIVATE_KEY="op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TA
 TAURI_KEY_PASSWORD="op://6fsizn2h5rrs5mp3e4phudjab4/3k2d5ycxeagdazexivgomi2gpy/TAURI_KEY_PASSWORD"
 ```
 
-### .reports/tauri_keys.txt
+### docs/artifacts (historical)
 
-This file has been updated to contain only 1Password references, not the actual keys. The original sensitive data has been removed and replaced with:
+Historically, release tracking documents lived under `.reports/`. Those have been migrated to `docs/artifacts/` for publication and long-term reference.
 
-- 1Password vault and item IDs
-- Reference URIs for key retrieval
-- Usage examples
+The actual signing key references should live in `.env.tauri-release` (1Password reference URIs only) and in this document.
 
 ## Security Benefits
 
@@ -124,7 +122,7 @@ op signin
 ## Migration Notes
 
 - **Migration Date**: November 7, 2025
-- **Previous Storage**: Keys were stored in `.reports/tauri_keys.txt`
+- **Previous Storage**: Keys were previously documented under `.reports/`
 - **Vault Created**: A new TerraphimPlatform vault was created (ID: deahm4nag52derwyq2frgy3pda)
 - **Item Updated**: Existing item `3k2d5ycxeagdazexivgomi2gpy` was updated with Tauri keys
 
