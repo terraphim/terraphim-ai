@@ -78,7 +78,7 @@ jobs:
   build-frontend:
     name: Build Frontend
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
+    timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
 
