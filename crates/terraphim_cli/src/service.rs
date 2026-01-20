@@ -33,11 +33,12 @@ impl CliService {
         let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
-                    log::info!("Loaded existing embedded configuration");
+                    log::debug!("Loaded existing embedded configuration");
                     config
                 }
-                Err(e) => {
-                    log::info!("Failed to load config: {:?}, using default embedded", e);
+                Err(_) => {
+                    // No saved config found is expected on first run - use default
+                    log::debug!("No saved config found, using default embedded");
                     ConfigBuilder::new_with_id(ConfigId::Embedded)
                         .build_default_embedded()
                         .build()?

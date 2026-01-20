@@ -252,31 +252,71 @@ pub trait Persistable: Serialize + DeserializeOwned {
     {
         let (ops, fastest_op) = &self.load_config().await?;
 
-        // First try the fastest operator as before
-        match fastest_op.read(key).await {
-            Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
-                Ok(obj) => {
-                    log::debug!("✅ Loaded '{}' from fastest operator", key);
-                    return Ok(obj);
+        // Helper to check existence and read from an operator without triggering WARN logs
+        async fn try_read_from_op<T: DeserializeOwned>(
+            op: &Operator,
+            key: &str,
+            profile_name: Option<&str>,
+        ) -> Option<std::result::Result<T, Error>> {
+            // Use stat() first to check existence - this doesn't trigger WARN-level logging
+            match op.stat(key).await {
+                Ok(_) => {
+                    // File exists, proceed with read
+                    match op.read(key).await {
+                        Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
+                            Ok(obj) => {
+                                if let Some(name) = profile_name {
+                                    log::debug!(
+                                        "Loaded '{}' from profile '{}'",
+                                        key,
+                                        name
+                                    );
+                                } else {
+                                    log::debug!("Loaded '{}' from fastest operator", key);
+                                }
+                                Some(Ok(obj))
+                            }
+                            Err(e) => {
+                                log::warn!(
+                                    "Failed to deserialize '{}': {}",
+                                    key,
+                                    e
+                                );
+                                Some(Err(Error::Json(e)))
+                            }
+                        },
+                        Err(e) => {
+                            log::debug!("Failed to read '{}' after stat: {}", key, e);
+                            Some(Err(e.into()))
+                        }
+                    }
+                }
+                Err(e) if e.kind() == opendal::ErrorKind::NotFound => {
+                    // File doesn't exist - this is expected on first run, log at debug
+                    log::debug!("File '{}' not found in storage", key);
+                    None
                 }
                 Err(e) => {
-                    log::warn!(
-                        "Failed to deserialize '{}' from fastest operator: {}",
-                        key,
-                        e
-                    );
+                    log::debug!("Failed to stat '{}': {}", key, e);
+                    Some(Err(e.into()))
                 }
-            },
-            Err(e) => {
-                log::debug!(
-                    "Failed to read '{}' from fastest operator: {}, trying fallback",
-                    key,
-                    e
-                );
             }
         }
 
-        // If fastest operator failed, try all operators in speed order
+        // First try the fastest operator
+        if let Some(result) = try_read_from_op::<Self>(fastest_op, key, None).await {
+            match result {
+                Ok(obj) => return Ok(obj),
+                Err(Error::Json(_)) => {
+                    // Deserialization error, don't retry with other operators
+                }
+                Err(_) => {
+                    // Other error, will try fallback
+                }
+            }
+        }
+
+        // If fastest operator failed or file not found, try all operators in speed order
         let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
         ops_vec.sort_by_key(|&(_, (_, speed))| speed);
 
@@ -287,45 +327,34 @@ pub trait Persistable: Serialize + DeserializeOwned {
             }
 
             log::debug!(
-                "🔄 Trying to load '{}' from profile '{}'",
+                "Trying to load '{}' from profile '{}'",
                 key,
                 profile_name
             );
 
-            match op.read(key).await {
-                Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
+            if let Some(result) = try_read_from_op::<Self>(op, key, Some(profile_name)).await {
+                match result {
                     Ok(obj) => {
                         log::info!(
-                            "✅ Successfully loaded '{}' from fallback profile '{}'",
+                            "Successfully loaded '{}' from fallback profile '{}'",
                             key,
                             profile_name
                         );
                         return Ok(obj);
                     }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to deserialize '{}' from profile '{}': {}",
-                            key,
-                            profile_name,
-                            e
-                        );
+                    Err(Error::Json(_)) => {
+                        // Deserialization error, continue to next
                     }
-                },
-                Err(e) => {
-                    log::debug!(
-                        "Failed to read '{}' from profile '{}': {}",
-                        key,
-                        profile_name,
-                        e
-                    );
+                    Err(_) => {
+                        // Other error, continue to next
+                    }
                 }
             }
         }
 
-        // If all operators failed, return the original error from the fastest operator
-        let bs = fastest_op.read(key).await?;
-        let obj = serde_json::from_slice(&bs.to_vec())?;
-        Ok(obj)
+        // If all operators failed, return NotFound error (no WARN logged)
+        log::debug!("Config file '{}' not found in any storage backend", key);
+        Err(Error::NotFound(key.to_string()))
     }
 
     fn get_key(&self) -> String;
