@@ -1,16 +1,17 @@
+use crate::autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
+use crate::components::gpui_aligned::{
+    CommonProps, GpuiComponent, GpuiComponentConfig, StatefulComponent,
+};
+use crate::search_service::SearchResults;
+use crate::security::validate_search_query;
 /// Simplified Search Component
 ///
 /// GPUI-aligned search component based on gpui-component patterns.
 /// Replaces the complex ReusableComponent implementation with a simpler,
 /// more maintainable approach that follows GPUI best practices.
-
 use gpui::*;
 use serde::{Deserialize, Serialize};
 use std::time::Instant;
-use crate::components::gpui_aligned::{GpuiComponentConfig, CommonProps, GpuiComponent, StatefulComponent};
-use crate::search_service::SearchResults;
-use crate::autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
-use crate::security::validate_search_query;
 
 /// Search component configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -135,7 +136,6 @@ impl GpuiComponent for SimpleSearchComponent {
     }
 
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
-
         let div_element = div().id("simple-search");
         // Note: test_id method may not exist on Div in this GPUI version
         // if let Some(ref test_id) = self.config.common_props.test_id {
@@ -144,27 +144,29 @@ impl GpuiComponent for SimpleSearchComponent {
         div_element
             .child(
                 // Search input field
-                div()
-                    .id("search-input-container")
-                    .child(
-                        // Use standard GPUI input for now
-                        // TODO: Replace with gpui_component::input when available
-                        div()
-                            .id("search-input")
-                            .child(
-                                if !self.state.query.is_empty() {
-                                    div().child(format!("Query: {}", self.state.query))
-                                } else {
-                                    div().child(self.config.placeholder.clone())
-                                }
-                            )
-                            .on_click(cx.listener(|this, _event, _window, cx| {
-                                // For now, simulate typing - would need proper input implementation
-                                let test_query = "example search";
-                                this.handle_event(SimpleSearchEvent::QueryChanged(test_query.to_string()), cx);
-                                this.handle_event(SimpleSearchEvent::SearchRequested(test_query.to_string()), cx);
-                            }))
-                    )
+                div().id("search-input-container").child(
+                    // Use standard GPUI input for now
+                    // TODO: Replace with gpui_component::input when available
+                    div()
+                        .id("search-input")
+                        .child(if !self.state.query.is_empty() {
+                            div().child(format!("Query: {}", self.state.query))
+                        } else {
+                            div().child(self.config.placeholder.clone())
+                        })
+                        .on_click(cx.listener(|this, _event, _window, cx| {
+                            // For now, simulate typing - would need proper input implementation
+                            let test_query = "example search";
+                            this.handle_event(
+                                SimpleSearchEvent::QueryChanged(test_query.to_string()),
+                                cx,
+                            );
+                            this.handle_event(
+                                SimpleSearchEvent::SearchRequested(test_query.to_string()),
+                                cx,
+                            );
+                        })),
+                ),
             )
             .children(self.render_autocomplete_suggestions(cx))
             .children(self.render_loading_indicator())
@@ -197,13 +199,21 @@ impl GpuiComponent for SimpleSearchComponent {
                 if self.config.show_suggestions {
                     let now = Instant::now();
                     if let Some(timer) = self.debounce_timer {
-                        if now.duration_since(timer).as_millis() >= self.config.autocomplete_debounce_ms {
+                        if now.duration_since(timer).as_millis()
+                            >= self.config.autocomplete_debounce_ms
+                        {
                             self.debounce_timer = Some(now);
-                            self.handle_event(SimpleSearchEvent::AutocompleteRequested(query.clone()), cx);
+                            self.handle_event(
+                                SimpleSearchEvent::AutocompleteRequested(query.clone()),
+                                cx,
+                            );
                         }
                     } else {
                         self.debounce_timer = Some(now);
-                        self.handle_event(SimpleSearchEvent::AutocompleteRequested(query.clone()), cx);
+                        self.handle_event(
+                            SimpleSearchEvent::AutocompleteRequested(query.clone()),
+                            cx,
+                        );
                     }
                 }
             }
@@ -226,7 +236,10 @@ impl GpuiComponent for SimpleSearchComponent {
                     self.state.selected_suggestion_index = None;
 
                     // Auto-trigger search when suggestion is selected
-                    self.handle_event(SimpleSearchEvent::SearchRequested(suggestion.term.clone()), cx);
+                    self.handle_event(
+                        SimpleSearchEvent::SearchRequested(suggestion.term.clone()),
+                        cx,
+                    );
                 }
             }
             SimpleSearchEvent::SearchRequested(query) => {
@@ -248,7 +261,8 @@ impl GpuiComponent for SimpleSearchComponent {
                         self.state.selected_suggestion_index = Some(selected - 1);
                     }
                 } else if !self.state.autocomplete_suggestions.is_empty() {
-                    self.state.selected_suggestion_index = Some(self.state.autocomplete_suggestions.len() - 1);
+                    self.state.selected_suggestion_index =
+                        Some(self.state.autocomplete_suggestions.len() - 1);
                 }
             }
             SimpleSearchEvent::NavigateDown => {
@@ -264,7 +278,10 @@ impl GpuiComponent for SimpleSearchComponent {
             }
             SimpleSearchEvent::SelectCurrentSuggestion => {
                 if let Some(selected) = self.state.selected_suggestion_index {
-                    self.handle_event(SimpleSearchEvent::AutocompleteSuggestionSelected(selected), cx);
+                    self.handle_event(
+                        SimpleSearchEvent::AutocompleteSuggestionSelected(selected),
+                        cx,
+                    );
                 }
             }
             SimpleSearchEvent::ClearRequested => {
@@ -287,10 +304,12 @@ impl SimpleSearchComponent {
         }
 
         Some(
-            div()
-                .id("autocomplete-suggestions")
-                .children(
-                    self.state.autocomplete_suggestions.iter().enumerate().map(|(idx, suggestion)| {
+            div().id("autocomplete-suggestions").children(
+                self.state
+                    .autocomplete_suggestions
+                    .iter()
+                    .enumerate()
+                    .map(|(idx, suggestion)| {
                         let is_selected = self.state.selected_suggestion_index == Some(idx);
                         let mut suggestion_div = div().id(("autocomplete-suggestion", idx));
                         if is_selected {
@@ -310,40 +329,41 @@ impl SimpleSearchComponent {
                                                 .id(("kg-icon", idx))
                                                 .text_size(px(12.0))
                                                 .text_color(gpui::blue())
-                                                .child("📚")
+                                                .child("KG")
                                         } else {
                                             div()
                                                 .id(("search-icon", idx))
                                                 .text_size(px(12.0))
                                                 .text_color(gpui::rgb(0x6b7280))
-                                                .child("🔍")
-                                        }
+                                                .child("Search")
+                                        },
                                     )
                                     .child(
                                         div()
                                             .id(("suggestion-text", idx))
                                             .flex_1()
-                                            .child(suggestion.term.clone())
+                                            .child(suggestion.term.clone()),
                                     )
-                                    .children(
-                                        if suggestion.score > 0.5 {
-                                            Some(
-                                                div()
-                                                    .id(("suggestion-score", idx))
-                                                    .text_size(px(10.0))
-                                                    .text_color(gpui::rgb(0x6b7280))
-                                                    .child(format!("{:.2}", suggestion.score))
-                                            )
-                                        } else {
-                                            None
-                                        }
-                                    )
+                                    .children(if suggestion.score > 0.5 {
+                                        Some(
+                                            div()
+                                                .id(("suggestion-score", idx))
+                                                .text_size(px(10.0))
+                                                .text_color(gpui::rgb(0x6b7280))
+                                                .child(format!("{:.2}", suggestion.score)),
+                                        )
+                                    } else {
+                                        None
+                                    }),
                             )
                             .on_click(cx.listener(move |this, _event, _window, cx| {
-                                this.handle_event(SimpleSearchEvent::AutocompleteSuggestionSelected(idx), cx);
+                                this.handle_event(
+                                    SimpleSearchEvent::AutocompleteSuggestionSelected(idx),
+                                    cx,
+                                );
                             }))
-                    })
-                )
+                    }),
+            ),
         )
     }
 
@@ -353,21 +373,13 @@ impl SimpleSearchComponent {
             return None;
         }
 
-        Some(
-            div()
-                .id("loading-indicator")
-                .child("Loading...")
-        )
+        Some(div().id("loading-indicator").child("Loading..."))
     }
 
     /// Render error message
     fn render_error_message(&self) -> Option<impl IntoElement> {
         if let Some(error) = &self.state.error {
-            Some(
-                div()
-                    .id("error-message")
-                    .child(error.clone())
-            )
+            Some(div().id("error-message").child(error.clone()))
         } else {
             None
         }
@@ -390,7 +402,11 @@ impl SimpleSearchComponent {
 
             self.state.autocomplete_loading = false;
             self.state.autocomplete_suggestions = suggestions;
-            self.state.selected_suggestion_index = if suggestions.is_empty() { None } else { Some(0) };
+            self.state.selected_suggestion_index = if suggestions.is_empty() {
+                None
+            } else {
+                Some(0)
+            };
         } else {
             // No autocomplete engine available - create mock suggestions
             self.state.autocomplete_loading = false;

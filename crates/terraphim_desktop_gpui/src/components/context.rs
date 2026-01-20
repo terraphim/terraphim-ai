@@ -1,10 +1,13 @@
+use chrono::{DateTime, Utc};
 use gpui::*;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ulid::Ulid;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
-use crate::components::{ReusableComponent, ComponentConfig, PerformanceTracker, ComponentError, ViewContext, LifecycleEvent, ServiceRegistry};
+use crate::components::{
+    ComponentConfig, ComponentError, LifecycleEvent, PerformanceTracker, ReusableComponent,
+    ServiceRegistry, ViewContext,
+};
 use terraphim_types::{ContextItem, ContextType};
 
 /// Configuration for context management component
@@ -158,9 +161,9 @@ pub enum ContextFilter {
 /// Sort modes for context items
 #[derive(Debug, Clone, PartialEq)]
 pub enum ContextSortMode {
-    ByDate(bool), // true for newest first
+    ByDate(bool),      // true for newest first
     ByRelevance(bool), // true for highest first
-    ByTitle(bool), // true for A-Z
+    ByTitle(bool),     // true for A-Z
     ByType,
 }
 
@@ -233,7 +236,9 @@ impl ContextComponent {
 
     /// Update a context item
     pub fn update_item(&mut self, item_id: &str, new_item: ContextItem) -> Result<(), String> {
-        let index = self.state.items
+        let index = self
+            .state
+            .items
             .iter()
             .position(|item| item.id.as_str() == item_id)
             .ok_or_else(|| format!("Context item with ID '{}' not found", item_id))?;
@@ -252,7 +257,8 @@ impl ContextComponent {
 
     /// Get selected items
     pub fn get_selected_items(&self) -> Vec<&Arc<ContextItem>> {
-        self.state.items
+        self.state
+            .items
             .iter()
             .filter(|item| self.state.selected_items.contains(&item.id.to_string()))
             .collect()
@@ -260,7 +266,12 @@ impl ContextComponent {
 
     /// Toggle selection of an item
     pub fn toggle_selection(&mut self, item_id: &str) {
-        if let Some(pos) = self.state.selected_items.iter().position(|id| id == item_id) {
+        if let Some(pos) = self
+            .state
+            .selected_items
+            .iter()
+            .position(|id| id == item_id)
+        {
             self.state.selected_items.remove(pos);
         } else {
             self.state.selected_items.push(item_id.to_string());
@@ -270,7 +281,9 @@ impl ContextComponent {
 
     /// Select all items
     pub fn select_all(&mut self) {
-        self.state.selected_items = self.state.items
+        self.state.selected_items = self
+            .state
+            .items
             .iter()
             .map(|item| item.id.to_string())
             .collect();
@@ -317,7 +330,10 @@ impl ContextComponent {
             items.retain(|item| {
                 item.title.to_lowercase().contains(&query_lower)
                     || item.content.to_lowercase().contains(&query_lower)
-                    || item.summary.as_ref().map_or(false, |s| s.to_lowercase().contains(&query_lower))
+                    || item
+                        .summary
+                        .as_ref()
+                        .map_or(false, |s| s.to_lowercase().contains(&query_lower))
             });
         }
 
@@ -362,9 +378,13 @@ impl ContextComponent {
                     let score_a = a.relevance_score.unwrap_or(0.0);
                     let score_b = b.relevance_score.unwrap_or(0.0);
                     if highest_first {
-                        score_b.partial_cmp(&score_a).unwrap_or(std::cmp::Ordering::Equal)
+                        score_b
+                            .partial_cmp(&score_a)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     } else {
-                        score_a.partial_cmp(&score_b).unwrap_or(std::cmp::Ordering::Equal)
+                        score_a
+                            .partial_cmp(&score_b)
+                            .unwrap_or(std::cmp::Ordering::Equal)
                     }
                 });
             }
@@ -404,9 +424,12 @@ impl ContextComponent {
                     let type_str = format!("{:?}", item.context_type);
                     *acc.entry(type_str).or_insert(0) += 1;
                     acc
-                }
+                },
             ),
-            total_relevance: self.state.items.iter()
+            total_relevance: self
+                .state
+                .items
+                .iter()
                 .map(|item| item.relevance_score.unwrap_or(0.0))
                 .sum(),
         }
@@ -432,4 +455,3 @@ impl ContextStats {
         }
     }
 }
-

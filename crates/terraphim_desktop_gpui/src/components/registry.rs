@@ -2,7 +2,6 @@
 ///
 /// This module provides a centralized registry for managing component dependencies,
 /// service instances, and their lifecycles with loose coupling.
-
 use std::any::{Any, TypeId};
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
@@ -13,10 +12,9 @@ use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
-use crate::components::{ComponentMetadata, ReusableComponent, ComponentError, LifecycleEvent};
+use crate::components::{ComponentError, ComponentMetadata, LifecycleEvent, ReusableComponent};
 
 /// Service registry for dependency injection and component management
-#[derive(Debug)]
 pub struct ServiceRegistry {
     /// Registered services by TypeId
     services: RwLock<HashMap<TypeId, Arc<dyn Any + Send + Sync>>>,
@@ -75,8 +73,22 @@ impl Default for RegistryConfig {
     }
 }
 
+impl Default for RegistryStats {
+    fn default() -> Self {
+        Self {
+            service_count: 0,
+            component_count: 0,
+            lookup_count: 0,
+            instantiation_count: 0,
+            failure_count: 0,
+            avg_instantiation_time: Duration::ZERO,
+            created_at: Instant::now(),
+        }
+    }
+}
+
 /// Registry statistics
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct RegistryStats {
     /// Total number of registered services
     pub service_count: usize,
@@ -134,7 +146,11 @@ pub enum RegistryError {
 /// Component factory trait for creating component instances
 pub trait ComponentFactory: Any + Send + Sync {
     /// Create a new component instance
-    fn create(&self, config: serde_json::Value, registry: &ServiceRegistry) -> Result<Box<dyn Any + Send + Sync>, RegistryError>;
+    fn create(
+        &self,
+        config: serde_json::Value,
+        registry: &ServiceRegistry,
+    ) -> Result<Box<dyn Any + Send + Sync>, RegistryError>;
 
     /// Get component metadata
     fn metadata(&self) -> &ComponentMetadata;
@@ -278,9 +294,10 @@ impl ServiceRegistry {
         {
             let services = self.services.read().map_err(|_| RegistryError::Locked)?;
             if services.contains_key(&type_id) {
-                return Err(RegistryError::InstantiationFailed(
-                    format!("Service {} already registered", type_name)
-                ));
+                return Err(RegistryError::InstantiationFailed(format!(
+                    "Service {} already registered",
+                    type_name
+                )));
             }
         }
 
@@ -331,16 +348,19 @@ impl ServiceRegistry {
 
         match services.get(&type_id) {
             Some(service) => {
-                let service = service.clone().downcast::<T>()
-                    .map_err(|_| RegistryError::TypeMismatch {
-                        expected: std::any::type_name::<T>().to_string(),
-                        actual: "unknown".to_string(),
-                    })?;
+                let service =
+                    service
+                        .clone()
+                        .downcast::<T>()
+                        .map_err(|_| RegistryError::TypeMismatch {
+                            expected: std::any::type_name::<T>().to_string(),
+                            actual: "unknown".to_string(),
+                        })?;
 
                 Ok(ServiceRef::new(service))
             }
             None => Err(RegistryError::ServiceNotRegistered(
-                std::any::type_name::<T>().to_string()
+                std::any::type_name::<T>().to_string(),
             )),
         }
     }
@@ -363,7 +383,8 @@ impl ServiceRegistry {
 
         {
             let mut services = self.services.write().map_err(|_| RegistryError::Locked)?;
-            services.remove(&type_id)
+            services
+                .remove(&type_id)
                 .ok_or_else(|| RegistryError::ServiceNotRegistered(type_name.to_string()))?;
         }
 
@@ -380,31 +401,46 @@ impl ServiceRegistry {
     }
 
     /// Register a component factory
-    pub fn register_component_factory<F: ComponentFactory + 'static>(&self, factory: F) -> Result<(), RegistryError> {
+    pub fn register_component_factory<F: ComponentFactory + 'static>(
+        &self,
+        factory: F,
+    ) -> Result<(), RegistryError> {
         let metadata = factory.metadata();
         let component_id = metadata.id.clone();
 
         // Store factory
         {
-            let mut factories = self.component_factories.write().map_err(|_| RegistryError::Locked)?;
+            let mut factories = self
+                .component_factories
+                .write()
+                .map_err(|_| RegistryError::Locked)?;
             factories.insert(component_id.clone(), Box::new(factory));
         }
 
         // Store metadata
         {
-            let mut metadata_map = self.component_metadata.write().map_err(|_| RegistryError::Locked)?;
+            let mut metadata_map = self
+                .component_metadata
+                .write()
+                .map_err(|_| RegistryError::Locked)?;
             metadata_map.insert(component_id.clone(), metadata.clone());
         }
 
         // Store dependencies
         {
-            let mut dependencies = self.dependencies.write().map_err(|_| RegistryError::Locked)?;
+            let mut dependencies = self
+                .dependencies
+                .write()
+                .map_err(|_| RegistryError::Locked)?;
             dependencies.insert(component_id, metadata.dependencies);
         }
 
         // Update stats
         {
-            let factories = self.component_factories.read().map_err(|_| RegistryError::Locked)?;
+            let factories = self
+                .component_factories
+                .read()
+                .map_err(|_| RegistryError::Locked)?;
             self.stats.component_count = factories.len();
         }
 
@@ -412,10 +448,18 @@ impl ServiceRegistry {
     }
 
     /// Create a component instance
-    pub fn create_component(&self, component_id: &str, config: serde_json::Value) -> Result<Box<dyn Any + Send + Sync>, RegistryError> {
-        let factories = self.component_factories.read().map_err(|_| RegistryError::Locked)?;
+    pub fn create_component(
+        &self,
+        component_id: &str,
+        config: serde_json::Value,
+    ) -> Result<Box<dyn Any + Send + Sync>, RegistryError> {
+        let factories = self
+            .component_factories
+            .read()
+            .map_err(|_| RegistryError::Locked)?;
 
-        let factory = factories.get(component_id)
+        let factory = factories
+            .get(component_id)
             .ok_or_else(|| RegistryError::ComponentNotRegistered(component_id.to_string()))?;
 
         let start_time = Instant::now();
@@ -479,17 +523,29 @@ impl ServiceRegistry {
     }
 
     /// Check for circular dependencies
-    fn detect_circular_dependencies(&self, component_id: &str, visited: &mut std::collections::HashSet<String>) -> Result<(), RegistryError> {
+    fn detect_circular_dependencies(
+        &self,
+        component_id: &str,
+        visited: &mut std::collections::HashSet<String>,
+    ) -> Result<(), RegistryError> {
         if visited.contains(component_id) {
             return Err(RegistryError::CircularDependency(format!(
-                "Circular dependency detected: {} -> {}", component_id,
-                visited.iter().map(|s| s.as_str()).collect::<Vec<_>>().join(" -> ")
+                "Circular dependency detected: {} -> {}",
+                component_id,
+                visited
+                    .iter()
+                    .map(|s| s.as_str())
+                    .collect::<Vec<_>>()
+                    .join(" -> ")
             )));
         }
 
         visited.insert(component_id.to_string());
 
-        let dependencies = self.dependencies.read().map_err(|_| RegistryError::Locked)?;
+        let dependencies = self
+            .dependencies
+            .read()
+            .map_err(|_| RegistryError::Locked)?;
         if let Some(deps) = dependencies.get(component_id) {
             for dep in deps {
                 self.detect_circular_dependencies(dep, visited)?;
@@ -529,9 +585,12 @@ impl ServiceRegistry {
             if result {
                 results.insert(type_name, Ok(()));
             } else {
-                results.insert(type_name, Err(RegistryError::InstantiationFailed(
-                    "Health check not implemented for service type".to_string()
-                )));
+                results.insert(
+                    type_name,
+                    Err(RegistryError::InstantiationFailed(
+                        "Health check not implemented for service type".to_string(),
+                    )),
+                );
             }
         }
 
@@ -557,17 +616,26 @@ impl ServiceRegistry {
         }
 
         {
-            let mut factories = self.component_factories.write().map_err(|_| RegistryError::Locked)?;
+            let mut factories = self
+                .component_factories
+                .write()
+                .map_err(|_| RegistryError::Locked)?;
             factories.clear();
         }
 
         {
-            let mut metadata = self.component_metadata.write().map_err(|_| RegistryError::Locked)?;
+            let mut metadata = self
+                .component_metadata
+                .write()
+                .map_err(|_| RegistryError::Locked)?;
             metadata.clear();
         }
 
         {
-            let mut dependencies = self.dependencies.write().map_err(|_| RegistryError::Locked)?;
+            let mut dependencies = self
+                .dependencies
+                .write()
+                .map_err(|_| RegistryError::Locked)?;
             dependencies.clear();
         }
 
@@ -580,9 +648,17 @@ impl ServiceRegistry {
 macro_rules! impl_component_factory {
     ($component_type:ty, $config_type:ty, $constructor:expr) => {
         impl $crate::components::registry::ComponentFactory for $component_type {
-            fn create(&self, config: serde_json::Value, registry: &$crate::ServiceRegistry) -> Result<Box<dyn std::any::Any + Send + Sync>, $crate::components::registry::RegistryError> {
-                let config: $config_type = serde_json::from_value(config)
-                    .map_err(|e| $crate::components::registry::RegistryError::Configuration(e.to_string()))?;
+            fn create(
+                &self,
+                config: serde_json::Value,
+                registry: &$crate::ServiceRegistry,
+            ) -> Result<
+                Box<dyn std::any::Any + Send + Sync>,
+                $crate::components::registry::RegistryError,
+            > {
+                let config: $config_type = serde_json::from_value(config).map_err(|e| {
+                    $crate::components::registry::RegistryError::Configuration(e.to_string())
+                })?;
 
                 let component = $constructor(config, registry)?;
                 Ok(Box::new(component))

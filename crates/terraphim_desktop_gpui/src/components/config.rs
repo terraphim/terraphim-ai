@@ -2,7 +2,6 @@
 ///
 /// This module provides the ComponentConfig trait and supporting types
 /// for configuration-driven component customization.
-
 use std::any::Any;
 use std::collections::HashMap;
 use std::fmt::Debug;
@@ -39,18 +38,19 @@ pub trait ComponentConfig: Debug + Send + Sync + 'static {
         Self: Sized;
 
     /// Serialize to JSON
-    fn to_json(&self) -> Result<String, ConfigError> {
-        serde_json::to_string(self)
-            .map_err(|e| ConfigError::Serialization(e.to_string()))
+    fn to_json(&self) -> Result<String, ConfigError>
+    where
+        Self: Serialize,
+    {
+        serde_json::to_string(self).map_err(|e| ConfigError::Serialization(e.to_string()))
     }
 
     /// Deserialize from JSON
     fn from_json(json: &str) -> Result<Self, ConfigError>
     where
-        Self: Sized,
+        Self: Sized + for<'de> Deserialize<'de>,
     {
-        serde_json::from_str(json)
-            .map_err(|e| ConfigError::Serialization(e.to_string()))
+        serde_json::from_str(json).map_err(|e| ConfigError::Serialization(e.to_string()))
     }
 
     /// Check if configuration is equal to another (ignoring irrelevant fields)
@@ -62,7 +62,10 @@ pub trait ComponentConfig: Debug + Send + Sync + 'static {
         use std::hash::{Hash, Hasher};
 
         let mut hasher = DefaultHasher::new();
-        self.to_map().hash(&mut hasher);
+        for (k, v) in self.to_map().iter() {
+            k.hash(&mut hasher);
+            v.hash(&mut hasher);
+        }
         hasher.finish()
     }
 
@@ -334,7 +337,11 @@ impl ConfigSchema {
     }
 
     /// Validate individual field value
-    fn validate_field_value(&self, field: &ConfigField, value: &ConfigValue) -> Result<(), ConfigError> {
+    fn validate_field_value(
+        &self,
+        field: &ConfigField,
+        value: &ConfigValue,
+    ) -> Result<(), ConfigError> {
         // Type validation
         if !self.is_type_compatible(&field.field_type, value) {
             return Err(ConfigError::TypeMismatch {
@@ -370,23 +377,29 @@ impl ConfigSchema {
     }
 
     /// Apply validation rule to value
-    fn apply_validation_rule(&self, rule: &ValidationRule, value: &ConfigValue) -> Result<(), ConfigError> {
+    fn apply_validation_rule(
+        &self,
+        rule: &ValidationRule,
+        value: &ConfigValue,
+    ) -> Result<(), ConfigError> {
         match rule {
             ValidationRule::MinValue(min) => {
                 if let Some(num) = value.as_float() {
                     if num < *min {
-                        return Err(ConfigError::Validation(
-                            format!("Value {} is below minimum {}", num, min)
-                        ));
+                        return Err(ConfigError::Validation(format!(
+                            "Value {} is below minimum {}",
+                            num, min
+                        )));
                     }
                 }
             }
             ValidationRule::MaxValue(max) => {
                 if let Some(num) = value.as_float() {
                     if num > *max {
-                        return Err(ConfigError::Validation(
-                            format!("Value {} is above maximum {}", num, max)
-                        ));
+                        return Err(ConfigError::Validation(format!(
+                            "Value {} is above maximum {}",
+                            num, max
+                        )));
                     }
                 }
             }
@@ -399,9 +412,10 @@ impl ConfigSchema {
                 };
 
                 if length < *min {
-                    return Err(ConfigError::Validation(
-                        format!("Length {} is below minimum {}", length, min)
-                    ));
+                    return Err(ConfigError::Validation(format!(
+                        "Length {} is below minimum {}",
+                        length, min
+                    )));
                 }
             }
             ValidationRule::MaxLength(max) => {
@@ -413,9 +427,10 @@ impl ConfigSchema {
                 };
 
                 if length > *max {
-                    return Err(ConfigError::Validation(
-                        format!("Length {} is above maximum {}", length, max)
-                    ));
+                    return Err(ConfigError::Validation(format!(
+                        "Length {} is above maximum {}",
+                        length, max
+                    )));
                 }
             }
             ValidationRule::Pattern(pattern) => {
@@ -423,17 +438,19 @@ impl ConfigSchema {
                     let regex = regex::Regex::new(pattern)
                         .map_err(|e| ConfigError::Validation(format!("Invalid regex: {}", e)))?;
                     if !regex.is_match(s) {
-                        return Err(ConfigError::Validation(
-                            format!("Value '{}' doesn't match pattern '{}'", s, pattern)
-                        ));
+                        return Err(ConfigError::Validation(format!(
+                            "Value '{}' doesn't match pattern '{}'",
+                            s, pattern
+                        )));
                     }
                 }
             }
             ValidationRule::Enum(allowed) => {
                 if !allowed.contains(value) {
-                    return Err(ConfigError::Validation(
-                        format!("Value {:?} not in allowed enum values: {:?}", value, allowed)
-                    ));
+                    return Err(ConfigError::Validation(format!(
+                        "Value {:?} not in allowed enum values: {:?}",
+                        value, allowed
+                    )));
                 }
             }
             ValidationRule::NotNull => {
@@ -444,7 +461,10 @@ impl ConfigSchema {
             ValidationRule::Url => {
                 if let Some(s) = value.as_string() {
                     if url::Url::parse(s).is_err() {
-                        return Err(ConfigError::Validation(format!("'{}' is not a valid URL", s)));
+                        return Err(ConfigError::Validation(format!(
+                            "'{}' is not a valid URL",
+                            s
+                        )));
                     }
                 }
             }
@@ -452,14 +472,20 @@ impl ConfigSchema {
                 if let Some(s) = value.as_string() {
                     // Simple email validation
                     if !s.contains('@') || !s.contains('.') {
-                        return Err(ConfigError::Validation(format!("'{}' is not a valid email", s)));
+                        return Err(ConfigError::Validation(format!(
+                            "'{}' is not a valid email",
+                            s
+                        )));
                     }
                 }
             }
             ValidationRule::FilePath => {
                 if let Some(s) = value.as_string() {
                     if std::path::Path::new(s).components().next().is_none() {
-                        return Err(ConfigError::Validation(format!("'{}' is not a valid file path", s)));
+                        return Err(ConfigError::Validation(format!(
+                            "'{}' is not a valid file path",
+                            s
+                        )));
                     }
                 }
             }
@@ -476,13 +502,16 @@ impl ConfigSchema {
 /// Default configuration trait for simple configurations
 pub trait DefaultConfig: ComponentConfig {
     /// Get default values as a map
-    fn default_values() -> HashMap<String, ConfigValue> {
+    fn default_values() -> HashMap<String, ConfigValue>
+    where
+        Self: Sized,
+    {
         Self::default().to_map()
     }
 }
 
 /// Mergeable configuration trait for combining configurations
-pub trait MergeableConfig: ComponentConfig + Sized {
+pub trait MergeableConfig: ComponentConfig + Clone + Sized {
     /// Merge with another configuration, preferring self values
     fn merge_preferences(&self, other: &Self) -> Self {
         self.merge(other).unwrap_or_else(|_| self.clone())

@@ -8,7 +8,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use gpui::*;
-use gpui::prelude::FluentBuilder;
+use gpui::prelude::{FluentBuilder, StatefulInteractiveElement};
 use gpui_component::button::*;
 use gpui_component::input::{Input, InputEvent, InputState};
 use gpui_component::{IconName, StyledExt};

@@ -2,14 +2,13 @@
 ///
 /// This module provides comprehensive performance tracking capabilities
 /// for components including metrics collection, analysis, and alerting.
-
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
-use tokio::sync::mpsc;
 use thiserror::Error;
+use tokio::sync::mpsc;
 
 use crate::components::ComponentError;
 
@@ -101,9 +100,9 @@ impl Default for AlertConfig {
         Self {
             enabled: true,
             response_time_threshold: 100, // 100ms
-            cpu_threshold: 80.0, // 80%
-            memory_threshold: 80.0, // 80%
-            error_rate_threshold: 5.0, // 5%
+            cpu_threshold: 80.0,          // 80%
+            memory_threshold: 80.0,       // 80%
+            error_rate_threshold: 5.0,    // 5%
             alert_cooldown: Duration::from_secs(30),
         }
     }
@@ -388,7 +387,8 @@ impl PerformanceTracker {
         {
             let mut metrics = self.metrics.write().unwrap();
             metrics.operations_in_progress += 1;
-            metrics.peak_concurrent_operations = metrics.peak_concurrent_operations
+            metrics.peak_concurrent_operations = metrics
+                .peak_concurrent_operations
                 .max(metrics.operations_in_progress);
         }
 
@@ -406,7 +406,8 @@ impl PerformanceTracker {
         let cutoff = now - duration;
 
         let history = self.history.read().unwrap();
-        let recent_snapshots: Vec<_> = history.iter()
+        let recent_snapshots: Vec<_> = history
+            .iter()
             .filter(|snapshot| snapshot.timestamp >= cutoff)
             .collect();
 
@@ -424,19 +425,24 @@ impl PerformanceTracker {
 
             if let Some(min_time) = snapshot.metrics.min_response_time {
                 aggregated.min_response_time = Some(
-                    aggregated.min_response_time.map_or(min_time, |m| m.min(min_time))
+                    aggregated
+                        .min_response_time
+                        .map_or(min_time, |m| m.min(min_time)),
                 );
             }
 
             if let Some(max_time) = snapshot.metrics.max_response_time {
                 aggregated.max_response_time = Some(
-                    aggregated.max_response_time.map_or(max_time, |m| m.max(max_time))
+                    aggregated
+                        .max_response_time
+                        .map_or(max_time, |m| m.max(max_time)),
                 );
             }
         }
 
         if aggregated.operation_count > 0 {
-            aggregated.avg_response_time = aggregated.total_response_time as f64 / aggregated.operation_count as f64;
+            aggregated.avg_response_time =
+                aggregated.total_response_time as f64 / aggregated.operation_count as f64;
         }
 
         // Use the latest snapshot for current resource usage
@@ -456,7 +462,8 @@ impl PerformanceTracker {
         let cutoff = now - period;
 
         let history = self.history.read().unwrap();
-        let recent_snapshots: Vec<_> = history.iter()
+        let recent_snapshots: Vec<_> = history
+            .iter()
             .filter(|snapshot| snapshot.timestamp >= cutoff)
             .collect();
 
@@ -467,20 +474,27 @@ impl PerformanceTracker {
         let mut trends = Vec::new();
 
         // Analyze response time trend
-        let response_times: Vec<f64> = recent_snapshots.iter()
+        let response_times: Vec<f64> = recent_snapshots
+            .iter()
             .map(|s| s.metrics.avg_response_time)
             .collect();
 
-        if let Some(trend) = self.calculate_trend(&response_times, TrendType::ResponseTime, period) {
+        if let Some(trend) = self.calculate_trend(&response_times, TrendType::ResponseTime, period)
+        {
             trends.push(trend);
         }
 
         // Analyze throughput trend (operations per second)
-        let throughput: Vec<f64> = recent_snapshots.windows(2)
+        let throughput: Vec<f64> = recent_snapshots
+            .windows(2)
             .map(|window| {
-                let time_diff = window[1].timestamp.duration_since(window[0].timestamp).as_secs_f64();
+                let time_diff = window[1]
+                    .timestamp
+                    .duration_since(window[0].timestamp)
+                    .as_secs_f64();
                 if time_diff > 0.0 {
-                    (window[1].metrics.operation_count - window[0].metrics.operation_count) as f64 / time_diff
+                    (window[1].metrics.operation_count - window[0].metrics.operation_count) as f64
+                        / time_diff
                 } else {
                     0.0
                 }
@@ -495,7 +509,12 @@ impl PerformanceTracker {
     }
 
     /// Calculate trend from data series
-    fn calculate_trend(&self, data: &[f64], trend_type: TrendType, period: Duration) -> Option<PerformanceTrend> {
+    fn calculate_trend(
+        &self,
+        data: &[f64],
+        trend_type: TrendType,
+        period: Duration,
+    ) -> Option<PerformanceTrend> {
         if data.len() < 2 {
             return None;
         }
@@ -543,7 +562,9 @@ impl PerformanceTracker {
 
     /// Get active alerts
     pub fn active_alerts(&self) -> Vec<PerformanceAlert> {
-        self.alerts.read().unwrap()
+        self.alerts
+            .read()
+            .unwrap()
             .iter()
             .filter(|alert| alert.active)
             .cloned()
@@ -576,7 +597,9 @@ impl PerformanceTracker {
         let mut new_alerts = Vec::new();
 
         // Check response time threshold
-        if metrics.avg_response_time > self.alert_config.response_time_threshold as f64 * 1_000_000.0 {
+        if metrics.avg_response_time
+            > self.alert_config.response_time_threshold as f64 * 1_000_000.0
+        {
             new_alerts.push(PerformanceAlert {
                 alert_type: AlertType::HighResponseTime,
                 severity: AlertSeverity::Warning,
@@ -603,13 +626,15 @@ impl PerformanceTracker {
                 severity: AlertSeverity::Warning,
                 message: format!(
                     "Memory usage {:.1}% exceeds threshold {:.1}%",
-                    metrics.memory_usage_percent,
-                    self.alert_config.memory_threshold
+                    metrics.memory_usage_percent, self.alert_config.memory_threshold
                 ),
                 timestamp: now,
                 trigger_metrics: {
                     let mut trigger = HashMap::new();
-                    trigger.insert("memory_usage_percent".to_string(), metrics.memory_usage_percent);
+                    trigger.insert(
+                        "memory_usage_percent".to_string(),
+                        metrics.memory_usage_percent,
+                    );
                     trigger
                 },
                 id: format!("high_memory_{}", now.elapsed().as_millis()),
@@ -619,15 +644,15 @@ impl PerformanceTracker {
 
         // Check error rate threshold
         if metrics.operation_count > 0 {
-            let error_rate = (metrics.failure_count as f64 / metrics.operation_count as f64) * 100.0;
+            let error_rate =
+                (metrics.failure_count as f64 / metrics.operation_count as f64) * 100.0;
             if error_rate > self.alert_config.error_rate_threshold {
                 new_alerts.push(PerformanceAlert {
                     alert_type: AlertType::HighErrorRate,
                     severity: AlertSeverity::Error,
                     message: format!(
                         "Error rate {:.1}% exceeds threshold {:.1}%",
-                        error_rate,
-                        self.alert_config.error_rate_threshold
+                        error_rate, self.alert_config.error_rate_threshold
                     ),
                     timestamp: now,
                     trigger_metrics: {
@@ -647,16 +672,18 @@ impl PerformanceTracker {
             for new_alert in new_alerts {
                 // Check if similar alert already exists and is active
                 let exists = alerts.iter().any(|alert| {
-                    alert.active &&
-                    alert.alert_type == new_alert.alert_type &&
-                    now.duration_since(alert.timestamp) < self.alert_config.alert_cooldown
+                    alert.active
+                        && alert.alert_type == new_alert.alert_type
+                        && now.duration_since(alert.timestamp) < self.alert_config.alert_cooldown
                 });
 
                 if !exists {
                     alerts.push(new_alert.clone());
 
                     // Send update notification
-                    let _ = self.update_tx.send(PerformanceUpdate::AlertTriggered(new_alert));
+                    let _ = self
+                        .update_tx
+                        .send(PerformanceUpdate::AlertTriggered(new_alert));
                 }
             }
         }
@@ -693,7 +720,9 @@ impl PerformanceTracker {
         self.check_alerts(&snapshot.metrics);
 
         // Send update notification
-        let _ = self.update_tx.send(PerformanceUpdate::MetricsUpdated(snapshot.metrics));
+        let _ = self
+            .update_tx
+            .send(PerformanceUpdate::MetricsUpdated(snapshot.metrics));
     }
 
     /// Collect system metrics
@@ -705,8 +734,8 @@ impl PerformanceTracker {
             cpu_percent: 0.0, // Would be collected from system
             memory_bytes: 0,  // Would be collected from system
             memory_percent: 0.0,
-            thread_count: 1,  // Would be collected from system
-            open_fds: 0,      // Would be collected from system
+            thread_count: 1, // Would be collected from system
+            open_fds: 0,     // Would be collected from system
             network_bytes_sent: 0,
             network_bytes_received: 0,
         }
@@ -760,15 +789,20 @@ impl OperationTimer {
 
         // Update min/max response times
         metrics.min_response_time = Some(
-            metrics.min_response_time.map_or(duration_nanos, |min| min.min(duration_nanos))
+            metrics
+                .min_response_time
+                .map_or(duration_nanos, |min| min.min(duration_nanos)),
         );
         metrics.max_response_time = Some(
-            metrics.max_response_time.map_or(duration_nanos, |max| max.max(duration_nanos))
+            metrics
+                .max_response_time
+                .map_or(duration_nanos, |max| max.max(duration_nanos)),
         );
 
         // Update average response time
         if metrics.operation_count > 0 {
-            metrics.avg_response_time = metrics.total_response_time as f64 / metrics.operation_count as f64;
+            metrics.avg_response_time =
+                metrics.total_response_time as f64 / metrics.operation_count as f64;
         }
 
         metrics.operations_in_progress = metrics.operations_in_progress.saturating_sub(1);
@@ -792,15 +826,20 @@ impl OperationTimer {
 
         // Update min/max response times
         metrics.min_response_time = Some(
-            metrics.min_response_time.map_or(duration_nanos, |min| min.min(duration_nanos))
+            metrics
+                .min_response_time
+                .map_or(duration_nanos, |min| min.min(duration_nanos)),
         );
         metrics.max_response_time = Some(
-            metrics.max_response_time.map_or(duration_nanos, |max| max.max(duration_nanos))
+            metrics
+                .max_response_time
+                .map_or(duration_nanos, |max| max.max(duration_nanos)),
         );
 
         // Update average response time
         if metrics.operation_count > 0 {
-            metrics.avg_response_time = metrics.total_response_time as f64 / metrics.operation_count as f64;
+            metrics.avg_response_time =
+                metrics.total_response_time as f64 / metrics.operation_count as f64;
         }
 
         metrics.operations_in_progress = metrics.operations_in_progress.saturating_sub(1);

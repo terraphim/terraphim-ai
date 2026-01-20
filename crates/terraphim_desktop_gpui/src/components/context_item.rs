@@ -1,10 +1,13 @@
+use chrono::{DateTime, Utc};
 use gpui::*;
+use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use ulid::Ulid;
-use chrono::{DateTime, Utc};
-use serde::{Deserialize, Serialize};
 
-use crate::components::{ReusableComponent, ComponentConfig, PerformanceTracker, ComponentError, ViewContext, LifecycleEvent, ServiceRegistry};
+use crate::components::{
+    ComponentConfig, ComponentError, LifecycleEvent, PerformanceTracker, ReusableComponent,
+    ServiceRegistry, ViewContext,
+};
 use terraphim_types::{ContextItem, ContextType};
 
 /// Configuration for context item component
@@ -338,4 +341,3 @@ impl ContextItemComponent {
         }
     }
 }
-

@@ -1,13 +1,12 @@
+use gpui::*;
+use serde::{Deserialize, Serialize};
 /// GPUI-Aligned Component System
 ///
 /// Simplified component patterns aligned with gpui-component best practices.
 /// Focuses on stateless RenderOnce components, Theme support, and practical reusability.
 /// Based on analysis of longbridge/gpui-component patterns.
-
 use std::any::Any;
 use std::marker::PhantomData;
-use gpui::*;
-use serde::{Deserialize, Serialize};
 
 /// Core component trait aligned with GPUI patterns
 ///
@@ -106,7 +105,11 @@ pub trait StatelessComponent: 'static + Send + Sync {
     fn component_name() -> &'static str;
 
     /// Render the component (stateless)
-    fn render(config: &Self::Config, window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement;
+    fn render(
+        config: &Self::Config,
+        window: &mut Window,
+        cx: &mut Context<Self>,
+    ) -> impl IntoElement;
 }
 
 /// Wrapper for stateless components
@@ -248,11 +251,7 @@ pub mod utils {
 
     /// Create a conditional class name
     pub fn conditional_class(condition: bool, class_name: &str) -> Option<&'static str> {
-        if condition {
-            Some(class_name)
-        } else {
-            None
-        }
+        if condition { Some(class_name) } else { None }
     }
 
     /// Generate test ID for component
@@ -348,7 +347,10 @@ mod tests {
 
     #[test]
     fn test_test_id_generation() {
-        assert_eq!(utils::test_id("button", Some("submit")), Some("button-submit".to_string()));
+        assert_eq!(
+            utils::test_id("button", Some("submit")),
+            Some("button-submit".to_string())
+        );
         assert_eq!(utils::test_id("input", None), Some("input".to_string()));
     }
 }

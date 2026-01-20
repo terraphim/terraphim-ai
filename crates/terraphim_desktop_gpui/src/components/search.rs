@@ -1,13 +1,12 @@
+use gpui::prelude::FluentBuilder;
+use gpui::*;
+use serde::{Deserialize, Serialize};
 /// Enhanced Search Component with Autocomplete
 ///
 /// This module provides a high-performance, GPUI-aligned search component
 /// with full autocomplete integration, replacing the complex ReusableComponent system.
 /// Built on gpui-component best practices with stateless RenderOnce patterns.
-
 use std::time::Instant;
-use gpui::*;
-use gpui::prelude::FluentBuilder;
-use serde::{Deserialize, Serialize};
 
 use crate::autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
 use crate::search_service::SearchResults;
@@ -85,14 +84,34 @@ impl GpuiComponentConfig for SearchConfig {
 
     fn merge_with(&self, other: &Self) -> Self {
         Self {
-            placeholder: if !other.placeholder.is_empty() { other.placeholder.clone() } else { self.placeholder.clone() },
-            max_results: if other.max_results != 50 { other.max_results } else { self.max_results },
-            max_autocomplete_suggestions: if other.max_autocomplete_suggestions != 10 { other.max_autocomplete_suggestions } else { self.max_autocomplete_suggestions },
+            placeholder: if !other.placeholder.is_empty() {
+                other.placeholder.clone()
+            } else {
+                self.placeholder.clone()
+            },
+            max_results: if other.max_results != 50 {
+                other.max_results
+            } else {
+                self.max_results
+            },
+            max_autocomplete_suggestions: if other.max_autocomplete_suggestions != 10 {
+                other.max_autocomplete_suggestions
+            } else {
+                self.max_autocomplete_suggestions
+            },
             show_suggestions: other.show_suggestions,
             auto_search: other.auto_search,
-            autocomplete_debounce_ms: if other.autocomplete_debounce_ms != 200 { other.autocomplete_debounce_ms } else { self.autocomplete_debounce_ms },
+            autocomplete_debounce_ms: if other.autocomplete_debounce_ms != 200 {
+                other.autocomplete_debounce_ms
+            } else {
+                self.autocomplete_debounce_ms
+            },
             enable_fuzzy_search: other.enable_fuzzy_search,
-            min_autocomplete_chars: if other.min_autocomplete_chars != 2 { other.min_autocomplete_chars } else { self.min_autocomplete_chars },
+            min_autocomplete_chars: if other.min_autocomplete_chars != 2 {
+                other.min_autocomplete_chars
+            } else {
+                self.min_autocomplete_chars
+            },
             common_props: self.common_props.merge_with(&other.common_props),
         }
     }
@@ -255,8 +274,8 @@ impl SearchComponent {
         let query = self.state.query.clone();
 
         // Validate query
-        let sanitized_query = validate_search_query(&query)
-            .map_err(|e| format!("Invalid query: {}", e))?;
+        let sanitized_query =
+            validate_search_query(&query).map_err(|e| format!("Invalid query: {}", e))?;
 
         if sanitized_query.is_empty() {
             return Ok(SearchResults {
@@ -365,7 +384,9 @@ impl SearchComponent {
 
         // Check if we should debounce
         if let Some(last_time) = self.debounce_timer {
-            if now.duration_since(last_time).as_millis() < self.config.autocomplete_debounce_ms as u128 {
+            if now.duration_since(last_time).as_millis()
+                < self.config.autocomplete_debounce_ms as u128
+            {
                 return; // Skip due to debouncing
             }
         }
@@ -414,7 +435,10 @@ impl SearchComponent {
     }
 
     /// Handle autocomplete request (synchronous)
-    fn handle_autocomplete_request(&mut self, query: String) -> Result<Vec<AutocompleteSuggestion>, String> {
+    fn handle_autocomplete_request(
+        &mut self,
+        query: String,
+    ) -> Result<Vec<AutocompleteSuggestion>, String> {
         if let Some(engine) = &self.autocomplete_engine {
             // Use real autocomplete engine (synchronous)
             let suggestions = engine.autocomplete(&query, self.config.max_autocomplete_suggestions);
@@ -481,7 +505,7 @@ impl GpuiComponent for SearchComponent {
                         div()
                             .text_color(gpui::rgb(0x737373))
                             .text_lg()
-                            .child("🔍")
+                            .child("Search"),
                     )
                     .child(
                         // Search input
@@ -496,35 +520,25 @@ impl GpuiComponent for SearchComponent {
                                         .bg(gpui::white())
                                         .border_0()
                                         .text_color(gpui::black())
-                                        .child(
-                                            if self.state.query.is_empty() {
-                                                div()
-                                                    .text_color(gpui::rgb(0x9ca3af))
-                                                    .child(self.config.placeholder.clone())
-                                            } else {
-                                                div()
-                                                    .text_color(gpui::black())
-                                                    .child(self.state.query.clone())
-                                            }
-                                        )
+                                        .child(if self.state.query.is_empty() {
+                                            div()
+                                                .text_color(gpui::rgb(0x9ca3af))
+                                                .child(self.config.placeholder.clone())
+                                        } else {
+                                            div()
+                                                .text_color(gpui::black())
+                                                .child(self.state.query.clone())
+                                        }),
                                 )
                             })
                             .when(is_loading, |this| {
                                 this.child(
-                                    div()
-                                        .text_color(gpui::rgb(0x737373))
-                                        .child("Searching...")
+                                    div().text_color(gpui::rgb(0x737373)).child("Searching..."),
                                 )
-                            })
+                            }),
                     )
                     .when(has_error, |this| {
-                        this.child(
-                            div()
-                                .text_color(gpui::red())
-                                .text_sm()
-                                .px_2()
-                                .child("⚠️")
-                        )
+                        this.child(div().text_color(gpui::red()).text_sm().px_2().child("⚠️"))
                     })
                     .when(is_autocomplete_loading, |this| {
                         this.child(
@@ -532,12 +546,14 @@ impl GpuiComponent for SearchComponent {
                                 .text_color(gpui::rgb(0x737373))
                                 .text_sm()
                                 .px_2()
-                                .child("⏳")
+                                .child("⏳"),
                         )
-                    })
+                    }),
             )
             .when(
-                self.config.show_suggestions && self.state.show_dropdown && !self.state.autocomplete_suggestions.is_empty(),
+                self.config.show_suggestions
+                    && self.state.show_dropdown
+                    && !self.state.autocomplete_suggestions.is_empty(),
                 |this| {
                     this.child(
                         // Autocomplete suggestions dropdown
@@ -555,58 +571,69 @@ impl GpuiComponent for SearchComponent {
                             .max_h_80()
                             // Note: overflow_y_scroll and z_10 not available in GPUI 0.2.2
                             .children(
-                                self.state.autocomplete_suggestions.iter().enumerate().map(|(index, suggestion)| {
-                                    let is_selected = self.state.selected_suggestion_index == Some(index);
-                                    let suggestion_term = suggestion.term.clone();
-                                    let suggestion_from_kg = suggestion.from_kg;
-                                    let suggestion_score = suggestion.score;
-                                    let suggestion_definition = suggestion.definition.clone();
+                                self.state
+                                    .autocomplete_suggestions
+                                    .iter()
+                                    .enumerate()
+                                    .map(|(index, suggestion)| {
+                                        let is_selected =
+                                            self.state.selected_suggestion_index == Some(index);
+                                        let suggestion_term = suggestion.term.clone();
+                                        let suggestion_from_kg = suggestion.from_kg;
+                                        let suggestion_score = suggestion.score;
+                                        let suggestion_definition = suggestion.definition.clone();
 
-                                    div()
-                                        // Note: key() not available in GPUI 0.2.2
-                                        .flex()
-                                        .items_center()
-                                        .px_3()
-                                        .py_2()
-                                        .cursor_pointer()
-                                        .hover(|this| this.bg(gpui::rgb(0xf3f4f6)))
-                                        .when(is_selected, |this| {
-                                            this.bg(gpui::blue()) // Simplified - no alpha in GPUI 0.2.2
-                                        })
-                                        .child(
-                                            // Suggestion icon/indicator
-                                            div()
-                                                .mr_2()
-                                                .text_color(gpui::rgb(0x737373))
-                                                .child(if suggestion_from_kg { "📚" } else { "💡" })
-                                        )
-                                        .child(
-                                            // Suggestion text
-                                            div()
-                                                .flex_1()
-                                                .child(
-                                                    div()
-                                                        .text_color(gpui::black())
-                                                        .child(suggestion_term)
-                                                )
-                                                .when(suggestion_definition.is_some(), |this| {
-                                                    this.child(
+                                        div()
+                                            // Note: key() not available in GPUI 0.2.2
+                                            .flex()
+                                            .items_center()
+                                            .px_3()
+                                            .py_2()
+                                            .cursor_pointer()
+                                            .hover(|this| this.bg(gpui::rgb(0xf3f4f6)))
+                                            .when(is_selected, |this| {
+                                                this.bg(gpui::blue()) // Simplified - no alpha in GPUI 0.2.2
+                                            })
+                                            .child(
+                                                // Suggestion icon/indicator
+                                                div().mr_2().text_color(gpui::rgb(0x737373)).child(
+                                                    if suggestion_from_kg { "KG" } else { "Tip" },
+                                                ),
+                                            )
+                                            .child(
+                                                // Suggestion text
+                                                div()
+                                                    .flex_1()
+                                                    .child(
                                                         div()
-                                                            .text_color(gpui::rgb(0x737373))
-                                                            .child(suggestion_definition.unwrap_or_default())
+                                                            .text_color(gpui::black())
+                                                            .child(suggestion_term),
                                                     )
-                                                })
-                                        )
-                                        .child(
-                                            // Score indicator
-                                            div()
-                                                .text_color(gpui::rgb(0x737373))
-                                                .child(format!("{:.1}", suggestion_score))
-                                        )
-                                }).collect::<Vec<_>>()
-                            )
+                                                    .when(
+                                                        suggestion_definition.is_some(),
+                                                        |this| {
+                                                            this.child(
+                                                                div()
+                                                                    .text_color(gpui::rgb(0x737373))
+                                                                    .child(
+                                                                        suggestion_definition
+                                                                            .unwrap_or_default(),
+                                                                    ),
+                                                            )
+                                                        },
+                                                    ),
+                                            )
+                                            .child(
+                                                // Score indicator
+                                                div()
+                                                    .text_color(gpui::rgb(0x737373))
+                                                    .child(format!("{:.1}", suggestion_score)),
+                                            )
+                                    })
+                                    .collect::<Vec<_>>(),
+                            ),
                     )
-                }
+                },
             )
     }
 
@@ -853,15 +880,13 @@ mod tests {
         let mut component = SearchComponent::new(config);
 
         // Add mock suggestions
-        component.state.autocomplete_suggestions = vec![
-            AutocompleteSuggestion {
-                term: "suggestion1".to_string(),
-                score: 0.9,
-                source: "test".to_string(),
-                context: None,
-                metadata: None,
-            },
-        ];
+        component.state.autocomplete_suggestions = vec![AutocompleteSuggestion {
+            term: "suggestion1".to_string(),
+            score: 0.9,
+            source: "test".to_string(),
+            context: None,
+            metadata: None,
+        }];
 
         // Select valid suggestion
         assert!(component.select_suggestion(0));

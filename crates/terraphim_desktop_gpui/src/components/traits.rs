@@ -3,7 +3,6 @@
 /// This module defines the foundational trait that all reusable components
 /// must implement, providing standardized lifecycle management, configuration,
 /// and performance monitoring capabilities.
-
 use std::any::Any;
 use std::fmt::Debug;
 use std::sync::Arc;
@@ -12,8 +11,8 @@ use std::time::{Duration, Instant};
 use gpui::*;
 use serde::{Deserialize, Serialize};
 
-use crate::components::{ComponentConfig, PerformanceTracker};
 use super::registry::ServiceRegistry;
+use crate::components::{ComponentConfig, PerformanceTracker};
 
 /// Import GPUI types we need
 pub type ViewContext<'a, T> = gpui::Context<'a, T>;
@@ -66,7 +65,11 @@ pub trait ReusableComponent: 'static + Send + Sync + Debug + Sized {
     fn unmount(&mut self, cx: &mut ViewContext<Self>) -> Result<(), ComponentError>;
 
     /// Handle component lifecycle events
-    fn handle_lifecycle_event(&mut self, event: LifecycleEvent, cx: &mut ViewContext<Self>) -> Result<(), ComponentError>;
+    fn handle_lifecycle_event(
+        &mut self,
+        event: LifecycleEvent,
+        cx: &mut ViewContext<Self>,
+    ) -> Result<(), ComponentError>;
 
     /// Check if component is currently mounted/active
     fn is_mounted(&self) -> bool;
@@ -357,8 +360,9 @@ impl<C: ReusableComponent> DefaultComponentBuilder<C> {
     }
 
     pub fn build(self) -> Result<C, ComponentError> {
-        let config = self.config
-            .ok_or_else(|| ComponentError::Configuration("No configuration provided".to_string()))?;
+        let config = self.config.ok_or_else(|| {
+            ComponentError::Configuration("No configuration provided".to_string())
+        })?;
 
         let mut component = C::init(config);
 

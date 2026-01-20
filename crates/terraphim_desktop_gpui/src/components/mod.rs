@@ -1,14 +1,12 @@
+pub mod config;
+pub mod registry;
+pub mod simple_search;
+
 /// Reusable components module for Terraphim GPUI
 ///
 /// This module provides high-performance, fully-tested reusable components
 /// built on the ReusableComponent trait architecture.
-
 pub mod traits;
-pub mod registry;
-pub mod config;
-pub mod gpui_aligned;
-pub mod simple_search;
-// pub mod performance;  // Commented out for demo (compilation errors)
 // pub mod testing;      // Commented out for demo (compilation errors)
 pub mod search;
 // pub mod search_services;  // Commented out for demo (compilation errors)
@@ -33,12 +31,11 @@ pub mod context_item;
 // pub mod performance_benchmark;
 // pub mod optimization_integration;
 
-pub use traits::*;
-pub use registry::*;
 pub use config::*;
-pub use gpui_aligned::*;
+pub use performance::*;
+pub use registry::*;
 pub use simple_search::*;
-// pub use performance::*;  // Commented out for demo
+pub use traits::*;
 // pub use testing::*;      // Commented out for demo
 pub use search::*;
 // pub use search_services::*;  // Commented out for demo
