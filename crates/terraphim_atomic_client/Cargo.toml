@@ -7,7 +7,7 @@ license = "MIT"
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12.5", features = ["json", "rustls-tls"], default-features = false, optional = true }
+reqwest = { version = "0.12.28", features = ["json", "rustls-tls"], default-features = false, optional = true }
 web-sys = { version = "0.3.69", features = ["Request", "RequestInit", "RequestMode", "Response", "Headers", "Window"], optional = true }
 hex = "0.4"
 base64 = "0.22.1"
