@@ -18,7 +18,6 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use opendal::layers::LoggingLayer;
 use opendal::services;
 use opendal::Operator;
 use opendal::Result as OpendalResult;
@@ -131,12 +130,13 @@ fn ensure_sqlite_table_exists(connection_string: &str, table_name: &str) -> Resu
 }
 
 /// Create a memory operator as fallback
+///
+/// Note: LoggingLayer is intentionally not added to avoid WARN-level logs
+/// for expected NotFound errors on first startup (config file doesn't exist yet).
 #[allow(clippy::result_large_err)]
 fn create_memory_operator() -> OpendalResult<Operator> {
     let builder = services::Memory::default();
-    Ok(Operator::new(builder)?
-        .layer(LoggingLayer::default())
-        .finish())
+    Ok(Operator::new(builder)?.finish())
 }
 
 pub async fn parse_profile(
@@ -193,11 +193,9 @@ pub async fn parse_profile(
                 })?;
             }
             let builder = services::Dashmap::default();
-            // Init an operator
-            Operator::new(builder)?
-                // Init with logging layer enabled.
-                .layer(LoggingLayer::default())
-                .finish()
+            // Note: LoggingLayer is intentionally not added to avoid WARN-level logs
+            // for expected NotFound errors on first startup (config file doesn't exist yet).
+            Operator::new(builder)?.finish()
         }
         // atomicserver feature removed in opendal 0.54
         Scheme::Atomicserver => {
@@ -403,7 +401,7 @@ mod tests {
         };
 
         // Save the object
-        test_obj.save_to_one("memory").await?;
+        test_obj.save_to_one("dashmap").await?;
 
         // Load the object
         let mut loaded_obj = TestStruct::new("Test Object".to_string());
@@ -457,10 +455,14 @@ mod tests {
         // Create test settings with rocksdb profile
         let mut profiles = std::collections::HashMap::new();
 
-        // Memory profile (needed as fastest operator fallback)
-        let mut memory_profile = std::collections::HashMap::new();
-        memory_profile.insert("type".to_string(), "memory".to_string());
-        profiles.insert("memory".to_string(), memory_profile);
+        // DashMap profile (needed as fastest operator fallback)
+        let mut dashmap_profile = std::collections::HashMap::new();
+        dashmap_profile.insert("type".to_string(), "dashmap".to_string());
+        dashmap_profile.insert(
+            "root".to_string(),
+            temp_dir.path().join("dashmap").to_string_lossy().to_string(),
+        );
+        profiles.insert("dashmap".to_string(), dashmap_profile);
 
         // RocksDB profile for testing
         let mut rocksdb_profile = std::collections::HashMap::new();
@@ -506,27 +508,27 @@ mod tests {
         Ok(())
     }
 
-    /// Test saving and loading a struct to memory profile
+    /// Test saving and loading a struct to dashmap profile
     #[tokio::test]
     #[serial_test::serial]
-    async fn test_save_and_load_memory() -> Result<()> {
+    async fn test_save_and_load_dashmap() -> Result<()> {
         // Create a test object
         let test_obj = TestStruct {
-            name: "Test Memory Object".to_string(),
+            name: "Test DashMap Object".to_string(),
             age: 35,
         };
 
-        // Save the object to memory
-        test_obj.save_to_one("memory").await?;
+        // Save the object to dashmap
+        test_obj.save_to_one("dashmap").await?;
 
         // Load the object
-        let mut loaded_obj = TestStruct::new("Test Memory Object".to_string());
+        let mut loaded_obj = TestStruct::new("Test DashMap Object".to_string());
         loaded_obj = loaded_obj.load().await?;
 
         // Compare the original and loaded objects
         assert_eq!(
             test_obj, loaded_obj,
-            "Loaded memory object does not match the original"
+            "Loaded dashmap object does not match the original"
         );
 
         Ok(())

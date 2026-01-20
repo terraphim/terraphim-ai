@@ -145,9 +145,14 @@ impl DeviceSettings {
         let mut profiles = HashMap::new();
 
         // Add minimal required profiles for embedded mode
-        let mut memory_profile = HashMap::new();
-        memory_profile.insert("type".to_string(), "memory".to_string());
-        profiles.insert("memory".to_string(), memory_profile);
+        // Use dashmap as primary (fast concurrent in-memory storage)
+        let mut dashmap_profile = HashMap::new();
+        dashmap_profile.insert("type".to_string(), "dashmap".to_string());
+        dashmap_profile.insert(
+            "root".to_string(),
+            "/tmp/terraphim_dashmap_embedded".to_string(),
+        );
+        profiles.insert("dashmap".to_string(), dashmap_profile);
 
         let mut sqlite_profile = HashMap::new();
         sqlite_profile.insert("type".to_string(), "sqlite".to_string());
