@@ -244,7 +244,8 @@ UBS_CMD="$(find_ubs)" || {
 }
 
 # Run UBS on staged files only using --staged flag
-if ! "$UBS_CMD" --staged --fail-on-warning . 2>&1 | tail -50; then
+# Disable size check since --staged only scans staged files, not the whole directory
+if ! UBS_MAX_DIR_SIZE_MB=0 "$UBS_CMD" --staged --fail-on-warning . 2>&1 | tail -50; then
   print_status "FAIL" "Bug scanner found issues. Fix them or use: git commit --no-verify"
   exit 1
 fi
