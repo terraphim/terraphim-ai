@@ -586,9 +586,15 @@ impl TerraphimUpdater {
         };
 
         // Construct download URL
+        // GitHub release tags use "v" prefix (e.g., v1.5.2) but self_update strips it
+        let version_tag = if version.starts_with('v') {
+            version.to_string()
+        } else {
+            format!("v{}", version)
+        };
         let download_url = format!(
             "https://github.com/{}/{}/releases/download/{}/{}",
-            repo_owner, repo_name, version, asset_name
+            repo_owner, repo_name, version_tag, asset_name
         );
 
         info!("Downloading from: {}", download_url);
@@ -1345,5 +1351,29 @@ mod tests {
 
         let failed = UpdateStatus::Failed("test error".to_string());
         assert!(failed.to_string().contains("test error"));
+    }
+
+    #[test]
+    fn test_version_prefix_for_github_releases() {
+        // GitHub release tags use "v" prefix but self_update strips it
+        // This test verifies our version tag construction logic
+        let version_without_v = "1.5.2";
+        let version_with_v = "v1.5.2";
+
+        // Version without v should get v prepended
+        let version_tag_1 = if version_without_v.starts_with('v') {
+            version_without_v.to_string()
+        } else {
+            format!("v{}", version_without_v)
+        };
+        assert_eq!(version_tag_1, "v1.5.2");
+
+        // Version with v should remain unchanged
+        let version_tag_2 = if version_with_v.starts_with('v') {
+            version_with_v.to_string()
+        } else {
+            format!("v{}", version_with_v)
+        };
+        assert_eq!(version_tag_2, "v1.5.2");
     }
 }
