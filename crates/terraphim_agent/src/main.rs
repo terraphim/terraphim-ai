@@ -3,7 +3,9 @@ use std::io;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+    },
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
@@ -101,6 +103,92 @@ fn create_block(title: &str, transparent: bool) -> Block<'_> {
 enum ViewMode {
     Search,
     ResultDetail,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TuiAction {
+    None,
+    Quit,
+    SearchOrOpen,
+    MoveUp,
+    MoveDown,
+    Autocomplete,
+    SwitchRole,
+    SummarizeSelection,
+    SummarizeDetail,
+    Backspace,
+    InsertChar(char),
+    BackToSearch,
+}
+
+#[cfg(test)]
+fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+    KeyEvent::new(code, modifiers)
+}
+
+fn map_search_key_event(event: KeyEvent) -> TuiAction {
+    match (event.code, event.modifiers) {
+        (KeyCode::Char('q'), KeyModifiers::NONE) => TuiAction::Quit,
+        (KeyCode::Enter, KeyModifiers::NONE) => TuiAction::SearchOrOpen,
+        (KeyCode::Up, KeyModifiers::NONE) => TuiAction::MoveUp,
+        (KeyCode::Down, KeyModifiers::NONE) => TuiAction::MoveDown,
+        (KeyCode::Tab, KeyModifiers::NONE) => TuiAction::Autocomplete,
+        (KeyCode::Char('r'), KeyModifiers::CONTROL) => TuiAction::SwitchRole,
+        (KeyCode::Char('s'), KeyModifiers::CONTROL) => TuiAction::SummarizeSelection,
+        (KeyCode::Backspace, KeyModifiers::NONE) => TuiAction::Backspace,
+        (KeyCode::Char(c), KeyModifiers::NONE) => TuiAction::InsertChar(c),
+        _ => TuiAction::None,
+    }
+}
+
+fn map_detail_key_event(event: KeyEvent) -> TuiAction {
+    match (event.code, event.modifiers) {
+        (KeyCode::Esc, KeyModifiers::NONE) => TuiAction::BackToSearch,
+        (KeyCode::Char('q'), KeyModifiers::NONE) => TuiAction::Quit,
+        (KeyCode::Char('s'), KeyModifiers::CONTROL) => TuiAction::SummarizeDetail,
+        _ => TuiAction::None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn map_search_key_event_allows_plain_letters() {
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('s'), KeyModifiers::NONE)),
+            TuiAction::InsertChar('s')
+        );
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('r'), KeyModifiers::NONE)),
+            TuiAction::InsertChar('r')
+        );
+    }
+
+    #[test]
+    fn map_search_key_event_ctrl_shortcuts() {
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('s'), KeyModifiers::CONTROL)),
+            TuiAction::SummarizeSelection
+        );
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('r'), KeyModifiers::CONTROL)),
+            TuiAction::SwitchRole
+        );
+    }
+
+    #[test]
+    fn map_detail_key_event_ctrl_s_summarizes() {
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('s'), KeyModifiers::CONTROL)),
+            TuiAction::SummarizeDetail
+        );
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('s'), KeyModifiers::NONE)),
+            TuiAction::None
+        );
+    }
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Default)]
@@ -318,9 +406,8 @@ fn main() -> Result<()> {
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
-                // Create runtime locally to avoid nesting with ui_loop's runtime
-                let rt = Runtime::new()?;
-                rt.block_on(run_tui_offline_mode(cli.transparent))
+                // Run TUI mode - it will create its own runtime
+                run_tui_offline_mode(cli.transparent)
             }
         }
 
@@ -344,7 +431,7 @@ fn main() -> Result<()> {
         }
     }
 }
-async fn run_tui_offline_mode(transparent: bool) -> Result<()> {
+fn run_tui_offline_mode(transparent: bool) -> Result<()> {
     // TODO: Update interactive TUI to use local TuiService instead of API client
     // For now, fall back to the existing TUI implementation that uses API client
     // let _service = TuiService::new().await?;
@@ -1301,16 +1388,14 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
         std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
     );
 
-    // Use the existing runtime handle instead of creating a new one
-    // This prevents panic from nested runtime creation
-    let handle = tokio::runtime::Handle::try_current()
-        .map_err(|_| anyhow::anyhow!("No tokio runtime context available"))?;
+    // Create a tokio runtime for this TUI session
+    // We need a local runtime because we're in a synchronous function (terminal event loop)
+    let rt = tokio::runtime::Runtime::new()?;
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
+    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
         current_role = cfg.config.selected_role.to_string();
-        if let Ok(rg) = handle.block_on(async { api.rolegraph(Some(current_role.as_str())).await })
-        {
+        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
             terms = rg.nodes.into_iter().map(|n| n.label).collect();
         }
     }
@@ -1329,7 +1414,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                         ])
                         .split(f.area());
 
-                    let input_title = format!("Search [Role: {}] • Enter: search, Tab: autocomplete, r: switch role, q: quit", current_role);
+                    let input_title = format!(
+                        "Search [Role: {}] • Enter: search, Tab: autocomplete, Ctrl+r: switch role, q: quit",
+                        current_role
+                    );
                     let input_widget = Paragraph::new(Line::from(input.as_str())).block(
                         create_block(&input_title, transparent)
                     );
@@ -1353,8 +1441,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                             item
                         }
                     }).collect();
-                    let list = List::new(items)
-                        .block(create_block("Results • ↑↓: select, Enter: view details, s: summarize", transparent));
+                    let list = List::new(items).block(create_block(
+                        "Results • ↑↓: select, Enter: view details, Ctrl+s: summarize",
+                        transparent,
+                    ));
                     f.render_widget(list, chunks[2]);
 
                     let status_text = format!("Terraphim TUI • {} results • Mode: Search", results.len());
@@ -1382,7 +1472,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
 
                         let content_text = if doc.body.is_empty() { "No content available" } else { &doc.body };
                         let content_widget = Paragraph::new(content_text)
-                            .block(create_block("Content • s: summarize, Esc: back to search", transparent))
+                            .block(create_block(
+                                "Content • Ctrl+s: summarize, Esc: back to search",
+                                transparent,
+                            ))
                             .wrap(ratatui::widgets::Wrap { trim: true });
                         f.render_widget(content_widget, chunks[1]);
 
@@ -1401,14 +1494,14 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
             if let Event::Key(key) = event::read()? {
                 match view_mode {
                     ViewMode::Search => {
-                        match key.code {
-                            KeyCode::Char('q') => break,
-                            KeyCode::Enter => {
+                        match map_search_key_event(key) {
+                            TuiAction::Quit => break,
+                            TuiAction::SearchOrOpen => {
                                 let query = input.trim().to_string();
                                 let api = api.clone();
                                 let role = current_role.clone();
                                 if !query.is_empty() {
-                                    if let Ok((lines, docs)) = handle.block_on(async move {
+                                    if let Ok((lines, docs)) = rt.block_on(async move {
                                         let q = SearchQuery {
                                             search_term: NormalizedTermValue::from(query.as_str()),
                                             search_terms: None,
@@ -1442,21 +1535,21 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     view_mode = ViewMode::ResultDetail;
                                 }
                             }
-                            KeyCode::Up => {
+                            TuiAction::MoveUp => {
                                 selected_result_index = selected_result_index.saturating_sub(1);
                             }
-                            KeyCode::Down => {
+                            TuiAction::MoveDown => {
                                 if selected_result_index + 1 < results.len() {
                                     selected_result_index += 1;
                                 }
                             }
-                            KeyCode::Tab => {
+                            TuiAction::Autocomplete => {
                                 // Real autocomplete from API
                                 let query = input.trim();
                                 if !query.is_empty() {
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_resp) = handle.block_on(async move {
+                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
                                         api.get_autocomplete(&role, query).await
                                     }) {
                                         suggestions = autocomplete_resp
@@ -1468,10 +1561,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('r') => {
+                            TuiAction::SwitchRole => {
                                 // Switch role
                                 let api = api.clone();
-                                if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
+                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
                                     let roles: Vec<String> =
                                         cfg.config.roles.keys().map(|k| k.to_string()).collect();
                                     if !roles.is_empty() {
@@ -1481,7 +1574,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                             let next_idx = (current_idx + 1) % roles.len();
                                             current_role = roles[next_idx].clone();
                                             // Update terms for new role
-                                            if let Ok(rg) = handle.block_on(async {
+                                            if let Ok(rg) = rt.block_on(async {
                                                 api.rolegraph(Some(&current_role)).await
                                             }) {
                                                 terms =
@@ -1491,13 +1584,13 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('s') => {
+                            TuiAction::SummarizeSelection => {
                                 // Summarize current selection
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = handle.block_on(async move {
+                                    if let Ok(summary) = rt.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {
@@ -1510,29 +1603,31 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Backspace => {
+                            TuiAction::Backspace => {
                                 input.pop();
                                 update_local_suggestions(&input, &terms, &mut suggestions);
                             }
-                            KeyCode::Char(c) => {
+                            TuiAction::InsertChar(c) => {
                                 input.push(c);
                                 update_local_suggestions(&input, &terms, &mut suggestions);
                             }
-                            _ => {}
+                            TuiAction::None
+                            | TuiAction::BackToSearch
+                            | TuiAction::SummarizeDetail => {}
                         }
                     }
                     ViewMode::ResultDetail => {
-                        match key.code {
-                            KeyCode::Esc => {
+                        match map_detail_key_event(key) {
+                            TuiAction::BackToSearch => {
                                 view_mode = ViewMode::Search;
                             }
-                            KeyCode::Char('s') => {
+                            TuiAction::SummarizeDetail => {
                                 // Summarize current document in detail view
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = handle.block_on(async move {
+                                    if let Ok(summary) = rt.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {
@@ -1554,8 +1649,16 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('q') => break,
-                            _ => {}
+                            TuiAction::Quit => break,
+                            TuiAction::None
+                            | TuiAction::SearchOrOpen
+                            | TuiAction::MoveUp
+                            | TuiAction::MoveDown
+                            | TuiAction::Autocomplete
+                            | TuiAction::SwitchRole
+                            | TuiAction::SummarizeSelection
+                            | TuiAction::Backspace
+                            | TuiAction::InsertChar(_) => {}
                         }
                     }
                 }
