@@ -2124,12 +2124,10 @@ impl ReplHandler {
                 let _min = min_shared.unwrap_or(1); // Will be used with enrichment
 
                 // Get the source session
-                let source = svc.get_session(&session_id).await;
-                if source.is_none() {
+                let Some(source) = svc.get_session(&session_id).await else {
                     println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
                     return Ok(());
-                }
-                let source = source.unwrap();
+                };
 
                 // Get keywords from first user message
                 let keywords = source

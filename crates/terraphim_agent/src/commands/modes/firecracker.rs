@@ -85,7 +85,7 @@ impl FirecrackerExecutor {
             command.replace(['/', ' '], "-"),
             std::time::SystemTime::now()
                 .duration_since(std::time::UNIX_EPOCH)
-                .unwrap()
+                .expect("system time should be after Unix epoch")
                 .as_secs()
         );
 
