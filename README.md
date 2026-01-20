@@ -375,7 +375,7 @@ $ terraphim-agent update
 
 ```bash
 # Build with all features
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 
 # Launch interactive REPL
 ./target/release/terraphim-agent
