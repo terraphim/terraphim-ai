@@ -334,6 +334,9 @@ enum Command {
         /// Output as JSON (always true for hooks, but explicit)
         #[arg(long, default_value_t = true)]
         json: bool,
+        /// Include guard check for destructive commands (git reset --hard, rm -rf, etc.)
+        #[arg(long, default_value_t = false)]
+        with_guard: bool,
     },
     /// Check command against safety guard patterns (blocks destructive git/fs commands)
     Guard {
@@ -836,6 +839,7 @@ async fn run_offline_command(command: Command) -> Result<()> {
             input,
             role,
             json: _,
+            with_guard,
         } => {
             // Read JSON input from argument or stdin
             let input_json = match input {
@@ -873,6 +877,28 @@ async fn run_offline_command(command: Command) -> Result<()> {
                             .and_then(|v| v.get("command"))
                             .and_then(|v| v.as_str())
                         {
+                            // Guard check if --with-guard flag is set
+                            if with_guard {
+                                let guard = guard_patterns::CommandGuard::new();
+                                let guard_result = guard.check(command);
+
+                                if guard_result.decision == "block" {
+                                    // Output deny response for Claude Code
+                                    let output = serde_json::json!({
+                                        "hookSpecificOutput": {
+                                            "hookEventName": "PreToolUse",
+                                            "permissionDecision": "deny",
+                                            "permissionDecisionReason": format!(
+                                                "BLOCKED: {}",
+                                                guard_result.reason.unwrap_or_default()
+                                            )
+                                        }
+                                    });
+                                    println!("{}", serde_json::to_string(&output)?);
+                                    return Ok(());
+                                }
+                            }
+
                             // Get thesaurus and perform replacement
                             let thesaurus = service.get_thesaurus(&role_name).await?;
                             let replacement_service =
