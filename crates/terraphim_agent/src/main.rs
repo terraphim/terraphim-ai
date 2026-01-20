@@ -432,15 +432,14 @@ fn main() -> Result<()> {
     }
 }
 fn run_tui_offline_mode(transparent: bool) -> Result<()> {
-    // TODO: Update interactive TUI to use local TuiService instead of API client
-    // For now, fall back to the existing TUI implementation that uses API client
-    // let _service = TuiService::new().await?;
-    run_tui(transparent)
+    // Note: TUI mode currently requires a running server to connect to.
+    // It will try TERRAPHIM_SERVER env var, or default to http://localhost:8000.
+    // For fully offline operation, use 'terraphim-agent repl' instead.
+    run_tui(None, transparent)
 }
 
-fn run_tui_server_mode(_server_url: &str, transparent: bool) -> Result<()> {
-    // TODO: Pass server_url to TUI for API client initialization
-    run_tui(transparent)
+fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
+    run_tui(Some(server_url.to_string()), transparent)
 }
 
 async fn run_offline_command(command: Command) -> Result<()> {
@@ -1314,7 +1313,7 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
     }
 }
 
-fn run_tui(transparent: bool) -> Result<()> {
+fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
     // Attempt to set up terminal for TUI
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
@@ -1349,7 +1348,7 @@ fn run_tui(transparent: bool) -> Result<()> {
                 }
             };
 
-            let res = ui_loop(&mut terminal, transparent);
+            let res = ui_loop(&mut terminal, server_url, transparent);
 
             // Always clean up terminal state
             let _ = disable_raw_mode();
@@ -1375,7 +1374,11 @@ fn run_tui(transparent: bool) -> Result<()> {
     }
 }
 
-fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: bool) -> Result<()> {
+fn ui_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    server_url: Option<String>,
+    transparent: bool,
+) -> Result<()> {
     let mut input = String::new();
     let mut results: Vec<String> = Vec::new();
     let mut detailed_results: Vec<Document> = Vec::new();
@@ -1384,9 +1387,11 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
     let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
     let mut selected_result_index = 0;
     let mut view_mode = ViewMode::Search;
-    let api = ApiClient::new(
-        std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
-    );
+    // Use provided server_url, then TERRAPHIM_SERVER env var, then default to localhost
+    let effective_url = server_url.unwrap_or_else(|| {
+        std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string())
+    });
+    let api = ApiClient::new(effective_url);
 
     // Create a tokio runtime for this TUI session
     // We need a local runtime because we're in a synchronous function (terminal event loop)
