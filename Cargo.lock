@@ -7539,19 +7539,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "pulldown-cmark"
-version = "0.13.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1e8bbe1a966bd2f362681a44f6edce3c2310ac21e4d5067a6e7ec396297a6ea0"
-dependencies = [
- "bitflags 2.10.0",
- "getopts",
- "memchr",
- "pulldown-cmark-escape",
- "unicase",
-]
-
-[[package]]
 name = "pulldown-cmark-escape"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10281,7 +10268,10 @@ dependencies = [
 name = "terraphim-markdown-parser"
 version = "1.0.0"
 dependencies = [
- "pulldown-cmark 0.13.0",
+ "markdown",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "ulid",
 ]
 
 [[package]]
@@ -10506,6 +10496,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cocoa 0.26.0",
+ "criterion",
  "env_logger 0.11.8",
  "futures",
  "futures-util",
@@ -10516,14 +10507,18 @@ dependencies = [
  "keyboard-types",
  "log",
  "lru 0.12.5",
+ "lsp-types",
  "objc",
  "parking_lot 0.12.5",
- "pulldown-cmark 0.12.2",
+ "pulldown-cmark",
  "rand 0.8.5",
  "regex",
+ "ropey",
  "serde",
  "serde_json",
+ "serde_yaml",
  "tempfile",
+ "terraphim-markdown-parser",
  "terraphim_automata",
  "terraphim_config",
  "terraphim_middleware",
@@ -10952,7 +10947,7 @@ dependencies = [
  "jiff",
  "log",
  "portpicker",
- "pulldown-cmark 0.12.2",
+ "pulldown-cmark",
  "ratatui",
  "regex",
  "reqwest 0.12.24",
