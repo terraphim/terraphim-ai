@@ -131,17 +131,46 @@ impl TuiService {
     }
 
     /// Get the role graph top-k concepts for a specific role
+    ///
+    /// Returns the top-k concepts sorted by rank (number of co-occurrences) in descending order.
     pub async fn get_role_graph_top_k(
         &self,
         role_name: &RoleName,
         top_k: usize,
     ) -> Result<Vec<String>> {
-        // For now, return placeholder data since role graph access needs proper implementation
-        // TODO: Implement actual role graph integration
         log::info!("Getting top {} concepts for role {}", top_k, role_name);
-        Ok((0..std::cmp::min(top_k, 10))
-            .map(|i| format!("concept_{}_for_role_{}", i + 1, role_name))
-            .collect())
+
+        // Get the role graph for this role
+        if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
+            let rolegraph = rolegraph_sync.lock().await;
+
+            // Get nodes and sort by rank (descending)
+            let mut nodes: Vec<_> = rolegraph.nodes_map().iter().collect();
+            nodes.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+
+            // Map node IDs to term names and collect top-k
+            let top_concepts: Vec<String> = nodes
+                .into_iter()
+                .take(top_k)
+                .filter_map(|(node_id, _node)| {
+                    rolegraph
+                        .ac_reverse_nterm
+                        .get(node_id)
+                        .map(|term| term.to_string())
+                })
+                .collect();
+
+            log::debug!(
+                "Found {} concepts for role {} (requested {})",
+                top_concepts.len(),
+                role_name,
+                top_k
+            );
+            Ok(top_concepts)
+        } else {
+            log::warn!("Role graph not found for role {}", role_name);
+            Ok(Vec::new())
+        }
     }
 
     /// Generate chat response using LLM
