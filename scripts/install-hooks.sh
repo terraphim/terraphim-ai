@@ -289,6 +289,25 @@ install_native_hooks
 setup_biome
 create_secrets_baseline
 
+# Check for Ultimate Bug Scanner (UBS)
+check_ubs() {
+    print_status "INFO" "Checking for Ultimate Bug Scanner (UBS)..."
+
+    if command_exists ubs; then
+        print_status "SUCCESS" "UBS is installed: $(command -v ubs)"
+    elif [ -x "$HOME/.local/bin/ubs" ]; then
+        print_status "SUCCESS" "UBS is installed: $HOME/.local/bin/ubs"
+    elif [ -x "/usr/local/bin/ubs" ]; then
+        print_status "SUCCESS" "UBS is installed: /usr/local/bin/ubs"
+    else
+        print_status "WARN" "UBS not found. Pre-commit hooks will skip bug scanning."
+        print_status "INFO" "Install UBS for additional bug detection:"
+        echo "  curl -sSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash"
+    fi
+}
+
+check_ubs
+
 echo ""
 print_status "SUCCESS" "Hook installation complete!"
 echo ""
@@ -330,11 +349,12 @@ echo ""
 print_status "INFO" "Hook System Overview:"
 echo ""
 print_status "INFO" "Native Git Hooks (ALWAYS active):"
-echo "  ✓ Conventional commit message validation (superior error messages)"
-echo "  ✓ Rust: cargo fmt, cargo clippy, cargo test"
-echo "  ✓ JavaScript/TypeScript: Biome check"
-echo "  ✓ Security: Secret detection, large file blocking"
-echo "  ✓ Syntax: YAML, TOML validation"
+echo "  - Conventional commit message validation (superior error messages)"
+echo "  - Rust: cargo fmt, cargo clippy, cargo test"
+echo "  - JavaScript/TypeScript: Biome check"
+echo "  - Security: Secret detection, large file blocking"
+echo "  - Syntax: YAML, TOML validation"
+echo "  - Ultimate Bug Scanner (UBS): AST-based bug detection (if installed)"
 echo ""
 print_status "INFO" "Pre-commit/Prek/Lefthook enhancements (if installed):"
 echo "  ✓ Automatic whitespace fixing (trailing spaces, EOF)"
