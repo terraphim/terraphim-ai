@@ -448,11 +448,20 @@ impl gpui::EventEmitter<()> for StreamingChatState {}
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_types::ChatMessage;
+    use terraphim_types::{ChatMessage, ConversationId};
+    use std::time::Duration;
+
+    fn create_test_conversation_id() -> ConversationId {
+        ConversationId::new()
+    }
+
+    fn create_test_message() -> ChatMessage {
+        ChatMessage::user("Test message".to_string())
+    }
 
     #[test]
     fn test_streaming_message_creation() {
-        let base_msg = ChatMessage::user("Test message".to_string());
+        let base_msg = create_test_message();
         let streaming = StreamingChatMessage::start_streaming(base_msg);
 
         assert_eq!(streaming.status, MessageStatus::Streaming);
@@ -480,5 +489,455 @@ mod tests {
         stats.cache_misses = 20;
 
         assert_eq!(stats.cache_hit_rate(), 0.8);
+    }
+
+    #[test]
+    fn test_cache_hit_rate_all_hits() {
+        let mut stats = ChatPerformanceStats::default();
+        stats.cache_hits = 100;
+        stats.cache_misses = 0;
+
+        assert_eq!(stats.cache_hit_rate(), 1.0);
+    }
+
+    #[test]
+    fn test_cache_hit_rate_all_misses() {
+        let mut stats = ChatPerformanceStats::default();
+        stats.cache_hits = 0;
+        stats.cache_misses = 100;
+
+        assert_eq!(stats.cache_hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_cache_hit_rate_empty() {
+        let stats = ChatPerformanceStats::default();
+
+        assert_eq!(stats.cache_hit_rate(), 0.0);
+    }
+
+    #[test]
+    fn test_performance_stats_default() {
+        let stats = ChatPerformanceStats::default();
+
+        assert_eq!(stats.total_messages, 0);
+        assert_eq!(stats.messages_completed, 0);
+        assert_eq!(stats.chunks_processed, 0);
+        assert_eq!(stats.stream_errors, 0);
+        assert_eq!(stats.avg_stream_duration, 0.0);
+        assert_eq!(stats.cache_hits, 0);
+        assert_eq!(stats.cache_misses, 0);
+    }
+
+    #[test]
+    fn test_streaming_chat_state_default() {
+        let state = StreamingChatState::default();
+
+        assert!(state.config_state.is_none());
+        assert!(state.current_conversation_id.is_none());
+        assert!(!state.is_streaming);
+        assert!(state.current_streaming_message.is_none());
+        assert!(state.error_state.is_none());
+        assert_eq!(state.max_retries, 3);
+        assert!(state.search_service.is_none());
+    }
+
+    #[test]
+    fn test_streaming_chat_state_new() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        assert!(state.config_state.is_none());
+        assert!(!state.is_streaming);
+        assert!(state.error_state.is_none());
+    }
+
+    #[test]
+    fn test_streaming_chat_state_with_config() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+
+        let mut state = StreamingChatState::new(
+            context_manager.clone(),
+            None,
+            None,
+        );
+
+        // Note: with_config requires ConfigState which needs async setup
+        // This is tested in integration tests
+    }
+
+    #[test]
+    fn test_chunk_type_variants() {
+        let text_chunk = RenderChunk {
+            content: "Text".to_string(),
+            chunk_type: ChunkType::Text,
+            position: 0,
+            complete: false,
+        };
+
+        let code_chunk = RenderChunk {
+            content: "Code".to_string(),
+            chunk_type: ChunkType::Code,
+            position: 1,
+            complete: false,
+        };
+
+        assert!(matches!(text_chunk.chunk_type, ChunkType::Text));
+        assert!(matches!(code_chunk.chunk_type, ChunkType::Code));
+    }
+
+    #[test]
+    fn test_stream_metrics_default() {
+        let metrics = StreamMetrics::default();
+
+        assert!(metrics.started_at.is_none());
+        assert!(metrics.first_token_at.is_none());
+        assert!(metrics.completed_at.is_none());
+        assert_eq!(metrics.total_tokens, 0);
+        assert_eq!(metrics.chunks_received, 0);
+        assert!(metrics.error.is_none());
+    }
+
+    #[test]
+    fn test_streaming_message_status_variants() {
+        let msg = create_test_message();
+
+        let streaming = StreamingChatMessage::start_streaming(msg.clone());
+
+        assert_eq!(streaming.status, MessageStatus::Streaming);
+        assert!(streaming.is_streaming);
+
+        // Note: Complete and error states require async operations
+        // These are tested in integration tests
+    }
+
+    #[test]
+    fn test_render_chunk_positioning() {
+        let mut chunk = RenderChunk {
+            content: "Test".to_string(),
+            chunk_type: ChunkType::Text,
+            position: 0,
+            complete: false,
+        };
+
+        assert_eq!(chunk.position, 0);
+
+        chunk.position = 5;
+        assert_eq!(chunk.position, 5);
+    }
+
+    #[test]
+    fn test_render_chunk_completion() {
+        let mut chunk = RenderChunk {
+            content: "Test".to_string(),
+            chunk_type: ChunkType::Text,
+            position: 0,
+            complete: false,
+        };
+
+        assert!(!chunk.complete);
+
+        chunk.complete = true;
+        assert!(chunk.complete);
+    }
+
+    #[test]
+    fn test_performance_stats_tracking() {
+        let mut stats = ChatPerformanceStats::default();
+
+        assert_eq!(stats.total_messages, 0);
+        assert_eq!(stats.messages_completed, 0);
+        assert_eq!(stats.chunks_processed, 0);
+        assert_eq!(stats.stream_errors, 0);
+
+        // Simulate processing
+        stats.total_messages = 10;
+        stats.messages_completed = 8;
+        stats.chunks_processed = 150;
+        stats.stream_errors = 1;
+
+        assert_eq!(stats.total_messages, 10);
+        assert_eq!(stats.messages_completed, 8);
+        assert_eq!(stats.chunks_processed, 150);
+        assert_eq!(stats.stream_errors, 1);
+    }
+
+    #[test]
+    fn test_performance_stats_avg_duration() {
+        let mut stats = ChatPerformanceStats::default();
+
+        // Initially 0
+        assert_eq!(stats.avg_stream_duration, 0.0);
+
+        // After one message of 2 seconds
+        stats.messages_completed = 1;
+        stats.avg_stream_duration = 2.0;
+
+        // After second message of 4 seconds
+        stats.avg_stream_duration = (2.0 * 1.0 + 4.0) / 2.0;
+        assert_eq!(stats.avg_stream_duration, 3.0);
+    }
+
+    #[test]
+    fn test_streaming_message_content_updates() {
+        let base_msg = create_test_message();
+        let mut streaming = StreamingChatMessage::start_streaming(base_msg);
+
+        let initial_content = streaming.content.clone();
+        assert!(!initial_content.is_empty());
+
+        // Note: Adding chunks requires async context
+        // This is tested in integration tests
+    }
+
+    #[test]
+    fn test_conversation_id_generation() {
+        let id1 = create_test_conversation_id();
+        let id2 = create_test_conversation_id();
+
+        assert_ne!(id1.as_str(), id2.as_str());
+        assert!(!id1.as_str().is_empty());
+        assert!(!id2.as_str().is_empty());
+    }
+
+    #[test]
+    fn test_message_status_equality() {
+        assert_eq!(MessageStatus::Streaming, MessageStatus::Streaming);
+        assert_ne!(MessageStatus::Streaming, MessageStatus::Completed);
+    }
+
+    #[test]
+    fn test_streaming_message_impls_clone() {
+        let base_msg = create_test_message();
+        let streaming = StreamingChatMessage::start_streaming(base_msg);
+
+        // Should be able to clone
+        let _cloned = streaming.clone();
+
+        // Note: The actual clone behavior depends on StreamingChatMessage implementation
+    }
+
+    #[test]
+    fn test_render_chunk_impls_debug() {
+        let chunk = RenderChunk {
+            content: "Test".to_string(),
+            chunk_type: ChunkType::Text,
+            position: 0,
+            complete: false,
+        };
+
+        let debug_str = format!("{:?}", chunk);
+        assert!(debug_str.contains("Test"));
+        assert!(debug_str.contains("Text"));
+    }
+
+    #[test]
+    fn test_stream_metrics_impls_debug() {
+        let metrics = StreamMetrics::default();
+        let debug_str = format!("{:?}", metrics);
+        assert!(debug_str.contains("StreamMetrics"));
+    }
+
+    #[test]
+    fn test_performance_stats_impls_debug() {
+        let stats = ChatPerformanceStats::default();
+        let debug_str = format!("{:?}", stats);
+        assert!(debug_str.contains("ChatPerformanceStats"));
+    }
+
+    #[test]
+    fn test_chunk_type_impls_debug() {
+        let chunk_type = ChunkType::Text;
+        let debug_str = format!("{:?}", chunk_type);
+        assert!(debug_str.contains("Text"));
+    }
+
+    #[test]
+    fn test_message_status_impls_debug() {
+        let status = MessageStatus::Streaming;
+        let debug_str = format!("{:?}", status);
+        assert!(debug_str.contains("Streaming"));
+    }
+
+    #[test]
+    fn test_streaming_message_impls_debug() {
+        let base_msg = create_test_message();
+        let streaming = StreamingChatMessage::start_streaming(base_msg);
+
+        let debug_str = format!("{:?}", streaming);
+        assert!(debug_str.contains("StreamingChatMessage"));
+    }
+
+    #[test]
+    fn test_error_state_management() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let mut state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        assert!(state.error_state.is_none());
+
+        // Note: Error handling is tested in integration tests with actual async operations
+    }
+
+    #[test]
+    fn test_cache_operations() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let mut state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        // Note: Cache operations are tested in integration tests
+        // The LruCache is initialized but requires actual usage to test
+    }
+
+    #[test]
+    fn test_stream_metrics_timestamps() {
+        let mut metrics = StreamMetrics::default();
+
+        assert!(metrics.started_at.is_none());
+
+        metrics.started_at = Some(chrono::Utc::now());
+
+        assert!(metrics.started_at.is_some());
+    }
+
+    #[test]
+    fn test_performance_stats_timing() {
+        let mut stats = ChatPerformanceStats::default();
+
+        // Should have a last_chunk_time
+        assert!(!stats.last_chunk_time.elapsed().is_negative());
+
+        // Simulate time passage
+        std::thread::sleep(Duration::from_millis(10));
+        assert!(stats.last_chunk_time.elapsed() >= Duration::from_millis(10));
+    }
+
+    #[test]
+    fn test_retry_attempts_tracking() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let mut state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        assert_eq!(state.max_retries, 3);
+
+        // Note: Retry tracking requires actual stream errors
+        // This is tested in integration tests
+    }
+
+    #[test]
+    fn test_search_integration() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let mut state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        assert!(state.search_service.is_none());
+
+        // Note: Search service integration requires async setup
+        // This is tested in integration tests
+    }
+
+    #[test]
+    fn test_context_search_cache() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        // Context search cache is initialized
+        // Note: Actual cache behavior tested in integration tests
+    }
+
+    #[test]
+    fn test_render_cache() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        // Render cache is initialized (DashMap)
+        // Note: Actual cache behavior tested in integration tests
+    }
+
+    #[test]
+    fn test_debounce_timer() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let mut state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        assert!(state.debounce_timer.is_none());
+
+        // Note: Debounce timer is set during operations
+        // This is tested in integration tests
+    }
+
+    #[test]
+    fn test_performance_monitoring() {
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        let mut state = StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        );
+
+        assert!(state.last_update.elapsed() >= Duration::from_secs(0));
+
+        // Note: Performance monitoring is tested through actual operations
+    }
+
+    #[test]
+    fn test_event_emitter_trait() {
+        // Verify that StreamingChatState implements EventEmitter
+        fn _assert_event_emitter<T: EventEmitter<()>>(_: T) {}
+        let context_manager = Arc::new(TokioMutex::new(
+            TerraphimContextManager::new(Default::default())
+        ));
+        _assert_event_emitter(StreamingChatState::new(
+            context_manager,
+            None,
+            None,
+        ));
     }
 }

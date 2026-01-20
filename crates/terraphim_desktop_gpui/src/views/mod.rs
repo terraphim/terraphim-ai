@@ -8,5 +8,5 @@ pub mod tray_menu;
 
 pub use article_modal::ArticleModal;
 pub use markdown_modal::{MarkdownModal, MarkdownModalEvent, MarkdownModalOptions};
-pub use role_selector::RoleSelector;
+pub use role_selector::{RoleChangeEvent, RoleSelector};
 pub use tray_menu::{TrayMenu, TrayMenuAction};

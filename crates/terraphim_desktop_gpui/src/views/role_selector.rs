@@ -1,6 +1,6 @@
-use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::{button::*, IconName, StyledExt};
+use gpui::*;
+use gpui_component::{IconName, StyledExt, button::*};
 use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
 
@@ -8,7 +8,7 @@ use crate::theme::colors::theme;
 
 /// Event emitted when role changes
 pub struct RoleChangeEvent {
-    pub new_role: String,
+    pub new_role: RoleName,
 }
 
 impl EventEmitter<RoleChangeEvent> for RoleSelector {}
@@ -61,7 +61,10 @@ impl RoleSelector {
 
     /// Set available roles (loaded from config in App)
     pub fn with_roles(mut self, roles: Vec<RoleName>) -> Self {
-        log::info!("RoleSelector loaded {} roles from config (Tauri pattern)", roles.len());
+        log::info!(
+            "RoleSelector loaded {} roles from config (Tauri pattern)",
+            roles.len()
+        );
         self.available_roles = roles;
         self
     }
@@ -80,44 +83,38 @@ impl RoleSelector {
         cx.notify();
     }
 
-    /// Change role using backend (pattern from Tauri select_role cmd.rs:392-462)
+    /// Request a role change (App will apply via RoleChangeEvent subscription)
     pub fn change_role(&mut self, role: RoleName, cx: &mut Context<Self>) {
         if self.current_role == role {
+            self.is_open = false;
+            cx.notify();
             return;
         }
 
-        log::info!("Changing role from {} to {}", self.current_role, role);
+        log::info!(
+            "RoleSelector: requesting role change from {} to {}",
+            self.current_role,
+            role
+        );
 
-        let config_state = match &self.config_state {
-            Some(state) => state.clone(),
-            None => {
-                log::warn!("Cannot change role: config not initialized");
-                return;
-            }
-        };
-
-        let role_clone = role.clone();
-
-        cx.spawn(async move |this, cx| {
-            // Update selected_role in config (from Tauri select_role pattern)
-            let mut config = config_state.config.lock().await;
-            config.selected_role = role_clone.clone();
-            drop(config);
-
-            log::info!("✅ Role changed to: {}", role_clone);
-
-            this.update(cx, |this, cx| {
-                this.current_role = role_clone;
-                this.is_open = false;
-                cx.notify();
-            }).ok();
-        }).detach();
+        // Close immediately; App will update selected role + views + tray.
+        self.is_open = false;
+        cx.emit(RoleChangeEvent { new_role: role });
+        cx.notify();
     }
 
     /// Toggle dropdown open/closed
-    pub fn toggle_dropdown(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    pub fn toggle_dropdown(
+        &mut self,
+        _event: &ClickEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.is_open = !self.is_open;
-        log::info!("Role dropdown {}", if self.is_open { "opened" } else { "closed" });
+        log::info!(
+            "Role dropdown {}",
+            if self.is_open { "opened" } else { "closed" }
+        );
         cx.notify();
     }
 
@@ -132,11 +129,7 @@ impl RoleSelector {
     /// Handle role selection from dropdown
     fn handle_role_select(&mut self, role_index: usize, cx: &mut Context<Self>) {
         if let Some(role) = self.available_roles.get(role_index).cloned() {
-            let role_name = role.to_string();
             self.change_role(role, cx);
-
-            // Emit event so App can update SearchState
-            cx.emit(RoleChangeEvent { new_role: role_name });
         }
     }
 
@@ -172,11 +165,7 @@ impl RoleSelector {
             .flex()
             .items_center()
             .gap_2()
-            .child(
-                div()
-                    .text_xl()
-                    .child(self.role_icon(role)),
-            )
+            .child(div().text_xl().child(self.role_icon(role)))
             .child(
                 div()
                     .text_sm()
@@ -187,8 +176,10 @@ impl RoleSelector {
     }
 
     /// Render dropdown menu with clickable role items
+    #[allow(dead_code)]
     fn render_dropdown(&self, cx: &mut Context<Self>) -> impl IntoElement {
-        let roles_to_render: Vec<(usize, RoleName, bool)> = self.available_roles
+        let roles_to_render: Vec<(usize, RoleName, bool)> = self
+            .available_roles
             .iter()
             .enumerate()
             .map(|(idx, role)| (idx, role.clone(), role == &self.current_role))
@@ -199,46 +190,44 @@ impl RoleSelector {
             .top(px(48.0))
             .right(px(0.0))
             .w(px(220.0))
-            .max_h(px(300.0))  // Limit height to prevent extending too far down
-            .overflow_hidden()  // Clip content that exceeds max height
+            .max_h(px(300.0)) // Limit height to prevent extending too far down
+            .overflow_hidden() // Clip content that exceeds max height
             .bg(rgb(0xffffff))
             .border_1()
             .border_color(rgb(0xdbdbdb))
             .rounded_md()
             .shadow_lg()
             .overflow_hidden()
-            .children(
-                roles_to_render.iter().map(|(idx, role, is_current)| {
-                    let role_name = role.to_string();
-                    let icon = self.role_icon(role);
-                    let current = *is_current;
-                    let index = *idx;
+            .children(roles_to_render.iter().map(|(idx, role, is_current)| {
+                let role_name = role.to_string();
+                let icon = self.role_icon(role);
+                let current = *is_current;
+                let index = *idx;
 
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .px_2()
-                        .py_2()
-                        .border_b_1()
-                        .border_color(rgb(0xf0f0f0))
-                        .when(current, |this| this.bg(rgb(0xf5f5f5)))
-                        .child(
-                            Button::new(("role-item", index))
-                                .label(role_name)
-                                .icon(icon)
-                                .ghost()
-                                .on_click(cx.listener(move |this, _ev, _window, cx| {
-                                    this.handle_role_select(index, cx);
-                                }))
-                        )
-                        .children(if current {
-                            Some(div().text_color(rgb(0x48c774)).text_sm().child("✓"))
-                        } else {
-                            None
-                        })
-                })
-            )
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .px_2()
+                    .py_2()
+                    .border_b_1()
+                    .border_color(rgb(0xf0f0f0))
+                    .when(current, |this| this.bg(rgb(0xf5f5f5)))
+                    .child(
+                        Button::new(("role-item", index))
+                            .label(role_name)
+                            .icon(icon)
+                            .ghost()
+                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                this.handle_role_select(index, cx);
+                            })),
+                    )
+                    .children(if current {
+                        Some(div().text_color(rgb(0x48c774)).text_sm().child("*"))
+                    } else {
+                        None
+                    })
+            }))
     }
 }
 
@@ -248,16 +237,14 @@ impl Render for RoleSelector {
         let current_icon = self.role_icon(&self.current_role);
 
         // Only render the button - dropdown will be rendered as overlay in app
-        div()
-            .relative()
-            .child(
-                // Main button with lucide icon
-                Button::new("role-selector-toggle")
-                    .label(&format!("Role: {}", current_role_display))
-                    .icon(current_icon)
-                    .outline()
-                    .on_click(cx.listener(Self::toggle_dropdown))
-            )
+        div().relative().child(
+            // Main button with lucide icon
+            Button::new("role-selector-toggle")
+                .label(&format!("Role: {}", current_role_display))
+                .icon(current_icon)
+                .outline()
+                .on_click(cx.listener(Self::toggle_dropdown)),
+        )
     }
 }
 
@@ -274,15 +261,27 @@ mod tests {
     #[test]
     fn test_role_icon_mapping() {
         let selector = RoleSelector {
+            config_state: None,
             current_role: RoleName::from("default"),
             available_roles: vec![],
             is_open: false,
-            on_role_change: None,
         };
 
-        assert_eq!(selector.role_icon(&RoleName::from("engineer")), "👨‍💻");
-        assert_eq!(selector.role_icon(&RoleName::from("researcher")), "🔬");
-        assert_eq!(selector.role_icon(&RoleName::from("writer")), "✍️");
-        assert_eq!(selector.role_icon(&RoleName::from("default")), "👤");
+        assert_eq!(
+            selector.get_role_icon(&RoleName::from("engineer")),
+            IconName::SquareTerminal
+        );
+        assert_eq!(
+            selector.get_role_icon(&RoleName::from("researcher")),
+            IconName::BookOpen
+        );
+        assert_eq!(
+            selector.get_role_icon(&RoleName::from("writer")),
+            IconName::File
+        );
+        assert_eq!(
+            selector.get_role_icon(&RoleName::from("default")),
+            IconName::CircleUser
+        );
     }
 }

@@ -11,7 +11,7 @@ pub struct AutocompleteState {
 }
 
 impl AutocompleteState {
-    pub fn new(cx: &mut Context<Self>) -> Self {
+    pub fn new(_cx: &mut Context<Self>) -> Self {
         log::info!("AutocompleteState initialized");
 
         Self {
@@ -26,8 +26,8 @@ impl AutocompleteState {
     pub fn initialize_engine(&mut self, role: &str, cx: &mut Context<Self>) {
         let role = role.to_string();
 
-        cx.spawn(async move |this, cx| {
-            match AutocompleteEngine::from_role(&role, None).await {
+        cx.spawn(
+            async move |this, cx| match AutocompleteEngine::from_role(&role, None).await {
                 Ok(engine) => {
                     log::info!(
                         "Autocomplete engine loaded with {} terms for role '{}'",
@@ -37,13 +37,15 @@ impl AutocompleteState {
                     this.update(cx, |this, cx| {
                         this.engine = Some(engine);
                         cx.notify();
-                    }).ok();
+                    })
+                    .ok();
                 }
                 Err(e) => {
                     log::error!("Failed to load autocomplete engine: {}", e);
                 }
-            }
-        }).detach();
+            },
+        )
+        .detach();
     }
 
     /// Fetch suggestions for query
@@ -64,7 +66,11 @@ impl AutocompleteState {
             };
 
             self.selected_index = 0;
-            log::debug!("Found {} suggestions for '{}'", self.suggestions.len(), query);
+            log::debug!(
+                "Found {} suggestions for '{}'",
+                self.suggestions.len(),
+                query
+            );
         } else {
             log::warn!("Autocomplete engine not initialized");
             self.suggestions = vec![];

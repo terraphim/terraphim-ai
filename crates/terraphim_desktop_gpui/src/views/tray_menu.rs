@@ -1,5 +1,5 @@
-use gpui::*;
 use gpui::prelude::FluentBuilder;
+use gpui::*;
 use gpui_component::StyledExt;
 
 /// Tray menu item definition
@@ -25,11 +25,14 @@ pub enum TrayMenuAction {
     Custom(String),
 }
 
+/// Type alias for tray menu action handler
+type TrayMenuActionHandler = Box<dyn Fn(TrayMenuAction, &mut Context<TrayMenu>) + 'static>;
+
 /// System tray menu component
 pub struct TrayMenu {
     items: Vec<TrayMenuItem>,
     is_visible: bool,
-    on_action: Option<Box<dyn Fn(TrayMenuAction, &mut Context<Self>) + 'static>>,
+    on_action: Option<TrayMenuActionHandler>,
 }
 
 impl TrayMenu {
@@ -40,49 +43,49 @@ impl TrayMenu {
             TrayMenuItem {
                 id: "show".to_string(),
                 label: "Show Terraphim".to_string(),
-                icon: Some("👁️".to_string()),
+                icon: None,
                 action: TrayMenuAction::ShowWindow,
                 enabled: true,
             },
             TrayMenuItem {
                 id: "hide".to_string(),
                 label: "Hide Terraphim".to_string(),
-                icon: Some("🙈".to_string()),
+                icon: None,
                 action: TrayMenuAction::HideWindow,
                 enabled: true,
             },
             TrayMenuItem {
                 id: "search".to_string(),
                 label: "Search".to_string(),
-                icon: Some("🔍".to_string()),
+                icon: None,
                 action: TrayMenuAction::Search,
                 enabled: true,
             },
             TrayMenuItem {
                 id: "chat".to_string(),
                 label: "Chat".to_string(),
-                icon: Some("💬".to_string()),
+                icon: None,
                 action: TrayMenuAction::Chat,
                 enabled: true,
             },
             TrayMenuItem {
                 id: "settings".to_string(),
                 label: "Settings".to_string(),
-                icon: Some("⚙️".to_string()),
+                icon: None,
                 action: TrayMenuAction::Settings,
                 enabled: true,
             },
             TrayMenuItem {
                 id: "about".to_string(),
                 label: "About".to_string(),
-                icon: Some("ℹ️".to_string()),
+                icon: None,
                 action: TrayMenuAction::About,
                 enabled: true,
             },
             TrayMenuItem {
                 id: "quit".to_string(),
                 label: "Quit".to_string(),
-                icon: Some("🚪".to_string()),
+                icon: None,
                 action: TrayMenuAction::Quit,
                 enabled: true,
             },
@@ -158,7 +161,7 @@ impl TrayMenu {
 
     /// Render a single menu item
     fn render_menu_item(&self, item: &TrayMenuItem, _cx: &Context<Self>) -> impl IntoElement {
-        let action = item.action.clone();
+        let _action = item.action.clone();
 
         div()
             .flex()
@@ -169,17 +172,13 @@ impl TrayMenu {
             .when(item.enabled, |this| {
                 this.hover(|style| style.bg(rgb(0xf5f5f5)).cursor_pointer())
             })
-            .when(!item.enabled, |this| {
-                this.opacity(0.5)
-            })
+            .when(!item.enabled, |this| this.opacity(0.5))
             .border_b_1()
             .border_color(rgb(0xf0f0f0))
             .children(
-                item.icon.as_ref().map(|icon| {
-                    div()
-                        .text_lg()
-                        .child(icon.clone())
-                }),
+                item.icon
+                    .as_ref()
+                    .map(|icon| div().text_lg().child(icon.clone())),
             )
             .child(
                 div()
@@ -236,15 +235,12 @@ impl Render for TrayMenu {
                     ),
             )
             .child(
-                div()
-                    .flex()
-                    .flex_col()
-                    .children(
-                        self.items
-                            .iter()
-                            .map(|item| self.render_menu_item(item, cx))
-                            .collect::<Vec<_>>(),
-                    ),
+                div().flex().flex_col().children(
+                    self.items
+                        .iter()
+                        .map(|item| self.render_menu_item(item, cx))
+                        .collect::<Vec<_>>(),
+                ),
             )
             .into_any_element()
     }
@@ -265,7 +261,7 @@ mod tests {
         let item = TrayMenuItem {
             id: "test".to_string(),
             label: "Test Item".to_string(),
-            icon: Some("🧪".to_string()),
+            icon: None,
             action: TrayMenuAction::Custom("test".to_string()),
             enabled: true,
         };

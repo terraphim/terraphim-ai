@@ -3,9 +3,8 @@
 /// A comprehensive modal component that provides rich markdown rendering,
 /// keyboard navigation, search functionality, and accessibility features.
 /// Inspired by Zed editor's modal patterns and Terraphim's existing modal architecture.
-
 use gpui::*;
-use gpui_component::{button::*, IconName, StyledExt};
+use gpui_component::{IconName, StyledExt, button::*};
 use pulldown_cmark::{Event, Parser, Tag, TagEnd};
 
 /// Configuration options for markdown modal behavior
@@ -126,7 +125,10 @@ pub enum MarkdownModalEvent {
     /// User navigated to section
     SectionNavigated { section: String },
     /// Search was performed
-    SearchPerformed { query: String, results: Vec<SearchResult> },
+    SearchPerformed {
+        query: String,
+        results: Vec<SearchResult>,
+    },
     /// Link was clicked
     LinkClicked { url: String },
     /// Keyboard shortcut triggered
@@ -316,16 +318,16 @@ impl MarkdownModal {
     /// Highlight search term in text
     fn highlight_search_term(&self, text: &str, query: &str, pos: usize) -> String {
         let end = (pos + query.len()).min(text.len());
-        format!(
-            "{}**{}**{}",
-            &text[..pos],
-            &text[pos..end],
-            &text[end..]
-        )
+        format!("{}**{}**{}", &text[..pos], &text[pos..end], &text[end..])
     }
 
     /// Get context around search result
-    fn get_search_context(&self, lines: &[&str], line_number: usize, context_size: usize) -> String {
+    fn get_search_context(
+        &self,
+        lines: &[&str],
+        line_number: usize,
+        context_size: usize,
+    ) -> String {
         let start = line_number.saturating_sub(context_size);
         let end = (line_number + context_size + 1).min(lines.len());
 
@@ -369,7 +371,11 @@ impl MarkdownModal {
                 Event::Start(Tag::CodeBlock(kind)) => {
                     let language = match kind {
                         pulldown_cmark::CodeBlockKind::Fenced(fence) => {
-                            if fence.is_empty() { "text".to_string() } else { fence.to_string() }
+                            if fence.is_empty() {
+                                "text".to_string()
+                            } else {
+                                fence.to_string()
+                            }
                         }
                         _ => "text".to_string(),
                     };
@@ -439,7 +445,7 @@ impl MarkdownModal {
                 log::info!("Escape key pressed - closing modal");
                 self.state.is_open = false;
                 cx.notify();
-            },
+            }
             "ctrl+f" | "cmd+f" => {
                 // Focus search input (would be implemented with proper focus management)
                 // Event emission would be handled by EventEmitter implementation
@@ -451,7 +457,8 @@ impl MarkdownModal {
             "n" => {
                 // Next search result
                 if let Some(selected) = self.state.selected_search_result {
-                    let next = (selected + 1).min(self.state.search_results.len().saturating_sub(1));
+                    let next =
+                        (selected + 1).min(self.state.search_results.len().saturating_sub(1));
                     self.navigate_to_search_result(next, cx);
                 }
             }
@@ -485,7 +492,11 @@ impl Render for MarkdownModal {
 
         let max_width = self.options.max_width.unwrap_or(1000.0);
         let max_height = self.options.max_height.unwrap_or(700.0);
-        let title = self.options.title.clone().unwrap_or_else(|| "Markdown Viewer".to_string());
+        let title = self
+            .options
+            .title
+            .clone()
+            .unwrap_or_else(|| "Markdown Viewer".to_string());
 
         // Parse markdown content
         let markdown_elements = self.parse_markdown(&self.state.content);
@@ -512,9 +523,7 @@ impl Render for MarkdownModal {
                     .flex()
                     .flex_col()
                     // Header
-                    .child(
-                        self.render_header(&title, cx)
-                    )
+                    .child(self.render_header(&title, cx))
                     // Main content area with sidebar
                     .child(
                         div()
@@ -522,15 +531,11 @@ impl Render for MarkdownModal {
                             .flex()
                             .overflow_hidden()
                             // Table of contents sidebar
-                            .child(
-                                self.render_sidebar(cx)
-                            )
+                            .child(self.render_sidebar(cx))
                             // Markdown content
-                            .child(
-                                self.render_content(markdown_elements, cx)
-                            )
+                            .child(self.render_content(markdown_elements, cx)),
                     )
-                    .into_any_element()
+                    .into_any_element(),
             )
             .into_any_element()
     }
@@ -553,7 +558,7 @@ impl MarkdownModal {
                     .text_xl()
                     .font_bold()
                     .text_color(rgb(0x1a1a1a))
-                    .child(title.to_string())
+                    .child(title.to_string()),
             )
             .child(
                 div()
@@ -561,9 +566,7 @@ impl MarkdownModal {
                     .items_center()
                     .gap_2()
                     // Search input
-                    .child(
-                        self.render_search_input(cx)
-                    )
+                    .child(self.render_search_input(cx))
                     // Close button
                     .child(
                         Button::new("close-markdown-modal")
@@ -572,13 +575,13 @@ impl MarkdownModal {
                             .ghost()
                             .on_click(cx.listener(|this, _ev, _window, cx| {
                                 this.close(_ev, _window, cx);
-                            }))
-                    )
+                            })),
+                    ),
             )
     }
 
     /// Render sidebar with table of contents
-    fn render_sidebar(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_sidebar(&self, _cx: &Context<Self>) -> impl IntoElement {
         if !self.options.show_toc || self.state.toc_entries.is_empty() {
             return div().w(px(200.0)).border_r_1().border_color(rgb(0xe0e0e0));
         }
@@ -595,121 +598,111 @@ impl MarkdownModal {
                     .font_semibold()
                     .text_color(rgb(0x1a1a1a))
                     .mb_3()
-                    .child("Table of Contents")
+                    .child("Table of Contents"),
             )
-            .children(
-                self.state.toc_entries.iter().map(|entry| {
-                    div()
-                        .ml(px(((entry.level - 1) as f32) * 16.0))
-                        .py_1()
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(rgb(0x333333))
-                                .child(entry.title.clone())
-                        )
-                })
-            )
+            .children(self.state.toc_entries.iter().map(|entry| {
+                div()
+                    .ml(px(((entry.level - 1) as f32) * 16.0))
+                    .py_1()
+                    .child(
+                        div()
+                            .text_sm()
+                            .text_color(rgb(0x333333))
+                            .child(entry.title.clone()),
+                    )
+            }))
     }
 
     /// Render search input
-    fn render_search_input(&self, cx: &Context<Self>) -> impl IntoElement {
+    fn render_search_input(&self, _cx: &Context<Self>) -> impl IntoElement {
         if !self.options.show_search {
             return div();
         }
 
         // In a full implementation, this would use gpui_component::input::Input
         // For now, we'll create a simple styled div
-        div()
-            .relative()
-            .w(px(300.0))
-            .child(
-                div()
-                    .w_full()
-                    .px_3()
-                    .py_2()
-                    .border_1()
-                    .border_color(rgb(0xd0d0d0))
-                    .rounded_md()
-                    .bg(rgb(0xffffff))
-                    .text_sm()
-                    .text_color(rgb(0x333333))
-                    .child(if self.state.search_query.is_empty() {
-                        "Search... (Ctrl+F)".to_string()
-                    } else {
-                        self.state.search_query.clone()
-                    })
-            )
+        div().relative().w(px(300.0)).child(
+            div()
+                .w_full()
+                .px_3()
+                .py_2()
+                .border_1()
+                .border_color(rgb(0xd0d0d0))
+                .rounded_md()
+                .bg(rgb(0xffffff))
+                .text_sm()
+                .text_color(rgb(0x333333))
+                .child(if self.state.search_query.is_empty() {
+                    "Search... (Ctrl+F)".to_string()
+                } else {
+                    self.state.search_query.clone()
+                }),
+        )
     }
 
     /// Render main markdown content area
-    fn render_content(&self, elements: Vec<MarkdownElement>, _cx: &Context<Self>) -> impl IntoElement {
+    fn render_content(
+        &self,
+        elements: Vec<MarkdownElement>,
+        _cx: &Context<Self>,
+    ) -> impl IntoElement {
         div()
             .flex_1()
             .px_6()
             .py_4()
-            .children(
-                elements.iter().map(|element| {
-                    match element {
-                        MarkdownElement::Heading { level, content } => {
-                            let font_size = self.styles.heading_sizes.get(level - 1).unwrap_or(&24.0);
-                            div()
-                                .text_size(px(*font_size))
-                                .font_bold()
-                                .text_color(rgb(0x1a1a1a))
-                                .mt_4()
-                                .mb_2()
-                                .child(content.clone())
-                        }
-                        MarkdownElement::Paragraph(text) => {
-                            div()
-                                .text_size(px(self.styles.base_font_size))
-                                .text_color(rgb(0x333333))
-                                .line_height(px(self.styles.line_height))
-                                .mb_4()
-                                .child(text.clone())
-                        }
-                        MarkdownElement::CodeBlock { language: _, content } => {
-                            div()
-                                .bg(rgb(0xf8f9fa))
-                                .border_1()
-                                .border_color(rgb(0xe0e0e0))
-                                .rounded_md()
-                                .p_4()
-                                .mb_4()
-                                .font_family("monospace")
-                                .text_size(px(13.0))
-                                .text_color(rgb(0xe83e8c))
-                                .child(content.clone())
-                        }
-                        MarkdownElement::ListItem { level, content } => {
-                            div()
-                                .ml(px((*level as f32) * 24.0))
-                                .text_size(px(self.styles.base_font_size))
-                                .text_color(rgb(0x333333))
-                                .line_height(px(self.styles.line_height))
-                                .mb_2()
-                                .child(format!("• {}", content))
-                        }
-                        MarkdownElement::Blockquote(text) => {
-                            div()
-                                .border_l_4()
-                                .border_color(rgb(0x6c757d))
-                                .bg(rgb(0xf8f9fa))
-                                .pl_4()
-                                .py_2()
-                                .mb_4()
-                                .text_size(px(self.styles.base_font_size))
-                                .text_color(rgb(0x6c757d))
-                                .child(text.clone())
-                        }
+            .children(elements.iter().map(|element| {
+                match element {
+                    MarkdownElement::Heading { level, content } => {
+                        let font_size = self.styles.heading_sizes.get(level - 1).unwrap_or(&24.0);
+                        div()
+                            .text_size(px(*font_size))
+                            .font_bold()
+                            .text_color(rgb(0x1a1a1a))
+                            .mt_4()
+                            .mb_2()
+                            .child(content.clone())
                     }
-                })
-            )
+                    MarkdownElement::Paragraph(text) => div()
+                        .text_size(px(self.styles.base_font_size))
+                        .text_color(rgb(0x333333))
+                        .line_height(px(self.styles.line_height))
+                        .mb_4()
+                        .child(text.clone()),
+                    MarkdownElement::CodeBlock {
+                        language: _,
+                        content,
+                    } => div()
+                        .bg(rgb(0xf8f9fa))
+                        .border_1()
+                        .border_color(rgb(0xe0e0e0))
+                        .rounded_md()
+                        .p_4()
+                        .mb_4()
+                        .font_family("monospace")
+                        .text_size(px(13.0))
+                        .text_color(rgb(0xe83e8c))
+                        .child(content.clone()),
+                    MarkdownElement::ListItem { level, content } => div()
+                        .ml(px((*level as f32) * 24.0))
+                        .text_size(px(self.styles.base_font_size))
+                        .text_color(rgb(0x333333))
+                        .line_height(px(self.styles.line_height))
+                        .mb_2()
+                        .child(format!("• {}", content)),
+                    MarkdownElement::Blockquote(text) => div()
+                        .border_l_4()
+                        .border_color(rgb(0x6c757d))
+                        .bg(rgb(0xf8f9fa))
+                        .pl_4()
+                        .py_2()
+                        .mb_4()
+                        .text_size(px(self.styles.base_font_size))
+                        .text_color(rgb(0x6c757d))
+                        .child(text.clone()),
+                }
+            }))
             // Simple search results overlay (no complex interactivity)
-            .child(
-                self.render_search_results_simple()
-            )
+            .child(self.render_search_results_simple())
     }
 
     /// Render simple search results overlay
@@ -739,33 +732,45 @@ impl MarkdownModal {
                     .child(format!(
                         "Found {} result{}",
                         self.state.search_results.len(),
-                        if self.state.search_results.len() == 1 { "" } else { "s" }
-                    ))
+                        if self.state.search_results.len() == 1 {
+                            ""
+                        } else {
+                            "s"
+                        }
+                    )),
             )
             .children(
-                self.state.search_results.iter().enumerate().map(|(index, result)| {
-                    let is_selected = self.state.selected_search_result == Some(index);
-                    div()
-                        .p_3()
-                        .mb_2()
-                        .border_1()
-                        .border_color(if is_selected { rgb(0x007bff) } else { rgb(0xe0e0e0) })
-                        .rounded_md()
-                        .cursor_pointer()
-                        .child(
-                            div()
-                                .text_xs()
-                                .text_color(rgb(0x6c757d))
-                                .mb_1()
-                                .child(format!("Line {}", result.line_number))
-                        )
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(rgb(0x333333))
-                                .child(result.snippet.clone())
-                        )
-                })
+                self.state
+                    .search_results
+                    .iter()
+                    .enumerate()
+                    .map(|(index, result)| {
+                        let is_selected = self.state.selected_search_result == Some(index);
+                        div()
+                            .p_3()
+                            .mb_2()
+                            .border_1()
+                            .border_color(if is_selected {
+                                rgb(0x007bff)
+                            } else {
+                                rgb(0xe0e0e0)
+                            })
+                            .rounded_md()
+                            .cursor_pointer()
+                            .child(
+                                div()
+                                    .text_xs()
+                                    .text_color(rgb(0x6c757d))
+                                    .mb_1()
+                                    .child(format!("Line {}", result.line_number)),
+                            )
+                            .child(
+                                div()
+                                    .text_sm()
+                                    .text_color(rgb(0x333333))
+                                    .child(result.snippet.clone()),
+                            )
+                    }),
             )
     }
 }

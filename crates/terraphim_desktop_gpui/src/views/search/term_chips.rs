@@ -1,6 +1,5 @@
 use gpui::*;
-use gpui::prelude::FluentBuilder;
-use gpui_component::{button::*, StyledExt};
+use gpui_component::{StyledExt, button::*};
 
 use crate::models::{ChipOperator, TermChip, TermChipSet};
 use crate::theme::colors::theme;
@@ -35,21 +34,11 @@ impl TermChips {
             } else {
                 theme::border()
             })
-            .child(
-                div()
-                    .flex()
-                    .items_center()
-                    .gap_1()
-            );
+            .child(div().flex().items_center().gap_1());
 
         // Add KG icon if from knowledge graph
         if is_from_kg {
-            chip_div = chip_div.child(
-                div()
-                    .text_sm()
-                    .text_color(theme::primary())
-                    .child("📚")
-            );
+            chip_div = chip_div.child(div().text_sm().text_color(theme::primary()).child("KG"));
         }
 
         // Add term value
@@ -57,7 +46,7 @@ impl TermChips {
             div()
                 .text_sm()
                 .text_color(theme::text_primary())
-                .child(value.clone())
+                .child(value.clone()),
         );
 
         // Add remove button
@@ -68,7 +57,7 @@ impl TermChips {
                 .on_click(cx.listener(move |_this, _ev, _window, _cx| {
                     // TODO: Emit event to remove chip
                     log::info!("Remove chip at index: {}", idx);
-                }))
+                })),
         )
     }
 
@@ -99,12 +88,7 @@ impl Render for TermChips {
         let operator = self.chips.operator;
 
         // Build a simple list of chips with operators
-        let mut container = div()
-            .flex()
-            .items_center()
-            .gap_2()
-            .flex_wrap()
-            .w_full();
+        let mut container = div().flex().items_center().gap_2().flex_wrap().w_full();
 
         for (idx, chip) in chips.iter().enumerate() {
             // Add operator before chip (except first)
@@ -113,7 +97,7 @@ impl Render for TermChips {
                     container = container.child(self.render_operator(op));
                 }
             }
-            
+
             // Add chip
             container = container.child(self.render_chip(chip, idx, cx));
         }

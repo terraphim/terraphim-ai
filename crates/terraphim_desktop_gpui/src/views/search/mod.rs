@@ -1,9 +1,11 @@
+use crate::slash_command::CommandRegistry;
+use crate::state::search::SearchState;
+use crate::theme::colors::theme;
+use crate::views::ArticleModal;
 use gpui::*;
 use gpui_component::StyledExt;
+use std::sync::Arc;
 use terraphim_config::ConfigState;
-use crate::state::search::SearchState;
-use crate::views::ArticleModal;
-use crate::theme::colors::theme;
 
 mod autocomplete;
 mod input;
@@ -27,37 +29,52 @@ pub struct SearchView {
 }
 
 impl SearchView {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState) -> Self {
+    pub fn new(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        config_state: ConfigState,
+        command_registry: Arc<CommandRegistry>,
+    ) -> Self {
         log::info!("=== SearchView INITIALIZATION ===");
         log::info!("ConfigState roles count: {}", config_state.roles.len());
-        log::info!("ConfigState roles: {:?}", config_state.roles.keys().collect::<Vec<_>>());
+        log::info!(
+            "ConfigState roles: {:?}",
+            config_state.roles.keys().collect::<Vec<_>>()
+        );
 
         let search_state = cx.new(|cx| {
             let state = SearchState::new(cx).with_config(config_state);
             log::info!("SearchState created - has_config: {}", state.has_config());
             state
         });
-        let search_input = cx.new(|cx| SearchInput::new(window, cx, search_state.clone()));
+        let search_input = cx
+            .new(|cx| SearchInput::new(window, cx, search_state.clone(), command_registry.clone()));
         let search_results = cx.new(|cx| SearchResults::new(window, cx, search_state.clone()));
         let article_modal = cx.new(|cx| ArticleModal::new(window, cx));
 
         // Forward AddToContextEvent from SearchResults to App
-        let results_sub1 = cx.subscribe(&search_results, |_this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
-            log::info!("SearchView forwarding AddToContext event");
-            cx.emit(AddToContextEvent { 
-                document: event.document.clone(),
-                navigate_to_chat: event.navigate_to_chat,
-            });
-        });
+        let results_sub1 = cx.subscribe(
+            &search_results,
+            |_this: &mut SearchView, _results, event: &AddToContextEvent, cx| {
+                log::info!("SearchView forwarding AddToContext event");
+                cx.emit(AddToContextEvent {
+                    document: event.document.clone(),
+                    navigate_to_chat: event.navigate_to_chat,
+                });
+            },
+        );
 
         // Handle OpenArticleEvent to show modal
         let modal_clone = article_modal.clone();
-        let results_sub2 = cx.subscribe(&search_results, move |_this: &mut SearchView, _results, event: &OpenArticleEvent, cx| {
-            log::info!("Opening article modal for: {}", event.document.title);
-            modal_clone.update(cx, |modal, modal_cx| {
-                modal.open(event.document.clone(), modal_cx);
-            });
-        });
+        let results_sub2 = cx.subscribe(
+            &search_results,
+            move |_this: &mut SearchView, _results, event: &OpenArticleEvent, cx| {
+                log::info!("Opening article modal for: {}", event.document.title);
+                modal_clone.update(cx, |modal, modal_cx| {
+                    modal.open(event.document.clone(), modal_cx);
+                });
+            },
+        );
 
         log::info!("SearchView initialized with backend services");
 
@@ -94,7 +111,7 @@ impl Render for SearchView {
     fn render(&mut self, _window: &mut Window, cx: &mut Context<Self>) -> impl IntoElement {
         // Get term chips from search state
         let term_chips = self.search_state.read(cx).get_term_chips();
-        
+
         div()
             .relative()
             .flex()
@@ -115,11 +132,7 @@ impl Render for SearchView {
             } else {
                 None
             })
-            .child(
-                div()
-                    .flex_1()
-                    .child(self.search_results.clone()),
-            )
-            .child(self.article_modal.clone())  // Modal renders on top
+            .child(div().flex_1().child(self.search_results.clone()))
+            .child(self.article_modal.clone()) // Modal renders on top
     }
 }

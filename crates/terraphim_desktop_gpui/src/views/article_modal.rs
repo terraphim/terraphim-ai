@@ -2,11 +2,11 @@
 ///
 /// Shows full document content with markdown rendering
 /// Pattern from desktop/src/lib/Search/ArticleModal.svelte
-
 use gpui::*;
-use gpui_component::{button::*, IconName, StyledExt};
+use gpui_component::{IconName, StyledExt, button::*};
 use terraphim_types::Document;
 
+use crate::markdown::render_markdown;
 use crate::theme::colors::theme;
 
 /// Article modal for viewing full document content
@@ -55,7 +55,7 @@ impl Render for ArticleModal {
         div()
             .absolute()
             .inset_0()
-            .bg(theme::text_primary())  // Use theme color for overlay
+            .bg(theme::text_primary()) // Use theme color for overlay
             .opacity(0.95)
             .flex()
             .items_center()
@@ -63,10 +63,10 @@ impl Render for ArticleModal {
             .child(
                 div()
                     .relative()
-                    .w(px(1000.0))      // Reasonable width for most screens
-                    .max_w_full()       // Don't exceed parent width
-                    .h(px(600.0))       // Reasonable height for laptop screens
-                    .max_h(px(700.0))   // Maximum height cap
+                    .w(px(1000.0)) // Reasonable width for most screens
+                    .max_w_full() // Don't exceed parent width
+                    .h(px(600.0)) // Reasonable height for laptop screens
+                    .max_h(px(700.0)) // Maximum height cap
                     .bg(theme::background())
                     .rounded_lg()
                     .shadow_xl()
@@ -88,31 +88,24 @@ impl Render for ArticleModal {
                                     .text_xl()
                                     .font_bold()
                                     .text_color(theme::text_primary())
-                                    .child(title)
+                                    .child(title),
                             )
                             .child(
                                 Button::new("close-modal")
                                     .label("Close")
                                     .icon(IconName::Delete)
                                     .ghost()
-                                    .on_click(cx.listener(Self::close))
-                            )
+                                    .on_click(cx.listener(Self::close)),
+                            ),
                     )
                     .child(
-                        // Document content area - truncates overflow for now
-                        // TODO: Add proper scrolling when GPUI supports it better
+                        // Document content area with markdown rendering
                         div()
                             .flex_1()
                             .overflow_hidden()
                             .px_6()
                             .py_4()
-                            .child(
-                                div()
-                                    .text_sm()
-                                    .line_height(px(24.0))
-                                    .text_color(theme::text_primary())
-                                    .child(body)
-                            )
+                            .child(render_markdown(&body)),
                     )
                     .child(
                         // Footer with URL
@@ -126,9 +119,9 @@ impl Render for ArticleModal {
                                 div()
                                     .text_xs()
                                     .text_color(theme::text_secondary())
-                                    .child(format!("Source: {}", url))
-                            )
-                    )
+                                    .child(format!("Source: {}", url)),
+                            ),
+                    ),
             )
             .into_any_element()
     }

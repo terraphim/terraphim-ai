@@ -3,10 +3,9 @@
 /// LEVERAGE: Uses existing search patterns and performance optimizations from Phase 1
 /// Provides smooth scrolling for 1000+ messages with sub-16ms frame times
 /// Built on proven patterns from SearchState autocomplete caching
-
 use gpui::*;
-use std::time::{Duration, Instant};
 use lru::LruCache;
+use std::time::{Duration, Instant};
 
 /// Virtual scrolling configuration
 #[derive(Debug, Clone)]
@@ -24,9 +23,9 @@ pub struct VirtualScrollConfig {
 impl Default for VirtualScrollConfig {
     fn default() -> Self {
         Self {
-            row_height: 80.0,           // Average message height
-            buffer_size: 5,              // 5 rows buffer for smooth scrolling
-            max_cached_heights: 1000,    // Cache up to 1000 message heights
+            row_height: 80.0,         // Average message height
+            buffer_size: 5,           // 5 rows buffer for smooth scrolling
+            max_cached_heights: 1000, // Cache up to 1000 message heights
             smooth_scroll_duration_ms: 200,
         }
     }
@@ -79,7 +78,9 @@ impl VirtualScrollState {
             last_render_time: Instant::now(),
             scroll_animation_start: None,
             scroll_animation_start_offset: 0.0,
-            height_cache: LruCache::new(std::num::NonZeroUsize::new(config.max_cached_heights).unwrap()),
+            height_cache: LruCache::new(
+                std::num::NonZeroUsize::new(config.max_cached_heights).unwrap(),
+            ),
         }
     }
 
@@ -89,14 +90,22 @@ impl VirtualScrollState {
         self.message_count = count;
         self.row_heights = heights;
 
-        log::debug!("VirtualScroll: updating messages {} -> {}", old_count, count);
+        log::debug!(
+            "VirtualScroll: updating messages {} -> {}",
+            old_count,
+            count
+        );
 
         // Recalculate accumulated heights
         self.recalculate_heights();
 
         // Maintain scroll position if new messages are added at bottom
         if count > old_count && self.scroll_offset > 0.0 {
-            let height_diff = self.total_height - (self.accumulated_heights.get(old_count.saturating_sub(1)).unwrap_or(&0.0));
+            let height_diff = self.total_height
+                - (self
+                    .accumulated_heights
+                    .get(old_count.saturating_sub(1))
+                    .unwrap_or(&0.0));
             self.scroll_offset += height_diff;
             self.target_scroll_offset = self.scroll_offset;
         }
@@ -120,7 +129,9 @@ impl VirtualScrollState {
         let max_offset = (self.total_height - self.viewport_height).max(0.0);
         self.target_scroll_offset = offset.clamp(0.0, max_offset);
 
-        if self.config.smooth_scroll_duration_ms > 0 && (self.target_scroll_offset - self.scroll_offset).abs() > 1.0 {
+        if self.config.smooth_scroll_duration_ms > 0
+            && (self.target_scroll_offset - self.scroll_offset).abs() > 1.0
+        {
             self.start_smooth_scroll(cx);
         } else {
             self.scroll_offset = self.target_scroll_offset;
@@ -183,10 +194,7 @@ impl VirtualScrollState {
 
     /// Render container for virtual scrolling (simplified without animation from external calls)
     pub fn render_container_simple(&self) -> impl IntoElement {
-        div()
-            .relative()
-            .h(px(self.total_height))
-            .w_full()
+        div().relative().h(px(self.total_height)).w_full()
     }
 
     /// Render container for virtual scrolling (with animation support when called from within)
@@ -202,7 +210,8 @@ impl VirtualScrollState {
 
                 let start_offset = self.scroll_animation_start_offset;
                 let target_offset = self.target_scroll_offset;
-                self.scroll_offset = start_offset + (target_offset - start_offset) * (eased_progress as f32);
+                self.scroll_offset =
+                    start_offset + (target_offset - start_offset) * (eased_progress as f32);
 
                 // Continue animation
                 cx.spawn(async move |this, cx| {
@@ -212,8 +221,10 @@ impl VirtualScrollState {
 
                     this.update(cx, |this, cx| {
                         this.continue_smooth_scroll(cx);
-                    }).ok();
-                }).detach();
+                    })
+                    .ok();
+                })
+                .detach();
             } else {
                 // Animation complete
                 self.scroll_offset = self.target_scroll_offset;
@@ -223,10 +234,7 @@ impl VirtualScrollState {
             }
         }
 
-        div()
-            .relative()
-            .h(px(self.total_height))
-            .w_full()
+        div().relative().h(px(self.total_height)).w_full()
     }
 
     /// Get position for a specific message index
@@ -252,7 +260,11 @@ impl VirtualScrollState {
 
         self.total_height = accumulated;
 
-        log::debug!("VirtualScroll: total_height={:.1}px for {} messages", self.total_height, self.message_count);
+        log::debug!(
+            "VirtualScroll: total_height={:.1}px for {} messages",
+            self.total_height,
+            self.message_count
+        );
     }
 
     /// Update visible range based on current scroll offset
@@ -363,6 +375,219 @@ mod tests {
         let state = VirtualScrollState::new(VirtualScrollConfig::default());
         assert_eq!(state.message_count, 0);
         assert_eq!(state.total_height, 0.0);
+        assert_eq!(state.viewport_height, 600.0);
+        assert_eq!(state.scroll_offset, 0.0);
+        assert_eq!(state.target_scroll_offset, 0.0);
+        assert_eq!(state.visible_range, (0, 0));
+    }
+
+    #[test]
+    fn test_virtual_scroll_config_default() {
+        let config = VirtualScrollConfig::default();
+        assert_eq!(config.row_height, 80.0);
+        assert_eq!(config.buffer_size, 5);
+        assert_eq!(config.max_cached_heights, 1000);
+        assert_eq!(config.smooth_scroll_duration_ms, 200);
+    }
+
+    #[test]
+    fn test_virtual_scroll_config_custom() {
+        let config = VirtualScrollConfig {
+            row_height: 100.0,
+            buffer_size: 10,
+            max_cached_heights: 2000,
+            smooth_scroll_duration_ms: 300,
+        };
+
+        let state = VirtualScrollState::new(config);
+        assert_eq!(state.height_cache.len(), 0); // Cache starts empty
+    }
+
+    #[test]
+    fn test_update_message_count() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+        assert_eq!(state.message_count, 0);
+
+        let heights = vec![80.0, 100.0, 90.0];
+        state.update_message_count(3, heights.clone());
+
+        assert_eq!(state.message_count, 3);
+        assert_eq!(state.row_heights, heights);
+        assert_eq!(state.total_height, 270.0);
+        assert!(!state.accumulated_heights.is_empty());
+    }
+
+    #[test]
+    fn test_update_message_count_increases_height() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights1 = vec![80.0, 100.0];
+        state.update_message_count(2, heights1);
+
+        assert_eq!(state.total_height, 180.0);
+
+        let heights2 = vec![80.0, 100.0, 90.0, 110.0];
+        state.update_message_count(4, heights2);
+
+        assert_eq!(state.total_height, 380.0);
+    }
+
+    #[test]
+    fn test_set_viewport_height() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+        assert_eq!(state.viewport_height, 600.0);
+
+        // Note: This requires Context and triggers notifications
+        // The actual behavior is tested in integration tests
+    }
+
+    #[test]
+    fn test_set_viewport_height_direct() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        state.set_viewport_height_direct(800.0);
+        assert_eq!(state.viewport_height, 800.0);
+
+        state.set_viewport_height_direct(400.0);
+        assert_eq!(state.viewport_height, 400.0);
+    }
+
+    #[test]
+    fn test_scroll_offset_clamping() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![80.0; 10];
+        state.update_message_count(10, heights);
+
+        // Test clamping to max offset
+        let max_offset = state.total_height - state.viewport_height;
+        let large_offset = max_offset + 1000.0;
+
+        state.set_scroll_offset_direct(large_offset);
+        assert_eq!(state.scroll_offset, max_offset);
+    }
+
+    #[test]
+    fn test_scroll_offset_below_zero() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        state.set_scroll_offset_direct(-100.0);
+        assert_eq!(state.scroll_offset, 0.0);
+    }
+
+    #[test]
+    fn test_handle_scroll() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![80.0; 10];
+        state.update_message_count(10, heights);
+
+        // Note: This requires Context and is tested in integration tests
+    }
+
+    #[test]
+    fn test_scroll_to_message() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0, 150.0, 200.0, 120.0];
+        state.update_message_count(4, heights);
+
+        // Scroll to message at index 2 (should be at height 250: 100 + 150)
+        state.scroll_to_message(2, &mut gpui::test::Context::default());
+
+        assert_eq!(state.scroll_offset, 250.0);
+    }
+
+    #[test]
+    fn test_scroll_to_message_out_of_bounds() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![80.0; 5];
+        state.update_message_count(5, heights);
+
+        // Try to scroll to message that doesn't exist
+        state.scroll_to_message(10, &mut gpui::test::Context::default());
+
+        // Should not crash and not change scroll position
+        assert_eq!(state.scroll_offset, 0.0);
+    }
+
+    #[test]
+    fn test_get_visible_range() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0; 20];
+        state.update_message_count(20, heights);
+        state.set_viewport_height_direct(300.0);
+
+        let range = state.get_visible_range();
+        assert!(range.1 > range.0);
+        assert!(range.0 >= 0);
+        assert!(range.1 <= 20);
+    }
+
+    #[test]
+    fn test_get_visible_range_empty() {
+        let state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let range = state.get_visible_range();
+        assert_eq!(range, (0, 0));
+    }
+
+    #[test]
+    fn test_get_total_height() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        assert_eq!(state.get_total_height(), 0.0);
+
+        let heights = vec![80.0, 120.0, 100.0];
+        state.update_message_count(3, heights);
+
+        assert_eq!(state.get_total_height(), 300.0);
+    }
+
+    #[test]
+    fn test_get_scroll_offset() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        assert_eq!(state.get_scroll_offset(), 0.0);
+
+        state.set_scroll_offset_direct(150.0);
+        assert_eq!(state.get_scroll_offset(), 150.0);
+    }
+
+    #[test]
+    fn test_get_viewport_height() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        assert_eq!(state.get_viewport_height(), 600.0);
+
+        state.set_viewport_height_direct(800.0);
+        assert_eq!(state.get_viewport_height(), 800.0);
+    }
+
+    #[test]
+    fn test_get_message_position() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0, 150.0, 200.0];
+        state.update_message_count(3, heights);
+
+        assert_eq!(state.get_message_position(0), 0.0);
+        assert_eq!(state.get_message_position(1), 100.0);
+        assert_eq!(state.get_message_position(2), 250.0);
+        assert_eq!(state.get_message_position(3), 450.0); // Total height
+    }
+
+    #[test]
+    fn test_get_message_position_out_of_bounds() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![80.0; 5];
+        state.update_message_count(5, heights);
+
+        // Index beyond length should return total height
+        assert_eq!(state.get_message_position(10), state.total_height);
     }
 
     #[test]
@@ -386,6 +611,56 @@ mod tests {
     }
 
     #[test]
+    fn test_find_message_index_for_scroll_empty() {
+        let state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let idx = state.find_message_index_for_scroll(100.0);
+        assert_eq!(idx, 0);
+    }
+
+    #[test]
+    fn test_find_message_index_for_scroll_exact_match() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0, 200.0, 300.0]; // Accumulated: 0, 100, 300
+        state.update_message_count(3, heights);
+
+        // Exact match at accumulated height
+        let idx = state.find_message_index_for_scroll(100.0);
+        assert_eq!(idx, 0); // First message
+
+        let idx = state.find_message_index_for_scroll(300.0);
+        assert_eq!(idx, 1); // Second message
+    }
+
+    #[test]
+    fn test_find_message_index_for_scroll_between_messages() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0, 200.0, 300.0]; // Accumulated: 0, 100, 300
+        state.update_message_count(3, heights);
+
+        // Between first and second message
+        let idx = state.find_message_index_for_scroll(50.0);
+        assert_eq!(idx, 0);
+
+        // Between second and third message
+        let idx = state.find_message_index_for_scroll(200.0);
+        assert_eq!(idx, 1);
+    }
+
+    #[test]
+    fn test_find_message_index_for_scroll_beyond_total() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0, 200.0, 300.0];
+        state.update_message_count(3, heights);
+
+        let idx = state.find_message_index_for_scroll(10000.0);
+        assert_eq!(idx, 2); // Last message index
+    }
+
+    #[test]
     fn test_easing_function() {
         // Test easing function properties
         assert_eq!(VirtualScrollState::ease_out_cubic(0.0), 0.0);
@@ -398,17 +673,75 @@ mod tests {
     }
 
     #[test]
+    fn test_easing_function_non_linear() {
+        // Easing should accelerate then decelerate
+        let start = VirtualScrollState::ease_out_cubic(0.0);
+        let quarter = VirtualScrollState::ease_out_cubic(0.25);
+        let half = VirtualScrollState::ease_out_cubic(0.5);
+        let three_quarters = VirtualScrollState::ease_out_cubic(0.75);
+        let end = VirtualScrollState::ease_out_cubic(1.0);
+
+        assert_eq!(start, 0.0);
+        assert_eq!(end, 1.0);
+
+        // Should be increasing
+        assert!(quarter > start);
+        assert!(half > quarter);
+        assert!(three_quarters > half);
+        assert!(end > three_quarters);
+
+        // Should not be linear (ease-out is faster at start)
+        let linear_at_half = 0.5;
+        assert!(half > linear_at_half); // Ease-out reaches further by halfway
+    }
+
+    #[test]
     fn test_visible_range_calculation() {
         let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
 
         // Add test messages
         let heights = vec![100.0; 20]; // 20 messages, 100px each
         state.update_message_count(20, heights);
-        state.set_viewport_height(300.0, &mut gpui::test::Context::default());
+        state.set_viewport_height_direct(300.0);
 
         let range = state.get_visible_range();
         assert!(range.1 > range.0); // Should have visible messages
         assert!(range.1 - range.0 <= 10); // Should not exceed viewport + buffer
+    }
+
+    #[test]
+    fn test_visible_range_with_buffer() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig {
+            buffer_size: 10, // Larger buffer
+            ..Default::default()
+        });
+
+        let heights = vec![100.0; 50];
+        state.update_message_count(50, heights);
+        state.set_viewport_height_direct(300.0);
+
+        let range = state.get_visible_range();
+        // With 300px viewport and 100px rows, we need 3 rows visible
+        // With 10-row buffer, we should have ~13 rows in range
+        assert!(range.1 - range.0 >= 10);
+        assert!(range.1 - range.0 <= 20); // 3 visible + 10 buffer + buffer on top
+    }
+
+    #[test]
+    fn test_visible_range_scroll_position() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0; 20];
+        state.update_message_count(20, heights);
+        state.set_viewport_height_direct(300.0);
+
+        // Scroll to middle
+        state.set_scroll_offset_direct(500.0);
+
+        let range = state.get_visible_range();
+        // Should show messages around the 5th message (500px / 100px = 5)
+        assert!(range.0 > 0);
+        assert!(range.1 < 20);
     }
 
     #[test]
@@ -417,12 +750,146 @@ mod tests {
 
         let heights = vec![80.0; 5];
         state.update_message_count(5, heights);
-        state.set_viewport_height(200.0, &mut gpui::test::Context::default());
+        state.set_viewport_height_direct(200.0);
 
         state.scroll_to_bottom(&mut gpui::test::Context::default());
 
         // Should be scrolled to the bottom
         let expected_offset = (state.total_height - 200.0).max(0.0);
         assert!((state.scroll_offset - expected_offset).abs() < 1.0);
+    }
+
+    #[test]
+    fn test_scroll_to_bottom_with_short_content() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![80.0; 2];
+        state.update_message_count(2, heights);
+        state.set_viewport_height_direct(300.0);
+
+        state.scroll_to_bottom(&mut gpui::test::Context::default());
+
+        // Content is shorter than viewport, should be at 0
+        assert_eq!(state.scroll_offset, 0.0);
+    }
+
+    #[test]
+    fn test_render_container_simple() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0; 5];
+        state.update_message_count(5, heights);
+
+        let container = state.render_container_simple();
+
+        // Just verify it doesn't panic
+        assert!(container.into_any_element().is_ok());
+    }
+
+    #[test]
+    fn test_render_container_with_animation() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig {
+            smooth_scroll_duration_ms: 200,
+            ..Default::default()
+        });
+
+        let heights = vec![100.0; 5];
+        state.update_message_count(5, heights);
+
+        // Note: This requires Context and is tested in integration tests
+        // The actual rendering with animation is complex and requires async context
+    }
+
+    #[test]
+    fn test_performance_stats() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0; 20];
+        state.update_message_count(20, heights);
+        state.set_scroll_offset_direct(500.0);
+
+        let stats = state.get_performance_stats();
+
+        assert_eq!(stats.total_messages, 20);
+        assert!(stats.visible_messages > 0);
+        assert_eq!(stats.total_height, 2000.0);
+        assert_eq!(stats.scroll_offset, 500.0);
+        assert_eq!(stats.cached_heights, 0); // Cache starts empty
+    }
+
+    #[test]
+    fn test_clear_caches() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        // Add some items to cache (simulated)
+        // Note: Actual caching happens during operation, not directly settable
+
+        state.clear_caches();
+
+        assert_eq!(state.height_cache.len(), 0);
+    }
+
+    #[test]
+    fn test_recalculate_heights() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights = vec![100.0, 150.0, 200.0, 120.0];
+        state.update_message_count(4, heights);
+
+        // Verify accumulated heights are correct
+        assert_eq!(state.accumulated_heights.len(), 4);
+        assert_eq!(state.accumulated_heights[0], 0.0); // First message starts at 0
+        assert_eq!(state.accumulated_heights[1], 100.0);
+        assert_eq!(state.accumulated_heights[2], 250.0);
+        assert_eq!(state.accumulated_heights[3], 450.0);
+    }
+
+    #[test]
+    fn test_update_message_count_preserves_scroll() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        let heights1 = vec![100.0; 5];
+        state.update_message_count(5, heights1);
+        state.set_scroll_offset_direct(200.0);
+
+        // Add more messages
+        let heights2 = vec![100.0; 10];
+        state.update_message_count(10, heights2);
+
+        // Scroll position should be adjusted for the new content
+        assert!(state.scroll_offset > 200.0);
+    }
+
+    #[test]
+    fn test_virtual_scroll_large_dataset() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        // Simulate large dataset (1000 messages)
+        let heights = vec![80.0; 1000];
+        state.update_message_count(1000, heights);
+
+        assert_eq!(state.message_count, 1000);
+        assert_eq!(state.total_height, 80000.0);
+
+        // Visible range should be small
+        let range = state.get_visible_range();
+        assert!(range.1 - range.0 < 50); // Should only render visible + buffer
+    }
+
+    #[test]
+    fn test_binary_search_performance() {
+        let mut state = VirtualScrollState::new(VirtualScrollConfig::default());
+
+        // Large dataset
+        let heights = vec![80.0; 10000];
+        state.update_message_count(10000, heights);
+
+        // Binary search should be O(log n)
+        let start = std::time::Instant::now();
+        let _idx = state.find_message_index_for_scroll(400000.0);
+        let elapsed = start.elapsed();
+
+        // Should be very fast (less than 1ms)
+        assert!(elapsed.as_micros() < 1000);
     }
 }

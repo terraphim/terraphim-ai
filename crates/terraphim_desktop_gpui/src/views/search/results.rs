@@ -1,5 +1,5 @@
 use gpui::*;
-use gpui_component::{button::*, IconName, StyledExt};
+use gpui_component::{IconName, StyledExt, button::*};
 use terraphim_types::Document;
 
 use crate::state::search::SearchState;
@@ -8,7 +8,7 @@ use crate::theme::colors::theme;
 /// Event emitted when user wants to add document to context
 pub struct AddToContextEvent {
     pub document: Document,
-    pub navigate_to_chat: bool,  // If true, also navigate to chat after adding
+    pub navigate_to_chat: bool, // If true, also navigate to chat after adding
 }
 
 /// Event emitted when user wants to view full document
@@ -25,14 +25,21 @@ pub struct SearchResults {
 }
 
 impl SearchResults {
-    pub fn new(_window: &mut Window, _cx: &mut Context<Self>, search_state: Entity<SearchState>) -> Self {
+    pub fn new(
+        _window: &mut Window,
+        _cx: &mut Context<Self>,
+        search_state: Entity<SearchState>,
+    ) -> Self {
         Self { search_state }
     }
 
     fn handle_open_url(&self, url: String) {
         if !url.is_empty() {
             // Determine the appropriate scheme for the URL
-            let url = if url.starts_with("http://") || url.starts_with("https://") || url.starts_with("file://") {
+            let url = if url.starts_with("http://")
+                || url.starts_with("https://")
+                || url.starts_with("file://")
+            {
                 // URL already has a valid scheme
                 url
             } else if url.starts_with('/') || url.starts_with("~/") {
@@ -75,7 +82,7 @@ impl SearchResults {
     fn handle_add_to_context(&mut self, document: Document, cx: &mut Context<Self>) {
         log::info!("Adding to context: {}", document.title);
         // Directly add to context (no modal, no navigation)
-        cx.emit(AddToContextEvent { 
+        cx.emit(AddToContextEvent {
             document,
             navigate_to_chat: false,
         });
@@ -84,7 +91,7 @@ impl SearchResults {
     fn handle_chat_with_document(&mut self, document: Document, cx: &mut Context<Self>) {
         log::info!("Chat with document: {}", document.title);
         // Add to context AND navigate to chat
-        cx.emit(AddToContextEvent { 
+        cx.emit(AddToContextEvent {
             document,
             navigate_to_chat: true,
         });
@@ -95,7 +102,12 @@ impl SearchResults {
         cx.emit(OpenArticleEvent { document });
     }
 
-    fn render_result_item(&self, doc: &Document, idx: usize, cx: &Context<Self>) -> impl IntoElement {
+    fn render_result_item(
+        &self,
+        doc: &Document,
+        idx: usize,
+        cx: &Context<Self>,
+    ) -> impl IntoElement {
         let doc_url = doc.url.clone();
         let doc_clone_for_context = doc.clone();
         let doc_clone_for_chat = doc.clone();
@@ -124,7 +136,7 @@ impl SearchResults {
                             .ghost()
                             .on_click(cx.listener(move |this, _ev, _window, cx| {
                                 this.handle_open_article(doc_clone_for_modal.clone(), cx);
-                            }))
+                            })),
                     ),
             )
             .child(
@@ -134,8 +146,7 @@ impl SearchResults {
                     .mb_2()
                     .child(
                         doc.description
-                            .as_ref()
-                            .map(|d| d.clone())
+                            .clone()
                             .unwrap_or_else(|| "No description".to_string()),
                     ),
             )
@@ -159,7 +170,7 @@ impl SearchResults {
                             .ghost()
                             .on_click(cx.listener(move |this, _ev, _window, _cx| {
                                 this.handle_open_url(doc_url.clone());
-                            }))
+                            })),
                     )
                     .child(
                         Button::new(("add-ctx", idx))
@@ -168,7 +179,7 @@ impl SearchResults {
                             .outline()
                             .on_click(cx.listener(move |this, _ev, _window, cx| {
                                 this.handle_add_to_context(doc_clone_for_context.clone(), cx);
-                            }))
+                            })),
                     )
                     .child(
                         Button::new(("chat-doc", idx))
@@ -177,8 +188,8 @@ impl SearchResults {
                             .primary()
                             .on_click(cx.listener(move |this, _ev, _window, cx| {
                                 this.handle_chat_with_document(doc_clone_for_chat.clone(), cx);
-                            }))
-                    )
+                            })),
+                    ),
             )
     }
 
@@ -189,12 +200,7 @@ impl SearchResults {
             .items_center()
             .justify_center()
             .py_12()
-            .child(
-                div()
-                    .text_2xl()
-                    .mb_4()
-                    .child("🔍"),
-            )
+            .child(div().text_2xl().mb_4().child("Search"))
             .child(
                 div()
                     .text_xl()
@@ -226,16 +232,32 @@ impl Render for SearchResults {
                 .py_12()
                 .child(
                     div()
-                        .text_lg()
-                        .text_color(theme::text_secondary())
-                        .child("Searching...")
+                        .flex()
+                        .flex_col()
+                        .items_center()
+                        .gap_3()
+                        .child(
+                            // Animated spinner
+                            div()
+                                .w_8()
+                                .h_8()
+                                .border_4()
+                                .border_color(theme::primary())
+                                .rounded_full(),
+                        )
+                        .child(
+                            div()
+                                .text_lg()
+                                .text_color(theme::text_secondary())
+                                .child("Searching..."),
+                        ),
                 )
                 .into_any_element()
         } else if has_error {
             div()
                 .px_4()
                 .py_3()
-                .bg(theme::warning())  // Use warning color directly
+                .bg(theme::warning()) // Use warning color directly
                 .border_1()
                 .border_color(theme::warning())
                 .rounded_md()
@@ -250,16 +272,12 @@ impl Render for SearchResults {
                 .flex_col()
                 .gap_3()
                 .child(
-                    div()
-                        .pb_2()
-                        .border_b_1()
-                        .border_color(rgb(0xf0f0f0))
-                        .child(
-                            div()
-                                .text_sm()
-                                .text_color(theme::text_secondary())
-                                .child(format!("Found {} results", results.len()))
-                        )
+                    div().pb_2().border_b_1().border_color(rgb(0xf0f0f0)).child(
+                        div()
+                            .text_sm()
+                            .text_color(theme::text_secondary())
+                            .child(format!("Found {} results", results.len())),
+                    ),
                 )
                 .children(results.iter().enumerate().map(|(idx, result)| {
                     // Render using the document from ResultItemViewModel

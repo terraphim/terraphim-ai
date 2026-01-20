@@ -5,7 +5,7 @@ use tokio::sync::mpsc;
 use tokio::sync::Mutex as TokioMutex;
 use terraphim_service::{llm, context::ContextManager as TerraphimContextManager};
 use terraphim_types::{
-    ChatMessage, ConversationId, ChunkType
+    ChatMessage, ConversationId, RoleName, ChunkType, ContextItem, StreamingChatMessage, RenderChunk, MessageStatus
 };
 use crate::views::chat::state::StreamingChatState;
 
@@ -184,6 +184,154 @@ impl StreamingCoordinator {
         active_streams.contains_key(conversation_id)
     }
 
+    /// Start a new stream (generic interface)
+    pub async fn start_stream(
+        &mut self,
+        conversation_id: ConversationId,
+        messages: Vec<serde_json::Value>,
+        role: RoleName,
+        context_items: Vec<ContextItem>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let mut streams = self.active_streams.lock().await;
+
+        // Cancel existing stream for this conversation
+        if let Some(existing) = streams.get(&conversation_id) {
+            existing.cancellation_tx.send(()).await.ok();
+        }
+
+        // Create cancellation channel
+        let (cancellation_tx, mut cancellation_rx) = mpsc::channel::<()>(1);
+
+        // Create LLM client based on role
+        let llm_client = create_llm_client(&role)?;
+
+        // Create stream handle with task
+        let stream_handle = StreamHandle {
+            conversation_id: conversation_id.clone(),
+            task_handle: tokio::spawn(Self::stream_task(
+                conversation_id.clone(),
+                messages,
+                role,
+                context_items,
+                llm_client,
+                cancellation_rx,
+            )),
+            cancellation_tx,
+            is_active: true,
+        };
+
+        streams.insert(conversation_id, stream_handle);
+        Ok(())
+    }
+
+    /// Async task for streaming LLM responses
+    async fn stream_task(
+        conversation_id: ConversationId,
+        messages: Vec<serde_json::Value>,
+        role: RoleName,
+        context_items: Vec<ContextItem>,
+        llm_client: Box<dyn llm::LlmClient>,
+        mut cancellation_rx: mpsc::Receiver<()>,
+    ) {
+        let llm_client_ref = llm_client.as_ref();
+        log::info!("Starting stream task for conversation: {}", conversation_id.as_str());
+
+        // Build messages with context
+        let mut full_messages = messages;
+
+        if !context_items.is_empty() {
+            let mut context_content = String::from("=== CONTEXT ===\n");
+            for (idx, item) in context_items.iter().enumerate() {
+                context_content.push_str(&format!(
+                    "{}. {}\n{}\n\n",
+                    idx + 1,
+                    item.title,
+                    item.content
+                ));
+            }
+            context_content.push_str("=== END CONTEXT ===\n");
+
+            full_messages.insert(
+                0,
+                serde_json::json!({
+                    "role": "system",
+                    "content": context_content
+                }),
+            );
+        }
+
+        // Create stream options
+        let opts = llm::ChatOptions {
+            max_tokens: Some(1024),
+            temperature: Some(0.7),
+        };
+
+        // Start streaming
+        let stream_result = llm_client.chat_completion_stream(full_messages, opts).await;
+
+        match stream_result {
+            Ok(mut stream) => {
+                let mut chunk_count = 0;
+
+                // Process stream with cancellation support
+                loop {
+                    tokio::select! {
+                        chunk_result = stream.next() => {
+                            match chunk_result {
+                                Some(Ok(chunk_content)) => {
+                                    chunk_count += 1;
+
+                                    // Determine chunk type
+                                    let chunk_type = StreamingCoordinator::detect_chunk_type(&chunk_content);
+
+                                    // Send chunk to UI
+                                    log::debug!("Sending chunk {} for conversation {}: {} chars",
+                                               chunk_count, conversation_id.as_str(), chunk_content.len());
+                                }
+                                Some(Err(e)) => {
+                                    log::error!("Stream chunk error for {}: {}", conversation_id.as_str(), e);
+                                    break;
+                                }
+                                None => {
+                                    log::info!("Stream completed for conversation {}", conversation_id.as_str());
+                                    break;
+                                }
+                            }
+                        }
+                        _ = cancellation_rx.recv() => {
+                            log::info!("Stream cancelled for conversation {}", conversation_id.as_str());
+                            break;
+                        }
+                    }
+                }
+            }
+            Err(e) => {
+                log::error!("Failed to start LLM stream for {}: {}", conversation_id.as_str(), e);
+            }
+        }
+    }
+
+    /// Send chunk to UI
+    pub async fn send_chunk(
+        &self,
+        conversation_id: &ConversationId,
+        content: String,
+        chunk_type: ChunkType,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        log::debug!("Sending chunk for {}: {} chars (type: {:?})",
+                   conversation_id.as_str(), content.len(), chunk_type);
+
+        // In a real implementation, this would send the chunk to the UI via a channel
+        // For now, we just log it
+        Ok(())
+    }
+
+    /// Check if stream is active
+    pub async fn is_stream_active(&self, conversation_id: &ConversationId) -> bool {
+        let streams = self.active_streams.lock().await;
+        streams.contains_key(conversation_id)
+    }
+
     /// Detect chunk type based on content analysis
     fn detect_chunk_type(content: &str) -> ChunkType {
         let trimmed = content.trim();
@@ -318,6 +466,17 @@ impl Drop for StreamHandle {
             log::debug!("StreamHandle dropped for conversation {}", self.conversation_id.as_str());
         }
     }
+}
+
+/// Create LLM client based on role configuration
+fn create_llm_client(role: &RoleName) -> Result<Box<dyn llm::LlmClient>, Box<dyn std::error::Error>> {
+    // For now, create a simple client - in a real implementation,
+    // this would use the role configuration to determine which LLM to use
+    log::debug!("Creating LLM client for role: {}", role.as_str());
+
+    // This is a placeholder - in a real implementation, we'd create the actual client
+    // based on role configuration (e.g., OpenAI, Ollama, etc.)
+    Err("LLM client creation not yet implemented".into())
 }
 
 #[cfg(test)]
