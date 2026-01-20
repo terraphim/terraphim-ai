@@ -3,8 +3,8 @@
 //! This module provides the visual popup component that displays
 //! slash command and KG autocomplete suggestions.
 
-use gpui::*;
 use gpui::prelude::FluentBuilder;
+use gpui::*;
 use std::sync::Arc;
 
 use super::providers::CompositeProvider;
@@ -18,11 +18,12 @@ use crate::theme::colors::theme;
 #[derive(Clone, Debug)]
 pub enum SlashCommandPopupEvent {
     /// A suggestion was selected
-    SuggestionSelected(UniversalSuggestion),
+    SuggestionSelected {
+        suggestion: UniversalSuggestion,
+        trigger: Option<TriggerInfo>,
+    },
     /// The popup was closed
     Closed,
-    /// A command was executed with result
-    CommandExecuted(CommandResult),
 }
 
 impl EventEmitter<SlashCommandPopupEvent> for SlashCommandPopup {}
@@ -47,15 +48,13 @@ pub struct SlashCommandPopup {
     is_loading: bool,
     /// Current view scope
     view_scope: ViewScope,
+    /// Focus handle for keyboard navigation
+    focus_handle: FocusHandle,
 }
 
 impl SlashCommandPopup {
     /// Create a new popup with default providers
-    pub fn new(
-        _window: &mut Window,
-        _cx: &mut Context<Self>,
-        view_scope: ViewScope,
-    ) -> Self {
+    pub fn new(_window: &mut Window, cx: &mut Context<Self>, view_scope: ViewScope) -> Self {
         let registry = Arc::new(CommandRegistry::with_builtin_commands());
         let provider = Arc::new(CompositeProvider::with_defaults(registry.clone(), None));
         let mut trigger_engine = TriggerEngine::new();
@@ -71,13 +70,14 @@ impl SlashCommandPopup {
             registry,
             is_loading: false,
             view_scope,
+            focus_handle: cx.focus_handle(),
         }
     }
 
     /// Create popup with custom providers
     pub fn with_providers(
         _window: &mut Window,
-        _cx: &mut Context<Self>,
+        cx: &mut Context<Self>,
         registry: Arc<CommandRegistry>,
         engine: Option<Arc<AutocompleteEngine>>,
         view_scope: ViewScope,
@@ -96,12 +96,16 @@ impl SlashCommandPopup {
             registry,
             is_loading: false,
             view_scope,
+            focus_handle: cx.focus_handle(),
         }
     }
 
     /// Set the autocomplete engine
     pub fn set_autocomplete_engine(&mut self, engine: Arc<AutocompleteEngine>) {
-        self.provider = Arc::new(CompositeProvider::with_defaults(self.registry.clone(), Some(engine)));
+        self.provider = Arc::new(CompositeProvider::with_defaults(
+            self.registry.clone(),
+            Some(engine),
+        ));
     }
 
     /// Process input text and detect triggers
@@ -157,7 +161,8 @@ impl SlashCommandPopup {
                 popup.selected_index = 0;
                 popup.is_loading = false;
                 cx.notify();
-            }).ok();
+            })
+            .ok();
         })
         .detach();
     }
@@ -194,24 +199,21 @@ impl SlashCommandPopup {
         log::info!("Accepting suggestion: {}", suggestion.text);
 
         // Emit event
-        cx.emit(SlashCommandPopupEvent::SuggestionSelected(suggestion.clone()));
-
-        // Execute command if applicable
-        if let SuggestionAction::ExecuteCommand { command_id, args } = &suggestion.action {
-            let context = CommandContext::new(
-                args.clone().unwrap_or_default(),
-                self.view_scope,
-            );
-            let result = self.registry.execute(command_id, context);
-            cx.emit(SlashCommandPopupEvent::CommandExecuted(result));
-        }
+        cx.emit(SlashCommandPopupEvent::SuggestionSelected {
+            suggestion: suggestion.clone(),
+            trigger: self.trigger_info.clone(),
+        });
 
         self.close(cx);
         Some(suggestion)
     }
 
     /// Accept suggestion at specific index
-    pub fn accept_at_index(&mut self, index: usize, cx: &mut Context<Self>) -> Option<UniversalSuggestion> {
+    pub fn accept_at_index(
+        &mut self,
+        index: usize,
+        cx: &mut Context<Self>,
+    ) -> Option<UniversalSuggestion> {
         if index < self.suggestions.len() {
             self.selected_index = index;
             self.accept_selected(cx)
@@ -237,6 +239,11 @@ impl SlashCommandPopup {
     /// Check if popup is open
     pub fn is_open(&self) -> bool {
         self.is_open
+    }
+
+    /// Get focus handle for external focus management
+    pub fn focus_handle(&self, _cx: &Context<Self>) -> FocusHandle {
+        self.focus_handle.clone()
     }
 
     /// Get current suggestions
@@ -278,14 +285,16 @@ impl SlashCommandPopup {
             .w_full()
             .cursor_pointer()
             .when(is_selected, |d| {
-                d.bg(theme::autocomplete_selected())
-                    .rounded_md()
+                d.bg(theme::autocomplete_selected()).rounded_md()
             })
             .hover(|style| style.bg(theme::surface_hover()))
-            .on_mouse_down(MouseButton::Left, cx.listener(move |this, _ev, _window, cx| {
-                log::info!("Suggestion clicked: index={}", index);
-                this.accept_at_index(index, cx);
-            }))
+            .on_mouse_down(
+                MouseButton::Left,
+                cx.listener(move |this, _ev, _window, cx| {
+                    log::info!("Suggestion clicked: index={}", index);
+                    this.accept_at_index(index, cx);
+                }),
+            )
             .child(
                 // Icon
                 div()
@@ -296,15 +305,15 @@ impl SlashCommandPopup {
                     .justify_center()
                     .child(match icon {
                         CommandIcon::Emoji(emoji) => emoji,
-                        CommandIcon::Named(_name) => "⚡".to_string(), // Fallback
+                        CommandIcon::Named(_name) => "*".to_string(), // Fallback
                         CommandIcon::None => {
                             if from_kg {
-                                "📚".to_string()
+                                "KG".to_string()
                             } else {
-                                "▸".to_string()
+                                ">".to_string()
                             }
                         }
-                    })
+                    }),
             )
             .child(
                 // Content
@@ -323,7 +332,7 @@ impl SlashCommandPopup {
                                     .font_weight(FontWeight::MEDIUM)
                                     .text_color(theme::text_primary())
                                     .truncate()
-                                    .child(text)
+                                    .child(text),
                             )
                             .when(from_kg, |d| {
                                 d.child(
@@ -333,9 +342,9 @@ impl SlashCommandPopup {
                                         .bg(theme::surface())
                                         .px_1()
                                         .rounded_sm()
-                                        .child("KG")
+                                        .child("KG"),
                                 )
-                            })
+                            }),
                     )
                     .when_some(description, |d, desc| {
                         d.child(
@@ -343,16 +352,16 @@ impl SlashCommandPopup {
                                 .text_sm()
                                 .text_color(theme::text_secondary())
                                 .truncate()
-                                .child(desc)
+                                .child(desc),
                         )
-                    })
+                    }),
             )
             .when_some(category, |d, cat| {
                 d.child(
                     div()
                         .text_xs()
                         .text_color(theme::text_secondary())
-                        .child(format!("{}", cat))
+                        .child(format!("{}", cat)),
                 )
             })
     }
@@ -388,7 +397,7 @@ impl SlashCommandPopup {
                                 .p_4()
                                 .text_center()
                                 .text_color(theme::text_secondary())
-                                .child("Loading...")
+                                .child("Loading..."),
                         )
                     })
                     .when(!is_loading && suggestions.is_empty(), |d| {
@@ -397,19 +406,14 @@ impl SlashCommandPopup {
                                 .p_4()
                                 .text_center()
                                 .text_color(theme::text_secondary())
-                                .child("No suggestions")
+                                .child("No suggestions"),
                         )
                     })
                     .when(!is_loading && !suggestions.is_empty(), |d| {
-                        d.children(
-                            suggestions
-                                .iter()
-                                .enumerate()
-                                .map(|(idx, suggestion)| {
-                                    self.render_suggestion_item(idx, suggestion, cx)
-                                })
-                        )
-                    })
+                        d.children(suggestions.iter().enumerate().map(|(idx, suggestion)| {
+                            self.render_suggestion_item(idx, suggestion, cx)
+                        }))
+                    }),
             )
             .child(
                 // Footer with keyboard hints
@@ -435,7 +439,7 @@ impl SlashCommandPopup {
                                     .items_center()
                                     .gap_1()
                                     .child("↑↓")
-                                    .child("navigate")
+                                    .child("navigate"),
                             )
                             .child(
                                 div()
@@ -443,7 +447,7 @@ impl SlashCommandPopup {
                                     .items_center()
                                     .gap_1()
                                     .child("⏎")
-                                    .child("select")
+                                    .child("select"),
                             )
                             .child(
                                 div()
@@ -451,15 +455,15 @@ impl SlashCommandPopup {
                                     .items_center()
                                     .gap_1()
                                     .child("esc")
-                                    .child("close")
-                            )
+                                    .child("close"),
+                            ),
                     )
                     .child(
                         div()
                             .text_xs()
                             .text_color(theme::text_secondary())
-                            .child(format!("{} results", suggestion_count))
-                    )
+                            .child(format!("{} results", suggestion_count)),
+                    ),
             )
     }
 }
@@ -472,6 +476,25 @@ impl Render for SlashCommandPopup {
 
         div()
             .relative()
+            .track_focus(&self.focus_handle)
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, _window, cx| {
+                log::debug!("SlashCommandPopup key_down: {:?}", ev.keystroke.key);
+                match ev.keystroke.key.as_str() {
+                    "down" => {
+                        this.select_next(cx);
+                    }
+                    "up" => {
+                        this.select_previous(cx);
+                    }
+                    "enter" | "tab" => {
+                        this.accept_selected(cx);
+                    }
+                    "escape" => {
+                        this.close(cx);
+                    }
+                    _ => {}
+                }
+            }))
             .child(self.render_popup(cx))
             .into_any_element()
     }
@@ -498,7 +521,10 @@ mod tests {
 
         // Verify action types exist and can be constructed
         match insert_action {
-            SuggestionAction::Insert { text, replace_trigger } => {
+            SuggestionAction::Insert {
+                text,
+                replace_trigger,
+            } => {
                 assert_eq!(text, "hello");
                 assert!(replace_trigger);
             }

@@ -160,8 +160,7 @@ impl ResultItemViewModel {
 
         if let Some(desc) = &self.document.description {
             if desc.to_lowercase().contains(&query_lower) {
-                self.highlighted_description =
-                    desc.replace(&query, &format!("**{}**", query));
+                self.highlighted_description = desc.replace(&query, &format!("**{}**", query));
             }
         }
 

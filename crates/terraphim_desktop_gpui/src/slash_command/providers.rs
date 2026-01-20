@@ -4,8 +4,8 @@
 //! for different suggestion sources: command palette, knowledge graph, and
 //! KG-enhanced commands.
 
-use std::sync::Arc;
 use async_trait::async_trait;
+use std::sync::Arc;
 
 use super::registry::CommandRegistry;
 use super::types::*;
@@ -80,7 +80,24 @@ impl SuggestionProvider for CommandPaletteProvider {
         limit: usize,
     ) -> Vec<UniversalSuggestion> {
         // Get commands matching the query for this view scope
-        self.registry.suggest(query, trigger.view, limit)
+        let query = query.trim();
+        let mut suggestions = self.registry.suggest(query, trigger.view, limit);
+
+        if let Some((cmd, args)) = query.split_once(' ') {
+            let args = args.trim();
+            if !args.is_empty() {
+                for suggestion in &mut suggestions {
+                    if suggestion.id == cmd {
+                        suggestion.action = SuggestionAction::ExecuteCommand {
+                            command_id: cmd.to_string(),
+                            args: Some(args.to_string()),
+                        };
+                    }
+                }
+            }
+        }
+
+        suggestions
     }
 }
 
@@ -269,7 +286,11 @@ impl SuggestionProvider for KGEnhancedCommandProvider {
 
     fn handles_trigger(&self, trigger: &TriggerInfo) -> bool {
         // Handle "/" trigger when there's both command and args
-        if let TriggerType::Char { sequence, start_of_line: true } = &trigger.trigger_type {
+        if let TriggerType::Char {
+            sequence,
+            start_of_line: true,
+        } = &trigger.trigger_type
+        {
             if sequence == "/" {
                 // Only handle if query contains a space (command + args)
                 return trigger.query.contains(' ');
@@ -321,7 +342,8 @@ impl CompositeProvider {
     pub fn add_provider(&mut self, provider: Arc<dyn SuggestionProvider>) {
         self.providers.push(provider);
         // Sort by priority descending
-        self.providers.sort_by(|a, b| b.priority().cmp(&a.priority()));
+        self.providers
+            .sort_by(|a, b| b.priority().cmp(&a.priority()));
     }
 
     /// Create with default providers (command palette + KG)
@@ -605,9 +627,6 @@ mod tests {
             KGEnhancedCommandProvider::parse_command_query("search  multiple  words"),
             ("search", "multiple  words")
         );
-        assert_eq!(
-            KGEnhancedCommandProvider::parse_command_query(""),
-            ("", "")
-        );
+        assert_eq!(KGEnhancedCommandProvider::parse_command_query(""), ("", ""));
     }
 }

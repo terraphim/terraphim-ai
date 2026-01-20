@@ -1,19 +1,22 @@
-use anyhow::{anyhow, Result};
-use tray_icon::{
-    menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem},
-    Icon, TrayIcon, TrayIconBuilder, TrayIconEvent,
-};
+use anyhow::{Result, anyhow};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 use terraphim_types::RoleName;
+use tray_icon::{
+    Icon, TrayIcon, TrayIconBuilder, TrayIconEvent,
+    menu::{Menu, MenuEvent, MenuId, MenuItem, PredefinedMenuItem},
+};
+
+/// Type alias for the system tray event handler
+type SystemTrayEventHandler = Box<dyn Fn(SystemTrayEvent) + Send + 'static>;
 
 /// System tray integration for Terraphim
 pub struct SystemTray {
     tray_icon: Option<TrayIcon>,
     menu: Option<Menu>,
     menu_items: Arc<Mutex<HashMap<MenuId, SystemTrayEvent>>>,
-    event_handler: Arc<Mutex<Option<Box<dyn Fn(SystemTrayEvent) + Send + 'static>>>>,
+    event_handler: Arc<Mutex<Option<SystemTrayEventHandler>>>,
     roles: Vec<RoleName>,
     selected_role: RoleName,
 }
@@ -25,6 +28,12 @@ pub enum SystemTrayEvent {
     ChangeRole(RoleName),
     Quit,
     TrayIconClick,
+}
+
+impl Default for SystemTray {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl SystemTray {
@@ -80,7 +89,9 @@ impl SystemTray {
         // Must call start_listening() AFTER on_event() to avoid race condition
         // where listener threads check for handler before it's set.
 
-        log::info!("System tray initialized successfully (call start_listening() after on_event())");
+        log::info!(
+            "System tray initialized successfully (call start_listening() after on_event())"
+        );
         Ok(())
     }
 
@@ -106,10 +117,10 @@ impl SystemTray {
         let mut icon_data = vec![0u8; size];
 
         for i in (0..size).step_by(4) {
-            icon_data[i] = 50;      // R
-            icon_data[i + 1] = 115;  // G (Terraphim blue: #3273dc)
-            icon_data[i + 2] = 220;  // B
-            icon_data[i + 3] = 255;  // A (fully opaque)
+            icon_data[i] = 50; // R
+            icon_data[i + 1] = 115; // G (Terraphim blue: #3273dc)
+            icon_data[i + 2] = 220; // B
+            icon_data[i + 3] = 255; // A (fully opaque)
         }
 
         icon_data
@@ -142,7 +153,7 @@ impl SystemTray {
         for role in &self.roles {
             let is_selected = role == &self.selected_role;
             let label = if is_selected {
-                format!("✓ {}", role)
+                format!("* {}", role)
             } else {
                 role.to_string()
             };
@@ -153,7 +164,10 @@ impl SystemTray {
             // Store role item event
             {
                 let mut items = self.menu_items.lock().unwrap();
-                items.insert(role_item.id().clone(), SystemTrayEvent::ChangeRole(role.clone()));
+                items.insert(
+                    role_item.id().clone(),
+                    SystemTrayEvent::ChangeRole(role.clone()),
+                );
             }
 
             menu.append(&role_item)
@@ -268,7 +282,11 @@ impl SystemTray {
     }
 
     /// Update a menu item's enabled state
-    pub fn set_menu_item_enabled(&mut self, event_type: SystemTrayEvent, enabled: bool) -> Result<()> {
+    pub fn set_menu_item_enabled(
+        &mut self,
+        event_type: SystemTrayEvent,
+        enabled: bool,
+    ) -> Result<()> {
         // Find the menu item ID associated with this event
         let items = self.menu_items.lock().unwrap();
         let menu_id = items
@@ -276,9 +294,13 @@ impl SystemTray {
             .find(|(_, ev)| std::mem::discriminant(*ev) == std::mem::discriminant(&event_type))
             .map(|(id, _)| id.clone());
 
-        if let Some(id) = menu_id {
+        if let Some(_id) = menu_id {
             // In a full implementation, we'd update the actual menu item
-            log::info!("Would update menu item {:?} enabled state to {}", event_type, enabled);
+            log::info!(
+                "Would update menu item {:?} enabled state to {}",
+                event_type,
+                enabled
+            );
             Ok(())
         } else {
             Err(anyhow!("Menu item not found for event: {:?}", event_type))
@@ -315,7 +337,11 @@ impl SystemTray {
     /// Check if the system tray is supported on this platform
     pub fn is_supported() -> bool {
         // System tray is supported on macOS, Windows, and most Linux desktops
-        cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux"))
+        cfg!(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux"
+        ))
     }
 }
 

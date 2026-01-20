@@ -72,7 +72,11 @@ impl KGSearchService {
     }
 
     /// Get KG term details from thesaurus
-    pub fn get_kg_term_from_thesaurus(&self, role_name: &str, term: &str) -> Result<Option<KGTerm>> {
+    pub fn get_kg_term_from_thesaurus(
+        &self,
+        role_name: &str,
+        term: &str,
+    ) -> Result<Option<KGTerm>> {
         let graph = self
             .role_graphs
             .get(role_name)
@@ -256,7 +260,12 @@ mod tests {
         let service = KGSearchService::new();
         let result = service.search_kg_term_ids("nonexistent", "rust");
         assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("Role graph not found"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Role graph not found")
+        );
     }
 
     #[test]

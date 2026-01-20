@@ -37,6 +37,7 @@
 //! let result = registry.execute("search", context);
 //! ```
 
+pub mod completion;
 pub mod popup;
 pub mod providers;
 pub mod registry;
@@ -44,17 +45,25 @@ pub mod trigger;
 pub mod types;
 
 // Re-exports
-pub use registry::CommandRegistry;
-pub use types::{
-    CommandCategory, CommandContext, CommandHandler, CommandIcon, CommandResult,
-    SuggestionAction, SuggestionMetadata, TriggerInfo, TriggerType, UniversalCommand,
-    UniversalSuggestion, ViewScope,
-};
+pub use completion::SlashCommandCompletionProvider;
+pub use popup::{SlashCommandPopup, SlashCommandPopupEvent};
 pub use providers::{
-    CommandPaletteProvider, CompositeProvider, KGEnhancedCommandProvider,
-    KnowledgeGraphProvider, SuggestionProvider,
+    CommandPaletteProvider, CompositeProvider, KGEnhancedCommandProvider, KnowledgeGraphProvider,
+    SuggestionProvider,
 };
+pub use registry::CommandRegistry;
 pub use trigger::{
     CharTrigger, DebounceManager, TriggerConfig, TriggerDetectionResult, TriggerEngine,
 };
-pub use popup::{SlashCommandPopup, SlashCommandPopupEvent};
+pub use types::{
+    CommandCategory, CommandContext, CommandHandler, CommandIcon, CommandResult, SuggestionAction,
+    SuggestionMetadata, TriggerInfo, TriggerType, UniversalCommand, UniversalSuggestion, ViewScope,
+};
+
+pub fn replace_text_range(input: &str, range: std::ops::Range<usize>, insert: &str) -> String {
+    let mut output = String::with_capacity(input.len().saturating_sub(range.len()) + insert.len());
+    output.push_str(&input[..range.start]);
+    output.push_str(insert);
+    output.push_str(&input[range.end..]);
+    output
+}

@@ -13,10 +13,18 @@ actions!(
     ]
 );
 
-pub fn register_app_actions(cx: &mut impl AppContext) {
+pub fn register_app_actions(_cx: &mut impl AppContext) {
     log::info!("Registering app-wide actions and key bindings");
 
-    // TODO: GPUI 0.2.2 - bind_keys API has changed, need to update
+    // App-level keybindings are disabled pending GPUI 0.2.2 API research
+    // The system uses global hotkeys via platform/hotkeys.rs instead
+    // which provide the same functionality:
+    // - Shift+Super+Space: Show/Hide window
+    // - Shift+Super+KeyS: Quick search
+    // - Shift+Super+KeyC: Open chat
+    // - Shift+Super+KeyE: Open editor
+
+    // TODO: Research proper GPUI 0.2.2 keybinding API for app-level shortcuts
     // Navigation shortcuts
     // cx.bind_keys([
     //     KeyBinding::new("cmd-1", NavigateToSearch, None),
@@ -32,5 +40,5 @@ pub fn register_app_actions(cx: &mut impl AppContext) {
     //     KeyBinding::new("cmd-k", GlobalSearch, None),
     // ]);
 
-    log::info!("Keybindings temporarily disabled - TODO: update to GPUI 0.2.2 API");
+    log::info!("Keybindings: Using global hotkeys (platform/hotkeys.rs)");
 }

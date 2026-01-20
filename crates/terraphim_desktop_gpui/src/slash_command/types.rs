@@ -125,30 +125,29 @@ pub enum SuggestionAction {
 impl fmt::Debug for SuggestionAction {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            SuggestionAction::Insert { text, replace_trigger } => {
-                f.debug_struct("Insert")
-                    .field("text", text)
-                    .field("replace_trigger", replace_trigger)
-                    .finish()
-            }
-            SuggestionAction::ExecuteCommand { command_id, args } => {
-                f.debug_struct("ExecuteCommand")
-                    .field("command_id", command_id)
-                    .field("args", args)
-                    .finish()
-            }
-            SuggestionAction::Search { query, use_kg } => {
-                f.debug_struct("Search")
-                    .field("query", query)
-                    .field("use_kg", use_kg)
-                    .finish()
-            }
-            SuggestionAction::Navigate { target, data } => {
-                f.debug_struct("Navigate")
-                    .field("target", target)
-                    .field("data", data)
-                    .finish()
-            }
+            SuggestionAction::Insert {
+                text,
+                replace_trigger,
+            } => f
+                .debug_struct("Insert")
+                .field("text", text)
+                .field("replace_trigger", replace_trigger)
+                .finish(),
+            SuggestionAction::ExecuteCommand { command_id, args } => f
+                .debug_struct("ExecuteCommand")
+                .field("command_id", command_id)
+                .field("args", args)
+                .finish(),
+            SuggestionAction::Search { query, use_kg } => f
+                .debug_struct("Search")
+                .field("query", query)
+                .field("use_kg", use_kg)
+                .finish(),
+            SuggestionAction::Navigate { target, data } => f
+                .debug_struct("Navigate")
+                .field("target", target)
+                .field("data", data)
+                .finish(),
             SuggestionAction::Custom(_) => write!(f, "Custom(<fn>)"),
         }
     }
@@ -217,6 +216,12 @@ impl CommandResult {
     /// Set whether to clear input
     pub fn with_clear_input(mut self, clear: bool) -> Self {
         self.clear_input = clear;
+        self
+    }
+
+    /// Attach a follow-up action
+    pub fn with_follow_up(mut self, action: SuggestionAction) -> Self {
+        self.follow_up = Some(Box::new(action));
         self
     }
 }
@@ -387,7 +392,7 @@ impl UniversalSuggestion {
             text: term.clone(),
             description: url.clone(),
             snippet: None,
-            icon: CommandIcon::Emoji("📚".to_string()),
+            icon: CommandIcon::None,
             category: Some(CommandCategory::KnowledgeGraph),
             score,
             action: SuggestionAction::Insert {
@@ -448,6 +453,36 @@ pub struct TriggerInfo {
     pub view: ViewScope,
 }
 
+impl TriggerInfo {
+    /// Calculate the replacement range for the active trigger.
+    pub fn replacement_range(&self, input_len: usize) -> std::ops::Range<usize> {
+        let trigger_len = match &self.trigger_type {
+            TriggerType::Char { sequence, .. } => sequence.len(),
+            TriggerType::Auto { .. } | TriggerType::Manual => 0,
+        };
+
+        let start = self.start_position.min(input_len);
+        let end = (self.start_position + trigger_len + self.query.len()).min(input_len);
+        start..end
+    }
+
+    /// Extract arguments when the trigger query starts with a command id.
+    pub fn command_args(&self, command_id: &str) -> Option<String> {
+        let query = self.query.trim();
+        let (cmd, args) = query.split_once(' ')?;
+        if cmd != command_id {
+            return None;
+        }
+
+        let args = args.trim();
+        if args.is_empty() {
+            None
+        } else {
+            Some(args.to_string())
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -501,7 +536,7 @@ mod tests {
             syntax: "/search <query>".to_string(),
             category: CommandCategory::Search,
             scope: ViewScope::Both,
-            icon: CommandIcon::Emoji("🔍".to_string()),
+            icon: CommandIcon::None,
             keywords: vec!["find".to_string(), "query".to_string()],
             priority: 100,
             accepts_args: true,
@@ -526,7 +561,10 @@ mod tests {
         assert_eq!(suggestion.text, "rust");
         assert_eq!(suggestion.score, 0.95);
         assert!(suggestion.from_kg);
-        assert_eq!(suggestion.metadata.url, Some("https://rust-lang.org".to_string()));
+        assert_eq!(
+            suggestion.metadata.url,
+            Some("https://rust-lang.org".to_string())
+        );
     }
 
     #[test]

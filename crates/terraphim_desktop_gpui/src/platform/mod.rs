@@ -1,15 +1,15 @@
-pub mod tray;
 pub mod hotkeys;
+pub mod tray;
 
-pub use tray::SystemTray;
 pub use hotkeys::GlobalHotkeys;
+pub use tray::SystemTray;
 
 /// Wake up the application event loop.
 /// This posts a synthetic event to ensure the run loop processes pending events.
 /// Useful for triggering UI updates from background threads (e.g., tray menu callbacks).
 #[cfg(target_os = "macos")]
 pub fn wake_app_event_loop() {
-    use cocoa::appkit::{NSApp, NSApplication, NSEvent, NSEventType};
+    use cocoa::appkit::{NSApp, NSEventType};
     use cocoa::base::nil;
     use cocoa::foundation::NSPoint;
     use objc::{class, msg_send, sel, sel_impl};

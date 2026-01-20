@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 
 /// Opens a URL in the system's default browser
 pub fn open_url_in_browser(url: &str) -> Result<()> {

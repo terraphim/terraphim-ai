@@ -108,11 +108,7 @@ impl SlashCommandManager {
             .collect()
     }
 
-    pub async fn execute_command(
-        &self,
-        command_name: &str,
-        args: &str,
-    ) -> Result<String, String> {
+    pub async fn execute_command(&self, command_name: &str, args: &str) -> Result<String, String> {
         let command = self
             .get_command(command_name)
             .ok_or_else(|| format!("Command '{}' not found", command_name))?;

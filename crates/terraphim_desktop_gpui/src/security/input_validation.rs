@@ -3,7 +3,6 @@
 /// Provides comprehensive input validation, sanitization, and security controls
 /// for user-facing components, implementing OWASP-recommended security patterns
 /// to prevent injection attacks and ensure data integrity.
-
 use std::collections::HashSet;
 use thiserror::Error;
 
@@ -59,7 +58,6 @@ pub const DANGEROUS_PATTERNS: &[&str] = &[
     "vbscript:",
     "data:text/html",
     "data:application",
-
     // Command injection patterns
     "rm -rf",
     "sudo ",
@@ -68,20 +66,17 @@ pub const DANGEROUS_PATTERNS: &[&str] = &[
     "wget ",
     "nc ",
     "netcat ",
-
     // Path traversal patterns
     "../",
     "..\\",
     "/etc/",
     "/proc/",
     "/sys/",
-
     // Code execution patterns
     "eval(",
     "exec(",
     "system(",
     "shell_exec(",
-
     // File inclusion patterns
     "include(",
     "require(",
@@ -96,11 +91,16 @@ pub fn validate_search_query(input: &str) -> Result<String, ValidationError> {
     }
 
     if input.len() > limits::MAX_SEARCH_QUERY {
-        return Err(ValidationError::TooLong { max: limits::MAX_SEARCH_QUERY });
+        return Err(ValidationError::TooLong {
+            max: limits::MAX_SEARCH_QUERY,
+        });
     }
 
     // Check for control characters
-    if input.chars().any(|c| c.is_control() && c != '\t' && c != '\n' && c != '\r') {
+    if input
+        .chars()
+        .any(|c| c.is_control() && c != '\t' && c != '\n' && c != '\r')
+    {
         return Err(ValidationError::ControlCharacters);
     }
 
@@ -117,8 +117,9 @@ pub fn validate_search_query(input: &str) -> Result<String, ValidationError> {
         .chars()
         .filter(|c| {
             // Allow printable characters, spaces, tabs, newlines
-            c.is_alphanumeric() || c.is_whitespace() ||
-            "!@#$%^&*()_+-=[]{}|;':\",./<>?".contains(*c)
+            c.is_alphanumeric()
+                || c.is_whitespace()
+                || "!@#$%^&*()_+-=[]{}|;':\",./<>?".contains(*c)
         })
         .collect::<String>()
         .trim()
@@ -143,7 +144,9 @@ pub fn validate_file_path(input: &str) -> Result<String, ValidationError> {
     }
 
     if input.len() > limits::MAX_FILENAME {
-        return Err(ValidationError::TooLong { max: limits::MAX_FILENAME });
+        return Err(ValidationError::TooLong {
+            max: limits::MAX_FILENAME,
+        });
     }
 
     // Check for path traversal attempts
@@ -159,7 +162,9 @@ pub fn validate_file_path(input: &str) -> Result<String, ValidationError> {
         .collect();
 
     if !found_prohibited.is_empty() {
-        return Err(ValidationError::ProhibitedCharacters { chars: found_prohibited });
+        return Err(ValidationError::ProhibitedCharacters {
+            chars: found_prohibited,
+        });
     }
 
     // Sanitize by removing prohibited characters
@@ -182,13 +187,18 @@ pub fn validate_username(input: &str) -> Result<String, ValidationError> {
     }
 
     if input.len() > limits::MAX_USERNAME {
-        return Err(ValidationError::TooLong { max: limits::MAX_USERNAME });
+        return Err(ValidationError::TooLong {
+            max: limits::MAX_USERNAME,
+        });
     }
 
     // Only allow alphanumeric characters, underscores, and hyphens
-    if !input.chars().all(|c| c.is_alphanumeric() || c == '_' || c == '-') {
+    if !input
+        .chars()
+        .all(|c| c.is_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(ValidationError::ProhibitedCharacters {
-            chars: "Only alphanumeric, underscore, and hyphen allowed".to_string()
+            chars: "Only alphanumeric, underscore, and hyphen allowed".to_string(),
         });
     }
 
@@ -202,7 +212,9 @@ pub fn validate_chat_message(input: &str) -> Result<String, ValidationError> {
     }
 
     if input.len() > limits::MAX_CHAT_MESSAGE {
-        return Err(ValidationError::TooLong { max: limits::MAX_CHAT_MESSAGE });
+        return Err(ValidationError::TooLong {
+            max: limits::MAX_CHAT_MESSAGE,
+        });
     }
 
     // Remove control characters except common whitespace
@@ -221,7 +233,9 @@ pub fn validate_config_value(input: &str) -> Result<String, ValidationError> {
     }
 
     if input.len() > limits::MAX_CONFIG_VALUE {
-        return Err(ValidationError::TooLong { max: limits::MAX_CONFIG_VALUE });
+        return Err(ValidationError::TooLong {
+            max: limits::MAX_CONFIG_VALUE,
+        });
     }
 
     // Check for JSON injection patterns

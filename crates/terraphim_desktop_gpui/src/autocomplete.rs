@@ -1,6 +1,7 @@
 use anyhow::Result;
 use terraphim_automata::{
-    autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search, AutocompleteConfig, AutocompleteIndex,
+    AutocompleteConfig, AutocompleteIndex, autocomplete_search, build_autocomplete_index,
+    fuzzy_autocomplete_search,
 };
 use terraphim_types::Thesaurus;
 
@@ -28,10 +29,7 @@ impl AutocompleteEngine {
         // Pass by value since build_autocomplete_index takes ownership
         let index = build_autocomplete_index(thesaurus.clone(), Some(config))?;
 
-        log::info!(
-            "Loaded autocomplete engine with {} terms",
-            thesaurus.len()
-        );
+        log::info!("Loaded autocomplete engine with {} terms", thesaurus.len());
 
         Ok(Self { index, thesaurus })
     }
@@ -43,15 +41,14 @@ impl AutocompleteEngine {
     }
 
     /// Create engine from role configuration
-    pub async fn from_role(role_name: &str, config_path: Option<&str>) -> Result<Self> {
-        
-        
-
+    pub async fn from_role(_role_name: &str, config_path: Option<&str>) -> Result<Self> {
         // Load config
-        let mut config = if let Some(path) = config_path {
+        let _config = if let Some(_path) = config_path {
             // For simplicity, we'll create a config from ConfigState
             // In a real app, you'd load from file properly
-            return Err(anyhow::anyhow!("Loading from file not yet implemented. Use from_thesaurus_json instead."));
+            return Err(anyhow::anyhow!(
+                "Loading from file not yet implemented. Use from_thesaurus_json instead."
+            ));
         } else {
             return Err(anyhow::anyhow!("No config path provided"));
         };

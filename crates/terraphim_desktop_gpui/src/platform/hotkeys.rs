@@ -1,15 +1,18 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use global_hotkey::{GlobalHotKeyManager, hotkey::HotKey};
 use keyboard_types::{Code, Modifiers};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::Mutex;
 
+/// Type alias for the hotkey event handler
+type HotkeyEventHandler = Box<dyn Fn(HotkeyEvent) + Send + 'static>;
+
 /// Global hotkey manager for Terraphim
 pub struct GlobalHotkeys {
     manager: Arc<GlobalHotKeyManager>,
     hotkeys: HashMap<u32, RegisteredHotkey>,
-    event_handler: Arc<Mutex<Option<Box<dyn Fn(HotkeyEvent) + Send + 'static>>>>,
+    event_handler: Arc<Mutex<Option<HotkeyEventHandler>>>,
 }
 
 /// A registered global hotkey
@@ -50,6 +53,12 @@ impl GlobalHotkeys {
             hotkeys: HashMap::new(),
             event_handler: Arc::new(Mutex::new(None)),
         })
+    }
+
+    /// Create a new global hotkey manager with default configuration
+    /// Returns None if creation fails
+    pub fn try_default() -> Option<Self> {
+        Self::new().ok()
     }
 
     /// Register default hotkeys for Terraphim
@@ -118,7 +127,7 @@ impl GlobalHotkeys {
 
         // Register with the system
         self.manager
-            .register(hotkey.clone())
+            .register(hotkey)
             .map_err(|e| anyhow!("Failed to register hotkey: {}", e))?;
 
         // Store the hotkey info using the library's ID
@@ -182,17 +191,13 @@ impl GlobalHotkeys {
 
                     // Find the registered hotkey by ID
                     if let Some(registered) = hotkeys.get(&event.id) {
-                        log::info!(
-                            "Global hotkey pressed: {}",
-                            registered.description
-                        );
+                        log::info!("Global hotkey pressed: {}", registered.description);
 
                         let hotkey_event = HotkeyEvent {
                             action: registered.action.clone(),
                             hotkey_str: format!(
                                 "{:?} + {:?}",
-                                registered.modifiers,
-                                registered.key
+                                registered.modifiers, registered.key
                             ),
                         };
 
@@ -229,7 +234,11 @@ impl GlobalHotkeys {
     /// Check if global hotkeys are supported on this platform
     pub fn is_supported() -> bool {
         // Global hotkeys are supported on macOS, Windows, and Linux with X11
-        cfg!(any(target_os = "macos", target_os = "windows", target_os = "linux"))
+        cfg!(any(
+            target_os = "macos",
+            target_os = "windows",
+            target_os = "linux"
+        ))
     }
 
     /// Check if accessibility permissions are needed (macOS)

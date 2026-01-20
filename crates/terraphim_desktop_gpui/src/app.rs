@@ -1,21 +1,22 @@
-use gpui::*;
 use gpui::prelude::FluentBuilder;
-use gpui_component::{button::*, StyledExt};
-use std::sync::mpsc::{self, Receiver, Sender};
+use gpui::*;
+use gpui_component::{StyledExt, button::*};
+use std::sync::Arc;
+use std::sync::mpsc;
+use std::sync::mpsc::Receiver;
 use terraphim_config::ConfigState;
 use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
 
-use crate::theme::TerraphimTheme;
+use crate::platform::hotkeys::HotkeyAction;
+use crate::platform::tray::SystemTrayEvent;
+use crate::platform::{GlobalHotkeys, SystemTray};
+use crate::slash_command::CommandRegistry;
 use crate::theme::colors::theme;
 use crate::views::chat::ChatView;
 use crate::views::editor::EditorView;
 use crate::views::search::{AddToContextEvent, SearchView};
-use crate::views::role_selector::RoleChangeEvent;
-use crate::views::{RoleSelector, TrayMenu, TrayMenuAction};
-use crate::platform::{SystemTray, GlobalHotkeys};
-use crate::platform::tray::SystemTrayEvent;
-use crate::platform::hotkeys::{HotkeyAction, HotkeyEvent};
+use crate::views::{RoleChangeEvent, RoleSelector, TrayMenu, TrayMenuAction};
 
 /// Main application state with integrated backend services
 pub struct TerraphimApp {
@@ -23,9 +24,9 @@ pub struct TerraphimApp {
     search_view: Entity<SearchView>,
     chat_view: Entity<ChatView>,
     editor_view: Entity<EditorView>,
+    command_registry: Arc<CommandRegistry>,
     role_selector: Entity<RoleSelector>,
     tray_menu: Entity<TrayMenu>,
-    theme: Entity<TerraphimTheme>,
     show_tray_menu: bool,
     // Backend services
     config_state: ConfigState,
@@ -36,6 +37,8 @@ pub struct TerraphimApp {
     hotkey_receiver: Option<Receiver<HotkeyAction>>,
     // Channel for receiving tray events from background thread
     tray_event_receiver: Option<Receiver<SystemTrayEvent>>,
+    // UI feedback
+    notification: Option<String>,
     _subscriptions: Vec<Subscription>,
 }
 
@@ -46,17 +49,36 @@ pub enum AppView {
     Editor,
 }
 
-impl TerraphimApp {
-    pub fn new(window: &mut Window, cx: &mut Context<Self>, config_state: ConfigState, all_roles: Vec<RoleName>) -> Self {
-        log::info!("TerraphimApp initializing with backend services and {} roles...", all_roles.len());
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum RoleChangeSource {
+    Tray,
+    UiDropdown,
+}
 
-        // Initialize theme
-        let theme = cx.new(|cx| TerraphimTheme::new(cx));
+impl TerraphimApp {
+    pub fn new(
+        window: &mut Window,
+        cx: &mut Context<Self>,
+        config_state: ConfigState,
+        all_roles: Vec<RoleName>,
+    ) -> Self {
+        log::info!(
+            "TerraphimApp initializing with backend services and {} roles...",
+            all_roles.len()
+        );
+
+        let command_registry = Arc::new(CommandRegistry::with_builtin_commands());
 
         // Initialize views with service access (pass cloned config_state)
-        let search_view = cx.new(|cx| SearchView::new(window, cx, config_state.clone()));
-        let chat_view = cx.new(|cx| ChatView::new(window, cx).with_config(config_state.clone()));
-        let editor_view = cx.new(|cx| EditorView::new(window, cx));
+        let search_registry = command_registry.clone();
+        let chat_registry = command_registry.clone();
+        let editor_registry = command_registry.clone();
+
+        let search_view =
+            cx.new(|cx| SearchView::new(window, cx, config_state.clone(), search_registry));
+        let chat_view =
+            cx.new(|cx| ChatView::new(window, cx, chat_registry).with_config(config_state.clone()));
+        let editor_view = cx.new(|cx| EditorView::new(window, cx, editor_registry));
 
         // Initialize role selector with ALL roles (pre-loaded in main.rs)
         let all_roles_for_tray = all_roles.clone(); // Clone for tray use later
@@ -73,19 +95,44 @@ impl TerraphimApp {
 
         // Subscribe to AddToContextEvent from SearchView
         let chat_view_clone = chat_view.clone();
-        let search_sub = cx.subscribe(&search_view, move |this: &mut TerraphimApp, _search, event: &AddToContextEvent, cx| {
-            log::info!("App received AddToContext for: {} (navigate_to_chat: {})", event.document.title, event.navigate_to_chat);
-            
-            // Directly add to context (no modal from search results)
-            chat_view_clone.update(cx, |chat, chat_cx| {
-                chat.add_document_as_context_direct(event.document.clone(), chat_cx);
-            });
-            
-            // Navigate to chat only if requested (from "Chat with Document" button)
-            if event.navigate_to_chat {
-                this.navigate_to(AppView::Chat, cx);
-            }
-        });
+        let search_sub = cx.subscribe(
+            &search_view,
+            move |this: &mut TerraphimApp, _search, event: &AddToContextEvent, cx| {
+                log::info!(
+                    "App received AddToContext for: {} (navigate_to_chat: {})",
+                    event.document.title,
+                    event.navigate_to_chat
+                );
+
+                // Show notification
+                this.notification = Some(format!("Added '{}' to context", event.document.title));
+                cx.notify();
+
+                // Auto-hide notification after 3 seconds
+                cx.spawn(async move |_this, _cx| {
+                    tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+                })
+                .detach();
+
+                // Directly add to context (no modal from search results)
+                chat_view_clone.update(cx, |chat, chat_cx| {
+                    chat.add_document_as_context_direct(event.document.clone(), chat_cx);
+                });
+
+                // Navigate to chat only if requested (from "Chat with Document" button)
+                if event.navigate_to_chat {
+                    this.navigate_to(AppView::Chat, cx);
+                }
+            },
+        );
+
+        // Subscribe to RoleChangeEvent from RoleSelector (UI dropdown)
+        let role_sub = cx.subscribe(
+            &role_selector,
+            |this: &mut TerraphimApp, _selector, event: &RoleChangeEvent, cx| {
+                this.apply_role_change(event.new_role.clone(), RoleChangeSource::UiDropdown, cx);
+            },
+        );
 
         // Initialize platform features
         let mut system_tray = None;
@@ -99,12 +146,15 @@ impl TerraphimApp {
 
             // Get selected role from config_state
             let selected_role = tokio::task::block_in_place(|| {
-                tokio::runtime::Handle::current().block_on(async {
-                    config_state.get_selected_role().await
-                })
+                tokio::runtime::Handle::current()
+                    .block_on(async { config_state.get_selected_role().await })
             });
 
-            log::info!("System tray: roles count = {}, selected = {:?}", all_roles_for_tray.len(), selected_role);
+            log::info!(
+                "System tray: roles count = {}, selected = {:?}",
+                all_roles_for_tray.len(),
+                selected_role
+            );
 
             let mut tray = SystemTray::with_roles(all_roles_for_tray, selected_role);
             match tray.initialize() {
@@ -186,23 +236,25 @@ impl TerraphimApp {
             search_view,
             chat_view,
             editor_view,
+            command_registry,
             role_selector,
             tray_menu,
-            theme,
             show_tray_menu: false,
             config_state,
             system_tray,
             global_hotkeys,
             hotkey_receiver,
             tray_event_receiver,
-            _subscriptions: vec![search_sub],
+            notification: None,
+            _subscriptions: vec![search_sub, role_sub],
         }
     }
 
     /// Poll hotkey channel and dispatch actions
     fn poll_hotkeys(&mut self, cx: &mut Context<Self>) {
         // Collect all pending actions first to avoid borrow conflicts
-        let actions: Vec<HotkeyAction> = self.hotkey_receiver
+        let actions: Vec<HotkeyAction> = self
+            .hotkey_receiver
             .as_ref()
             .map(|rx| {
                 let mut actions = Vec::new();
@@ -261,7 +313,8 @@ impl TerraphimApp {
     /// Poll tray event channel and dispatch actions (same pattern as poll_hotkeys)
     fn poll_tray_events(&mut self, cx: &mut Context<Self>) {
         // Collect all pending events first to avoid borrow conflicts
-        let events: Vec<SystemTrayEvent> = self.tray_event_receiver
+        let events: Vec<SystemTrayEvent> = self
+            .tray_event_receiver
             .as_ref()
             .map(|rx| {
                 let mut events = Vec::new();
@@ -279,6 +332,57 @@ impl TerraphimApp {
         }
     }
 
+    fn apply_role_change(
+        &mut self,
+        role: RoleName,
+        source: RoleChangeSource,
+        cx: &mut Context<Self>,
+    ) {
+        log::info!("Applying role change to {:?} (source: {:?})", role, source);
+
+        // 1) Update config_state.selected_role
+        let config_state = self.config_state.clone();
+        tokio::task::block_in_place(|| {
+            tokio::runtime::Handle::current().block_on(async {
+                let mut config = config_state.config.lock().await;
+                config.selected_role = role.clone();
+                log::info!("ConfigState.selected_role updated to '{}'", role);
+            });
+        });
+
+        // 2) Update role selector UI
+        self.role_selector.update(cx, |selector, selector_cx| {
+            selector.set_selected_role(role.clone(), selector_cx);
+        });
+
+        // 3) Update search view
+        self.search_view.update(cx, |search_view, search_cx| {
+            search_view.update_role(role.to_string(), search_cx);
+            log::info!("SearchView updated with new role: {}", role);
+        });
+
+        // 4) Update chat view
+        self.chat_view.update(cx, |chat_view, chat_cx| {
+            chat_view.update_role(role.to_string(), chat_cx);
+            log::info!("ChatView updated with new role: {}", role);
+        });
+
+        // 5) Update editor view
+        self.editor_view.update(cx, |editor_view, editor_cx| {
+            editor_view.update_role(role.to_string(), editor_cx);
+            log::info!("EditorView updated with new role: {}", role);
+        });
+
+        // 6) Update system tray menu checkmark (if supported / initialized)
+        if let Some(ref mut tray) = self.system_tray {
+            if let Err(e) = tray.update_selected_role(role.clone()) {
+                log::error!("Failed to update tray menu role: {}", e);
+            }
+        }
+
+        cx.notify();
+    }
+
     /// Handle a system tray event
     fn handle_tray_event(&mut self, event: SystemTrayEvent, cx: &mut Context<Self>) {
         log::info!("=== TRAY EVENT HANDLER ===");
@@ -291,30 +395,7 @@ impl TerraphimApp {
             }
             SystemTrayEvent::ChangeRole(role) => {
                 log::info!("Role change requested via tray: {:?}", role);
-
-                // Update config_state selected_role
-                let config_state = self.config_state.clone();
-                tokio::task::block_in_place(|| {
-                    tokio::runtime::Handle::current().block_on(async {
-                        let mut config = config_state.config.lock().await;
-                        config.selected_role = role.clone();
-                        log::info!("ConfigState.selected_role updated to '{}'", role);
-                    });
-                });
-
-                // Update role selector UI
-                self.role_selector.update(cx, |selector, selector_cx| {
-                    selector.set_selected_role(role.clone(), selector_cx);
-                });
-
-                // Update tray menu to show checkmark on new role
-                if let Some(ref mut tray) = self.system_tray {
-                    if let Err(e) = tray.update_selected_role(role.clone()) {
-                        log::error!("Failed to update tray menu role: {}", e);
-                    }
-                }
-
-                cx.notify();
+                self.apply_role_change(role, RoleChangeSource::Tray, cx);
             }
             SystemTrayEvent::ToggleWindow => {
                 log::info!("Toggle window requested via tray");
@@ -347,17 +428,32 @@ impl TerraphimApp {
     }
 
     /// Navigate to search view handler
-    fn navigate_to_search(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn navigate_to_search(
+        &mut self,
+        _event: &ClickEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.navigate_to(AppView::Search, cx);
     }
 
     /// Navigate to chat view handler
-    fn navigate_to_chat(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn navigate_to_chat(
+        &mut self,
+        _event: &ClickEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.navigate_to(AppView::Chat, cx);
     }
 
     /// Navigate to editor view handler
-    fn navigate_to_editor(&mut self, _event: &ClickEvent, _window: &mut Window, cx: &mut Context<Self>) {
+    fn navigate_to_editor(
+        &mut self,
+        _event: &ClickEvent,
+        _window: &mut Window,
+        cx: &mut Context<Self>,
+    ) {
         self.navigate_to(AppView::Editor, cx);
     }
 
@@ -472,7 +568,7 @@ impl TerraphimApp {
                                 theme::text_primary()
                             })
                             .hover(|style| style.bg(theme::surface_hover()).cursor_pointer())
-                            .child("☰"),
+                            .child("Menu"),
                     ),
             )
     }
@@ -480,7 +576,7 @@ impl TerraphimApp {
     /// Render role selector dropdown as overlay (appears above all content)
     fn render_role_dropdown_overlay(&self, cx: &mut Context<Self>) -> Option<impl IntoElement> {
         let is_open = self.role_selector.read(cx).is_dropdown_open();
-        
+
         if !is_open {
             return None;
         }
@@ -490,8 +586,8 @@ impl TerraphimApp {
         Some(
             div()
                 .absolute()
-                .top(px(64.0))  // Below navigation bar (p_4 = 16px, button height ~32px, gap)
-                .right(px(16.0))  // Right edge with padding
+                .top(px(64.0)) // Below navigation bar (p_4 = 16px, button height ~32px, gap)
+                .right(px(16.0)) // Right edge with padding
                 .w(px(220.0))
                 .max_h(px(300.0))
                 .overflow_hidden()
@@ -500,10 +596,9 @@ impl TerraphimApp {
                 .border_color(theme::border())
                 .rounded_md()
                 .shadow_lg()
-                .child(self.render_role_dropdown_content(cx))
+                .child(self.render_role_dropdown_content(cx)),
         )
     }
-
 
     /// Render the actual dropdown content
     fn render_role_dropdown_content(&self, cx: &mut Context<Self>) -> impl IntoElement {
@@ -518,60 +613,57 @@ impl TerraphimApp {
 
         div()
             .overflow_hidden()
-            .children(
-                roles_to_render.iter().map(|(idx, role, is_current)| {
-                    let role_name = role.to_string();
-                    let icon = role_selector.get_role_icon(role);
-                    let current = *is_current;
-                    let index = *idx;
+            .children(roles_to_render.iter().map(|(idx, role, is_current)| {
+                let role_name = role.to_string();
+                let icon = role_selector.get_role_icon(role);
+                let current = *is_current;
+                let index = *idx;
 
-                    div()
-                        .flex()
-                        .items_center()
-                        .justify_between()
-                        .px_2()
-                        .py_2()
-                        .border_b_1()
-                        .border_color(theme::border_light())
-                        .when(current, |this| this.bg(theme::surface()))
-                        .child(
-                            Button::new(("role-item", index))
-                                .label(role_name)
-                                .icon(icon)
-                                .ghost()
-                                .on_click(cx.listener(move |this, _ev, _window, cx| {
-                                    this.role_selector.update(cx, |selector, selector_cx| {
-                                        selector.select_role(index, selector_cx);
-                                    });
-                                }))
-                        )
-                        .children(if current {
-                            Some(div().text_color(theme::success()).text_sm().child("✓"))
-                        } else {
-                            None
-                        })
-                })
-            )
+                div()
+                    .flex()
+                    .items_center()
+                    .justify_between()
+                    .px_2()
+                    .py_2()
+                    .border_b_1()
+                    .border_color(theme::border_light())
+                    .when(current, |this| this.bg(theme::surface()))
+                    .child(
+                        Button::new(("role-item", index))
+                            .label(role_name)
+                            .icon(icon)
+                            .ghost()
+                            .on_click(cx.listener(move |this, _ev, _window, cx| {
+                                this.role_selector.update(cx, |selector, selector_cx| {
+                                    selector.select_role(index, selector_cx);
+                                });
+                            })),
+                    )
+                    .children(if current {
+                        Some(div().text_color(theme::success()).text_sm().child("*"))
+                    } else {
+                        None
+                    })
+            }))
     }
 
     fn render_search_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let is_active = self.current_view == AppView::Search;
 
-        let btn = Button::new("nav-search")
-            .label("Search");
+        let btn = Button::new("nav-search").label("Search");
 
         if is_active {
             btn.primary()
         } else {
-            btn.outline().on_click(cx.listener(Self::navigate_to_search))
+            btn.outline()
+                .on_click(cx.listener(Self::navigate_to_search))
         }
     }
 
     fn render_chat_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let is_active = self.current_view == AppView::Chat;
 
-        let btn = Button::new("nav-chat")
-            .label("Chat");
+        let btn = Button::new("nav-chat").label("Chat");
 
         if is_active {
             btn.primary()
@@ -583,13 +675,13 @@ impl TerraphimApp {
     fn render_editor_button(&self, cx: &mut Context<Self>) -> impl IntoElement {
         let is_active = self.current_view == AppView::Editor;
 
-        let btn = Button::new("nav-editor")
-            .label("Editor");
+        let btn = Button::new("nav-editor").label("Editor");
 
         if is_active {
             btn.primary()
         } else {
-            btn.outline().on_click(cx.listener(Self::navigate_to_editor))
+            btn.outline()
+                .on_click(cx.listener(Self::navigate_to_editor))
         }
     }
 }
@@ -622,33 +714,29 @@ impl Render for TerraphimApp {
                 this.child(self.tray_menu.clone())
             })
             .children(self.render_role_dropdown_overlay(cx))
+            // Notification banner
+            .when(self.notification.is_some(), |this| {
+                this.child(
+                    div()
+                        .absolute()
+                        .top_4()
+                        .right_4()
+                        .px_4()
+                        .py_2()
+                        .bg(theme::success())
+                        .text_color(theme::primary_text())
+                        .rounded_md()
+                        .shadow_lg()
+                        .child(self.notification.as_ref().unwrap().clone()),
+                )
+            })
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_app_view_variants() {
-        assert_eq!(AppView::Search, AppView::Search);
-        assert_ne!(AppView::Search, AppView::Chat);
-        assert_ne!(AppView::Chat, AppView::Editor);
-    }
-
-    #[test]
-    fn test_tray_menu_action_handling() {
-        // Test that all TrayMenuAction variants are handled
-        let actions = vec![
-            TrayMenuAction::ShowWindow,
-            TrayMenuAction::HideWindow,
-            TrayMenuAction::Search,
-            TrayMenuAction::Chat,
-            TrayMenuAction::Settings,
-            TrayMenuAction::About,
-            TrayMenuAction::Quit,
-        ];
-
-        assert_eq!(actions.len(), 7);
-    }
-}
+// NOTE: No unit tests here.
+//
+// When this module is built for the binary (`src/main.rs`), it is included as a
+// module in the `terraphim-gpui` crate. Keeping `#[cfg(test)]` tests here caused
+// Rust's `#[test]` macro expansion to hit a recursion limit in this workspace.
+//
+// Place unit tests in `crates/terraphim_desktop_gpui/tests/*` instead.

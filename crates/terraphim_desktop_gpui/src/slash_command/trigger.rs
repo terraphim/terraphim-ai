@@ -227,9 +227,19 @@ impl TriggerEngine {
             return None;
         }
 
+        // Only search within the current line to avoid cross-line triggers.
+        let line_start = text[..cursor]
+            .rfind(|c| c == '\n' || c == '\r')
+            .map(|pos| pos + 1)
+            .unwrap_or(0);
+        let search_end = cursor.saturating_sub(trigger_len);
+        if search_end < line_start {
+            return None;
+        }
+
         // Look backwards from cursor for the trigger sequence
         // We check if the trigger appears and extract query after it
-        for start_pos in (0..=cursor.saturating_sub(trigger_len)).rev() {
+        for start_pos in (line_start..=search_end).rev() {
             let end_pos = start_pos + trigger_len;
             if end_pos > text.len() {
                 continue;

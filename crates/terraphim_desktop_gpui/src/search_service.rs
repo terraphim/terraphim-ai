@@ -1,9 +1,9 @@
 use anyhow::Result;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+use tokio::sync::Mutex;
 
 /// Search service integration layer
 pub struct SearchService {
@@ -41,7 +41,10 @@ impl SearchService {
         let config_state = ConfigState::new(&mut config).await?;
         let service = Arc::new(Mutex::new(TerraphimService::new(config_state)));
 
-        log::info!("SearchService initialized with {} roles", config.roles.len());
+        log::info!(
+            "SearchService initialized with {} roles",
+            config.roles.len()
+        );
 
         Ok(Self { service, config })
     }
@@ -87,24 +90,19 @@ impl SearchService {
 
     /// Parse query string into structured query
     pub fn parse_query(query: &str) -> ParsedQuery {
-        let mut terms = Vec::new();
-        let mut operator = None;
+        let terms;
+        let operator;
 
         // Simple parsing: split by AND/OR operators
         if query.contains(" AND ") {
             operator = Some(LogicalOperator::And);
-            terms = query
-                .split(" AND ")
-                .map(|s| s.trim().to_string())
-                .collect();
+            terms = query.split(" AND ").map(|s| s.trim().to_string()).collect();
         } else if query.contains(" OR ") {
             operator = Some(LogicalOperator::Or);
-            terms = query
-                .split(" OR ")
-                .map(|s| s.trim().to_string())
-                .collect();
+            terms = query.split(" OR ").map(|s| s.trim().to_string()).collect();
         } else {
             terms = vec![query.to_string()];
+            operator = None;
         }
 
         ParsedQuery { terms, operator }
