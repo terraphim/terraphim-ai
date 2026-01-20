@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-cli"
-version = "1.0.0"
+version.workspace = true
 edition = "2024"
 authors = ["Terraphim Team"]
 description = "CLI tool for semantic knowledge graph search with JSON output for automation"

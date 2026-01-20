@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_server"
-version = "1.0.0"
+version.workspace = true
 edition = "2021"
 authors = ["Terraphim Contributors"]
 description = "Terraphim service handling the core logic of the Terraphim AI."
