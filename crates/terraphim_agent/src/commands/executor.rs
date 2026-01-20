@@ -35,10 +35,12 @@ impl CommandExecutor {
 
     /// Create a command executor with custom hook manager
     pub fn with_hooks(mut self, hooks: Vec<Box<dyn super::CommandHook + Send + Sync>>) -> Self {
-        for hook in hooks {
-            Arc::get_mut(&mut self.hook_manager)
-                .unwrap()
-                .add_pre_hook(hook);
+        if let Some(hook_manager) = Arc::get_mut(&mut self.hook_manager) {
+            for hook in hooks {
+                hook_manager.add_pre_hook(hook);
+            }
+        } else {
+            log::warn!("Cannot add hooks: hook manager has multiple references");
         }
         self
     }
