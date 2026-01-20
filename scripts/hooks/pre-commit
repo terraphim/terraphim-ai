@@ -243,19 +243,12 @@ UBS_CMD="$(find_ubs)" || {
   exit 0
 }
 
-# Get staged files
-STAGED_FILES=$(git diff --cached --name-only --diff-filter=ACM)
-
-if [ -z "$STAGED_FILES" ]; then
-  print_status "INFO" "No staged files to scan."
-else
-  # Run UBS on staged files only (faster than scanning entire project)
-  if ! echo "$STAGED_FILES" | xargs "$UBS_CMD" --fail-on-warning 2>&1 | tail -50; then
-    print_status "FAIL" "Bug scanner found issues. Fix them or use: git commit --no-verify"
-    exit 1
-  fi
-  print_status "SUCCESS" "No critical issues found by UBS"
+# Run UBS on staged files only using --staged flag
+if ! "$UBS_CMD" --staged --fail-on-warning . 2>&1 | tail -50; then
+  print_status "FAIL" "Bug scanner found issues. Fix them or use: git commit --no-verify"
+  exit 1
 fi
+print_status "SUCCESS" "No critical issues found by UBS"
 
 print_status "SUCCESS" "All pre-commit checks passed!"
 echo ""
