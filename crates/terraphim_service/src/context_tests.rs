@@ -6,7 +6,7 @@
 
 #[cfg(test)]
 mod tests {
-    use super::super::context::{ContextConfig, ContextManager};
+    use super::super::context::{ContextConfig, TerraphimContextManager};
     use ahash::AHashMap;
     use terraphim_types::{
         ChatMessage, ContextItem, ContextType, ConversationId, Document, RoleName,
@@ -61,7 +61,7 @@ mod tests {
 
     #[test]
     async fn test_create_conversation() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let title = "Test Conversation".to_string();
         let role = RoleName::new("engineer");
 
@@ -84,7 +84,7 @@ mod tests {
 
     #[test]
     async fn test_create_conversation_with_empty_title() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let title = "".to_string();
         let role = RoleName::new("engineer");
 
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     async fn test_list_conversations() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
 
         // Create multiple conversations
         let conv1 = manager
@@ -134,7 +134,7 @@ mod tests {
 
     #[test]
     async fn test_get_conversation() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let conversation_id = manager
             .create_conversation("Test".to_string(), RoleName::new("engineer"))
             .await
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     async fn test_add_message_to_conversation() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let conversation_id = manager
             .create_conversation("Test".to_string(), RoleName::new("engineer"))
             .await
@@ -172,7 +172,7 @@ mod tests {
 
     #[test]
     async fn test_add_context_to_conversation() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let conversation_id = manager
             .create_conversation("Test".to_string(), RoleName::new("engineer"))
             .await
@@ -201,7 +201,7 @@ mod tests {
 
     #[test]
     async fn test_create_search_context() {
-        let manager = ContextManager::new(create_test_config());
+        let manager = TerraphimContextManager::new(create_test_config());
         let documents = create_test_documents(3);
         let query = "test query";
 
@@ -224,7 +224,7 @@ mod tests {
 
     #[test]
     async fn test_create_search_context_with_empty_documents() {
-        let manager = ContextManager::new(create_test_config());
+        let manager = TerraphimContextManager::new(create_test_config());
         let documents: Vec<Document> = vec![];
         let query = "empty query";
 
@@ -237,7 +237,7 @@ mod tests {
 
     #[test]
     async fn test_create_document_context() {
-        let manager = ContextManager::new(create_test_config());
+        let manager = TerraphimContextManager::new(create_test_config());
         let document = create_test_document();
 
         let context_item = manager.create_document_context(&document);
@@ -292,7 +292,7 @@ mod tests {
 
     #[test]
     async fn test_add_message_to_nonexistent_conversation() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let fake_id = ConversationId::from_string("non-existent".to_string());
 
         let message = ChatMessage::user("Test".to_string());
@@ -303,7 +303,7 @@ mod tests {
 
     #[test]
     async fn test_add_context_to_nonexistent_conversation() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
         let fake_id = ConversationId::from_string("non-existent".to_string());
 
         let context_item = ContextItem {
@@ -330,7 +330,7 @@ mod tests {
             default_search_results_limit: 5,
             enable_auto_suggestions: false,
         };
-        let mut manager = ContextManager::new(config);
+        let mut manager = TerraphimContextManager::new(config);
 
         // Create max conversations
         let _conv1 = manager
@@ -367,7 +367,7 @@ mod tests {
             default_search_results_limit: 5,
             enable_auto_suggestions: false,
         };
-        let mut manager = ContextManager::new(config);
+        let mut manager = TerraphimContextManager::new(config);
         let conversation_id = manager
             .create_conversation("Test".to_string(), RoleName::new("engineer"))
             .await
@@ -408,9 +408,19 @@ mod tests {
         assert!(manager.add_context(&conversation_id, context1).is_ok());
         assert!(manager.add_context(&conversation_id, context2).is_ok());
 
-        // Third should exceed limit
+        // Third should exceed limit but return a warning rather than error
         let result = manager.add_context(&conversation_id, context3);
-        assert!(result.is_err());
+        assert!(result.is_ok());
+
+        let warning = result.unwrap().warning;
+        assert!(warning.is_some());
+        assert!(warning
+            .unwrap()
+            .contains("Context items limit exceeded"));
+
+        // Context should still be added despite warning
+        let conversation = manager.get_conversation(&conversation_id).unwrap();
+        assert_eq!(conversation.global_context.len(), 3);
     }
 
     #[test]
@@ -422,7 +432,7 @@ mod tests {
             default_search_results_limit: 5,
             enable_auto_suggestions: false,
         };
-        let mut manager = ContextManager::new(config);
+        let mut manager = TerraphimContextManager::new(config);
         let conversation_id = manager
             .create_conversation("Test".to_string(), RoleName::new("engineer"))
             .await
@@ -440,7 +450,17 @@ mod tests {
         };
 
         let result = manager.add_context(&conversation_id, large_context);
-        assert!(result.is_err());
+        assert!(result.is_ok());
+
+        let warning = result.unwrap().warning;
+        assert!(warning.is_some());
+        assert!(warning
+            .unwrap()
+            .contains("Context length limit exceeded"));
+
+        // Context should still be present
+        let conversation = manager.get_conversation(&conversation_id).unwrap();
+        assert_eq!(conversation.global_context.len(), 1);
     }
 
     #[test]
@@ -452,7 +472,7 @@ mod tests {
             default_search_results_limit: 5,
             enable_auto_suggestions: false,
         };
-        let mut manager = ContextManager::new(config);
+        let mut manager = TerraphimContextManager::new(config);
 
         // Create conversations up to limit
         let conv1 = manager
@@ -492,7 +512,7 @@ mod tests {
         use std::sync::Arc;
         use tokio::sync::Mutex;
 
-        let manager = Arc::new(Mutex::new(ContextManager::new(create_test_config())));
+        let manager = Arc::new(Mutex::new(TerraphimContextManager::new(create_test_config())));
         let mut handles = vec![];
 
         // Spawn multiple tasks to create conversations concurrently
@@ -563,7 +583,7 @@ mod tests {
 
     #[test]
     async fn test_conversation_role_assignment() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
 
         // Test different role assignments
         let engineer_conv = manager
@@ -584,7 +604,7 @@ mod tests {
 
     #[test]
     async fn test_timestamp_ordering() {
-        let mut manager = ContextManager::new(create_test_config());
+        let mut manager = TerraphimContextManager::new(create_test_config());
 
         // Create conversations with small delays to ensure different timestamps
         let conv1 = manager

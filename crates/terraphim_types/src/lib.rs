@@ -2070,3 +2070,167 @@ mod tests {
         assert_eq!(rule.model, deserialized.model);
     }
 }
+
+// ============================================================================
+// Streaming Chat Types
+// ============================================================================
+
+/// Streaming chat message for real-time updates
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct StreamingChatMessage {
+    pub message: ChatMessage,
+    pub status: MessageStatus,
+    pub chunks: Vec<RenderChunk>,
+    pub stream_metrics: StreamMetrics,
+}
+
+impl StreamingChatMessage {
+    /// Create a new streaming message from a base message
+    pub fn start_streaming(message: ChatMessage) -> Self {
+        Self {
+            message,
+            status: MessageStatus::Streaming,
+            chunks: Vec::new(),
+            stream_metrics: StreamMetrics {
+                chunks_received: 0,
+                started_at: chrono::Utc::now(),
+                completed_at: None,
+                total_bytes: 0,
+            },
+        }
+    }
+
+    /// Add a chunk to this streaming message
+    pub fn add_chunk(&mut self, chunk: RenderChunk) {
+        self.stream_metrics.chunks_received += 1;
+        self.stream_metrics.total_bytes += chunk.content.len();
+        self.chunks.push(chunk);
+    }
+
+    /// Mark streaming as complete
+    pub fn complete_streaming(&mut self) {
+        self.status = MessageStatus::Completed;
+        self.stream_metrics.completed_at = Some(chrono::Utc::now());
+    }
+
+    /// Check if message is currently streaming
+    pub fn is_streaming(&self) -> bool {
+        matches!(self.status, MessageStatus::Streaming)
+    }
+
+    /// Set error state
+    pub fn set_error(&mut self, error: String) {
+        self.status = MessageStatus::Failed;
+        self.message.content = error;
+        self.stream_metrics.completed_at = Some(chrono::Utc::now());
+    }
+
+    /// Get current content from all chunks
+    pub fn get_content(&self) -> String {
+        self.chunks
+            .iter()
+            .map(|c| c.content.as_str())
+            .collect::<String>()
+    }
+}
+
+/// Render chunk for streaming responses
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct RenderChunk {
+    pub content: String,
+    pub chunk_type: ChunkType,
+    pub position: usize,
+    pub complete: bool,
+}
+
+/// Type of chunk for streaming responses
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum ChunkType {
+    Text,
+    Code,
+    Markdown,
+    Metadata,
+    CodeBlock { language: String },
+}
+
+/// Stream metrics for performance monitoring
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub struct StreamMetrics {
+    pub chunks_received: usize,
+    pub started_at: chrono::DateTime<chrono::Utc>,
+    pub completed_at: Option<chrono::DateTime<chrono::Utc>>,
+    pub total_bytes: usize,
+}
+
+impl Default for StreamMetrics {
+    fn default() -> Self {
+        Self {
+            chunks_received: 0,
+            started_at: chrono::Utc::now(),
+            completed_at: None,
+            total_bytes: 0,
+        }
+    }
+}
+
+impl StreamMetrics {
+    /// Create new stream metrics
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Calculate stream duration
+    pub fn duration(&self) -> Option<chrono::Duration> {
+        self.completed_at
+            .map(|completed| completed - self.started_at)
+    }
+
+    /// Calculate chunks per second
+    pub fn chunks_per_second(&self) -> f64 {
+        let duration_secs = self
+            .duration()
+            .map(|d| d.num_milliseconds() as f64 / 1000.0)
+            .unwrap_or(1.0);
+        self.chunks_received as f64 / duration_secs.max(0.001)
+    }
+
+    /// Calculate bytes per second
+    pub fn bytes_per_second(&self) -> f64 {
+        let duration_secs = self
+            .duration()
+            .map(|d| d.num_milliseconds() as f64 / 1000.0)
+            .unwrap_or(1.0);
+        self.total_bytes as f64 / duration_secs.max(0.001)
+    }
+}
+
+/// Message status for streaming lifecycle
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[cfg_attr(feature = "typescript", derive(Tsify))]
+#[cfg_attr(feature = "typescript", tsify(into_wasm_abi, from_wasm_abi))]
+pub enum MessageStatus {
+    Pending,
+    Streaming,
+    Completed,
+    Failed,
+}
+
+impl MessageStatus {
+    /// Check if the message is still in progress
+    pub fn is_active(&self) -> bool {
+        matches!(self, MessageStatus::Pending | MessageStatus::Streaming)
+    }
+
+    /// Check if the message is complete
+    pub fn is_complete(&self) -> bool {
+        matches!(self, MessageStatus::Completed | MessageStatus::Failed)
+    }
+}

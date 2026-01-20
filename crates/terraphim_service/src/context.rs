@@ -15,6 +15,12 @@ use terraphim_types::{
 
 use crate::{Result as ServiceResult, ServiceError};
 
+/// Result of adding context - includes warning if limits were exceeded
+#[derive(Debug, Clone)]
+pub struct AddContextResult {
+    pub warning: Option<String>,
+}
+
 /// Configuration for the context management service
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ContextConfig {
@@ -43,18 +49,24 @@ impl Default for ContextConfig {
 }
 
 /// Service for managing LLM conversation contexts
-pub struct ContextManager {
+/// Uses Arc<TokioMutex<>> for thread-safe async access
+pub type ContextManager = TerraphimContextManager;
+
+pub struct TerraphimContextManager {
     config: ContextConfig,
     /// In-memory cache of recent conversations
     conversations_cache: AHashMap<ConversationId, Arc<Conversation>>,
+    /// Track creation order for LRU eviction
+    created_order: Vec<ConversationId>,
 }
 
-impl ContextManager {
+impl TerraphimContextManager {
     /// Create a new context manager
     pub fn new(config: ContextConfig) -> Self {
         Self {
             config,
             conversations_cache: AHashMap::new(),
+            created_order: Vec::new(),
         }
     }
 
@@ -70,6 +82,7 @@ impl ContextManager {
         // Add to cache (for now we'll only use in-memory storage)
         self.conversations_cache
             .insert(id.clone(), Arc::new(conversation));
+        self.created_order.push(id.clone());
 
         // Clean cache if needed
         self.clean_cache();
@@ -78,13 +91,19 @@ impl ContextManager {
     }
 
     /// Get a conversation by ID
-    pub fn get_conversation(&self, id: &ConversationId) -> Option<Arc<Conversation>> {
+    pub async fn get_conversation(&self, id: &ConversationId) -> ServiceResult<Arc<Conversation>> {
         // For now, only check cache (in-memory storage)
-        self.conversations_cache.get(id).cloned()
+        self.conversations_cache
+            .get(id)
+            .cloned()
+            .ok_or_else(|| ServiceError::Config(format!("Conversation {} not found", id)))
     }
 
     /// List conversation summaries
-    pub fn list_conversations(&self, limit: Option<usize>) -> Vec<ConversationSummary> {
+    pub async fn list_conversations(
+        &self,
+        limit: Option<usize>,
+    ) -> ServiceResult<Vec<ConversationSummary>> {
         let mut summaries: Vec<ConversationSummary> = self
             .conversations_cache
             .values()
@@ -98,11 +117,11 @@ impl ContextManager {
             summaries.truncate(limit);
         }
 
-        summaries
+        Ok(summaries)
     }
 
     /// Add a message to a conversation
-    pub fn add_message(
+    pub async fn add_message(
         &mut self,
         conversation_id: &ConversationId,
         message: ChatMessage,
@@ -110,9 +129,7 @@ impl ContextManager {
         let message_id = message.id.clone();
 
         // Get conversation from cache
-        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
-            ServiceError::Config(format!("Conversation {} not found", conversation_id))
-        })?;
+        let conversation = self.get_conversation(conversation_id).await?;
 
         // Create a mutable copy and add message
         let mut updated_conversation = (*conversation).clone();
@@ -122,20 +139,24 @@ impl ContextManager {
         self.conversations_cache
             .insert(conversation_id.clone(), Arc::new(updated_conversation));
 
+        // Update LRU order
+        self.update_access_order(conversation_id);
+
         Ok(message_id)
     }
 
     /// Add context to a conversation
-    pub fn add_context(
+    /// Always succeeds, but returns a warning if limits are exceeded
+    pub async fn add_context(
         &mut self,
         conversation_id: &ConversationId,
         context: ContextItem,
-    ) -> ServiceResult<()> {
-        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
-            ServiceError::Config(format!("Conversation {} not found", conversation_id))
-        })?;
+    ) -> ServiceResult<AddContextResult> {
+        let conversation = self.get_conversation(conversation_id).await?;
 
-        // Check context limits
+        let mut warning: Option<String> = None;
+
+        // Check context limits (warn but don't prevent)
         let total_context_count = conversation.global_context.len()
             + conversation
                 .messages
@@ -144,23 +165,29 @@ impl ContextManager {
                 .sum::<usize>();
 
         if total_context_count >= self.config.max_context_items {
-            return Err(ServiceError::Config(
-                "Maximum context items reached for this conversation".to_string(),
+            warning = Some(format!(
+                "Context items limit exceeded ({} / {} items). Consider removing some items.",
+                total_context_count + 1,
+                self.config.max_context_items
             ));
         }
 
-        // Check context length
+        // Check context length (warn but don't prevent)
         let estimated_length = conversation.estimated_context_length() + context.content.len();
         if estimated_length > self.config.max_context_length {
-            return Err(ServiceError::Config(format!(
-                "Adding this context would exceed maximum context length ({} / {} characters). Context item size: {} characters",
-                estimated_length,
-                self.config.max_context_length,
-                context.content.len()
-            )));
+            let length_warning = format!(
+                "Context length limit exceeded ({} / {} characters). This may affect LLM performance.",
+                estimated_length, self.config.max_context_length
+            );
+
+            // Combine warnings if both limits exceeded
+            warning = match warning {
+                Some(existing) => Some(format!("{} {}", existing, length_warning)),
+                None => Some(length_warning),
+            };
         }
 
-        // Create a mutable copy and add context
+        // Always add context, even if limits are exceeded
         let mut updated_conversation = (*conversation).clone();
         updated_conversation.add_global_context(context);
 
@@ -168,18 +195,19 @@ impl ContextManager {
         self.conversations_cache
             .insert(conversation_id.clone(), Arc::new(updated_conversation));
 
-        Ok(())
+        // Update LRU order
+        self.update_access_order(conversation_id);
+
+        Ok(AddContextResult { warning })
     }
 
     /// Delete a context item from a conversation
-    pub fn delete_context(
+    pub async fn delete_context(
         &mut self,
         conversation_id: &ConversationId,
         context_id: &str,
     ) -> ServiceResult<()> {
-        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
-            ServiceError::Config(format!("Conversation {} not found", conversation_id))
-        })?;
+        let conversation = self.get_conversation(conversation_id).await?;
 
         // Create a mutable copy and remove the context item
         let mut updated_conversation = (*conversation).clone();
@@ -205,19 +233,20 @@ impl ContextManager {
         self.conversations_cache
             .insert(conversation_id.clone(), Arc::new(updated_conversation));
 
+        // Update LRU order
+        self.update_access_order(conversation_id);
+
         Ok(())
     }
 
     /// Update a context item in a conversation
-    pub fn update_context(
+    pub async fn update_context(
         &mut self,
         conversation_id: &ConversationId,
         context_id: &str,
         updated_context: ContextItem,
     ) -> ServiceResult<ContextItem> {
-        let conversation = self.get_conversation(conversation_id).ok_or_else(|| {
-            ServiceError::Config(format!("Conversation {} not found", conversation_id))
-        })?;
+        let conversation = self.get_conversation(conversation_id).await?;
 
         // Create a mutable copy and update the context item
         let mut updated_conversation = (*conversation).clone();
@@ -249,6 +278,9 @@ impl ContextManager {
         // Update cache
         self.conversations_cache
             .insert(conversation_id.clone(), Arc::new(updated_conversation));
+
+        // Update LRU order
+        self.update_access_order(conversation_id);
 
         Ok(updated_context)
     }
@@ -286,20 +318,26 @@ impl ContextManager {
         context_item
     }
 
+    /// Get context items for conversation
+    pub async fn get_context_items(
+        &self,
+        conversation_id: &ConversationId,
+    ) -> ServiceResult<Vec<ContextItem>> {
+        let conversation = self.get_conversation(conversation_id).await?;
+        Ok(conversation.global_context.clone())
+    }
+
     /// Get context suggestions based on conversation content
-    pub fn get_context_suggestions(
+    pub async fn get_context_suggestions(
         &self,
         conversation_id: &ConversationId,
         _limit: usize,
-    ) -> Vec<String> {
+    ) -> ServiceResult<Vec<String>> {
         if !self.config.enable_auto_suggestions {
-            return Vec::new();
+            return Ok(Vec::new());
         }
 
-        let _conversation = match self.get_conversation(conversation_id) {
-            Some(conv) => conv,
-            None => return Vec::new(),
-        };
+        let _conversation = self.get_conversation(conversation_id).await?;
 
         // TODO: Implement intelligent context suggestions based on:
         // - Recent messages in the conversation
@@ -307,28 +345,59 @@ impl ContextManager {
         // - Frequently used context items
         // - Knowledge graph relationships
 
-        Vec::new()
+        Ok(Vec::new())
     }
 
-    /// Clean the conversation cache if it exceeds limits
+    /// Clean the conversation cache if it exceeds limits using LRU
     fn clean_cache(&mut self) {
-        if self.conversations_cache.len() > self.config.max_conversations_cache {
-            // Remove oldest conversations (this is a simple implementation)
-            // In production, you might want to use LRU cache
-            let excess = self.conversations_cache.len() - self.config.max_conversations_cache;
-            let mut to_remove = Vec::new();
-
-            for (id, conversation) in &self.conversations_cache {
-                to_remove.push((id.clone(), conversation.updated_at));
-            }
-
-            to_remove.sort_by_key(|(_, updated_at)| *updated_at);
-
-            for (id, _) in to_remove.iter().take(excess) {
-                self.conversations_cache.remove(id);
+        while self.conversations_cache.len() > self.config.max_conversations_cache {
+            // Remove oldest conversation (LRU eviction)
+            if let Some(oldest_id) = self.created_order.first().cloned() {
+                self.conversations_cache.remove(&oldest_id);
+                self.created_order.remove(0);
+            } else {
+                break;
             }
         }
     }
+
+    /// Update access order for LRU (move to end when accessed)
+    fn update_access_order(&mut self, conversation_id: &ConversationId) {
+        if let Some(pos) = self
+            .created_order
+            .iter()
+            .position(|id| id == conversation_id)
+        {
+            let id = self.created_order.remove(pos);
+            self.created_order.push(id);
+        }
+    }
+
+    /// Get cache statistics
+    pub fn get_cache_stats(&self) -> CacheStats {
+        CacheStats {
+            total_conversations: self.conversations_cache.len(),
+            max_conversations: self.config.max_conversations_cache,
+            total_context_items: self
+                .conversations_cache
+                .values()
+                .map(|conv| conv.global_context.len())
+                .sum(),
+            total_messages: self
+                .conversations_cache
+                .values()
+                .map(|conv| conv.messages.len())
+                .sum(),
+        }
+    }
+}
+
+/// Cache statistics
+pub struct CacheStats {
+    pub total_conversations: usize,
+    pub max_conversations: usize,
+    pub total_context_items: usize,
+    pub total_messages: usize,
 }
 
 /// Build LLM messages with context injection
@@ -389,14 +458,17 @@ mod tests {
 
     #[tokio::test]
     async fn test_conversation_creation() {
-        let mut context_manager = ContextManager::new(ContextConfig::default());
+        let mut context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         let conversation_id = context_manager
             .create_conversation("Test Conversation".to_string(), RoleName::new("Test"))
             .await
             .unwrap();
 
-        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let conversation = context_manager
+            .get_conversation(&conversation_id)
+            .await
+            .unwrap();
 
         assert_eq!(conversation.title, "Test Conversation");
         assert_eq!(conversation.role.as_str(), "Test");
@@ -405,7 +477,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_add_message_to_conversation() {
-        let mut context_manager = ContextManager::new(ContextConfig::default());
+        let mut context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         let conversation_id = context_manager
             .create_conversation("Test Conversation".to_string(), RoleName::new("Test"))
@@ -415,9 +487,13 @@ mod tests {
         let message = ChatMessage::user("Hello, world!".to_string());
         let message_id = context_manager
             .add_message(&conversation_id, message)
+            .await
             .unwrap();
 
-        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let conversation = context_manager
+            .get_conversation(&conversation_id)
+            .await
+            .unwrap();
 
         assert_eq!(conversation.messages.len(), 1);
         assert_eq!(conversation.messages[0].id, message_id);
@@ -425,9 +501,9 @@ mod tests {
         assert_eq!(conversation.messages[0].role, "user");
     }
 
-    #[test]
-    fn test_create_document_context() {
-        let context_manager = ContextManager::new(ContextConfig::default());
+    #[tokio::test]
+    async fn test_create_document_context() {
+        let context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         let document = Document {
             id: "test-doc".to_string(),
@@ -451,9 +527,9 @@ mod tests {
         assert_eq!(context.relevance_score, Some(10.0));
     }
 
-    #[test]
-    fn test_create_search_context() {
-        let context_manager = ContextManager::new(ContextConfig::default());
+    #[tokio::test]
+    async fn test_create_search_context() {
+        let context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         let documents = vec![
             Document {
@@ -492,8 +568,8 @@ mod tests {
         assert_eq!(context.relevance_score, Some(5.0));
     }
 
-    #[test]
-    fn test_build_llm_messages_with_context() {
+    #[tokio::test]
+    async fn test_build_llm_messages_with_context() {
         let mut conversation = Conversation::new("Test".to_string(), RoleName::new("Test"));
 
         // Add global context
@@ -544,7 +620,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_delete_context_real_manager() {
-        let mut context_manager = ContextManager::new(ContextConfig::default());
+        let mut context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         // Create a real conversation
         let conversation_id = context_manager
@@ -567,36 +643,49 @@ mod tests {
         let context_id = context_item.id.clone();
         context_manager
             .add_context(&conversation_id, context_item)
+            .await
             .unwrap();
 
         // Verify context was added
-        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let conversation = context_manager
+            .get_conversation(&conversation_id)
+            .await
+            .unwrap();
         assert_eq!(conversation.global_context.len(), 1);
         assert_eq!(conversation.global_context[0].id, context_id);
 
         // Test successful deletion
-        let result = context_manager.delete_context(&conversation_id, &context_id);
+        let result = context_manager
+            .delete_context(&conversation_id, &context_id)
+            .await;
         assert!(result.is_ok());
 
         // Verify context was removed
-        let updated_conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let updated_conversation = context_manager
+            .get_conversation(&conversation_id)
+            .await
+            .unwrap();
         assert_eq!(updated_conversation.global_context.len(), 0);
 
         // Test deletion of non-existent context
-        let result = context_manager.delete_context(&conversation_id, "non-existent");
+        let result = context_manager
+            .delete_context(&conversation_id, "non-existent")
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
 
         // Test deletion from non-existent conversation
         let fake_conv_id = ConversationId::from_string("fake-conversation".to_string());
-        let result = context_manager.delete_context(&fake_conv_id, &context_id);
+        let result = context_manager
+            .delete_context(&fake_conv_id, &context_id)
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
 
     #[tokio::test]
     async fn test_update_context_real_manager() {
-        let mut context_manager = ContextManager::new(ContextConfig::default());
+        let mut context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         // Create a real conversation
         let conversation_id = context_manager
@@ -624,6 +713,7 @@ mod tests {
         let original_created_at = original_context.created_at;
         context_manager
             .add_context(&conversation_id, original_context)
+            .await
             .unwrap();
 
         // Create updated context
@@ -644,12 +734,16 @@ mod tests {
         };
 
         // Test successful update
-        let result =
-            context_manager.update_context(&conversation_id, &context_id, updated_context.clone());
+        let result = context_manager
+            .update_context(&conversation_id, &context_id, updated_context.clone())
+            .await;
         assert!(result.is_ok());
 
         // Verify context was updated correctly
-        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let conversation = context_manager
+            .get_conversation(&conversation_id)
+            .await
+            .unwrap();
         assert_eq!(conversation.global_context.len(), 1);
 
         let updated_item = &conversation.global_context[0];
@@ -684,24 +778,24 @@ mod tests {
         assert!(conversation.updated_at > conversation.created_at);
 
         // Test update of non-existent context
-        let result = context_manager.update_context(
-            &conversation_id,
-            "non-existent",
-            updated_context.clone(),
-        );
+        let result = context_manager
+            .update_context(&conversation_id, "non-existent", updated_context.clone())
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
 
         // Test update in non-existent conversation
         let fake_conv_id = ConversationId::from_string("fake-conversation".to_string());
-        let result = context_manager.update_context(&fake_conv_id, &context_id, updated_context);
+        let result = context_manager
+            .update_context(&fake_conv_id, &context_id, updated_context)
+            .await;
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("not found"));
     }
 
     #[tokio::test]
     async fn test_context_with_summary_field() {
-        let context_manager = ContextManager::new(ContextConfig::default());
+        let context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         // Test document context with summary
         let document = Document {
@@ -751,7 +845,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_partial_context_update() {
-        let mut context_manager = ContextManager::new(ContextConfig::default());
+        let mut context_manager = TerraphimContextManager::new(ContextConfig::default());
 
         let conversation_id = context_manager
             .create_conversation("Test Partial Update".to_string(), RoleName::new("test"))
@@ -778,11 +872,13 @@ mod tests {
         let original_created_at = original_context.created_at;
         context_manager
             .add_context(&conversation_id, original_context)
+            .await
             .unwrap();
 
         // Update only summary and title, keeping other fields
         let mut partial_update = context_manager
             .get_conversation(&conversation_id)
+            .await
             .unwrap()
             .global_context[0]
             .clone();
@@ -790,11 +886,16 @@ mod tests {
         partial_update.title = "Updated Title Only".to_string();
         partial_update.summary = Some("Updated summary only".to_string());
 
-        let result = context_manager.update_context(&conversation_id, &context_id, partial_update);
+        let result = context_manager
+            .update_context(&conversation_id, &context_id, partial_update)
+            .await;
         assert!(result.is_ok());
 
         // Verify only specified fields were updated
-        let conversation = context_manager.get_conversation(&conversation_id).unwrap();
+        let conversation = context_manager
+            .get_conversation(&conversation_id)
+            .await
+            .unwrap();
         let updated_item = &conversation.global_context[0];
 
         assert_eq!(updated_item.title, "Updated Title Only");
