@@ -15,9 +15,6 @@ secret_access_key = "${AWS_SECRET_ACCESS_KEY}"
 type = "sled"
 datadir= "/tmp/terraphim/sled"
 
-[profiles.memory]
-type = "memory"
-
 [profiles.dashmap]
 type = "dashmap"
 root = "/tmp/dashmaptest"

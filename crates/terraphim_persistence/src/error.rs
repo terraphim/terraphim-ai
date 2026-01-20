@@ -14,6 +14,9 @@ pub enum Error {
     #[error("No operator found")]
     NoOperator,
 
+    #[error("Not found: {0}")]
+    NotFound(String),
+
     #[error("Settings error: {0}")]
     Settings(#[from] terraphim_settings::Error),
 
