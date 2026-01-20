@@ -82,10 +82,10 @@ custom-protocol = ["tauri/custom-protocol"]
 openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 # Optional database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
-rocksdb = ["terraphim_persistence/services-rocksdb"]
+# rocksdb = ["terraphim_persistence/services-rocksdb"]  # Disabled - causes locking issues
 redis = ["terraphim_persistence/services-redis"]
 # Enable all database backends
-full-db = ["sqlite", "rocksdb", "redis"]
+full-db = ["sqlite", "redis"]  # rocksdb removed
 
 [package.metadata.deb]
 maintainer = "Terraphim Contributors <team@terraphim.ai>"
