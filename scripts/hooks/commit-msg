@@ -35,7 +35,8 @@ if [[ $commit_msg =~ ^Merge.* ]] || [[ $commit_msg =~ ^Revert.* ]]; then
 fi
 
 # Extract first line (subject) for validation
-subject_line=$(echo "$commit_msg" | head -n1)
+# Using head -n1 to get only the first line, even for multiline messages
+subject_line=$(head -n1 "$commit_file")
 
 # Conventional commit pattern
 # Format: type(optional scope): description
@@ -59,7 +60,7 @@ subject_line=$(echo "$commit_msg" | head -n1)
 conventional_pattern='^(feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(\([a-zA-Z0-9_-]+\))?: .{1,72}$'
 
 print_status "INFO" "Validating conventional commit format..."
-echo "Commit message: $commit_msg"
+echo "Subject line: $subject_line"
 echo ""
 
 # Check if commit message subject matches conventional format
