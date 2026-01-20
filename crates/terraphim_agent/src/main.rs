@@ -83,6 +83,72 @@ pub enum HookType {
     PrepareCommitMsg,
 }
 
+/// Boundary mode for text replacement
+#[derive(clap::ValueEnum, Debug, Clone, Default)]
+pub enum BoundaryMode {
+    /// Match anywhere (default, current behavior)
+    #[default]
+    None,
+    /// Only match at word boundaries
+    Word,
+}
+
+/// Check if a character is a word boundary character (not alphanumeric).
+fn is_word_boundary_char(c: char) -> bool {
+    !c.is_alphanumeric() && c != '_'
+}
+
+/// Check if a match position is at word boundaries in the text.
+/// Returns true if the character before start (or start of string) and
+/// the character after end (or end of string) are word boundary characters.
+fn is_at_word_boundary(text: &str, start: usize, end: usize) -> bool {
+    // Check character before start
+    let before_ok = if start == 0 {
+        true
+    } else {
+        text[..start]
+            .chars()
+            .last()
+            .map(is_word_boundary_char)
+            .unwrap_or(true)
+    };
+
+    // Check character after end
+    let after_ok = if end >= text.len() {
+        true
+    } else {
+        text[end..]
+            .chars()
+            .next()
+            .map(is_word_boundary_char)
+            .unwrap_or(true)
+    };
+
+    before_ok && after_ok
+}
+
+/// Format a replacement link from a NormalizedTerm and LinkType.
+fn format_replacement_link(
+    term: &terraphim_types::NormalizedTerm,
+    link_type: terraphim_hooks::LinkType,
+) -> String {
+    let display_text = term.display();
+    match link_type {
+        terraphim_hooks::LinkType::WikiLinks => format!("[[{}]]", display_text),
+        terraphim_hooks::LinkType::HTMLLinks => format!(
+            "<a href=\"{}\">{}</a>",
+            term.url.as_deref().unwrap_or_default(),
+            display_text
+        ),
+        terraphim_hooks::LinkType::MarkdownLinks => format!(
+            "[{}]({})",
+            display_text,
+            term.url.as_deref().unwrap_or_default()
+        ),
+        terraphim_hooks::LinkType::PlainText => display_text.to_string(),
+    }
+}
+
 /// Create a transparent style for UI elements
 fn transparent_style() -> Style {
     Style::default().bg(Color::Reset)
@@ -189,6 +255,77 @@ mod tests {
             TuiAction::None
         );
     }
+
+    #[test]
+    fn test_is_word_boundary_char() {
+        // Non-alphanumeric chars are boundaries
+        assert!(is_word_boundary_char(' '));
+        assert!(is_word_boundary_char('\t'));
+        assert!(is_word_boundary_char('\n'));
+        assert!(is_word_boundary_char('.'));
+        assert!(is_word_boundary_char(','));
+        assert!(is_word_boundary_char('('));
+        assert!(is_word_boundary_char(')'));
+        assert!(is_word_boundary_char('"'));
+
+        // Alphanumeric chars are NOT boundaries
+        assert!(!is_word_boundary_char('a'));
+        assert!(!is_word_boundary_char('Z'));
+        assert!(!is_word_boundary_char('0'));
+        assert!(!is_word_boundary_char('9'));
+
+        // Underscore is NOT a boundary (word char in most regex)
+        assert!(!is_word_boundary_char('_'));
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_start_of_string() {
+        // At start of string, "npm" should be at boundary
+        let text = "npm install";
+        assert!(is_at_word_boundary(text, 0, 3)); // "npm" at start
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_end_of_string() {
+        // At end of string, "npm" should be at boundary
+        let text = "install npm";
+        assert!(is_at_word_boundary(text, 8, 11)); // "npm" at end
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_middle_with_spaces() {
+        // In middle with spaces, "npm" should be at boundary
+        let text = "run npm install";
+        assert!(is_at_word_boundary(text, 4, 7)); // "npm" surrounded by spaces
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_not_at_boundary() {
+        // "npm" embedded in "anpmb" should NOT be at boundary
+        let text = "anpmb";
+        assert!(!is_at_word_boundary(text, 1, 4)); // "npm" embedded
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_partial_boundary() {
+        // "npm" at start but not end: "npma"
+        let text = "npma";
+        assert!(!is_at_word_boundary(text, 0, 3)); // "npm" no boundary after
+
+        // "npm" at end but not start: "anpm"
+        let text2 = "anpm";
+        assert!(!is_at_word_boundary(text2, 1, 4)); // "npm" no boundary before
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_with_punctuation() {
+        // Punctuation counts as boundary
+        let text = "(npm)";
+        assert!(is_at_word_boundary(text, 1, 4)); // "npm" between parens
+
+        let text2 = "use npm, please";
+        assert!(is_at_word_boundary(text2, 4, 7)); // "npm" followed by comma
+    }
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Default)]
@@ -276,6 +413,9 @@ enum Command {
         /// Output format: plain (default), markdown, wiki, html
         #[arg(long)]
         format: Option<String>,
+        /// Boundary mode: none (match anywhere) or word (only at word boundaries)
+        #[arg(long, default_value = "none")]
+        boundary: BoundaryMode,
         /// Output as JSON with metadata (for hook integration)
         #[arg(long, default_value_t = false)]
         json: bool,
@@ -636,6 +776,7 @@ async fn run_offline_command(command: Command) -> Result<()> {
             text,
             role,
             format,
+            boundary,
             json,
             fail_open,
         } => {
@@ -683,13 +824,66 @@ async fn run_offline_command(command: Command) -> Result<()> {
                 }
             };
 
-            let replacement_service =
-                terraphim_hooks::ReplacementService::new(thesaurus).with_link_type(link_type);
+            let replacement_service = terraphim_hooks::ReplacementService::new(thesaurus.clone())
+                .with_link_type(link_type);
 
-            let hook_result = if fail_open {
-                replacement_service.replace_fail_open(&input_text)
-            } else {
-                replacement_service.replace(&input_text)?
+            let hook_result = match boundary {
+                BoundaryMode::None => {
+                    // Standard replacement - match anywhere
+                    if fail_open {
+                        replacement_service.replace_fail_open(&input_text)
+                    } else {
+                        replacement_service.replace(&input_text)?
+                    }
+                }
+                BoundaryMode::Word => {
+                    // Word boundary mode - only match at word boundaries
+                    let matches_result = replacement_service.find_matches(&input_text);
+                    match matches_result {
+                        Ok(matches) => {
+                            // Filter matches to only those at word boundaries
+                            let filtered_matches: Vec<_> = matches
+                                .into_iter()
+                                .filter(|m| {
+                                    if let Some((start, end)) = m.pos {
+                                        is_at_word_boundary(&input_text, start, end)
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .collect();
+
+                            if filtered_matches.is_empty() {
+                                terraphim_hooks::HookResult::pass_through(input_text.clone())
+                            } else {
+                                // Apply filtered matches in reverse order to preserve positions
+                                let mut result = input_text.clone();
+                                let mut sorted_matches = filtered_matches;
+                                sorted_matches.sort_by(|a, b| b.pos.cmp(&a.pos)); // Reverse sort by position
+
+                                for m in sorted_matches {
+                                    if let Some((start, end)) = m.pos {
+                                        let replacement =
+                                            format_replacement_link(&m.normalized_term, link_type);
+                                        result.replace_range(start..end, &replacement);
+                                    }
+                                }
+
+                                terraphim_hooks::HookResult::success(input_text.clone(), result)
+                            }
+                        }
+                        Err(e) => {
+                            if fail_open {
+                                terraphim_hooks::HookResult::fail_open(
+                                    input_text.clone(),
+                                    e.to_string(),
+                                )
+                            } else {
+                                return Err(anyhow::anyhow!("Failed to find matches: {}", e));
+                            }
+                        }
+                    }
+                }
             };
 
             if json {
@@ -1237,6 +1431,7 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             text,
             role: _,
             format: _,
+            boundary: _,
             json,
             fail_open,
         } => {
