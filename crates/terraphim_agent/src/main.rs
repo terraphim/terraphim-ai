@@ -194,7 +194,8 @@ fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
 
 fn map_search_key_event(event: KeyEvent) -> TuiAction {
     match (event.code, event.modifiers) {
-        (KeyCode::Char('q'), KeyModifiers::NONE) => TuiAction::Quit,
+        (KeyCode::Char('q'), KeyModifiers::CONTROL) => TuiAction::Quit,
+        (KeyCode::Esc, KeyModifiers::NONE) => TuiAction::Quit,
         (KeyCode::Enter, KeyModifiers::NONE) => TuiAction::SearchOrOpen,
         (KeyCode::Up, KeyModifiers::NONE) => TuiAction::MoveUp,
         (KeyCode::Down, KeyModifiers::NONE) => TuiAction::MoveDown,
@@ -210,7 +211,7 @@ fn map_search_key_event(event: KeyEvent) -> TuiAction {
 fn map_detail_key_event(event: KeyEvent) -> TuiAction {
     match (event.code, event.modifiers) {
         (KeyCode::Esc, KeyModifiers::NONE) => TuiAction::BackToSearch,
-        (KeyCode::Char('q'), KeyModifiers::NONE) => TuiAction::Quit,
+        (KeyCode::Char('q'), KeyModifiers::CONTROL) => TuiAction::Quit,
         (KeyCode::Char('s'), KeyModifiers::CONTROL) => TuiAction::SummarizeDetail,
         _ => TuiAction::None,
     }
@@ -230,6 +231,11 @@ mod tests {
             map_search_key_event(key_event(KeyCode::Char('r'), KeyModifiers::NONE)),
             TuiAction::InsertChar('r')
         );
+        // 'q' should also be typeable now
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('q'), KeyModifiers::NONE)),
+            TuiAction::InsertChar('q')
+        );
     }
 
     #[test]
@@ -242,6 +248,16 @@ mod tests {
             map_search_key_event(key_event(KeyCode::Char('r'), KeyModifiers::CONTROL)),
             TuiAction::SwitchRole
         );
+        // Ctrl+q quits
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+            TuiAction::Quit
+        );
+        // Esc also quits in search mode
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Esc, KeyModifiers::NONE)),
+            TuiAction::Quit
+        );
     }
 
     #[test]
@@ -253,6 +269,25 @@ mod tests {
         assert_eq!(
             map_detail_key_event(key_event(KeyCode::Char('s'), KeyModifiers::NONE)),
             TuiAction::None
+        );
+    }
+
+    #[test]
+    fn map_detail_key_event_ctrl_q_quits() {
+        // Ctrl+q quits in detail mode
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+            TuiAction::Quit
+        );
+        // Plain 'q' does nothing (no typing in detail mode)
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('q'), KeyModifiers::NONE)),
+            TuiAction::None
+        );
+        // Esc goes back to search, not quit
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Esc, KeyModifiers::NONE)),
+            TuiAction::BackToSearch
         );
     }
 
