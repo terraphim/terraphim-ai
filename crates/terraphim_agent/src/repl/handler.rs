@@ -494,39 +494,37 @@ impl ReplHandler {
         match subcommand {
             RoleSubcommand::List => {
                 if let Some(service) = &self.service {
-                    let roles = service.list_roles().await;
+                    let roles_with_info = service.list_roles_with_info().await;
                     println!("{}", "Available roles:".bold());
-                    for role in roles {
-                        let marker = if role == self.current_role {
-                            "▶"
+                    for (role, shortname) in roles_with_info {
+                        let marker = if role == self.current_role { ">" } else { " " };
+                        if let Some(short) = shortname {
+                            println!("  {} {} ({})", marker.green(), role, short.cyan());
                         } else {
-                            " "
-                        };
-                        println!("  {} {}", marker.green(), role);
+                            println!("  {} {}", marker.green(), role);
+                        }
                     }
                 } else if let Some(api_client) = &self.api_client {
                     match api_client.get_config().await {
                         Ok(response) => {
                             println!("{}", "Available roles:".bold());
-                            let roles: Vec<String> = response
-                                .config
-                                .roles
-                                .keys()
-                                .map(|k| k.to_string())
-                                .collect();
-                            for role in roles {
-                                let marker = if role == self.current_role {
-                                    "▶"
+                            for (name, role) in response.config.roles.iter() {
+                                let marker = if name.to_string() == self.current_role {
+                                    ">"
                                 } else {
                                     " "
                                 };
-                                println!("  {} {}", marker.green(), role);
+                                if let Some(ref short) = role.shortname {
+                                    println!("  {} {} ({})", marker.green(), name, short.cyan());
+                                } else {
+                                    println!("  {} {}", marker.green(), name);
+                                }
                             }
                         }
                         Err(e) => {
                             println!(
                                 "{} Failed to get roles: {}",
-                                "❌".bold(),
+                                "X".bold(),
                                 e.to_string().red()
                             );
                         }
@@ -534,19 +532,62 @@ impl ReplHandler {
                 }
             }
             RoleSubcommand::Select { name } => {
-                self.current_role = name.clone();
+                // Try to find role by name or shortname
+                let resolved_name = if let Some(service) = &self.service {
+                    service
+                        .find_role_by_name_or_shortname(&name)
+                        .await
+                        .map(|r| r.to_string())
+                } else if let Some(api_client) = &self.api_client {
+                    // For API mode, fetch config and resolve shortname client-side
+                    match api_client.get_config().await {
+                        Ok(cfg) => {
+                            let query_lower = name.to_lowercase();
+                            cfg.config
+                                .roles
+                                .iter()
+                                .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
+                                .or_else(|| {
+                                    cfg.config.roles.iter().find(|(_, role)| {
+                                        role.shortname
+                                            .as_ref()
+                                            .map(|s| s.to_lowercase() == query_lower)
+                                            .unwrap_or(false)
+                                    })
+                                })
+                                .map(|(n, _)| n.to_string())
+                        }
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                };
+
+                let actual_name = match resolved_name {
+                    Some(n) => n,
+                    None => {
+                        println!(
+                            "{} Role '{}' not found (checked name and shortname)",
+                            "X".bold(),
+                            name.red()
+                        );
+                        return Ok(());
+                    }
+                };
+
+                self.current_role = actual_name.clone();
                 // Update the service's selected role so search uses the new role
                 if let Some(service) = &self.service {
-                    let role_name = terraphim_types::RoleName::new(&name);
+                    let role_name = terraphim_types::RoleName::new(&actual_name);
                     if let Err(e) = service.update_selected_role(role_name).await {
                         println!(
                             "{} Warning: Failed to update service role: {}",
-                            "⚠".yellow().bold(),
+                            "!".yellow().bold(),
                             e.to_string().yellow()
                         );
                     }
                 }
-                println!("{} Switched to role: {}", "✅".bold(), name.green());
+                println!("{} Switched to role: {}", "OK".bold(), actual_name.green());
             }
         }
         Ok(())
