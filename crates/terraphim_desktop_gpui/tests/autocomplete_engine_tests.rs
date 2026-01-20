@@ -1,5 +1,5 @@
-use terraphim_desktop_gpui::autocomplete::AutocompleteEngine;
 use terraphim_automata::load_thesaurus_from_json;
+use terraphim_desktop_gpui::autocomplete::AutocompleteEngine;
 
 /// Test suite for AutocompleteEngine with comprehensive coverage
 #[test]
@@ -24,10 +24,13 @@ fn test_autocomplete_suggestion_structure() {
 #[test]
 fn test_autocomplete_creation_error() {
     // Test that thesaurus requires proper structure
-    let json = r#"[]"#;  // Empty array - Thesaurus expects 2 elements
+    let json = r#"[]"#; // Empty array - Thesaurus expects 2 elements
 
     let result = AutocompleteEngine::from_thesaurus_json(json);
-    assert!(result.is_err(), "Empty JSON should return error - Thesaurus expects 2 elements");
+    assert!(
+        result.is_err(),
+        "Empty JSON should return error - Thesaurus expects 2 elements"
+    );
 }
 
 #[test]
@@ -53,7 +56,11 @@ fn test_invalid_json_error_cases() {
 
     for (invalid_json, description) in cases {
         let result = AutocompleteEngine::from_thesaurus_json(invalid_json);
-        assert!(result.is_err(), "Should reject invalid JSON: {}", description);
+        assert!(
+            result.is_err(),
+            "Should reject invalid JSON: {}",
+            description
+        );
     }
 }
 

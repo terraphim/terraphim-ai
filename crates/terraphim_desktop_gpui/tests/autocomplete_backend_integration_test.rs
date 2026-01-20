@@ -2,15 +2,19 @@
 ///
 /// Validates that GPUI autocomplete uses the EXACT same terraphim_automata
 /// functions as Tauri, with the same parameters and thresholds.
-
-use terraphim_automata::{autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search};
+use terraphim_automata::{
+    autocomplete_search, build_autocomplete_index, fuzzy_autocomplete_search,
+};
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_types::RoleName;
 
 #[tokio::test]
 async fn test_autocomplete_kg_integration_exact_match() {
     // Build config and load KG thesaurus
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let role = RoleName::from("Terraphim Engineer");
@@ -20,8 +24,7 @@ async fn test_autocomplete_kg_integration_exact_match() {
     let rolegraph = rolegraph_sync.lock().await;
 
     // Build autocomplete index (SAME as Tauri)
-    let autocomplete_index =
-        build_autocomplete_index(rolegraph.thesaurus.clone(), None).unwrap();
+    let autocomplete_index = build_autocomplete_index(rolegraph.thesaurus.clone(), None).unwrap();
 
     // Exact search for short queries (SAME as Tauri)
     // Note: Test with prefix that exists in actual KG
@@ -49,19 +52,23 @@ async fn test_autocomplete_kg_integration_exact_match() {
 
 #[tokio::test]
 async fn test_autocomplete_fuzzy_search() {
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let role = RoleName::from("Terraphim Engineer");
     let rolegraph_sync = config_state.roles.get(&role).unwrap();
     let rolegraph = rolegraph_sync.lock().await;
 
-    let autocomplete_index =
-        build_autocomplete_index(rolegraph.thesaurus.clone(), None).unwrap();
+    let autocomplete_index = build_autocomplete_index(rolegraph.thesaurus.clone(), None).unwrap();
 
     // Fuzzy search with 0.7 threshold (SAME as Tauri cmd.rs:2212)
     let results = fuzzy_autocomplete_search(&autocomplete_index, "searc", 0.7, Some(8))
-        .unwrap_or_else(|_| autocomplete_search(&autocomplete_index, "searc", Some(8)).unwrap_or_default());
+        .unwrap_or_else(|_| {
+            autocomplete_search(&autocomplete_index, "searc", Some(8)).unwrap_or_default()
+        });
 
     println!(
         "✅ Fuzzy autocomplete with 0.7 threshold found {} suggestions",
@@ -82,7 +89,10 @@ async fn test_autocomplete_fuzzy_search() {
 #[tokio::test]
 async fn test_autocomplete_length_threshold() {
     // Test the 3-char cutoff between fuzzy and exact search (Tauri pattern)
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let role = RoleName::from("Terraphim Engineer");
@@ -109,7 +119,10 @@ async fn test_autocomplete_length_threshold() {
 
 #[tokio::test]
 async fn test_autocomplete_limit_enforcement() {
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let role = RoleName::from("Terraphim Engineer");
@@ -121,16 +134,16 @@ async fn test_autocomplete_limit_enforcement() {
     // Test that limit is respected (Tauri uses limit=8)
     let results = autocomplete_search(&index, "a", Some(8)).unwrap();
 
-    assert!(
-        results.len() <= 8,
-        "Should respect limit of 8 suggestions"
-    );
+    assert!(results.len() <= 8, "Should respect limit of 8 suggestions");
     println!("✅ Autocomplete respects limit: {} <= 8", results.len());
 }
 
 #[tokio::test]
 async fn test_autocomplete_empty_query_handling() {
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let role = RoleName::from("Terraphim Engineer");
@@ -165,7 +178,10 @@ fn test_autocomplete_suggestion_structure() {
 #[tokio::test]
 async fn test_thesaurus_loading_for_role() {
     // Verify that thesaurus loads correctly for KG-enabled roles
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let role = RoleName::from("Terraphim Engineer");
@@ -181,10 +197,7 @@ async fn test_thesaurus_loading_for_role() {
         let rolegraph = rolegraph_sync.lock().await;
         let thesaurus_size = rolegraph.thesaurus.len();
 
-        assert!(
-            thesaurus_size > 0,
-            "Thesaurus should contain terms"
-        );
+        assert!(thesaurus_size > 0, "Thesaurus should contain terms");
         println!("✅ Thesaurus loaded with {} terms", thesaurus_size);
     }
 }

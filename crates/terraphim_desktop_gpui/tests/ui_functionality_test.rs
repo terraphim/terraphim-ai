@@ -1,17 +1,19 @@
 /// UI Functionality Tests - Prove Search, Role Changes, and Modal Work
 ///
 /// These tests verify the actual UI functionality, not just backend
-
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_persistence::Persistable;
-use terraphim_types::{Document, RoleName, SearchQuery};
 use terraphim_service::TerraphimService;
+use terraphim_types::{Document, RoleName, SearchQuery};
 
 #[tokio::test]
 async fn test_search_returns_different_results_per_role() {
     println!("\n=== TESTING ROLE-BASED SEARCH ===\n");
 
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     // Test search with Terraphim Engineer (has KG)
@@ -26,7 +28,10 @@ async fn test_search_returns_different_results_per_role() {
     };
 
     let results_terraphim = service1.search(&query1).await.unwrap();
-    println!("Terraphim Engineer role: {} results", results_terraphim.len());
+    println!(
+        "Terraphim Engineer role: {} results",
+        results_terraphim.len()
+    );
 
     // Test search with Default role (different haystack)
     let mut service2 = TerraphimService::new(config_state.clone());
@@ -47,9 +52,16 @@ async fn test_search_returns_different_results_per_role() {
 
     if counts_differ {
         println!("✅ PASS: Different roles return different result counts");
-        println!("   Terraphim: {}, Default: {}", results_terraphim.len(), results_default.len());
+        println!(
+            "   Terraphim: {}, Default: {}",
+            results_terraphim.len(),
+            results_default.len()
+        );
     } else {
-        println!("⚠️ Same count ({}) but may have different documents", results_terraphim.len());
+        println!(
+            "⚠️ Same count ({}) but may have different documents",
+            results_terraphim.len()
+        );
 
         // Check if actual documents differ
         if !results_terraphim.is_empty() && !results_default.is_empty() {
@@ -65,8 +77,10 @@ async fn test_search_returns_different_results_per_role() {
     }
 
     // Both should return some results
-    assert!(!results_terraphim.is_empty() || !results_default.is_empty(),
-        "At least one role should return results");
+    assert!(
+        !results_terraphim.is_empty() || !results_default.is_empty(),
+        "At least one role should return results"
+    );
 
     println!("\n✅ Role-based search verified working\n");
 }
@@ -75,7 +89,10 @@ async fn test_search_returns_different_results_per_role() {
 async fn test_search_state_role_changes() {
     println!("\n=== TESTING SEARCH STATE ROLE TRACKING ===\n");
 
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     // Verify SearchState picks up selected_role from config
@@ -86,7 +103,8 @@ async fn test_search_state_role_changes() {
     // Just verify it's one of the valid roles
     assert!(
         selected_role.as_str() == "Terraphim Engineer" || selected_role.as_str() == "Default",
-        "Selected role should be a valid role, got: {}", selected_role
+        "Selected role should be a valid role, got: {}",
+        selected_role
     );
 
     // Simulate role change by updating config
@@ -98,7 +116,11 @@ async fn test_search_state_role_changes() {
     let new_selected = config_state.get_selected_role().await;
     println!("After change: {}", new_selected);
 
-    assert_eq!(new_selected.as_str(), "Default", "Role should change to Default");
+    assert_eq!(
+        new_selected.as_str(),
+        "Default",
+        "Role should change to Default"
+    );
 
     println!("✅ Role changes propagate through config_state\n");
 }
@@ -107,7 +129,10 @@ async fn test_search_state_role_changes() {
 async fn test_all_five_roles_can_search() {
     println!("\n=== TESTING ALL 5 ROLES CAN SEARCH ===\n");
 
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     let roles = vec![
@@ -170,7 +195,10 @@ fn test_modal_state_management() {
 
     assert!(is_open, "Modal should be open");
     assert!(document.is_some(), "Document should be set");
-    println!("✅ Modal opens with document: {}", document.as_ref().unwrap().title);
+    println!(
+        "✅ Modal opens with document: {}",
+        document.as_ref().unwrap().title
+    );
 
     // Close modal
     is_open = false;
@@ -236,7 +264,11 @@ async fn test_add_to_context_backend_integration() {
 
     // Verify added
     let conversation = manager.get_conversation(&conv_id).unwrap();
-    assert_eq!(conversation.global_context.len(), 1, "Should have 1 context item");
+    assert_eq!(
+        conversation.global_context.len(),
+        1,
+        "Should have 1 context item"
+    );
 
     println!("✅ Document added to context successfully");
     println!("   Context title: {}", conversation.global_context[0].title);
@@ -250,9 +282,9 @@ fn test_ui_components_exist() {
     println!("\n=== VERIFYING UI COMPONENTS EXIST ===\n");
 
     // This is a compile-time check that all components are importable
-    use terraphim_desktop_gpui::views::{ArticleModal, RoleSelector};
     use terraphim_desktop_gpui::state::search::SearchState;
     use terraphim_desktop_gpui::views::search::{AddToContextEvent, SearchView};
+    use terraphim_desktop_gpui::views::{ArticleModal, RoleSelector};
 
     println!("✅ ArticleModal component exists");
     println!("✅ RoleSelector component exists");

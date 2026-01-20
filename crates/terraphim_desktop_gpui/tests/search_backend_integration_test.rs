@@ -2,7 +2,6 @@
 ///
 /// These tests validate that GPUI uses the same backend as Tauri
 /// by calling the exact same service methods with the same patterns.
-
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
@@ -14,7 +13,10 @@ async fn test_search_backend_integration_basic() {
     let mut config = match ConfigBuilder::new_with_id(ConfigId::Desktop).build() {
         Ok(mut config) => match config.load().await {
             Ok(config) => config,
-            Err(_) => ConfigBuilder::new().build_default_desktop().build().unwrap(),
+            Err(_) => ConfigBuilder::new()
+                .build_default_desktop()
+                .build()
+                .unwrap(),
         },
         Err(_) => panic!("Failed to build config"),
     };
@@ -40,12 +42,18 @@ async fn test_search_backend_integration_basic() {
         !results.is_empty(),
         "Should find results for 'async' in knowledge graph"
     );
-    println!("✅ Search found {} results using TerraphimService", results.len());
+    println!(
+        "✅ Search found {} results using TerraphimService",
+        results.len()
+    );
 }
 
 #[tokio::test]
 async fn test_search_with_multiple_terms_and_operator() {
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
     let mut service = TerraphimService::new(config_state);
 
@@ -60,12 +68,18 @@ async fn test_search_with_multiple_terms_and_operator() {
 
     let results = service.search(&search_query).await.unwrap();
 
-    println!("✅ Multi-term search with AND operator returned {} results", results.len());
+    println!(
+        "✅ Multi-term search with AND operator returned {} results",
+        results.len()
+    );
 }
 
 #[tokio::test]
 async fn test_search_different_roles() {
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
 
     // Test search with different roles
@@ -83,10 +97,17 @@ async fn test_search_different_roles() {
 
         match service.search(&search_query).await {
             Ok(results) => {
-                println!("✅ Role '{}' search returned {} results", role_name, results.len());
+                println!(
+                    "✅ Role '{}' search returned {} results",
+                    role_name,
+                    results.len()
+                );
             }
             Err(e) => {
-                println!("⚠️ Role '{}' search failed: {} (may not have haystacks)", role_name, e);
+                println!(
+                    "⚠️ Role '{}' search failed: {} (may not have haystacks)",
+                    role_name, e
+                );
             }
         }
     }
@@ -94,7 +115,10 @@ async fn test_search_different_roles() {
 
 #[tokio::test]
 async fn test_search_backend_error_handling() {
-    let mut config = ConfigBuilder::new().build_default_desktop().build().unwrap();
+    let mut config = ConfigBuilder::new()
+        .build_default_desktop()
+        .build()
+        .unwrap();
     let config_state = ConfigState::new(&mut config).await.unwrap();
     let mut service = TerraphimService::new(config_state);
 
@@ -111,10 +135,16 @@ async fn test_search_backend_error_handling() {
     // Should handle gracefully (empty results or error)
     match service.search(&search_query).await {
         Ok(results) => {
-            println!("✅ Search with invalid role handled gracefully: {} results", results.len());
+            println!(
+                "✅ Search with invalid role handled gracefully: {} results",
+                results.len()
+            );
         }
         Err(e) => {
-            println!("✅ Search with invalid role returned error (expected): {}", e);
+            println!(
+                "✅ Search with invalid role returned error (expected): {}",
+                e
+            );
         }
     }
 }

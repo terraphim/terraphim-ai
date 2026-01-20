@@ -2,10 +2,9 @@
 
 /// Comprehensive test suite for MarkdownModal component
 /// Tests markdown parsing, rendering, search functionality, and reusability
-
 use terraphim_desktop_gpui::views::markdown_modal::{
-    MarkdownModal, MarkdownModalOptions, MarkdownModalState,
-    MarkdownStyles, TocEntry, SearchResult, MarkdownModalEvent
+    MarkdownModal, MarkdownModalEvent, MarkdownModalOptions, MarkdownModalState, MarkdownStyles,
+    SearchResult, TocEntry,
 };
 
 /// Test markdown content samples
@@ -192,7 +191,10 @@ fn test_section_id_generation() {
         ("Simple Heading", "simple-heading"),
         ("Heading with-hyphens", "heading-with-hyphens"),
         ("Heading_with_underscores", "heading-with-underscores"),
-        ("Heading with Multiple   Spaces", "heading-with-multiple---spaces"),
+        (
+            "Heading with Multiple   Spaces",
+            "heading-with-multiple---spaces",
+        ),
         ("Heading-123-with-numbers", "heading-123-with-numbers"),
         ("", ""),
     ];
@@ -220,12 +222,7 @@ fn test_search_term_highlighting() {
 
     // Simulate the highlight_search_term logic
     let end = (pos + query.len()).min(text.len());
-    let result = format!(
-        "{}**{}**{}",
-        &text[..pos],
-        &text[pos..end],
-        &text[end..]
-    );
+    let result = format!("{}**{}**{}", &text[..pos], &text[pos..end], &text[end..]);
 
     assert_eq!(result, "This is a **test** string");
 }
@@ -243,7 +240,8 @@ fn test_search_content_extraction() {
         if let Some(pos) = line.to_lowercase().find(&query.to_lowercase()) {
             results.push(SearchResult {
                 line_number: line_number + 1,
-                snippet: format!("{}**{}**{}",
+                snippet: format!(
+                    "{}**{}**{}",
                     &line[..pos],
                     &line[pos..pos + query.len()],
                     &line[pos + query.len()..]
@@ -263,13 +261,7 @@ fn test_search_content_extraction() {
 
 #[test]
 fn test_get_search_context() {
-    let lines = vec![
-        "Line 1",
-        "Line 2",
-        "Target line",
-        "Line 4",
-        "Line 5",
-    ];
+    let lines = vec!["Line 1", "Line 2", "Target line", "Line 4", "Line 5"];
     let line_number: usize = 2; // Target line index
     let context_size = 1;
 
@@ -349,8 +341,14 @@ fn test_complex_markdown_structure() {
     // Count different markdown elements
     let heading_count = content.lines().filter(|line| line.starts_with('#')).count();
     let code_block_count = content.matches("```").count() / 2;
-    let list_count = content.lines().filter(|line| line.trim_start().starts_with("-")).count();
-    let blockquote_count = content.lines().filter(|line| line.trim_start().starts_with(">")).count();
+    let list_count = content
+        .lines()
+        .filter(|line| line.trim_start().starts_with("-"))
+        .count();
+    let blockquote_count = content
+        .lines()
+        .filter(|line| line.trim_start().starts_with(">"))
+        .count();
 
     assert_eq!(heading_count, 6);
     assert_eq!(code_block_count, 2);
@@ -364,17 +362,17 @@ fn test_markdown_modal_event_types() {
     let events = vec![
         MarkdownModalEvent::Closed,
         MarkdownModalEvent::SectionNavigated {
-            section: "test-section".to_string()
+            section: "test-section".to_string(),
         },
         MarkdownModalEvent::SearchPerformed {
             query: "test".to_string(),
-            results: Vec::new()
+            results: Vec::new(),
         },
         MarkdownModalEvent::LinkClicked {
-            url: "https://example.com".to_string()
+            url: "https://example.com".to_string(),
         },
         MarkdownModalEvent::KeyboardShortcut {
-            shortcut: "ctrl+f".to_string()
+            shortcut: "ctrl+f".to_string(),
         },
     ];
 
@@ -647,20 +645,28 @@ fn test_performance_considerations() {
 
     // Search performance with many results
     let _many_results_content = "keyword\n".repeat(1000);
-    let simulated_results = (0..1000).map(|i| SearchResult {
-        line_number: i + 1,
-        snippet: "keyword found".to_string(),
-        context: format!("Line {}: keyword", i + 1),
-        position: 0,
-    }).collect::<Vec<_>>();
+    let simulated_results = (0..1000)
+        .map(|i| SearchResult {
+            line_number: i + 1,
+            snippet: "keyword found".to_string(),
+            context: format!("Line {}: keyword", i + 1),
+            position: 0,
+        })
+        .collect::<Vec<_>>();
 
     // Should limit results for performance
     let limited_results = simulated_results.into_iter().take(50).collect::<Vec<_>>();
     assert_eq!(limited_results.len(), 50);
 
     // TOC generation with many headings
-    let many_headings_content = (0..100).map(|i| format!("# Heading {}", i)).collect::<Vec<_>>().join("\n");
-    let heading_count = many_headings_content.lines().filter(|line| line.starts_with('#')).count();
+    let many_headings_content = (0..100)
+        .map(|i| format!("# Heading {}", i))
+        .collect::<Vec<_>>()
+        .join("\n");
+    let heading_count = many_headings_content
+        .lines()
+        .filter(|line| line.starts_with('#'))
+        .count();
 
     // Should handle many headings efficiently
     assert_eq!(heading_count, 100);

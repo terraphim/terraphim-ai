@@ -2,7 +2,6 @@
 ///
 /// Validates that GPUI uses the EXACT same ContextManager as Tauri
 /// by calling the same methods with the same patterns.
-
 use terraphim_service::context::{ContextConfig, ContextManager};
 use terraphim_types::{ChatMessage, ContextItem, ContextType, ConversationId, RoleName};
 

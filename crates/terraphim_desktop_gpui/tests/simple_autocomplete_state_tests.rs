@@ -167,9 +167,18 @@ fn test_ordering_by_score() {
     }
 
     let mut suggestions = vec![
-        TestSuggestion { term: "exact_match".to_string(), score: 1.0 },
-        TestSuggestion { term: "partial_match".to_string(), score: 0.7 },
-        TestSuggestion { term: "fuzzy_match".to_string(), score: 0.5 },
+        TestSuggestion {
+            term: "exact_match".to_string(),
+            score: 1.0,
+        },
+        TestSuggestion {
+            term: "partial_match".to_string(),
+            score: 0.7,
+        },
+        TestSuggestion {
+            term: "fuzzy_match".to_string(),
+            score: 0.5,
+        },
     ];
 
     // Test ordering by score (higher scores should come first)

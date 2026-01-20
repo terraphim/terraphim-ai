@@ -1,5 +1,4 @@
 /// Simple KG autocomplete test to validate basic functionality
-
 use terraphim_desktop_gpui::AutocompleteEngine;
 
 #[test]
@@ -16,7 +15,10 @@ fn test_basic_kg_autocomplete() {
     // Basic autocomplete test
     let suggestions = engine.autocomplete("ru", 5);
     assert!(!suggestions.is_empty(), "Should have suggestions for 'ru'");
-    assert!(suggestions.iter().any(|s| s.term == "rust"), "Should suggest 'rust'");
+    assert!(
+        suggestions.iter().any(|s| s.term == "rust"),
+        "Should suggest 'rust'"
+    );
 
     println!("✅ Basic KG Autocomplete test passed!");
 }

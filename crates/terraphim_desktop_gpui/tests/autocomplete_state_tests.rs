@@ -1,8 +1,8 @@
 #![recursion_limit = "1024"]
 
 use gpui::*;
-use terraphim_desktop_gpui::views::search::autocomplete::AutocompleteState;
 use terraphim_desktop_gpui::autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
+use terraphim_desktop_gpui::views::search::autocomplete::AutocompleteState;
 
 /// Mock context for testing AutocompleteState without full GPUI setup
 struct MockContext {

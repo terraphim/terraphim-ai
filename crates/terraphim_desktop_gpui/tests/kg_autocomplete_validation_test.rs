@@ -4,7 +4,6 @@
 /// 1. Autocomplete works with KG-enabled roles
 /// 2. Article modal opens correctly
 /// 3. Search results integration with autocomplete
-
 use terraphim_desktop_gpui::autocomplete::{AutocompleteEngine, AutocompleteSuggestion};
 use terraphim_desktop_gpui::state::search::SearchState;
 use terraphim_types::{Document, Thesaurus};
@@ -29,16 +28,25 @@ fn test_kg_autocomplete_engine_with_thesaurus() {
     // Test 1: Basic autocomplete with "ru" prefix
     let suggestions = engine.autocomplete("ru", 5);
     assert!(!suggestions.is_empty(), "Should have suggestions for 'ru'");
-    assert!(suggestions.iter().any(|s| s.term == "rust"), "Should suggest 'rust'");
+    assert!(
+        suggestions.iter().any(|s| s.term == "rust"),
+        "Should suggest 'rust'"
+    );
 
     // Test 2: Autocomplete with "ter" prefix
     let suggestions = engine.autocomplete("ter", 5);
     assert!(!suggestions.is_empty(), "Should have suggestions for 'ter'");
-    assert!(suggestions.iter().any(|s| s.term == "terraphim"), "Should suggest 'terraphim'");
+    assert!(
+        suggestions.iter().any(|s| s.term == "terraphim"),
+        "Should suggest 'terraphim'"
+    );
 
     // Test 3: Fuzzy search for typos
     let suggestions = engine.fuzzy_search("asynch", 5);
-    assert!(!suggestions.is_empty(), "Fuzzy search should find 'async' despite typo");
+    assert!(
+        !suggestions.is_empty(),
+        "Fuzzy search should find 'async' despite typo"
+    );
 
     // Test 4: Multi-word terms
     let suggestions = engine.autocomplete("know", 5);
@@ -49,7 +57,10 @@ fn test_kg_autocomplete_engine_with_thesaurus() {
 
     // Test 5: Validate all suggestions have KG flag
     for suggestion in &suggestions {
-        assert!(suggestion.from_kg, "All suggestions should be marked as from KG");
+        assert!(
+            suggestion.from_kg,
+            "All suggestions should be marked as from KG"
+        );
     }
 
     println!("✅ KG Autocomplete Engine tests passed!");
@@ -64,14 +75,17 @@ fn test_autocomplete_scoring_and_ranking() {
         {"id": 4, "nterm": "testament", "url": "https://testament.com"}
     ]"#;
 
-    let engine = AutocompleteEngine::from_thesaurus_json(thesaurus_json)
-        .expect("Failed to create engine");
+    let engine =
+        AutocompleteEngine::from_thesaurus_json(thesaurus_json).expect("Failed to create engine");
 
     let suggestions = engine.autocomplete("test", 10);
 
     // Exact match should have highest score
     assert_eq!(suggestions[0].term, "test", "Exact match should be first");
-    assert!(suggestions[0].score >= 0.9, "Exact match should have high score");
+    assert!(
+        suggestions[0].score >= 0.9,
+        "Exact match should have high score"
+    );
 
     // All suggestions should have decreasing scores
     for i in 1..suggestions.len() {
@@ -91,15 +105,24 @@ fn test_kg_term_validation() {
         {"id": 2, "nterm": "another_valid", "url": "https://another.com"}
     ]"#;
 
-    let engine = AutocompleteEngine::from_thesaurus_json(thesaurus_json)
-        .expect("Failed to create engine");
+    let engine =
+        AutocompleteEngine::from_thesaurus_json(thesaurus_json).expect("Failed to create engine");
 
     // Test valid terms
-    assert!(engine.is_kg_term("valid_term"), "Should recognize valid KG term");
-    assert!(engine.is_kg_term("another_valid"), "Should recognize another valid KG term");
+    assert!(
+        engine.is_kg_term("valid_term"),
+        "Should recognize valid KG term"
+    );
+    assert!(
+        engine.is_kg_term("another_valid"),
+        "Should recognize another valid KG term"
+    );
 
     // Test invalid terms
-    assert!(!engine.is_kg_term("invalid_term"), "Should not recognize invalid term");
+    assert!(
+        !engine.is_kg_term("invalid_term"),
+        "Should not recognize invalid term"
+    );
     assert!(!engine.is_kg_term(""), "Empty string should not be KG term");
 
     let all_terms = engine.get_terms();
@@ -153,16 +176,25 @@ fn test_autocomplete_with_special_characters() {
         {"id": 4, "nterm": "node.js", "url": "https://nodejs.org"}
     ]"#;
 
-    let engine = AutocompleteEngine::from_thesaurus_json(thesaurus_json)
-        .expect("Failed to create engine");
+    let engine =
+        AutocompleteEngine::from_thesaurus_json(thesaurus_json).expect("Failed to create engine");
 
     // Test with special characters
     let suggestions = engine.autocomplete("c", 10);
-    assert!(suggestions.iter().any(|s| s.term == "c++"), "Should handle C++");
-    assert!(suggestions.iter().any(|s| s.term == "c#"), "Should handle C#");
+    assert!(
+        suggestions.iter().any(|s| s.term == "c++"),
+        "Should handle C++"
+    );
+    assert!(
+        suggestions.iter().any(|s| s.term == "c#"),
+        "Should handle C#"
+    );
 
     let suggestions = engine.autocomplete("node", 10);
-    assert!(suggestions.iter().any(|s| s.term == "node.js"), "Should handle dots in names");
+    assert!(
+        suggestions.iter().any(|s| s.term == "node.js"),
+        "Should handle dots in names"
+    );
 
     println!("✅ Special character autocomplete tests passed!");
 }
@@ -176,14 +208,20 @@ fn test_article_modal_document_structure() {
         body: "This is the full body of the test article with detailed content.".to_string(),
         description: Some("Brief description".to_string()),
         url: "https://test.com/article".to_string(),
-        tags: vec!["test".to_string(), "article".to_string()],
-        rank: Some(0.95),
+        tags: Some(vec!["test".to_string(), "article".to_string()]),
+        rank: Some(95),
+        summarization: None,
+        stub: None,
+        source_haystack: None,
     };
 
     // Validate all required fields are present
     assert!(!doc.id.is_empty(), "Document must have ID");
     assert!(!doc.title.is_empty(), "Document must have title");
-    assert!(!doc.body.is_empty(), "Document must have body for article modal");
+    assert!(
+        !doc.body.is_empty(),
+        "Document must have body for article modal"
+    );
     assert!(!doc.url.is_empty(), "Document must have URL");
 
     println!("✅ Article modal document structure tests passed!");
@@ -208,17 +246,27 @@ mod integration_tests {
 
         // User types "terr"
         let suggestions = engine.autocomplete("terr", 5);
-        assert_eq!(suggestions.len(), 4, "Should get all terraphim-related suggestions");
+        assert_eq!(
+            suggestions.len(),
+            4,
+            "Should get all terraphim-related suggestions"
+        );
 
         // User continues typing "terraph"
         let suggestions = engine.autocomplete("terraph", 5);
         assert!(!suggestions.is_empty(), "Should still have suggestions");
-        assert!(suggestions[0].term.starts_with("terraphim"), "First suggestion should start with terraphim");
+        assert!(
+            suggestions[0].term.starts_with("terraphim"),
+            "First suggestion should start with terraphim"
+        );
 
         // User selects first suggestion
         let selected = &suggestions[0];
         assert!(selected.from_kg, "Selected item should be from KG");
-        assert!(selected.score > 0.0, "Selected item should have positive score");
+        assert!(
+            selected.score > 0.0,
+            "Selected item should have positive score"
+        );
 
         println!("✅ Full autocomplete flow test passed!");
     }
@@ -243,14 +291,20 @@ mod integration_tests {
         let suggestions = engine.autocomplete("term_10", 10);
         let duration = start.elapsed();
 
-        assert!(!suggestions.is_empty(), "Should find suggestions in large KG");
+        assert!(
+            !suggestions.is_empty(),
+            "Should find suggestions in large KG"
+        );
         assert!(
             duration.as_millis() < 100,
             "Autocomplete should complete within 100ms, took {}ms",
             duration.as_millis()
         );
 
-        println!("✅ Performance test passed! Autocomplete took {}ms", duration.as_millis());
+        println!(
+            "✅ Performance test passed! Autocomplete took {}ms",
+            duration.as_millis()
+        );
     }
 }
 

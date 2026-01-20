@@ -5,9 +5,9 @@
 //! 2. Update RoleSelector UI
 //! 3. Are consistent between tray menu and dropdown sources
 
+use std::sync::Arc;
 use terraphim_config::ConfigState;
 use terraphim_types::RoleName;
-use std::sync::Arc;
 use tokio::sync::Mutex;
 
 /// Helper to create a test ConfigState with mock roles
@@ -33,8 +33,9 @@ async fn test_config_state_role_change() {
     // Create config state with initial role
     let config_state = create_test_config_state(
         vec!["Python Engineer", "Rust Engineer", "Default"],
-        "Python Engineer"
-    ).await;
+        "Python Engineer",
+    )
+    .await;
 
     // Verify initial state
     {
@@ -57,10 +58,8 @@ async fn test_config_state_role_change() {
 
 #[tokio::test]
 async fn test_config_state_role_change_preserves_other_fields() {
-    let config_state = create_test_config_state(
-        vec!["Python Engineer", "Rust Engineer"],
-        "Python Engineer"
-    ).await;
+    let config_state =
+        create_test_config_state(vec!["Python Engineer", "Rust Engineer"], "Python Engineer").await;
 
     // Change role
     {
@@ -75,10 +74,7 @@ async fn test_config_state_role_change_preserves_other_fields() {
 
 #[tokio::test]
 async fn test_multiple_rapid_role_changes() {
-    let config_state = create_test_config_state(
-        vec!["Role1", "Role2", "Role3"],
-        "Role1"
-    ).await;
+    let config_state = create_test_config_state(vec!["Role1", "Role2", "Role3"], "Role1").await;
 
     // Simulate rapid role changes (like user clicking quickly)
     for role in &["Role2", "Role3", "Role1", "Role2"] {
@@ -95,10 +91,7 @@ async fn test_multiple_rapid_role_changes() {
 
 #[tokio::test]
 async fn test_concurrent_role_changes() {
-    let config_state = create_test_config_state(
-        vec!["Role1", "Role2"],
-        "Role1"
-    ).await;
+    let config_state = create_test_config_state(vec!["Role1", "Role2"], "Role1").await;
 
     let config_state_clone = config_state.clone();
 

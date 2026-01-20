@@ -1,6 +1,6 @@
 #![cfg(feature = "legacy-components")]
 
 #[test]
-fn legacy_ui_visual_tests_placeholder() {
+fn legacy_virtual_scroll_integration_placeholder() {
     assert!(true);
 }
