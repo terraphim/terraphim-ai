@@ -41,3 +41,7 @@ docs/.env.1password
 scratchpad/firecracker-rust
 terraphim_server/dist/
 scratchpad/
+# Temporary session files
+tmp/
+2025-*.txt
+slash_command.txt
