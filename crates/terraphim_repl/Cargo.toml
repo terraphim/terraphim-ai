@@ -1,6 +1,6 @@
 [package]
 name = "terraphim-repl"
-version = "1.0.0"
+version.workspace = true
 edition = "2024"
 authors = ["Terraphim Team"]
 description = "Offline-capable REPL for semantic knowledge graph search"
