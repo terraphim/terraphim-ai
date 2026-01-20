@@ -685,14 +685,35 @@ async fn run_offline_command(command: Command) -> Result<()> {
         Command::Roles { sub } => {
             match sub {
                 RolesSub::List => {
-                    let roles = service.list_roles().await;
-                    println!("{}", roles.join("\n"));
+                    let roles_with_info = service.list_roles_with_info().await;
+                    let selected = service.get_selected_role().await;
+                    for (name, shortname) in roles_with_info {
+                        let marker = if name == selected.to_string() {
+                            "*"
+                        } else {
+                            " "
+                        };
+                        if let Some(short) = shortname {
+                            println!("{} {} ({})", marker, name, short);
+                        } else {
+                            println!("{} {}", marker, name);
+                        }
+                    }
                 }
                 RolesSub::Select { name } => {
-                    let role_name = RoleName::new(&name);
-                    service.update_selected_role(role_name).await?;
+                    // Find role by name or shortname
+                    let role_name = service
+                        .find_role_by_name_or_shortname(&name)
+                        .await
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Role '{}' not found (checked name and shortname)",
+                                name
+                            )
+                        })?;
+                    service.update_selected_role(role_name.clone()).await?;
                     service.save_config().await?;
-                    println!("selected:{}", name);
+                    println!("selected:{}", role_name);
                 }
             }
             Ok(())
@@ -1279,13 +1300,46 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             match sub {
                 RolesSub::List => {
                     let cfg = api.get_config().await?;
-                    let keys: Vec<String> =
-                        cfg.config.roles.keys().map(|r| r.to_string()).collect();
-                    println!("{}", keys.join("\n"));
+                    let selected = cfg.config.selected_role.to_string();
+                    for (name, role) in cfg.config.roles.iter() {
+                        let marker = if name.to_string() == selected {
+                            "*"
+                        } else {
+                            " "
+                        };
+                        if let Some(ref short) = role.shortname {
+                            println!("{} {} ({})", marker, name, short);
+                        } else {
+                            println!("{} {}", marker, name);
+                        }
+                    }
                 }
                 RolesSub::Select { name } => {
-                    let _ = api.update_selected_role(&name).await?;
-                    println!("selected:{}", name);
+                    // Try to find role by name or shortname
+                    let cfg = api.get_config().await?;
+                    let query_lower = name.to_lowercase();
+                    let role_name = cfg
+                        .config
+                        .roles
+                        .iter()
+                        .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
+                        .or_else(|| {
+                            cfg.config.roles.iter().find(|(_, role)| {
+                                role.shortname
+                                    .as_ref()
+                                    .map(|s| s.to_lowercase() == query_lower)
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .map(|(n, _)| n.to_string())
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Role '{}' not found (checked name and shortname)",
+                                name
+                            )
+                        })?;
+                    let _ = api.update_selected_role(&role_name).await?;
+                    println!("selected:{}", role_name);
                 }
             }
             Ok(())
