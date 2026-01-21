@@ -144,25 +144,25 @@ impl DeviceSettings {
 
         let mut profiles = HashMap::new();
 
-        // Add minimal required profiles for embedded mode
-        // Use dashmap as primary (fast concurrent in-memory storage)
-        let mut dashmap_profile = HashMap::new();
-        dashmap_profile.insert("type".to_string(), "dashmap".to_string());
-        dashmap_profile.insert(
-            "root".to_string(),
-            "/tmp/terraphim_dashmap_embedded".to_string(),
-        );
-        profiles.insert("dashmap".to_string(), dashmap_profile);
+        // Get user data directory for persistent storage
+        // Use ProjectDirs for cross-platform paths, fallback to ~/.terraphim
+        let data_dir = if let Some(proj_dirs) = ProjectDirs::from("com", "aks", "terraphim") {
+            proj_dirs.data_dir().to_string_lossy().to_string()
+        } else if let Ok(home) = std::env::var("HOME") {
+            format!("{}/.terraphim", home)
+        } else {
+            // Fallback to /tmp only if we can't get a better path
+            "/tmp/terraphim_embedded".to_string()
+        };
 
+        // Use only SQLite for persistent storage
+        // DashMap disabled - causes role selections to be lost between CLI invocations
         let mut sqlite_profile = HashMap::new();
         sqlite_profile.insert("type".to_string(), "sqlite".to_string());
-        sqlite_profile.insert(
-            "datadir".to_string(),
-            "/tmp/terraphim_sqlite_embedded".to_string(),
-        );
+        sqlite_profile.insert("datadir".to_string(), format!("{}/sqlite", data_dir));
         sqlite_profile.insert(
             "connection_string".to_string(),
-            "/tmp/terraphim_sqlite_embedded/terraphim.db".to_string(),
+            format!("{}/sqlite/terraphim.db", data_dir),
         );
         sqlite_profile.insert("table".to_string(), "terraphim_kv".to_string());
         profiles.insert("sqlite".to_string(), sqlite_profile);
@@ -171,7 +171,7 @@ impl DeviceSettings {
             server_hostname: "127.0.0.1:8000".to_string(),
             api_endpoint: "http://localhost:8000/api".to_string(),
             initialized: true,
-            default_data_path: "/tmp/terraphim_embedded".to_string(),
+            default_data_path: data_dir,
             profiles,
         }
     }
