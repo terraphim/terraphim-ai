@@ -15,21 +15,18 @@ readme = "../../README.md"
 default = ["repl-interactive"]
 repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:indicatif", "dep:dirs"]
 repl-interactive = ["repl", "dep:atty"]
-# NOTE: repl-sessions removed from repl-full for crates.io publishing (terraphim_sessions not published yet)
-repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-interactive"]
+# NOTE: repl-sessions re-enabled for local development (path dependency)
+repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-interactive", "repl-sessions"]
 repl-chat = ["repl"]  # Chat functionality
 repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
 repl-web = ["repl"]   # Web operations and configuration
-# NOTE: repl-sessions feature exists but dependency disabled for crates.io publishing
-# (terraphim_sessions not published yet). Feature is valid but non-functional until dependency added.
-# repl-sessions = ["repl"]  # Session history search (stub - requires terraphim_sessions when published)
+# Session history search - enabled for local development
+repl-sessions = ["repl", "dep:terraphim_sessions"]
 
 [lints.rust]
-# Allow cfg(feature = "repl-sessions") even though feature is commented out
-# This will be removed once terraphim_sessions is published to crates.io
-unexpected_cfgs = { level = "warn", check-cfg = ["cfg(feature, values(\"repl-sessions\"))"] }
+# repl-sessions feature is now enabled for local development
 
 [dependencies]
 anyhow = "1.0"
@@ -76,8 +73,8 @@ terraphim_service = { path = "../terraphim_service", version = "1.0.0" }
 terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 terraphim_hooks = { path = "../terraphim_hooks", version = "1.0.0" }
-# NOTE: terraphim_sessions commented out for crates.io publishing (not published yet)
-# terraphim_sessions = { path = "../terraphim_sessions", version = "0.1.0", optional = true, features = ["cla-full"] }
+# Session search - enabled for local development (path dependency)
+terraphim_sessions = { path = "../terraphim_sessions", version = "0.1.0", optional = true, features = ["tsa-full"] }
 
 [dev-dependencies]
 serial_test = "3.3"
