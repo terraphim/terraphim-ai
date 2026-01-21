@@ -1,9 +1,9 @@
 # Handover Document
 
-**Date**: 2026-01-20
-**Session Focus**: Role Selection Enhancements + RocksDB Disabling
+**Date**: 2026-01-21
+**Session Focus**: Enable terraphim-agent Sessions Feature + v1.6.0 Release
 **Branch**: `main`
-**Previous Commit**: `2227b0cc` - fix(updater): resolve GitHub asset name mismatch for auto-update
+**Previous Commit**: `a3b4473c` - chore(release): prepare v1.6.0 with sessions feature
 
 ---
 
@@ -11,77 +11,62 @@
 
 ### Completed Tasks This Session
 
-#### 1. Added `roles select` Command to terraphim-cli
-**Problem**: `terraphim-cli` only had `roles` (list) command, while `terraphim-agent` had both `roles list` and `roles select`. Users expected consistent behavior across both CLIs.
+#### 1. Enabled `repl-sessions` Feature in terraphim_agent
+**Problem**: The `/sessions` REPL commands were disabled because `terraphim_sessions` was not published to crates.io.
 
 **Solution Implemented**:
-- Added `RolesSub` enum with `List` and `Select` variants to `crates/terraphim_cli/src/main.rs`
-- Implemented `handle_roles_list()` and `handle_roles_select()` handler functions
-- Added role management methods to `crates/terraphim_cli/src/service.rs`
+- Added `repl-sessions` to `repl-full` feature array
+- Uncommented `repl-sessions` feature definition
+- Uncommented `terraphim_sessions` dependency with corrected feature name (`tsa-full`)
+
+**Files Modified**:
+- `crates/terraphim_agent/Cargo.toml`
 
 **Status**: COMPLETED
 
 ---
 
-#### 2. Implemented Role Selection by Shortname (Both CLIs)
-**Problem**: Users had to type full role names like "Terraphim Engineer" when selecting roles. Roles have optional shortnames (e.g., "eng") that should also work.
+#### 2. Published Crates to crates.io
+**Problem**: Users installing via `cargo install` couldn't use session features.
 
 **Solution Implemented**:
-- Added `find_role_by_name_or_shortname()` method to both services
-- Case-insensitive matching on both name and shortname
-- Updated all role selection handlers to use the new method
-
-**Technical Details**:
-```rust
-pub async fn find_role_by_name_or_shortname(&self, query: &str) -> Option<RoleName> {
-    let config = self.config_state.config.lock().await;
-    let query_lower = query.to_lowercase();
-
-    // First try exact match on name
-    for (name, _role) in config.roles.iter() {
-        if name.to_string().to_lowercase() == query_lower {
-            return Some(name.clone());
-        }
-    }
-    // Then try match on shortname
-    for (name, role) in config.roles.iter() {
-        if let Some(ref shortname) = role.shortname {
-            if shortname.to_lowercase() == query_lower {
-                return Some(name.clone());
-            }
-        }
-    }
-    None
-}
-```
+Published three crates in dependency order:
+1. `terraphim-session-analyzer` v1.6.0
+2. `terraphim_sessions` v1.6.0
+3. `terraphim_agent` v1.6.0
 
 **Files Modified**:
-- `crates/terraphim_cli/src/main.rs` - Added RolesSub enum and handlers
-- `crates/terraphim_cli/src/service.rs` - Added role management methods
-- `crates/terraphim_agent/src/main.rs` - Updated to use shortname lookup
-- `crates/terraphim_agent/src/service.rs` - Added shortname methods, removed redundant `list_roles()`
-- `crates/terraphim_agent/src/repl/handler.rs` - Updated REPL with shortname support
+- `Cargo.toml` - Bumped workspace version to 1.6.0
+- `crates/terraphim_sessions/Cargo.toml` - Added full crates.io metadata
+- `crates/terraphim-session-analyzer/Cargo.toml` - Updated to workspace version
+- `crates/terraphim_types/Cargo.toml` - Fixed WASM uuid configuration
 
 **Status**: COMPLETED
 
 ---
 
-#### 3. Disabled RocksDB Feature Across Codebase
-**Problem**: RocksDB causes locking issues and was breaking builds. Need to disable it consistently.
+#### 3. Tagged v1.6.0 Release
+**Problem**: Need release tag for proper versioning.
 
 **Solution Implemented**:
-- Commented out `rocksdb` feature in `crates/terraphim_persistence/Cargo.toml`
-- Disabled `services-rocksdb` feature in `terraphim_server/Cargo.toml`
-- Disabled `services-rocksdb` feature in `desktop/src-tauri/Cargo.toml`
-- Commented out `[profiles.rocksdb]` sections in all settings.toml files
+- Created `v1.6.0` tag at commit `a3b4473c`
+- Pushed tag and commits to remote
+
+**Status**: COMPLETED
+
+---
+
+#### 4. Updated README with Sessions Documentation
+**Problem**: README didn't document session search feature.
+
+**Solution Implemented**:
+- Added `--features repl-full` installation instructions
+- Added Session Search section with all REPL commands
+- Updated notes about crates.io installation
+- Listed supported session sources (Claude Code, Cursor, Aider)
 
 **Files Modified**:
-- `crates/terraphim_persistence/Cargo.toml`
-- `terraphim_server/Cargo.toml`
-- `desktop/src-tauri/Cargo.toml`
-- `crates/terraphim_settings/default/settings.toml`
-- `terraphim_server/default/settings.toml`
-- `desktop/default/settings.toml`
+- `README.md`
 
 **Status**: COMPLETED
 
@@ -95,73 +80,70 @@ git branch --show-current
 # Output: main
 ```
 
-### Modified Files (Unstaged) - Ready to Commit
-```
-M crates/terraphim_agent/src/forgiving/parser.rs
-M crates/terraphim_agent/src/main.rs
-M crates/terraphim_agent/src/repl/commands.rs
-M crates/terraphim_agent/src/repl/handler.rs
-M crates/terraphim_cli/src/main.rs
-M crates/terraphim_cli/src/service.rs
-M crates/terraphim_persistence/Cargo.toml
-M crates/terraphim_settings/default/settings.toml
-M crates/terraphim_settings/test_settings/settings.toml
-M desktop/default/settings.toml
-M desktop/src-tauri/Cargo.toml
-M terraphim_server/Cargo.toml
-M terraphim_server/default/settings.toml
-M terraphim_server/dist/index.html
+### v1.6.0 Installation
+```bash
+# Full installation with session search
+cargo install terraphim_agent --features repl-full
+
+# Available session commands:
+/sessions sources          # Detect available sources
+/sessions import           # Import from Claude Code, Cursor, Aider
+/sessions list             # List imported sessions
+/sessions search <query>   # Full-text search
+/sessions stats            # Show statistics
+/sessions concepts <term>  # Knowledge graph concept search
+/sessions related <id>     # Find related sessions
+/sessions timeline         # Timeline visualization
+/sessions export           # Export to JSON/Markdown
 ```
 
-### Untracked Files (Session Artifacts)
-```
-Cargo.lock.backup
-DESKTOP_BUILD_REPORT.md
-DESKTOP_TEST_REPORT.md
-HANDOVER.md.backup
-desktop-integration-test.sh
-desktop-smoke-test.sh
-lessons-learned.md
-```
+### Verified Functionality
+| Command | Status | Result |
+|---------|--------|--------|
+| `/sessions sources` | Working | Detected 419 Claude Code sessions |
+| `/sessions import --limit N` | Working | Imports sessions from claude-code-native |
+| `/sessions list --limit N` | Working | Shows session table with ID, Source, Title, Messages |
+| `/sessions stats` | Working | Shows total sessions, messages, breakdown by source |
+| `/sessions search <query>` | Working | Full-text search across imported sessions |
 
 ---
 
 ## Key Implementation Notes
 
-### Package Name Gotcha
-- The package is named `terraphim-cli` (hyphen) not `terraphim_cli` (underscore)
-- Use `cargo build -p terraphim-cli` (with hyphen)
-- Rust convention: crate names in Cargo.toml use hyphens, module paths use underscores
+### Feature Name Mismatch Resolution
+- terraphim_agent expected `cla-full` feature
+- terraphim_sessions provides `tsa-full` feature
+- Fixed by using correct feature name in dependency
 
-### Role Shortname Support
-- Shortnames defined in `terraphim_config::Role.shortname: Option<String>`
-- Lookup order: exact name match first, then shortname match
-- Case-insensitive matching for user convenience
-- Example: `terraphim-cli roles select eng` works if role has shortname "eng"
+### Version Requirements
+Dependencies use flexible version requirements:
+```toml
+terraphim-session-analyzer = { version = "1.6.0", path = "..." }
+terraphim_automata = { version = ">=1.4.10", path = "..." }
+```
 
-### RocksDB Dependency Chain
-When disabling RocksDB, update these files in order:
-1. `crates/terraphim_persistence/Cargo.toml` - disable feature definition
-2. `terraphim_server/Cargo.toml` - remove from features that depend on it
-3. `desktop/src-tauri/Cargo.toml` - remove from features that depend on it
-4. All `settings.toml` files - comment out profile sections
+### WASM uuid Configuration
+Fixed parse error by consolidating WASM dependencies:
+```toml
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+uuid = { version = "1.19.0", features = ["v4", "serde", "js"] }
+getrandom = { version = "0.3", features = ["wasm_js"] }
+```
 
 ---
 
 ## Next Steps (Prioritized)
 
-### Immediate (This Session - Uncommitted)
+### Immediate
+1. **Commit README Changes**
+   - Session documentation added
+   - Suggested commit: `docs: add session search documentation to README`
 
-1. **Commit Current Changes**
-   - All role selection and RocksDB changes are ready
-   - Suggested commit: `feat(cli): add roles select command with shortname support; disable rocksdb`
-
-### High Priority (From Previous Session)
+### High Priority (From Previous Sessions)
 
 2. **Complete TUI Keyboard Handling Fix** (Issue #463)
    - Use modifier keys (Ctrl+s, Ctrl+r) for shortcuts
    - Allow plain characters for typing
-   - Status: Partially implemented in previous session
 
 3. **Investigate Release Pipeline Version Mismatch** (Issue #464)
    - `v1.5.2` asset reports version `1.4.10` when running `--version`
@@ -169,11 +151,7 @@ When disabling RocksDB, update these files in order:
 
 ### Medium Priority
 
-4. **Clean Up Session Artifacts**
-   - Archive or remove backup files
-   - Review and commit index.html changes
-
-5. **Review Other Open Issues**
+4. **Review Other Open Issues**
    - #442: Validation framework
    - #438-#433: Performance improvements
 
@@ -181,34 +159,30 @@ When disabling RocksDB, update these files in order:
 
 ## Testing Commands
 
-### Role Selection Testing
+### Session Search Testing
 ```bash
-# Build CLI
-cargo build -p terraphim-cli
+# Build with full features
+cargo build -p terraphim_agent --features repl-full --release
 
-# List roles with shortnames
-./target/debug/terraphim-cli roles list
+# Launch REPL
+./target/release/terraphim-agent
 
-# Select by full name
-./target/debug/terraphim-cli roles select "Terraphim Engineer"
-
-# Select by shortname
-./target/debug/terraphim-cli roles select eng
-
-# Test agent
-cargo build -p terraphim_agent
-./target/debug/terraphim-agent roles list
-./target/debug/terraphim-agent roles select eng
+# Test session commands
+/sessions sources
+/sessions import --limit 20
+/sessions list --limit 10
+/sessions search "rust"
+/sessions stats
 ```
 
-### Build Verification
+### Installation Testing
 ```bash
-# Check all affected packages compile
-cargo build -p terraphim-cli -p terraphim_agent -p terraphim_server
+# Test cargo install with features
+cargo install terraphim_agent --features repl-full
 
-# Run tests
-cargo test -p terraphim_service
-cargo test -p terraphim_settings
+# Verify installation
+terraphim-agent --version
+# Expected: terraphim-agent 1.6.0
 ```
 
 ---
@@ -220,14 +194,11 @@ None
 
 ### Risks to Monitor
 
-1. **Uncommitted Changes**: 14 files modified but not committed
+1. **README Changes Uncommitted**: Session documentation needs to be committed
    - **Mitigation**: Commit after handover review
 
-2. **Feature Consistency**: Ensure both CLIs behave identically for role operations
-   - **Mitigation**: Manual testing with both binaries
-
-3. **Settings File Compatibility**: RocksDB removal may affect existing user configs
-   - **Mitigation**: RocksDB sections are commented, not removed
+2. **crates.io Propagation**: May take time for new versions to be available
+   - **Mitigation**: Versions published, should be available within minutes
 
 ---
 
@@ -235,29 +206,26 @@ None
 
 ### Building
 ```bash
-cargo build -p terraphim-cli
-cargo build -p terraphim_agent
-cargo build -p terraphim_server
-cargo build --release
+cargo build -p terraphim_agent --features repl-full
+cargo build -p terraphim_agent --features repl-full --release
+```
+
+### Publishing
+```bash
+# Publish order matters (dependencies first)
+cargo publish -p terraphim-session-analyzer
+cargo publish -p terraphim_sessions
+cargo publish -p terraphim_agent
 ```
 
 ### Testing
 ```bash
-cargo test
-cargo test -p terraphim_service
-cargo test -- --nocapture
-```
-
-### Git
-```bash
-git status
-git diff --stat
-git add -p
-git commit -m "message"
+cargo test -p terraphim_sessions
+cargo test -p terraphim_agent
 ```
 
 ---
 
-**Generated**: 2026-01-20
-**Session Focus**: Role Selection + RocksDB Disabling
-**Next Priority**: Commit changes, then TUI keyboard fix (Issue #463)
+**Generated**: 2026-01-21
+**Session Focus**: Sessions Feature Enablement + v1.6.0 Release
+**Next Priority**: Commit README changes, then TUI keyboard fix (Issue #463)
