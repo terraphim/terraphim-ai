@@ -15,6 +15,20 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use terraphim_types::Document;
 
+/// Expand tilde (~) in paths to the user's home directory
+fn expand_tilde(path: &str) -> String {
+    if path.starts_with("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            return format!("{}{}", home, &path[1..]);
+        }
+    } else if path == "~" {
+        if let Ok(home) = std::env::var("HOME") {
+            return home;
+        }
+    }
+    path.to_string()
+}
+
 pub use error::{Error, Result};
 
 static DEVICE_STORAGE: AsyncOnceCell<DeviceStorage> = AsyncOnceCell::new();
@@ -105,6 +119,7 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
     log::info!("Loaded settings: {:?}", settings);
 
     // Pre-create directories for storage backends that need them
+    // Expand tilde in paths to support home directory references
     for profile in settings.profiles.values() {
         let unknown = "unknown".to_string();
         let profile_type = profile.get("type").unwrap_or(&unknown);
@@ -112,11 +127,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "sqlite" => {
                 if let Some(datadir) = profile.get("datadir") {
                     if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating SQLite directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create SQLite directory '{}': {}", datadir, e);
+                        let expanded = expand_tilde(datadir);
+                        log::info!("Pre-creating SQLite directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create SQLite directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created SQLite directory: {}", datadir);
+                            log::info!("Created SQLite directory: {}", expanded);
                         }
                     }
                 }
@@ -124,11 +140,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "redb" => {
                 if let Some(datadir) = profile.get("datadir") {
                     if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating ReDB directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create ReDB directory '{}': {}", datadir, e);
+                        let expanded = expand_tilde(datadir);
+                        log::info!("Pre-creating ReDB directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create ReDB directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created ReDB directory: {}", datadir);
+                            log::info!("Created ReDB directory: {}", expanded);
                         }
                     }
                 }
@@ -136,11 +153,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "dashmap" => {
                 if let Some(root) = profile.get("root") {
                     if !root.is_empty() {
-                        log::info!("🔧 Pre-creating DashMap directory: {}", root);
-                        if let Err(e) = std::fs::create_dir_all(root) {
-                            log::warn!("Failed to create DashMap directory '{}': {}", root, e);
+                        let expanded = expand_tilde(root);
+                        log::info!("Pre-creating DashMap directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create DashMap directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created DashMap directory: {}", root);
+                            log::info!("Created DashMap directory: {}", expanded);
                         }
                     }
                 }
@@ -148,11 +166,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "rocksdb" => {
                 if let Some(datadir) = profile.get("datadir") {
                     if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating RocksDB directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create RocksDB directory '{}': {}", datadir, e);
+                        let expanded = expand_tilde(datadir);
+                        log::info!("Pre-creating RocksDB directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create RocksDB directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created RocksDB directory: {}", datadir);
+                            log::info!("Created RocksDB directory: {}", expanded);
                         }
                     }
                 }
@@ -266,22 +285,14 @@ pub trait Persistable: Serialize + DeserializeOwned {
                         Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
                             Ok(obj) => {
                                 if let Some(name) = profile_name {
-                                    log::debug!(
-                                        "Loaded '{}' from profile '{}'",
-                                        key,
-                                        name
-                                    );
+                                    log::debug!("Loaded '{}' from profile '{}'", key, name);
                                 } else {
                                     log::debug!("Loaded '{}' from fastest operator", key);
                                 }
                                 Some(Ok(obj))
                             }
                             Err(e) => {
-                                log::warn!(
-                                    "Failed to deserialize '{}': {}",
-                                    key,
-                                    e
-                                );
+                                log::warn!("Failed to deserialize '{}': {}", key, e);
                                 Some(Err(Error::Json(e)))
                             }
                         },
@@ -326,11 +337,7 @@ pub trait Persistable: Serialize + DeserializeOwned {
                 continue;
             }
 
-            log::debug!(
-                "Trying to load '{}' from profile '{}'",
-                key,
-                profile_name
-            );
+            log::debug!("Trying to load '{}' from profile '{}'", key, profile_name);
 
             if let Some(result) = try_read_from_op::<Self>(op, key, Some(profile_name)).await {
                 match result {
