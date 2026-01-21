@@ -210,7 +210,7 @@ mod tests {
     }
 
     /// Test saving and loading a thesaurus to sqlite profile (if available)
-    #[cfg(feature = "services-sqlite")]
+    #[cfg(feature = "sqlite")]
     #[tokio::test]
     #[serial_test::serial]
     async fn test_save_and_load_thesaurus_sqlite() -> Result<()> {

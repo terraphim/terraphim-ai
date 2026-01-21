@@ -461,7 +461,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(feature = "services-sqlite")]
+    #[cfg(feature = "sqlite")]
     #[tokio::test]
     #[serial]
     async fn test_document_sqlite_backend() -> Result<()> {
