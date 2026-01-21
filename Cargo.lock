@@ -3095,7 +3095,7 @@ dependencies = [
 
 [[package]]
 name = "grepapp_haystack"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -3315,7 +3315,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "terraphim_types",
 ]
@@ -9163,7 +9163,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-cli"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -9226,7 +9226,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-repl"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "colored 2.2.0",
@@ -9251,7 +9251,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-session-analyzer"
-version = "1.5.0"
+version = "1.6.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -9290,7 +9290,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -9758,7 +9758,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "ahash 0.8.12",
  "async-trait",
@@ -9876,7 +9876,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_rlm"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9930,7 +9930,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.5.1"
+version = "1.6.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -10012,7 +10012,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_sessions"
-version = "0.1.0"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
