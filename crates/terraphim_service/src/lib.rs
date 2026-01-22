@@ -372,10 +372,7 @@ impl TerraphimService {
                                     e
                                 );
                             }
-                            Err(ServiceError::Config(format!(
-                                "Failed to build thesaurus from local KG for role {}: {}",
-                                role_name, e
-                            )))
+
                         }
                     }
                 } else {
