@@ -36,7 +36,7 @@
     "Quickwit Logs": {
       "shortname": "QuickwitLogs",
       "name": "Quickwit Logs",
-      "relevance_function": "BM25",
+      "relevance_function": "bm25",
       "terraphim_it": false,
       "theme": "darkly",
       "kg": null,
@@ -63,6 +63,7 @@
       "shortname": "Default",
       "name": "Default",
       "relevance_function": "title-scorer",
+      "terraphim_it": false,
       "theme": "spacelab",
       "kg": null,
       "haystacks": [
