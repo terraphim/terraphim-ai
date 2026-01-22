@@ -96,7 +96,7 @@ impl QuickwitHaystackIndexer {
         base_url: &str,
         config: &QuickwitConfig,
     ) -> Vec<QuickwitIndexInfo> {
-        let url = format!("{}/v1/indexes", base_url);
+        let url = format!("{}/api/v1/indexes", base_url);
 
         log::debug!("Fetching available Quickwit indexes from: {}", url);
 
@@ -320,7 +320,7 @@ impl QuickwitHaystackIndexer {
     ) -> String {
         let encoded_query = urlencoding::encode(query);
         format!(
-            "{}/v1/{}/search?query={}&max_hits={}&sort_by={}",
+            "{}/api/v1/{}/search?query={}&max_hits={}&sort_by={}",
             base_url.trim_end_matches('/'),
             index,
             encoded_query,
@@ -382,7 +382,7 @@ impl QuickwitHaystackIndexer {
         let body = serde_json::to_string_pretty(hit).unwrap_or_else(|_| "{}".to_string());
 
         // Build URL to the document (approximation - Quickwit doesn't have doc URLs)
-        let url = format!("{}/v1/{}/doc/{}", base_url, index_name, quickwit_doc_id);
+        let url = format!("{}/api/v1/{}/doc/{}", base_url, index_name, quickwit_doc_id);
 
         // Parse timestamp to rank (microseconds since epoch for sorting)
         let rank = self.parse_timestamp_to_rank(timestamp_str);
@@ -580,10 +580,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_skeleton_returns_empty_index() {
+    async fn test_graceful_degradation_no_server() {
+        // Test that the indexer returns empty when Quickwit is not available
         let indexer = QuickwitHaystackIndexer::default();
         let haystack = Haystack {
-            location: "http://localhost:7280".to_string(),
+            // Use a port that definitely has no server
+            location: "http://localhost:59999".to_string(),
             service: terraphim_config::ServiceType::Quickwit,
             read_only: true,
             fetch_content: false,
@@ -593,6 +595,7 @@ mod tests {
 
         let result = indexer.index("test", &haystack).await;
         assert!(result.is_ok());
+        // Should return empty due to graceful degradation
         assert_eq!(result.unwrap().len(), 0);
     }
 

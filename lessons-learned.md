@@ -338,3 +338,51 @@ This helps users debug issues by showing where to find available assets.
 2. **TUI Keyboard Shortcuts**: Create user-facing documentation for all keyboard shortcuts
 3. **Auto-Update Troubleshooting**: Add troubleshooting section to user guide
 4. **Release Pipeline**: Document version propagation process from Cargo.toml to release artifacts
+
+---
+
+## 2026-01-22: Quickwit Haystack Integration
+
+### API Path Prefix Inconsistency
+
+**Lesson**: Quickwit uses `/api/v1/` path prefix, not the standard `/v1/` prefix.
+
+**Discovery**: Integration tests were failing silently because requests to `/v1/indexes` returned "Route not found" while the server was healthy.
+
+**Bug Fixed**:
+- Changed `fetch_available_indexes`: `/v1/indexes` -> `/api/v1/indexes`
+- Changed `build_search_url`: `/v1/{index}/search` -> `/api/v1/{index}/search`
+- Changed `hit_to_document`: `/v1/{index}/doc` -> `/api/v1/{index}/doc`
+
+**Debug Technique**: When HTTP requests return unexpected results but the server responds:
+1. Test the exact URL with curl: `curl -s http://localhost:7280/v1/indexes`
+2. Try common path variations: `/api/v1/`, `/v1/`, root paths
+3. Check API documentation version compatibility
+
+**Best Practice**: Always verify API paths with curl before implementing HTTP clients. Different versions of the same API may use different path prefixes.
+
+---
+
+### Graceful Degradation Testing
+
+**Lesson**: Tests expecting "no server" behavior should use ports that definitely have no service.
+
+**Discovery**: Test `test_skeleton_returns_empty_index` used localhost:7280 expecting no response, but with the API fix, it started returning real data.
+
+**Pattern**: For graceful degradation tests:
+- Use high ports unlikely to have services (e.g., 59999)
+- Or use invalid hostnames (e.g., `invalid.local`)
+- Name tests clearly: `test_graceful_degradation_no_server`
+
+---
+
+### Quickwit Index Discovery Modes
+
+**Lesson**: Quickwit haystack supports three discovery modes with different performance profiles.
+
+**Modes**:
+1. **Explicit** (`default_index` set): ~100ms, 1 API call, best for production
+2. **Auto-Discovery** (no `default_index`): ~300-500ms, N+1 API calls, best for exploration
+3. **Filtered Discovery** (`index_filter` pattern): ~200-400ms, balances control and convenience
+
+**Best Practice**: Use explicit index mode in production configs for predictable performance.
