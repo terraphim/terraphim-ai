@@ -729,8 +729,26 @@ terraphim-agent --config quickwit_production_config.json
 /search "level:ERROR AND service:api AND timestamp:[2024-01-13T10:00:00Z TO *]"
 ```
 
+**Pre-configured Role:**
+
+The "Quickwit Logs" role is available in `terraphim_server/default/terraphim_engineer_config.json`:
+- Auto-discovery mode (searches all available indexes)
+- BM25 relevance function for text matching
+- LLM summarization disabled (faster results for log analysis)
+- Dark theme (darkly) optimized for log viewing
+- Specialized system prompt for log analysis
+
+Use for quick log exploration:
+```bash
+terraphim-agent
+# In REPL, switch to Quickwit Logs role
+/role QuickwitLogs
+/search "level:ERROR"
+```
+
 **Documentation:**
 - User Guide: `docs/quickwit-integration.md`
+- Log Exploration: `docs/user-guide/quickwit-log-exploration.md`
 - Example: `examples/quickwit-log-search.md`
 - Skill: `skills/quickwit-search/skill.md`
 - Configs: `terraphim_server/default/quickwit_*.json`
