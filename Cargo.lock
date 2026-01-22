@@ -9454,6 +9454,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_app_core"
+version = "1.6.0"
+dependencies = [
+ "anyhow",
+ "log",
+ "serde",
+ "serde_json",
+ "terraphim_automata",
+ "terraphim_config",
+ "terraphim_persistence",
+ "terraphim_service",
+ "terraphim_settings",
+ "terraphim_types",
+ "tokio",
+]
+
+[[package]]
 name = "terraphim_atomic_client"
 version = "1.0.0"
 dependencies = [
@@ -10008,6 +10025,19 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+]
+
+[[package]]
+name = "terraphim_session_connectors"
+version = "1.6.0"
+dependencies = [
+ "anyhow",
+ "home",
+ "jiff 0.1.29",
+ "serde",
+ "serde_json",
+ "tracing",
+ "walkdir",
 ]
 
 [[package]]

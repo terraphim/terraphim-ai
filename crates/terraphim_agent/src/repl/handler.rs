@@ -1892,7 +1892,8 @@ impl ReplHandler {
             }
 
             SessionsSubcommand::Import { source, limit } => {
-                let options = ImportOptions::new().with_limit(limit.unwrap_or(100));
+                let mut options = ImportOptions::default();
+                options.limit = Some(limit.unwrap_or(100));
 
                 println!("\n{} Importing sessions...", "⏳".bold());
 
