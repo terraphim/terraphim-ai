@@ -189,6 +189,88 @@ brew services start ollama
 ollama serve
 ```
 
+### Quickwit Log Search Issues
+
+#### Connection Refused
+**Error**: "Failed to connect to Quickwit"
+**Solutions**:
+
+1. **Verify Quickwit is Running**:
+```bash
+curl http://localhost:7280/health
+# Should return: "ok"
+
+curl http://localhost:7280/api/v1/indexes
+# Should return list of available indexes
+```
+
+2. **Check API Path Prefix**:
+Quickwit uses `/api/v1/` path prefix (not `/v1/`):
+```bash
+# Correct
+curl http://localhost:7280/api/v1/indexes
+
+# Incorrect (will return "Route not found")
+curl http://localhost:7280/v1/indexes
+```
+
+3. **Authentication Issues**:
+```bash
+# Test Basic Auth
+curl -u username:password http://localhost:7280/api/v1/indexes
+
+# Test Bearer token
+curl -H "Authorization: Bearer your-token" http://localhost:7280/api/v1/indexes
+```
+
+#### No Results from Auto-Discovery
+**Error**: "No indexes discovered"
+**Solutions**:
+
+1. **Verify Indexes Exist**:
+```bash
+curl http://localhost:7280/api/v1/indexes | jq '.[].index_config.index_id'
+```
+
+2. **Check Index Filter Pattern**:
+If using `index_filter`, ensure pattern matches:
+- `workers-*` matches `workers-logs`, `workers-metrics`
+- `*-logs` matches `api-logs`, `service-logs`
+- `*` matches all indexes
+
+3. **Try Explicit Index**:
+```json
+{
+  "extra_parameters": {
+    "default_index": "your-index-name"
+  }
+}
+```
+
+#### Empty Search Results
+**Error**: Query returns no documents
+**Solutions**:
+
+1. **Test Direct Search**:
+```bash
+curl "http://localhost:7280/api/v1/workers-logs/search?query=*&max_hits=10"
+```
+
+2. **Verify Query Syntax**:
+```bash
+# Simple text search
+/search error
+
+# Field-specific search
+/search "level:ERROR"
+
+# Time range (requires timestamp field)
+/search "timestamp:[2024-01-01 TO *]"
+```
+
+3. **Check Sort Field**:
+If using `-timestamp` sort, ensure the field exists in your index schema.
+
 ---
 
 ## 🧠 Memory & Performance Issues

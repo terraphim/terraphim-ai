@@ -176,8 +176,8 @@ export QUICKWIT_TOKEN="Bearer $(cat ~/.quickwit/token)"
 # Using 1Password CLI
 export QUICKWIT_PASSWORD=$(op read "op://Private/Quickwit/password")
 
-# Using environment variable
-# export QUICKWIT_PASSWORD="${QUICKWIT_PASSWORD:-}"
+# Or use existing environment variable if set
+# export QUICKWIT_PASSWORD
 
 # Then start terraphim-agent
 terraphim-agent --config quickwit_production_config.json
@@ -333,7 +333,7 @@ Then search returns results from both indexes unified.
 2. Check Bearer token includes "Bearer " prefix
 3. Test auth with curl:
    ```bash
-   curl -H "Authorization: Bearer token" http://localhost:7280/v1/indexes
+   curl -H "Authorization: Bearer token" http://localhost:7280/api/v1/indexes
    ```
 
 ### No Results
@@ -343,7 +343,7 @@ Then search returns results from both indexes unified.
 **Possible Causes:**
 1. Index is empty - verify:
    ```bash
-   curl "http://localhost:7280/v1/workers-logs/search?query=*&max_hits=10"
+   curl "http://localhost:7280/api/v1/workers-logs/search?query=*&max_hits=10"
    ```
 2. Query doesn't match any logs - try broader query
 3. Auto-discovery found no indexes - check logs for warnings
@@ -355,7 +355,7 @@ Then search returns results from both indexes unified.
 **Solutions:**
 1. Test endpoint directly:
    ```bash
-   curl http://localhost:7280/v1/indexes
+   curl http://localhost:7280/api/v1/indexes
    ```
 2. Check authentication if required
 3. Use explicit `default_index` as workaround
