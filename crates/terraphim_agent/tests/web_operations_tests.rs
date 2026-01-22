@@ -549,24 +549,32 @@ mod tests {
         assert_eq!(config.security.max_execution_time_ms, 60000);
 
         // Test default allowed domains
-        assert!(config
-            .security
-            .allowed_domains
-            .contains(&"https://httpbin.org".to_string()));
-        assert!(config
-            .security
-            .allowed_domains
-            .contains(&"https://jsonplaceholder.typicode.com".to_string()));
-        assert!(config
-            .security
-            .allowed_domains
-            .contains(&"https://api.github.com".to_string()));
+        assert!(
+            config
+                .security
+                .allowed_domains
+                .contains(&"https://httpbin.org".to_string())
+        );
+        assert!(
+            config
+                .security
+                .allowed_domains
+                .contains(&"https://jsonplaceholder.typicode.com".to_string())
+        );
+        assert!(
+            config
+                .security
+                .allowed_domains
+                .contains(&"https://api.github.com".to_string())
+        );
 
         // Test default blocked domains
-        assert!(config
-            .security
-            .blocked_domains
-            .contains(&"malware.example.com".to_string()));
+        assert!(
+            config
+                .security
+                .blocked_domains
+                .contains(&"malware.example.com".to_string())
+        );
 
         // Test browser settings
         assert_eq!(

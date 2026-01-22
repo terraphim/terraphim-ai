@@ -9,8 +9,8 @@ use anyhow::Result;
 use std::sync::Arc;
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
-use terraphim_service::llm::{build_llm_from_role, ChatOptions};
 use terraphim_service::TerraphimService;
+use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use terraphim_settings::DeviceSettings;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
@@ -25,7 +25,9 @@ impl AppService {
     /// Initialize a new service using embedded defaults and persisted overrides.
     pub async fn new_embedded() -> Result<Self> {
         // Initialize logging
-        terraphim_service::logging::init_logging(terraphim_service::logging::detect_logging_config());
+        terraphim_service::logging::init_logging(
+            terraphim_service::logging::detect_logging_config(),
+        );
 
         log::info!("Initializing app service with embedded configuration");
 
@@ -136,7 +138,10 @@ impl AppService {
     }
 
     /// Update the selected role.
-    pub async fn update_selected_role(&self, role_name: RoleName) -> Result<terraphim_config::Config> {
+    pub async fn update_selected_role(
+        &self,
+        role_name: RoleName,
+    ) -> Result<terraphim_config::Config> {
         let service = self.service.lock().await;
         Ok(service.update_selected_role(role_name).await?)
     }
@@ -162,7 +167,8 @@ impl AppService {
     /// Search documents using the current selected role.
     pub async fn search(&self, search_term: &str, limit: Option<usize>) -> Result<Vec<Document>> {
         let selected_role = self.get_selected_role().await;
-        self.search_with_role(search_term, &selected_role, limit).await
+        self.search_with_role(search_term, &selected_role, limit)
+            .await
     }
 
     /// Search documents with a specific role.
@@ -200,7 +206,11 @@ impl AppService {
     /// Get the role graph top-k concepts for a specific role.
     ///
     /// Returns the top-k concepts sorted by rank (number of co-occurrences) in descending order.
-    pub async fn get_role_graph_top_k(&self, role_name: &RoleName, top_k: usize) -> Result<Vec<String>> {
+    pub async fn get_role_graph_top_k(
+        &self,
+        role_name: &RoleName,
+        top_k: usize,
+    ) -> Result<Vec<String>> {
         log::info!("Getting top {} concepts for role {}", top_k, role_name);
 
         if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
@@ -228,15 +238,17 @@ impl AppService {
     }
 
     /// Generate chat response using LLM.
-    pub async fn chat(&self, role_name: &RoleName, prompt: &str, _model: Option<String>) -> Result<String> {
+    pub async fn chat(
+        &self,
+        role_name: &RoleName,
+        prompt: &str,
+        _model: Option<String>,
+    ) -> Result<String> {
         let config = self.config_state.config.lock().await;
         let Some(role) = config.roles.get(role_name) else {
             // Fail-open UX: allow users to set arbitrary roles (e.g. in tests)
             // without hard-failing chat.
-            return Ok(format!(
-                "Role '{}' not found in configuration",
-                role_name
-            ));
+            return Ok(format!("Role '{}' not found in configuration", role_name));
         };
 
         let Some(llm_client) = build_llm_from_role(role) else {
@@ -302,7 +314,9 @@ impl AppService {
         });
 
         let index = terraphim_automata::build_autocomplete_index(thesaurus, config)?;
-        Ok(terraphim_automata::autocomplete_search(&index, query, limit)?)
+        Ok(terraphim_automata::autocomplete_search(
+            &index, query, limit,
+        )?)
     }
 
     /// Find matches in text using thesaurus.
@@ -400,7 +414,8 @@ impl AppService {
         });
 
         let index = terraphim_automata::build_autocomplete_index(thesaurus, config)?;
-        let results = terraphim_automata::fuzzy_autocomplete_search(&index, query, threshold, limit)?;
+        let results =
+            terraphim_automata::fuzzy_autocomplete_search(&index, query, threshold, limit)?;
 
         Ok(results
             .into_iter()
@@ -477,7 +492,10 @@ impl AppService {
                 vec!["tests", "test", "testing", "unit test", "integration test"],
             ),
             ("documentation", vec!["documentation", "docs", "comments"]),
-            ("error_handling", vec!["error handling", "exception handling"]),
+            (
+                "error_handling",
+                vec!["error handling", "exception handling"],
+            ),
             ("security", vec!["security", "security check"]),
             ("performance", vec!["performance", "optimization"]),
             ("authentication", vec!["authentication", "auth", "login"]),

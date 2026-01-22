@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use terraphim_automata::{builder::Logseq, ThesaurusBuilder};
+use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
 
 fn extract_clean_output(output: &str) -> String {
     output

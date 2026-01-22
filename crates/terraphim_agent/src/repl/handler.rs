@@ -1716,7 +1716,7 @@ impl ReplHandler {
     /// Handle update management commands
     async fn handle_update(&mut self, subcommand: UpdateSubcommand) -> Result<()> {
         use terraphim_update::{
-            check_for_updates_auto, rollback::BackupManager, update_binary, UpdateStatus,
+            UpdateStatus, check_for_updates_auto, rollback::BackupManager, update_binary,
         };
 
         // Get the current binary name and version

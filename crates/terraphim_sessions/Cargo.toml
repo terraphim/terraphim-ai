@@ -48,6 +48,9 @@ dirs = "5.0"
 # Feature-gated: Terraphim Session Analyzer
 terraphim-session-analyzer = { version = "1.6.0", path = "../terraphim-session-analyzer", optional = true }
 
+# Shared session connectors (with optional connector implementations)
+terraphim_session_connectors = { path = "../terraphim_session_connectors", default-features = false, optional = true }
+
 # Feature-gated: Terraphim enrichment (uses published crates.io versions)
 terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
 terraphim_rolegraph = { version = ">=1.4.10", path = "../terraphim_rolegraph", optional = true }

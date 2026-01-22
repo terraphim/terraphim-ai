@@ -2,7 +2,9 @@
 //!
 //! Parses chat history from Aider (`.aider.chat.history.md`).
 
-use crate::{ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector};
+use crate::{
+    ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector,
+};
 use anyhow::Result;
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -105,9 +107,7 @@ fn parse_history_file(path: &std::path::Path) -> Result<Vec<NormalizedSession>> 
                 }
             }
 
-            let timestamp_str = line
-                .trim_start_matches("# aider chat started at")
-                .trim();
+            let timestamp_str = line.trim_start_matches("# aider chat started at").trim();
             current_session = Some(SessionBuilder::new(timestamp_str, path));
         } else if let Some(ref mut builder) = current_session {
             builder.add_line(line);

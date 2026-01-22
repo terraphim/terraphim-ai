@@ -4,7 +4,9 @@
 //!
 //! OpenCode stores prompt history in `~/.local/state/opencode/prompt-history.jsonl`.
 
-use crate::{ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector};
+use crate::{
+    ConnectorStatus, ImportOptions, NormalizedMessage, NormalizedSession, SessionConnector,
+};
 use anyhow::Result;
 use serde::Deserialize;
 use std::path::PathBuf;

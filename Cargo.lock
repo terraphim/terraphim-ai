@@ -10055,6 +10055,7 @@ dependencies = [
  "terraphim-session-analyzer",
  "terraphim_automata",
  "terraphim_rolegraph",
+ "terraphim_session_connectors",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",

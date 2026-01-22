@@ -121,10 +121,12 @@ fn test_config_response_deserialization() {
     assert_eq!(config_response.status, "Success");
     assert_eq!(config_response.config.selected_role.to_string(), "Default");
     assert_eq!(config_response.config.global_shortcut, "Ctrl+Space");
-    assert!(config_response
-        .config
-        .roles
-        .contains_key(&RoleName::new("Default")));
+    assert!(
+        config_response
+            .config
+            .roles
+            .contains_key(&RoleName::new("Default"))
+    );
 }
 
 /// Test ChatRequest serialization
