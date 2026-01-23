@@ -91,6 +91,7 @@ mod tests {
         Ok(())
     }
 
+
     /// Test saving and loading a thesaurus to memory profile
     #[tokio::test]
     #[serial_test::serial]
