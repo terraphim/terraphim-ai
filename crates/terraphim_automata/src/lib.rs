@@ -350,9 +350,10 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
         AutomataPath::Local(path) => {
             // Check if file exists before attempting to read
             if !std::path::Path::new(path).exists() {
-                return Err(TerraphimAutomataError::InvalidThesaurus(
-                    format!("Thesaurus file not found: {}", path.display())
-                ));
+                return Err(TerraphimAutomataError::InvalidThesaurus(format!(
+                    "Thesaurus file not found: {}",
+                    path.display()
+                )));
             }
             fs::read_to_string(path)?
         }
