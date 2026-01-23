@@ -167,19 +167,6 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
                     }
                 }
             }
-            "rocksdb" => {
-                if let Some(datadir) = profile.get("datadir") {
-                    if !datadir.is_empty() {
-                        let expanded = expand_tilde(datadir);
-                        log::info!("Pre-creating RocksDB directory: {}", expanded);
-                        if let Err(e) = std::fs::create_dir_all(&expanded) {
-                            log::warn!("Failed to create RocksDB directory '{}': {}", expanded, e);
-                        } else {
-                            log::info!("Created RocksDB directory: {}", expanded);
-                        }
-                    }
-                }
-            }
             _ => {}
         }
     }

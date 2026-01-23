@@ -51,7 +51,6 @@ fn cleanup_test_persistence() -> Result<()> {
     let test_dirs = vec![
         "/tmp/terraphim_sqlite",
         "/tmp/dashmaptest",
-        "/tmp/terraphim_rocksdb",
         "/tmp/opendal",
     ];
 
