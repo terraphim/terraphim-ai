@@ -41,6 +41,17 @@ fn run_cli_json(args: &[&str]) -> Result<serde_json::Value, String> {
         .map_err(|e| format!("Failed to parse JSON: {} - output: {}", e, stdout))
 }
 
+/// Assert that a JSON response does not contain an error field.
+/// Panics with descriptive message if error is present.
+fn assert_no_json_error(json: &serde_json::Value, context: &str) {
+    assert!(
+        json.get("error").is_none(),
+        "{} returned error: {:?}",
+        context,
+        json.get("error")
+    );
+}
+
 #[cfg(test)]
 mod role_switching_tests {
     use super::*;
@@ -147,11 +158,7 @@ mod role_switching_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response or success response
-                if json.get("error").is_some() {
-                    eprintln!("Find with role returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Find with role");
                 // Should succeed with the specified role
                 assert!(
                     json.get("text").is_some() || json.get("matches").is_some(),
@@ -171,11 +178,7 @@ mod role_switching_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace with role returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace with role");
                 // May have original field or be an error
                 assert!(
                     json.get("original").is_some() || json.get("replaced").is_some(),
@@ -196,11 +199,7 @@ mod role_switching_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Thesaurus with role returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Thesaurus with role");
                 // Should have either role or terms field
                 assert!(
                     json.get("role").is_some()
@@ -358,11 +357,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace markdown returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace markdown");
                 assert_eq!(json["format"].as_str(), Some("markdown"));
                 assert_eq!(json["original"].as_str(), Some("rust programming"));
                 assert!(json.get("replaced").is_some());
@@ -388,11 +383,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace html returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace html");
                 assert_eq!(json["format"].as_str(), Some("html"));
             }
             Err(e) => {
@@ -416,11 +407,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace wiki returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace wiki");
                 assert_eq!(json["format"].as_str(), Some("wiki"));
             }
             Err(e) => {
@@ -444,11 +431,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace plain returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace plain");
                 assert_eq!(json["format"].as_str(), Some("plain"));
                 // Plain format should not modify text
                 assert_eq!(
@@ -471,11 +454,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace default format returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace default format");
                 assert_eq!(
                     json["format"].as_str(),
                     Some("markdown"),
@@ -503,11 +482,7 @@ mod replace_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace preserves text returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace preserves text");
                 let _original = json["original"].as_str().unwrap();
                 let replaced = json["replaced"].as_str().unwrap();
                 // Text without matches should be preserved
@@ -532,11 +507,7 @@ mod find_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Find basic returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Find basic");
                 assert_eq!(json["text"].as_str(), Some("rust async tokio"));
                 assert!(json.get("matches").is_some());
                 assert!(json.get("count").is_some());
@@ -555,11 +526,7 @@ mod find_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Find matches array returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Find matches array");
                 assert!(json["matches"].is_array(), "Matches should be an array");
             }
             Err(e) => {
@@ -581,11 +548,7 @@ mod find_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Find matches fields returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Find matches fields");
                 if let Some(matches) = json["matches"].as_array() {
                     for m in matches {
                         assert!(m.get("term").is_some(), "Match should have term");
@@ -615,11 +578,7 @@ mod find_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Find count returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Find count");
                 let count = json["count"].as_u64().unwrap_or(0) as usize;
                 let matches_len = json["matches"].as_array().map(|a| a.len()).unwrap_or(0);
                 assert_eq!(count, matches_len, "Count should match array length");
@@ -643,11 +602,7 @@ mod thesaurus_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Thesaurus basic returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Thesaurus basic");
                 assert!(json.get("role").is_some());
                 assert!(json.get("name").is_some());
                 assert!(json.get("terms").is_some());
@@ -668,11 +623,7 @@ mod thesaurus_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Thesaurus limit returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Thesaurus limit");
                 let shown = json["shown_count"].as_u64().unwrap_or(0);
                 assert!(shown <= 5, "Should respect limit");
 
@@ -693,11 +644,7 @@ mod thesaurus_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Thesaurus terms fields returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Thesaurus terms fields");
                 if let Some(terms) = json["terms"].as_array() {
                     for term in terms {
                         assert!(term.get("id").is_some(), "Term should have id");
@@ -723,11 +670,7 @@ mod thesaurus_tests {
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Thesaurus count returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Thesaurus count");
                 let total = json["total_count"].as_u64().unwrap_or(0);
                 let shown = json["shown_count"].as_u64().unwrap_or(0);
                 assert!(total >= shown, "Total count should be >= shown count");
