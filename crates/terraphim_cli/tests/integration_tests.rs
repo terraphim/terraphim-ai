@@ -41,6 +41,15 @@ fn run_cli_json(args: &[&str]) -> Result<serde_json::Value, String> {
         .map_err(|e| format!("Failed to parse JSON: {} - output: {}", e, stdout))
 }
 
+fn assert_no_json_error(json: &serde_json::Value, context: &str) {
+    assert!(
+        json.get("error").is_none(),
+        "{} returned error: {:?}",
+        context,
+        json.get("error")
+    );
+}
+
 #[cfg(test)]
 mod role_switching_tests {
     use super::*;
@@ -143,15 +152,11 @@ mod role_switching_tests {
     #[test]
     #[serial]
     fn test_find_with_explicit_role() {
-        let result = run_cli_json(&["find", "test text", "--role", "Default"]);
+        let result = run_cli_json(&["find", "test text", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
-                // Check if this is an error response or success response
-                if json.get("error").is_some() {
-                    eprintln!("Find with role returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Find with role");
                 // Should succeed with the specified role
                 assert!(
                     json.get("text").is_some() || json.get("matches").is_some(),
@@ -167,15 +172,11 @@ mod role_switching_tests {
     #[test]
     #[serial]
     fn test_replace_with_explicit_role() {
-        let result = run_cli_json(&["replace", "test text", "--role", "Default"]);
+        let result = run_cli_json(&["replace", "test text", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Replace with role returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Replace with role");
                 // May have original field or be an error
                 assert!(
                     json.get("original").is_some() || json.get("replaced").is_some(),
@@ -192,15 +193,11 @@ mod role_switching_tests {
     #[test]
     #[serial]
     fn test_thesaurus_with_explicit_role() {
-        let result = run_cli_json(&["thesaurus", "--role", "Default"]);
+        let result = run_cli_json(&["thesaurus", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
-                // Check if this is an error response
-                if json.get("error").is_some() {
-                    eprintln!("Thesaurus with role returned error: {:?}", json);
-                    return;
-                }
+                assert_no_json_error(&json, "Thesaurus with role");
                 // Should have either role or terms field
                 assert!(
                     json.get("role").is_some()
@@ -346,10 +343,18 @@ mod replace_tests {
     #[test]
     #[serial]
     fn test_replace_markdown_format() {
-        let result = run_cli_json(&["replace", "rust programming", "--link-format", "markdown"]);
+        let result = run_cli_json(&[
+            "replace",
+            "rust programming",
+            "--role",
+            "Terraphim Engineer",
+            "--link-format",
+            "markdown",
+        ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Replace markdown");
                 assert_eq!(json["format"].as_str(), Some("markdown"));
                 assert_eq!(json["original"].as_str(), Some("rust programming"));
                 assert!(json.get("replaced").is_some());
@@ -363,10 +368,18 @@ mod replace_tests {
     #[test]
     #[serial]
     fn test_replace_html_format() {
-        let result = run_cli_json(&["replace", "async tokio", "--link-format", "html"]);
+        let result = run_cli_json(&[
+            "replace",
+            "async tokio",
+            "--role",
+            "Terraphim Engineer",
+            "--link-format",
+            "html",
+        ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Replace html");
                 assert_eq!(json["format"].as_str(), Some("html"));
             }
             Err(e) => {
@@ -378,10 +391,18 @@ mod replace_tests {
     #[test]
     #[serial]
     fn test_replace_wiki_format() {
-        let result = run_cli_json(&["replace", "docker kubernetes", "--link-format", "wiki"]);
+        let result = run_cli_json(&[
+            "replace",
+            "docker kubernetes",
+            "--role",
+            "Terraphim Engineer",
+            "--link-format",
+            "wiki",
+        ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Replace wiki");
                 assert_eq!(json["format"].as_str(), Some("wiki"));
             }
             Err(e) => {
@@ -393,10 +414,18 @@ mod replace_tests {
     #[test]
     #[serial]
     fn test_replace_plain_format() {
-        let result = run_cli_json(&["replace", "git github", "--link-format", "plain"]);
+        let result = run_cli_json(&[
+            "replace",
+            "git github",
+            "--role",
+            "Terraphim Engineer",
+            "--link-format",
+            "plain",
+        ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Replace plain");
                 assert_eq!(json["format"].as_str(), Some("plain"));
                 // Plain format should not modify text
                 assert_eq!(
@@ -414,10 +443,11 @@ mod replace_tests {
     #[test]
     #[serial]
     fn test_replace_default_format_is_markdown() {
-        let result = run_cli_json(&["replace", "test text"]);
+        let result = run_cli_json(&["replace", "test text", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Replace default format");
                 assert_eq!(
                     json["format"].as_str(),
                     Some("markdown"),
@@ -436,12 +466,15 @@ mod replace_tests {
         let result = run_cli_json(&[
             "replace",
             "some random text without matches xyz123",
+            "--role",
+            "Terraphim Engineer",
             "--format",
             "markdown",
         ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Replace preserves text");
                 let _original = json["original"].as_str().unwrap();
                 let replaced = json["replaced"].as_str().unwrap();
                 // Text without matches should be preserved
@@ -461,10 +494,11 @@ mod find_tests {
     #[test]
     #[serial]
     fn test_find_basic() {
-        let result = run_cli_json(&["find", "rust async tokio"]);
+        let result = run_cli_json(&["find", "rust async tokio", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Find basic");
                 assert_eq!(json["text"].as_str(), Some("rust async tokio"));
                 assert!(json.get("matches").is_some());
                 assert!(json.get("count").is_some());
@@ -478,10 +512,11 @@ mod find_tests {
     #[test]
     #[serial]
     fn test_find_returns_array_of_matches() {
-        let result = run_cli_json(&["find", "api server client"]);
+        let result = run_cli_json(&["find", "api server client", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Find matches array");
                 assert!(json["matches"].is_array(), "Matches should be an array");
             }
             Err(e) => {
@@ -493,10 +528,16 @@ mod find_tests {
     #[test]
     #[serial]
     fn test_find_matches_have_required_fields() {
-        let result = run_cli_json(&["find", "database json config"]);
+        let result = run_cli_json(&[
+            "find",
+            "database json config",
+            "--role",
+            "Terraphim Engineer",
+        ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Find matches fields");
                 if let Some(matches) = json["matches"].as_array() {
                     for m in matches {
                         assert!(m.get("term").is_some(), "Match should have term");
@@ -516,10 +557,16 @@ mod find_tests {
     #[test]
     #[serial]
     fn test_find_count_matches_array_length() {
-        let result = run_cli_json(&["find", "linux docker kubernetes"]);
+        let result = run_cli_json(&[
+            "find",
+            "linux docker kubernetes",
+            "--role",
+            "Terraphim Engineer",
+        ]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Find count");
                 let count = json["count"].as_u64().unwrap_or(0) as usize;
                 let matches_len = json["matches"].as_array().map(|a| a.len()).unwrap_or(0);
                 assert_eq!(count, matches_len, "Count should match array length");
@@ -538,10 +585,11 @@ mod thesaurus_tests {
     #[test]
     #[serial]
     fn test_thesaurus_basic() {
-        let result = run_cli_json(&["thesaurus"]);
+        let result = run_cli_json(&["thesaurus", "--role", "Terraphim Engineer"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Thesaurus basic");
                 assert!(json.get("role").is_some());
                 assert!(json.get("name").is_some());
                 assert!(json.get("terms").is_some());
@@ -557,10 +605,11 @@ mod thesaurus_tests {
     #[test]
     #[serial]
     fn test_thesaurus_with_limit() {
-        let result = run_cli_json(&["thesaurus", "--limit", "5"]);
+        let result = run_cli_json(&["thesaurus", "--role", "Terraphim Engineer", "--limit", "5"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Thesaurus limit");
                 let shown = json["shown_count"].as_u64().unwrap_or(0);
                 assert!(shown <= 5, "Should respect limit");
 
@@ -576,10 +625,11 @@ mod thesaurus_tests {
     #[test]
     #[serial]
     fn test_thesaurus_terms_have_required_fields() {
-        let result = run_cli_json(&["thesaurus", "--limit", "10"]);
+        let result = run_cli_json(&["thesaurus", "--role", "Terraphim Engineer", "--limit", "10"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Thesaurus terms fields");
                 if let Some(terms) = json["terms"].as_array() {
                     for term in terms {
                         assert!(term.get("id").is_some(), "Term should have id");
@@ -600,10 +650,11 @@ mod thesaurus_tests {
     #[test]
     #[serial]
     fn test_thesaurus_total_count_greater_or_equal_shown() {
-        let result = run_cli_json(&["thesaurus", "--limit", "5"]);
+        let result = run_cli_json(&["thesaurus", "--role", "Terraphim Engineer", "--limit", "5"]);
 
         match result {
             Ok(json) => {
+                assert_no_json_error(&json, "Thesaurus count");
                 let total = json["total_count"].as_u64().unwrap_or(0);
                 let shown = json["shown_count"].as_u64().unwrap_or(0);
                 assert!(total >= shown, "Total count should be >= shown count");
