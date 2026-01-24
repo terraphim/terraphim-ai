@@ -74,11 +74,7 @@ fn parse_config_from_output(output: &str) -> Result<serde_json::Value> {
 /// Clean up test persistence files
 fn cleanup_test_persistence() -> Result<()> {
     // Clean up test persistence directories
-    let test_dirs = vec![
-        "/tmp/terraphim_sqlite",
-        "/tmp/dashmaptest",
-        "/tmp/opendal",
-    ];
+    let test_dirs = vec!["/tmp/terraphim_sqlite", "/tmp/dashmaptest", "/tmp/opendal"];
 
     for dir in test_dirs {
         if Path::new(dir).exists() {
