@@ -316,8 +316,27 @@ The workspace uses Rust edition 2024 and resolver version 2 for optimal dependen
 - `terraphim_rolegraph`: Knowledge graph implementation with node/edge relationships
 - `terraphim_automata`: Text matching, autocomplete, and thesaurus building
 - `terraphim_config`: Configuration management and role-based settings
-- `terraphim_persistence`: Document storage abstraction layer
+- `terraphim_persistence`: Document storage abstraction layer with cache warm-up
 - `terraphim_server`: HTTP API server (main binary)
+
+### Persistence Layer Cache Warm-up
+
+The persistence layer (`terraphim_persistence`) supports transparent cache warm-up for multi-backend configurations:
+
+**Cache Write-back Behavior:**
+- When data is loaded from a slower fallback operator (e.g., SQLite, S3), it is automatically cached to the fastest operator (e.g., memory, dashmap)
+- Uses fire-and-forget pattern with `tokio::spawn` - non-blocking, doesn't slow load path
+- Objects over 1MB are compressed using zstd before caching
+- Schema evolution handling: if cached data fails to deserialize, the cache entry is deleted and data is refetched from persistent storage
+
+**Configuration:**
+- Operators are ordered by speed (memory > dashmap > sqlite > s3)
+- Same-operator detection: skips redundant cache write if only one backend is configured
+- Tracing spans for observability: `load_from_operator{key}`, `try_read{profile}`, `cache_writeback{key, size}`
+
+**Testing:**
+- Use `DeviceStorage::init_memory_only()` for test isolation (single memory backend)
+- Multi-profile cache write-back tested via integration tests in `tests/persistence_warmup.rs`
 
 **Agent System Crates**:
 - `terraphim_agent_supervisor`: Agent lifecycle management and supervision
