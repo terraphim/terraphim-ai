@@ -314,8 +314,8 @@ impl LlmProxyClient {
         log::info!("📋 LLM Proxy Configuration:");
 
         for (provider, config) in &self.configs {
-            let proxy_status = if config.base_url.is_some() {
-                format!("Proxy: {}", config.base_url.as_ref().unwrap())
+            let proxy_status = if let Some(base_url) = &config.base_url {
+                format!("Proxy: {}", base_url)
             } else {
                 "Direct".to_string()
             };
