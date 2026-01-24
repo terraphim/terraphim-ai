@@ -503,11 +503,10 @@ mod collaboration_and_attribution_tests {
         for analysis in &analyses {
             for file_op in &analysis.file_operations {
                 total_operations += 1;
-                if file_op.agent_context.is_some() {
+                if let Some(agent_context) = &file_op.agent_context {
                     operations_with_context += 1;
 
                     // Verify the agent context is reasonable
-                    let agent_context = file_op.agent_context.as_ref().unwrap();
                     assert!(
                         !agent_context.is_empty(),
                         "Agent context should not be empty"
