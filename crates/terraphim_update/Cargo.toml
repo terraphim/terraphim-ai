@@ -25,7 +25,7 @@ ureq = "2.9"
 dirs = "5.0"
 dialoguer = "0.11"
 # zipsign-api for signature verification (also pulled by self_update)
-zipsign-api = "0.1"
+zipsign-api = "0.2"
 base64 = "0.22"
 # Archive extraction
 flate2 = "1.0"
