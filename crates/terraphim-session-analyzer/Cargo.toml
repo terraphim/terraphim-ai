@@ -52,7 +52,7 @@ lazy_static = "1.4"
 indexmap = { version = "2.2", features = ["serde"] }
 aho-corasick = "1.1"
 shell-words = "1.1"
-toml = "0.8"
+toml = "0.9"
 
 # Terminal UI
 colored = "2.1"
