@@ -158,8 +158,8 @@ TARGET_DIR="target/$TARGET/$PROFILE"
 if [[ -d "$TARGET_DIR" ]]; then
     for binary in "$TARGET_DIR"/terraphim*; do
         if [[ -f "$binary" && -x "$binary" ]]; then
-            local size=$(du -h "$binary" | cut -f1)
-            local name=$(basename "$binary")
+            size=$(du -h "$binary" | cut -f1)
+            name=$(basename "$binary")
             log_info "$name: $size"
         fi
     done

@@ -55,3 +55,7 @@ keys/
 
 # Claude Code working files
 .claude/plans/
+
+# Build output logs (should not be committed)
+cargo_test_output.log
+*.log

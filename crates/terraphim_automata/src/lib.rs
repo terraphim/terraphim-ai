@@ -348,14 +348,17 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
 
     let contents = match automata_path {
         AutomataPath::Local(path) => {
-            // Check if file exists before attempting to read
-            if !std::path::Path::new(path).exists() {
-                return Err(TerraphimAutomataError::InvalidThesaurus(format!(
-                    "Thesaurus file not found: {}",
-                    path.display()
-                )));
-            }
-            fs::read_to_string(path)?
+            // Read file directly and handle errors atomically (avoid TOCTOU race)
+            fs::read_to_string(path).map_err(|e| {
+                if e.kind() == std::io::ErrorKind::NotFound {
+                    TerraphimAutomataError::InvalidThesaurus(format!(
+                        "Thesaurus file not found: {}",
+                        path.display()
+                    ))
+                } else {
+                    TerraphimAutomataError::Io(e)
+                }
+            })?
         }
         AutomataPath::Remote(_) => {
             return Err(TerraphimAutomataError::InvalidThesaurus(
