@@ -261,7 +261,7 @@ Search multiple specific indexes:
 ### No Results
 
 **Possible causes:**
-1. Index is empty - verify with: `curl http://localhost:7280/v1/{index}/search?query=*`
+1. Index is empty - verify with: `curl http://localhost:7280/api/v1/{index}/search?query=*`
 2. Query doesn't match any logs
 3. Auto-discovery found no indexes - check logs for warnings
 
@@ -270,7 +270,7 @@ Search multiple specific indexes:
 **Error:** "No indexes discovered"
 
 **Solutions:**
-1. Verify `/v1/indexes` endpoint works: `curl http://localhost:7280/v1/indexes`
+1. Verify `/api/v1/indexes` endpoint works: `curl http://localhost:7280/api/v1/indexes`
 2. Check authentication if required
 3. Try explicit `default_index` instead
 
