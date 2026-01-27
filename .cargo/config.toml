@@ -11,6 +11,7 @@ linker = "aarch64-linux-gnu-gcc"
 
 [target.aarch64-unknown-linux-musl]
 linker = "aarch64-linux-musl-gcc"
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s"]
 
 [target.armv7-unknown-linux-gnueabihf]
 linker = "arm-linux-gnueabihf-gcc"
@@ -20,6 +21,7 @@ linker = "arm-linux-musleabihf-gcc"
 
 [target.x86_64-unknown-linux-musl]
 linker = "x86_64-linux-musl-gcc"
+rustflags = ["-C", "target-feature=+crt-static", "-C", "link-arg=-s"]
 
 [target.powerpc64le-unknown-linux-gnu]
 linker = "powerpc64le-linux-gnu-gcc"
@@ -43,6 +45,8 @@ linker = "riscv64-linux-gnu-gcc"
 
 # Build configuration
 [build]
+# Use a shared target directory for all workspace members
+target-dir = "target"
 # Default target intentionally left as host; set --target explicitly (use `cross` for Linux)
 
 # Cross-compilation settings (commented out - let cross-rs handle Docker images)

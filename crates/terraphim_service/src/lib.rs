@@ -372,6 +372,9 @@ impl TerraphimService {
                                     e
                                 );
                             }
+                            Err(ServiceError::Config(
+                                "Failed to build thesaurus from local KG".into(),
+                            ))
                         }
                     }
                 } else {
@@ -439,7 +442,7 @@ impl TerraphimService {
                                         // Check if error is "file not found" (expected for optional files)
                                         // and downgrade log level from ERROR to DEBUG
                                         let is_file_not_found =
-                                            e.to().to_string().contains("file not found");
+                                            e.to_string().contains("file not found");
 
                                         if is_file_not_found {
                                             log::debug!("Failed to update role and thesaurus (optional file not found): {:?}", e);

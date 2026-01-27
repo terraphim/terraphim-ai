@@ -22,11 +22,16 @@ on:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
-  CARGO_INCREMENTAL: 0
   CARGO_NET_RETRY: 10
   RUSTUP_MAX_RETRIES: 10
   REGISTRY: ghcr.io
   IMAGE_NAME: terraphim/terraphim-ai
+  # sccache configuration for distributed caching
+  SCCACHE_GHA_ENABLED: "true"
+  RUSTC_WRAPPER: "sccache"
+  # Use CI-optimized profiles
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
 
 jobs:
   # Build setup and metadata
@@ -103,6 +108,9 @@ jobs:
           components: rustfmt, clippy
           targets: ${{ matrix.target }}
 
+      - name: Run sccache-cache
+        uses: mozilla-actions/sccache-action@v0.0.3
+
       - name: Cache Cargo registry and dependencies (self-hosted)
         uses: actions/cache@v4
         with:
@@ -129,33 +137,39 @@ jobs:
 
       - name: Build release binaries
         run: |
-          # Build workspace with default features (no rocksdb for faster CI)
-          cargo build --release --target ${{ matrix.target }} --workspace
+          # Start sccache server
+          sccache --start-server || true
+          
+          # Build workspace with default features using CI-optimized profile
+          cargo build --profile ci-release --target ${{ matrix.target }} --workspace
 
           # Verify key binaries exist
-          ls -la target/${{ matrix.target }}/release/terraphim*
+          ls -la target/${{ matrix.target }}/ci-release/terraphim*
 
           # Show binary sizes
-          for binary in target/${{ matrix.target }}/release/terraphim*; do
+          for binary in target/${{ matrix.target }}/ci-release/terraphim*; do
             if [[ -f "$binary" ]]; then
               echo "$(basename "$binary"): $(du -h "$binary" | cut -f1)"
             fi
           done
+          
+          # Show sccache stats
+          sccache -s || true
 
       - name: Run tests
         run: |
-          # Run unit and integration tests (exclude integration-signing which requires zipsign CLI)
-          cargo test --release --target ${{ matrix.target }} --workspace --features "self_update/signatures"
+          # Run unit and integration tests with CI profile
+          cargo test --profile ci --target ${{ matrix.target }} --workspace --features "self_update/signatures"
 
       - name: Upload binary artifacts
         uses: actions/upload-artifact@v4
         with:
           name: rust-binaries-${{ matrix.target }}
           path: |
-            target/${{ matrix.target }}/release/terraphim_server
-            target/${{ matrix.target }}/release/terraphim_mcp_server
-            target/${{ matrix.target }}/release/terraphim-agent
-          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+            target/${{ matrix.target }}/ci-release/terraphim_server
+            target/${{ matrix.target }}/ci-release/terraphim_mcp_server
+            target/${{ matrix.target }}/ci-release/terraphim-agent
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '30' || '7' }}
 
       - name: Create .deb package
         if: matrix.target == 'x86_64-unknown-linux-gnu'
@@ -177,7 +191,7 @@ jobs:
         with:
           name: deb-packages
           path: target/${{ matrix.target }}/debian/*.deb
-          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '30' || '7' }}
 
   # Frontend build
   frontend-build:
@@ -224,7 +238,7 @@ jobs:
         with:
           name: frontend-dist
           path: desktop/dist/
-          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '30' || '7' }}
 
   # WASM build
   wasm-build:
@@ -264,7 +278,7 @@ jobs:
         with:
           name: wasm-package
           path: crates/terraphim_automata/wasm-test/pkg/
-          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '30' || '7' }}
 
   # Docker image build
   docker-build:

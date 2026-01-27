@@ -1,0 +1,75 @@
+name: Nightly Cleanup
+on:
+  schedule:
+    - cron: '0 2 * * *'  # 2 AM daily
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  cleanup:
+    name: Cleanup Build Artifacts
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Run target cleanup script
+        run: |
+          chmod +x scripts/cleanup-target.sh
+          ./scripts/cleanup-target.sh --retention 3
+
+      - name: Cleanup old GitHub Actions artifacts
+        run: |
+          # Keep only artifacts from last 10 workflow runs
+          gh run list --limit 50 --json databaseId,createdAt | \
+            jq -r '.[10:].databaseId' | \
+            xargs -I {} gh run delete {} || true
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup cargo cache
+        run: |
+          if command -v cargo-cache &> /dev/null; then
+            echo "Running cargo cache autoclean..."
+            cargo cache --autoclean
+          else
+            echo "cargo-cache not installed, skipping..."
+          fi
+          
+          # Clean up old cargo registry cache manually
+          if [[ -d ~/.cargo/registry/cache ]]; then
+            echo "Cleaning old cargo registry cache..."
+            find ~/.cargo/registry/cache -type f -mtime +7 -delete || true
+          fi
+
+      - name: Report disk usage
+        run: |
+          echo "## Disk Usage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Current Disk Usage" >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          df -h >> $GITHUB_STEP_SUMMARY
+          echo '```' >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          if [[ -d target ]]; then
+            echo "### Target Directory Size" >> $GITHUB_STEP_SUMMARY
+            echo "$(du -sh target 2>/dev/null | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ -d ~/.cargo/registry ]]; then
+            echo "### Cargo Registry Size" >> $GITHUB_STEP_SUMMARY
+            echo "$(du -sh ~/.cargo/registry 2>/dev/null | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi
+          
+          if [[ -d /opt/cargo-cache ]]; then
+            echo "### Self-Hosted Cache Size" >> $GITHUB_STEP_SUMMARY
+            echo "$(du -sh /opt/cargo-cache 2>/dev/null | cut -f1)" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+          fi

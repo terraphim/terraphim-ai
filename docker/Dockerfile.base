@@ -1,5 +1,5 @@
 # Multi-stage base Dockerfile for Terraphim AI
-# Optimized for CI/CD with fast builds and layer caching
+# Optimized for CI/CD with fast builds, layer caching, and minimal disk usage
 
 # ============================================
 # Stage 1: Base Builder
@@ -12,7 +12,9 @@ ENV CARGO_TERM_COLOR=always \
     RUST_BACKTRACE=1 \
     RUSTFLAGS="-C target-cpu=generic" \
     CARGO_NET_RETRY=10 \
-    CARGO_IO_MAX_THREADS=8
+    CARGO_IO_MAX_THREADS=8 \
+    SCCACHE_DIR=/var/cache/sccache \
+    RUSTC_WRAPPER=sccache
 
 # Install system dependencies (with proper layering for caching)
 RUN apt-get update && apt-get install -y \
@@ -29,6 +31,8 @@ RUN apt-get update && apt-get install -y \
     unzip \
     tar \
     gzip \
+    # sccache for distributed caching
+    sccache \
     # Clean up after base packages
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
@@ -60,7 +64,8 @@ USER terraphim
 RUN cargo install --version 0.12.2 cargo-edit && \
     cargo install --version 0.18.3 cargo-audit && \
     cargo install --version 0.14.2 cargo-deny && \
-    cargo install --version 8.4.0 cargo-watch || true
+    cargo install --version 8.4.0 cargo-watch && \
+    cargo install --version 0.8.3 cargo-cache || true
 
 # ============================================
 # Stage 2: Rust Builder with Cache
@@ -79,9 +84,12 @@ RUN mkdir -p crates/terraphim_automata/src && \
     mkdir -p terraphim_server/src && \
     echo "fn main() {}" > terraphim_server/src/main.rs
 
-# Build dependencies (creates cached layers)
-RUN cargo build --release --bins --workspace && \
-    rm -rf target/release/deps/terraphim* || true
+# Build dependencies with cache mounts for optimal disk usage
+RUN --mount=type=cache,target=/var/cache/sccache \
+    --mount=type=cache,target=/usr/local/cargo/registry \
+    --mount=type=cache,target=/app/target \
+    cargo build --profile ci-release --bins --workspace && \
+    rm -rf target/ci-release/deps/terraphim* || true
 
 # ============================================
 # Stage 3: WASM Builder
@@ -137,8 +145,8 @@ RUN useradd -m -s /bin/bash terraphim && \
 WORKDIR /app
 
 # Copy built artifacts from builder stages
-COPY --from=rust-builder --chown=terraphim:terraphim /app/target/release/terraphim_server /app/bin/
-COPY --from=rust-builder --chown=terraphim:terraphim /app/target/release/terraphim_mcp_server /app/bin/
+COPY --from=rust-builder --chown=terraphim:terraphim /app/target/ci-release/terraphim_server /app/bin/
+COPY --from=rust-builder --chown=terraphim:terraphim /app/target/ci-release/terraphim_mcp_server /app/bin/
 COPY --from=frontend-builder --chown=terraphim:terraphim /app/desktop/dist /app/dist/
 
 # Copy configuration files

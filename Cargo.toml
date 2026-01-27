@@ -30,15 +30,53 @@ log = "0.4"
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 self_update = { git = "https://github.com/AlexMikhalev/self_update.git", branch = "update-zipsign-api-v0.2" }
 
+# Optimized profiles for disk usage and build performance
+
+[profile.dev]
+# Enable incremental with optimized settings
+incremental = true
+codegen-units = 256
+# Split debug info to reduce object file sizes
+split-debuginfo = "unpacked"
+
+[profile.test]
+incremental = true
+codegen-units = 256
+split-debuginfo = "unpacked"
+
 [profile.release]
 panic = "unwind"
-lto = false
+lto = "thin"
 codegen-units = 1
 opt-level = 3
+strip = "debuginfo"
 
 [profile.release-lto]
 inherits = "release"
 lto = true
 codegen-units = 1
 opt-level = 3
+strip = true
 panic = "abort"
+
+[profile.size-optimized]
+inherits = "release"
+opt-level = "z"
+lto = true
+codegen-units = 1
+strip = true
+panic = "abort"
+
+# CI-optimized profiles for faster builds with less disk usage
+[profile.ci]
+inherits = "dev"
+incremental = false
+codegen-units = 16
+split-debuginfo = "off"
+debug = false
+
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 8
+strip = "debuginfo"
