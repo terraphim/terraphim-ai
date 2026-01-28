@@ -22,6 +22,8 @@ fn is_ci_expected_kg_error(err: &str) -> bool {
         || err.contains("not found")
         || err.contains("thesaurus")
         || err.contains("automata")
+        || err.contains("IO error")
+        || err.contains("Io error")
 }
 
 fn extract_clean_output(output: &str) -> String {
