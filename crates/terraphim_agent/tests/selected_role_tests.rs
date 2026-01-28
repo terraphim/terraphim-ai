@@ -3,18 +3,6 @@ use serial_test::serial;
 use std::process::Command;
 use std::str;
 
-/// Detect if running in CI environment (GitHub Actions, Docker containers in CI, etc.)
-fn is_ci_environment() -> bool {
-    // Check standard CI environment variables
-    std::env::var("CI").is_ok()
-        || std::env::var("GITHUB_ACTIONS").is_ok()
-        // Check if running as root in a container (common in CI Docker containers)
-        || (std::env::var("USER").as_deref() == Ok("root")
-            && std::path::Path::new("/.dockerenv").exists())
-        // Check if the home directory is /root (typical for CI containers)
-        || std::env::var("HOME").as_deref() == Ok("/root")
-}
-
 /// Check if stderr contains expected errors for chat command in CI (no LLM configured)
 fn is_expected_chat_error(stderr: &str) -> bool {
     stderr.contains("No LLM configured")
