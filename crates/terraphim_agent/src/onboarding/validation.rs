@@ -9,7 +9,6 @@ use thiserror::Error;
 
 /// Validation errors that can occur
 #[derive(Debug, Error, Clone)]
-#[allow(dead_code)]
 pub enum ValidationError {
     /// A required field is empty
     #[error("Field '{0}' cannot be empty")]
@@ -26,6 +25,10 @@ pub enum ValidationError {
     /// Service type requires specific configuration
     #[error("Service {0} requires: {1}")]
     ServiceRequirement(String, String),
+
+    /// Path does not exist on filesystem
+    #[error("Path does not exist: {0}")]
+    PathNotFound(String),
 
     /// URL is malformed
     #[error("Invalid URL: {0}")]
@@ -227,11 +230,9 @@ mod tests {
         let result = validate_role(&role);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(
-            errors
-                .iter()
-                .any(|e| matches!(e, ValidationError::EmptyField(_)))
-        );
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::EmptyField(_))));
     }
 
     #[test]
@@ -241,11 +242,9 @@ mod tests {
         let result = validate_role(&role);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(
-            errors
-                .iter()
-                .any(|e| matches!(e, ValidationError::MissingHaystack))
-        );
+        assert!(errors
+            .iter()
+            .any(|e| matches!(e, ValidationError::MissingHaystack)));
     }
 
     #[test]

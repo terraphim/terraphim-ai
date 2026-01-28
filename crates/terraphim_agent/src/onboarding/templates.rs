@@ -300,8 +300,7 @@ impl TemplateRegistry {
         &self.templates
     }
 
-    /// Get template IDs as a vec (test only)
-    #[cfg(test)]
+    /// Get template IDs as a vec
     pub fn ids(&self) -> Vec<&str> {
         self.templates.iter().map(|t| t.id.as_str()).collect()
     }
