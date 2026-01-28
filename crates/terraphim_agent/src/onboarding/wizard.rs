@@ -3,20 +3,19 @@
 //! Provides the interactive setup wizard flow for first-time users
 //! and add-role capability for extending existing configurations.
 
-use dialoguer::{Confirm, Select, theme::ColorfulTheme};
+use std::path::PathBuf;
+
+use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use terraphim_config::Role;
 use terraphim_types::RelevanceFunction;
 
-use super::OnboardingError;
 use super::prompts::{
     prompt_haystacks, prompt_knowledge_graph, prompt_llm_config, prompt_relevance_function,
-    prompt_role_basics, prompt_theme,
+    prompt_role_basics, prompt_theme, PromptResult,
 };
 use super::templates::{ConfigTemplate, TemplateRegistry};
 use super::validation::validate_role;
-
-#[cfg(test)]
-use std::path::Path;
+use super::OnboardingError;
 
 /// Result of running the setup wizard
 #[derive(Debug)]
@@ -111,8 +110,7 @@ impl QuickStartChoice {
 }
 
 /// Check if this is a first run (no existing configuration)
-#[cfg(test)]
-pub fn is_first_run(config_path: &Path) -> bool {
+pub fn is_first_run(config_path: &PathBuf) -> bool {
     !config_path.exists()
 }
 
@@ -314,7 +312,7 @@ fn prompt_path_for_template(
             .map_err(|_| OnboardingError::Cancelled)?;
 
         if !proceed {
-            return Err(OnboardingError::Cancelled);
+            return Err(OnboardingError::PathNotFound(expanded));
         }
     }
 
@@ -330,53 +328,84 @@ fn custom_wizard(theme: &ColorfulTheme) -> Result<Role, OnboardingError> {
     println!();
 
     // Step 1: Role basics (name and shortname)
-    let (name, shortname) = prompt_role_basics()?.into_result()?;
+    let (name, shortname) = match prompt_role_basics()? {
+        PromptResult::Value(v) => v,
+        PromptResult::Back => return Err(OnboardingError::NavigateBack),
+    };
 
     let mut role = Role::new(name);
     role.shortname = shortname;
 
     // Step 2: Theme selection
-    role.theme = prompt_theme()?.into_result()?;
+    role.theme = match prompt_theme()? {
+        PromptResult::Value(t) => t,
+        PromptResult::Back => {
+            // Go back to role basics - restart wizard
+            return Err(OnboardingError::NavigateBack);
+        }
+    };
 
     // Step 3: Relevance function
-    let relevance = prompt_relevance_function()?.into_result()?;
+    let relevance = match prompt_relevance_function()? {
+        PromptResult::Value(r) => r,
+        PromptResult::Back => {
+            // Go back - restart wizard
+            return Err(OnboardingError::NavigateBack);
+        }
+    };
     role.relevance_function = relevance;
     // Set terraphim_it based on relevance function (TerraphimGraph requires it)
     role.terraphim_it = matches!(relevance, RelevanceFunction::TerraphimGraph);
 
     // Step 4: Haystacks
-    role.haystacks = prompt_haystacks()?.into_result()?;
+    role.haystacks = match prompt_haystacks()? {
+        PromptResult::Value(haystacks) => haystacks,
+        PromptResult::Back => {
+            return Err(OnboardingError::NavigateBack);
+        }
+    };
 
     // Step 5: LLM configuration (optional)
-    let llm_config = prompt_llm_config()?.into_result()?;
-    if let Some(provider) = llm_config.provider {
-        role.llm_enabled = true;
-        role.extra.insert(
-            "llm_provider".to_string(),
-            serde_json::Value::String(provider),
-        );
-        if let Some(model) = llm_config.model {
-            role.extra
-                .insert("ollama_model".to_string(), serde_json::Value::String(model));
+    match prompt_llm_config()? {
+        PromptResult::Value(llm_config) => {
+            if let Some(provider) = llm_config.provider {
+                role.llm_enabled = true;
+                role.extra.insert(
+                    "llm_provider".to_string(),
+                    serde_json::Value::String(provider),
+                );
+                if let Some(model) = llm_config.model {
+                    role.extra
+                        .insert("ollama_model".to_string(), serde_json::Value::String(model));
+                }
+                if let Some(base_url) = llm_config.base_url {
+                    role.extra.insert(
+                        "ollama_base_url".to_string(),
+                        serde_json::Value::String(base_url),
+                    );
+                }
+                if let Some(api_key) = llm_config.api_key {
+                    role.extra.insert(
+                        "openrouter_api_key".to_string(),
+                        serde_json::Value::String(api_key),
+                    );
+                }
+            } else {
+                role.llm_enabled = false;
+            }
         }
-        if let Some(base_url) = llm_config.base_url {
-            role.extra.insert(
-                "ollama_base_url".to_string(),
-                serde_json::Value::String(base_url),
-            );
+        PromptResult::Back => {
+            return Err(OnboardingError::NavigateBack);
         }
-        if let Some(api_key) = llm_config.api_key {
-            role.extra.insert(
-                "openrouter_api_key".to_string(),
-                serde_json::Value::String(api_key),
-            );
-        }
-    } else {
-        role.llm_enabled = false;
     }
 
     // Step 6: Knowledge graph (optional)
-    role.kg = prompt_knowledge_graph()?.into_result()?;
+    role.kg = match prompt_knowledge_graph()? {
+        PromptResult::Value(kg) => kg,
+        PromptResult::Back => {
+            return Err(OnboardingError::NavigateBack);
+        }
+    };
 
     // Validate the complete role
     validate_role(&role).map_err(|errors| {
@@ -423,7 +452,6 @@ fn custom_wizard(theme: &ColorfulTheme) -> Result<Role, OnboardingError> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[test]
     fn test_quick_start_choice_template_ids() {
