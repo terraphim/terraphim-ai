@@ -19,6 +19,7 @@ pub struct McpToolsHandler {
 }
 
 #[cfg(feature = "repl-mcp")]
+#[allow(dead_code)]
 impl McpToolsHandler {
     /// Create a new McpToolsHandler with a reference to the TuiService
     pub fn new(service: Arc<TuiService>) -> Self {
@@ -52,10 +53,9 @@ impl McpToolsHandler {
         exclude_term: bool,
     ) -> anyhow::Result<Vec<(String, String)>> {
         let role = self.get_role().await;
-        Ok(self
-            .service
+        self.service
             .extract_paragraphs(&role, text, exclude_term)
-            .await?)
+            .await
     }
 
     /// Find all thesaurus term matches in the given text
@@ -80,9 +80,10 @@ impl McpToolsHandler {
         let role = self.get_role().await;
         let link_type = match format.as_deref() {
             Some("html") => LinkType::HTMLLinks,
-            Some("markdown") | _ => LinkType::MarkdownLinks,
+            Some("markdown") | None => LinkType::MarkdownLinks,
+            _ => LinkType::MarkdownLinks,
         };
-        Ok(self.service.replace_matches(&role, text, link_type).await?)
+        self.service.replace_matches(&role, text, link_type).await
     }
 
     /// Get thesaurus entries for a role
