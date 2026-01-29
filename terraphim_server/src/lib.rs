@@ -173,13 +173,14 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     for (role_name, role) in &mut config.roles {
         if role.relevance_function == RelevanceFunction::TerraphimGraph {
             if let Some(kg) = &role.kg {
-                if kg.automata_path.is_none() && kg.knowledge_graph_local.is_some() {
+                if let (None, Some(kg_local)) =
+                    (&kg.automata_path, &kg.knowledge_graph_local)
+                {
                     log::info!(
                         "Building rolegraph for role '{}' from local files",
                         role_name
                     );
 
-                    let kg_local = kg.knowledge_graph_local.as_ref().unwrap();
                     log::info!("Knowledge graph path: {:?}", kg_local.path);
 
                     // Check if the directory exists
