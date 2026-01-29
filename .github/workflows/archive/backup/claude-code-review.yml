@@ -26,15 +26,6 @@ jobs:
       id-token: write
 
     steps:
-      - name: Pre-checkout cleanup
-        run: |
-          # Clean up files that may have different permissions from previous Docker runs
-          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
-          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
-          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
-          sudo rm -rf "${WORKDIR}/target" || true
-          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
-
       - name: Checkout repository
         uses: actions/checkout@v6
         with:
