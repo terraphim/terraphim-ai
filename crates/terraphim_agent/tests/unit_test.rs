@@ -92,7 +92,8 @@ fn test_config_response_deserialization() {
     let json_response = r#"{
         "status": "Success",
         "config": {
-            "id": "TestConfig",
+            "id": "Embedded",
+            "default_role": "Default",
             "selected_role": "Default",
             "global_shortcut": "Ctrl+Space",
             "roles": {
