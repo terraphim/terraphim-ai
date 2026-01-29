@@ -173,72 +173,152 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
     for (role_name, role) in &mut config.roles {
         if role.relevance_function == RelevanceFunction::TerraphimGraph {
             if let Some(kg) = &role.kg {
-                if kg.automata_path.is_none() {
-                    if let Some(kg_local) = &kg.knowledge_graph_local {
-                        log::info!(
-                            "Building rolegraph for role '{}' from local files",
-                            role_name
-                        );
-                        log::info!("Knowledge graph path: {:?}", kg_local.path);
+                if let (None, Some(kg_local)) = (&kg.automata_path, &kg.knowledge_graph_local) {
+                    log::info!(
+                        "Building rolegraph for role '{}' from local files",
+                        role_name
+                    );
 
-                        // Check if the directory exists
-                        if !kg_local.path.exists() {
-                            log::warn!(
-                                "Knowledge graph directory does not exist: {:?}",
-                                kg_local.path
-                            );
-                            continue;
-                        }
+                    log::info!("Knowledge graph path: {:?}", kg_local.path);
 
-                        // List files in the directory
-                        let files: Vec<_> = if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
-                            entries
-                                .filter_map(|entry| entry.ok())
-                                .filter(|entry| {
-                                    if let Some(ext) = entry.path().extension() {
-                                        ext == "md" || ext == "markdown"
-                                    } else {
-                                        false
-                                    }
-                                })
-                                .collect()
-                        } else {
-                            Vec::new()
-                        };
-
-                        log::info!(
-                            "Found {} markdown files in {:?}",
-                            files.len(),
+                    // Check if the directory exists
+                    if !kg_local.path.exists() {
+                        log::warn!(
+                            "Knowledge graph directory does not exist: {:?}",
                             kg_local.path
                         );
-                        for file in &files {
-                            log::info!("  - {:?}", file.path());
-                        }
+                        continue;
+                    }
 
-                        // Build thesaurus using Logseq builder
-                        let builder = Logseq::default();
-                        log::info!("Created Logseq builder for path: {:?}", kg_local.path);
+                    // List files in the directory
+                    let files: Vec<_> = if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
+                        entries
+                            .filter_map(|entry| entry.ok())
+                            .filter(|entry| {
+                                if let Some(ext) = entry.path().extension() {
+                                    ext == "md" || ext == "markdown"
+                                } else {
+                                    false
+                                }
+                            })
+                            .collect()
+                    } else {
+                        Vec::new()
+                    };
 
-                        match builder
-                            .build(role_name.to_string(), kg_local.path.clone())
-                            .await
-                        {
-                            Ok(thesaurus) => {
-                                log::info!("Successfully built and indexed rolegraph for role '{}' with {} terms and {} documents", role_name, thesaurus.len(), files.len());
-                                // Create rolegraph
-                                let rolegraph =
-                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
-                                log::info!(
-                                    "Successfully created rolegraph for role '{}'",
-                                    role_name
-                                );
+                    log::info!(
+                        "Found {} markdown files in {:?}",
+                        files.len(),
+                        kg_local.path
+                    );
+                    for file in &files {
+                        log::info!("  - {:?}", file.path());
+                    }
 
-                                // Index documents from knowledge graph files into the rolegraph
-                                let mut rolegraph_with_docs = rolegraph;
+                    // Build thesaurus using Logseq builder
+                    let builder = Logseq::default();
+                    log::info!("Created Logseq builder for path: {:?}", kg_local.path);
 
-                                // Index the knowledge graph markdown files as documents
-                                if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
-                                    for entry in entries.filter_map(|e| e.ok()) {
+                    match builder
+                        .build(role_name.to_string(), kg_local.path.clone())
+                        .await
+                    {
+                        Ok(thesaurus) => {
+                            log::info!("Successfully built and indexed rolegraph for role '{}' with {} terms and {} documents", role_name, thesaurus.len(), files.len());
+                            // Create rolegraph
+                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                            log::info!("Successfully created rolegraph for role '{}'", role_name);
+
+                            // Index documents from knowledge graph files into the rolegraph
+                            let mut rolegraph_with_docs = rolegraph;
+
+                            // Index the knowledge graph markdown files as documents
+                            if let Ok(entries) = std::fs::read_dir(&kg_local.path) {
+                                for entry in entries.filter_map(|e| e.ok()) {
+                                    if let Some(ext) = entry.path().extension() {
+                                        if ext == "md" || ext == "markdown" {
+                                            if let Ok(content) =
+                                                tokio::fs::read_to_string(&entry.path()).await
+                                            {
+                                                // Create a proper description from the document content
+                                                let description =
+                                                    create_document_description(&content);
+
+                                                // Use normalized ID to match what persistence layer uses
+                                                let filename =
+                                                    entry.file_name().to_string_lossy().to_string();
+                                                let normalized_id = {
+                                                    NORMALIZE_REGEX
+                                                        .replace_all(&filename, "")
+                                                        .to_lowercase()
+                                                };
+
+                                                let document = Document {
+                                                    id: normalized_id.clone(),
+                                                    url: entry.path().to_string_lossy().to_string(),
+                                                    title: filename.clone(), // Keep original filename as title for display
+                                                    body: content,
+                                                    description,
+                                                    summarization: None,
+                                                    stub: None,
+                                                    tags: None,
+                                                    rank: None,
+                                                    source_haystack: None,
+                                                };
+
+                                                // Save document to persistence layer first
+                                                if let Err(e) = document.save().await {
+                                                    log::error!("Failed to save document '{}' to persistence: {}", document.id, e);
+                                                } else {
+                                                    log::info!("✅ Saved document '{}' to persistence layer", document.id);
+                                                }
+
+                                                // Validate document has content before indexing into rolegraph
+                                                if document.body.is_empty() {
+                                                    log::warn!("Document '{}' has empty body, cannot properly index into rolegraph", filename);
+                                                } else {
+                                                    log::debug!("Document '{}' has {} chars of body content", filename, document.body.len());
+                                                }
+
+                                                // Then add to rolegraph for KG indexing using the same normalized ID
+                                                let document_clone = document.clone();
+                                                rolegraph_with_docs
+                                                    .insert_document(&normalized_id, document);
+
+                                                // Log rolegraph statistics after insertion
+                                                let node_count =
+                                                    rolegraph_with_docs.get_node_count();
+                                                let edge_count =
+                                                    rolegraph_with_docs.get_edge_count();
+                                                let doc_count =
+                                                    rolegraph_with_docs.get_document_count();
+
+                                                log::info!(
+                                                    "✅ Indexed document '{}' into rolegraph (body: {} chars, nodes: {}, edges: {}, docs: {})",
+                                                    filename, document_clone.body.len(), node_count, edge_count, doc_count
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Also process and save all documents from haystack directories (recursively)
+                            for haystack in &role.haystacks {
+                                if haystack.service == terraphim_config::ServiceType::Ripgrep {
+                                    log::info!(
+                                        "Processing haystack documents from: {} (recursive)",
+                                        haystack.location
+                                    );
+
+                                    let mut processed_count = 0;
+
+                                    // Use walkdir for recursive directory traversal
+                                    for entry in WalkDir::new(&haystack.location)
+                                        .into_iter()
+                                        .filter_map(|e| e.ok())
+                                        .filter(|e| e.file_type().is_file())
+                                    {
                                         if let Some(ext) = entry.path().extension() {
                                             if ext == "md" || ext == "markdown" {
                                                 if let Ok(content) =
@@ -259,6 +339,16 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                             .to_lowercase()
                                                     };
 
+                                                    // Skip if this is already a KG document (avoid duplicates)
+                                                    if let Some(kg_local) =
+                                                        &kg.knowledge_graph_local
+                                                    {
+                                                        if entry.path().starts_with(&kg_local.path)
+                                                        {
+                                                            continue; // Skip KG files, already processed above
+                                                        }
+                                                    }
+
                                                     let document = Document {
                                                         id: normalized_id.clone(),
                                                         url: entry
@@ -275,144 +365,38 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         source_haystack: None,
                                                     };
 
-                                                    // Save document to persistence layer first
+                                                    // Save document to persistence layer
                                                     if let Err(e) = document.save().await {
-                                                        log::error!("Failed to save document '{}' to persistence: {}", document.id, e);
+                                                        log::debug!("Failed to save haystack document '{}' to persistence: {}", document.id, e);
                                                     } else {
-                                                        log::info!("✅ Saved document '{}' to persistence layer", document.id);
+                                                        log::debug!("✅ Saved haystack document '{}' to persistence layer", document.id);
+                                                        processed_count += 1;
                                                     }
-
-                                                    // Validate document has content before indexing into rolegraph
-                                                    if document.body.is_empty() {
-                                                        log::warn!("Document '{}' has empty body, cannot properly index into rolegraph", filename);
-                                                    } else {
-                                                        log::debug!("Document '{}' has {} chars of body content", filename, document.body.len());
-                                                    }
-
-                                                    // Then add to rolegraph for KG indexing using the same normalized ID
-                                                    let document_clone = document.clone();
-                                                    rolegraph_with_docs
-                                                        .insert_document(&normalized_id, document);
-
-                                                    // Log rolegraph statistics after insertion
-                                                    let node_count =
-                                                        rolegraph_with_docs.get_node_count();
-                                                    let edge_count =
-                                                        rolegraph_with_docs.get_edge_count();
-                                                    let doc_count =
-                                                        rolegraph_with_docs.get_document_count();
-
-                                                    log::info!(
-                                                    "✅ Indexed document '{}' into rolegraph (body: {} chars, nodes: {}, edges: {}, docs: {})",
-                                                    filename, document_clone.body.len(), node_count, edge_count, doc_count
-                                                );
                                                 }
                                             }
                                         }
                                     }
-                                }
-
-                                // Also process and save all documents from haystack directories (recursively)
-                                for haystack in &role.haystacks {
-                                    if haystack.service == terraphim_config::ServiceType::Ripgrep {
-                                        log::info!(
-                                            "Processing haystack documents from: {} (recursive)",
-                                            haystack.location
-                                        );
-
-                                        let mut processed_count = 0;
-
-                                        // Use walkdir for recursive directory traversal
-                                        for entry in WalkDir::new(&haystack.location)
-                                            .into_iter()
-                                            .filter_map(|e| e.ok())
-                                            .filter(|e| e.file_type().is_file())
-                                        {
-                                            if let Some(ext) = entry.path().extension() {
-                                                if ext == "md" || ext == "markdown" {
-                                                    if let Ok(content) =
-                                                        tokio::fs::read_to_string(&entry.path())
-                                                            .await
-                                                    {
-                                                        // Create a proper description from the document content
-                                                        let description =
-                                                            create_document_description(&content);
-
-                                                        // Use normalized ID to match what persistence layer uses
-                                                        let filename = entry
-                                                            .file_name()
-                                                            .to_string_lossy()
-                                                            .to_string();
-                                                        let normalized_id = {
-                                                            NORMALIZE_REGEX
-                                                                .replace_all(&filename, "")
-                                                                .to_lowercase()
-                                                        };
-
-                                                        // Skip if this is already a KG document (avoid duplicates)
-                                                        if let Some(kg_local) =
-                                                            &kg.knowledge_graph_local
-                                                        {
-                                                            if entry
-                                                                .path()
-                                                                .starts_with(&kg_local.path)
-                                                            {
-                                                                continue; // Skip KG files, already processed above
-                                                            }
-                                                        }
-
-                                                        let document = Document {
-                                                            id: normalized_id.clone(),
-                                                            url: entry
-                                                                .path()
-                                                                .to_string_lossy()
-                                                                .to_string(),
-                                                            title: filename.clone(), // Keep original filename as title for display
-                                                            body: content,
-                                                            description,
-                                                            summarization: None,
-                                                            stub: None,
-                                                            tags: None,
-                                                            rank: None,
-                                                            source_haystack: None,
-                                                        };
-
-                                                        // Save document to persistence layer
-                                                        if let Err(e) = document.save().await {
-                                                            log::debug!("Failed to save haystack document '{}' to persistence: {}", document.id, e);
-                                                        } else {
-                                                            log::debug!("✅ Saved haystack document '{}' to persistence layer", document.id);
-                                                            processed_count += 1;
-                                                        }
-                                                    }
-                                                }
-                                            }
-                                        }
-                                        log::info!(
+                                    log::info!(
                                         "✅ Processed {} documents from haystack: {} (recursive)",
                                         processed_count,
                                         haystack.location
                                     );
-                                    }
                                 }
+                            }
 
-                                // Store in local rolegraphs map
-                                local_rolegraphs.insert(
-                                    role_name.clone(),
-                                    RoleGraphSync::from(rolegraph_with_docs),
-                                );
-                                log::info!(
-                                    "Stored rolegraph in local map for role '{}'",
-                                    role_name
-                                );
-                            }
-                            Err(e) => {
-                                log::error!(
-                                    "Failed to build thesaurus for role '{}': {}",
-                                    role_name,
-                                    e
-                                );
-                            }
+                            // Store in local rolegraphs map
+                            local_rolegraphs.insert(
+                                role_name.clone(),
+                                RoleGraphSync::from(rolegraph_with_docs),
+                            );
+                            log::info!("Stored rolegraph in local map for role '{}'", role_name);
+                        }
+                        Err(e) => {
+                            log::error!(
+                                "Failed to build thesaurus for role '{}': {}",
+                                role_name,
+                                e
+                            );
                         }
                     }
                 }
