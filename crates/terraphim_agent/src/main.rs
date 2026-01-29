@@ -46,7 +46,8 @@ fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
     println!();
     println!("Interactive Mode (requires TTY):");
-    println!("  terraphim-agent              # Start REPL or TUI");
+    println!("  terraphim-agent              # Start REPL (default)");
+    println!("  terraphim-agent --tui        # Start TUI (requires server)");
     println!("  terraphim-agent repl         # Explicit REPL mode");
     println!();
     println!("Common Commands:");
@@ -392,6 +393,9 @@ struct Cli {
     /// Output format (human, json, json-compact)
     #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
     format: OutputFormat,
+    /// Force TUI mode (default is REPL)
+    #[arg(long, default_value_t = false)]
+    tui: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -568,7 +572,8 @@ fn main() -> Result<()> {
     });
 
     match cli.command {
-        Some(Command::Interactive) | None => {
+        Some(Command::Interactive) => {
+            // Explicit interactive command - force TUI mode
             // Check if we're in a TTY for interactive mode (both stdout and stdin required)
             use atty::Stream;
             if !atty::is(Stream::Stdout) {
@@ -586,6 +591,46 @@ fn main() -> Result<()> {
             } else {
                 // Run TUI mode - it will create its own runtime
                 run_tui_offline_mode(cli.transparent)
+            }
+        }
+
+        None => {
+            // No command specified - default to REPL mode or TUI mode if --tui flag is set
+            if cli.tui {
+                // Check if we're in a TTY for TUI mode
+                use atty::Stream;
+                if !atty::is(Stream::Stdout) {
+                    eprintln!("Error: TUI mode requires a TTY (terminal)");
+                    std::process::exit(1);
+                }
+
+                if !atty::is(Stream::Stdin) {
+                    eprintln!("Error: TUI mode requires a TTY (terminal)");
+                    std::process::exit(1);
+                }
+
+                if cli.server {
+                    run_tui_server_mode(&cli.server_url, cli.transparent)
+                } else {
+                    run_tui_offline_mode(cli.transparent)
+                }
+            } else {
+                // Default to REPL mode
+                #[cfg(feature = "repl")]
+                {
+                    let rt = Runtime::new()?;
+                    if cli.server {
+                        rt.block_on(repl::run_repl_server_mode(&cli.server_url))
+                    } else {
+                        rt.block_on(repl::run_repl_offline_mode())
+                    }
+                }
+
+                #[cfg(not(feature = "repl"))]
+                {
+                    // If repl feature is not enabled, show error
+                    anyhow::bail!("REPL mode requires 'repl' feature. Build with: cargo build --features repl");
+                }
             }
         }
 
