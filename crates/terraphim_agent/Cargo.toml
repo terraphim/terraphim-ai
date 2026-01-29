@@ -55,6 +55,8 @@ async-trait = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 strsim = "0.11"  # For edit distance / fuzzy matching in forgiving CLI
 uuid = { version = "1.19", features = ["v4", "serde"] }
+dialoguer = "0.11"  # Interactive CLI prompts for onboarding wizard
+console = "0.15"  # Terminal styling for wizard output
 
 # REPL dependencies - only compiled with features
 rustyline = { version = "17.0", optional = true }
