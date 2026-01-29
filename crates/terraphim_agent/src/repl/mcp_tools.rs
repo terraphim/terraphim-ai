@@ -14,13 +14,13 @@ use terraphim_automata::LinkType;
 use terraphim_types::RoleName;
 
 #[cfg(feature = "repl-mcp")]
-#[allow(dead_code)]
+#[allow(dead_code)] // Prepared for future MCP tool integration
 pub struct McpToolsHandler {
     service: Arc<TuiService>,
 }
 
 #[cfg(feature = "repl-mcp")]
-#[allow(dead_code)]
+#[allow(dead_code)] // Prepared for future MCP tool integration
 impl McpToolsHandler {
     /// Create a new McpToolsHandler with a reference to the TuiService
     pub fn new(service: Arc<TuiService>) -> Self {
