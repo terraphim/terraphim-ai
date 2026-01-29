@@ -11,6 +11,13 @@ use terraphim_types::{NormalizedTermValue, RelevanceFunction, RoleName, SearchQu
 #[tokio::test]
 #[serial]
 async fn ollama_llama_integration_comprehensive() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama integration tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -393,6 +400,13 @@ async fn test_model_listing(base_url: &str) {
 #[tokio::test]
 #[serial]
 async fn ollama_llama_length_constraint_test() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama integration tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -466,6 +480,13 @@ async fn ollama_llama_length_constraint_test() {
 #[tokio::test]
 #[serial]
 async fn ollama_llama_performance_test() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama integration tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
