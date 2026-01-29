@@ -145,7 +145,8 @@ pub use api::{
     AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
     CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
-    ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
+    ListConversationsResponse, RoleGraphResponseDto, SearchResponse, ThesaurusResponse,
+    UpdateContextRequest, UpdateContextResponse,
 };
 pub use error::{Result, Status};
 

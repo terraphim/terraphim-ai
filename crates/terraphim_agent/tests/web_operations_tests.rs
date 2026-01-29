@@ -3,7 +3,12 @@ use std::str::FromStr;
 #[cfg(feature = "repl")]
 use terraphim_agent::repl::web_operations::*;
 
-#[cfg(all(test, feature = "repl"))]
+#[cfg(all(
+    test,
+    feature = "repl",
+    feature = "repl-web",
+    feature = "repl-web-advanced"
+))]
 mod tests {
     use super::*;
     use terraphim_agent::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};

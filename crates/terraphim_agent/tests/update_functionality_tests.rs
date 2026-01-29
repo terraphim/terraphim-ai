@@ -3,6 +3,13 @@
 //! Tests the complete autoupdate workflow including checking for updates
 //! and updating to new versions from GitHub Releases.
 
+#![cfg(feature = "update-tests")]
+//! Integration tests for terraphim-agent autoupdate functionality
+//!
+//! These tests require a built release binary at a Linux-specific path and network access.
+//! In local dev / CI on macOS, this binary does not exist and network may be blocked.
+//! Therefore they are gated behind the `update-tests` feature.
+
 use std::process::Command;
 
 /// Test the check-update command functionality

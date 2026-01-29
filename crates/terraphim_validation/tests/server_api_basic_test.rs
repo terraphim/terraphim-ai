@@ -21,7 +21,7 @@ mod basic_tests {
         let response = server.get("/health").await;
 
         assert!(
-            response.status().is_success(),
+            response.status_code().is_success(),
             "Health check should succeed"
         );
     }

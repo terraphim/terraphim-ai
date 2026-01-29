@@ -3,6 +3,7 @@
 //!
 //! Integration tests for the desktop UI testing framework.
 
+use terraphim_validation::testing::desktop_ui::utils::Platform;
 use terraphim_validation::testing::desktop_ui::*;
 
 #[cfg(test)]
@@ -115,7 +116,7 @@ mod tests {
             },
         ];
 
-        let aggregated = ResultUtils::aggregate_results(results);
+        let aggregated = ResultUtils::aggregate_ui_results(results);
 
         assert_eq!(aggregated.total, 3);
         assert_eq!(aggregated.passed, 2);

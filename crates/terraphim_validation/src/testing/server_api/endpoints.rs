@@ -20,11 +20,11 @@ pub mod health_tests {
             .await
             .expect("Failed to create test server");
 
-        let response = server.get("/health").await.expect("Request failed");
+        let response = server.get("/health").await;
 
-        assert!(response.status().is_success());
+        assert!(response.status_code().is_success());
 
-        let body = response.text().await.expect("Failed to read response body");
+        let body = response.text();
         assert_eq!(body, "OK");
     }
 }
@@ -41,12 +41,9 @@ pub mod document_tests {
             .expect("Failed to create test server");
         let document = TestFixtures::sample_document();
 
-        let response = server
-            .post("/documents", &document)
-            .await
-            .expect("Request failed");
+        let response = server.post("/documents", &document).await;
 
-        assert!(response.status().is_success());
+        assert!(response.status_code().is_success());
     }
 
     #[tokio::test]
@@ -55,12 +52,9 @@ pub mod document_tests {
             .await
             .expect("Failed to create test server");
 
-        let response = server
-            .get("/documents/search?query=test")
-            .await
-            .expect("Search request failed");
+        let response = server.get("/documents/search?query=test").await;
 
-        assert!(response.status().is_success());
+        assert!(response.status_code().is_success());
     }
 }
 
@@ -75,8 +69,8 @@ pub mod config_tests {
             .await
             .expect("Failed to create test server");
 
-        let response = server.get("/config").await.expect("Config request failed");
+        let response = server.get("/config").await;
 
-        assert!(response.status().is_success());
+        assert!(response.status_code().is_success());
     }
 }
