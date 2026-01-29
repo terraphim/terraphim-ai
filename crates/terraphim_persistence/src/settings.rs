@@ -252,8 +252,9 @@ pub async fn parse_profile(
         }
         #[cfg(feature = "services-redis")]
         Scheme::Redis => Operator::from_iter::<services::Redis>(profile.clone())?.finish(),
-        #[cfg(feature = "services-rocksdb")]
-        Scheme::Rocksdb => Operator::from_iter::<services::Rocksdb>(profile.clone())?.finish(),
+        // RocksDB support is disabled due to locking issues
+        // #[cfg(feature = "services-rocksdb")]
+        // Scheme::Rocksdb => Operator::from_iter::<services::Rocksdb>(profile.clone())?.finish(),
         #[cfg(feature = "services-redb")]
         Scheme::Redb => {
             // Ensure parent directory exists for ReDB database file
@@ -468,76 +469,12 @@ mod tests {
         Ok(())
     }
 
-    /// Test saving and loading a struct to rocksdb profile
-    #[cfg(feature = "services-rocksdb")]
-    #[tokio::test]
-    #[serial_test::serial]
-    async fn test_save_and_load_rocksdb() -> Result<()> {
-        use tempfile::TempDir;
-
-        // Create temporary directory for test
-        let temp_dir = TempDir::new().unwrap();
-        let rocksdb_path = temp_dir.path().join("test_rocksdb");
-
-        // Create test settings with rocksdb profile
-        let mut profiles = std::collections::HashMap::new();
-
-        // DashMap profile (needed as fastest operator fallback)
-        let mut dashmap_profile = std::collections::HashMap::new();
-        dashmap_profile.insert("type".to_string(), "dashmap".to_string());
-        dashmap_profile.insert(
-            "root".to_string(),
-            temp_dir
-                .path()
-                .join("dashmap")
-                .to_string_lossy()
-                .to_string(),
-        );
-        profiles.insert("dashmap".to_string(), dashmap_profile);
-
-        // RocksDB profile for testing
-        let mut rocksdb_profile = std::collections::HashMap::new();
-        rocksdb_profile.insert("type".to_string(), "rocksdb".to_string());
-        rocksdb_profile.insert(
-            "datadir".to_string(),
-            rocksdb_path.to_string_lossy().to_string(),
-        );
-        profiles.insert("rocksdb".to_string(), rocksdb_profile);
-
-        let settings = DeviceSettings {
-            server_hostname: "localhost:8000".to_string(),
-            api_endpoint: "http://localhost:8000/api".to_string(),
-            initialized: false,
-            default_data_path: temp_dir.path().to_string_lossy().to_string(),
-            profiles,
-        };
-
-        // Initialize storage with custom settings
-        let storage = crate::init_device_storage_with_settings(settings).await?;
-
-        // Verify rocksdb profile is available
-        assert!(
-            storage.ops.contains_key("rocksdb"),
-            "RocksDB profile should be available. Available profiles: {:?}",
-            storage.ops.keys().collect::<Vec<_>>()
-        );
-
-        // Test direct operator write/read
-        let rocksdb_op = &storage.ops.get("rocksdb").unwrap().0;
-        let test_key = "test_rocksdb_key.json";
-        let test_data = r#"{"name":"Test RocksDB Object","age":30}"#;
-
-        rocksdb_op.write(test_key, test_data).await?;
-        let read_data = rocksdb_op.read(test_key).await?;
-        let read_str = String::from_utf8(read_data.to_vec()).unwrap();
-
-        assert_eq!(
-            test_data, read_str,
-            "RocksDB read data should match written data"
-        );
-
-        Ok(())
-    }
+    // RocksDB test disabled - rocksdb feature is disabled due to locking issues
+    // /// Test saving and loading a struct to rocksdb profile
+    // #[cfg(feature = "services-rocksdb")]
+    // #[tokio::test]
+    // #[serial_test::serial]
+    // async fn test_save_and_load_rocksdb() -> Result<()> { ... }
 
     /// Test saving and loading a struct to dashmap profile (if available)
     #[cfg(feature = "dashmap")]
