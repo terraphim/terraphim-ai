@@ -89,21 +89,16 @@ fn extra_props(class_url: &str, slug: &str) -> HashMap<String, serde_json::Value
 async fn generic_classes_crud_search() {
     dotenv().ok();
 
-    // Skip in CI or when environment variables aren't set
+    // This is an optional, environment/integration test.
+    // Skip when ATOMIC_* env vars are not present.
     let config = match Config::from_env() {
         Ok(c) => c,
         Err(_) => {
-            eprintln!(
-                "Skipping test: ATOMIC_SERVER_URL & ATOMIC_SERVER_SECRET not set (integration test requires live server)"
-            );
+            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
             return;
         }
     };
-
-    if config.agent.is_none() {
-        eprintln!("Skipping test: Need authenticated agent");
-        return;
-    }
+    assert!(config.agent.is_some(), "Need authenticated agent");
     let store = Store::new(config).expect("Create store");
 
     let skip: HashSet<&str> = [
@@ -142,11 +137,11 @@ async fn generic_classes_crud_search() {
         .get_resource(&collections_url)
         .await
         .expect("fetch collections");
-    let members =
-        collections_res.properties["https://atomicdata.dev/properties/collection/members"]
-            .as_array()
-            .expect("members array")
-            .clone();
+    let members = collections_res.properties
+        ["https://atomicdata.dev/properties/collection/members"]
+        .as_array()
+        .expect("members array")
+        .clone();
 
     let mut errors = Vec::new();
 

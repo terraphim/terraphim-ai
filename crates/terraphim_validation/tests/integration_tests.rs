@@ -1,14 +1,14 @@
 #![cfg(feature = "release-integration-tests")]
 
-use crate::{
+use anyhow::Result;
+use terraphim_validation::{
     artifacts::{ArtifactType, Platform, ReleaseArtifact},
     orchestrator::ValidationOrchestrator,
     testing::{create_mock_release_structure, create_temp_dir, create_test_artifact},
 };
-use anyhow::Result;
 
-#[tokio::test]
-async fn test_artifact_creation() {
+#[test]
+fn test_artifact_creation() {
     let artifact = create_test_artifact(
         "test-artifact",
         "1.0.0",
@@ -25,8 +25,8 @@ async fn test_artifact_creation() {
     assert!(!artifact.is_available_locally());
 }
 
-#[tokio::test]
-async fn test_orchestrator_creation() {
+#[test]
+fn test_orchestrator_creation() {
     let result = ValidationOrchestrator::new();
     assert!(result.is_ok());
 
@@ -36,8 +36,8 @@ async fn test_orchestrator_creation() {
     assert_eq!(config.timeout_seconds, 1800);
 }
 
-#[tokio::test]
-async fn test_mock_release_structure() -> Result<()> {
+#[test]
+fn test_mock_release_structure() -> Result<()> {
     let release_path = create_mock_release_structure("1.0.0")?;
 
     // Verify directory structure
@@ -69,17 +69,18 @@ async fn test_mock_release_structure() -> Result<()> {
     Ok(())
 }
 
-#[tokio::test]
-async fn test_validation_categories() -> Result<()> {
+#[test]
+fn test_validation_categories() -> Result<()> {
     let orchestrator = ValidationOrchestrator::new()?;
 
+    // Run async validation in a runtime for this sync test
+    let rt = tokio::runtime::Runtime::new()?;
+
     // Test with valid categories
-    let result = orchestrator
-        .validate_categories(
-            "1.0.0",
-            vec!["download".to_string(), "installation".to_string()],
-        )
-        .await;
+    let result = rt.block_on(orchestrator.validate_categories(
+        "1.0.0",
+        vec!["download".to_string(), "installation".to_string()],
+    ));
 
     assert!(result.is_ok());
 
@@ -87,11 +88,12 @@ async fn test_validation_categories() -> Result<()> {
     assert_eq!(report.version, "1.0.0");
 
     // Test with unknown category (should not fail)
-    let result = orchestrator
-        .validate_categories("1.0.0", vec!["unknown".to_string()])
-        .await;
+    let result =
+        rt.block_on(orchestrator.validate_categories("1.0.0", vec!["unknown".to_string()]));
 
     assert!(result.is_ok());
+
+    Ok(())
 }
 
 #[test]
@@ -103,7 +105,7 @@ fn test_platform_string_representation() {
 
 #[test]
 fn test_platform_families() {
-    use crate::artifacts::PlatformFamily;
+    use terraphim_validation::artifacts::PlatformFamily;
 
     assert_eq!(Platform::LinuxX86_64.family(), PlatformFamily::Linux);
     assert_eq!(Platform::LinuxAarch64.family(), PlatformFamily::Linux);

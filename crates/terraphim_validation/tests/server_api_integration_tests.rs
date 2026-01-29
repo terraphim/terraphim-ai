@@ -19,11 +19,8 @@ mod api_integration_tests {
 
         // 1. Health check
         let response = server.get("/health").await;
-        response.validate_status(reqwest::StatusCode::OK);
-        let body = response
-            .text()
-            .await
-            .expect("Failed to read health response");
+        let response = response.validate_status(reqwest::StatusCode::OK);
+        let body = response.text();
         assert_eq!(body, "OK");
 
         // 2. Create documents
@@ -31,79 +28,55 @@ mod api_integration_tests {
         let mut created_ids = Vec::new();
 
         for doc in documents {
-            let response = server
-                .post("/documents", &doc)
-                .await
-                .expect("Document creation failed");
-            response.validate_status(reqwest::StatusCode::OK);
+            let response = server.post("/documents", &doc).await;
+            let response = response.validate_status(reqwest::StatusCode::OK);
 
-            let create_response: terraphim_server::api::CreateDocumentResponse =
+            let create_response: terraphim_server::CreateDocumentResponse =
                 response.validate_json().expect("JSON validation failed");
-            assert_eq!(
-                create_response.status,
-                terraphim_server::error::Status::Success
-            );
+            assert_eq!(create_response.status, terraphim_server::Status::Success);
             created_ids.push(create_response.id);
         }
 
         // 3. Search documents
         let search_query = TestFixtures::search_query("test");
-        let response = server
-            .post("/documents/search", &search_query)
-            .await
-            .expect("Search failed");
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = server.post("/documents/search", &search_query).await;
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let search_response: terraphim_server::api::SearchResponse =
+        let search_response: terraphim_server::SearchResponse =
             response.validate_json().expect("JSON validation failed");
-        assert_eq!(
-            search_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(search_response.status, terraphim_server::Status::Success);
         assert!(search_response.total >= 3);
 
         // 4. Get configuration
         let response = server.get("/config").await;
-        response.validate_status(reqwest::StatusCode::OK);
 
-        let config_response: terraphim_server::api::ConfigResponse =
+        let response = response.validate_status(reqwest::StatusCode::OK);
+
+        let config_response: terraphim_server::ConfigResponse =
             response.validate_json().expect("JSON validation failed");
-        assert_eq!(
-            config_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(config_response.status, terraphim_server::Status::Success);
 
         // 5. Update configuration
         let mut updated_config = config_response.config;
         updated_config.global_shortcut = "Ctrl+Shift+X".to_string();
 
-        let response = server
-            .post("/config", &updated_config)
-            .await
-            .expect("Config update failed");
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = server.post("/config", &updated_config).await;
 
-        let update_response: terraphim_server::api::ConfigResponse =
+        let response = response.validate_status(reqwest::StatusCode::OK);
+
+        let update_response: terraphim_server::ConfigResponse =
             response.validate_json().expect("JSON validation failed");
-        assert_eq!(
-            update_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(update_response.status, terraphim_server::Status::Success);
         assert_eq!(update_response.config.global_shortcut, "Ctrl+Shift+X");
 
         // 6. Test rolegraph visualization
-        let response = server
-            .get("/rolegraph")
-            .await
-            .expect("Rolegraph fetch failed");
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = server.get("/rolegraph").await;
 
-        let rolegraph_response: terraphim_server::api::RoleGraphResponseDto =
+        let response = response.validate_status(reqwest::StatusCode::OK);
+
+        let rolegraph_response: terraphim_server::RoleGraphResponseDto =
             response.validate_json().expect("JSON validation failed");
-        assert_eq!(
-            rolegraph_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(rolegraph_response.status, terraphim_server::Status::Success);
 
         println!("Full API workflow test completed successfully");
     }
@@ -164,30 +137,21 @@ mod api_integration_tests {
 
         // Test various security scenarios
         let malicious_document = TestFixtures::malicious_document();
-        let response = server
-            .post("/documents", &malicious_document)
-            .await
-            .expect("Malicious document creation failed");
+        let response = server.post("/documents", &malicious_document).await;
 
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let create_response: terraphim_server::api::CreateDocumentResponse =
+        let create_response: terraphim_server::CreateDocumentResponse =
             response.validate_json().expect("JSON validation failed");
 
-        assert_eq!(
-            create_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(create_response.status, terraphim_server::Status::Success);
 
         // Verify XSS sanitization by searching
-        let search_response = server
-            .get("/documents/search?query=script")
-            .await
-            .expect("XSS search failed");
+        let search_response = server.get("/documents/search?query=script").await;
 
-        search_response.validate_status(reqwest::StatusCode::OK);
+        let search_response = search_response.validate_status(reqwest::StatusCode::OK);
 
-        let search_result: terraphim_server::api::SearchResponse = search_response
+        let search_result: terraphim_server::SearchResponse = search_response
             .validate_json()
             .expect("JSON validation failed");
 
@@ -207,18 +171,12 @@ mod api_integration_tests {
             .expect("Failed to create test server");
 
         // Test invalid role
-        let response = server
-            .get("/thesaurus/NonExistentRole")
-            .await
-            .expect("Invalid role request failed");
-        response.validate_status(reqwest::StatusCode::NOT_FOUND);
+        let response = server.get("/thesaurus/NonExistentRole").await;
+        let response = response.validate_status(reqwest::StatusCode::NOT_FOUND);
 
-        let thesaurus_response: terraphim_server::api::ThesaurusResponse =
+        let thesaurus_response: terraphim_server::ThesaurusResponse =
             response.validate_json().expect("JSON validation failed");
-        assert_eq!(
-            thesaurus_response.status,
-            terraphim_server::error::Status::Error
-        );
+        assert_eq!(thesaurus_response.status, terraphim_server::Status::Error);
 
         // Test malformed JSON
         let client = reqwest::Client::new();
@@ -233,18 +191,12 @@ mod api_integration_tests {
         response.validate_status(reqwest::StatusCode::BAD_REQUEST);
 
         // Test empty search (should handle gracefully)
-        let response = server
-            .get("/documents/search?query=")
-            .await
-            .expect("Empty search failed");
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = server.get("/documents/search?query=").await;
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let search_response: terraphim_server::api::SearchResponse =
+        let search_response: terraphim_server::SearchResponse =
             response.validate_json().expect("JSON validation failed");
-        assert_eq!(
-            search_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(search_response.status, terraphim_server::Status::Success);
 
         println!("Error handling comprehensive test passed");
     }
@@ -256,68 +208,60 @@ mod api_integration_tests {
             .expect("Failed to create test server");
 
         // Create a conversation
-        let conversation_request = terraphim_server::api_conversations::CreateConversationRequest {
-            title: Some("Test Conversation".to_string()),
+        let conversation_request = terraphim_server::CreateConversationRequest {
+            title: "Test Conversation".to_string(),
             role: "TestRole".to_string(),
         };
 
-        let response = server
-            .post("/conversations", &conversation_request)
-            .await
-            .expect("Conversation creation failed");
+        let response = server.post("/conversations", &conversation_request).await;
 
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let create_conv_response: terraphim_server::api_conversations::CreateConversationResponse =
+        let create_conv_response: terraphim_server::CreateConversationResponse =
             response.validate_json().expect("JSON validation failed");
 
         assert_eq!(
             create_conv_response.status,
-            terraphim_server::error::Status::Success
+            terraphim_server::Status::Success
         );
-        let conversation_id = create_conv_response.id.clone();
+        let conversation_id = create_conv_response
+            .conversation_id
+            .clone()
+            .expect("Expected conversation_id");
 
         // List conversations
-        let response = server
-            .get("/conversations")
-            .await
-            .expect("List conversations failed");
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = server.get("/conversations").await;
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let list_response: terraphim_server::api_conversations::ListConversationsResponse =
+        let list_response: terraphim_server::ListConversationsResponse =
             response.validate_json().expect("JSON validation failed");
 
-        assert_eq!(
-            list_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(list_response.status, terraphim_server::Status::Success);
         assert!(
             list_response
                 .conversations
                 .iter()
-                .any(|c| c.id == conversation_id)
+                .any(|c| c.id.to_string() == conversation_id)
         );
 
         // Get specific conversation
         let response = server
             .get(&format!("/conversations/{}", conversation_id))
-            .await
-            .expect("Get conversation failed");
+            .await;
 
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let get_response: terraphim_server::api_conversations::GetConversationResponse =
+        let get_response: terraphim_server::GetConversationResponse =
             response.validate_json().expect("JSON validation failed");
 
-        assert_eq!(
-            get_response.status,
-            terraphim_server::error::Status::Success
-        );
-        assert_eq!(get_response.conversation.id, conversation_id);
+        assert_eq!(get_response.status, terraphim_server::Status::Success);
+        let conversation = get_response.conversation.expect("Expected conversation");
+        assert_eq!(conversation.id.to_string(), conversation_id);
 
         // Add a message to the conversation
-        let message_request = terraphim_server::api_conversations::AddMessageRequest {
-            message: TestFixtures::chat_message("Hello, this is a test message"),
+        let message_request = terraphim_server::AddMessageRequest {
+            content: "Hello, this is a test message".to_string(),
+            role: Some("user".to_string()),
         };
 
         let response = server
@@ -325,18 +269,14 @@ mod api_integration_tests {
                 &format!("/conversations/{}/messages", conversation_id),
                 &message_request,
             )
-            .await
-            .expect("Add message failed");
+            .await;
 
-        response.validate_status(reqwest::StatusCode::OK);
+        let response = response.validate_status(reqwest::StatusCode::OK);
 
-        let add_msg_response: terraphim_server::api_conversations::AddMessageResponse =
+        let add_msg_response: terraphim_server::AddMessageResponse =
             response.validate_json().expect("JSON validation failed");
 
-        assert_eq!(
-            add_msg_response.status,
-            terraphim_server::error::Status::Success
-        );
+        assert_eq!(add_msg_response.status, terraphim_server::Status::Success);
 
         println!("Chat and conversation workflow test completed successfully");
     }
