@@ -2,7 +2,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py", "crates/terraphim_validation"]  # Experimental crates with incomplete API implementations
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py", "crates/terraphim_validation", "crates/terraphim_rlm"]  # Experimental crates with incomplete API implementations (RLM feature-gated)
 default-members = ["terraphim_server"]
 
 [workspace.package]
