@@ -7,30 +7,6 @@ use serial_test::serial;
 use std::process::Command;
 use std::str;
 
-/// Detect if running in CI environment (GitHub Actions, Docker containers in CI, etc.)
-fn is_ci_environment() -> bool {
-    // Check standard CI environment variables
-    std::env::var("CI").is_ok()
-        || std::env::var("GITHUB_ACTIONS").is_ok()
-        // Check if running as root in a container (common in CI Docker containers)
-        || (std::env::var("USER").as_deref() == Ok("root")
-            && std::path::Path::new("/.dockerenv").exists())
-        // Check if the home directory is /root (typical for CI containers)
-        || std::env::var("HOME").as_deref() == Ok("/root")
-}
-
-/// Check if stderr contains CI-expected errors (KG/thesaurus build failures)
-fn is_ci_expected_error(stderr: &str) -> bool {
-    stderr.contains("Failed to build thesaurus")
-        || stderr.contains("Knowledge graph not configured")
-        || stderr.contains("Config error")
-        || stderr.contains("Middleware error")
-        || stderr.contains("IO error")
-        || stderr.contains("Builder error")
-        || stderr.contains("thesaurus")
-        || stderr.contains("automata")
-}
-
 /// Helper function to run TUI command with arguments
 fn run_tui_command(args: &[&str]) -> Result<(String, String, i32)> {
     let mut cmd = Command::new("cargo");
@@ -62,7 +38,7 @@ fn extract_clean_output(output: &str) -> String {
 #[test]
 #[serial]
 fn test_search_multi_term_functionality() -> Result<()> {
-    println!("Testing multi-term search functionality");
+    println!("🔍 Testing multi-term search functionality");
 
     // Test multi-term search with AND operator
     let (stdout, stderr, code) = run_tui_command(&[
@@ -86,16 +62,16 @@ fn test_search_multi_term_functionality() -> Result<()> {
     let clean_output = extract_clean_output(&stdout);
 
     if code == 0 && !clean_output.is_empty() {
-        println!("Multi-term AND search found results");
+        println!("✅ Multi-term AND search found results");
         // Validate output format (allow various formats)
         let has_expected_format = clean_output
             .lines()
             .any(|line| line.contains('\t') || line.starts_with("- ") || line.contains("rank"));
         if !has_expected_format {
-            println!("Unexpected output format, but search succeeded");
+            println!("⚠️ Unexpected output format, but search succeeded");
         }
     } else {
-        println!("Multi-term AND search found no results");
+        println!("⚠️ Multi-term AND search found no results");
     }
 
     // Test multi-term search with OR operator
@@ -118,7 +94,7 @@ fn test_search_multi_term_functionality() -> Result<()> {
     );
 
     if code == 0 {
-        println!("Multi-term OR search completed successfully");
+        println!("✅ Multi-term OR search completed successfully");
     }
 
     Ok(())
@@ -127,7 +103,7 @@ fn test_search_multi_term_functionality() -> Result<()> {
 #[test]
 #[serial]
 fn test_search_with_role_and_limit() -> Result<()> {
-    println!("Testing search with role and limit options");
+    println!("🔍 Testing search with role and limit options");
 
     // Test search with specific role
     let (stdout, stderr, code) =
@@ -143,7 +119,7 @@ fn test_search_with_role_and_limit() -> Result<()> {
     let clean_output = extract_clean_output(&stdout);
 
     if code == 0 && !clean_output.is_empty() {
-        println!("Search with role found results");
+        println!("✅ Search with role found results");
 
         // Count results to verify limit
         let result_count = clean_output
@@ -157,7 +133,7 @@ fn test_search_with_role_and_limit() -> Result<()> {
             result_count
         );
     } else {
-        println!("Search with role found no results");
+        println!("⚠️ Search with role found no results");
     }
 
     // Test with Terraphim Engineer role
@@ -178,7 +154,7 @@ fn test_search_with_role_and_limit() -> Result<()> {
     );
 
     if code == 0 {
-        println!("Search with Terraphim Engineer role completed");
+        println!("✅ Search with Terraphim Engineer role completed");
     }
 
     Ok(())
@@ -187,25 +163,16 @@ fn test_search_with_role_and_limit() -> Result<()> {
 #[test]
 #[serial]
 fn test_roles_management() -> Result<()> {
-    println!("Testing roles management commands");
+    println!("👤 Testing roles management commands");
 
     // Test roles list
     let (stdout, stderr, code) = run_tui_command(&["roles", "list"])?;
 
-    // In CI, roles list may fail due to config/KG issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
-            println!(
-                "Roles list skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
-            );
-            return Ok(());
-        }
-        panic!(
-            "Roles list should succeed: exit_code={}, stderr={}",
-            code, stderr
-        );
-    }
+    assert_eq!(
+        code, 0,
+        "Roles list should succeed: exit_code={}, stderr={}",
+        code, stderr
+    );
 
     let clean_output = extract_clean_output(&stdout);
     assert!(
@@ -214,7 +181,7 @@ fn test_roles_management() -> Result<()> {
     );
 
     let roles: Vec<&str> = clean_output.lines().collect();
-    println!("Found {} roles: {:?}", roles.len(), roles);
+    println!("✅ Found {} roles: {:?}", roles.len(), roles);
 
     // Verify expected roles exist
     let expected_roles = ["Default", "Terraphim Engineer"];
@@ -228,31 +195,32 @@ fn test_roles_management() -> Result<()> {
 
     // Test role selection (if roles exist)
     if !roles.is_empty() {
-        let test_role = roles[0].trim();
+        let test_role_line = roles[0].trim();
+        // Extract just the role name before the parenthesis (e.g., "Rust Engineer" from "Rust Engineer (rust-engineer)")
+        let test_role = if let Some(paren_pos) = test_role_line.find('(') {
+            test_role_line[..paren_pos].trim()
+        } else {
+            test_role_line
+        };
+        // Also strip leading * or whitespace from the role list output
+        let test_role = test_role.trim_start_matches('*').trim();
+
         let (stdout, stderr, code) = run_tui_command(&["roles", "select", test_role])?;
 
-        // In CI, role selection may fail due to KG/thesaurus issues
-        if code != 0 {
-            if is_ci_environment() && is_ci_expected_error(&stderr) {
-                println!(
-                    "Role selection skipped in CI - KG fixtures unavailable: {}",
-                    stderr.lines().next().unwrap_or("")
-                );
-                return Ok(());
-            }
-            panic!(
-                "Role selection should succeed: exit_code={}, stderr={}",
-                code, stderr
-            );
-        }
+        assert_eq!(
+            code, 0,
+            "Role selection should succeed: exit_code={}, stderr={}",
+            code, stderr
+        );
 
         let clean_output = extract_clean_output(&stdout);
         assert!(
             clean_output.contains(&format!("selected:{}", test_role)),
-            "Role selection should confirm the selection"
+            "Role selection should confirm the selection: got '{}'",
+            clean_output
         );
 
-        println!("Role selection completed for: {}", test_role);
+        println!("✅ Role selection completed for: {}", test_role);
     }
 
     Ok(())
@@ -261,25 +229,16 @@ fn test_roles_management() -> Result<()> {
 #[test]
 #[serial]
 fn test_config_management() -> Result<()> {
-    println!("Testing config management commands");
+    println!("🔧 Testing config management commands");
 
     // Test config show
     let (stdout, stderr, code) = run_tui_command(&["config", "show"])?;
 
-    // In CI, config show may fail due to config/KG issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
-            println!(
-                "Config show skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
-            );
-            return Ok(());
-        }
-        panic!(
-            "Config show should succeed: exit_code={}, stderr={}",
-            code, stderr
-        );
-    }
+    assert_eq!(
+        code, 0,
+        "Config show should succeed: exit_code={}, stderr={}",
+        code, stderr
+    );
 
     let clean_output = extract_clean_output(&stdout);
     assert!(!clean_output.is_empty(), "Config should return JSON data");
@@ -299,7 +258,7 @@ fn test_config_management() -> Result<()> {
     );
     assert!(config.get("roles").is_some(), "Config should have roles");
 
-    println!("Config show completed and validated");
+    println!("✅ Config show completed and validated");
 
     // Test config set (selected_role) with valid role
     let (stdout, stderr, code) = run_tui_command(&[
@@ -312,12 +271,15 @@ fn test_config_management() -> Result<()> {
     if code == 0 {
         let clean_output = extract_clean_output(&stdout);
         if clean_output.contains("updated selected_role to Default") {
-            println!("Config set completed successfully");
+            println!("✅ Config set completed successfully");
         } else {
-            println!("Config set succeeded but output format may have changed");
+            println!("⚠️ Config set succeeded but output format may have changed");
         }
     } else {
-        println!("Config set failed: exit_code={}, stderr={}", code, stderr);
+        println!(
+            "⚠️ Config set failed: exit_code={}, stderr={}",
+            code, stderr
+        );
         // This might be expected if role validation is strict
         println!("   Testing with non-existent role to verify error handling...");
 
@@ -325,7 +287,7 @@ fn test_config_management() -> Result<()> {
             run_tui_command(&["config", "set", "selected_role", "NonExistentRole"])?;
 
         assert_ne!(error_code, 0, "Should fail with non-existent role");
-        println!("   Properly rejects non-existent roles");
+        println!("   ✅ Properly rejects non-existent roles");
     }
 
     Ok(())
@@ -334,31 +296,22 @@ fn test_config_management() -> Result<()> {
 #[test]
 #[serial]
 fn test_graph_command() -> Result<()> {
-    println!("Testing graph command");
+    println!("🕸️ Testing graph command");
 
     // Test graph with default settings
     let (stdout, stderr, code) = run_tui_command(&["graph", "--top-k", "5"])?;
 
-    // In CI, graph command may fail due to KG/thesaurus issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
-            println!(
-                "Graph command skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
-            );
-            return Ok(());
-        }
-        panic!(
-            "Graph command should succeed: exit_code={}, stderr={}",
-            code, stderr
-        );
-    }
+    assert_eq!(
+        code, 0,
+        "Graph command should succeed: exit_code={}, stderr={}",
+        code, stderr
+    );
 
     let clean_output = extract_clean_output(&stdout);
 
     if !clean_output.is_empty() {
         println!(
-            "Graph command returned {} lines",
+            "✅ Graph command returned {} lines",
             clean_output.lines().count()
         );
 
@@ -369,29 +322,22 @@ fn test_graph_command() -> Result<()> {
             "Graph should respect top-k limit of 5"
         );
     } else {
-        println!("Graph command returned empty results");
+        println!("⚠️ Graph command returned empty results");
     }
 
     // Test graph with specific role
     let (_stdout, stderr, code) =
         run_tui_command(&["graph", "--role", "Terraphim Engineer", "--top-k", "10"])?;
 
-    // In CI, graph with role may fail due to role/KG issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
-            println!(
-                "Graph with role skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
-            );
-            return Ok(());
-        }
-        panic!(
-            "Graph with role should succeed: exit_code={}, stderr={}",
-            code, stderr
-        );
-    }
+    assert_eq!(
+        code, 0,
+        "Graph with role should succeed: exit_code={}, stderr={}",
+        code, stderr
+    );
 
-    println!("Graph command with role completed");
+    if code == 0 {
+        println!("✅ Graph command with role completed");
+    }
 
     Ok(())
 }
@@ -399,81 +345,61 @@ fn test_graph_command() -> Result<()> {
 #[test]
 #[serial]
 fn test_chat_command() -> Result<()> {
-    println!("Testing chat command");
+    println!("💬 Testing chat command");
 
     // Test basic chat
     let (stdout, stderr, code) = run_tui_command(&["chat", "Hello, this is a test message"])?;
 
-    // In CI, chat command may fail due to KG/thesaurus or config issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
+    // Chat command may return exit code 1 if no LLM is configured - this is acceptable
+    let combined_output = format!("{}{}", stdout, stderr);
+
+    if code == 0 {
+        let clean_output = extract_clean_output(&stdout);
+        // Chat should either return a response or indicate no LLM is configured
+        assert!(!clean_output.is_empty(), "Chat should return some response");
+
+        if clean_output.to_lowercase().contains("no llm configured") {
+            println!("✅ Chat correctly indicates no LLM is configured");
+        } else {
             println!(
-                "Chat command skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
+                "✅ Chat returned response: {}",
+                clean_output.lines().next().unwrap_or("")
             );
-            return Ok(());
         }
+    } else if combined_output.to_lowercase().contains("no llm configured") {
+        println!("✅ Chat correctly indicates no LLM is configured (exit code 1)");
+    } else {
         panic!(
-            "Chat command should succeed: exit_code={}, stderr={}",
+            "Chat command failed unexpectedly: exit_code={}, stderr={}",
             code, stderr
         );
     }
 
-    let clean_output = extract_clean_output(&stdout);
-
-    // Chat should either return a response or indicate no LLM is configured
-    assert!(!clean_output.is_empty(), "Chat should return some response");
-
-    if clean_output.to_lowercase().contains("no llm configured") {
-        println!("Chat correctly indicates no LLM is configured");
-    } else {
-        println!(
-            "Chat returned response: {}",
-            clean_output.lines().next().unwrap_or("")
-        );
-    }
-
-    // Test chat with role
+    // Test chat with role - accept exit code 1 if no LLM configured
     let (_stdout, stderr, code) =
         run_tui_command(&["chat", "Test message with role", "--role", "Default"])?;
 
-    // In CI, chat with role may fail due to role/KG issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
-            println!(
-                "Chat with role skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
-            );
-            return Ok(());
-        }
-        panic!(
-            "Chat with role should succeed: exit_code={}, stderr={}",
-            code, stderr
-        );
-    }
+    assert!(
+        code == 0 || stderr.to_lowercase().contains("no llm configured"),
+        "Chat with role should succeed or indicate no LLM: exit_code={}, stderr={}",
+        code,
+        stderr
+    );
 
-    println!("Chat with role completed");
+    println!("✅ Chat with role completed");
 
-    // Test chat with model specification
+    // Test chat with model specification - accept exit code 1 if no LLM configured
     let (_stdout, stderr, code) =
         run_tui_command(&["chat", "Test with model", "--model", "test-model"])?;
 
-    // In CI, chat with model may fail due to config issues
-    if code != 0 {
-        if is_ci_environment() && is_ci_expected_error(&stderr) {
-            println!(
-                "Chat with model skipped in CI - KG fixtures unavailable: {}",
-                stderr.lines().next().unwrap_or("")
-            );
-            return Ok(());
-        }
-        panic!(
-            "Chat with model should succeed: exit_code={}, stderr={}",
-            code, stderr
-        );
-    }
+    assert!(
+        code == 0 || stderr.to_lowercase().contains("no llm configured"),
+        "Chat with model should succeed or indicate no LLM: exit_code={}, stderr={}",
+        code,
+        stderr
+    );
 
-    println!("Chat with model specification completed");
+    println!("✅ Chat with model specification completed");
 
     Ok(())
 }
@@ -481,7 +407,7 @@ fn test_chat_command() -> Result<()> {
 #[test]
 #[serial]
 fn test_command_help_and_usage() -> Result<()> {
-    println!("Testing command help and usage");
+    println!("📖 Testing command help and usage");
 
     // Test main help
     let (stdout, _stderr, code) = run_tui_command(&["--help"])?;
@@ -498,7 +424,7 @@ fn test_command_help_and_usage() -> Result<()> {
         "Help should mention search command"
     );
 
-    println!("Main help validated");
+    println!("✅ Main help validated");
 
     // Test subcommand help
     let subcommands = ["search", "roles", "config", "graph", "chat", "extract"];
@@ -519,7 +445,7 @@ fn test_command_help_and_usage() -> Result<()> {
             subcommand
         );
 
-        println!("  Help for {} validated", subcommand);
+        println!("  ✅ Help for {} validated", subcommand);
     }
 
     Ok(())
@@ -528,32 +454,32 @@ fn test_command_help_and_usage() -> Result<()> {
 #[test]
 #[serial]
 fn test_error_handling_and_edge_cases() -> Result<()> {
-    println!("Testing error handling and edge cases");
+    println!("⚠️ Testing error handling and edge cases");
 
     // Test invalid command
     let (_, _, code) = run_tui_command(&["invalid-command"])?;
     assert_ne!(code, 0, "Invalid command should fail");
-    println!("Invalid command properly rejected");
+    println!("✅ Invalid command properly rejected");
 
     // Test search without required argument
     let (_, _, code) = run_tui_command(&["search"])?;
     assert_ne!(code, 0, "Search without query should fail");
-    println!("Missing search query properly rejected");
+    println!("✅ Missing search query properly rejected");
 
     // Test roles with invalid subcommand
     let (_, _, code) = run_tui_command(&["roles", "invalid"])?;
     assert_ne!(code, 0, "Invalid roles subcommand should fail");
-    println!("Invalid roles subcommand properly rejected");
+    println!("✅ Invalid roles subcommand properly rejected");
 
     // Test config with invalid arguments
     let (_, _, code) = run_tui_command(&["config", "set"])?;
     assert_ne!(code, 0, "Incomplete config set should fail");
-    println!("Incomplete config set properly rejected");
+    println!("✅ Incomplete config set properly rejected");
 
     // Test graph with invalid top-k
     let (_, _stderr, code) = run_tui_command(&["graph", "--top-k", "invalid"])?;
     assert_ne!(code, 0, "Invalid top-k should fail");
-    println!("Invalid top-k properly rejected");
+    println!("✅ Invalid top-k properly rejected");
 
     // Test search with very long query (should handle gracefully)
     let long_query = "a".repeat(10000);
@@ -562,7 +488,7 @@ fn test_error_handling_and_edge_cases() -> Result<()> {
         code == 0 || code == 1,
         "Very long query should be handled gracefully"
     );
-    println!("Very long query handled gracefully");
+    println!("✅ Very long query handled gracefully");
 
     Ok(())
 }
@@ -570,7 +496,7 @@ fn test_error_handling_and_edge_cases() -> Result<()> {
 #[test]
 #[serial]
 fn test_output_formatting() -> Result<()> {
-    println!("Testing output formatting");
+    println!("📝 Testing output formatting");
 
     // Test search output format
     let (stdout, _, code) = run_tui_command(&["search", "test", "--limit", "3"])?;
@@ -592,7 +518,7 @@ fn test_output_formatting() -> Result<()> {
                 }
             }
 
-            println!("Search output format validated");
+            println!("✅ Search output format validated");
         }
     }
 
@@ -612,7 +538,7 @@ fn test_output_formatting() -> Result<()> {
             );
         }
 
-        println!("Roles list output format validated");
+        println!("✅ Roles list output format validated");
     }
 
     // Test config show output format (should be valid JSON)
@@ -630,7 +556,7 @@ fn test_output_formatting() -> Result<()> {
                 json_content
             );
 
-            println!("Config output format validated");
+            println!("✅ Config output format validated");
         }
     }
 
@@ -640,7 +566,7 @@ fn test_output_formatting() -> Result<()> {
 #[test]
 #[serial]
 fn test_performance_and_limits() -> Result<()> {
-    println!("Testing performance and limits");
+    println!("⚡ Testing performance and limits");
 
     // Test search with large limit
     let start = std::time::Instant::now();
@@ -654,7 +580,7 @@ fn test_performance_and_limits() -> Result<()> {
         "Search with large limit should complete within 60 seconds"
     );
 
-    println!("Large limit search completed in {:?}", duration);
+    println!("✅ Large limit search completed in {:?}", duration);
 
     // Test graph with large top-k
     let start = std::time::Instant::now();
@@ -668,7 +594,7 @@ fn test_performance_and_limits() -> Result<()> {
         "Graph with large top-k should complete within 30 seconds"
     );
 
-    println!("Large top-k graph completed in {:?}", duration);
+    println!("✅ Large top-k graph completed in {:?}", duration);
 
     // Test multiple rapid commands
     println!("  Testing rapid command execution...");
@@ -697,7 +623,10 @@ fn test_performance_and_limits() -> Result<()> {
         "Rapid commands should complete within 2 minutes"
     );
 
-    println!("Rapid command execution completed in {:?}", total_duration);
+    println!(
+        "✅ Rapid command execution completed in {:?}",
+        total_duration
+    );
 
     Ok(())
 }
