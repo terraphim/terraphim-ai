@@ -93,8 +93,8 @@ fn test_config_response_deserialization() {
         "status": "Success",
         "config": {
             "id": "Embedded",
-            "selected_role": "Default",
             "default_role": "Default",
+            "selected_role": "Default",
             "global_shortcut": "Ctrl+Space",
             "roles": {
                 "Default": {
