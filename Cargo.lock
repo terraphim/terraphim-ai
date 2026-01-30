@@ -9873,7 +9873,9 @@ dependencies = [
  "test-env-log",
  "thiserror 1.0.69",
  "tokio",
+ "tracing",
  "tracing-subscriber",
+ "zstd",
 ]
 
 [[package]]
