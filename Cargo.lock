@@ -9693,7 +9693,7 @@ dependencies = [
  "terraphim_config",
  "terraphim_types",
  "thiserror 1.0.69",
- "toml 0.8.23",
+ "toml 0.9.8",
  "tracing",
  "tracing-subscriber",
  "walkdir",
