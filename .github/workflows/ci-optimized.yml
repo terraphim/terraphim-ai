@@ -315,10 +315,7 @@ jobs:
             bash -c "
               set -euo pipefail
               timeout 10m cargo test --workspace \
-                -- -Z unstable-options \
-                --test-threads 2 \
-                --report-time \
-                --quiet || {
+                -- --test-threads 2 || {
                 echo '::error::Tests timed out or failed'
                 exit 1
               }
