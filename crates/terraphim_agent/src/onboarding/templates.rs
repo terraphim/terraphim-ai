@@ -301,6 +301,7 @@ impl TemplateRegistry {
     }
 
     /// Get template IDs as a vec
+    #[allow(dead_code)]
     pub fn ids(&self) -> Vec<&str> {
         self.templates.iter().map(|t| t.id.as_str()).collect()
     }

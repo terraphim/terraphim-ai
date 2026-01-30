@@ -30,6 +30,7 @@ use thiserror::Error;
 
 /// Errors that can occur during onboarding
 #[derive(Debug, Error)]
+#[allow(dead_code)]
 pub enum OnboardingError {
     /// User cancelled the setup wizard
     #[error("User cancelled setup")]

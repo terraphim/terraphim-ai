@@ -13,7 +13,9 @@ struct QuickwitSearchResponse {
     num_hits: u64,
     hits: Vec<serde_json::Value>,
     elapsed_time_micros: u64,
+    /// Error messages from Quickwit (kept for API compatibility and debugging)
     #[serde(default)]
+    #[allow(dead_code)]
     errors: Vec<String>,
 }
 
@@ -33,6 +35,8 @@ struct QuickwitConfig {
     default_index: Option<String>,
     index_filter: Option<String>,
     max_hits: u64,
+    /// Timeout for requests (kept for future use with custom HTTP client)
+    #[allow(dead_code)]
     timeout_seconds: u64,
     sort_by: String,
 }
