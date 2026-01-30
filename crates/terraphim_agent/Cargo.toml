@@ -48,7 +48,7 @@ urlencoding = "2.1"
 ahash = "0.8"
 terraphim_update = { path = "../terraphim_update", version = "1.0.0" }
 pulldown-cmark = { version = "0.13", default-features = false, features = ["html"] }
-handlebars = "6.3"
+handlebars = "6.4"
 regex = "1.0"
 walkdir = "2.0"
 async-trait = "0.1"
