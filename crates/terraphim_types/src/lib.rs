@@ -42,7 +42,7 @@
 //! ## Working with Documents
 //!
 //! ```
-//! use terraphim_types::Document;
+//! use terraphim_types::{Document, DocumentType};
 //!
 //! let document = Document {
 //!     id: "doc-1".to_string(),
@@ -55,6 +55,10 @@
 //!     tags: Some(vec!["rust".to_string(), "programming".to_string()]),
 //!     rank: None,
 //!     source_haystack: None,
+//!     doc_type: DocumentType::KgEntry,
+//!     synonyms: None,
+//!     route: None,
+//!     priority: None,
 //! };
 //! ```
 //!
@@ -335,6 +339,26 @@ impl Display for Concept {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DocumentType {
+    KgEntry,
+    Document,
+    ConfigDocument,
+}
+
+impl Default for DocumentType {
+    fn default() -> Self {
+        DocumentType::KgEntry
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RouteDirective {
+    pub provider: String,
+    pub model: String,
+}
+
 /// The central document type representing indexed and searchable content.
 ///
 /// Documents are the primary unit of content in Terraphim. They can come from
@@ -357,7 +381,7 @@ impl Display for Concept {
 /// # Examples
 ///
 /// ```
-/// use terraphim_types::Document;
+/// use terraphim_types::{Document, DocumentType};
 ///
 /// let doc = Document {
 ///     id: "rust-book-ch1".to_string(),
@@ -370,6 +394,10 @@ impl Display for Concept {
 ///     tags: Some(vec!["rust".to_string(), "tutorial".to_string()]),
 ///     rank: Some(95),
 ///     source_haystack: Some("rust-docs".to_string()),
+///     doc_type: DocumentType::KgEntry,
+///     synonyms: None,
+///     route: None,
+///     priority: None,
 ///};
 /// ```
 #[derive(Deserialize, Serialize, Debug, Clone, Default)]
@@ -397,6 +425,18 @@ pub struct Document {
     pub rank: Option<u64>,
     /// Source haystack location that this document came from
     pub source_haystack: Option<String>,
+    /// Document classification derived from directives
+    #[serde(default)]
+    pub doc_type: DocumentType,
+    /// Synonyms extracted from directives (optional)
+    #[serde(default)]
+    pub synonyms: Option<Vec<String>>,
+    /// Optional route directive (provider/model)
+    #[serde(default)]
+    pub route: Option<RouteDirective>,
+    /// Optional priority directive (0-100)
+    #[serde(default)]
+    pub priority: Option<u8>,
 }
 
 impl fmt::Display for Document {
@@ -2282,5 +2322,36 @@ mod tests {
         assert_eq!(rule.priority, deserialized.priority);
         assert_eq!(rule.provider, deserialized.provider);
         assert_eq!(rule.model, deserialized.model);
+    }
+
+    #[test]
+    fn test_document_type_serialization() {
+        let types = vec![
+            DocumentType::KgEntry,
+            DocumentType::Document,
+            DocumentType::ConfigDocument,
+        ];
+
+        for doc_type in types {
+            let json = serde_json::to_string(&doc_type).unwrap();
+            let deserialized: DocumentType = serde_json::from_str(&json).unwrap();
+            assert_eq!(doc_type, deserialized);
+        }
+    }
+
+    #[test]
+    fn test_document_defaults_for_new_fields() {
+        let json = r#"{
+            "id":"doc-1",
+            "url":"file:///tmp/doc.md",
+            "title":"Doc",
+            "body":"Body"
+        }"#;
+
+        let doc: Document = serde_json::from_str(json).unwrap();
+        assert_eq!(doc.doc_type, DocumentType::KgEntry);
+        assert!(doc.synonyms.is_none());
+        assert!(doc.route.is_none());
+        assert!(doc.priority.is_none());
     }
 }

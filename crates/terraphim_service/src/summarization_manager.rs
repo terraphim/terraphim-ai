@@ -436,6 +436,10 @@ mod tests {
             tags: Some(vec![]),
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 

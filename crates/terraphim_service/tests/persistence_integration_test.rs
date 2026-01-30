@@ -56,6 +56,10 @@ async fn test_service_document_persistence_integration() {
         tags: Some(vec!["service".to_string(), "persistence".to_string(), "integration".to_string()]),
         rank: Some(95),
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let created_doc = service
@@ -150,6 +154,10 @@ async fn test_service_document_persistence_integration() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let _created_special_doc = new_service
@@ -475,6 +483,10 @@ async fn test_unicode_persistence_in_service() {
         tags: Some(vec!["unicode".to_string(), "测试".to_string(), "тест".to_string()]),
         rank: Some(100),
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     // Create document through service
@@ -567,6 +579,10 @@ async fn test_large_content_persistence_in_service() {
         tags: Some(vec!["large".to_string(), "performance".to_string()]),
         rank: Some(50),
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     println!(

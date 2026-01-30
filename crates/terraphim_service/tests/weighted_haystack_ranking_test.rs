@@ -21,6 +21,10 @@ async fn test_weighted_haystack_ranking() {
         tags: None,
         rank: Some(10), // Initial rank
         source_haystack: Some("./local_docs".to_string()),
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
     let low_weight_doc = Document {
         id: "low_weight_doc".to_string(),
@@ -34,6 +38,10 @@ async fn test_weighted_haystack_ranking() {
         tags: None,
         rank: Some(20), // Higher initial rank than high_weight_doc
         source_haystack: Some("https://remote.api".to_string()),
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
     // Create test haystacks with different weights
     let high_weight_haystack = Haystack {
@@ -143,6 +151,10 @@ async fn test_default_weight_handling() {
         tags: None,
         rank: Some(15),
         source_haystack: None, // No source haystack
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     // Create test config with a default haystack
