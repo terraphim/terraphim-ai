@@ -675,6 +675,10 @@ mod tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Save document to each operator to verify they work

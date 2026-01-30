@@ -106,6 +106,10 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     rolegraph.insert_document(&document.id, document.clone());

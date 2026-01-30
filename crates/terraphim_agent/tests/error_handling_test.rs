@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serial_test::serial;
 use terraphim_agent::client::ApiClient;
-use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Document, DocumentType, NormalizedTermValue, RoleName, SearchQuery};
 use tokio::time::timeout;
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";
@@ -359,6 +359,10 @@ async fn test_summarization_error_handling() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let result = client

@@ -1,5 +1,5 @@
 use terraphim_agent::client::*;
-use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Document, DocumentType, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Test ApiClient construction and basic properties
 #[test]
@@ -183,6 +183,10 @@ fn test_summarize_request_serialization() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let summarize_request = SummarizeRequest {
@@ -450,6 +454,10 @@ fn test_batch_summarize_request_serialization() {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc2".to_string(),
@@ -462,6 +470,10 @@ fn test_batch_summarize_request_serialization() {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
     ];
 
@@ -557,6 +569,10 @@ fn test_boundary_values() {
         tags: Some(vec!["tag1".to_string(), "tag2".to_string()]),
         rank: Some(100),
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let doc_json = serde_json::to_string(&complete_doc);
@@ -574,6 +590,10 @@ fn test_boundary_values() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let minimal_doc_json = serde_json::to_string(&minimal_doc);

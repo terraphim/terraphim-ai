@@ -123,6 +123,10 @@ async fn test_knowledge_graph_ranking_expansion() {
                 tags: None,
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             };
 
             initial_rolegraph.insert_document(&document.id, document.clone());
@@ -241,6 +245,10 @@ The Graph Analysis component works closely with existing graph processing system
                 tags: None,
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             };
 
             expanded_rolegraph.insert_document(&document.id, document.clone());
