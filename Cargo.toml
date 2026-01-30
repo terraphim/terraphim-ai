@@ -2,7 +2,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py"]  # Experimental crates with incomplete API implementations
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py", "crates/terraphim_rlm"]  # Experimental / RLM requires external fcctl-core
 default-members = ["terraphim_server"]
 
 [workspace.package]
