@@ -12,14 +12,19 @@ mod tests {
         // Load .env file if present
         dotenv().ok();
 
-        // Optional integration test: skip when ATOMIC_* env vars are not present
-        let config = match Config::from_env() {
-            Ok(c) => c,
-            Err(_) => {
-                eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-                return;
-            }
-        };
+        // Skip test in CI if environment variables are not set
+        if std::env::var("ATOMIC_SERVER_URL").is_err()
+            || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+        {
+            eprintln!(
+                "Skipping test_commit_create: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+            );
+            return;
+        }
+
+        // Load configuration and ensure an Agent is present
+        let config = Config::from_env()
+            .expect("Environment variables ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET must be set");
         assert!(
             config.agent.is_some(),
             "ATOMIC_SERVER_SECRET must decode into a valid Agent"
