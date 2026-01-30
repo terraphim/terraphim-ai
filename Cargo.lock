@@ -9503,6 +9503,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tsify",
+ "walkdir",
  "wasm-bindgen",
  "wasm-bindgen-futures",
 ]

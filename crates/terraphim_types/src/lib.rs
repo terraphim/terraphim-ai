@@ -359,6 +359,18 @@ pub struct RouteDirective {
     pub model: String,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct MarkdownDirectives {
+    #[serde(default)]
+    pub doc_type: DocumentType,
+    #[serde(default)]
+    pub synonyms: Vec<String>,
+    #[serde(default)]
+    pub route: Option<RouteDirective>,
+    #[serde(default)]
+    pub priority: Option<u8>,
+}
+
 /// The central document type representing indexed and searchable content.
 ///
 /// Documents are the primary unit of content in Terraphim. They can come from

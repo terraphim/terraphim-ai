@@ -108,6 +108,7 @@
 pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
+pub mod markdown_directives;
 pub mod matcher;
 pub mod url_protector;
 
@@ -115,6 +116,9 @@ pub use autocomplete::{
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
     AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
+};
+pub use markdown_directives::{
+    parse_markdown_directives_dir, MarkdownDirectiveWarning, MarkdownDirectivesParseResult,
 };
 pub use matcher::{
     extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,
