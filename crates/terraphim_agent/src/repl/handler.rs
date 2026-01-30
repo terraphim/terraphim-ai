@@ -729,7 +729,7 @@ impl ReplHandler {
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode summarization - create a temporary document
-                use terraphim_types::Document;
+                use terraphim_types::{Document, DocumentType};
 
                 let doc = Document {
                     id: "temp-summary".to_string(),
@@ -742,6 +742,10 @@ impl ReplHandler {
                     tags: Some(vec![]),
                     rank: None,
                     source_haystack: None,
+                    doc_type: DocumentType::KgEntry,
+                    synonyms: None,
+                    route: None,
+                    priority: None,
                 };
 
                 match api_client
