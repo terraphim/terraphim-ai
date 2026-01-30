@@ -40,8 +40,12 @@ mod tests {
         dotenv().ok();
 
         // Skip test in CI if environment variables are not set
-        if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
-            eprintln!("Skipping test_crud_operations: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        if std::env::var("ATOMIC_SERVER_URL").is_err()
+            || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+        {
+            eprintln!(
+                "Skipping test_crud_operations: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+            );
             return;
         }
 
@@ -157,7 +161,8 @@ async fn test_search() {
     dotenv().ok();
 
     // Skip test in CI if environment variables are not set
-    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
         eprintln!("Skipping test_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
         return;
     }
@@ -176,7 +181,8 @@ async fn test_query() {
     dotenv().ok();
 
     // Skip test in CI if environment variables are not set
-    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
         eprintln!("Skipping test_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
         return;
     }
@@ -209,8 +215,11 @@ async fn test_create_and_search() {
     dotenv().ok();
 
     // Skip test in CI if environment variables are not set
-    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
-        eprintln!("Skipping test_create_and_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
+        eprintln!(
+            "Skipping test_create_and_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+        );
         return;
     }
 
@@ -286,8 +295,11 @@ async fn test_create_and_query() {
     dotenv().ok();
 
     // Skip test in CI if environment variables are not set
-    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
-        eprintln!("Skipping test_create_and_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
+        eprintln!(
+            "Skipping test_create_and_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+        );
         return;
     }
 
