@@ -314,6 +314,7 @@ pub async fn load_thesaurus_from_json_and_replace_async(
 /// Note: Remote loading requires the "remote-loading" feature to be enabled.
 #[cfg(feature = "remote-loading")]
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
+    #[allow(dead_code)]
     async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::builder()
