@@ -39,14 +39,15 @@ mod tests {
         // Load .env file if present
         dotenv().ok();
 
-        // Optional integration test: skip when ATOMIC_* env vars are not present
-        let config = match Config::from_env() {
-            Ok(c) => c,
-            Err(_) => {
-                eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-                return;
-            }
-        };
+        // Skip test in CI if environment variables are not set
+        if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+            eprintln!("Skipping test_crud_operations: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+            return;
+        }
+
+        // Load configuration and ensure agent is present
+        let config = Config::from_env()
+            .expect("Environment variables ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET must be set");
         assert!(
             config.agent.is_some(),
             "ATOMIC_SERVER_SECRET must decode into a valid Agent"
@@ -155,13 +156,13 @@ async fn test_search() {
     // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+        eprintln!("Skipping test_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        return;
+    }
+
+    let config = Config::from_env().expect("Environment variables must be set");
     let store = Store::new(config).expect("Failed to create Store");
 
     let _results = store.search("test").await.expect("Search request failed");
@@ -174,13 +175,13 @@ async fn test_query() {
     // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+        eprintln!("Skipping test_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        return;
+    }
+
+    let config = Config::from_env().expect("Environment variables must be set");
     let store = Store::new(config).expect("Failed to create Store");
 
     // Query the collections resource directly using GET with query params
@@ -207,13 +208,13 @@ async fn test_create_and_search() {
     // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+        eprintln!("Skipping test_create_and_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        return;
+    }
+
+    let config = Config::from_env().expect("Environment variables must be set");
     assert!(
         config.agent.is_some(),
         "ATOMIC_SERVER_SECRET must decode into Agent"
@@ -284,13 +285,13 @@ async fn test_create_and_query() {
     // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err() {
+        eprintln!("Skipping test_create_and_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        return;
+    }
+
+    let config = Config::from_env().expect("Environment variables must be set");
     assert!(
         config.agent.is_some(),
         "ATOMIC_SERVER_SECRET must decode into Agent"
