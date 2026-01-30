@@ -1,0 +1,37 @@
+name: Cleanup Target Directory
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly cleanup on Sundays at midnight UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    name: Clean old build artifacts
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Rust toolchain
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: stable
+
+      - name: Clean release artifacts
+        run: |
+          cargo clean --release
+          cargo clean --doc
+
+      - name: Display disk usage
+        run: |
+          echo "Target directory size after cleanup:"
+          du -sh target/
+
+      - name: Summary
+        run: |
+          echo "### Cleanup completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Cleaned release artifacts" >> $GITHUB_STEP_SUMMARY
+          echo "- Cleaned documentation artifacts" >> $GITHUB_STEP_SUMMARY

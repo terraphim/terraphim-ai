@@ -5,6 +5,13 @@ use std::time::Duration;
 /// Debug test to understand why summarization isn't working
 #[tokio::test]
 async fn test_debug_summarization_flow() {
+    if std::env::var("RUN_DEBUG_SUMMARIZATION_TEST")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_DEBUG_SUMMARIZATION_TEST=1 to run this debug test");
+        return;
+    }
     println!("🧪 Debug Summarization Flow Test");
     println!("=================================");
 
@@ -105,6 +112,8 @@ async fn start_test_server() -> Option<Child> {
         .args([
             "run",
             "--release",
+            "-p",
+            "terraphim_server",
             "--bin",
             "terraphim_server",
             "--",

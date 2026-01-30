@@ -557,6 +557,41 @@ impl TuiService {
             missing,
         })
     }
+
+    /// Add a new role to the configuration
+    ///
+    /// This adds the role to the existing config and saves it.
+    /// If a role with the same name exists, it will be replaced.
+    pub async fn add_role(&self, role: terraphim_config::Role) -> Result<()> {
+        {
+            let mut config = self.config_state.config.lock().await;
+            let role_name = role.name.clone();
+            config.roles.insert(role_name.clone(), role);
+            log::info!("Added role '{}' to configuration", role_name);
+        }
+        self.save_config().await?;
+        Ok(())
+    }
+
+    /// Set the configuration to use a single role
+    ///
+    /// This replaces the current config with a new one containing only this role,
+    /// and sets it as the selected role.
+    pub async fn set_role(&self, role: terraphim_config::Role) -> Result<()> {
+        {
+            let mut config = self.config_state.config.lock().await;
+            let role_name = role.name.clone();
+            config.roles.clear();
+            config.roles.insert(role_name.clone(), role);
+            config.selected_role = role_name.clone();
+            log::info!(
+                "Set configuration to role '{}' (cleared other roles)",
+                role_name
+            );
+        }
+        self.save_config().await?;
+        Ok(())
+    }
 }
 
 /// Result of connectivity check

@@ -275,6 +275,7 @@ jobs:
     runs-on: [self-hosted, Linux, X64]
     needs: [setup, build-base-image, build-frontend, build-rust]
     if: needs.setup.outputs.should-build == 'true'
+    timeout-minutes: 20
 
     steps:
       - name: Pre-checkout cleanup
@@ -304,13 +305,21 @@ jobs:
         run: |
           docker load < terraphim-builder-image.tar.gz
 
-      - name: Run tests
+      - name: Run tests with timeout
+        timeout-minutes: 15
         run: |
           docker run --rm \
             -v $PWD:/workspace \
             -w /workspace \
             ${{ needs.build-base-image.outputs.image-tag }} \
-            cargo test --workspace
+            bash -c "
+              set -euo pipefail
+              timeout 10m cargo test --workspace \
+                -- --test-threads 2 || {
+                echo '::error::Tests timed out or failed'
+                exit 1
+              }
+            "
 
   summary:
     needs: [lint-and-format, build-frontend, build-rust, test]

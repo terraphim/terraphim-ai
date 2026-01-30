@@ -15,6 +15,10 @@ async fn test_agent_creation_simple() {
 
 #[tokio::test]
 async fn test_agent_command_processing() {
+    if std::env::var("RUN_OLLAMA_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
