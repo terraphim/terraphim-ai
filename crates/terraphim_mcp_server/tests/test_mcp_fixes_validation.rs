@@ -118,7 +118,9 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
         .call_tool(CallToolRequestParam {
             name: "load_thesaurus".into(),
             arguments: json!({
-                "role_name": "Default"
+                "role_name": "Default",
+                // Use local KG that exists in this repo; avoids needing role config automata_path
+                "automata_path": "docs/src/kg"
             })
             .as_object()
             .cloned(),
@@ -325,7 +327,9 @@ async fn test_mcp_text_processing_tools() -> Result<()> {
             arguments: json!({
                 "text": "This is a test document",
                 "patterns": ["test"],
-                "replacement": "sample"
+                "replacement": "sample",
+                // required by tool schema
+                "link_type": "PlainText"
             })
             .as_object()
             .cloned(),

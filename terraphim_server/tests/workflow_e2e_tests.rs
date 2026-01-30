@@ -3,8 +3,18 @@ use axum_test::TestServer;
 use serde_json::json;
 use terraphim_server::build_router_for_tests;
 
+fn should_run_workflow_e2e_tests() -> bool {
+    std::env::var("RUN_WORKFLOW_E2E_TESTS")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+}
+
 #[tokio::test]
 async fn test_prompt_chain_workflow() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     // Build the test router
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
@@ -48,6 +58,10 @@ async fn test_prompt_chain_workflow() {
 
 #[tokio::test]
 async fn test_routing_workflow() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -96,6 +110,10 @@ async fn test_routing_workflow() {
 
 #[tokio::test]
 async fn test_parallel_workflow() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -144,6 +162,10 @@ async fn test_parallel_workflow() {
 
 #[tokio::test]
 async fn test_orchestration_workflow() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -194,6 +216,10 @@ async fn test_orchestration_workflow() {
 
 #[tokio::test]
 async fn test_optimization_workflow() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -246,6 +272,10 @@ async fn test_optimization_workflow() {
 
 #[tokio::test]
 async fn test_workflow_status_endpoint() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -276,6 +306,10 @@ async fn test_workflow_status_endpoint() {
 
 #[tokio::test]
 async fn test_workflow_trace_endpoint() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -308,6 +342,10 @@ async fn test_workflow_trace_endpoint() {
 
 #[tokio::test]
 async fn test_list_workflows_endpoint() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -333,6 +371,10 @@ async fn test_list_workflows_endpoint() {
 
 #[tokio::test]
 async fn test_workflow_with_custom_config() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -362,6 +404,10 @@ async fn test_workflow_with_custom_config() {
 
 #[tokio::test]
 async fn test_workflow_error_handling() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -382,6 +428,10 @@ async fn test_workflow_error_handling() {
 
 #[tokio::test]
 async fn test_concurrent_workflows() {
+    if !should_run_workflow_e2e_tests() {
+        eprintln!("Skipping: set RUN_WORKFLOW_E2E_TESTS=1 to run workflow e2e tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 

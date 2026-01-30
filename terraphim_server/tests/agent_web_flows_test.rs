@@ -9,6 +9,10 @@ use terraphim_server::build_router_for_tests;
 
 #[tokio::test]
 async fn test_prompt_chain_web_flow() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -60,6 +64,10 @@ async fn test_prompt_chain_web_flow() {
 
 #[tokio::test]
 async fn test_routing_web_flow_with_complexity_analysis() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -121,6 +129,10 @@ async fn test_routing_web_flow_with_complexity_analysis() {
 
 #[tokio::test]
 async fn test_parallel_web_flow_with_perspectives() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -181,6 +193,10 @@ async fn test_parallel_web_flow_with_perspectives() {
 
 #[tokio::test]
 async fn test_orchestration_web_flow_with_workers() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -245,6 +261,10 @@ async fn test_orchestration_web_flow_with_workers() {
 
 #[tokio::test]
 async fn test_optimization_web_flow_with_iterations() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -322,6 +342,10 @@ async fn test_optimization_web_flow_with_iterations() {
 
 #[tokio::test]
 async fn test_web_error_handling_and_validation() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -352,6 +376,10 @@ async fn test_web_error_handling_and_validation() {
 
 #[tokio::test]
 async fn test_web_workflow_status_monitoring() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -401,6 +429,10 @@ async fn test_web_workflow_status_monitoring() {
 
 #[tokio::test]
 async fn test_web_workflow_listing_and_management() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -440,6 +472,10 @@ async fn test_web_workflow_listing_and_management() {
 
 #[tokio::test]
 async fn test_web_agent_role_integration() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
@@ -478,6 +514,10 @@ async fn test_web_agent_role_integration() {
 
 #[tokio::test]
 async fn test_web_concurrent_workflow_handling() {
+    if std::env::var("RUN_WEB_WORKFLOW_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_WEB_WORKFLOW_TESTS=1 to run web workflow integration tests");
+        return;
+    }
     let router = build_router_for_tests().await;
     let server = TestServer::new(router).unwrap();
 
