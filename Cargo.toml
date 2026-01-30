@@ -42,3 +42,18 @@ lto = true
 codegen-units = 1
 opt-level = 3
 panic = "abort"
+
+# CI-optimized profiles for faster builds with less disk usage
+[profile.ci]
+inherits = "dev"
+incremental = false
+codegen-units = 16
+split-debuginfo = "off"
+debug = false
+strip = true
+
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 8
+strip = "symbols"
