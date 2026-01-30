@@ -21,6 +21,7 @@ use tokio::runtime::Runtime;
 
 mod client;
 mod guard_patterns;
+mod onboarding;
 mod service;
 
 // Robot mode and forgiving CLI - always available
@@ -46,7 +47,8 @@ fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
     println!();
     println!("Interactive Mode (requires TTY):");
-    println!("  terraphim-agent              # Start REPL or TUI");
+    println!("  terraphim-agent              # Start REPL (default)");
+    println!("  terraphim-agent --tui        # Start TUI (requires server)");
     println!("  terraphim-agent repl         # Explicit REPL mode");
     println!();
     println!("Common Commands:");
@@ -392,6 +394,9 @@ struct Cli {
     /// Output format (human, json, json-compact)
     #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
     format: OutputFormat,
+    /// Force TUI mode (default is REPL)
+    #[arg(long, default_value_t = false)]
+    tui: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -537,6 +542,22 @@ enum Command {
         server_url: String,
     },
 
+    /// Interactive setup wizard for first-time configuration
+    Setup {
+        /// Apply a specific template directly (skip interactive wizard)
+        #[arg(long)]
+        template: Option<String>,
+        /// Path to use with the template (required for some templates like local-notes)
+        #[arg(long)]
+        path: Option<String>,
+        /// Add a new role to existing configuration (instead of replacing)
+        #[arg(long, default_value_t = false)]
+        add_role: bool,
+        /// List available templates and exit
+        #[arg(long, default_value_t = false)]
+        list_templates: bool,
+    },
+
     /// Check for updates without installing
     CheckUpdate,
 
@@ -568,7 +589,8 @@ fn main() -> Result<()> {
     });
 
     match cli.command {
-        Some(Command::Interactive) | None => {
+        Some(Command::Interactive) => {
+            // Explicit interactive command - force TUI mode
             // Check if we're in a TTY for interactive mode (both stdout and stdin required)
             use atty::Stream;
             if !atty::is(Stream::Stdout) {
@@ -586,6 +608,46 @@ fn main() -> Result<()> {
             } else {
                 // Run TUI mode - it will create its own runtime
                 run_tui_offline_mode(cli.transparent)
+            }
+        }
+
+        None => {
+            // No command specified - default to REPL mode or TUI mode if --tui flag is set
+            if cli.tui {
+                // Check if we're in a TTY for TUI mode
+                use atty::Stream;
+                if !atty::is(Stream::Stdout) {
+                    eprintln!("Error: TUI mode requires a TTY (terminal)");
+                    std::process::exit(1);
+                }
+
+                if !atty::is(Stream::Stdin) {
+                    eprintln!("Error: TUI mode requires a TTY (terminal)");
+                    std::process::exit(1);
+                }
+
+                if cli.server {
+                    run_tui_server_mode(&cli.server_url, cli.transparent)
+                } else {
+                    run_tui_offline_mode(cli.transparent)
+                }
+            } else {
+                // Default to REPL mode
+                #[cfg(feature = "repl")]
+                {
+                    let rt = Runtime::new()?;
+                    if cli.server {
+                        rt.block_on(repl::run_repl_server_mode(&cli.server_url))
+                    } else {
+                        rt.block_on(repl::run_repl_offline_mode())
+                    }
+                }
+
+                #[cfg(not(feature = "repl"))]
+                {
+                    // If repl feature is not enabled, show error
+                    anyhow::bail!("REPL mode requires 'repl' feature. Build with: cargo build --features repl");
+                }
             }
         }
 
@@ -1226,6 +1288,109 @@ async fn run_offline_command(command: Command) -> Result<()> {
             // Handled above before TuiService initialization
             unreachable!("Guard command should be handled before TuiService initialization")
         }
+        Command::Setup {
+            template,
+            path,
+            add_role,
+            list_templates,
+        } => {
+            use onboarding::{
+                apply_template, list_templates as get_templates, run_setup_wizard, SetupMode,
+                SetupResult,
+            };
+
+            // List templates and exit if requested
+            if list_templates {
+                println!("Available templates:\n");
+                for template in get_templates() {
+                    let path_note = if template.requires_path {
+                        " (requires --path)"
+                    } else if template.default_path.is_some() {
+                        &format!(" (default: {})", template.default_path.as_ref().unwrap())
+                    } else {
+                        ""
+                    };
+                    println!("  {} - {}{}", template.id, template.description, path_note);
+                }
+                println!("\nUse --template <id> to apply a template directly.");
+                return Ok(());
+            }
+
+            // Apply template directly if specified
+            if let Some(template_id) = template {
+                println!("Applying template: {}", template_id);
+                match apply_template(&template_id, path.as_deref()) {
+                    Ok(role) => {
+                        // Save the role to config
+                        if add_role {
+                            service.add_role(role.clone()).await?;
+                            println!("Role '{}' added to configuration.", role.name);
+                        } else {
+                            service.set_role(role.clone()).await?;
+                            println!("Configuration set to role '{}'.", role.name);
+                        }
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to apply template: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            // Run interactive wizard
+            let mode = if add_role {
+                SetupMode::AddRole
+            } else {
+                SetupMode::FirstRun
+            };
+
+            match run_setup_wizard(mode).await {
+                Ok(SetupResult::Template {
+                    template,
+                    custom_path: _,
+                    role,
+                }) => {
+                    if add_role {
+                        service.add_role(role.clone()).await?;
+                        println!(
+                            "\nRole '{}' added from template '{}'.",
+                            role.name, template.id
+                        );
+                    } else {
+                        service.set_role(role.clone()).await?;
+                        println!(
+                            "\nConfiguration set to role '{}' from template '{}'.",
+                            role.name, template.id
+                        );
+                    }
+                }
+                Ok(SetupResult::Custom { role }) => {
+                    if add_role {
+                        service.add_role(role.clone()).await?;
+                        println!("\nCustom role '{}' added to configuration.", role.name);
+                    } else {
+                        service.set_role(role.clone()).await?;
+                        println!("\nConfiguration set to custom role '{}'.", role.name);
+                    }
+                }
+                Ok(SetupResult::Cancelled) => {
+                    println!("\nSetup cancelled.");
+                }
+                Err(onboarding::OnboardingError::NotATty) => {
+                    eprintln!(
+                        "Interactive mode requires a terminal. Use --template for non-interactive setup."
+                    );
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("Setup failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+
+            Ok(())
+        }
         Command::CheckUpdate => {
             println!("Checking for terraphim-agent updates...");
             match check_for_updates("terraphim-agent").await {
@@ -1610,6 +1775,84 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 }
             }
 
+            Ok(())
+        }
+        Command::Setup {
+            template,
+            path,
+            add_role,
+            list_templates,
+        } => {
+            // Setup command - can run in server mode to add roles to running config
+            if list_templates {
+                println!("Available templates:");
+                for t in onboarding::list_templates() {
+                    let path_info = if t.requires_path {
+                        " (requires --path)"
+                    } else if t.default_path.is_some() {
+                        " (optional --path)"
+                    } else {
+                        ""
+                    };
+                    println!("  {} - {}{}", t.id, t.description, path_info);
+                }
+                return Ok(());
+            }
+
+            if let Some(template_id) = template {
+                // Apply template directly
+                let role = onboarding::apply_template(&template_id, path.as_deref())
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                println!("Configured role: {}", role.name);
+                println!("To add this role to a running server, restart with the new config.");
+
+                // In server mode, we could potentially add the role via API
+                // For now, just show what was configured
+                if !role.haystacks.is_empty() {
+                    println!("Haystacks:");
+                    for h in &role.haystacks {
+                        println!("  - {} ({:?})", h.location, h.service);
+                    }
+                }
+                if role.kg.is_some() {
+                    println!("Knowledge graph: configured");
+                }
+                if role.llm_enabled {
+                    println!("LLM: enabled");
+                }
+            } else {
+                // Interactive wizard
+                let mode = if add_role {
+                    onboarding::SetupMode::AddRole
+                } else {
+                    onboarding::SetupMode::FirstRun
+                };
+
+                match onboarding::run_setup_wizard(mode).await {
+                    Ok(onboarding::SetupResult::Template {
+                        template,
+                        role,
+                        custom_path,
+                    }) => {
+                        println!("\nApplied template: {}", template.name);
+                        if let Some(ref path) = custom_path {
+                            println!("Custom path: {}", path);
+                        }
+                        println!("Role '{}' configured successfully.", role.name);
+                    }
+                    Ok(onboarding::SetupResult::Custom { role }) => {
+                        println!("\nCustom role '{}' configured successfully.", role.name);
+                    }
+                    Ok(onboarding::SetupResult::Cancelled) => {
+                        println!("\nSetup cancelled.");
+                    }
+                    Err(e) => {
+                        eprintln!("Setup error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
             Ok(())
         }
         Command::Interactive => {

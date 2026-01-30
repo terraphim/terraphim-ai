@@ -38,6 +38,44 @@ pub fn create_test_device_settings() -> Result<DeviceSettings> {
     create_memory_only_device_settings()
 }
 
+/// Create a DeviceSettings instance with multiple profiles for cache write-back testing
+///
+/// This creates a configuration with:
+/// - `memory` profile (speed 1) - fast cache
+/// - `dashmap` profile (speed 100) - slow persistent storage
+///
+/// This is useful for testing cache write-back behavior where data loaded from
+/// the slow backend should be cached to the fast backend.
+#[cfg(feature = "dashmap")]
+pub fn create_multi_profile_device_settings() -> Result<DeviceSettings> {
+    let mut profiles = HashMap::new();
+
+    // Add memory profile (fastest) - speed 1
+    let mut memory_profile = HashMap::new();
+    memory_profile.insert("type".to_string(), "memory".to_string());
+    profiles.insert("memory".to_string(), memory_profile);
+
+    // Add dashmap profile (slower) - speed 100
+    // Uses a temp directory for root
+    let mut dashmap_profile = HashMap::new();
+    dashmap_profile.insert("type".to_string(), "dashmap".to_string());
+    dashmap_profile.insert(
+        "root".to_string(),
+        "/tmp/terraphim_test_dashmap".to_string(),
+    );
+    profiles.insert("dashmap".to_string(), dashmap_profile);
+
+    let settings = DeviceSettings {
+        server_hostname: "localhost".to_string(),
+        api_endpoint: "http://localhost:8080".to_string(),
+        initialized: true,
+        default_data_path: "/tmp/terraphim_test".to_string(),
+        profiles,
+    };
+
+    Ok(settings)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

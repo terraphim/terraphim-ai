@@ -294,6 +294,12 @@ fn analyze_duplicates(search_response: &SearchResponse, _query: &str) -> Duplica
 #[tokio::test]
 #[serial]
 async fn test_terraphim_graph_with_duplicates() {
+    if std::env::var("RUN_E2E_KG_HAYSTACK_TESTS").ok().as_deref() != Some("1") {
+        eprintln!(
+            "Skipping: set RUN_E2E_KG_HAYSTACK_TESTS=1 to run TerraphimGraph duplicate test (requires local KG fixtures)"
+        );
+        return;
+    }
     let current_dir = std::env::current_dir().unwrap();
 
     // Check if we have the KG directory

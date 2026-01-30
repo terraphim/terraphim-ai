@@ -347,8 +347,21 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
     }
 
     let contents = match automata_path {
-        AutomataPath::Local(path) => fs::read_to_string(path)?,
-        AutomataPath::Remote(url) => read_url(url.clone()).await?,
+        AutomataPath::Local(path) => {
+            // Check if file exists before attempting to read
+            if !std::path::Path::new(path).exists() {
+                return Err(TerraphimAutomataError::InvalidThesaurus(format!(
+                    "Thesaurus file not found: {}",
+                    path.display()
+                )));
+            }
+            fs::read_to_string(path)?
+        }
+        AutomataPath::Remote(_) => {
+            return Err(TerraphimAutomataError::InvalidThesaurus(
+                "Remote loading is not supported. Enable the 'remote-loading' feature.".to_string(),
+            ));
+        }
     };
 
     let thesaurus = serde_json::from_str(&contents)?;

@@ -316,8 +316,27 @@ The workspace uses Rust edition 2024 and resolver version 2 for optimal dependen
 - `terraphim_rolegraph`: Knowledge graph implementation with node/edge relationships
 - `terraphim_automata`: Text matching, autocomplete, and thesaurus building
 - `terraphim_config`: Configuration management and role-based settings
-- `terraphim_persistence`: Document storage abstraction layer
+- `terraphim_persistence`: Document storage abstraction layer with cache warm-up
 - `terraphim_server`: HTTP API server (main binary)
+
+### Persistence Layer Cache Warm-up
+
+The persistence layer (`terraphim_persistence`) supports transparent cache warm-up for multi-backend configurations:
+
+**Cache Write-back Behavior:**
+- When data is loaded from a slower fallback operator (e.g., SQLite, S3), it is automatically cached to the fastest operator (e.g., memory, dashmap)
+- Uses fire-and-forget pattern with `tokio::spawn` - non-blocking, doesn't slow load path
+- Objects over 1MB are compressed using zstd before caching
+- Schema evolution handling: if cached data fails to deserialize, the cache entry is deleted and data is refetched from persistent storage
+
+**Configuration:**
+- Operators are ordered by speed (memory > dashmap > sqlite > s3)
+- Same-operator detection: skips redundant cache write if only one backend is configured
+- Tracing spans for observability: `load_from_operator{key}`, `try_read{profile}`, `cache_writeback{key, size}`
+
+**Testing:**
+- Use `DeviceStorage::init_memory_only()` for test isolation (single memory backend)
+- Multi-profile cache write-back tested via integration tests in `tests/persistence_warmup.rs`
 
 **Agent System Crates**:
 - `terraphim_agent_supervisor`: Agent lifecycle management and supervision
@@ -640,118 +659,6 @@ The system uses role-based configuration with multiple backends:
 - **Discourse**: Forum integration
 - **JMAP**: Email integration
 - **Quickwit**: Cloud-native search engine for log and observability data with hybrid index discovery
-
-### Quickwit Haystack Integration
-
-Quickwit provides powerful log and observability data search capabilities for Terraphim AI.
-
-**Key Features:**
-- **Hybrid Index Discovery**: Choose explicit (fast) or auto-discovery (convenient) modes
-- **Dual Authentication**: Bearer token and Basic Auth support
-- **Glob Pattern Filtering**: Filter auto-discovered indexes with patterns
-- **Graceful Error Handling**: Network failures never crash searches
-- **Production Ready**: Based on try_search deployment at logs.terraphim.cloud
-
-**Configuration Modes:**
-
-1. **Explicit Index (Production - Fast)**
-   ```json
-   {
-     "location": "http://localhost:7280",
-     "service": "Quickwit",
-     "extra_parameters": {
-       "default_index": "workers-logs",
-       "max_hits": "100"
-     }
-   }
-   ```
-   - Performance: ~100ms (1 API call)
-   - Best for: Production monitoring, known indexes
-
-2. **Auto-Discovery (Exploration - Convenient)**
-   ```json
-   {
-     "location": "http://localhost:7280",
-     "service": "Quickwit",
-     "extra_parameters": {
-       "max_hits": "50"
-     }
-   }
-   ```
-   - Performance: ~300-500ms (N+1 API calls)
-   - Best for: Exploring unfamiliar instances
-
-3. **Filtered Discovery (Balanced)**
-   ```json
-   {
-     "location": "https://logs.terraphim.cloud/api",
-     "service": "Quickwit",
-     "extra_parameters": {
-       "auth_username": "cloudflare",
-       "auth_password": "${QUICKWIT_PASSWORD}",
-       "index_filter": "workers-*",
-       "max_hits": "100"
-     }
-   }
-   ```
-   - Performance: ~200-400ms (depends on matches)
-   - Best for: Multi-service monitoring with control
-
-**Authentication Examples:**
-```bash
-# Bearer token
-export QUICKWIT_TOKEN="Bearer abc123"
-
-# Basic auth with 1Password
-export QUICKWIT_PASSWORD=$(op read "op://Private/Quickwit/password")
-
-# Start agent
-terraphim-agent --config quickwit_production_config.json
-```
-
-**Query Syntax:**
-```bash
-# Simple text search
-/search error
-
-# Field-specific
-/search "level:ERROR"
-/search "service:api-server"
-
-# Boolean operators
-/search "error AND database"
-/search "level:ERROR OR level:WARN"
-
-# Time ranges
-/search "timestamp:[2024-01-01 TO 2024-01-31]"
-
-# Combined
-/search "level:ERROR AND service:api AND timestamp:[2024-01-13T10:00:00Z TO *]"
-```
-
-**Pre-configured Role:**
-
-The "Quickwit Logs" role is available in `terraphim_server/default/terraphim_engineer_config.json`:
-- Auto-discovery mode (searches all available indexes)
-- BM25 relevance function for text matching
-- LLM summarization disabled (faster results for log analysis)
-- Dark theme (darkly) optimized for log viewing
-- Specialized system prompt for log analysis
-
-Use for quick log exploration:
-```bash
-terraphim-agent
-# In REPL, switch to Quickwit Logs role
-/role QuickwitLogs
-/search "level:ERROR"
-```
-
-**Documentation:**
-- User Guide: `docs/quickwit-integration.md`
-- Log Exploration: `docs/user-guide/quickwit-log-exploration.md`
-- Example: `examples/quickwit-log-search.md`
-- Skill: `skills/quickwit-search/skill.md`
-- Configs: `terraphim_server/default/quickwit_*.json`
 
 ## Firecracker Integration
 
@@ -1134,53 +1041,3 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
 - **Technology**: Vanilla JavaScript, HTML, CSS (no frameworks)
 - **Pattern**: No build step, static files only
 - **Purpose**: Simple, deployable examples that work without compilation
-
-````markdown
-## UBS Quick Reference for AI Agents
-
-UBS stands for "Ultimate Bug Scanner": **The AI Coding Agent's Secret Weapon: Flagging Likely Bugs for Fixing Early On**
-
-**Install:** `curl -sSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash`
-
-**Golden Rule:** `ubs <changed-files>` before every commit. Exit 0 = safe. Exit >0 = fix & re-run.
-
-**Commands:**
-```bash
-ubs file.ts file2.py                    # Specific files (< 1s) — USE THIS
-ubs $(git diff --name-only --cached)    # Staged files — before commit
-ubs --only=js,python src/               # Language filter (3-5x faster)
-ubs --ci --fail-on-warning .            # CI mode — before PR
-ubs --help                              # Full command reference
-ubs sessions --entries 1                # Tail the latest install session log
-ubs .                                   # Whole project (ignores things like .venv and node_modules automatically)
-```
-
-**Output Format:**
-```
-⚠️  Category (N errors)
-    file.ts:42:5 – Issue description
-    💡 Suggested fix
-Exit code: 1
-```
-Parse: `file:line:col` → location | 💡 → how to fix | Exit 0/1 → pass/fail
-
-**Fix Workflow:**
-1. Read finding → category + fix suggestion
-2. Navigate `file:line:col` → view context
-3. Verify real issue (not false positive)
-4. Fix root cause (not symptom)
-5. Re-run `ubs <file>` → exit 0
-6. Commit
-
-**Speed Critical:** Scope to changed files. `ubs src/file.ts` (< 1s) vs `ubs .` (30s). Never full scan for small edits.
-
-**Bug Severity:**
-- **Critical** (always fix): Null safety, XSS/injection, async/await, memory leaks
-- **Important** (production): Type narrowing, division-by-zero, resource leaks
-- **Contextual** (judgment): TODO/FIXME, console logs
-
-**Anti-Patterns:**
-- ❌ Ignore findings → ✅ Investigate each
-- ❌ Full scan per edit → ✅ Scope to file
-- ❌ Fix symptom (`if (x) { x.y }`) → ✅ Root cause (`x?.y`)
-````
