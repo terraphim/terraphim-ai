@@ -13,8 +13,8 @@ use tokio::sync::RwLock;
 // Automata imports for enhanced functionality
 use ahash::AHashMap;
 use terraphim_automata::{
-    autocomplete_search, build_autocomplete_index, extract_paragraphs_from_automata, find_matches,
-    AutocompleteConfig, AutocompleteIndex, Matched,
+    AutocompleteConfig, AutocompleteIndex, Matched, autocomplete_search, build_autocomplete_index,
+    extract_paragraphs_from_automata, find_matches,
 };
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
@@ -940,18 +940,22 @@ mod tests {
 
         // Test missing required parameter
         let empty_params = HashMap::new();
-        assert!(registry
-            .validate_parameters("test", &empty_params)
-            .await
-            .is_err());
+        assert!(
+            registry
+                .validate_parameters("test", &empty_params)
+                .await
+                .is_err()
+        );
 
         // Test invalid type
         let mut invalid_params = HashMap::new();
         invalid_params.insert("name".to_string(), serde_json::Value::Number(42.into()));
-        assert!(registry
-            .validate_parameters("test", &invalid_params)
-            .await
-            .is_err());
+        assert!(
+            registry
+                .validate_parameters("test", &invalid_params)
+                .await
+                .is_err()
+        );
     }
 
     #[tokio::test]
@@ -988,9 +992,11 @@ mod tests {
         // Test partial match
         let suggestions = registry.suggest_commands("hel", None).await;
         assert_eq!(suggestions.len(), 2);
-        assert!(suggestions
-            .iter()
-            .any(|cmd| cmd.definition.name == "hello-world"));
+        assert!(
+            suggestions
+                .iter()
+                .any(|cmd| cmd.definition.name == "hello-world")
+        );
 
         // Test fuzzy match (current implementation may return different results)
         let _suggestions = registry.suggest_commands("hlp", None).await;
@@ -1087,9 +1093,11 @@ mod tests {
         // Test prefix match
         let results = registry.discover_commands("dep", Some(5)).await.unwrap();
         assert!(!results.is_empty());
-        assert!(results
-            .iter()
-            .any(|r| r.command.definition.name == "deploy"));
+        assert!(
+            results
+                .iter()
+                .any(|r| r.command.definition.name == "deploy")
+        );
 
         // Test content-based discovery (should find commands with matching content)
         let results = registry
@@ -1179,9 +1187,11 @@ Options:
 
         // Verify that extracted paragraphs contain the query terms
         for (matched, paragraph) in &paragraphs {
-            assert!(paragraph
-                .to_lowercase()
-                .contains(&matched.term.to_lowercase()));
+            assert!(
+                paragraph
+                    .to_lowercase()
+                    .contains(&matched.term.to_lowercase())
+            );
         }
     }
 

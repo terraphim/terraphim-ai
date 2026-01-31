@@ -1,4 +1,4 @@
-use anyhow::{ensure, Result};
+use anyhow::{Result, ensure};
 use serial_test::serial;
 use std::process::Command;
 use std::str;

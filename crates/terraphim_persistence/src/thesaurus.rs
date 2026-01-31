@@ -142,7 +142,10 @@ mod tests {
                 );
             }
             Err(e) => {
-                println!("ReDB profile not available for thesaurus (expected in some environments): {:?}", e);
+                println!(
+                    "ReDB profile not available for thesaurus (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have redb configured
             }
         }
@@ -172,7 +175,10 @@ mod tests {
                 );
             }
             Err(e) => {
-                println!("SQLite profile not available for thesaurus (expected in some environments): {:?}", e);
+                println!(
+                    "SQLite profile not available for thesaurus (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have sqlite configured
             }
         }

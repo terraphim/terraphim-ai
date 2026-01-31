@@ -1,11 +1,11 @@
 use terraphim_automata::autocomplete::{
-    autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
-    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
-    AutocompleteConfig, AutocompleteResult,
+    AutocompleteConfig, AutocompleteResult, autocomplete_search, build_autocomplete_index,
+    deserialize_autocomplete_index, fuzzy_autocomplete_search,
+    fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
 };
 
 #[cfg(feature = "remote-loading")]
-use terraphim_automata::{load_autocomplete_index, AutomataPath};
+use terraphim_automata::{AutomataPath, load_autocomplete_index};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 /// Create a comprehensive test thesaurus with various term patterns

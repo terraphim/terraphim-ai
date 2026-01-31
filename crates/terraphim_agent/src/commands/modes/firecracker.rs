@@ -4,8 +4,8 @@
 //! for complete isolation and security.
 
 use super::{
-    default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
-    ExecutorCapabilities, ResourceUsage,
+    CommandDefinition, CommandExecutionError, CommandExecutionResult, ExecutorCapabilities,
+    ResourceUsage, default_resource_usage,
 };
 use crate::client::ApiClient;
 use std::collections::HashMap;

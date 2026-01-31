@@ -6,7 +6,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
-use terraphim_server::{axum_server, SearchResponse};
+use terraphim_server::{SearchResponse, axum_server};
 use terraphim_types::RelevanceFunction;
 
 /// Integration test for relevance functions with duplicate handling from multiple haystacks
@@ -275,7 +275,7 @@ fn analyze_duplicates(search_response: &SearchResponse, _query: &str) -> Duplica
     // Find duplicate URLs
     let duplicate_urls: Vec<String> = url_counts
         .iter()
-        .filter(|(_, &count)| count > 1)
+        .filter(|(_, count)| **count > 1)
         .map(|(url, _)| url.clone())
         .collect();
 

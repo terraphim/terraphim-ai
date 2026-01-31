@@ -3,18 +3,20 @@
 //! Provides the interactive setup wizard flow for first-time users
 //! and add-role capability for extending existing configurations.
 
-use dialoguer::{theme::ColorfulTheme, Confirm, Select};
-use std::path::PathBuf;
+use dialoguer::{Confirm, Select, theme::ColorfulTheme};
 use terraphim_config::Role;
 use terraphim_types::RelevanceFunction;
 
+use super::OnboardingError;
 use super::prompts::{
     prompt_haystacks, prompt_knowledge_graph, prompt_llm_config, prompt_relevance_function,
     prompt_role_basics, prompt_theme,
 };
 use super::templates::{ConfigTemplate, TemplateRegistry};
 use super::validation::validate_role;
-use super::OnboardingError;
+
+#[cfg(test)]
+use std::path::{Path, PathBuf};
 
 /// Result of running the setup wizard
 #[derive(Debug)]
@@ -110,7 +112,7 @@ impl QuickStartChoice {
 
 /// Check if this is a first run (no existing configuration)
 #[cfg(test)]
-pub fn is_first_run(config_path: &PathBuf) -> bool {
+pub fn is_first_run(config_path: &Path) -> bool {
     !config_path.exists()
 }
 

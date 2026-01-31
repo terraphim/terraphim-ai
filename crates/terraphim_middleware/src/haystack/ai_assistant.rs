@@ -11,8 +11,8 @@
 //! Configure via `extra_parameters["connector"]` with one of:
 //! `claude-code`, `opencode`, `cursor`, `aider`, `codex`
 
-use crate::Result;
 use crate::indexer::IndexMiddleware;
+use crate::Result;
 use std::path::PathBuf;
 use terraphim_config::Haystack;
 use terraphim_session_analyzer::connectors::{
@@ -279,6 +279,10 @@ fn message_to_document(
         ]),
         rank: msg.created_at.map(|t| t.as_millisecond() as u64),
         source_haystack: None, // Will be set by caller
+        doc_type: Default::default(),
+        synonyms: None,
+        route: None,
+        priority: None,
     }
 }
 
@@ -378,18 +382,16 @@ mod tests {
         assert!(doc.title.contains("[CLAUDE-CODE]"));
         assert!(doc.title.contains("Test Project"));
         assert_eq!(doc.body, "Hello, can you help me?");
-        assert!(
-            doc.tags
-                .as_ref()
-                .unwrap()
-                .contains(&"ai-assistant".to_string())
-        );
-        assert!(
-            doc.tags
-                .as_ref()
-                .unwrap()
-                .contains(&"claude-code".to_string())
-        );
+        assert!(doc
+            .tags
+            .as_ref()
+            .unwrap()
+            .contains(&"ai-assistant".to_string()));
+        assert!(doc
+            .tags
+            .as_ref()
+            .unwrap()
+            .contains(&"claude-code".to_string()));
         assert!(doc.tags.as_ref().unwrap().contains(&"user".to_string()));
     }
 

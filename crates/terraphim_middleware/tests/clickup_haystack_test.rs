@@ -1,7 +1,7 @@
 use terraphim_config::{ConfigBuilder, Haystack, Role, ServiceType};
 use terraphim_middleware::{
     haystack::ClickUpHaystackIndexer,
-    indexer::{IndexMiddleware, search_haystacks},
+    indexer::{search_haystacks, IndexMiddleware},
 };
 use terraphim_types::{RelevanceFunction, SearchQuery};
 

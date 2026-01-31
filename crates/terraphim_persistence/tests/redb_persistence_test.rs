@@ -62,7 +62,10 @@ async fn test_redb_configuration() -> Result<(), Box<dyn std::error::Error>> {
     if redb_file.exists() {
         log::info!("✅ ReDB database file exists: {:?}", redb_file);
     } else {
-        log::warn!("⚠️ ReDB database file not found at expected path: {:?} (might be using WAL or temp file)", redb_file);
+        log::warn!(
+            "⚠️ ReDB database file not found at expected path: {:?} (might be using WAL or temp file)",
+            redb_file
+        );
     }
     // assert!(
     //    redb_file.exists(),

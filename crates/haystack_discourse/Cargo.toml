@@ -1,7 +1,7 @@
 [package]
 name = "discourse_haystack"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim"]
 description = "A CLI client for fetching Discourse posts and messages"
 license = "MIT"
