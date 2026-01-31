@@ -3,9 +3,9 @@
 //! This module bridges HTTP workflow endpoints with the TerraphimAgent system,
 //! replacing mock implementations with actual multi-agent execution.
 
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::sync::Arc;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 use ahash::AHashMap;
 use terraphim_config::Role;
@@ -16,8 +16,8 @@ use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
 
 use super::{
-    update_workflow_status, ExecutionStatus, LlmConfig, StepConfig, WebSocketBroadcaster,
-    WorkflowSessions,
+    ExecutionStatus, LlmConfig, StepConfig, WebSocketBroadcaster, WorkflowSessions,
+    update_workflow_status,
 };
 use terraphim_config::ConfigState;
 
@@ -136,7 +136,8 @@ impl MultiAgentWorkflowExecutor {
             }
         }
 
-        log::debug!("Resolved LLM config for role '{}': provider={:?}, model={:?}, base_url={:?}, temperature={:?}",
+        log::debug!(
+            "Resolved LLM config for role '{}': provider={:?}, model={:?}, base_url={:?}, temperature={:?}",
             role_name,
             resolved.llm_provider,
             resolved.llm_model,
@@ -544,7 +545,10 @@ impl MultiAgentWorkflowExecutor {
 
         let aggregated_summary = format!(
             "Multi-perspective analysis of: {}\n\nAnalyzed from {} different viewpoints with {} total tokens and ${:.6} cost.",
-            prompt, perspectives.len(), total_tokens, total_cost
+            prompt,
+            perspectives.len(),
+            total_tokens,
+            total_cost
         );
 
         Ok(json!({
@@ -802,8 +806,10 @@ impl MultiAgentWorkflowExecutor {
             let gen_prompt = if current_content.is_empty() {
                 format!("Create content for: {}", prompt)
             } else {
-                format!("Improve this content based on evaluation:\n\nOriginal request: {}\n\nCurrent content:\n{}",
-                    prompt, current_content)
+                format!(
+                    "Improve this content based on evaluation:\n\nOriginal request: {}\n\nCurrent content:\n{}",
+                    prompt, current_content
+                )
             };
 
             let gen_input = CommandInput::new(gen_prompt, CommandType::Generate);

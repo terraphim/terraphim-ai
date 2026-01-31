@@ -91,6 +91,13 @@ mod tests {
         Ok(())
     }
 
+    // RocksDB test disabled - rocksdb feature is disabled due to locking issues
+    // /// Test saving and loading a thesaurus to rocksdb profile
+    // #[cfg(feature = "services-rocksdb")]
+    // #[tokio::test]
+    // #[serial_test::serial]
+    // async fn test_save_and_load_thesaurus_rocksdb() -> Result<()> { ... }
+
     /// Test saving and loading a thesaurus to memory profile
     #[tokio::test]
     #[serial_test::serial]
@@ -135,7 +142,10 @@ mod tests {
                 );
             }
             Err(e) => {
-                println!("ReDB profile not available for thesaurus (expected in some environments): {:?}", e);
+                println!(
+                    "ReDB profile not available for thesaurus (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have redb configured
             }
         }
@@ -165,7 +175,10 @@ mod tests {
                 );
             }
             Err(e) => {
-                println!("SQLite profile not available for thesaurus (expected in some environments): {:?}", e);
+                println!(
+                    "SQLite profile not available for thesaurus (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have sqlite configured
             }
         }

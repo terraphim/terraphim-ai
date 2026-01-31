@@ -227,9 +227,11 @@ mod tests {
         let result = validate_role(&role);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::EmptyField(_))));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::EmptyField(_)))
+        );
     }
 
     #[test]
@@ -239,9 +241,11 @@ mod tests {
         let result = validate_role(&role);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::MissingHaystack)));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::MissingHaystack))
+        );
     }
 
     #[test]

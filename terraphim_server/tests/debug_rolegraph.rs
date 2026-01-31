@@ -4,7 +4,7 @@
 mod tests {
     use ahash::AHashMap;
 
-    use terraphim_server::{axum_server, Status};
+    use terraphim_server::{Status, axum_server};
     use terraphim_settings::DeviceSettings;
 
     use std::{net::SocketAddr, time::Duration};

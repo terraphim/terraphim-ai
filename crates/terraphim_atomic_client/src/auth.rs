@@ -3,8 +3,8 @@
 //! This module provides functions for creating authentication headers
 //! using Ed25519 signatures, as required by the Atomic Server API.
 
-use crate::{error::AtomicError, Result};
-use base64::{engine::general_purpose::STANDARD, Engine};
+use crate::{Result, error::AtomicError};
+use base64::{Engine, engine::general_purpose::STANDARD};
 use ed25519_dalek::{Signer, SigningKey};
 #[cfg(feature = "native")]
 use reqwest::header::{HeaderMap, HeaderName, HeaderValue};

@@ -1,7 +1,8 @@
-use crate::Result;
 use crate::indexer::IndexMiddleware;
+use crate::Result;
 use reqwest::Client;
 use serde::Deserialize;
+use std::time::Duration;
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
 use terraphim_types::Index;
@@ -261,9 +262,10 @@ impl QuickwitHaystackIndexer {
 
         log::debug!("Searching Quickwit index '{}': {}", index, url);
 
-        // Build request with authentication
+        // Build request with authentication and timeout
         let mut request = self.client.get(&url);
         request = self.add_auth_header(request, config);
+        request = request.timeout(Duration::from_secs(config.timeout_seconds));
 
         // Execute request
         match request.send().await {
