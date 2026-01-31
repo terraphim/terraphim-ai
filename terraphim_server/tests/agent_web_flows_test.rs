@@ -76,17 +76,17 @@ async fn test_routing_web_flow_with_complexity_analysis() {
         (
             "Simple task: Write a hello world function",
             "SimpleTaskAgent",
-            0.2
+            0.2,
         ),
         (
             "Complex task: Design a distributed system with event sourcing, CQRS, and microservices architecture for a global banking platform with real-time fraud detection",
             "ComplexTaskAgent",
-            0.8
+            0.8,
         ),
         (
             "Medium task: Create a REST API for user authentication with JWT tokens",
             "SimpleTaskAgent",
-            0.4
+            0.4,
         ),
     ];
 
@@ -422,9 +422,11 @@ async fn test_web_workflow_status_monitoring() {
     assert_eq!(trace_body["workflow_id"].as_str().unwrap(), workflow_id);
     assert!(trace_body["timeline"].is_object());
     assert!(trace_body["performance"].is_object());
-    assert!(trace_body["performance"]["execution_time_ms"]
-        .as_i64()
-        .is_some());
+    assert!(
+        trace_body["performance"]["execution_time_ms"]
+            .as_i64()
+            .is_some()
+    );
 }
 
 #[tokio::test]

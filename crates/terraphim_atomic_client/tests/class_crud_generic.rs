@@ -142,11 +142,11 @@ async fn generic_classes_crud_search() {
         .get_resource(&collections_url)
         .await
         .expect("fetch collections");
-    let members = collections_res.properties
-        ["https://atomicdata.dev/properties/collection/members"]
-        .as_array()
-        .expect("members array")
-        .clone();
+    let members =
+        collections_res.properties["https://atomicdata.dev/properties/collection/members"]
+            .as_array()
+            .expect("members array")
+            .clone();
 
     let mut errors = Vec::new();
 

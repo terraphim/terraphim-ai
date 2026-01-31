@@ -13,7 +13,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use tempfile::{tempdir, NamedTempFile};
+use tempfile::{NamedTempFile, tempdir};
 use terraphim_session_analyzer::{Analyzer, Reporter};
 
 /// Test data directory path
@@ -157,7 +157,9 @@ mod basic_filename_matching_tests {
             if !analysis.file_operations.is_empty() {
                 for file_op in &analysis.file_operations {
                     assert!(
-                        file_op.file_path.contains("REVISED_STATUS_IMPLEMENTATION_ESTIMATES.md"),
+                        file_op
+                            .file_path
+                            .contains("REVISED_STATUS_IMPLEMENTATION_ESTIMATES.md"),
                         "File operation should be related to REVISED_STATUS_IMPLEMENTATION_ESTIMATES.md, found: {}",
                         file_op.file_path
                     );

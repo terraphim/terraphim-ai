@@ -18,10 +18,10 @@
 // specific language governing permissions and limitations
 // under the License.
 
-use opendal::services;
 use opendal::Operator;
 use opendal::Result as OpendalResult;
 use opendal::Scheme;
+use opendal::services;
 
 use std::borrow::Cow;
 use std::collections::HashMap;

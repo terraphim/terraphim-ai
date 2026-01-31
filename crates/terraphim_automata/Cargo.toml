@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_automata"
 version = "1.4.10"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Automata for searching and processing knowledge graphs"
 documentation = "https://terraphim.ai"

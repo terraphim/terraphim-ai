@@ -11,7 +11,7 @@ use std::time::SystemTime;
 
 // Automata imports for term extraction
 use ahash::AHashMap;
-use terraphim_automata::{find_matches, Matched};
+use terraphim_automata::{Matched, find_matches};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 /// Parsed command with enriched content analysis
@@ -716,7 +716,10 @@ impl MarkdownCommandParser {
         if !name_regex.is_match(&definition.name) {
             return Err(CommandRegistryError::invalid_frontmatter(
                 source_path,
-                format!("Invalid command name '{}'. Must start with letter and contain only alphanumeric characters, hyphens, and underscores", definition.name)
+                format!(
+                    "Invalid command name '{}'. Must start with letter and contain only alphanumeric characters, hyphens, and underscores",
+                    definition.name
+                ),
             ));
         }
 
@@ -727,7 +730,10 @@ impl MarkdownCommandParser {
             if !param_name_regex.is_match(&param.name) {
                 return Err(CommandRegistryError::invalid_frontmatter(
                     source_path,
-                    format!("Invalid parameter name '{}'. Must start with letter and contain only alphanumeric characters and underscores", param.name)
+                    format!(
+                        "Invalid parameter name '{}'. Must start with letter and contain only alphanumeric characters and underscores",
+                        param.name
+                    ),
                 ));
             }
         }
@@ -926,9 +932,11 @@ Some additional content that might be included.
         assert!(result.is_ok());
         let parsed = result.unwrap();
         assert!(parsed.content.contains("Test Command"));
-        assert!(parsed
-            .content
-            .contains("**bold** description with *italic* text and `code` blocks"));
+        assert!(
+            parsed
+                .content
+                .contains("**bold** description with *italic* text and `code` blocks")
+        );
         assert!(!parsed.content.contains("https://example.com"));
     }
 
@@ -1156,18 +1164,26 @@ Third paragraph with more information.";
         assert!(!thesaurus.is_empty());
 
         // Should contain learned terms
-        assert!(thesaurus
-            .get(&NormalizedTermValue::from("deploy"))
-            .is_some());
-        assert!(thesaurus
-            .get(&NormalizedTermValue::from("microservice"))
-            .is_some());
-        assert!(thesaurus
-            .get(&NormalizedTermValue::from("cluster"))
-            .is_some());
-        assert!(thesaurus
-            .get(&NormalizedTermValue::from("database"))
-            .is_some());
+        assert!(
+            thesaurus
+                .get(&NormalizedTermValue::from("deploy"))
+                .is_some()
+        );
+        assert!(
+            thesaurus
+                .get(&NormalizedTermValue::from("microservice"))
+                .is_some()
+        );
+        assert!(
+            thesaurus
+                .get(&NormalizedTermValue::from("cluster"))
+                .is_some()
+        );
+        assert!(
+            thesaurus
+                .get(&NormalizedTermValue::from("database"))
+                .is_some()
+        );
     }
 
     #[tokio::test]
@@ -1214,10 +1230,12 @@ The service requires proper database configuration and SSL certificates for secu
             enriched_command.parsed_command.definition.name,
             "deploy-service"
         );
-        assert!(enriched_command
-            .parsed_command
-            .content
-            .contains("Deploy Service Command"));
+        assert!(
+            enriched_command
+                .parsed_command
+                .content
+                .contains("Deploy Service Command")
+        );
 
         // Should have enriched content analysis
         assert!(enriched_command.enriched_content.is_some());
@@ -1225,15 +1243,21 @@ The service requires proper database configuration and SSL certificates for secu
 
         // Should have extracted keywords
         assert!(!enriched.extracted_keywords.is_empty());
-        assert!(enriched
-            .extracted_keywords
-            .contains(&"microservice".to_string()));
-        assert!(enriched
-            .extracted_keywords
-            .contains(&"kubernetes".to_string()));
-        assert!(enriched
-            .extracted_keywords
-            .contains(&"database".to_string()));
+        assert!(
+            enriched
+                .extracted_keywords
+                .contains(&"microservice".to_string())
+        );
+        assert!(
+            enriched
+                .extracted_keywords
+                .contains(&"kubernetes".to_string())
+        );
+        assert!(
+            enriched
+                .extracted_keywords
+                .contains(&"database".to_string())
+        );
 
         // Should have complexity metrics
         assert!(enriched.complexity_metrics.word_count > 0);
@@ -1279,9 +1303,11 @@ The service requires proper database configuration and SSL certificates for secu
         // Should find matches from thesaurus
         assert!(!analysis.matched_terms.is_empty());
         assert!(analysis.matched_terms.iter().any(|m| m.term == "database"));
-        assert!(analysis
-            .matched_terms
-            .iter()
-            .any(|m| m.term == "kubernetes"));
+        assert!(
+            analysis
+                .matched_terms
+                .iter()
+                .any(|m| m.term == "kubernetes")
+        );
     }
 }
