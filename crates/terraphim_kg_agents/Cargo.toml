@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_kg_agents"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 description = "Specialized knowledge graph-based agent implementations"
 license = "MIT OR Apache-2.0"
 

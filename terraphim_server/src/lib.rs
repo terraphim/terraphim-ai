@@ -3,14 +3,14 @@ use std::net::SocketAddr;
 use std::sync::Arc;
 
 use axum::{
-    http::{header, StatusCode, Uri},
+    Extension, Router,
+    http::{StatusCode, Uri, header},
     response::{Html, IntoResponse, Response},
     routing::{delete, get, post},
-    Extension, Router,
 };
 use regex::Regex;
 use rust_embed::RustEmbed;
-use tokio::sync::{broadcast, RwLock};
+use tokio::sync::{RwLock, broadcast};
 
 // Pre-compiled regex for normalizing document IDs (performance optimization)
 static NORMALIZE_REGEX: std::sync::LazyLock<Regex> = std::sync::LazyLock::new(|| {
@@ -137,15 +137,15 @@ mod error;
 
 pub mod workflows;
 
-use api::{
-    create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
-    search_documents_post,
-};
 pub use api::{
     AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
     CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
     ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
+};
+use api::{
+    create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,
+    search_documents_post,
 };
 pub use error::{Result, Status};
 
@@ -224,7 +224,12 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                         .await
                     {
                         Ok(thesaurus) => {
-                            log::info!("Successfully built and indexed rolegraph for role '{}' with {} terms and {} documents", role_name, thesaurus.len(), files.len());
+                            log::info!(
+                                "Successfully built and indexed rolegraph for role '{}' with {} terms and {} documents",
+                                role_name,
+                                thesaurus.len(),
+                                files.len()
+                            );
                             // Create rolegraph
                             let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
                             log::info!("Successfully created rolegraph for role '{}'", role_name);
@@ -273,16 +278,30 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
 
                                                 // Save document to persistence layer first
                                                 if let Err(e) = document.save().await {
-                                                    log::error!("Failed to save document '{}' to persistence: {}", document.id, e);
+                                                    log::error!(
+                                                        "Failed to save document '{}' to persistence: {}",
+                                                        document.id,
+                                                        e
+                                                    );
                                                 } else {
-                                                    log::info!("✅ Saved document '{}' to persistence layer", document.id);
+                                                    log::info!(
+                                                        "✅ Saved document '{}' to persistence layer",
+                                                        document.id
+                                                    );
                                                 }
 
                                                 // Validate document has content before indexing into rolegraph
                                                 if document.body.is_empty() {
-                                                    log::warn!("Document '{}' has empty body, cannot properly index into rolegraph", filename);
+                                                    log::warn!(
+                                                        "Document '{}' has empty body, cannot properly index into rolegraph",
+                                                        filename
+                                                    );
                                                 } else {
-                                                    log::debug!("Document '{}' has {} chars of body content", filename, document.body.len());
+                                                    log::debug!(
+                                                        "Document '{}' has {} chars of body content",
+                                                        filename,
+                                                        document.body.len()
+                                                    );
                                                 }
 
                                                 // Then add to rolegraph for KG indexing using the same normalized ID
@@ -300,7 +319,11 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
 
                                                 log::info!(
                                                     "✅ Indexed document '{}' into rolegraph (body: {} chars, nodes: {}, edges: {}, docs: {})",
-                                                    filename, document_clone.body.len(), node_count, edge_count, doc_count
+                                                    filename,
+                                                    document_clone.body.len(),
+                                                    node_count,
+                                                    edge_count,
+                                                    doc_count
                                                 );
                                             }
                                         }
@@ -377,9 +400,16 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
 
                                                     // Save document to persistence layer
                                                     if let Err(e) = document.save().await {
-                                                        log::debug!("Failed to save haystack document '{}' to persistence: {}", document.id, e);
+                                                        log::debug!(
+                                                            "Failed to save haystack document '{}' to persistence: {}",
+                                                            document.id,
+                                                            e
+                                                        );
                                                     } else {
-                                                        log::debug!("✅ Saved haystack document '{}' to persistence layer", document.id);
+                                                        log::debug!(
+                                                            "✅ Saved haystack document '{}' to persistence layer",
+                                                            document.id
+                                                        );
                                                         processed_count += 1;
                                                     }
                                                 }

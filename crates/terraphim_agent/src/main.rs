@@ -7,15 +7,15 @@ use crossterm::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
-    Terminal,
 };
 use tokio::runtime::Runtime;
 
@@ -646,7 +646,9 @@ fn main() -> Result<()> {
                 #[cfg(not(feature = "repl"))]
                 {
                     // If repl feature is not enabled, show error
-                    anyhow::bail!("REPL mode requires 'repl' feature. Build with: cargo build --features repl");
+                    anyhow::bail!(
+                        "REPL mode requires 'repl' feature. Build with: cargo build --features repl"
+                    );
                 }
             }
         }
@@ -1295,8 +1297,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
             list_templates,
         } => {
             use onboarding::{
-                apply_template, list_templates as get_templates, run_setup_wizard, SetupMode,
-                SetupResult,
+                SetupMode, SetupResult, apply_template, list_templates as get_templates,
+                run_setup_wizard,
             };
 
             // List templates and exit if requested

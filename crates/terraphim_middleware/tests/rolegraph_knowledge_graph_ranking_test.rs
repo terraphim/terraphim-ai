@@ -1,10 +1,10 @@
 use serial_test::serial;
-use terraphim_automata::{AutomataPath, load_thesaurus};
+use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
 };
 use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
-use terraphim_middleware::{RipgrepIndexer, indexer::IndexMiddleware};
+use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::{
     Document, KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName,

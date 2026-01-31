@@ -5,10 +5,10 @@
 #[cfg(feature = "native")]
 pub mod native {
     use crate::{
+        Result,
         auth::get_authentication_headers,
         error::AtomicError,
         types::{Commit, Config},
-        Result,
     };
     use reqwest::Client;
     use serde_json::Value;
@@ -96,10 +96,10 @@ pub mod native {
 #[cfg(feature = "wasm")]
 pub mod wasm {
     use crate::{
+        Result,
         auth::get_authentication_headers,
         error::AtomicError,
         types::{Commit, Config},
-        Result,
     };
     use serde_json::Value;
     use wasm_bindgen::{JsCast, JsValue};

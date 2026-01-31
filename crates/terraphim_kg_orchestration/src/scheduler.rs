@@ -96,7 +96,7 @@ impl TaskScheduler {
 
     /// Create a default role graph for testing
     async fn create_default_role_graph() -> OrchestrationResult<Arc<RoleGraph>> {
-        use terraphim_automata::{load_thesaurus, AutomataPath};
+        use terraphim_automata::{AutomataPath, load_thesaurus};
         use terraphim_types::RoleName;
 
         let role_name = RoleName::new("orchestration_role");
