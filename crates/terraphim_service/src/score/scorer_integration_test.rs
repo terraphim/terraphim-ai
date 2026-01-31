@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
     use super::super::*;
-    use terraphim_types::Document;
+    use terraphim_types::{Document, DocumentType};
 
     fn create_test_documents() -> Vec<Document> {
         vec![
@@ -18,6 +18,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "rust".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "doc2".to_string(),
@@ -30,6 +34,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "python".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "doc3".to_string(),
@@ -43,6 +51,10 @@ mod tests {
                 tags: Some(vec!["ai".to_string(), "ml".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ]
     }

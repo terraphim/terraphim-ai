@@ -4,7 +4,7 @@ use async_trait::async_trait;
 use reqwest::Client;
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
-use terraphim_types::{Document, Index};
+use terraphim_types::{Document, DocumentType, Index};
 
 #[derive(Debug, Clone)]
 pub struct ClickUpHaystackIndexer {
@@ -34,6 +34,10 @@ impl ClickUpHaystackIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         dummy_doc.normalize_key(original_id)
     }
@@ -60,6 +64,10 @@ impl ClickUpHaystackIndexer {
             tags: Some(vec!["clickup".to_string(), "task".to_string()]),
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         })
     }
 }

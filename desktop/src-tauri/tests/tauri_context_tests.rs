@@ -6,7 +6,7 @@
 
 use serial_test::serial;
 use std::collections::HashMap;
-use terraphim_types::Document;
+use terraphim_types::{Document, DocumentType};
 
 // Import the command functions and types directly from the cmd module
 use terraphim_ai_desktop::cmd::{
@@ -28,6 +28,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["rust".to_string(), "programming".to_string(), "guide".to_string()]),
             rank: Some(95),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc-2".to_string(),
@@ -40,6 +44,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["rust".to_string(), "async".to_string(), "tokio".to_string()]),
             rank: Some(88),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc-3".to_string(),
@@ -52,6 +60,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["rust".to_string(), "web".to_string(), "axum".to_string()]),
             rank: Some(82),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
     ]
 }

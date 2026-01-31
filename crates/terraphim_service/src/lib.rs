@@ -2053,6 +2053,10 @@ impl TerraphimService {
                                                 tags: document.tags.clone(),
                                                 rank: document.rank,
                                                 source_haystack: document.source_haystack.clone(),
+                                                doc_type: terraphim_types::DocumentType::KgEntry,
+                                                synonyms: None,
+                                                route: None,
+                                                priority: None,
                                             };
 
                                             // Save to persistence for future use
@@ -3088,6 +3092,10 @@ mod tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Test 1: Save Atomic Data document to persistence
@@ -3206,6 +3214,10 @@ mod tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Save the Atomic Data document to persistence
@@ -3327,6 +3339,10 @@ mod tests {
                 tags: Some(vec!["test".to_string(), "first".to_string()]),
                 rank: None, // Should be assigned by the function
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "test-doc-2".to_string(),
@@ -3339,6 +3355,10 @@ mod tests {
                 tags: Some(vec!["test".to_string(), "second".to_string()]),
                 rank: None, // Should be assigned by the function
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "test-doc-3".to_string(),
@@ -3351,6 +3371,10 @@ mod tests {
                 tags: Some(vec!["test".to_string(), "third".to_string()]),
                 rank: None, // Should be assigned by the function
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
