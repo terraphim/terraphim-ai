@@ -26,10 +26,6 @@ pub enum ValidationError {
     #[error("Service {0} requires: {1}")]
     ServiceRequirement(String, String),
 
-    /// Path does not exist on filesystem
-    #[error("Path does not exist: {0}")]
-    PathNotFound(String),
-
     /// URL is malformed
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),

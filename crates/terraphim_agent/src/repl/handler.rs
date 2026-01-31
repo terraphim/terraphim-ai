@@ -9,6 +9,9 @@ use crate::{client::ApiClient, service::TuiService};
 
 // Import robot module types
 use crate::robot::{ExitCode, SelfDocumentation};
+
+#[cfg(feature = "repl-mcp")]
+use crate::repl::mcp_tools::McpToolsHandler;
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -23,14 +26,24 @@ pub struct ReplHandler {
     service: Option<TuiService>,
     api_client: Option<ApiClient>,
     current_role: String,
+    #[cfg(feature = "repl-mcp")]
+    mcp_handler: Option<McpToolsHandler>,
 }
 
 impl ReplHandler {
     pub fn new_offline(service: TuiService) -> Self {
+        #[cfg(feature = "repl-mcp")]
+        let mcp_handler = {
+            let service_arc = std::sync::Arc::new(service.clone());
+            Some(McpToolsHandler::new(service_arc))
+        };
+
         Self {
             service: Some(service),
             api_client: None,
             current_role: "Default".to_string(),
+            #[cfg(feature = "repl-mcp")]
+            mcp_handler,
         }
     }
 
@@ -39,6 +52,8 @@ impl ReplHandler {
             service: None,
             api_client: Some(api_client),
             current_role: "Terraphim Engineer".to_string(),
+            #[cfg(feature = "repl-mcp")]
+            mcp_handler: None,
         }
     }
 
@@ -781,39 +796,18 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Autocompleting: '{}'", "🔍".bold(), query.cyan());
 
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service.autocomplete(&role_name, &query, limit).await {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.autocomplete_terms(&query, limit).await {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
                         } else {
-                            let mut table = Table::new();
-                            table
-                                .load_preset(UTF8_FULL)
-                                .apply_modifier(UTF8_ROUND_CORNERS)
-                                .set_header(vec![
-                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                                ]);
-
-                            for result in &results {
-                                table.add_row(vec![
-                                    Cell::new(&result.term),
-                                    Cell::new(format!("{:.2}", result.score)),
-                                    Cell::new(result.url.as_deref().unwrap_or("N/A")),
-                                ]);
+                            for (i, term) in results.iter().enumerate() {
+                                println!("  {}. {}", (i + 1).to_string().yellow(), term);
                             }
-
-                            println!("{}", table);
                             println!(
                                 "{} Found {} suggestion(s)",
                                 "✅".bold(),
@@ -850,45 +844,28 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Extracting paragraphs from text...", "📄".bold());
 
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service
-                    .extract_paragraphs(&role_name, &text, exclude_term)
-                    .await
-                {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.extract_paragraphs(&text, exclude_term).await {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No paragraphs found", "ℹ".blue().bold());
                         } else {
-                            let mut table = Table::new();
-                            table
-                                .load_preset(UTF8_FULL)
-                                .apply_modifier(UTF8_ROUND_CORNERS)
-                                .set_header(vec![
-                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Paragraph")
-                                        .add_attribute(comfy_table::Attribute::Bold),
-                                ]);
-
-                            for (term, paragraph) in &results {
-                                let truncated_paragraph = if paragraph.len() > 100 {
+                            for (i, (term, paragraph)) in results.iter().enumerate() {
+                                let truncated = if paragraph.len() > 100 {
                                     format!("{}...", &paragraph[..97])
                                 } else {
                                     paragraph.clone()
                                 };
-
-                                table
-                                    .add_row(vec![Cell::new(term), Cell::new(truncated_paragraph)]);
+                                println!(
+                                    "  {}. {}: {}",
+                                    (i + 1).to_string().yellow(),
+                                    term.cyan(),
+                                    truncated
+                                );
                             }
-
-                            println!("{}", table);
                             println!(
                                 "{} Found {} paragraph(s)",
                                 "✅".bold(),
@@ -921,40 +898,18 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Finding matches in text...", "🔍".bold());
 
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service.find_matches(&role_name, &text).await {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.find_matches(&text).await {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No matches found", "ℹ".blue().bold());
                         } else {
-                            let mut table = Table::new();
-                            table
-                                .load_preset(UTF8_FULL)
-                                .apply_modifier(UTF8_ROUND_CORNERS)
-                                .set_header(vec![
-                                    Cell::new("Match").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Start").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("End").add_attribute(comfy_table::Attribute::Bold),
-                                ]);
-
-                            for matched in &results {
-                                let (start, end) = matched.pos.unwrap_or((0, 0));
-                                table.add_row(vec![
-                                    Cell::new(matched.normalized_term.value.as_str()),
-                                    Cell::new(start.to_string()),
-                                    Cell::new(end.to_string()),
-                                ]);
+                            for (i, matched) in results.iter().enumerate() {
+                                println!("  {}. {}", (i + 1).to_string().yellow(), matched);
                             }
-
-                            println!("{}", table);
                             println!(
                                 "{} Found {} match(es)",
                                 "✅".bold(),
@@ -990,18 +945,8 @@ impl ReplHandler {
 
             println!("{} Replacing matches in text...", "🔄".bold());
 
-            let link_type = match format.as_deref() {
-                Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
-                Some("html") => terraphim_automata::LinkType::HTMLLinks,
-                Some("wiki") => terraphim_automata::LinkType::WikiLinks,
-                Some("plain") => terraphim_automata::LinkType::PlainText,
-                _ => terraphim_automata::LinkType::PlainText, // Default to plain text
-            };
-
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service.replace_matches(&role_name, &text, link_type).await {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.replace_matches(&text, format).await {
                     Ok(result) => {
                         println!("\n{} {}\n", "📝".bold(), "Result:".bold());
                         println!("{}", result);
@@ -1031,51 +976,33 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Loading thesaurus...", "📚".bold());
 
-            if let Some(service) = &self.service {
-                let role_name = if let Some(role_str) = role {
-                    terraphim_types::RoleName::new(&role_str)
-                } else {
-                    service.get_selected_role().await
-                };
-
-                match service.get_thesaurus(&role_name).await {
-                    Ok(thesaurus) => {
-                        let mut table = Table::new();
-                        table
-                            .load_preset(UTF8_FULL)
-                            .apply_modifier(UTF8_ROUND_CORNERS)
-                            .set_header(vec![
-                                Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
-                                Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
-                                Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                            ]);
-
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.get_thesaurus(role).await {
+                    Ok(results) => {
                         let mut count = 0;
-                        for (term, normalized) in (&thesaurus).into_iter().take(20) {
+                        for (term, url) in results.iter().take(20) {
                             // Show first 20 entries
-                            table.add_row(vec![
-                                Cell::new(term.as_str()),
-                                Cell::new(normalized.id.to_string()),
-                                Cell::new(normalized.value.as_str()),
-                                Cell::new(normalized.url.as_deref().unwrap_or("N/A")),
-                            ]);
+                            if url.is_empty() {
+                                println!("  {}. {}", (count + 1).to_string().yellow(), term);
+                            } else {
+                                println!(
+                                    "  {}. {} -> {}",
+                                    (count + 1).to_string().yellow(),
+                                    term,
+                                    url.cyan()
+                                );
+                            }
                             count += 1;
                         }
 
-                        println!("{}", table);
                         println!(
-                            "{} Showing {} of {} thesaurus entries for role '{}'",
+                            "{} Showing {} of {} thesaurus entries",
                             "✅".bold(),
                             count.to_string().green(),
-                            thesaurus.len().to_string().cyan(),
-                            role_name.to_string().yellow()
+                            results.len().to_string().cyan()
                         );
                     }
                     Err(e) => {
