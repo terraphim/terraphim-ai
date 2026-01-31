@@ -3,6 +3,9 @@
 //! This binary provides a CLI interface for running comprehensive performance
 //! benchmarks on terraphim-ai components, with CI/CD integration.
 
+#![allow(unused)]
+#![allow(dead_code)]
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
