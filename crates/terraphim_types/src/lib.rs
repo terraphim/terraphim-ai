@@ -77,8 +77,8 @@
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::hash_map::Iter;
 use std::collections::HashSet;
+use std::collections::hash_map::Iter;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
@@ -339,18 +339,13 @@ impl Display for Concept {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum DocumentType {
+    #[default]
     KgEntry,
     Document,
     ConfigDocument,
-}
-
-impl Default for DocumentType {
-    fn default() -> Self {
-        DocumentType::KgEntry
-    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -1009,7 +1004,7 @@ impl ContextItem {
         if !document.url.is_empty() {
             metadata.insert("url".to_string(), document.url.clone());
         }
-        if let Some(ref tags) = &document.tags {
+        if let Some(tags) = &document.tags {
             metadata.insert("tags".to_string(), tags.join(", "));
         }
         if let Some(rank) = document.rank {

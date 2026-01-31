@@ -24,7 +24,7 @@ mod validation;
 mod wizard;
 
 pub use templates::{ConfigTemplate, TemplateRegistry};
-pub use wizard::{apply_template, run_setup_wizard, SetupMode, SetupResult};
+pub use wizard::{SetupMode, SetupResult, apply_template, run_setup_wizard};
 
 use thiserror::Error;
 
@@ -48,7 +48,9 @@ pub enum OnboardingError {
     Io(#[from] std::io::Error),
 
     /// Not running in a TTY - interactive mode requires a terminal
-    #[error("Not a TTY - interactive mode requires a terminal. Use --template for non-interactive mode.")]
+    #[error(
+        "Not a TTY - interactive mode requires a terminal. Use --template for non-interactive mode."
+    )]
     NotATty,
 
     /// JSON serialization/deserialization error

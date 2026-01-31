@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::time::{Duration, Instant};
 use terraphim_config::{Haystack, Role, ServiceType};
-use terraphim_service::llm::{build_llm_from_role, ChatOptions};
+use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use tokio::time::sleep;
 
 /// Load configuration from .env file
@@ -548,7 +548,10 @@ async fn test_performance_benchmarks() {
     let test_cases = vec![
         ("short", "Hello"),
         ("medium", "Explain what Terraphim AI does in 2-3 sentences."),
-        ("long", "Please provide a detailed explanation of how semantic search works, including the benefits of using knowledge graphs for document retrieval and the role of vector embeddings in modern information retrieval systems."),
+        (
+            "long",
+            "Please provide a detailed explanation of how semantic search works, including the benefits of using knowledge graphs for document retrieval and the role of vector embeddings in modern information retrieval systems.",
+        ),
     ];
 
     println!("Running performance benchmarks...");

@@ -12,7 +12,7 @@ use chrono::Utc;
 use async_trait::async_trait;
 use log::{debug, error, info, warn};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 
 use terraphim_agent_supervisor::{
     AgentFactory, AgentPid, AgentSpec, AgentStatus, AgentSupervisor, ExitReason, InitArgs,

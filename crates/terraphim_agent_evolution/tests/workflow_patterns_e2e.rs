@@ -183,9 +183,11 @@ async fn test_prompt_chaining_generation_chain() {
 
     // Should have generation-specific steps (falls back to generic chain)
     let step_ids: Vec<_> = result.execution_trace.iter().map(|s| &s.step_id).collect();
-    assert!(step_ids
-        .iter()
-        .any(|id| id.contains("understand_task") || id.contains("execute_task")));
+    assert!(
+        step_ids
+            .iter()
+            .any(|id| id.contains("understand_task") || id.contains("execute_task"))
+    );
 }
 
 // =============================================================================
@@ -211,14 +213,18 @@ async fn test_routing_simple_task_optimization() {
 
     // Should have selected appropriate route for simple task
     assert!(result.execution_trace.len() >= 2); // Route selection + execution
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id == "route_selection"));
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id == "task_execution"));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id == "route_selection")
+    );
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id == "task_execution")
+    );
 
     // Simple task should optimize for cost/speed
     assert!(result.metadata.resources_used.llm_calls <= 2);
@@ -267,10 +273,12 @@ async fn test_routing_fallback_strategy() {
 
     // Should succeed using fallback route
     assert!(result.metadata.success);
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id.contains("route_selection")));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id.contains("route_selection"))
+    );
 }
 
 // =============================================================================
@@ -299,22 +307,28 @@ async fn test_parallelization_comparison_task_e2e() {
     // Should have created multiple parallel tasks
     assert!(result.execution_trace.len() >= 3);
     // Check for step types using pattern matching instead of equality
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| matches!(s.step_type, workflows::StepType::Parallel)));
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| matches!(s.step_type, workflows::StepType::Aggregation)));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| matches!(s.step_type, workflows::StepType::Parallel))
+    );
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| matches!(s.step_type, workflows::StepType::Aggregation))
+    );
 
     // Should have parallel tasks (falls back to generic parallel tasks)
     let task_descriptions: Vec<_> = result.execution_trace.iter().map(|s| &s.step_id).collect();
-    assert!(task_descriptions
-        .iter()
-        .any(|id| id.contains("analysis_perspective")
-            || id.contains("practical_perspective")
-            || id.contains("creative_perspective")));
+    assert!(
+        task_descriptions
+            .iter()
+            .any(|id| id.contains("analysis_perspective")
+                || id.contains("practical_perspective")
+                || id.contains("creative_perspective"))
+    );
 
     // Resource usage should reflect parallel execution
     assert!(result.metadata.resources_used.parallel_tasks >= 2);
@@ -366,10 +380,12 @@ async fn test_parallelization_aggregation_strategies() {
         assert!(!result.result.is_empty());
 
         // Should have aggregation step in trace
-        assert!(result
-            .execution_trace
-            .iter()
-            .any(|s| matches!(s.step_type, workflows::StepType::Aggregation)));
+        assert!(
+            result
+                .execution_trace
+                .iter()
+                .any(|s| matches!(s.step_type, workflows::StepType::Aggregation))
+        );
     }
 }
 
@@ -403,10 +419,12 @@ async fn test_orchestrator_workers_sequential_execution() {
     assert_eq!(result.metadata.pattern_used, "orchestrator_workers");
 
     // Should have orchestrator planning phase
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id == "orchestrator_planning"));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id == "orchestrator_planning")
+    );
 
     // Should have worker execution phases
     let worker_steps: Vec<_> = result
@@ -417,10 +435,12 @@ async fn test_orchestrator_workers_sequential_execution() {
     assert!(worker_steps.len() >= 3); // At least 3 workers should execute
 
     // Should have final synthesis
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id == "final_synthesis"));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id == "final_synthesis")
+    );
 
     // Resource usage should reflect coordinated execution
     assert!(result.metadata.resources_used.llm_calls >= 4); // Orchestrator + workers
@@ -496,10 +516,12 @@ async fn test_orchestrator_workers_quality_gate() {
     assert!(result.metadata.quality_score.unwrap_or(0.0) >= 0.7);
 
     // Should have quality assessment in trace
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id.contains("review") || s.step_id.contains("quality")));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id.contains("review") || s.step_id.contains("quality"))
+    );
 }
 
 // =============================================================================
@@ -532,10 +554,12 @@ async fn test_evaluator_optimizer_iterative_improvement() {
 
     // Should show at least initial generation, may have optimization iterations
     assert!(!result.execution_trace.is_empty()); // At least initial generation
-    assert!(result
-        .execution_trace
-        .iter()
-        .any(|s| s.step_id == "initial_generation"));
+    assert!(
+        result
+            .execution_trace
+            .iter()
+            .any(|s| s.step_id == "initial_generation")
+    );
     // Note: May not have optimization iterations if quality threshold is met early
 
     // Quality should meet or exceed threshold

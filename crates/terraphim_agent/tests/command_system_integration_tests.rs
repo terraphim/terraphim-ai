@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 use terraphim_agent::commands::validator::{SecurityAction, SecurityResult};
 use terraphim_agent::commands::{
-    hooks, CommandHook, CommandRegistry, CommandValidator, ExecutionMode, HookContext, HookManager,
+    CommandHook, CommandRegistry, CommandValidator, ExecutionMode, HookContext, HookManager, hooks,
 };
 use tokio::fs;
 
@@ -591,10 +591,12 @@ async fn test_command_suggestion_system() {
     // Test description-based search
     let deploy_commands = registry.search_commands("application").await;
     assert_eq!(deploy_commands.len(), 1, "Should find deploy command");
-    assert!(deploy_commands[0]
-        .definition
-        .description
-        .contains("Deploy applications"));
+    assert!(
+        deploy_commands[0]
+            .definition
+            .description
+            .contains("Deploy applications")
+    );
 
     // Test case-insensitive search
     let hello_commands = registry.search_commands("HeLLo").await;
@@ -631,12 +633,14 @@ async fn test_parameter_validation_integration() {
     assert_eq!(env_param.param_type, "string");
     assert!(env_param.required);
     // Use get_validation() which merges direct allowed_values with nested validation
-    assert!(env_param
-        .get_validation()
-        .as_ref()
-        .unwrap()
-        .allowed_values
-        .is_some());
+    assert!(
+        env_param
+            .get_validation()
+            .as_ref()
+            .unwrap()
+            .allowed_values
+            .is_some()
+    );
 
     let dry_run_param = &deploy_cmd.definition.parameters[1];
     assert_eq!(dry_run_param.name, "dry_run");

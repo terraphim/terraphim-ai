@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as FmtWrite;
 use tabled::{
-    settings::{object::Columns, Modify, Style, Width},
     Table, Tabled,
+    settings::{Modify, Style, Width, object::Columns},
 };
 
 pub struct Reporter {

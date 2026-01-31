@@ -12,7 +12,7 @@ use terraphim_types::RelevanceFunction;
 /// Test that all 6 templates are available and can be applied
 #[test]
 fn test_all_templates_available() {
-    use terraphim_agent::onboarding::{apply_template, TemplateRegistry};
+    use terraphim_agent::onboarding::{TemplateRegistry, apply_template};
 
     let registry = TemplateRegistry::new();
     let templates = registry.list();

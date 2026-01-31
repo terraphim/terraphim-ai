@@ -168,8 +168,10 @@ async fn test_end_to_end_offline_workflow() -> Result<()> {
         "Setting role should succeed: stderr={}",
         set_stderr
     );
-    assert!(extract_clean_output(&set_stdout)
-        .contains(&format!("updated selected_role to {}", custom_role)));
+    assert!(
+        extract_clean_output(&set_stdout)
+            .contains(&format!("updated selected_role to {}", custom_role))
+    );
     println!("✓ Set role: {}", custom_role);
 
     // 4. Verify role persistence

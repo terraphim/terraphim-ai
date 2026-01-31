@@ -110,9 +110,11 @@ mod tests {
 
         // Verify the retrieved resource
         assert_eq!(retrieved_resource.subject, test_resource_id);
-        assert!(retrieved_resource
-            .properties
-            .contains_key("https://atomicdata.dev/properties/shortname"));
+        assert!(
+            retrieved_resource
+                .properties
+                .contains_key("https://atomicdata.dev/properties/shortname")
+        );
 
         // Update the resource
         let mut update_map = HashMap::new();
@@ -360,8 +362,10 @@ async fn test_create_and_query() {
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     // Use the API endpoint directly to query by class
-    let query_url = format!("{}/query?property=https://atomicdata.dev/properties/isA&value=https://atomicdata.dev/classes/Article",
-                           store.config.server_url.trim_end_matches('/'));
+    let query_url = format!(
+        "{}/query?property=https://atomicdata.dev/properties/isA&value=https://atomicdata.dev/classes/Article",
+        store.config.server_url.trim_end_matches('/')
+    );
     let query_resource = store.get_resource(&query_url).await.expect("Query failed");
     let query_results = [query_resource];
 
