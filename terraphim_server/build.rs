@@ -86,7 +86,9 @@ fn main() -> std::io::Result<()> {
 
 fn should_build(dirs: &Dirs) -> bool {
     if !dirs.browser_root.exists() {
-        p!("Could not find browser folder, assuming this is a `cargo publish` run. Skipping JS build.");
+        p!(
+            "Could not find browser folder, assuming this is a `cargo publish` run. Skipping JS build."
+        );
         return false;
     }
 

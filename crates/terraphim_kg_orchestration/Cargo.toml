@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_kg_orchestration"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Knowledge graph-based agent orchestration engine for coordinating multi-agent workflows"
 documentation = "https://terraphim.ai"

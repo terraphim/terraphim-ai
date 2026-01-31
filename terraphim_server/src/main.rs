@@ -21,7 +21,7 @@ use std::net::SocketAddr;
 use terraphim_config::ConfigState;
 use terraphim_config::{ConfigBuilder, ConfigId};
 use terraphim_persistence::Persistable;
-use terraphim_server::{axum_server, Result};
+use terraphim_server::{Result, axum_server};
 use terraphim_settings::DeviceSettings;
 // TODO: Re-enable auto-update when terraphim_update is added to workspace
 // use terraphim_update::{check_for_updates, update_binary};
