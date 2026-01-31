@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use terraphim_config::{Haystack, ServiceType};
-use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
+use terraphim_middleware::{RipgrepIndexer, indexer::IndexMiddleware};
 
 /// Integration test to demonstrate and validate Ripgrep tag filtering functionality
 #[tokio::test]

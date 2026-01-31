@@ -263,7 +263,9 @@ mod kg_protocol_resolution_test {
             assert!(
                 id.contains("terraphim-graph") && first_id.contains("terraphim-graph"),
                 "All synonyms should resolve to documents with 'terraphim-graph' in ID. '{}' resolved to '{}' but expected similar to '{}'",
-                synonym, id, first_id
+                synonym,
+                id,
+                first_id
             );
         }
 

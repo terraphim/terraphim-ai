@@ -18,9 +18,11 @@ use terraphim_automata::AutomataPath;
 /// that uses local KG files and builds thesaurus from local markdown files
 async fn create_autocomplete_test_config() -> Result<String> {
     // Use memory-only persistence to avoid RocksDB filesystem issues in CI
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
-    // Isolate logs to tmp
-    std::env::set_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    unsafe {
+        std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+        // Isolate logs to tmp
+        std::env::set_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    }
     // Force persistence layer to use memory-only device settings
     let _ = DeviceStorage::init_memory_only().await;
     let current_dir = std::env::current_dir()?;

@@ -4,6 +4,7 @@
 
 use anyhow::Result;
 use terraphim_agent::service::TuiService;
+use terraphim_types::RoleName;
 
 /// Test that TuiService can be created and basic methods work
 #[tokio::test]
@@ -167,6 +168,61 @@ async fn test_tui_service_find_matches() -> Result<()> {
             println!("Find matches returned error (expected if no data): {}", e);
         }
     }
+
+    Ok(())
+}
+
+/// Test that role discovery works with shortnames and case-insensitive lookups
+#[tokio::test]
+async fn test_tui_service_find_role_by_shortname() -> Result<()> {
+    let service = TuiService::new_with_embedded_defaults().await?;
+    let roles = service.list_roles_with_info().await;
+
+    let (role_name, shortname) = roles
+        .into_iter()
+        .find(|(_, short)| short.is_some())
+        .expect("Embedded config should include at least one shortname");
+
+    let shortname = shortname.expect("shortname already verified as Some");
+
+    let found = service
+        .find_role_by_name_or_shortname(&shortname)
+        .await
+        .expect("Should find role by its shortname");
+    assert_eq!(found, RoleName::new(&role_name));
+
+    // Ensure lookup is case-insensitive
+    let found_upper = service
+        .find_role_by_name_or_shortname(&shortname.to_uppercase())
+        .await
+        .expect("Should find role ignoring case");
+    assert_eq!(found_upper, RoleName::new(&role_name));
+
+    Ok(())
+}
+
+/// Test that updating the selected role persists across service queries
+#[tokio::test]
+async fn test_tui_service_update_selected_role() -> Result<()> {
+    let service = TuiService::new_with_embedded_defaults().await?;
+    let current_role = service.get_selected_role().await;
+
+    let new_role = service
+        .list_roles_with_info()
+        .await
+        .into_iter()
+        .map(|(name, _)| RoleName::new(&name))
+        .find(|role| role != &current_role)
+        .expect("Embedded config should contain multiple roles");
+
+    let updated_config = service
+        .update_selected_role(new_role.clone())
+        .await
+        .expect("Should update selected role");
+    assert_eq!(updated_config.selected_role, new_role);
+
+    let persisted_role = service.get_selected_role().await;
+    assert_eq!(persisted_role, new_role);
 
     Ok(())
 }
