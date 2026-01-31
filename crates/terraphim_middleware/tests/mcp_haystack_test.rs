@@ -24,11 +24,9 @@ async fn mcp_live_haystack_smoke() {
         terraphim_it: false,
         theme: "lumen".to_string(),
         kg: None,
-        haystacks: vec![
-            Haystack::new(base_url.clone(), ServiceType::Mcp, true)
-                .with_extra_parameter("base_url".into(), base_url.clone())
-                .with_extra_parameter("transport".into(), "sse".into()),
-        ],
+        haystacks: vec![Haystack::new(base_url.clone(), ServiceType::Mcp, true)
+            .with_extra_parameter("base_url".into(), base_url.clone())
+            .with_extra_parameter("transport".into(), "sse".into())],
         llm_enabled: false,
         llm_api_key: None,
         llm_model: None,

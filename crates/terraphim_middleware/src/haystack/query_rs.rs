@@ -1,4 +1,4 @@
-use crate::{Result, indexer::IndexMiddleware};
+use crate::{indexer::IndexMiddleware, Result};
 use async_trait::async_trait;
 use reqwest::Client;
 use scraper::{Html, Selector};
