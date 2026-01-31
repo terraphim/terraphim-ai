@@ -77,6 +77,14 @@ pub struct HookManager {
     hooks: Vec<Arc<dyn Hook>>,
 }
 
+impl std::fmt::Debug for HookManager {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HookManager")
+            .field("hook_count", &self.hooks.len())
+            .finish()
+    }
+}
+
 impl HookManager {
     pub fn new() -> Self {
         Self { hooks: Vec::new() }

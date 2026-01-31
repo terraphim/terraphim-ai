@@ -3,7 +3,7 @@ use crate::score::bm25_additional::{
     JaccardScorer, OkapiBM25Scorer, QueryRatioScorer, TFIDFScorer,
 };
 use crate::score::common::{BM25Params, FieldWeights};
-use terraphim_types::Document;
+use terraphim_types::{Document, DocumentType};
 
 fn create_test_documents() -> Vec<Document> {
     vec![
@@ -18,6 +18,10 @@ fn create_test_documents() -> Vec<Document> {
             stub: None,
             url: "https://example.com/doc1".to_string(),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc2".to_string(),
@@ -30,6 +34,10 @@ fn create_test_documents() -> Vec<Document> {
             stub: None,
             url: "https://example.com/doc2".to_string(),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc3".to_string(),
@@ -42,6 +50,10 @@ fn create_test_documents() -> Vec<Document> {
             stub: None,
             url: "https://example.com/doc3".to_string(),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
     ]
 }

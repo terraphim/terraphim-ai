@@ -437,6 +437,10 @@ mod tests {
             tags: Some(vec!["test".to_string(), "document".to_string()]),
             rank: Some(10),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         let context = context_manager.create_document_context(&document);
@@ -464,6 +468,10 @@ mod tests {
                 tags: None,
                 rank: Some(5),
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "doc2".to_string(),
@@ -476,6 +484,10 @@ mod tests {
                 tags: None,
                 rank: Some(3),
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
@@ -714,6 +726,10 @@ mod tests {
             tags: Some(vec!["test".to_string(), "summary".to_string()]),
             rank: Some(88),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         let context_item = context_manager.create_document_context(&document);

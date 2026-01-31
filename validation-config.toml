@@ -1,0 +1,14 @@
+download_dir = "target/validation-downloads"
+concurrent_validations = 4
+timeout_seconds = 1800
+enabled_platforms = [
+    "LinuxX86_64",
+    "MacOSX86_64",
+    "WindowsX86_64",
+]
+enabled_categories = [
+    "download",
+    "installation",
+    "functionality",
+    "security",
+]

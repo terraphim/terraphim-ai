@@ -319,6 +319,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "2".to_string(),
@@ -331,6 +335,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
@@ -366,6 +374,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "2".to_string(),
@@ -378,6 +390,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
@@ -413,6 +429,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "2".to_string(),
@@ -425,6 +445,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
@@ -460,6 +484,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "systems".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "2".to_string(),
@@ -472,6 +500,10 @@ mod tests {
                 tags: Some(vec!["programming".to_string(), "tutorial".to_string()]),
                 rank: None,
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
