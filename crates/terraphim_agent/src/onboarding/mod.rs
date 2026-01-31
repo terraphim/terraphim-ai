@@ -43,10 +43,6 @@ pub enum OnboardingError {
     #[error("Validation failed: {0}")]
     Validation(String),
 
-    /// Configuration error from terraphim_config
-    #[error("Configuration error: {0}")]
-    Config(String),
-
     /// IO error during file operations
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
@@ -55,21 +51,9 @@ pub enum OnboardingError {
     #[error("Not a TTY - interactive mode requires a terminal. Use --template for non-interactive mode.")]
     NotATty,
 
-    /// Role with this name already exists
-    #[error("Role already exists: {0}")]
-    RoleExists(String),
-
     /// JSON serialization/deserialization error
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
-
-    /// Network error during URL validation
-    #[error("Network error: {0}")]
-    Network(String),
-
-    /// Path does not exist
-    #[error("Path does not exist: {0}")]
-    PathNotFound(String),
 
     /// User went back in wizard navigation
     #[error("User navigated back")]
