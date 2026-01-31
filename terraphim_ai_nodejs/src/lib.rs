@@ -428,7 +428,7 @@ table = "terraphim_kv"
     let settings_path = temp_dir.path().join("settings.toml");
     fs::write(&settings_path, settings_content).expect("Failed to write settings");
 
-    // Updating process-wide env vars now requires acknowledging unsafe mutation.
+    // SAFETY: This test runs in isolation before spawning other threads
     unsafe {
       std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
     }
