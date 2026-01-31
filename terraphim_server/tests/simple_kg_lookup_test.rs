@@ -58,6 +58,10 @@ async fn test_kg_lookup_functionality_basic() {
         ]),
         rank: None,
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     // Test persistence layer

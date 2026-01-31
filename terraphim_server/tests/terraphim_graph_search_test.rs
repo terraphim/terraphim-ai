@@ -5,7 +5,9 @@ use std::path::PathBuf;
 use terraphim_config::{Config, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
 use terraphim_persistence::{DeviceStorage, Persistable};
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
+use terraphim_types::{
+    Document, DocumentType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
+};
 
 /// Comprehensive test for TerraphimGraph search issue
 ///
@@ -44,6 +46,10 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             tags: Some(vec!["haystack".to_string(), "service".to_string()]),
             rank: None,
             source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
         },
         Document {
             id: "service_doc".to_string(),
@@ -56,6 +62,10 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             tags: Some(vec!["service".to_string()]),
             rank: None,
             source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
         },
         Document {
             id: "terraphim_graph_doc".to_string(),
@@ -71,6 +81,10 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             tags: Some(vec!["terraphim-graph".to_string(), "knowledge-graph".to_string()]),
             rank: None,
             source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
         },
     ];
 
@@ -292,6 +306,10 @@ async fn test_persistence_fallback_behavior() -> Result<(), Box<dyn std::error::
         tags: Some(vec!["fallback".to_string(), "test".to_string()]),
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     // Save to all profiles

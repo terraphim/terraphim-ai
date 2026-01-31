@@ -4,7 +4,7 @@ use std::str::FromStr;
 
 use markdown::mdast::Node;
 use markdown::ParseOptions;
-use terraphim_types::Document;
+use terraphim_types::{Document, DocumentType};
 use thiserror::Error;
 use ulid::Ulid;
 
@@ -126,6 +126,10 @@ pub fn blocks_to_documents(source_id: &str, normalized: &NormalizedMarkdown) -> 
                 tags: None,
                 rank: None,
                 source_haystack: None,
+                doc_type: DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             }
         })
         .collect()
