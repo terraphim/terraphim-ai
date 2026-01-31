@@ -127,8 +127,7 @@ mod tests {
     fn setup_temp_config_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let xdg_config_home = temp_dir.path().join(".config");
-        // Updating process-wide environment variables is unsafe in Rust 2024.
-        // We gate all calls within a single block to acknowledge the global mutation.
+        // SAFETY: This test runs in isolation before spawning other threads
         unsafe {
             std::env::set_var("HOME", temp_dir.path());
             std::env::set_var("USERPROFILE", temp_dir.path());
