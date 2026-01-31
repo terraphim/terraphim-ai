@@ -22,6 +22,8 @@ repl-mcp = ["repl"]   # MCP tools integration
 repl-file = ["repl"]  # Enhanced file operations
 repl-custom = ["repl"]  # Markdown-defined custom commands
 repl-web = ["repl"]   # Web operations and configuration
+# Update tests - gated because they require built release binary and network access
+update-tests = []
 # Session history search - enabled for local development
 repl-sessions = ["repl", "dep:terraphim_sessions"]
 
