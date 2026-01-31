@@ -7,7 +7,7 @@ use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
-use terraphim_types::{Document, Index};
+use terraphim_types::{Document, DocumentType, Index};
 
 /// Statistics for tracking URL fetch success/failure rates
 #[derive(Default)]
@@ -216,6 +216,10 @@ impl IndexMiddleware for QueryRsHaystackIndexer {
                                 tags: Some(vec!["queryrs".to_string(), "cache".to_string()]),
                                 rank: None,
                                 source_haystack: None,
+                                doc_type: DocumentType::KgEntry,
+                                synonyms: None,
+                                route: None,
+                                priority: None,
                             };
                             if let Err(e) = cache_doc.save().await {
                                 log::warn!(
@@ -442,6 +446,10 @@ impl QueryRsHaystackIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         let normalized = dummy_doc.normalize_key(original_id);
 
@@ -1081,6 +1089,10 @@ impl QueryRsHaystackIndexer {
                         ]),
                         rank: Some(score),
                         source_haystack: None,
+                        doc_type: DocumentType::KgEntry,
+                        synonyms: None,
+                        route: None,
+                        priority: None,
                     });
                 }
             }
@@ -1131,6 +1143,10 @@ impl QueryRsHaystackIndexer {
                                         tags: Some(tags),
                                         rank: None,
                                         source_haystack: None,
+                                        doc_type: DocumentType::KgEntry,
+                                        synonyms: None,
+                                        route: None,
+                                        priority: None,
                                     });
                                 }
                             }
@@ -1217,6 +1233,10 @@ impl QueryRsHaystackIndexer {
                             ]),
                             rank: Some(downloads),
                             source_haystack: None,
+                            doc_type: DocumentType::KgEntry,
+                            synonyms: None,
+                            route: None,
+                            priority: None,
                         });
                     }
                 }
@@ -1259,6 +1279,10 @@ impl QueryRsHaystackIndexer {
                                 ]),
                                 rank: None,
                                 source_haystack: None,
+                                doc_type: DocumentType::KgEntry,
+                                synonyms: None,
+                                route: None,
+                                priority: None,
                             });
                         }
                     }

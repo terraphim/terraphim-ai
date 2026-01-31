@@ -406,6 +406,10 @@ impl QuickwitHaystackIndexer {
             tags: Some(tags),
             rank,
             source_haystack: Some(base_url.to_string()),
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         })
     }
 
@@ -426,6 +430,10 @@ impl QuickwitHaystackIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         dummy_doc.normalize_key(&original_id)

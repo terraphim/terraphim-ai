@@ -626,7 +626,7 @@ mod tests {
     use super::*;
     use crate::summarization_queue::Priority;
     use terraphim_config::Role;
-    use terraphim_types::Document;
+    use terraphim_types::{Document, DocumentType};
 
     fn create_test_document() -> Document {
         Document {
@@ -640,6 +640,10 @@ mod tests {
             tags: Some(vec![]),
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 

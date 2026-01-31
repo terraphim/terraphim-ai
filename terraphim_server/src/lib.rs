@@ -264,6 +264,11 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                     tags: None,
                                                     rank: None,
                                                     source_haystack: None,
+                                                    doc_type:
+                                                        terraphim_types::DocumentType::KgEntry,
+                                                    synonyms: None,
+                                                    route: None,
+                                                    priority: None,
                                                 };
 
                                                 // Save document to persistence layer first
@@ -363,6 +368,11 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                                         tags: None,
                                                         rank: None,
                                                         source_haystack: None,
+                                                        doc_type:
+                                                            terraphim_types::DocumentType::KgEntry,
+                                                        synonyms: None,
+                                                        route: None,
+                                                        priority: None,
                                                     };
 
                                                     // Save document to persistence layer

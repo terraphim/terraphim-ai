@@ -14,8 +14,7 @@ use terraphim_automata::AutomataPath;
 use terraphim_rolegraph::input::TEST_CORPUS;
 use terraphim_rolegraph::split_paragraphs;
 use terraphim_rolegraph::RoleGraph;
-use terraphim_types::Document;
-use terraphim_types::Thesaurus;
+use terraphim_types::{Document, DocumentType, Thesaurus};
 
 lazy_static::lazy_static! {
     static ref TOKIO_RUNTIME: Runtime = Runtime::new().unwrap();
@@ -60,6 +59,10 @@ fn dummy_document(id: String, body: String) -> Document {
         tags: None,
         body,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     }
 }
 
