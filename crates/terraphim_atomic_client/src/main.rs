@@ -30,10 +30,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("  terraphim_atomic_client delete <resource_url>");
             println!("  terraphim_atomic_client search <query>");
             println!("  terraphim_atomic_client get <resource_url>");
-            println!("  terraphim_atomic_client export <subject_url> [output_file] [format] [--validate]");
-            println!("  terraphim_atomic_client export-ontology <ontology_subject> [output_file] [format] [--validate]");
-            println!("  terraphim_atomic_client collection <class_url> <sort_property_url> [--desc] [--limit N]");
-            println!("  terraphim_atomic_client export-to-local <root_subject> [output_file] [format] [--validate]");
+            println!(
+                "  terraphim_atomic_client export <subject_url> [output_file] [format] [--validate]"
+            );
+            println!(
+                "  terraphim_atomic_client export-ontology <ontology_subject> [output_file] [format] [--validate]"
+            );
+            println!(
+                "  terraphim_atomic_client collection <class_url> <sort_property_url> [--desc] [--limit N]"
+            );
+            println!(
+                "  terraphim_atomic_client export-to-local <root_subject> [output_file] [format] [--validate]"
+            );
             println!(
                 "  terraphim_atomic_client import-ontology <json_file> [parent_url] [--validate]"
             );
@@ -195,7 +203,9 @@ async fn search_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
 async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Usage: terraphim_atomic_client export <subject_url> [output_file] [format]
     if args.len() < 3 {
-        println!("Usage: terraphim_atomic_client export <subject_url> [output_file] [format] [--validate]");
+        println!(
+            "Usage: terraphim_atomic_client export <subject_url> [output_file] [format] [--validate]"
+        );
         return Ok(());
     }
 
@@ -289,7 +299,7 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         // Always send JSON-AD regardless of chosen output format.
         let body = serde_json::to_vec(&resources)?;
 
-        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+        use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Terraphim-Atomic-Client/1.0")
@@ -467,7 +477,9 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     // Usage: terraphim_atomic_client export-ontology <ontology_subject> [output_file] [format] [--validate]
 
     if args.len() < 3 {
-        println!("Usage: terraphim_atomic_client export-ontology <ontology_subject> [output_file] [format] [--validate]");
+        println!(
+            "Usage: terraphim_atomic_client export-ontology <ontology_subject> [output_file] [format] [--validate]"
+        );
         return Ok(());
     }
 
@@ -495,11 +507,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     let ontology_path = {
         let url = ontology_subject.trim_end_matches('/');
         let after = url.split('/').next_back().unwrap_or("");
-        if after.is_empty() {
-            url
-        } else {
-            after
-        }
+        if after.is_empty() { url } else { after }
     };
 
     let mut mapping: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -762,7 +770,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         // Always send JSON-AD transformed payload for validation
         let body = serde_json::to_vec(&transformed)?;
 
-        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+        use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Terraphim-Atomic-Client/1.0")
@@ -810,7 +818,9 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
 async fn collection_query(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Usage: terraphim_atomic_client collection <class_url> <sort_property_url> [--desc] [--limit N]
     if args.len() < 4 {
-        println!("Usage: terraphim_atomic_client collection <class_url> <sort_property_url> [--desc] [--limit N]");
+        println!(
+            "Usage: terraphim_atomic_client collection <class_url> <sort_property_url> [--desc] [--limit N]"
+        );
         return Ok(());
     }
 
@@ -839,7 +849,9 @@ async fn collection_query(args: &[String]) -> Result<(), Box<dyn std::error::Err
 async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     // Usage: terraphim_atomic_client export-to-local <root_subject> [output_file] [format] [--validate]
     if args.len() < 3 {
-        println!("Usage: terraphim_atomic_client export-to-local <root_subject> [output_file] [format] [--validate]");
+        println!(
+            "Usage: terraphim_atomic_client export-to-local <root_subject> [output_file] [format] [--validate]"
+        );
         return Ok(());
     }
 
@@ -1144,7 +1156,7 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
             import_url.push_str(&encoded_agent);
         }
         let body = serde_json::to_vec(&transformed)?;
-        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
+        use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Terraphim-Atomic-Client/1.0")

@@ -54,9 +54,9 @@ pub mod store;
 pub mod time_utils;
 pub mod types;
 
+pub use auth::Agent;
 #[cfg(feature = "native")]
 pub use auth::get_authentication_headers;
-pub use auth::Agent;
 pub use error::AtomicError;
 
 /// Result type used throughout the library

@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_agent"
 version.workspace = true
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim AI Agent CLI - Command-line interface with interactive REPL and ASCII graph visualization"
 documentation = "https://terraphim.ai"

@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_onepassword_cli"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "1Password CLI integration for Terraphim AI secret management"
 documentation = "https://terraphim.ai"

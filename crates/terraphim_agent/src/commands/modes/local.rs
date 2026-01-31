@@ -4,8 +4,8 @@
 //! and don't require sandboxing.
 
 use super::{
-    default_resource_usage, CommandDefinition, CommandExecutionError, CommandExecutionResult,
-    ExecutorCapabilities,
+    CommandDefinition, CommandExecutionError, CommandExecutionResult, ExecutorCapabilities,
+    default_resource_usage,
 };
 use std::collections::HashMap;
 use std::process::Stdio;

@@ -113,15 +113,15 @@ pub mod matcher;
 pub mod url_protector;
 
 pub use autocomplete::{
+    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
-    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
 };
 pub use markdown_directives::{
-    parse_markdown_directives_dir, MarkdownDirectiveWarning, MarkdownDirectivesParseResult,
+    MarkdownDirectiveWarning, MarkdownDirectivesParseResult, parse_markdown_directives_dir,
 };
 pub use matcher::{
-    extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,
+    LinkType, Matched, extract_paragraphs_from_automata, find_matches, replace_matches,
 };
 
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
@@ -569,13 +569,19 @@ mod tests {
             load_thesaurus_from_json_and_replace(json_str, content, LinkType::MarkdownLinks)
                 .unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
-        assert_eq!(replaced_str, "I like [project constraints](https://example.com/project-constraints) and [strategy documents](https://example.com/strategy-documents).");
+        assert_eq!(
+            replaced_str,
+            "I like [project constraints](https://example.com/project-constraints) and [strategy documents](https://example.com/strategy-documents)."
+        );
 
         // Test HTMLLinks
         let replaced =
             load_thesaurus_from_json_and_replace(json_str, content, LinkType::HTMLLinks).unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
-        assert_eq!(replaced_str, "I like <a href=\"https://example.com/project-constraints\">project constraints</a> and <a href=\"https://example.com/strategy-documents\">strategy documents</a>.");
+        assert_eq!(
+            replaced_str,
+            "I like <a href=\"https://example.com/project-constraints\">project constraints</a> and <a href=\"https://example.com/strategy-documents\">strategy documents</a>."
+        );
 
         // Test WikiLinks
         let replaced =

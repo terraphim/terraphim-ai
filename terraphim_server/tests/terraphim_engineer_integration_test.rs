@@ -5,7 +5,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
+use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
 
 /// Integration test for Terraphim Engineer configuration with local knowledge graph
 ///
@@ -200,10 +200,12 @@ async fn test_terraphim_engineer_local_kg_integration() {
         .expect("Failed to parse config response");
 
     assert_eq!(config_json.config.default_role, "Terraphim Engineer".into());
-    assert!(config_json
-        .config
-        .roles
-        .contains_key(&"Terraphim Engineer".into()));
+    assert!(
+        config_json
+            .config
+            .roles
+            .contains_key(&"Terraphim Engineer".into())
+    );
     log::info!("✅ Configuration endpoint validated");
 
     // Test 3: Search with Terraphim Engineer role

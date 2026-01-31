@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_automata_py"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Python bindings for terraphim_automata - Fast autocomplete and text processing for knowledge graphs"
 documentation = "https://terraphim.ai"
