@@ -1,5 +1,8 @@
 //! Command line interface for Terraphim validation system
 
+#![allow(unused)]
+#![allow(dead_code)]
+
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use log::info;

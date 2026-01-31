@@ -3,6 +3,9 @@
 //! This module provides a comprehensive desktop UI testing framework for Terraphim AI
 //! that can be integrated into CI/CD pipelines for automated release validation.
 
+#![allow(unused)]
+#![allow(dead_code)]
+
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 use terraphim_validation::testing::desktop_ui::{
