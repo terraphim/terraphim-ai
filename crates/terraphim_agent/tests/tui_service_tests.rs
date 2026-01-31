@@ -8,7 +8,7 @@ use terraphim_agent::service::TuiService;
 /// Test that TuiService can be created and basic methods work
 #[tokio::test]
 async fn test_tui_service_creation() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
 
     // Get the current config
     let config = service.get_config().await;
@@ -28,7 +28,7 @@ async fn test_tui_service_creation() -> Result<()> {
 /// Test the search method with default role
 #[tokio::test]
 async fn test_tui_service_search() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
 
     // Search with the default search method (uses selected role)
     let results = service.search("test", Some(5)).await;
@@ -50,7 +50,7 @@ async fn test_tui_service_search() -> Result<()> {
 /// Test autocomplete method
 #[tokio::test]
 async fn test_tui_service_autocomplete() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
     let role_name = service.get_selected_role().await;
 
     // Autocomplete may fail if no thesaurus is loaded, which is expected
@@ -75,7 +75,7 @@ async fn test_tui_service_autocomplete() -> Result<()> {
 /// Test replace_matches method
 #[tokio::test]
 async fn test_tui_service_replace_matches() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
     let role_name = service.get_selected_role().await;
 
     let text = "This is a test with some terms to replace.";
@@ -103,7 +103,7 @@ async fn test_tui_service_replace_matches() -> Result<()> {
 /// Test summarize method
 #[tokio::test]
 async fn test_tui_service_summarize() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
     let role_name = service.get_selected_role().await;
 
     let content = "This is a test paragraph that needs to be summarized. It contains multiple sentences with various topics and information that should be condensed.";
@@ -133,7 +133,7 @@ async fn test_tui_service_summarize() -> Result<()> {
 /// Test list roles with info
 #[tokio::test]
 async fn test_tui_service_list_roles_with_info() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
 
     let roles = service.list_roles_with_info().await;
 
@@ -148,7 +148,7 @@ async fn test_tui_service_list_roles_with_info() -> Result<()> {
 /// Test find_matches method
 #[tokio::test]
 async fn test_tui_service_find_matches() -> Result<()> {
-    let service = TuiService::new().await?;
+    let service = TuiService::new_with_embedded_defaults().await?;
     let role_name = service.get_selected_role().await;
 
     let text = "This is a test paragraph with some terms to match.";
