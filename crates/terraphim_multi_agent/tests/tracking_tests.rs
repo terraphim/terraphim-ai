@@ -2,8 +2,16 @@ use chrono::Utc;
 use std::collections::HashMap;
 use terraphim_multi_agent::{test_utils::*, *};
 
+fn ollama_available() -> bool {
+    std::env::var("RUN_OLLAMA_TESTS").ok().as_deref() == Some("1")
+}
+
 #[tokio::test]
 async fn test_token_usage_tracking_accuracy() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -41,6 +49,10 @@ async fn test_token_usage_tracking_accuracy() {
 
 #[tokio::test]
 async fn test_cost_tracking_accuracy() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -78,6 +90,10 @@ async fn test_cost_tracking_accuracy() {
 
 #[tokio::test]
 async fn test_token_tracking_multiple_commands() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -119,6 +135,10 @@ async fn test_token_tracking_multiple_commands() {
 
 #[tokio::test]
 async fn test_cost_calculation_by_model() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -147,6 +167,10 @@ async fn test_cost_calculation_by_model() {
 
 #[tokio::test]
 async fn test_tracking_record_structure() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -172,6 +196,10 @@ async fn test_tracking_record_structure() {
 
 #[tokio::test]
 async fn test_concurrent_tracking() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -213,6 +241,10 @@ async fn test_concurrent_tracking() {
 
 #[tokio::test]
 async fn test_tracking_metadata() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -236,6 +268,10 @@ async fn test_tracking_metadata() {
 
 #[tokio::test]
 async fn test_budget_tracking() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 
@@ -307,6 +343,10 @@ async fn test_tracking_add_record_methods() {
 
 #[tokio::test]
 async fn test_tracking_time_accuracy() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 

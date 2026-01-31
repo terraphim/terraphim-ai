@@ -1115,6 +1115,10 @@ mod tests {
             body: test_document.to_string(),
             description: None,
             summarization: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         rolegraph.insert_document(&document_id, document);
         println!("query with terraphim-graph and service");
@@ -1152,6 +1156,10 @@ mod tests {
             body: test_document2.to_string(),
             description: None,
             summarization: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         rolegraph.insert_document(&document_id2, document2);
         log::debug!("Query graph");
@@ -1204,6 +1212,10 @@ mod tests {
             body: query4.to_string(),
             description: None,
             summarization: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
@@ -1306,6 +1318,10 @@ mod tests {
             description: Some("Test document with thesaurus terms".to_string()),
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Insert document into rolegraph (this should create nodes and edges)
@@ -1406,6 +1422,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Insert document into rolegraph
@@ -1490,6 +1510,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -1545,6 +1569,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -1609,6 +1637,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         single_rolegraph.insert_document(&document_id, simple_document);

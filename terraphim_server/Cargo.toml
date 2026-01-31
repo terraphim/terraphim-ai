@@ -40,7 +40,7 @@ mime_guess = "2.0.4"
 tower = { version = "0.5.3", features = ["util"] }
 rust-embed = { version = "8.2.0", features = ["axum", "axum-ex", "mime-guess"] }
 env_logger = "0.11.8"
-url = "2.5.0"
+url = "2.5.8"
 ahash = "0.8.11"
 schemars = "0.8.22"
 regex = "1.11.0"
@@ -56,10 +56,9 @@ openrouter = ["terraphim_service/openrouter", "terraphim_config/openrouter"]
 ollama = ["terraphim_service/ollama"]
 # Optional database backends
 sqlite = ["terraphim_persistence/services-sqlite"]
-# rocksdb = ["terraphim_persistence/services-rocksdb"]  # Disabled - causes locking issues
 redis = ["terraphim_persistence/services-redis"]
 # Enable all database backends
-full-db = ["sqlite", "redis"]  # rocksdb removed
+full-db = ["sqlite", "redis"]
 
 [dev-dependencies]
 serial_test = "3.3.1"

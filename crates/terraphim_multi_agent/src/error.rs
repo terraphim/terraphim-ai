@@ -120,6 +120,10 @@ pub enum MultiAgentError {
     /// External service error (VM execution, API calls, etc)
     #[error("External service error: {0}")]
     External(String),
+
+    /// Hook validation error
+    #[error("Hook validation: {0}")]
+    HookValidation(String),
 }
 
 impl From<anyhow::Error> for MultiAgentError {
