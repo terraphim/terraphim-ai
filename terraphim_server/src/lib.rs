@@ -145,8 +145,7 @@ pub use api::{
     AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
     CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
-    ListConversationsResponse, RoleGraphResponseDto, SearchResponse, ThesaurusResponse,
-    UpdateContextRequest, UpdateContextResponse,
+    ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
 };
 pub use error::{Result, Status};
 
@@ -179,6 +178,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                         "Building rolegraph for role '{}' from local files",
                         role_name
                     );
+
                     log::info!("Knowledge graph path: {:?}", kg_local.path);
 
                     // Check if the directory exists
