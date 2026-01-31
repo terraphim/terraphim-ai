@@ -9171,6 +9171,7 @@ dependencies = [
  "ratatui",
  "regex",
  "reqwest 0.12.28",
+ "rustc_version",
  "rustyline 17.0.2",
  "serde",
  "serde_json",

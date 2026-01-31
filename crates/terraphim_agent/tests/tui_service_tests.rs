@@ -9,6 +9,30 @@ use terraphim_agent::service::TuiService;
 use terraphim_settings::DeviceSettings;
 use terraphim_types::RoleName;
 
+#[cfg(rust_has_unsafe_env_setters)]
+fn set_env_var(key: &'static str, value: impl AsRef<OsStr>) {
+    unsafe {
+        std::env::set_var(key, value);
+    }
+}
+
+#[cfg(not(rust_has_unsafe_env_setters))]
+fn set_env_var(key: &'static str, value: impl AsRef<OsStr>) {
+    std::env::set_var(key, value);
+}
+
+#[cfg(rust_has_unsafe_env_setters)]
+fn remove_env_var(key: &'static str) {
+    unsafe {
+        std::env::remove_var(key);
+    }
+}
+
+#[cfg(not(rust_has_unsafe_env_setters))]
+fn remove_env_var(key: &'static str) {
+    std::env::remove_var(key);
+}
+
 struct EnvVarGuard {
     key: &'static str,
     original: Option<OsString>,
@@ -17,23 +41,17 @@ struct EnvVarGuard {
 impl EnvVarGuard {
     fn set(key: &'static str, value: impl AsRef<OsStr>) -> Self {
         let original = std::env::var_os(key);
-        // SAFETY: test-owned directories isolate these env overrides from user state.
-        unsafe {
-            std::env::set_var(key, value);
-        }
+        set_env_var(key, value);
         Self { key, original }
     }
 }
 
 impl Drop for EnvVarGuard {
     fn drop(&mut self) {
-        // SAFETY: restoring environment variables to their prior values is always valid.
-        unsafe {
-            if let Some(value) = &self.original {
-                std::env::set_var(self.key, value);
-            } else {
-                std::env::remove_var(self.key);
-            }
+        if let Some(value) = &self.original {
+            set_env_var(self.key, value);
+        } else {
+            remove_env_var(self.key);
         }
     }
 }
