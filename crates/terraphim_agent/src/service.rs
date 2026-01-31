@@ -1,6 +1,6 @@
 use anyhow::Result;
 use std::sync::Arc;
-use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
+use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_service::llm::{ChatOptions, build_llm_from_role};
@@ -24,12 +24,20 @@ impl TuiService {
 
         log::info!("Initializing TUI service with embedded configuration");
 
-        // Load device settings
-        let device_settings = DeviceSettings::load_from_env_and_file(None)?;
+        // Load device settings, falling back to embedded defaults when running in sandboxes/tests
+        let device_settings = match DeviceSettings::load_from_env_and_file(None) {
+            Ok(settings) => settings,
+            Err(err) => {
+                log::warn!(
+                    "Failed to load device settings from env/file: {err:?}; using embedded defaults"
+                );
+                DeviceSettings::default_embedded()
+            }
+        };
         log::debug!("Device settings: {:?}", device_settings);
 
         // Try to load existing configuration, fallback to default embedded config
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+        let config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
                     log::debug!("Loaded existing embedded configuration");
@@ -38,23 +46,30 @@ impl TuiService {
                 Err(_) => {
                     // No saved config found is expected on first run - use default
                     log::debug!("No saved config found, using default embedded");
-                    ConfigBuilder::new_with_id(ConfigId::Embedded)
-                        .build_default_embedded()
-                        .build()?
+                    return Self::new_with_embedded_defaults().await;
                 }
             },
             Err(e) => {
                 log::warn!("Failed to build config: {:?}, using default", e);
-                ConfigBuilder::new_with_id(ConfigId::Embedded)
-                    .build_default_embedded()
-                    .build()?
+                return Self::new_with_embedded_defaults().await;
             }
         };
 
-        // Create config state
-        let config_state = ConfigState::new(&mut config).await?;
+        Self::from_config(config).await
+    }
 
-        // Create service
+    /// Initialize service strictly from the embedded default configuration.
+    ///
+    /// This constructor avoids touching host-specific config/state and is used by tests.
+    pub async fn new_with_embedded_defaults() -> Result<Self> {
+        let config = ConfigBuilder::new_with_id(ConfigId::Embedded)
+            .build_default_embedded()
+            .build()?;
+        Self::from_config(config).await
+    }
+
+    async fn from_config(mut config: Config) -> Result<Self> {
+        let config_state = ConfigState::new(&mut config).await?;
         let service = TerraphimService::new(config_state.clone());
 
         Ok(Self {
