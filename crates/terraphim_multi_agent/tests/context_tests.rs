@@ -1,6 +1,10 @@
 use chrono::Utc;
 use terraphim_multi_agent::{test_utils::*, *};
 
+fn ollama_available() -> bool {
+    std::env::var("RUN_OLLAMA_TESTS").ok().as_deref() == Some("1")
+}
+
 #[tokio::test]
 async fn test_context_item_creation() {
     let agent = create_test_agent().await.unwrap();
@@ -134,6 +138,10 @@ async fn test_context_different_item_types() {
 
 #[tokio::test]
 async fn test_context_automatic_enrichment() {
+    if !ollama_available() {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 and ensure Ollama has model gemma3:270m");
+        return;
+    }
     let agent = create_test_agent().await.unwrap();
     agent.initialize().await.unwrap();
 

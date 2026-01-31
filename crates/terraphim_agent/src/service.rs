@@ -119,7 +119,6 @@ impl TuiService {
     }
 
     /// Search documents using the current selected role
-    #[allow(dead_code)]
     pub async fn search(&self, search_term: &str, limit: Option<usize>) -> Result<Vec<Document>> {
         let selected_role = self.get_selected_role().await;
         self.search_with_role(search_term, &selected_role, limit)
@@ -277,7 +276,6 @@ impl TuiService {
     }
 
     /// Perform autocomplete search using thesaurus for a role
-    #[allow(dead_code)]
     pub async fn autocomplete(
         &self,
         role_name: &RoleName,
@@ -303,7 +301,6 @@ impl TuiService {
     }
 
     /// Find matches in text using thesaurus
-    #[allow(dead_code)]
     pub async fn find_matches(
         &self,
         role_name: &RoleName,
@@ -317,7 +314,6 @@ impl TuiService {
     }
 
     /// Replace matches in text with links using thesaurus
-    #[allow(dead_code)]
     pub async fn replace_matches(
         &self,
         role_name: &RoleName,
@@ -333,7 +329,6 @@ impl TuiService {
     }
 
     /// Summarize content using available AI services
-    #[allow(dead_code)]
     pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
         // For now, use the chat method with a summarization prompt
         let prompt = format!("Please summarize the following content:\n\n{}", content);
@@ -556,6 +551,41 @@ impl TuiService {
             satisfied,
             missing,
         })
+    }
+
+    /// Add a new role to the configuration
+    ///
+    /// This adds the role to the existing config and saves it.
+    /// If a role with the same name exists, it will be replaced.
+    pub async fn add_role(&self, role: terraphim_config::Role) -> Result<()> {
+        {
+            let mut config = self.config_state.config.lock().await;
+            let role_name = role.name.clone();
+            config.roles.insert(role_name.clone(), role);
+            log::info!("Added role '{}' to configuration", role_name);
+        }
+        self.save_config().await?;
+        Ok(())
+    }
+
+    /// Set the configuration to use a single role
+    ///
+    /// This replaces the current config with a new one containing only this role,
+    /// and sets it as the selected role.
+    pub async fn set_role(&self, role: terraphim_config::Role) -> Result<()> {
+        {
+            let mut config = self.config_state.config.lock().await;
+            let role_name = role.name.clone();
+            config.roles.clear();
+            config.roles.insert(role_name.clone(), role);
+            config.selected_role = role_name.clone();
+            log::info!(
+                "Set configuration to role '{}' (cleared other roles)",
+                role_name
+            );
+        }
+        self.save_config().await?;
+        Ok(())
     }
 }
 

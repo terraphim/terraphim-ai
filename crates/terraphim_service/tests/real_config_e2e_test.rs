@@ -12,6 +12,13 @@ use terraphim_types::{NormalizedTermValue, SearchQuery};
 #[tokio::test]
 #[serial]
 async fn test_real_config_auto_summarization_e2e() -> Result<()> {
+    if std::env::var("RUN_REAL_CONFIG_E2E_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_REAL_CONFIG_E2E_TESTS=1 to run real-config e2e tests");
+        return Ok(());
+    }
     println!("🚀 Starting E2E test with real Terraphim Engineer config");
 
     // Initialize test persistence

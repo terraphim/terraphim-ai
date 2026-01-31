@@ -479,6 +479,73 @@ The compactness and mobility of such AI assistant drives the [[Design Decisions]
 
 Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
 
+## 🔒 Validation Framework
+
+Terraphim includes a comprehensive validation system that ensures security, quality, and compliance across all AI operations.
+
+### 🛡️ Runtime Validation Hooks
+
+**Two-Stage Security Flow**:
+1. **Guard Stage**: Blocks dangerous operations (e.g., `git commit --no-verify`)
+2. **Replacement Stage**: Enhances commands using knowledge graph intelligence
+
+**Hook Coverage**:
+- **Pre/Post LLM**: Validates AI inputs/outputs for safety and quality
+- **Pre/Post Tool**: Secures code execution in VM environments
+- **Claude Code Integration**: Seamless workflow validation with guard+replacement
+
+**Configuration**: `~/.config/terraphim/runtime-validation.toml`
+```toml
+[hooks]
+enabled = true
+fail_open = true          # Development mode
+
+[guard]
+strict_mode = false        # Balance security vs. productivity
+
+[llm_hooks]
+enabled = true
+require_human_review = false
+
+[tool_hooks]
+enabled = true
+vm_isolation = true
+```
+
+### 📋 Release Validation
+
+Comprehensive release testing and validation system:
+- **Multi-Platform Testing**: Windows, macOS, Linux validation
+- **Security Scanning**: Automated vulnerability assessment
+- **Performance Benchmarking**: CI/CD integrated performance tests
+- **Installation Testing**: Package installation verification
+- **Functional Testing**: End-to-end feature validation
+
+**Usage**:
+```bash
+# Run complete release validation
+terraphim-validation validate --version v1.5.0
+
+# Run specific validation categories
+terraphim-validation validate --categories security,performance
+
+# Generate validation report
+terraphim-validation status --report-format json
+```
+
+**Documentation**: See [Runtime Validation Hooks](.docs/runtime-validation-hooks.md) for detailed implementation guide.
+
+### Development with Validation
+
+During development, hooks operate in fail-open mode to avoid blocking workflows:
+```bash
+# Development configuration
+export TERRAPHIM_RUNTIME_VALIDATION_HOOKS=true
+export TERRAPHIM_FAIL_OPEN=true
+export TERRAPHIM_GUARD_STAGE=true
+export TERRAPHIM_REPLACEMENT_STAGE=true
+```
+
 ## Configuration
 
 ### Storage Backends

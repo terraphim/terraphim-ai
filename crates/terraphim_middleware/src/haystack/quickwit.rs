@@ -3,12 +3,12 @@ use crate::indexer::IndexMiddleware;
 use reqwest::Client;
 use serde::Deserialize;
 use terraphim_config::Haystack;
+use terraphim_persistence::Persistable;
 use terraphim_types::Index;
 
 /// Response structure from Quickwit search API
-/// Corresponds to GET /v1/{index}/search response
+/// Corresponds to GET /api/v1/{index}/search response
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct QuickwitSearchResponse {
     num_hits: u64,
     hits: Vec<serde_json::Value>,
@@ -18,7 +18,7 @@ struct QuickwitSearchResponse {
 }
 
 /// Index metadata from Quickwit indexes listing
-/// Corresponds to GET /v1/indexes response items
+/// Corresponds to GET /api/v1/indexes response items
 #[derive(Debug, Deserialize, Clone)]
 struct QuickwitIndexInfo {
     index_id: String,
@@ -26,7 +26,6 @@ struct QuickwitIndexInfo {
 
 /// Configuration parsed from Haystack extra_parameters
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct QuickwitConfig {
     auth_token: Option<String>,
     auth_username: Option<String>,
@@ -407,14 +406,16 @@ impl QuickwitHaystackIndexer {
             tags: Some(tags),
             rank,
             source_haystack: Some(base_url.to_string()),
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         })
     }
 
     /// Normalize document ID for persistence layer
     /// Follows pattern from QueryRsHaystackIndexer
     fn normalize_document_id(&self, index_name: &str, doc_id: &str) -> String {
-        use terraphim_persistence::Persistable;
-
         let original_id = format!("quickwit_{}_{}", index_name, doc_id);
 
         // Use Persistable trait to normalize the ID
@@ -429,6 +430,10 @@ impl QuickwitHaystackIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         dummy_doc.normalize_key(&original_id)

@@ -15,7 +15,7 @@ use terraphim_server::{
 };
 use terraphim_service::http_client;
 use terraphim_settings::DeviceSettings;
-use terraphim_types::{ContextType, Document, RelevanceFunction};
+use terraphim_types::{ContextType, Document, DocumentType, RelevanceFunction};
 
 /// Sample configuration for testing context management
 fn create_test_config() -> Config {
@@ -108,6 +108,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["rust".to_string(), "programming".to_string()]),
             rank: Some(95),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc-2".to_string(),
@@ -121,6 +125,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["async".to_string(), "tokio".to_string()]),
             rank: Some(87),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc-3".to_string(),
@@ -133,6 +141,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["web".to_string(), "axum".to_string()]),
             rank: Some(72),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
     ]
 }

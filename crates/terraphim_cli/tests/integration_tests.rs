@@ -27,12 +27,10 @@ fn run_cli_json(args: &[&str]) -> Result<serde_json::Value, String> {
     let stdout = String::from_utf8_lossy(&output.stdout);
 
     if !output.status.success() {
-        // Try to parse error output as JSON
-        if let Ok(json) = serde_json::from_str::<serde_json::Value>(&stdout) {
-            return Ok(json);
-        }
+        // Command failed - return error even if output is valid JSON (error object)
         return Err(format!(
-            "Command failed: {}",
+            "Command failed with exit code {:?}: {}",
+            output.status.code(),
             String::from_utf8_lossy(&output.stderr)
         ));
     }

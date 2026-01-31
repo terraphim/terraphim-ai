@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
 use terraphim_persistence::Persistable;
-use terraphim_types::{Document, Index};
+use terraphim_types::{Document, DocumentType, Index};
 
 use super::IndexMiddleware;
 use crate::Result;
@@ -125,6 +125,10 @@ impl RipgrepIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         // Create a meaningful ID from the file path
         let original_id = format!("ripgrep_{}", file_path);

@@ -6,7 +6,7 @@ use serde_json::Value;
 use std::time::Duration;
 use terraphim_config::Haystack;
 use terraphim_persistence::Persistable;
-use terraphim_types::{Document, Index};
+use terraphim_types::{Document, DocumentType, Index};
 
 /// Request payload for Perplexity API
 #[derive(Debug, Serialize)]
@@ -278,6 +278,10 @@ impl PerplexityHaystackIndexer {
                 ]),
                 rank: Some(1000), // High rank for AI-curated results
                 source_haystack: None,
+                doc_type: DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             };
 
             documents.push(document);
@@ -306,6 +310,10 @@ impl PerplexityHaystackIndexer {
                         ]),
                         rank: Some(500), // Lower rank than main result
                         source_haystack: None,
+                        doc_type: DocumentType::KgEntry,
+                        synonyms: None,
+                        route: None,
+                        priority: None,
                     };
                     documents.push(source_doc);
                 }
@@ -426,6 +434,10 @@ impl PerplexityHaystackIndexer {
                     tags: Some(vec!["perplexity".to_string(), "cache".to_string()]),
                     rank: None,
                     source_haystack: None,
+                    doc_type: DocumentType::KgEntry,
+                    synonyms: None,
+                    route: None,
+                    priority: None,
                 };
 
                 if let Err(e) = cache_doc.save().await {

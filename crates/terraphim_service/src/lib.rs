@@ -259,11 +259,25 @@ impl TerraphimService {
                                         Ok(thesaurus)
                                     }
                                     Err(e) => {
-                                        log::error!(
-                                            "Failed to build thesaurus from local KG for role {}: {:?}",
-                                            role_name,
-                                            e
-                                        );
+                                        // Check if error is "file not found" (expected for optional files)
+                                        // and downgrade log level from ERROR to DEBUG
+                                        let is_file_not_found =
+                                            e.to_string().contains("file not found")
+                                                || e.to_string().contains("not found:");
+
+                                        if is_file_not_found {
+                                            log::debug!(
+                                                "Failed to build thesaurus from local KG (optional file not found) for role {}: {:?}",
+                                                role_name,
+                                                e
+                                            );
+                                        } else {
+                                            log::error!(
+                                                "Failed to build thesaurus from local KG for role {}: {:?}",
+                                                role_name,
+                                                e
+                                            );
+                                        }
                                         Err(ServiceError::Config(
                                             "Failed to load or build thesaurus".into(),
                                         ))
@@ -345,14 +359,23 @@ impl TerraphimService {
                             Ok(thesaurus)
                         }
                         Err(e) => {
-                            log::error!(
-                                "Failed to build thesaurus from local KG for role {}: {:?}",
-                                role_name,
-                                e
-                            );
-                            Err(ServiceError::Config(
-                                "Failed to build thesaurus from local KG".into(),
-                            ))
+                            // Check if error is "file not found" (expected for optional files)
+                            // and downgrade log level from ERROR to DEBUG
+                            let is_file_not_found = e.to_string().contains("file not found");
+
+                            if is_file_not_found {
+                                log::debug!("Failed to build thesaurus from local KG (optional file not found) for role {}: {:?}", role_name, e);
+                            } else {
+                                log::error!(
+                                    "Failed to build thesaurus from local KG for role {}: {:?}",
+                                    role_name,
+                                    e
+                                );
+                            }
+                            Err(ServiceError::Config(format!(
+                                "Failed to build thesaurus from local KG for role {}: {}",
+                                role_name, e
+                            )))
                         }
                     }
                 } else {
@@ -417,7 +440,19 @@ impl TerraphimService {
                                         rolegraphs.insert(role_name.clone(), rolegraph_value);
                                     }
                                     Err(e) => {
-                                        log::error!("Failed to update role and thesaurus: {:?}", e)
+                                        // Check if error is "file not found" (expected for optional files)
+                                        // and downgrade log level from ERROR to DEBUG
+                                        let is_file_not_found =
+                                            e.to_string().contains("file not found");
+
+                                        if is_file_not_found {
+                                            log::debug!("Failed to update role and thesaurus (optional file not found): {:?}", e);
+                                        } else {
+                                            log::error!(
+                                                "Failed to update role and thesaurus: {:?}",
+                                                e
+                                            );
+                                        }
                                     }
                                 }
 
@@ -459,7 +494,16 @@ impl TerraphimService {
                     Ok(thesaurus)
                 }
                 Err(e) => {
-                    log::error!("Failed to load thesaurus: {:?}", e);
+                    // Check if error is "file not found" (expected for optional files)
+                    // and downgrade log level from ERROR to DEBUG
+                    let is_file_not_found = e.to_string().contains("file not found")
+                        || e.to_string().contains("not found:");
+
+                    if is_file_not_found {
+                        log::debug!("Thesaurus file not found (optional): {:?}", e);
+                    } else {
+                        log::error!("Failed to load thesaurus: {:?}", e);
+                    }
                     // Try to build thesaurus from KG and update the config_state directly
                     let mut rolegraphs = self.config_state.roles.clone();
                     let result = load_thesaurus_from_automata_path(
@@ -2009,6 +2053,10 @@ impl TerraphimService {
                                                 tags: document.tags.clone(),
                                                 rank: document.rank,
                                                 source_haystack: document.source_haystack.clone(),
+                                                doc_type: terraphim_types::DocumentType::KgEntry,
+                                                synonyms: None,
+                                                route: None,
+                                                priority: None,
                                             };
 
                                             // Save to persistence for future use
@@ -3044,6 +3092,10 @@ mod tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Test 1: Save Atomic Data document to persistence
@@ -3162,6 +3214,10 @@ mod tests {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Save the Atomic Data document to persistence
@@ -3283,6 +3339,10 @@ mod tests {
                 tags: Some(vec!["test".to_string(), "first".to_string()]),
                 rank: None, // Should be assigned by the function
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "test-doc-2".to_string(),
@@ -3295,6 +3355,10 @@ mod tests {
                 tags: Some(vec!["test".to_string(), "second".to_string()]),
                 rank: None, // Should be assigned by the function
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "test-doc-3".to_string(),
@@ -3307,6 +3371,10 @@ mod tests {
                 tags: Some(vec!["test".to_string(), "third".to_string()]),
                 rank: None, // Should be assigned by the function
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 

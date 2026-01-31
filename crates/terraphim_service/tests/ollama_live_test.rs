@@ -8,6 +8,13 @@ use terraphim_service::llm;
 #[tokio::test]
 #[serial]
 async fn live_ollama_summarize_deepseek_coder() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama live tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
