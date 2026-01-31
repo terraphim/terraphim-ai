@@ -109,8 +109,8 @@ impl QuickStartChoice {
 }
 
 /// Check if this is a first run (no existing configuration)
-#[cfg(test)]
-pub fn is_first_run(config_path: &PathBuf) -> bool {
+#[allow(dead_code)]
+pub fn is_first_run(config_path: &std::path::Path) -> bool {
     !config_path.exists()
 }
 
@@ -421,6 +421,7 @@ fn custom_wizard(theme: &ColorfulTheme) -> Result<Role, OnboardingError> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
 
     #[test]
     fn test_quick_start_choice_template_ids() {

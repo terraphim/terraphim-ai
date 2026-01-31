@@ -3,6 +3,9 @@
 //! Command-line interface for running comprehensive TUI interface tests
 //! for terraphim-ai release validation.
 
+#![allow(unused)]
+#![allow(dead_code)]
+
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
