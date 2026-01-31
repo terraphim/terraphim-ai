@@ -476,11 +476,7 @@ impl KnowledgeGraphTaskDecomposer {
 
         // Factor 3: Complexity appropriateness
         let complexity_score = if original_task.complexity.requires_decomposition() {
-            if subtasks.len() > 1 {
-                1.0
-            } else {
-                0.5
-            }
+            if subtasks.len() > 1 { 1.0 } else { 0.5 }
         } else if subtasks.len() <= 2 {
             1.0
         } else {
@@ -704,7 +700,7 @@ mod tests {
     }
 
     async fn create_test_role_graph() -> Arc<RoleGraph> {
-        use terraphim_automata::{load_thesaurus, AutomataPath};
+        use terraphim_automata::{AutomataPath, load_thesaurus};
         use terraphim_types::RoleName;
 
         // Use the existing test pattern from rolegraph crate

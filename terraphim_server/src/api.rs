@@ -1,21 +1,21 @@
 use axum::{
+    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
-    Extension, Json,
 };
 use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::broadcast::Sender;
 use tokio::sync::Mutex;
+use tokio::sync::broadcast::Sender;
 
 use crate::AppState;
 use terraphim_config::Config;
 use terraphim_persistence::Persistable;
-use terraphim_rolegraph::magic_unpair;
 use terraphim_rolegraph::RoleGraph;
+use terraphim_rolegraph::magic_unpair;
 use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};
@@ -849,7 +849,7 @@ pub(crate) async fn list_openrouter_models(
                         status: Status::Error,
                         models: vec![],
                         error: Some("Missing OpenRouter API key".to_string()),
-                    }))
+                    }));
                 }
             }
         };
@@ -2031,7 +2031,7 @@ pub(crate) async fn add_context_to_conversation(
             return Ok(Json(AddContextResponse {
                 status: Status::Error,
                 error: Some(format!("Invalid context type: {}", request.context_type)),
-            }))
+            }));
         }
     };
 
@@ -2117,7 +2117,7 @@ pub(crate) async fn update_context_in_conversation(
                 status: Status::Error,
                 context: None,
                 error: Some(format!("Conversation {} not found", conversation_id)),
-            }))
+            }));
         }
     };
 
@@ -2134,7 +2134,7 @@ pub(crate) async fn update_context_in_conversation(
                 status: Status::Error,
                 context: None,
                 error: Some(format!("Context item {} not found", context_id)),
-            }))
+            }));
         }
     };
 

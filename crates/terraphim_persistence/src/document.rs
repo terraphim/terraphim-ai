@@ -497,7 +497,10 @@ mod tests {
                 );
             }
             Err(e) => {
-                println!("SQLite backend not available for document (expected in some environments): {:?}", e);
+                println!(
+                    "SQLite backend not available for document (expected in some environments): {:?}",
+                    e
+                );
                 // This is okay - not all environments may have SQLite configured
             }
         }
