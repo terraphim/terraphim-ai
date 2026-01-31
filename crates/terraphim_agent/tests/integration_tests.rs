@@ -122,7 +122,12 @@ fn parse_config_from_output(output: &str) -> Result<serde_json::Value> {
 
 /// Clean up test files
 fn cleanup_test_files() -> Result<()> {
-    let test_dirs = vec!["/tmp/terraphim_sqlite", "/tmp/dashmaptest", "/tmp/opendal"];
+    let test_dirs = vec![
+        "/tmp/terraphim_sqlite",
+        "/tmp/dashmaptest",
+        "/tmp/terraphim_rocksdb",
+        "/tmp/opendal",
+    ];
 
     for dir in test_dirs {
         if Path::new(dir).exists() {
