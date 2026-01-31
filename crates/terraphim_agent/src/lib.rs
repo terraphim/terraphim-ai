@@ -1,4 +1,5 @@
 pub mod client;
+pub mod onboarding;
 pub mod service;
 
 // Robot mode - always available for AI agent integration

@@ -109,7 +109,7 @@ case "$WORKFLOW" in
         echo "🌍 Testing Earthly workflow matrix..."
 
         # Test syntax
-        test_workshop_syntax ".github/workflows/earthly-runner.yml" "Earthly Runner"
+        test_workflow_syntax ".github/workflows/earthly-runner.yml" "Earthly Runner"
 
         # Show matrix config (if any)
         show_matrix_config ".github/workflows/earthly-runner.yml" "Earthly Runner"

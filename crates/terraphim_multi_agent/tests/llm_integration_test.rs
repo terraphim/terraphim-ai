@@ -235,6 +235,12 @@ async fn test_direct_llm_clients() {
 
 /// Check if Ollama is available by making a simple request
 async fn check_ollama_available() -> bool {
+    // Treat these as opt-in integration tests. Even if Ollama is running,
+    // the required models might not be pulled.
+    if std::env::var("RUN_OLLAMA_TESTS").ok().as_deref() != Some("1") {
+        return false;
+    }
+
     let client = reqwest::Client::new();
     match client.get("http://127.0.0.1:11434/api/tags").send().await {
         Ok(response) => response.status().is_success(),

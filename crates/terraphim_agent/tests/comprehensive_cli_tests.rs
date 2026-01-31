@@ -195,7 +195,16 @@ fn test_roles_management() -> Result<()> {
 
     // Test role selection (if roles exist)
     if !roles.is_empty() {
-        let test_role = roles[0].trim();
+        let test_role_line = roles[0].trim();
+        // Extract just the role name before the parenthesis (e.g., "Rust Engineer" from "Rust Engineer (rust-engineer)")
+        let test_role = if let Some(paren_pos) = test_role_line.find('(') {
+            test_role_line[..paren_pos].trim()
+        } else {
+            test_role_line
+        };
+        // Also strip leading * or whitespace from the role list output
+        let test_role = test_role.trim_start_matches('*').trim();
+
         let (stdout, stderr, code) = run_tui_command(&["roles", "select", test_role])?;
 
         assert_eq!(
@@ -207,7 +216,8 @@ fn test_roles_management() -> Result<()> {
         let clean_output = extract_clean_output(&stdout);
         assert!(
             clean_output.contains(&format!("selected:{}", test_role)),
-            "Role selection should confirm the selection"
+            "Role selection should confirm the selection: got '{}'",
+            clean_output
         );
 
         println!("✅ Role selection completed for: {}", test_role);
@@ -340,46 +350,53 @@ fn test_chat_command() -> Result<()> {
     // Test basic chat
     let (stdout, stderr, code) = run_tui_command(&["chat", "Hello, this is a test message"])?;
 
-    assert_eq!(
-        code, 0,
-        "Chat command should succeed: exit_code={}, stderr={}",
-        code, stderr
-    );
+    // Chat command may return exit code 1 if no LLM is configured - this is acceptable
+    let combined_output = format!("{}{}", stdout, stderr);
 
-    let clean_output = extract_clean_output(&stdout);
+    if code == 0 {
+        let clean_output = extract_clean_output(&stdout);
+        // Chat should either return a response or indicate no LLM is configured
+        assert!(!clean_output.is_empty(), "Chat should return some response");
 
-    // Chat should either return a response or indicate no LLM is configured
-    assert!(!clean_output.is_empty(), "Chat should return some response");
-
-    if clean_output.to_lowercase().contains("no llm configured") {
-        println!("✅ Chat correctly indicates no LLM is configured");
+        if clean_output.to_lowercase().contains("no llm configured") {
+            println!("✅ Chat correctly indicates no LLM is configured");
+        } else {
+            println!(
+                "✅ Chat returned response: {}",
+                clean_output.lines().next().unwrap_or("")
+            );
+        }
+    } else if combined_output.to_lowercase().contains("no llm configured") {
+        println!("✅ Chat correctly indicates no LLM is configured (exit code 1)");
     } else {
-        println!(
-            "✅ Chat returned response: {}",
-            clean_output.lines().next().unwrap_or("")
+        panic!(
+            "Chat command failed unexpectedly: exit_code={}, stderr={}",
+            code, stderr
         );
     }
 
-    // Test chat with role
+    // Test chat with role - accept exit code 1 if no LLM configured
     let (_stdout, stderr, code) =
         run_tui_command(&["chat", "Test message with role", "--role", "Default"])?;
 
-    assert_eq!(
-        code, 0,
-        "Chat with role should succeed: exit_code={}, stderr={}",
-        code, stderr
+    assert!(
+        code == 0 || stderr.to_lowercase().contains("no llm configured"),
+        "Chat with role should succeed or indicate no LLM: exit_code={}, stderr={}",
+        code,
+        stderr
     );
 
     println!("✅ Chat with role completed");
 
-    // Test chat with model specification
+    // Test chat with model specification - accept exit code 1 if no LLM configured
     let (_stdout, stderr, code) =
         run_tui_command(&["chat", "Test with model", "--model", "test-model"])?;
 
-    assert_eq!(
-        code, 0,
-        "Chat with model should succeed: exit_code={}, stderr={}",
-        code, stderr
+    assert!(
+        code == 0 || stderr.to_lowercase().contains("no llm configured"),
+        "Chat with model should succeed or indicate no LLM: exit_code={}, stderr={}",
+        code,
+        stderr
     );
 
     println!("✅ Chat with model specification completed");

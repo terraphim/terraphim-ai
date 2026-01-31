@@ -2,24 +2,25 @@
 # Supports Ubuntu 18.04, 20.04, 22.04, and 24.04 with multiple architectures
 
 ARG UBUNTU_VERSION=22.04
-ARG RUST_VERSION=1.92.0
+ARG RUST_VERSION=1.85.0
 ARG NODE_VERSION=20
 
 # ================================
-# Frontend Stage
+# Frontend Build Stage
 # ================================
-# Frontend is pre-built by CI workflow and included in build context
-# This stage just verifies the assets exist and prepares them for copy
-FROM --platform=$BUILDPLATFORM alpine:3.23 AS frontend-builder
+FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
 
 WORKDIR /app
+# Copy package files - yarn.lock is optional
+COPY desktop/package*.json ./
+COPY desktop/yarn.lock* ./
+RUN yarn install --frozen-lockfile --network-timeout 300000
 
-# Copy pre-built frontend assets from CI
-# The desktop/dist directory is populated by the workflow before Docker build
-COPY desktop/dist ./dist/
+COPY desktop ./
+RUN yarn run build
 
-# Verify frontend build exists
-RUN ls -la dist/ && test -f dist/index.html && echo "Frontend assets verified"
+# Verify frontend build
+RUN ls -la dist/ && test -f dist/index.html
 
 # ================================
 # Rust Build Stage
@@ -104,23 +105,26 @@ RUN case "${TARGETARCH}" in \
 
 WORKDIR /code
 
-# Copy all source code - simpler approach for reliable builds
-# Caching is handled by GitHub Actions GHA cache
+# Copy dependency files first for better caching
 COPY Cargo.toml Cargo.lock ./
-COPY crates ./crates
-COPY terraphim_server ./terraphim_server
-COPY terraphim_firecracker ./terraphim_firecracker
+COPY crates/*/Cargo.toml crates/
+COPY terraphim_server/Cargo.toml terraphim_server/
 
-# Copy frontend to desktop/dist (RustEmbed expects ../desktop/dist relative to terraphim_server)
-COPY --from=frontend-builder /app/dist ./desktop/dist
+# Create empty source files to satisfy cargo
+RUN find crates -name Cargo.toml -exec dirname {} \; | while read dir; do \
+    mkdir -p "$dir/src" && echo 'fn main() {}' > "$dir/src/lib.rs" || true; \
+    done && \
+    mkdir -p terraphim_server/src && echo 'fn main() {}' > terraphim_server/src/main.rs
 
-# Modify workspace to exclude Tauri and nodejs members (not needed for server build)
-RUN sed -i 's/, "desktop\/src-tauri", "terraphim_ai_nodejs"//g' Cargo.toml
-
-# Fetch dependencies
+# Pre-build dependencies
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     cargo fetch --target=$RUST_TARGET
+
+# Copy source code
+COPY crates ./crates
+COPY terraphim_server ./terraphim_server
+COPY --from=frontend-builder /app/dist ./terraphim_server/dist
 
 # Build the application
 RUN . /root/.profile && \
@@ -128,14 +132,14 @@ RUN . /root/.profile && \
     cargo build --release --target=$RUST_TARGET \
     --package terraphim_server \
     --package terraphim_mcp_server \
-    --package terraphim_agent
+    --package terraphim_tui
 
-# Verify binaries exist (can't test cross-compiled binaries on build host)
+# Test the binaries
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
-    ls -la ./target/$RUST_TARGET/release/terraphim_server && \
-    ls -la ./target/$RUST_TARGET/release/terraphim_mcp_server && \
-    ls -la ./target/$RUST_TARGET/release/terraphim-agent
+    ./target/$RUST_TARGET/release/terraphim_server --version && \
+    ./target/$RUST_TARGET/release/terraphim_mcp_server --version && \
+    ./target/$RUST_TARGET/release/terraphim-agent --version
 
 # Move binaries to predictable location
 RUN . /root/.profile && \
@@ -154,25 +158,20 @@ ARG UBUNTU_VERSION
 
 # Install minimal runtime dependencies
 ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update -qq && apt-get install -yqq --no-install-recommends \
+    ca-certificates \
+    curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Handle different OpenSSL versions across Ubuntu releases
-# Note: Must install OpenSSL first based on version since package names differ
-RUN apt-get update -qq && \
-    case "${UBUNTU_VERSION}" in \
-        "18.04"|"20.04") \
-            apt-get install -yqq --no-install-recommends \
-                ca-certificates curl libssl1.1 \
-            ;; \
-        "22.04"|"24.04") \
-            apt-get install -yqq --no-install-recommends \
-                ca-certificates curl libssl3 \
-            ;; \
-        *) \
-            apt-get install -yqq --no-install-recommends \
-                ca-certificates curl libssl3 \
-            ;; \
-    esac && \
-    rm -rf /var/lib/apt/lists/*
+RUN case "${UBUNTU_VERSION}" in \
+    "18.04"|"20.04") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl1.1 && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    "22.04"|"24.04") \
+        apt-get update -qq && apt-get install -yqq --no-install-recommends libssl3 && rm -rf /var/lib/apt/lists/* \
+        ;; \
+    esac
 
 # Create non-root user
 RUN useradd --create-home --shell /bin/bash terraphim

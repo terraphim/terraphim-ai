@@ -1,0 +1,113 @@
+# Terraphim AI Release Validation Configuration
+# This file controls how the validation system operates
+
+# Directory where artifacts are downloaded for validation
+download_dir = "target/validation-downloads"
+
+# Number of validations to run concurrently (default: 4)
+concurrent_validations = 4
+
+# Timeout for individual validations in seconds (default: 1800 = 30 minutes)
+timeout_seconds = 1800
+
+# Enabled platforms for validation (add/remove as needed)
+# Available: LinuxX86_64, LinuxAarch64, LinuxArmV7,
+#           MacOSX86_64, MacOSAarch64, WindowsX86_64
+enabled_platforms = [
+    "LinuxX86_64",
+    "MacOSX86_64",
+    "WindowsX86_64"
+]
+
+# Validation categories to run (order matters for dependencies)
+# Available: download, installation, functionality, security, performance
+enabled_categories = [
+    "download",
+    "installation",
+    "functionality",
+    "security",
+    "performance"
+]
+
+# Optional webhook for notification when validation completes
+# notification_webhook = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+
+# GitHub API configuration
+[github]
+# GitHub token for API access (can also be set via GITHUB_TOKEN env var)
+# token = "ghp_..."
+# Repository name (format: owner/repo)
+# repository = "terraphim/terraphim-ai"
+
+# Docker configuration for container-based validation
+[docker]
+# Enable Docker-based validation (default: true)
+enabled = true
+# Docker registry URL
+registry = "ghcr.io/terraphim"
+# Additional Docker runtime options
+runtime_options = []
+
+# Performance testing configuration
+[performance]
+# Maximum startup time in milliseconds for server
+max_startup_time_ms = 5000
+# Maximum memory usage in MB for server
+max_memory_mb = 512
+# Maximum response time in milliseconds for API endpoints
+max_api_response_time_ms = 1000
+
+# Security scanning configuration
+[security]
+# Enable vulnerability scanning
+vulnerability_scan = true
+# Maximum allowed severity level (info, warning, low, medium, high, critical)
+max_severity = "medium"
+# Security database to use (osv, nvd, etc.)
+database = "osv"
+
+# Notification configuration
+[notifications]
+# Email notification settings
+[notifications.email]
+enabled = false
+# smtp_server = "smtp.gmail.com"
+# smtp_port = 587
+# username = "your-email@gmail.com"
+# password = <set-via-env>
+
+# Slack notification settings
+[notifications.slack]
+enabled = false
+# webhook_url = "https://hooks.slack.com/services/YOUR/WEBHOOK/URL"
+# channel = "#releases"
+
+# Logging configuration
+[logging]
+# Log level: trace, debug, info, warn, error
+level = "info"
+# Log format: compact, pretty, json
+format = "pretty"
+# Enable file logging
+file_enabled = true
+# Log file path (relative to project root)
+file_path = "logs/validation.log"
+# Maximum log file size in MB before rotation
+max_file_size_mb = 10
+# Number of log files to keep
+max_files = 5
+
+# Advanced configuration
+[advanced]
+# Enable caching for downloaded artifacts
+cache_artifacts = true
+# Cache directory for downloaded artifacts
+cache_dir = "cache/validation"
+# Enable parallel platform validation
+parallel_platforms = true
+# Maximum parallel platform validations
+max_parallel_platforms = 3
+# Enable detailed timing metrics
+detailed_timing = true
+# Enable resource usage monitoring
+resource_monitoring = true
