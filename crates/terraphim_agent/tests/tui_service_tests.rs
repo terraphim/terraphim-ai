@@ -3,8 +3,40 @@
 //! These tests verify that the core TuiService methods work correctly.
 
 use anyhow::Result;
+use serial_test::serial;
+use std::ffi::{OsStr, OsString};
 use terraphim_agent::service::TuiService;
+use terraphim_settings::DeviceSettings;
 use terraphim_types::RoleName;
+
+struct EnvVarGuard {
+    key: &'static str,
+    original: Option<OsString>,
+}
+
+impl EnvVarGuard {
+    fn set(key: &'static str, value: impl AsRef<OsStr>) -> Self {
+        let original = std::env::var_os(key);
+        // SAFETY: test-owned directories isolate these env overrides from user state.
+        unsafe {
+            std::env::set_var(key, value);
+        }
+        Self { key, original }
+    }
+}
+
+impl Drop for EnvVarGuard {
+    fn drop(&mut self) {
+        // SAFETY: restoring environment variables to their prior values is always valid.
+        unsafe {
+            if let Some(value) = &self.original {
+                std::env::set_var(self.key, value);
+            } else {
+                std::env::remove_var(self.key);
+            }
+        }
+    }
+}
 
 /// Test that TuiService can be created and basic methods work
 #[tokio::test]
@@ -21,6 +53,37 @@ async fn test_tui_service_creation() -> Result<()> {
     assert!(
         !selected_role.to_string().is_empty(),
         "Should have a selected role"
+    );
+
+    Ok(())
+}
+
+/// Ensure the real constructor loads device settings and config paths
+#[tokio::test]
+#[serial]
+async fn test_tui_service_new_uses_host_settings_path() -> Result<()> {
+    let temp_home = tempfile::tempdir()?;
+    let _home_guard = EnvVarGuard::set("HOME", temp_home.path());
+
+    let xdg_config_home = temp_home.path().join(".config");
+    let _xdg_guard = EnvVarGuard::set("XDG_CONFIG_HOME", &xdg_config_home);
+
+    let data_path = temp_home.path().join(".terraphim");
+    let _data_guard = EnvVarGuard::set("TERRAPHIM_DATA_PATH", &data_path);
+
+    let service = TuiService::new().await?;
+
+    let config_dir = DeviceSettings::default_config_path();
+    let settings_file = config_dir.join("settings.toml");
+    assert!(
+        settings_file.exists(),
+        "TuiService::new should bootstrap host settings at {:?}",
+        settings_file
+    );
+
+    assert!(
+        !service.get_config().await.roles.is_empty(),
+        "Service initialized via TuiService::new should still load embedded roles"
     );
 
     Ok(())
