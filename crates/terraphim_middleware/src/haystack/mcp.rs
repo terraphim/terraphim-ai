@@ -1,4 +1,4 @@
-use crate::{Result, indexer::IndexMiddleware};
+use crate::{indexer::IndexMiddleware, Result};
 use terraphim_config::Haystack;
 use terraphim_types::{Document, Index};
 
