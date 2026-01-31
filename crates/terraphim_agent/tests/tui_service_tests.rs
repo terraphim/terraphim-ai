@@ -4,57 +4,10 @@
 
 use anyhow::Result;
 use serial_test::serial;
-use std::ffi::{OsStr, OsString};
 use terraphim_agent::service::TuiService;
 use terraphim_settings::DeviceSettings;
+use terraphim_test_utils::EnvVarGuard;
 use terraphim_types::RoleName;
-
-#[cfg(rust_has_unsafe_env_setters)]
-fn set_env_var(key: &'static str, value: impl AsRef<OsStr>) {
-    unsafe {
-        std::env::set_var(key, value);
-    }
-}
-
-#[cfg(not(rust_has_unsafe_env_setters))]
-fn set_env_var(key: &'static str, value: impl AsRef<OsStr>) {
-    std::env::set_var(key, value);
-}
-
-#[cfg(rust_has_unsafe_env_setters)]
-fn remove_env_var(key: &'static str) {
-    unsafe {
-        std::env::remove_var(key);
-    }
-}
-
-#[cfg(not(rust_has_unsafe_env_setters))]
-fn remove_env_var(key: &'static str) {
-    std::env::remove_var(key);
-}
-
-struct EnvVarGuard {
-    key: &'static str,
-    original: Option<OsString>,
-}
-
-impl EnvVarGuard {
-    fn set(key: &'static str, value: impl AsRef<OsStr>) -> Self {
-        let original = std::env::var_os(key);
-        set_env_var(key, value);
-        Self { key, original }
-    }
-}
-
-impl Drop for EnvVarGuard {
-    fn drop(&mut self) {
-        if let Some(value) = &self.original {
-            set_env_var(self.key, value);
-        } else {
-            remove_env_var(self.key);
-        }
-    }
-}
 
 /// Test that TuiService can be created and basic methods work
 #[tokio::test]
