@@ -314,6 +314,7 @@ pub async fn load_thesaurus_from_json_and_replace_async(
 /// Note: Remote loading requires the "remote-loading" feature to be enabled.
 #[cfg(feature = "remote-loading")]
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
+    #[allow(dead_code)]
     async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::builder()
@@ -347,8 +348,21 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
     }
 
     let contents = match automata_path {
-        AutomataPath::Local(path) => fs::read_to_string(path)?,
-        AutomataPath::Remote(url) => read_url(url.clone()).await?,
+        AutomataPath::Local(path) => {
+            // Check if file exists before attempting to read
+            if !std::path::Path::new(path).exists() {
+                return Err(TerraphimAutomataError::InvalidThesaurus(format!(
+                    "Thesaurus file not found: {}",
+                    path.display()
+                )));
+            }
+            fs::read_to_string(path)?
+        }
+        AutomataPath::Remote(_) => {
+            return Err(TerraphimAutomataError::InvalidThesaurus(
+                "Remote loading is not supported. Enable the 'remote-loading' feature.".to_string(),
+            ));
+        }
     };
 
     let thesaurus = serde_json::from_str(&contents)?;
