@@ -4,7 +4,7 @@ use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_service::llm::{ChatOptions, build_llm_from_role};
-use terraphim_settings::DeviceSettings;
+use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
@@ -27,11 +27,18 @@ impl TuiService {
         // Load device settings, falling back to embedded defaults when running in sandboxes/tests
         let device_settings = match DeviceSettings::load_from_env_and_file(None) {
             Ok(settings) => settings,
-            Err(err) => {
+            Err(DeviceSettingsError::IoError(err))
+                if err.kind() == std::io::ErrorKind::NotFound =>
+            {
                 log::warn!(
-                    "Failed to load device settings from env/file: {err:?}; using embedded defaults"
+                    "Device settings not found ({}); using embedded defaults",
+                    err
                 );
                 DeviceSettings::default_embedded()
+            }
+            Err(err) => {
+                log::error!("Failed to load device settings: {err:?}");
+                return Err(err.into());
             }
         };
         log::debug!("Device settings: {:?}", device_settings);
