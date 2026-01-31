@@ -127,11 +127,15 @@ mod tests {
     fn setup_temp_config_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
         let xdg_config_home = temp_dir.path().join(".config");
-        std::env::set_var("HOME", temp_dir.path());
-        std::env::set_var("USERPROFILE", temp_dir.path());
-        std::env::set_var("XDG_CONFIG_HOME", &xdg_config_home);
-        std::env::set_var("APPDATA", temp_dir.path());
-        std::env::set_var("LOCALAPPDATA", temp_dir.path());
+        // Updating process-wide environment variables is unsafe in Rust 2024.
+        // We gate all calls within a single block to acknowledge the global mutation.
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+            std::env::set_var("USERPROFILE", temp_dir.path());
+            std::env::set_var("XDG_CONFIG_HOME", &xdg_config_home);
+            std::env::set_var("APPDATA", temp_dir.path());
+            std::env::set_var("LOCALAPPDATA", temp_dir.path());
+        }
         let config_path = temp_dir.path().join("terraphim");
         fs::create_dir_all(&config_path).expect("Failed to create config dir");
         temp_dir

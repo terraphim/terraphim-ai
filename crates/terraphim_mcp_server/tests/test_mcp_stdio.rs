@@ -12,10 +12,12 @@ fn test_mcp_autocomplete_via_stdio() {
         return;
     }
     // Set the environment variable for local dev settings
-    env::set_var(
-        "TERRAPHIM_SETTINGS_PATH",
-        "../terraphim_settings/default/settings_local_dev.toml",
-    );
+    unsafe {
+        env::set_var(
+            "TERRAPHIM_SETTINGS_PATH",
+            "../terraphim_settings/default/settings_local_dev.toml",
+        );
+    }
 
     // Start the MCP server
     // NOTE: Don't pass --verbose here. It can enable non-JSON output on stdout,

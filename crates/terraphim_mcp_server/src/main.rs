@@ -37,15 +37,15 @@ use std::sync::Arc;
 use anyhow::Result;
 use clap::{Parser, ValueEnum};
 use rmcp::{
+    ServiceExt,
     transport::{
         sse_server::{SseServer, SseServerConfig},
         stdio,
     },
-    ServiceExt,
 };
 use terraphim_config::{ConfigBuilder, ConfigState};
 use terraphim_mcp_server::McpService;
-use tracing::{info, Level};
+use tracing::{Level, info};
 
 #[derive(Parser, Debug)]
 #[command(name = "terraphim_mcp_server")]
