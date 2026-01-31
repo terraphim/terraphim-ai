@@ -48,7 +48,7 @@ ahash = { version = "0.8.8", features = ["serde"] }
 dirs = "6.0"
 regex = "1"
 anyhow = "1"
-url = { version = "2.3.1", features = ["serde"] }
+url = { version = "2.5.8", features = ["serde"] }
 async-once-cell = "0.5.3"
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 thiserror = "1.0.53"

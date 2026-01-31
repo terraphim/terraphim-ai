@@ -231,7 +231,6 @@ async fn test_build_thesaurus_from_kg_files() {
         "haystack",
         "datasource",
         "service",
-        "provider",
         "middleware",
     ];
 

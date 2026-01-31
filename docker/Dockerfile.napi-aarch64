@@ -1,7 +1,7 @@
 # NAPI-RS aarch64 cross-compilation builder
 # Replaces ghcr.io/napi-rs/napi-rs/nodejs-rust:lts-debian-aarch64 with newer Rust
 
-FROM rust:1.92-slim-bookworm
+FROM rust:1.93-slim-bookworm
 
 # Set environment variables
 ENV CARGO_TERM_COLOR=always \

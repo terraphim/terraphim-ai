@@ -37,6 +37,9 @@ jobs:
     name: Build Documentation
     runs-on: [self-hosted, linux, x64]
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          sudo rm -rf "${{ github.workspace }}/target" "${{ github.workspace }}/desktop/dist" "${{ github.workspace }}/desktop/node_modules" "${{ github.workspace }}/terraphim_server/dist" 2>/dev/null || true
       - name: Checkout repository
         uses: actions/checkout@v6
 
