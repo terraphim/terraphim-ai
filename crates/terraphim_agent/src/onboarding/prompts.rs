@@ -572,27 +572,6 @@ pub fn prompt_knowledge_graph() -> Result<PromptResult<Option<KnowledgeGraph>>, 
     }
 }
 
-/// Prompt for confirmation with custom message
-pub fn prompt_confirm(message: &str, default: bool) -> Result<bool, OnboardingError> {
-    let theme = ColorfulTheme::default();
-    Ok(Confirm::with_theme(&theme)
-        .with_prompt(message)
-        .default(default)
-        .interact()?)
-}
-
-/// Prompt for simple text input
-pub fn prompt_input(message: &str, default: Option<&str>) -> Result<String, OnboardingError> {
-    let theme = ColorfulTheme::default();
-    let mut input = Input::with_theme(&theme).with_prompt(message);
-
-    if let Some(d) = default {
-        input = input.default(d.to_string());
-    }
-
-    Ok(input.interact_text()?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
