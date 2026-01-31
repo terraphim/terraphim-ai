@@ -8,17 +8,23 @@ use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 use tokio::process::Command;
 
 // Additional imports for thesaurus building
-use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::AutomataPath;
+use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::DeviceStorage;
 use terraphim_persistence::Persistable;
+
+fn set_env_var(key: &str, value: &str) {
+    unsafe {
+        std::env::set_var(key, value);
+    }
+}
 
 /// Create a configuration with the correct "Terraphim Engineer" role
 /// that uses local KG files and builds thesaurus from local markdown files
 async fn create_terraphim_engineer_config() -> Result<String> {
     // Use memory-only persistence to avoid RocksDB filesystem issues in CI
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
-    std::env::set_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
     let _ = DeviceStorage::init_memory_only().await;
     let current_dir = std::env::current_dir()?;
     let project_root = current_dir.parent().unwrap().parent().unwrap();
@@ -128,7 +134,7 @@ async fn create_terraphim_engineer_config() -> Result<String> {
 #[serial]
 async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🧪 Testing MCP server with Terraphim Engineer configuration...");
 
@@ -269,7 +275,7 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
 #[serial]
 async fn test_desktop_cli_mcp_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🖥️ Testing desktop CLI with MCP server...");
 
@@ -353,7 +359,7 @@ async fn test_desktop_cli_mcp_search() -> Result<()> {
 #[serial]
 async fn test_mcp_role_switching_before_search() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🔄 Testing role switching via config API...");
 
@@ -456,7 +462,7 @@ async fn test_mcp_role_switching_before_search() -> Result<()> {
 #[serial]
 async fn test_mcp_resource_operations() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🧪 Testing MCP resource operations with Terraphim Engineer configuration...");
 
@@ -674,7 +680,7 @@ async fn test_mcp_resource_operations() -> Result<()> {
 #[serial]
 async fn test_mcp_search_uses_selected_role() -> Result<()> {
     // Use memory-only persistence to avoid database conflicts between tests
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
 
     println!("🧪 Testing MCP search uses selected role when no role parameter passed...");
 
@@ -771,8 +777,7 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
 
     // 4. Verify both searches return the same results (since they should use the same role)
     assert_eq!(
-        results_without_role,
-        results_with_role,
+        results_without_role, results_with_role,
         "Search without role parameter should return same results as search with explicit role parameter"
     );
 
@@ -809,7 +814,9 @@ async fn test_mcp_search_uses_selected_role() -> Result<()> {
         );
 
         // The results might be different, but the important thing is that the role parameter was respected
-        println!("✅ Role parameter override is working (results may differ based on role configuration)");
+        println!(
+            "✅ Role parameter override is working (results may differ based on role configuration)"
+        );
     } else {
         println!("⚠️ Search with different role failed (expected if Default role doesn't exist)");
     }

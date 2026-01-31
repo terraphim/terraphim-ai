@@ -33,7 +33,10 @@ fn ensure_dist_dir() {
                 &index_path,
                 "<!DOCTYPE html><html><head><title>Terraphim</title></head><body>Terraphim Desktop</body></html>",
             ) {
-                println!("cargo:warning=Failed to create placeholder index.html: {}", e);
+                println!(
+                    "cargo:warning=Failed to create placeholder index.html: {}",
+                    e
+                );
             } else {
                 println!("cargo:warning=Created placeholder index.html for Tauri");
             }

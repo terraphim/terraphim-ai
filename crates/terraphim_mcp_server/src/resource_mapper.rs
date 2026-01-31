@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use rmcp::model::{Annotated, RawResource, Resource, ResourceContents};
 use terraphim_types::Document;
 

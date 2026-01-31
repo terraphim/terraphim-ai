@@ -7,7 +7,7 @@
 //! - Versioned rollback support
 //! - Graceful error handling for missing/corrupt backups
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fs;

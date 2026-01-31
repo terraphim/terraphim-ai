@@ -203,7 +203,9 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
         println!("     Data path should be: /Users/alex/projects/terraphim/terraphim-ai/docs/src");
 
         // Don't fail the test, but make it clear this needs investigation
-        println!("     🔧 This needs manual investigation - the system runs without crashing but may not be functional");
+        println!(
+            "     🔧 This needs manual investigation - the system runs without crashing but may not be functional"
+        );
     } else {
         println!("  ✅ Search functionality appears to be working - found results across queries");
     }
@@ -252,7 +254,10 @@ async fn test_desktop_startup_terraphim_engineer_role_functional() {
                 }
 
                 if documents.is_empty() {
-                    println!("    ⚠️  No documents found for KG term '{}' - may indicate thesaurus loading issues", term);
+                    println!(
+                        "    ⚠️  No documents found for KG term '{}' - may indicate thesaurus loading issues",
+                        term
+                    );
                 }
             }
             Err(e) => {

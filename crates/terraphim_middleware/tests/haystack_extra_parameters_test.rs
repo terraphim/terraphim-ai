@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 use terraphim_config::{Haystack, ServiceType};
-use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
+use terraphim_middleware::{RipgrepIndexer, indexer::IndexMiddleware};
 
 /// Test the custom serialization behavior that prevents atomic server secrets
 /// from being exposed for non-Atomic haystacks

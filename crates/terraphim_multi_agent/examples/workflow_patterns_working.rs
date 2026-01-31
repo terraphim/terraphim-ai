@@ -8,7 +8,7 @@ use ahash::AHashMap;
 use std::sync::Arc;
 use terraphim_config::Role;
 use terraphim_multi_agent::{
-    test_utils::create_test_role, CommandInput, CommandType, MultiAgentResult, TerraphimAgent,
+    CommandInput, CommandType, MultiAgentResult, TerraphimAgent, test_utils::create_test_role,
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;

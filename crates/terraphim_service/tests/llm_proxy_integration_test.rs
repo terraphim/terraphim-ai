@@ -39,7 +39,9 @@ impl TestEnv {
             if env::var(var).is_ok() {
                 self.original_vars
                     .push((var.to_string(), env::var(var).ok()));
-                env::remove_var(var);
+                unsafe {
+                    env::remove_var(var);
+                }
             }
         }
     }
@@ -48,14 +50,18 @@ impl TestEnv {
         // Store original value if it exists
         self.original_vars
             .push((key.to_string(), env::var(key).ok()));
-        env::set_var(key, value);
+        unsafe {
+            env::set_var(key, value);
+        }
     }
 
     #[allow(dead_code)]
     fn remove_var(&mut self, key: &str) {
         self.original_vars
             .push((key.to_string(), env::var(key).ok()));
-        env::remove_var(key);
+        unsafe {
+            env::remove_var(key);
+        }
     }
 }
 
@@ -64,8 +70,8 @@ impl Drop for TestEnv {
         // Restore original environment variables
         for (key, original_value) in self.original_vars.drain(..) {
             match original_value {
-                Some(value) => env::set_var(&key, value),
-                None => env::remove_var(&key),
+                Some(value) => unsafe { env::set_var(&key, value) },
+                None => unsafe { env::remove_var(&key) },
             }
         }
     }
@@ -93,9 +99,11 @@ async fn test_llm_proxy_auto_configuration() {
     let client = LlmProxyClient::new("anthropic".to_string()).unwrap();
 
     // Verify auto-configuration
-    assert!(client
-        .configured_providers()
-        .contains(&"anthropic".to_string()));
+    assert!(
+        client
+            .configured_providers()
+            .contains(&"anthropic".to_string())
+    );
 
     let config = client.get_config("anthropic").unwrap();
     assert_eq!(config.provider, "anthropic");
