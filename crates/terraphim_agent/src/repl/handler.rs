@@ -374,14 +374,13 @@ impl ReplHandler {
             );
 
             if let Some(service) = &self.service {
-                // Offline mode
-                let role_name = if let Some(role) = role {
-                    terraphim_types::RoleName::new(&role)
+                // Offline mode - use search_with_role if role specified, otherwise use default search
+                let results = if let Some(role) = role {
+                    let role_name = terraphim_types::RoleName::new(&role);
+                    service.search_with_role(&query, &role_name, limit).await?
                 } else {
-                    service.get_selected_role().await
+                    service.search(&query, limit).await?
                 };
-
-                let results = service.search_with_role(&query, &role_name, limit).await?;
 
                 if results.is_empty() {
                     println!("{} No results found", "ℹ".blue().bold());
@@ -1647,7 +1646,7 @@ impl ReplHandler {
     /// Handle update management commands
     async fn handle_update(&mut self, subcommand: UpdateSubcommand) -> Result<()> {
         use terraphim_update::{
-            check_for_updates_auto, rollback::BackupManager, update_binary, UpdateStatus,
+            UpdateStatus, check_for_updates_auto, rollback::BackupManager, update_binary,
         };
 
         // Get the current binary name and version

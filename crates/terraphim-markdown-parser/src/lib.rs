@@ -2,8 +2,8 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::str::FromStr;
 
-use markdown::mdast::Node;
 use markdown::ParseOptions;
+use markdown::mdast::Node;
 use terraphim_types::{Document, DocumentType};
 use thiserror::Error;
 use ulid::Ulid;

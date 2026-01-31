@@ -5,8 +5,8 @@ use terraphim_persistence::Persistable;
 use terraphim_types::{Document, DocumentType, Index};
 
 use super::IndexMiddleware;
-use crate::Result;
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
+use crate::Result;
 use cached::proc_macro::cached;
 use terraphim_config::Haystack;
 use tokio::fs as tfs;

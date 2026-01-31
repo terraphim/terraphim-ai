@@ -130,8 +130,8 @@ mod tests {
     use super::*;
     use serde_json::json;
     use wiremock::{
-        matchers::{header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
+        matchers::{header, method, path, query_param},
     };
 
     fn can_bind_localhost() -> bool {

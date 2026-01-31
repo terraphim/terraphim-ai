@@ -14,7 +14,9 @@ use tokio::process::Command;
 /// Errors that can occur during 1Password operations
 #[derive(Error, Debug)]
 pub enum OnePasswordError {
-    #[error("1Password CLI not found. Please install from https://developer.1password.com/docs/cli/get-started/")]
+    #[error(
+        "1Password CLI not found. Please install from https://developer.1password.com/docs/cli/get-started/"
+    )]
     CliNotFound,
 
     #[error("Not authenticated with 1Password CLI. Run: op signin")]

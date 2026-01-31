@@ -1,7 +1,7 @@
 use crate::{
+    Result,
     error::AtomicError,
     types::{Commit, Config, Resource},
-    Result,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
