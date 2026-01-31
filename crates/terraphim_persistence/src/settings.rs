@@ -252,9 +252,6 @@ pub async fn parse_profile(
         }
         #[cfg(feature = "services-redis")]
         Scheme::Redis => Operator::from_iter::<services::Redis>(profile.clone())?.finish(),
-        // RocksDB support is disabled due to locking issues
-        // #[cfg(feature = "services-rocksdb")]
-        // Scheme::Rocksdb => Operator::from_iter::<services::Rocksdb>(profile.clone())?.finish(),
         #[cfg(feature = "services-redb")]
         Scheme::Redb => {
             // Ensure parent directory exists for ReDB database file
@@ -468,13 +465,6 @@ mod tests {
 
         Ok(())
     }
-
-    // RocksDB test disabled - rocksdb feature is disabled due to locking issues
-    // /// Test saving and loading a struct to rocksdb profile
-    // #[cfg(feature = "services-rocksdb")]
-    // #[tokio::test]
-    // #[serial_test::serial]
-    // async fn test_save_and_load_rocksdb() -> Result<()> { ... }
 
     /// Test saving and loading a struct to dashmap profile (if available)
     #[cfg(feature = "dashmap")]
