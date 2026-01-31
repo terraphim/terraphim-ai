@@ -61,20 +61,17 @@ s3 = ["opendal/services-s3"]  # Only for server deployments
 
 # Optional local backends
 redis = ["opendal/services-redis"]
-# rocksdb = ["opendal/services-rocksdb"]  # Disabled - causes locking issues
 redb = ["opendal/services-redb"]
 ipfs = ["opendal/services-ipfs"]
 
 # Server profile with cloud support
 server = ["s3"]  # Removed atomicserver (not available in opendal 0.54)
-all-backends = ["server", "redis", "redb", "ipfs"]  # rocksdb removed
+all-backends = ["server", "redis", "redb", "ipfs"]
 
 # Legacy feature names for backwards compatibility
 services-dashmap = ["dashmap"]
 services-sqlite = ["sqlite"]
-# services-atomicserver = ["atomicserver"]  # Removed - atomicserver not available in opendal 0.54
 services-s3 = ["s3"]
 services-redis = ["redis"]
-# services-rocksdb = ["rocksdb"]  # Disabled
 services-redb = ["redb"]
 services-ipfs = ["ipfs"]
