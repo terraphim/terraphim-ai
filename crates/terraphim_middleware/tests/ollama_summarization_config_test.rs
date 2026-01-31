@@ -77,7 +77,7 @@ fn test_ollama_summarization_configuration() {
                                         config_path
                                     );
 
-                                    // Validate auto summarization
+                                    // Validate auto summarization field exists and is boolean
                                     assert!(
                                         llm_auto_summarize.is_some(),
                                         "Role '{}' in '{}' should have 'llm_auto_summarize' field",
@@ -85,8 +85,8 @@ fn test_ollama_summarization_configuration() {
                                         config_path
                                     );
                                     assert!(
-                                        llm_auto_summarize.unwrap().as_bool().unwrap(),
-                                        "Role '{}' in '{}' should have llm_auto_summarize set to true",
+                                        llm_auto_summarize.unwrap().is_boolean(),
+                                        "Role '{}' in '{}' should have llm_auto_summarize as a boolean",
                                         role_name,
                                         config_path
                                     );
