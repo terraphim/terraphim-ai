@@ -47,6 +47,7 @@ rmcp = { version = "0.9", features = ["client", "transport-child-process"], opti
 [dev-dependencies]
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
 terraphim_settings = { path = "../terraphim_settings" }
+terraphim_test_utils = { path = "../terraphim_test_utils" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 futures = "0.3"
 test-log = { version = "0.2.19", features = ["trace"] }

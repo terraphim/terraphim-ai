@@ -1055,6 +1055,7 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::tempfile;
+    use terraphim_test_utils::EnvVarGuard;
     use tokio::test;
 
     #[test]
@@ -1361,14 +1362,10 @@ mod tests {
         assert_eq!(result, home.join(".terraphim"));
 
         // Test when env var is set
-        unsafe {
-            std::env::set_var("TERRAPHIM_TEST_PATH", "/custom/path");
-        }
+        let _guard = EnvVarGuard::set("TERRAPHIM_TEST_PATH", "/custom/path");
         let result = expand_path("${TERRAPHIM_TEST_PATH:-${HOME}/.default}");
         assert_eq!(result, PathBuf::from("/custom/path"));
-        unsafe {
-            std::env::remove_var("TERRAPHIM_TEST_PATH");
-        }
+        drop(_guard);
 
         println!("expand_path tests passed!");
         println!("HOME = {}", home_str);

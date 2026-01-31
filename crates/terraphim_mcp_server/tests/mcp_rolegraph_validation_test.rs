@@ -4,6 +4,7 @@ use serial_test::serial;
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
 };
+use terraphim_test_utils::set_env_var;
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 use tokio::process::Command;
 
@@ -12,12 +13,6 @@ use terraphim_automata::AutomataPath;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::DeviceStorage;
 use terraphim_persistence::Persistable;
-
-fn set_env_var(key: &str, value: &str) {
-    unsafe {
-        std::env::set_var(key, value);
-    }
-}
 
 /// Create a configuration with the correct "Terraphim Engineer" role
 /// that uses local KG files and builds thesaurus from local markdown files

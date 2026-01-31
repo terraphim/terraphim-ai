@@ -3,15 +3,13 @@ use terraphim_middleware::{
     haystack::ClickUpHaystackIndexer,
     indexer::{IndexMiddleware, search_haystacks},
 };
+use terraphim_test_utils::EnvVarGuard;
 use terraphim_types::{RelevanceFunction, SearchQuery};
 
 #[tokio::test]
 async fn clickup_mapping_handles_missing_token() {
     // Ensure no token is present
-    // SAFETY: This test runs in isolation and no other threads are reading CLICKUP_API_TOKEN
-    unsafe {
-        std::env::remove_var("CLICKUP_API_TOKEN");
-    }
+    let _guard = EnvVarGuard::remove("CLICKUP_API_TOKEN");
 
     let haystack = Haystack::new("clickup".to_string(), ServiceType::ClickUp, true);
     let indexer = ClickUpHaystackIndexer::default();
