@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_config"
 version = "1.4.10"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim configuration"
 documentation = "https://terraphim.ai"
@@ -65,3 +65,4 @@ openrouter = []
 tempfile = "3.23.0"
 env_logger = "0.11"
 terraphim_multi_agent = { path = "../terraphim_multi_agent" }
+terraphim_test_utils = { path = "../terraphim_test_utils" }

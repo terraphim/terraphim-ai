@@ -99,7 +99,7 @@ pub fn create_custom_client(
 /// - JSON content type header
 /// - Accept JSON responses
 pub fn create_api_client() -> reqwest::Result<Client> {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+    use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
 
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -119,7 +119,7 @@ pub fn create_api_client() -> reqwest::Result<Client> {
 /// - Browser-like headers to avoid blocking
 /// - HTML content acceptance
 pub fn create_scraping_client() -> reqwest::Result<Client> {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT};
+    use reqwest::header::{ACCEPT, HeaderMap, HeaderValue};
 
     let mut headers = HeaderMap::new();
     headers.insert(

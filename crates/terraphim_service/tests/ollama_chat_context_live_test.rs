@@ -7,7 +7,7 @@ use ahash::AHashMap;
 use serial_test::serial;
 use std::env;
 use terraphim_service::context::{ContextConfig, ContextManager};
-use terraphim_service::llm::{build_llm_from_role, ChatOptions};
+use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use terraphim_types::{ContextItem, ContextType, RoleName};
 
 #[tokio::test]
