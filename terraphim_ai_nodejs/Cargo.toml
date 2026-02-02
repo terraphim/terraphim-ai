@@ -1,5 +1,5 @@
 [package]
-edition = "2021"
+edition.workspace = true
 name = "terraphim_ai_nodejs"
 version = "1.0.0"
 license = "MIT"

@@ -124,7 +124,9 @@ mod tests {
 
     #[test]
     fn test_env_overrides() {
-        env::set_var("LLM_PROXY_URL", "http://env-proxy:9999");
+        unsafe {
+            env::set_var("LLM_PROXY_URL", "http://env-proxy:9999");
+        }
 
         let role_config = LlmRouterConfig {
             enabled: true,
@@ -137,6 +139,8 @@ mod tests {
 
         assert_eq!(merged.proxy_url, Some("http://env-proxy:9999".to_string()));
 
-        env::remove_var("LLM_PROXY_URL");
+        unsafe {
+            env::remove_var("LLM_PROXY_URL");
+        }
     }
 }

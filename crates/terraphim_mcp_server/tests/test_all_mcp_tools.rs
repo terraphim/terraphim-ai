@@ -5,10 +5,12 @@ use std::process::{Command, Stdio};
 #[test]
 fn test_all_mcp_tools() {
     // Set the environment variable for local dev settings
-    env::set_var(
-        "TERRAPHIM_SETTINGS_PATH",
-        "../terraphim_settings/default/settings_local_dev.toml",
-    );
+    unsafe {
+        env::set_var(
+            "TERRAPHIM_SETTINGS_PATH",
+            "../terraphim_settings/default/settings_local_dev.toml",
+        );
+    }
 
     println!("Starting comprehensive MCP server test for all tools...");
 

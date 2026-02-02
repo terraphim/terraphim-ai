@@ -2,7 +2,7 @@ use anyhow::Result;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{error, info, Level};
+use tracing::{Level, error, info};
 
 mod config;
 mod github;
@@ -413,6 +413,7 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use salvo::test::TestClient;
+    use terraphim_test_utils::EnvVarGuard;
 
     fn create_test_settings() -> Settings {
         use std::path::PathBuf;
@@ -430,9 +431,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_valid_webhook_signature() {
-        unsafe {
-            std::env::set_var("GITHUB_WEBHOOK_SECRET", "test_secret");
-        }
+        let _guard = EnvVarGuard::set("GITHUB_WEBHOOK_SECRET", "test_secret");
         let settings = create_test_settings();
         let payload = r#"{"action":"opened","number":1,"repository":{"full_name":"test/repo"}}"#;
 
@@ -455,16 +454,11 @@ mod tests {
             .await;
 
         assert_eq!(resp.status_code, Some(salvo::http::StatusCode::OK));
-        unsafe {
-            std::env::remove_var("GITHUB_WEBHOOK_SECRET");
-        }
     }
 
     #[tokio::test]
     async fn test_invalid_webhook_signature() {
-        unsafe {
-            std::env::set_var("GITHUB_WEBHOOK_SECRET", "test_secret");
-        }
+        let _guard = EnvVarGuard::set("GITHUB_WEBHOOK_SECRET", "test_secret");
         let payload = r#"{"action":"opened","number":1,"repository":{"full_name":"test/repo"}}"#;
 
         let service =
@@ -477,8 +471,5 @@ mod tests {
             .await;
 
         assert_eq!(resp.status_code, Some(salvo::http::StatusCode::FORBIDDEN));
-        unsafe {
-            std::env::remove_var("GITHUB_WEBHOOK_SECRET");
-        }
     }
 }
