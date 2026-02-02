@@ -16,7 +16,7 @@ use super::templates::{ConfigTemplate, TemplateRegistry};
 use super::validation::validate_role;
 
 #[cfg(test)]
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 /// Result of running the setup wizard
 #[derive(Debug)]
