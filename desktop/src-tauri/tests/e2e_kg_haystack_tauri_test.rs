@@ -79,7 +79,9 @@ async fn test_find_documents_for_kg_term_haystack() {
                 println!("    ❌ Service failed for term '{}': {:?}", term, e);
                 // In test environment, this might fail due to configuration issues
                 // The important thing is that we test the service interface
-                println!("    ℹ️  This may be expected in test environment due to missing local KG files");
+                println!(
+                    "    ℹ️  This may be expected in test environment due to missing local KG files"
+                );
             }
         }
     }

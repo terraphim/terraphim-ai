@@ -9171,6 +9171,7 @@ dependencies = [
  "ratatui",
  "regex",
  "reqwest 0.12.28",
+ "rustc_version",
  "rustyline 17.0.2",
  "serde",
  "serde_json",
@@ -9188,6 +9189,7 @@ dependencies = [
  "terraphim_service",
  "terraphim_sessions",
  "terraphim_settings",
+ "terraphim_test_utils",
  "terraphim_types",
  "terraphim_update",
  "thiserror 1.0.69",
@@ -9413,6 +9415,7 @@ dependencies = [
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_settings",
+ "terraphim_test_utils",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
@@ -9469,6 +9472,7 @@ dependencies = [
  "terraphim_config",
  "terraphim_github_runner",
  "terraphim_service",
+ "terraphim_test_utils",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
@@ -9605,6 +9609,7 @@ dependencies = [
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_service",
+ "terraphim_test_utils",
  "terraphim_types",
  "terraphim_update",
  "thiserror 1.0.69",
@@ -9647,6 +9652,7 @@ dependencies = [
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_settings",
+ "terraphim_test_utils",
  "terraphim_types",
  "test-log",
  "thiserror 1.0.69",
@@ -9833,6 +9839,7 @@ dependencies = [
  "terraphim_persistence",
  "terraphim_rolegraph",
  "terraphim_settings",
+ "terraphim_test_utils",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
@@ -9904,6 +9911,13 @@ dependencies = [
  "tokio",
  "tokio-test",
  "uuid",
+]
+
+[[package]]
+name = "terraphim_test_utils"
+version = "1.6.0"
+dependencies = [
+ "rustc_version",
 ]
 
 [[package]]

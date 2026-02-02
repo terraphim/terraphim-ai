@@ -1,17 +1,8 @@
-use std::str::FromStr;
-
-#[cfg(feature = "repl")]
-use terraphim_agent::repl::web_operations::*;
-
-#[cfg(all(
-    test,
-    feature = "repl",
-    feature = "repl-web",
-    feature = "repl-web-advanced"
-))]
+#[cfg(all(test, feature = "repl", feature = "repl-web"))]
 mod tests {
-    use super::*;
+    use std::str::FromStr;
     use terraphim_agent::repl::commands::{ReplCommand, WebConfigSubcommand, WebSubcommand};
+    use terraphim_agent::repl::web_operations::*;
 
     #[test]
     fn test_web_get_command_parsing() {

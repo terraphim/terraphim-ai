@@ -539,10 +539,12 @@ mod tests {
 
         // Check system message with global context
         assert_eq!(messages[0]["role"], "system");
-        assert!(messages[0]["content"]
-            .as_str()
-            .unwrap()
-            .contains("This is system information"));
+        assert!(
+            messages[0]["content"]
+                .as_str()
+                .unwrap()
+                .contains("This is system information")
+        );
 
         // Check user message with message context
         assert_eq!(messages[1]["role"], "user");
@@ -740,9 +742,11 @@ mod tests {
             Some("This is the document description that becomes the summary".to_string())
         );
         assert_eq!(context_item.title, "Document with Summary");
-        assert!(context_item
-            .content
-            .contains("This is the document description that becomes the summary"));
+        assert!(
+            context_item
+                .content
+                .contains("This is the document description that becomes the summary")
+        );
 
         // Test search result context with summary
         let documents = vec![document];
@@ -750,16 +754,20 @@ mod tests {
 
         // Verify search context has a summary
         assert!(search_context.summary.is_some());
-        assert!(search_context
-            .summary
-            .as_ref()
-            .unwrap()
-            .contains("test query"));
-        assert!(search_context
-            .summary
-            .as_ref()
-            .unwrap()
-            .contains("1 documents found"));
+        assert!(
+            search_context
+                .summary
+                .as_ref()
+                .unwrap()
+                .contains("test query")
+        );
+        assert!(
+            search_context
+                .summary
+                .as_ref()
+                .unwrap()
+                .contains("1 documents found")
+        );
     }
 
     #[tokio::test]

@@ -8,6 +8,7 @@ use terraphim_config::{
 };
 use terraphim_persistence::DeviceStorage;
 use terraphim_persistence::Persistable;
+use terraphim_test_utils::set_env_var;
 use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 use tokio::process::Command;
 
@@ -18,9 +19,9 @@ use terraphim_automata::AutomataPath;
 /// that uses local KG files and builds thesaurus from local markdown files
 async fn create_autocomplete_test_config() -> Result<String> {
     // Use memory-only persistence to avoid RocksDB filesystem issues in CI
-    std::env::set_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
+    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
     // Isolate logs to tmp
-    std::env::set_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
+    set_env_var("TERRAPHIM_LOG_DIR", "/tmp/terraphim-logs");
     // Force persistence layer to use memory-only device settings
     let _ = DeviceStorage::init_memory_only().await;
     let current_dir = std::env::current_dir()?;

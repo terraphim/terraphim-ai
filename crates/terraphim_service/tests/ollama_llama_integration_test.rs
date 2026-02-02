@@ -3,7 +3,7 @@
 use ahash::AHashMap;
 use serial_test::serial;
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
-use terraphim_service::{llm, TerraphimService};
+use terraphim_service::{TerraphimService, llm};
 use terraphim_types::{NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
 
 /// Comprehensive integration test suite for Ollama LLM integration with llama3.2:3b
@@ -153,7 +153,10 @@ async fn test_direct_llm_client(base_url: &str) {
     // Additional validation: ensure the summary is not excessively long
     // Even with LLM flexibility, we expect some reasonable length control
     if actual_length > 500 {
-        println!("⚠️  Summary is very long ({} chars) - this may indicate the LLM is not following length instructions", actual_length);
+        println!(
+            "⚠️  Summary is very long ({} chars) - this may indicate the LLM is not following length instructions",
+            actual_length
+        );
     }
 }
 

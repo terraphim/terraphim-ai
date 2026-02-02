@@ -6,9 +6,10 @@ extern crate napi_derive;
 use anyhow::Context;
 use napi::bindgen_prelude::{Buffer, Status};
 use terraphim_automata::{
+  LinkType,
   autocomplete::{autocomplete_search, build_autocomplete_index},
   deserialize_autocomplete_index, load_thesaurus_from_json, load_thesaurus_from_json_and_replace,
-  serialize_autocomplete_index, LinkType,
+  serialize_autocomplete_index,
 };
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
@@ -427,8 +428,10 @@ table = "terraphim_kv"
     let settings_path = temp_dir.path().join("settings.toml");
     fs::write(&settings_path, settings_content).expect("Failed to write settings");
 
-    // Set environment variable to point to our test config
-    std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+    // SAFETY: This test runs in isolation before spawning other threads
+    unsafe {
+      std::env::set_var("XDG_CONFIG_HOME", temp_dir.path());
+    }
 
     temp_dir
   }

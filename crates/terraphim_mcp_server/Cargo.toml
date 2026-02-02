@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_mcp_server"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 license = "MIT"
 
 [[bin]]
@@ -45,4 +45,5 @@ terraphim_automata = { path = "../terraphim_automata" }  # For AutomataPath
 terraphim_config = { path = "../terraphim_config" }
 terraphim_middleware = { path = "../terraphim_middleware" }  # For Logseq builder
 terraphim_persistence = { path = "../terraphim_persistence", features = ["memory"] }
+terraphim_test_utils = { path = "../terraphim_test_utils" }
 env_logger = "0.11"
