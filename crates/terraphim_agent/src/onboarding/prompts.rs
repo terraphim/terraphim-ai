@@ -2,8 +2,8 @@
 //!
 //! Uses dialoguer for cross-platform terminal prompts with themes.
 
-use crate::onboarding::{OnboardingError, validation};
-use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
+use crate::onboarding::{validation, OnboardingError};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use std::path::PathBuf;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{Haystack, KnowledgeGraph, KnowledgeGraphLocal, ServiceType};
@@ -33,7 +33,6 @@ pub enum PromptResult<T> {
 }
 
 impl<T> PromptResult<T> {
-    #[allow(dead_code)]
     pub fn into_result(self) -> Result<T, OnboardingError> {
         match self {
             PromptResult::Value(v) => Ok(v),
@@ -574,7 +573,6 @@ pub fn prompt_knowledge_graph() -> Result<PromptResult<Option<KnowledgeGraph>>, 
 }
 
 /// Prompt for confirmation with custom message
-#[allow(dead_code)]
 pub fn prompt_confirm(message: &str, default: bool) -> Result<bool, OnboardingError> {
     let theme = ColorfulTheme::default();
     Ok(Confirm::with_theme(&theme)
@@ -584,7 +582,6 @@ pub fn prompt_confirm(message: &str, default: bool) -> Result<bool, OnboardingEr
 }
 
 /// Prompt for simple text input
-#[allow(dead_code)]
 pub fn prompt_input(message: &str, default: Option<&str>) -> Result<String, OnboardingError> {
     let theme = ColorfulTheme::default();
     let mut input = Input::with_theme(&theme).with_prompt(message);
