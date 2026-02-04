@@ -223,9 +223,21 @@ jobs:
 
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
           mkdir -p artifacts
+          # Create tar.gz archives with version in filename for auto-update compatibility
           # Server binary only exists for non-cross builds
+          if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
+            tar -czf "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.tar.gz" \
+              -C "target/${{ matrix.target }}/release" terraphim_server
+          fi
+          tar -czf "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.tar.gz" \
+            -C "target/${{ matrix.target }}/release" terraphim-agent
+          tar -czf "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.tar.gz" \
+            -C "target/${{ matrix.target }}/release" terraphim-cli
+          # Also copy raw binaries for backward compatibility
           if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
             cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
           fi
@@ -236,8 +248,20 @@ jobs:
       - name: Prepare artifacts (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
           mkdir -p artifacts
+          # Create zip archives with version in filename for auto-update compatibility
+          if [ -f "target/${{ matrix.target }}/release/terraphim_server.exe" ]; then
+            zip -j "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.zip" \
+              "target/${{ matrix.target }}/release/terraphim_server.exe"
+          fi
+          zip -j "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" \
+            "target/${{ matrix.target }}/release/terraphim-agent.exe"
+          zip -j "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" \
+            "target/${{ matrix.target }}/release/terraphim-cli.exe"
+          # Also copy raw binaries for backward compatibility
           cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe || true
@@ -590,9 +614,14 @@ jobs:
           for artifact_dir in binaries-*; do
             if [ -d "$artifact_dir" ]; then
               echo "Processing $artifact_dir..."
-              # Copy all files that look like binaries (no extension or .exe)
+              # Copy archive files (tar.gz, zip) for auto-update compatibility
+              find "$artifact_dir" -type f \( -name "*.tar.gz" -o -name "*.zip" \) | while read file; do
+                echo "  Copying archive: $file"
+                cp "$file" release-assets/
+              done
+              # Copy raw binaries for backward compatibility
               find "$artifact_dir" -type f \( -name "terraphim*" -o -name "*.exe" \) | while read file; do
-                echo "  Copying: $file"
+                echo "  Copying binary: $file"
                 cp "$file" release-assets/
               done
             fi
