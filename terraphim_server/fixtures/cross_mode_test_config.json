@@ -1,0 +1,67 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Terraphim Engineer": {
+      "shortname": "TerraEng",
+      "name": "Terraphim Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": {"Local": "terraphim_server/fixtures/term_to_id.json"},
+        "knowledge_graph_local": null,
+        "public": true,
+        "publish": false
+      },
+      "haystacks": [
+        {
+          "location": "terraphim_server/fixtures/haystack",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "terraphim_server/fixtures/haystack",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    },
+    "Quickwit Logs": {
+      "shortname": "QuickwitLogs",
+      "name": "Quickwit Logs",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "darkly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "terraphim_server/fixtures/haystack",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "extra": {}
+    }
+  },
+  "default_role": "Terraphim Engineer",
+  "selected_role": "Terraphim Engineer"
+}
