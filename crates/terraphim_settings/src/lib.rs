@@ -258,13 +258,13 @@ mod tests {
     use test_log::test;
 
     use envtestkit::lock::lock_test;
+    use tempfile::TempDir;
 
     #[test]
     fn test_env_variable() {
         let _lock = lock_test();
-        // Test that config loading works with test settings
-        let config =
-            DeviceSettings::load_from_env_and_file(Some(PathBuf::from("./test_settings/")));
+        let temp_dir = TempDir::new().unwrap();
+        let config = DeviceSettings::load_from_env_and_file(Some(temp_dir.path().to_path_buf()));
 
         log::debug!("Config: {:?}", config);
 
@@ -282,7 +282,8 @@ mod tests {
 
     #[test]
     fn test_update_initialized_flag() {
-        let test_config_path = PathBuf::from("./test_settings/");
+        let temp_dir = TempDir::new().unwrap();
+        let test_config_path = temp_dir.path().to_path_buf();
 
         // Check if initialized is false
         let mut config =

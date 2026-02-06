@@ -70,6 +70,111 @@ fn ensure_server_binary() -> Result<PathBuf> {
     Ok(binary_path)
 }
 
+/// Generate a test config with absolute paths so the server works regardless of CWD
+fn generate_absolute_config(workspace_root: &Path, port: u16) -> Result<PathBuf> {
+    let fixtures_dir = workspace_root.join("terraphim_server/fixtures");
+    let haystack_path = fixtures_dir.join("haystack");
+    let automata_path = fixtures_dir.join("term_to_id.json");
+
+    let config = serde_json::json!({
+        "id": "Server",
+        "global_shortcut": "Ctrl+Shift+T",
+        "roles": {
+            "Terraphim Engineer": {
+                "shortname": "TerraEng",
+                "name": "Terraphim Engineer",
+                "relevance_function": "terraphim-graph",
+                "terraphim_it": true,
+                "theme": "lumen",
+                "kg": {
+                    "automata_path": {"Local": automata_path.to_str().unwrap()},
+                    "knowledge_graph_local": null,
+                    "public": true,
+                    "publish": false
+                },
+                "haystacks": [{
+                    "location": haystack_path.to_str().unwrap(),
+                    "service": "Ripgrep",
+                    "read_only": true,
+                    "atomic_server_secret": null,
+                    "extra_parameters": {}
+                }],
+                "extra": {}
+            },
+            "Default": {
+                "shortname": "Default",
+                "name": "Default",
+                "relevance_function": "title-scorer",
+                "terraphim_it": false,
+                "theme": "spacelab",
+                "kg": null,
+                "haystacks": [{
+                    "location": haystack_path.to_str().unwrap(),
+                    "service": "Ripgrep",
+                    "read_only": true,
+                    "atomic_server_secret": null,
+                    "extra_parameters": {}
+                }],
+                "extra": {}
+            },
+            "Quickwit Logs": {
+                "shortname": "QuickwitLogs",
+                "name": "Quickwit Logs",
+                "relevance_function": "bm25",
+                "terraphim_it": false,
+                "theme": "darkly",
+                "kg": null,
+                "haystacks": [{
+                    "location": haystack_path.to_str().unwrap(),
+                    "service": "Ripgrep",
+                    "read_only": true,
+                    "atomic_server_secret": null,
+                    "extra_parameters": {}
+                }],
+                "extra": {}
+            }
+        },
+        "default_role": "Terraphim Engineer",
+        "selected_role": "Terraphim Engineer"
+    });
+
+    let config_path = std::env::temp_dir().join(format!("terraphim_test_config_{}.json", port));
+    fs::write(&config_path, serde_json::to_string_pretty(&config)?)?;
+    Ok(config_path)
+}
+
+/// Generate an isolated settings.toml so the server persistence layer
+/// does not share the default /tmp/terraphim_sqlite database with other runs.
+fn generate_isolated_settings(port: u16) -> Result<PathBuf> {
+    let settings_dir = std::env::temp_dir().join(format!("terraphim_settings_{}", port));
+    fs::create_dir_all(&settings_dir)?;
+
+    let data_dir = std::env::temp_dir().join(format!("terraphim_test_{}", port));
+    let sqlite_dir = data_dir.join("sqlite");
+    fs::create_dir_all(&sqlite_dir)?;
+
+    let settings_content = format!(
+        r#"server_hostname = "127.0.0.1:{port}"
+api_endpoint = "http://localhost:{port}/api"
+initialized = false
+default_data_path = "{data_dir}"
+
+[profiles.sqlite]
+type = "sqlite"
+datadir = "{sqlite_dir}"
+connection_string = "{sqlite_dir}/terraphim.db"
+table = "terraphim_kv"
+"#,
+        port = port,
+        data_dir = data_dir.display(),
+        sqlite_dir = sqlite_dir.display(),
+    );
+
+    let settings_file = settings_dir.join("settings.toml");
+    fs::write(&settings_file, settings_content)?;
+    Ok(settings_dir)
+}
+
 /// Test helper to start a real terraphim server (instant with pre-compiled binary)
 async fn start_test_server() -> Result<(Child, String)> {
     let port = portpicker::pick_unused_port().expect("Failed to find unused port");
@@ -80,18 +185,17 @@ async fn start_test_server() -> Result<(Child, String)> {
     // Use pre-compiled binary for instant startup
     let binary_path = ensure_server_binary()?;
 
-    // Use workspace root for config path since tests run from crate directory
     let workspace_root = get_workspace_root()?;
-    let config_path = workspace_root.join("terraphim_server/fixtures/cross_mode_test_config.json");
+    let config_path = generate_absolute_config(&workspace_root, port)?;
 
-    // Use unique temp directory for persistence to avoid loading saved configs
-    let temp_data_path = format!("/tmp/terraphim_test_{}", port);
+    // Generate isolated settings so the persistence layer uses a unique
+    // SQLite database, preventing stale saved configs from overriding --config
+    let settings_dir = generate_isolated_settings(port)?;
 
     let mut server = Command::new(&binary_path)
         .args(["--config", config_path.to_str().unwrap()])
-        .current_dir(&workspace_root) // Ensure relative paths in config resolve correctly
         .env("TERRAPHIM_SERVER_HOSTNAME", format!("127.0.0.1:{}", port))
-        .env("TERRAPHIM_DATA_PATH", &temp_data_path)
+        .env("TERRAPHIM_SETTINGS_PATH", settings_dir.to_str().unwrap())
         .env("RUST_LOG", "warn")
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -235,16 +339,21 @@ fn search_via_repl(server_url: &str, query: &str, role: &str) -> Result<Vec<Norm
 fn cleanup_test_resources(mut server: Child) -> Result<()> {
     let _ = server.kill();
 
-    let test_dirs = vec!["/tmp/terraphim_sqlite", "/tmp/dashmaptest", "/tmp/opendal"];
-    for dir in test_dirs {
-        if Path::new(dir).exists() {
-            let _ = fs::remove_dir_all(dir);
-        }
-    }
-
     let test_kg_path = "docs/src/kg/test_ranking_kg.md";
     if Path::new(test_kg_path).exists() {
         let _ = fs::remove_file(test_kg_path);
+    }
+
+    // Clean up temp directories created for this test run
+    // (glob pattern for /tmp/terraphim_test_* and /tmp/terraphim_settings_*)
+    if let Ok(entries) = fs::read_dir(std::env::temp_dir()) {
+        for entry in entries.flatten() {
+            let name = entry.file_name();
+            let name = name.to_string_lossy();
+            if name.starts_with("terraphim_test_") || name.starts_with("terraphim_settings_") {
+                let _ = fs::remove_dir_all(entry.path());
+            }
+        }
     }
 
     Ok(())
