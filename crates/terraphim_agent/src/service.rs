@@ -140,13 +140,6 @@ impl TuiService {
         None
     }
 
-    /// Search documents using the current selected role
-    pub async fn search(&self, search_term: &str, limit: Option<usize>) -> Result<Vec<Document>> {
-        let selected_role = self.get_selected_role().await;
-        self.search_with_role(search_term, &selected_role, limit)
-            .await
-    }
-
     /// Search documents with a specific role
     pub async fn search_with_role(
         &self,

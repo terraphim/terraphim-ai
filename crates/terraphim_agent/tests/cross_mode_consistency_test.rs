@@ -329,46 +329,28 @@ async fn test_cross_mode_consistency() -> Result<()> {
             server_results.len() == cli_results.len() && server_results.len() == repl_results.len();
         println!("  Counts match: {}", counts_match);
 
-        // Top results should be similar (allowing for minor ordering differences)
-        // For small result sets, we relax the requirement
-        let num_results = server_results.len().min(cli_results.len());
-        let top_n = num_results.min(5);
-        let server_top: Vec<String> = server_titles.iter().take(top_n).cloned().collect();
-        let cli_top: Vec<String> = cli_titles.iter().take(top_n).cloned().collect();
-        let repl_top: Vec<String> = repl_titles.iter().take(top_n).cloned().collect();
+        // Compare result sets (ordering may differ due to non-deterministic
+        // TitleScorer ranking for equal-score documents)
+        let mut server_set: Vec<String> = server_titles.clone();
+        let mut cli_set: Vec<String> = cli_titles.clone();
+        let mut repl_set: Vec<String> = repl_titles.clone();
+        server_set.sort();
+        cli_set.sort();
+        repl_set.sort();
 
-        // Calculate minimum required matches based on result set size
-        // For 1-2 results: require all to match
-        // For 3+ results: require at least 50% overlap
-        let min_matches = if top_n <= 2 { top_n } else { (top_n + 1) / 2 };
-        let server_cli_match = count_matches(&server_top, &cli_top) >= min_matches;
-        let server_repl_match = count_matches(&server_top, &repl_top) >= min_matches;
-        let cli_repl_match = count_matches(&cli_top, &repl_top) >= min_matches;
+        let server_cli_match = server_set == cli_set;
+        let server_repl_match = server_set == repl_set;
+        let cli_repl_match = cli_set == repl_set;
 
-        println!(
-            "  Server-CLI match: {} ({}/{} required)",
-            server_cli_match,
-            count_matches(&server_top, &cli_top),
-            min_matches
-        );
-        println!(
-            "  Server-REPL match: {} ({}/{} required)",
-            server_repl_match,
-            count_matches(&server_top, &repl_top),
-            min_matches
-        );
-        println!(
-            "  CLI-REPL match: {} ({}/{} required)",
-            cli_repl_match,
-            count_matches(&cli_top, &repl_top),
-            min_matches
-        );
+        println!("  Server-CLI sets match: {}", server_cli_match);
+        println!("  Server-REPL sets match: {}", server_repl_match);
+        println!("  CLI-REPL sets match: {}", cli_repl_match);
 
-        if !server_cli_match || !server_repl_match || !cli_repl_match {
+        if !counts_match || !server_cli_match || !server_repl_match || !cli_repl_match {
             all_consistent = false;
-            println!("  ⚠️ WARNING: Results inconsistent across modes!");
+            println!("  WARNING: Results inconsistent across modes!");
         } else {
-            println!("  ✓ Results consistent across all modes");
+            println!("  Results consistent across all modes");
         }
 
         // Log comparison for debugging (snapshots removed due to ordering variations)
@@ -403,11 +385,6 @@ async fn test_cross_mode_consistency() -> Result<()> {
     );
 
     Ok(())
-}
-
-/// Count matching items between two vectors
-fn count_matches(a: &[String], b: &[String]) -> usize {
-    a.iter().filter(|item| b.contains(item)).count()
 }
 
 #[tokio::test]
