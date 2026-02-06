@@ -3,19 +3,17 @@
 //! Provides the interactive setup wizard flow for first-time users
 //! and add-role capability for extending existing configurations.
 
-use std::path::PathBuf;
-
-use dialoguer::{theme::ColorfulTheme, Confirm, Select};
+use dialoguer::{Confirm, Select, theme::ColorfulTheme};
 use terraphim_config::Role;
 use terraphim_types::RelevanceFunction;
 
+use super::OnboardingError;
 use super::prompts::{
-    prompt_haystacks, prompt_knowledge_graph, prompt_llm_config, prompt_relevance_function,
-    prompt_role_basics, prompt_theme, PromptResult,
+    PromptResult, prompt_haystacks, prompt_knowledge_graph, prompt_llm_config,
+    prompt_relevance_function, prompt_role_basics, prompt_theme,
 };
 use super::templates::{ConfigTemplate, TemplateRegistry};
 use super::validation::validate_role;
-use super::OnboardingError;
 
 /// Result of running the setup wizard
 #[derive(Debug)]
@@ -107,11 +105,6 @@ impl QuickStartChoice {
             Self::Custom,
         ]
     }
-}
-
-/// Check if this is a first run (no existing configuration)
-pub fn is_first_run(config_path: &PathBuf) -> bool {
-    !config_path.exists()
 }
 
 /// Apply a template directly without interactive wizard
@@ -513,11 +506,5 @@ mod tests {
         let role = apply_template("local-notes", Some("/my/notes")).unwrap();
         assert_eq!(role.name.to_string(), "Local Notes");
         assert_eq!(role.haystacks[0].location, "/my/notes");
-    }
-
-    #[test]
-    fn test_is_first_run_nonexistent_path() {
-        let path = PathBuf::from("/nonexistent/config.json");
-        assert!(is_first_run(&path));
     }
 }

@@ -26,10 +26,6 @@ pub enum ValidationError {
     #[error("Service {0} requires: {1}")]
     ServiceRequirement(String, String),
 
-    /// Path does not exist on filesystem
-    #[error("Path does not exist: {0}")]
-    PathNotFound(String),
-
     /// URL is malformed
     #[error("Invalid URL: {0}")]
     InvalidUrl(String),
@@ -230,9 +226,11 @@ mod tests {
         let result = validate_role(&role);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::EmptyField(_))));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::EmptyField(_)))
+        );
     }
 
     #[test]
@@ -242,9 +240,11 @@ mod tests {
         let result = validate_role(&role);
         assert!(result.is_err());
         let errors = result.unwrap_err();
-        assert!(errors
-            .iter()
-            .any(|e| matches!(e, ValidationError::MissingHaystack)));
+        assert!(
+            errors
+                .iter()
+                .any(|e| matches!(e, ValidationError::MissingHaystack))
+        );
     }
 
     #[test]

@@ -2,8 +2,8 @@
 //!
 //! Uses dialoguer for cross-platform terminal prompts with themes.
 
-use crate::onboarding::{validation, OnboardingError};
-use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
+use crate::onboarding::{OnboardingError, validation};
+use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
 use std::path::PathBuf;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{Haystack, KnowledgeGraph, KnowledgeGraphLocal, ServiceType};
@@ -30,15 +30,6 @@ const BACK_OPTION: &str = "<< Go Back";
 pub enum PromptResult<T> {
     Value(T),
     Back,
-}
-
-impl<T> PromptResult<T> {
-    pub fn into_result(self) -> Result<T, OnboardingError> {
-        match self {
-            PromptResult::Value(v) => Ok(v),
-            PromptResult::Back => Err(OnboardingError::NavigateBack),
-        }
-    }
 }
 
 /// Prompt for role basic info (name, shortname)
@@ -570,27 +561,6 @@ pub fn prompt_knowledge_graph() -> Result<PromptResult<Option<KnowledgeGraph>>, 
         }
         _ => Ok(PromptResult::Value(None)),
     }
-}
-
-/// Prompt for confirmation with custom message
-pub fn prompt_confirm(message: &str, default: bool) -> Result<bool, OnboardingError> {
-    let theme = ColorfulTheme::default();
-    Ok(Confirm::with_theme(&theme)
-        .with_prompt(message)
-        .default(default)
-        .interact()?)
-}
-
-/// Prompt for simple text input
-pub fn prompt_input(message: &str, default: Option<&str>) -> Result<String, OnboardingError> {
-    let theme = ColorfulTheme::default();
-    let mut input = Input::with_theme(&theme).with_prompt(message);
-
-    if let Some(d) = default {
-        input = input.default(d.to_string());
-    }
-
-    Ok(input.interact_text()?)
 }
 
 #[cfg(test)]
