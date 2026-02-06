@@ -393,7 +393,7 @@ jobs:
 
       - name: Run cargo audit
         run: |
-          cargo install cargo-audit --features=fix
+          cargo install cargo-audit
           # Fetch fresh advisory database to handle CVSS format updates
           cargo audit --fetch || true
           # Run audit, continuing on advisory DB parse errors (CVSS 4.0 format issue)

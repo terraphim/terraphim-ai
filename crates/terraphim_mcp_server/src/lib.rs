@@ -445,8 +445,7 @@ impl McpService {
                             desc.clone()
                         } else {
                             let body = d.body.as_str();
-                            let snip = body.chars().take(160).collect::<String>();
-                            snip
+                            body.chars().take(160).collect::<String>()
                         }
                     }
                     _ => String::new(),
