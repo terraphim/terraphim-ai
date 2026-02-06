@@ -569,7 +569,7 @@ mod tests {
 
     #[test]
     fn test_available_themes_not_empty() {
-        assert!(!AVAILABLE_THEMES.is_empty());
+        assert!(AVAILABLE_THEMES.len() > 1);
         assert!(AVAILABLE_THEMES.contains(&"spacelab"));
         assert!(AVAILABLE_THEMES.contains(&"darkly"));
     }
