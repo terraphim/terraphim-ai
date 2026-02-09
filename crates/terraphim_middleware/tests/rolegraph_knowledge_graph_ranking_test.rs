@@ -251,6 +251,7 @@ async fn test_build_thesaurus_from_kg_files() {
 /// Test that demonstrates the issue when using wrong thesaurus
 #[tokio::test]
 #[serial]
+#[ignore = "Requires remote-loading feature - terraphim_automata needs 'remote-loading' enabled"]
 async fn test_demonstrates_issue_with_wrong_thesaurus() {
     // This test demonstrates why search fails when using the remote thesaurus
     // instead of a locally built one from the kg files
