@@ -57,7 +57,7 @@ tsify = { version = "0.5", features = ["js"], optional = true }
 wasm-bindgen = { version = "0.2", optional = true }
 
 [features]
-default = ["typescript"]
+default = []
 typescript = ["tsify", "wasm-bindgen"]
 openrouter = []
 

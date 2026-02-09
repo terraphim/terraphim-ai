@@ -245,7 +245,7 @@ fn test_before_after_comparison() {
             "Docs.rs URL",
             "https://docs.rs/serde_json/1.0.96/serde_json/value/enum.Value.html",
             "Old: docs_rs_https_docs_rs_serde_json_1_0_96_serde_json_value_enum_value_html",
-            "doc_docs_rs_serde_json_1_0_96_serde_json_value_enum_value",
+            "doc_docs_rs_serde_json_1_0_96_serde_json_value_enu",  // Truncated to 50 chars
         ),
     ];
 

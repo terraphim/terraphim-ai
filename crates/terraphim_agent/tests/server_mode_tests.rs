@@ -293,7 +293,19 @@ async fn test_server_mode_roles_select() -> Result<()> {
         return Ok(());
     }
 
-    let first_role = roles[0].trim();
+    // Parse role name from format: "  ✓ RoleName (ShortName)" or "  ✓ RoleName"
+    let first_line = roles[0].trim();
+    let first_role = if let Some(idx) = first_line.rfind('(') {
+        // Extract just the role name before the parenthesis
+        first_line[..idx]
+            .trim()
+            .split_whitespace()
+            .last()
+            .unwrap_or(first_line)
+    } else {
+        // No parenthesis, just take the last word
+        first_line.split_whitespace().last().unwrap_or(first_line)
+    };
     println!("Selecting first available role: {}", first_role);
 
     // Test role selection
