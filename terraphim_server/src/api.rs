@@ -4,6 +4,7 @@ use axum::{
     http::StatusCode,
     response::IntoResponse,
 };
+#[cfg(feature = "schema")]
 use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -175,9 +176,18 @@ pub(crate) async fn update_config(
 }
 
 /// Returns JSON Schema for Terraphim Config
+#[cfg(feature = "schema")]
 pub(crate) async fn get_config_schema() -> Json<Value> {
     let schema = schema_for!(Config);
     Json(serde_json::to_value(&schema).expect("schema serialization"))
+}
+
+/// Returns JSON Schema for Terraphim Config (placeholder when schema feature disabled)
+#[cfg(not(feature = "schema"))]
+pub(crate) async fn get_config_schema() -> Json<Value> {
+    Json(serde_json::json!({
+        "error": "Schema generation not available. Enable 'schema' feature."
+    }))
 }
 
 /// Request body for updating the selected role only

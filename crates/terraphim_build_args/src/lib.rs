@@ -15,16 +15,19 @@ pub mod cli;
 ///
 /// # Usage
 ///
-/// ```rust
+/// ```rust,no_run
 /// use terraphim_build_args::{BuildConfig, BuildTarget, FeatureSet};
 ///
-/// let config = BuildConfig::builder()
-///     .target(BuildTarget::NativeRelease)
-///     .features(FeatureSet::from_string("openrouter,typescript"))
-///     .environment("production")
-///     .build()?;
+/// fn main() -> Result<(), Box<dyn std::error::Error>> {
+///     let config = BuildConfig::builder()
+///         .target(BuildTarget::NativeRelease)
+///         .features(FeatureSet::from_string("openrouter,typescript")?)
+///         .environment("production")
+///         .build()?;
 ///
-/// println!("Cargo args: {}", config.cargo_args());
+///     println!("Cargo args: {:?}", config.cargo_args());
+///     Ok(())
+/// }
 /// ```
 pub mod config;
 pub mod environment;

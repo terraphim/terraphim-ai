@@ -1,3 +1,4 @@
+use std::net::TcpListener;
 use std::path::PathBuf;
 use std::time::Duration;
 
@@ -6,6 +7,14 @@ use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState};
 use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
+
+/// Find an available port for testing
+fn find_available_port() -> Result<u16, std::io::Error> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    drop(listener);
+    Ok(port)
+}
 
 /// Integration test for Terraphim Engineer configuration with local knowledge graph
 ///
@@ -151,8 +160,11 @@ async fn test_terraphim_engineer_local_kg_integration() {
 
     log::info!("✅ Terraphim Engineer role configuration validated");
 
-    // Start server on a test port
-    let server_addr = "127.0.0.1:8081".parse().unwrap();
+    // Find an available port
+    let port = find_available_port().expect("Failed to find available port");
+    let server_addr: std::net::SocketAddr = format!("127.0.0.1:{}", port).parse().unwrap();
+
+    log::info!("Starting test server on port {}", port);
     let server_handle = tokio::spawn(async move {
         if let Err(e) = axum_server(server_addr, config_state).await {
             log::error!("Server error: {:?}", e);
@@ -165,7 +177,7 @@ async fn test_terraphim_engineer_local_kg_integration() {
 
     let client = terraphim_service::http_client::create_default_client()
         .expect("Failed to create HTTP client");
-    let base_url = "http://127.0.0.1:8081";
+    let base_url = format!("http://127.0.0.1:{}", port);
 
     // Test 1: Health check
     log::info!("🔍 Testing server health...");

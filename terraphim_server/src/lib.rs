@@ -9,6 +9,7 @@ use axum::{
     routing::{delete, get, post},
 };
 use regex::Regex;
+#[cfg(feature = "embedded-assets")]
 use rust_embed::RustEmbed;
 use tokio::sync::{RwLock, broadcast};
 
@@ -152,9 +153,25 @@ pub use error::{Result, Status};
 // use axum_embed::ServeEmbed;
 static INDEX_HTML: &str = "index.html";
 
+#[cfg(feature = "embedded-assets")]
 #[derive(RustEmbed)]
 #[folder = "../desktop/dist"]
 struct Assets;
+
+#[cfg(not(feature = "embedded-assets"))]
+mod assets {
+    pub struct Asset;
+    pub struct EmbeddedFile;
+
+    impl Asset {
+        pub fn get(_path: &str) -> Option<EmbeddedFile> {
+            None
+        }
+    }
+}
+
+#[cfg(not(feature = "embedded-assets"))]
+use assets::Asset as Assets;
 
 // Extended application state that includes workflow management
 #[derive(Clone)]

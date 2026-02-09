@@ -13,7 +13,7 @@
  * ## Usage
  *
  * ```rust,no_run
- * use atomic_server_client::{types::{Config, Resource}, store::Store};
+ * use terraphim_atomic_client::{types::{Config, Resource}, store::Store};
  * use std::collections::HashMap;
  * use serde_json::json;
  *
