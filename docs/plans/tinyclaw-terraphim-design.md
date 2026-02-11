@@ -4,7 +4,8 @@
 **Research Doc**: [tinyclaw-terraphim-research.md](tinyclaw-terraphim-research.md)
 **Author**: Terraphim AI Design
 **Date**: 2026-02-11
-**Estimated Effort**: ~5,700 LOC Rust + ~400 LOC TypeScript (WhatsApp bridge)
+**Revised**: 2026-02-11 (v2 -- leverage terraphim_multi_agent)
+**Estimated Effort**: ~5,300 LOC Rust + ~400 LOC TypeScript (WhatsApp bridge)
 
 ---
 
@@ -16,9 +17,20 @@ Build a multi-channel AI assistant binary (`terraphim-tinyclaw`) on the Terraphi
 
 ### Approach
 
-New crate `terraphim_tinyclaw` as a binary crate in the workspace. It depends on existing agent crates (`terraphim_agent_messaging`, `terraphim_multi_agent`, `terraphim_agent_evolution`, `terraphim_service`) and introduces channel adapters, a tool registry, a skills loader, and an orchestrator.
+New crate `terraphim_tinyclaw` as a binary crate in the workspace. It composes heavily with `terraphim_multi_agent` for the core agent engine (LLM client, context management, prompt sanitization, KG enrichment, execution tracking) and introduces channel adapters, a tool-calling loop, a tool registry, and session persistence on top.
 
-The design follows PicoClaw's proven architecture -- channel trait, message bus, agent loop, session manager -- adapted to Rust async idioms and Terraphim's existing infrastructure.
+The design follows PicoClaw's proven architecture -- channel trait, message bus, agent loop, session manager -- adapted to Rust async idioms. The key difference from a naive port: we reuse Terraphim's existing `TerraphimAgent`, `GenAiLlmClient`, and `AgentContext` rather than reimplementing LLM access and context windowing from scratch.
+
+### Reused Components from terraphim_multi_agent
+
+| Component | What It Provides | What TinyClaw Adds |
+|-----------|------------------|-------------------|
+| `GenAiLlmClient` | Multi-provider LLM (Ollama, OpenAI, Anthropic, OpenRouter) via rust-genai | `generate_with_tools()` method for tool-calling responses |
+| `AgentContext` | Token-aware context windowing with 3 eviction strategies (RelevanceFirst, ChronologicalRecent, Balanced), pinned items | LLM-based summarization trigger before eviction |
+| `PromptSanitizer` | Prompt injection defense (9 patterns, Unicode obfuscation, control chars) | Applied to inbound user messages from channels |
+| `CommandHistory` + `CommandRecord` | Execution tracking with quality scores, token/cost stats, step recording | Maps tool-calling iterations to `ExecutionStep` |
+| `TerraphimAgent` | Role-based agent with KG enrichment (`get_enriched_context_for_query`), state persistence, status tracking | Wraps in iterative tool-calling loop |
+| `LlmRequest` / `LlmResponse` / `LlmMessage` | Typed LLM message types with role enum, token usage | Direct reuse in agent loop |
 
 ### Scope
 
@@ -44,7 +56,6 @@ The design follows PicoClaw's proven architecture -- channel trait, message bus,
 - Cron/scheduled tasks
 - Onboarding CLI wizard
 - Subagent spawning
-- Knowledge graph enrichment of responses
 - Firecracker VM sandboxed execution
 
 **Avoid At All Cost (5/25 Rule):**
@@ -52,7 +63,7 @@ The design follows PicoClaw's proven architecture -- channel trait, message bus,
 - MoChat channel (niche platform)
 - DingTalk channel (niche platform)
 - QQ channel (can reuse Telegram pattern later)
-- LiteLLM-style provider registry (Terraphim already has LlmClient trait)
+- LiteLLM-style provider registry (GenAiLlmClient already handles multi-provider)
 - Matrix bridge for WhatsApp (unproven approach)
 - Custom UI/dashboard
 - Multi-agent routing workflows (premature for chat assistant)
@@ -67,39 +78,44 @@ The design follows PicoClaw's proven architecture -- channel trait, message bus,
 
 ```
                    terraphim_tinyclaw binary
-  +---------------------------------------------------------+
-  |                                                         |
-  |  +----------+  +----------+  +----------+  +--------+  |
-  |  | Telegram |  | Discord  |  | CLI      |  | (more  |  |
-  |  | Adapter  |  | Adapter  |  | Adapter  |  | later) |  |
-  |  +----+-----+  +----+-----+  +----+-----+  +--------+  |
-  |       |              |              |                    |
-  |       v              v              v                    |
-  |  +-------------------------------------------+         |
-  |  |        MessageBus (tokio::mpsc)            |         |
-  |  |  inbound_tx/rx    outbound_tx/rx           |         |
-  |  +-------------------+---+--------------------+         |
-  |                       |   |                             |
-  |             +---------+   +--------+                    |
-  |             v                      v                    |
-  |  +-------------------+  +-------------------+          |
-  |  |   AgentLoop       |  | OutboundDispatch  |          |
-  |  |   - tool calling  |  | - routes by       |          |
-  |  |   - LLM calls     |  |   channel name    |          |
-  |  |   - compression   |  +-------------------+          |
-  |  +--------+----------+                                  |
-  |           |                                             |
-  |    +------+------+                                      |
-  |    v      v      v                                      |
-  | +------+ +----+ +----------+                            |
-  | |Tools | |Sess| |LlmClient|                            |
-  | |Reg.  | |Mgr | |(existing)|                            |
-  | +------+ +----+ +----------+                            |
-  +---------------------------------------------------------+
+  +--------------------------------------------------------------------+
+  |                                                                    |
+  |  +----------+  +----------+  +----------+  +--------+             |
+  |  | Telegram |  | Discord  |  | CLI      |  | (more  |             |
+  |  | Adapter  |  | Adapter  |  | Adapter  |  | later) |             |
+  |  +----+-----+  +----+-----+  +----+-----+  +--------+             |
+  |       |              |              |                               |
+  |       v              v              v                               |
+  |  +-------------------------------------------+                    |
+  |  |        MessageBus (tokio::mpsc)            |                    |
+  |  |  inbound_tx/rx    outbound_tx/rx           |                    |
+  |  +-------------------+---+--------------------+                    |
+  |                       |   |                                        |
+  |             +---------+   +--------+                               |
+  |             v                      v                               |
+  |  +--------------------+  +-------------------+                    |
+  |  | ToolCallingLoop    |  | OutboundDispatch  |                    |
+  |  | (NEW ~200 LOC)     |  | - routes by       |                    |
+  |  | - iterates LLM     |  |   channel name    |                    |
+  |  | - executes tools   |  +-------------------+                    |
+  |  | - max_iterations   |                                            |
+  |  +--------+-----------+                                            |
+  |           |                                                        |
+  |    +------+------+------+                                          |
+  |    v      v      v      v                                          |
+  | +------+ +----+ +-------------------------------+                  |
+  | |Tools | |Sess| | TerraphimAgent (REUSED)       |                  |
+  | |Reg.  | |Mgr | |  +-- GenAiLlmClient           |                  |
+  | +------+ +----+ |  +-- AgentContext (windowing)  |                  |
+  |                  |  +-- PromptSanitizer          |                  |
+  |                  |  +-- RoleGraph + Automata (KG)|                  |
+  |                  |  +-- CommandHistory (tracking) |                  |
+  |                  +-------------------------------+                  |
+  +--------------------------------------------------------------------+
 
   External deps: teloxide, serenity, reqwest, tokio
-  Internal deps: terraphim_service, terraphim_agent_evolution,
-                 terraphim_agent_messaging
+  Internal deps: terraphim_multi_agent (primary),
+                 terraphim_agent_evolution, terraphim_config
 ```
 
 ### Data Flow
@@ -110,14 +126,20 @@ User message on Telegram
   -> InboundMessage { channel: "telegram", sender_id, chat_id, content }
   -> is_allowed() check (allow-list)
   -> bus.inbound_tx.send(msg)
-  -> AgentLoop.consume_inbound()
+  -> ToolCallingLoop.consume_inbound()
+  -> sanitize_system_prompt(msg.content)       [reuse: PromptSanitizer]
   -> session = SessionManager.get_or_create(session_key)
-  -> check context compression trigger
-  -> build messages: [system_prompt, summary?, history, user_msg]
+  -> agent_context.add_item(User, msg.content)  [reuse: AgentContext]
+  -> check eviction: if over token limit, apply strategy
+  -> kg_context = agent.get_enriched_context_for_query(msg.content)
+                                                [reuse: TerraphimAgent KG]
+  -> build messages from agent_context.format_for_llm()
   -> for i in 0..max_iterations:
-       response = llm_client.chat_with_tools(messages, tools)
+       response = llm_client.generate_with_tools(messages, tools)
        if no tool_calls: break
-       execute tools, append results
+       execute tools, add Tool items to context
+       record ExecutionStep                     [reuse: CommandHistory]
+  -> agent_context.add_item(Assistant, response)
   -> session.add_messages(user + assistant)
   -> session_manager.save(session)
   -> OutboundMessage { channel: "telegram", chat_id, content: response }
@@ -131,28 +153,39 @@ User message on Telegram
 | Decision | Rationale | Alternatives Rejected |
 |----------|-----------|----------------------|
 | New binary crate, not library | Binary is the deliverable; library abstractions live in existing crates | Modifying terraphim_server (wrong responsibility) |
-| `tokio::mpsc` for bus, not AgentMailbox | Simpler, proven pattern from PicoClaw; AgentMailbox is overkill for channel<->agent routing | AgentMailbox (Erlang-style, too complex for this) |
+| `tokio::mpsc` for bus, not AgentMailbox | Simpler, proven pattern from PicoClaw; AgentMailbox uses `Box<dyn Any + Send>` (wrong abstraction for concrete chat messages). OpenClaw evaluation confirmed: scheduling/batching/fan-out patterns sit above the queue primitive | AgentMailbox (Erlang-style Call/Cast/Info with type erasure) |
+| Compose with `TerraphimAgent` | Reuse GenAiLlmClient (multi-provider), AgentContext (windowing), PromptSanitizer, KG enrichment, CommandHistory instead of reimplementing | Write everything from scratch (duplicates ~1,200 LOC) |
+| Extend `GenAiLlmClient` for tool calls | Already supports Ollama/OpenAI/Anthropic/OpenRouter via rust-genai; add `generate_with_tools()` | Extend `terraphim_service::LlmClient` (different crate, different abstraction level) |
 | `teloxide` for Telegram | Most mature Rust Telegram library, async, well-documented | Raw HTTP (more work), `frankenstein` (less mature) |
 | `serenity` for Discord | Batteries-included, good for first implementation | `twilight` (lighter but harder to start with) |
 | JSONL session files | Proven by nanobot, append-friendly, human-readable | SQLite (overkill), JSON per session (PicoClaw, less efficient) |
-| Extend `LlmClient` trait for tool calls | Existing trait returns plain string; tool calling needs structured response | New trait (duplication), raw HTTP (loses abstraction) |
 | Feature-gate channels | Keep binary lean; `--features telegram,discord` | Always compile all (slow builds, unnecessary deps) |
 
 ### Eliminated Options (Essentialism)
 
 | Option Rejected | Why Rejected | Risk of Including |
 |-----------------|--------------|-------------------|
-| AgentMailbox as bus | 2,174 LOC of Erlang patterns for what is a simple channel | Complexity without benefit for 1:1 message routing |
-| process_command() as agent loop | Designed for structured CommandTypes, not iterative tool-calling chat | Would require heavy adaptation, losing the PicoClaw simplicity |
+| AgentMailbox as bus | Uses `Box<dyn Any + Send>` payloads requiring downcasting; designed for N:M agent-to-agent routing, not N:1 channel-to-agent chat. OpenClaw evaluation confirmed their patterns (FIFO queuing, debouncing, fan-out) map to tokio::Semaphore/broadcast, not AgentMailbox | Type-safety loss, wrong abstraction |
+| `process_command()` as agent loop | Routes by CommandType (Generate/Answer/Search/etc.) -- single-shot dispatch, not iterative tool-calling. TinyClaw sends everything through the same tool-calling loop | Would require heavy adaptation, losing the PicoClaw simplicity |
 | VersionedMemory for sessions | Too heavy for per-message chat history; designed for long-lived agent state | Session load/save becomes expensive |
-| Multi-agent workflows | Premature for Phase 1 chat; no evidence of need from reference projects | Months of integration work before first message delivered |
-| Custom LLM provider registry | Terraphim has LlmClient trait + Ollama + OpenRouter; that's enough for MVP | Delays shipping for marginal flexibility |
+| Multi-agent workflows (pool, registry) | Premature for Phase 1 chat; single TerraphimAgent suffices | Months of integration work before first message delivered |
+| `terraphim_service::LlmClient` extension | Wrong crate; GenAiLlmClient in terraphim_multi_agent already handles multi-provider via rust-genai, only needs tool-calling addition | Modifying shared service crate for channel-specific feature |
+
+### Reused Options (from terraphim_multi_agent)
+
+| Component Reused | Why Reused | What We Avoid Reimplementing |
+|------------------|-----------|------------------------------|
+| `GenAiLlmClient` | Already handles Ollama/OpenAI/Anthropic/OpenRouter with base URL config | ~340 LOC LLM client + provider switching |
+| `AgentContext` | Token windowing, 3 eviction strategies, pinned items, `format_for_llm()` | ~530 LOC context management |
+| `PromptSanitizer` | 9 injection patterns, Unicode obfuscation detection, control char stripping | ~218 LOC security code |
+| `CommandHistory` + tracking types | Execution steps, quality scores, token/cost stats | ~200 LOC observability |
+| `TerraphimAgent.get_enriched_context_for_query()` | KG node matching, graph path connectivity, related concepts | KG integration for free |
 
 ### Simplicity Check
 
 > **What if this could be easy?**
 
-The simplest design: one binary with a channel trait, a message bus (two tokio channels), an agent loop that calls the LLM iteratively, and session files on disk. Everything else is a channel adapter or a tool implementation. PicoClaw proves this architecture works in ~6,000 LOC. We target the same in Rust, reusing existing LLM and persistence infrastructure.
+The simplest design: one binary with a channel trait, a message bus (two tokio channels), and a thin tool-calling loop that wraps the existing `TerraphimAgent`. Context management, LLM access, prompt sanitization, KG enrichment, and execution tracking are already built -- we compose with them. The new code is: channel adapters, tool implementations, JSONL sessions, and ~200 LOC of iterative tool-calling glue. PicoClaw proves this architecture works in ~6,000 LOC Go. We target ~3,000 LOC of new Rust code on top of ~1,200 LOC of reused infrastructure.
 
 **Senior Engineer Test**: This is a straightforward port of a working Go architecture to Rust. No novel algorithms, no distributed systems, no custom protocols. The only complexity is in the channel SDK integrations, which are well-documented third-party libraries.
 
@@ -171,7 +204,7 @@ The simplest design: one binary with a channel trait, a message bus (two tokio c
 
 | File | Purpose | Est. LOC |
 |------|---------|----------|
-| `terraphim_tinyclaw/Cargo.toml` | Crate manifest with feature flags | 60 |
+| `terraphim_tinyclaw/Cargo.toml` | Crate manifest with feature flags | 70 |
 | `terraphim_tinyclaw/src/main.rs` | CLI entry point (agent + gateway modes) | 150 |
 | `terraphim_tinyclaw/src/config.rs` | Configuration types and loading | 200 |
 | `terraphim_tinyclaw/src/bus.rs` | InboundMessage, OutboundMessage, MessageBus | 120 |
@@ -181,8 +214,7 @@ The simplest design: one binary with a channel trait, a message bus (two tokio c
 | `terraphim_tinyclaw/src/channels/discord.rs` | Discord adapter via serenity | 400 |
 | `terraphim_tinyclaw/src/channels/cli.rs` | Interactive CLI adapter (stdin/stdout) | 80 |
 | `terraphim_tinyclaw/src/agent/mod.rs` | Agent module root | 10 |
-| `terraphim_tinyclaw/src/agent/loop.rs` | Tool-calling agent loop + context compression | 350 |
-| `terraphim_tinyclaw/src/agent/context.rs` | System prompt builder | 150 |
+| `terraphim_tinyclaw/src/agent/loop.rs` | Tool-calling loop wrapping TerraphimAgent + AgentContext | 250 |
 | `terraphim_tinyclaw/src/session.rs` | Session + SessionManager with JSONL persistence | 200 |
 | `terraphim_tinyclaw/src/tools/mod.rs` | Tool trait + ToolRegistry | 100 |
 | `terraphim_tinyclaw/src/tools/filesystem.rs` | read_file, write_file, list_dir | 140 |
@@ -190,18 +222,28 @@ The simplest design: one binary with a channel trait, a message bus (two tokio c
 | `terraphim_tinyclaw/src/tools/shell.rs` | Shell exec with deny patterns | 120 |
 | `terraphim_tinyclaw/src/tools/web.rs` | web_search (Brave), web_fetch | 150 |
 | `terraphim_tinyclaw/src/format.rs` | Markdown-to-platform formatting | 120 |
-| **Total** | | **~3,215** |
+| **Total new code** | | **~2,975** |
 
 ### Modified Files
 
 | File | Changes |
 |------|---------|
 | `Cargo.toml` (workspace) | Add `terraphim_tinyclaw` to members |
-| `crates/terraphim_service/src/llm.rs` | Extend `LlmClient` trait with `chat_with_tools()` method (default impl) |
+| `crates/terraphim_multi_agent/src/genai_llm_client.rs` | Add `generate_with_tools()` method for tool-calling responses (~80 LOC) |
+| `crates/terraphim_multi_agent/src/llm_types.rs` | Add `ToolCall`, `LlmToolResponse` types (~40 LOC) |
 
 ### Deleted Files
 
 None.
+
+### Reused Files (from terraphim_multi_agent, no modifications needed)
+
+| File | What It Provides |
+|------|------------------|
+| `crates/terraphim_multi_agent/src/context.rs` | `AgentContext` with token windowing and eviction strategies |
+| `crates/terraphim_multi_agent/src/prompt_sanitizer.rs` | `sanitize_system_prompt()` for prompt injection defense |
+| `crates/terraphim_multi_agent/src/history.rs` | `CommandHistory`, `CommandRecord`, `ExecutionStep` for tracking |
+| `crates/terraphim_multi_agent/src/agent.rs` | `TerraphimAgent` with KG enrichment and state management |
 
 ---
 
@@ -343,30 +385,34 @@ impl SessionManager {
 ```
 
 ```rust
-// agent/loop.rs -- Core agent loop
+// agent/loop.rs -- Tool-calling loop composing with TerraphimAgent
 
-/// Configuration for the agent loop.
-pub struct AgentLoopConfig {
-    pub max_iterations: usize,         // Default: 20
-    pub compress_at_messages: usize,   // Default: 20
-    pub compress_at_token_ratio: f32,  // Default: 0.75
-    pub keep_last_messages: usize,     // Default: 4
-    pub model: String,
+/// Configuration for the tool-calling loop.
+pub struct ToolCallingConfig {
+    pub max_iterations: usize,           // Default: 20
+    pub summarize_at_token_ratio: f32,   // Default: 0.75
+    pub keep_last_messages: usize,       // Default: 4
 }
 
-/// The core agent processing engine.
-pub struct AgentLoop {
-    config: AgentLoopConfig,
-    llm: Arc<dyn LlmClient>,
+/// Tool-calling loop that wraps TerraphimAgent with iterative tool execution.
+///
+/// Composes with existing terraphim_multi_agent components:
+/// - `TerraphimAgent` for KG enrichment and state management
+/// - `AgentContext` for token-aware context windowing (RelevanceFirst/Balanced)
+/// - `GenAiLlmClient` for multi-provider LLM access
+/// - `PromptSanitizer` for input sanitization
+/// - `CommandHistory` for execution tracking
+pub struct ToolCallingLoop {
+    config: ToolCallingConfig,
+    agent: TerraphimAgent,        // reuse: LLM, KG, context, tracking
     tools: Arc<ToolRegistry>,
     sessions: SessionManager,
-    context: ContextBuilder,
 }
 
-impl AgentLoop {
+impl ToolCallingLoop {
     pub async fn run(&mut self, bus: Arc<MessageBus>) -> Result<()>;
     async fn process_message(&mut self, msg: InboundMessage) -> Result<OutboundMessage>;
-    async fn compress_context(&self, session: &mut Session) -> Result<()>;
+    async fn summarize_if_needed(&self, session: &mut Session) -> Result<()>;
 }
 ```
 
@@ -409,26 +455,50 @@ pub struct DiscordConfig {
 }
 ```
 
-### LlmClient Trait Extension
+### GenAiLlmClient Tool-Calling Extension
 
 ```rust
-// Addition to crates/terraphim_service/src/llm.rs
+// Addition to crates/terraphim_multi_agent/src/llm_types.rs
 
-/// Extended chat completion with tool-calling support.
-/// Default implementation calls chat_completion() and returns no tool calls.
-async fn chat_with_tools(
-    &self,
-    messages: Vec<serde_json::Value>,
-    tools: Option<Vec<serde_json::Value>>,
-    opts: ChatOptions,
-) -> ServiceResult<LlmToolResponse> {
-    // Default: delegate to chat_completion, return content-only response
-    let content = self.chat_completion(messages, opts).await?;
-    Ok(LlmToolResponse {
-        content: Some(content),
-        tool_calls: vec![],
-        usage: TokenUsage::default(),
-    })
+/// A tool call request from the LLM response.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCall {
+    pub id: String,
+    pub name: String,
+    pub arguments: serde_json::Value,
+}
+
+/// Response from an LLM that may include tool calls.
+#[derive(Debug)]
+pub struct LlmToolResponse {
+    pub content: Option<String>,
+    pub tool_calls: Vec<ToolCall>,
+    pub usage: TokenUsage,
+    pub model: String,
+    pub request_id: uuid::Uuid,
+    pub duration_ms: u64,
+}
+```
+
+```rust
+// Addition to crates/terraphim_multi_agent/src/genai_llm_client.rs
+
+impl GenAiLlmClient {
+    /// Generate response with tool-calling support.
+    ///
+    /// Sends tool definitions in the request body (OpenAI-compatible format).
+    /// Parses tool_calls from response if present.
+    /// Falls back to content-only response if provider doesn't support tools.
+    pub async fn generate_with_tools(
+        &self,
+        request: LlmRequest,
+        tools: Option<Vec<serde_json::Value>>,
+    ) -> MultiAgentResult<LlmToolResponse> {
+        // Implementation: extend rust-genai ChatRequest with tool definitions
+        // Parse ChatResponse for tool_calls field
+        // Return LlmToolResponse with both content and tool_calls
+        todo!()
+    }
 }
 ```
 
@@ -478,7 +548,9 @@ pub enum TinyClawError {
 | `test_tool_execute_shell_deny` | `tools/shell.rs` | Verify deny patterns block dangerous commands |
 | `test_session_add_get_history` | `session.rs` | Add messages, get truncated history |
 | `test_session_jsonl_persistence` | `session.rs` | Save and reload from JSONL file |
-| `test_context_compression_trigger` | `agent/loop.rs` | Trigger compression at message count threshold |
+| `test_context_eviction_trigger` | `agent/loop.rs` | Verify AgentContext evicts when over token limit |
+| `test_summarization_trigger` | `agent/loop.rs` | Trigger LLM summarization at 75% token ratio |
+| `test_prompt_sanitization` | `agent/loop.rs` | Verify PromptSanitizer strips injection attempts |
 | `test_is_allowed_empty_list` | `channel.rs` | Empty allow-list permits all |
 | `test_is_allowed_whitelist` | `channel.rs` | Only listed senders permitted |
 | `test_config_from_toml` | `config.rs` | Parse config with defaults |
@@ -489,9 +561,10 @@ pub enum TinyClawError {
 
 | Test | Location | Purpose |
 |------|----------|---------|
-| `test_agent_loop_no_tools` | `tests/agent_loop.rs` | Message in -> LLM call -> response out (no tool calls) |
-| `test_agent_loop_with_tool_call` | `tests/agent_loop.rs` | Message in -> LLM returns tool call -> execute -> LLM final response |
-| `test_agent_loop_max_iterations` | `tests/agent_loop.rs` | Verify loop stops at max_iterations |
+| `test_tool_calling_loop_no_tools` | `tests/agent_loop.rs` | Message in -> LLM call -> response out (no tool calls) |
+| `test_tool_calling_loop_with_tool` | `tests/agent_loop.rs` | Message in -> LLM returns tool call -> execute -> LLM final response |
+| `test_tool_calling_loop_max_iterations` | `tests/agent_loop.rs` | Verify loop stops at max_iterations |
+| `test_kg_enrichment_in_context` | `tests/agent_loop.rs` | Verify KG concepts appear in LLM context |
 | `test_channel_manager_dispatch` | `tests/channel_manager.rs` | Outbound message routes to correct channel |
 | `test_full_roundtrip_cli` | `tests/cli_roundtrip.rs` | CLI input -> bus -> agent -> bus -> CLI output |
 
@@ -535,26 +608,33 @@ pub enum TinyClawError {
 **Dependencies:** Step 1
 **Estimated:** 6 hours
 
-### Step 5: Extend LlmClient for Tool Calling
-**Files:** `crates/terraphim_service/src/llm.rs` (modify), `crates/terraphim_service/src/openrouter.rs` (modify)
-**Description:** Add `chat_with_tools()` to LlmClient trait with default impl. Implement for OpenRouter provider to send tools in request body and parse tool_calls from response.
-**Tests:** Unit test with mock response JSON. Live test gated by `OPENROUTER_API_KEY`.
+### Step 5: Extend GenAiLlmClient for Tool Calling
+**Files:** `crates/terraphim_multi_agent/src/genai_llm_client.rs` (modify), `crates/terraphim_multi_agent/src/llm_types.rs` (modify)
+**Description:** Add `generate_with_tools()` to `GenAiLlmClient`. This extends the existing rust-genai `ChatRequest` with tool definitions (OpenAI-compatible JSON format) and parses `tool_calls` from the response. Add `ToolCall` and `LlmToolResponse` types to `llm_types.rs`.
+**Tests:** Unit test parsing a tool-call response JSON fixture. Live test gated by `OPENROUTER_API_KEY`.
 **Dependencies:** Step 4
 **Estimated:** 4 hours
 
-### Step 6: Agent Loop + Context Builder
-**Files:** `src/agent/mod.rs`, `src/agent/loop.rs`, `src/agent/context.rs`
-**Description:** Core agent loop: consume inbound -> get/create session -> build context -> iterative LLM+tool loop -> save session -> publish outbound. Context builder assembles system prompt from workspace bootstrap files.
-**Tests:** `test_context_compression_trigger`, integration tests for agent loop
+### Step 6: Tool-Calling Loop (composing with TerraphimAgent)
+**Files:** `src/agent/mod.rs`, `src/agent/loop.rs`
+**Description:** `ToolCallingLoop` wraps `TerraphimAgent` and composes with existing components:
+- Creates `TerraphimAgent` from Role config (provides GenAiLlmClient, AgentContext, KG, CommandHistory)
+- Consumes inbound messages from bus
+- Sanitizes input via `sanitize_system_prompt()` (reuse PromptSanitizer)
+- Manages `AgentContext` window: adds User/Assistant/Tool items, relies on built-in eviction strategies
+- Enriches context via `agent.get_enriched_context_for_query()` (reuse KG)
+- Iterative loop: `generate_with_tools()` -> execute tools -> record `ExecutionStep` (reuse CommandHistory) -> repeat until no tool_calls or max_iterations
+- Saves session and publishes outbound
+**Tests:** `test_context_eviction_trigger`, integration tests for tool-calling loop
 **Dependencies:** Steps 2, 3, 4, 5
-**Estimated:** 8 hours
+**Estimated:** 6 hours
 
-### Step 7: Context Compression
+### Step 7: LLM-Based Context Summarization
 **Files:** `src/agent/loop.rs` (extend)
-**Description:** Port PicoClaw's context compression algorithm. Trigger when history > 20 messages OR estimated tokens > 75% of context window. Summarize via LLM, replace history with summary + last 4 messages. Multi-part summarization for large histories.
-**Tests:** `test_context_compression_trigger`, integration test with mock LLM
+**Description:** Add LLM summarization as a pre-step before AgentContext's built-in eviction. When `agent_context.current_tokens > max_tokens * 0.75`, summarize the non-pinned history via GenAiLlmClient, replace old items with a single Memory-typed summary item (pinned=false, high relevance). This complements AgentContext's eviction -- summarization preserves semantic content while eviction drops low-relevance items.
+**Tests:** `test_summarization_trigger`, integration test verifying summary item replaces history
 **Dependencies:** Step 6
-**Estimated:** 3 hours
+**Estimated:** 2 hours
 
 ### Step 8: Markdown Formatting
 **Files:** `src/format.rs`
@@ -598,7 +678,17 @@ pub enum TinyClawError {
 | `toml` | 0.8.x | always | Config file parsing |
 | `dirs` | 5.x | always | Platform-appropriate config/data directories |
 
-### Existing Dependencies Reused
+### Internal Crate Dependencies
+
+| Crate | What It Provides |
+|-------|------------------|
+| `terraphim_multi_agent` | `TerraphimAgent`, `GenAiLlmClient`, `AgentContext`, `PromptSanitizer`, `CommandHistory`, `LlmRequest`/`LlmResponse` types |
+| `terraphim_config` | `Role` configuration type |
+| `terraphim_agent_evolution` | `VersionedMemory`, `VersionedTaskList`, `VersionedLessons` (via TerraphimAgent) |
+| `terraphim_rolegraph` | `RoleGraph` for KG enrichment (via TerraphimAgent) |
+| `terraphim_persistence` | `DeviceStorage` for agent state persistence (via TerraphimAgent) |
+
+### Transitive Dependencies Reused (via terraphim_multi_agent)
 
 - `tokio` (runtime, mpsc, signal, fs)
 - `serde` + `serde_json` (serialization)
@@ -607,10 +697,19 @@ pub enum TinyClawError {
 - `thiserror` (error types)
 - `uuid` (message IDs)
 - `chrono` (timestamps)
+- `genai` (rust-genai multi-provider LLM client)
 
 ### Feature Flags
 
 ```toml
+[dependencies]
+terraphim_multi_agent = { path = "../crates/terraphim_multi_agent" }
+terraphim_config = { path = "../crates/terraphim_config" }
+terraphim_persistence = { path = "../crates/terraphim_persistence" }
+
+teloxide = { version = "0.13", optional = true }
+serenity = { version = "0.12", optional = true }
+
 [features]
 default = ["telegram", "discord"]
 telegram = ["dep:teloxide"]
@@ -643,9 +742,10 @@ The performance-critical path is the LLM call (seconds), not the local routing (
 
 Since this is a new crate, rollback is trivial:
 1. Remove `terraphim_tinyclaw` from workspace members
-2. Revert any changes to `crates/terraphim_service/src/llm.rs`
+2. Revert `generate_with_tools()` addition to `crates/terraphim_multi_agent/src/genai_llm_client.rs`
+3. Revert `ToolCall`/`LlmToolResponse` types from `crates/terraphim_multi_agent/src/llm_types.rs`
 
-No database migrations, no shared state changes.
+No database migrations, no shared state changes. The GenAiLlmClient extension is additive (new method, no existing signatures changed).
 
 ---
 
