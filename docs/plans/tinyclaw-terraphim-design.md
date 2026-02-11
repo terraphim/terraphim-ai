@@ -1084,9 +1084,86 @@ No database migrations, no shared state changes, no modifications to existing cr
 
 ---
 
+## Specification Interview Findings
+
+**Interview Date**: 2026-02-11
+**Dimensions Covered**: Proxy lifecycle, Execution guard, Concurrency, Sessions, Channel auth, Secrets/errors, Role management, System prompts, Graceful shutdown
+**Convergence Status**: Complete (7 rounds, all critical dimensions explored)
+
+### Key Decisions from Interview
+
+#### Proxy Lifecycle & Routing (Failure Modes)
+
+- **Proxy launch model**: Pre-started (separate process). TinyClaw only needs `proxy.base_url` in config. User manages proxy lifecycle via systemd, docker, or manual start. Simplest Phase 1 approach.
+- **Proxy fallback when down**: Disable tools entirely, text-only mode. Tell user "tools unavailable, answering from knowledge only". No fragile text-parsed tool calls. Clean failure.
+- **Health detection**: On-failure only. No background polling. When a proxy request fails, mark `proxy_healthy = false`. Try again after 60s backoff. No wasted health-check requests when healthy.
+- **Task-type signaling**: Skip for Phase 1. Use proxy's default routing for all requests. Add `X-Task-Type` header support in Phase 2 after validating basic flow works.
+
+#### Execution Guard & Tool Safety
+
+- **Blocked tool message**: Specific pattern message sent to LLM. Example: "Command blocked: contains destructive pattern (rm -rf). Suggest alternative: list files first, then remove specific items." Helps LLM adapt without revealing evasion paths.
+- **Shell timeout**: Configurable per-tool via `tools.shell.timeout_seconds` in config. Default 120 seconds. User can raise for build-heavy workflows.
+- **Filesystem boundaries**: No restriction (anywhere on filesystem). Full access like PicoClaw. User trusts the agent. Simpler implementation.
+- **Web tools**: Configurable provider. `tools.web_search.provider = 'brave' | 'searxng' | 'google'`. `tools.web_fetch.mode = 'readability' | 'raw'`. Maximum flexibility.
+
+#### Concurrency & Sessions
+
+- **Message processing**: Serial (one at a time). Single consumer on inbound_rx. While processing User A's multi-iteration loop, User B waits in queue. Acceptable for personal assistant with few users. No race conditions on AgentContext/sessions.
+- **Group session model**: Per-chat with user attribution. One session per group chat. Each message records sender_id. LLM sees "User A said X, User B said Y". Shared context with user awareness.
+- **Session size cap**: Cap at N messages (200) + summary. Context compression already summarizes old messages. JSONL file keeps growing but only loads recent N + summary on startup. Old messages available in file but not in memory.
+
+#### Channel Auth & Message Handling
+
+- **Auth default**: Require non-empty `allow_from`. Config validation refuses to start if any enabled channel has empty allow_from. Forces user to think about auth before deploying. Prevents accidental exposure of filesystem+shell tools.
+- **Message chunking**: Simple paragraph split using `find_paragraph_end()` from `terraphim_automata`. Split at `\n\n` boundaries, greedily pack into platform-sized chunks (4096 Telegram, 2000 Discord). Single paragraph exceeding limit splits at line boundaries. No full markdown normalization needed for Phase 1.
+- **Build order**: All three channel adapters (CLI, Telegram, Discord) in parallel after the Channel trait is defined. Channel trait is simple enough.
+
+#### Secrets & Error Handling
+
+- **Secret management**: Environment variable expansion in TOML config values using `$ENV_VAR_NAME` syntax. Matches terraphim-llm-proxy pattern. Config files can be committed without secrets.
+- **Error UX**: Error message to user AND admin notification. Send "Sorry, I encountered an error" to originating channel. Log structured error event. If monitoring channel is configured, notify there too.
+
+#### Role Management & System Prompts
+
+- **KG enrichment**: Configurable via `/role list` and `/role select <name>` commands, available in all channels. Switching roles swaps TerraphimAgent's RoleGraph+Automata. KG enrichment is naturally scoped to the active role's domain.
+- **Role scope**: Global (one active role for entire TinyClaw instance). `/role select` in any channel changes it everywhere. Simpler state management.
+- **Role switch during processing**: Queued. `/role select` waits until current message processing finishes. Next message uses new role. No mid-response context mixing.
+- **System prompt**: Two-layer. SYSTEM.md file in workspace provides persona/instructions. Role's KG enrichment adds domain knowledge on top. Combined as: `[SYSTEM.md content]\n\n[KG concepts from active role]`.
+- **System prompt token budget**: Uncapped. System prompt is part of AgentContext's total token window. Large system prompts reduce conversation space. User's responsibility to keep SYSTEM.md reasonable.
+- **Binary relationship**: Separate binary (`terraphim-tinyclaw`), coexists with `terraphim-agent`. Different use cases: tinyclaw for multi-channel gateway, terraphim-agent for local REPL/search.
+
+#### Graceful Shutdown
+
+- **Shutdown behavior**: On SIGINT/SIGTERM, let current tool iteration finish (with timeout), save session including tool result. Don't start next LLM iteration. Send partial response to user if available.
+- **Channel disconnection**: Silent disconnect. Just close connections. No farewell messages. Simple.
+
+### Deferred Items
+
+- Task-type signaling (`X-Task-Type` header): Deferred to Phase 2. Use proxy default routing for Phase 1.
+- Proxy sidecar mode (auto-launch): Deferred. Pre-started only for now.
+- Custom taxonomy for chat routing: Deferred. Use proxy's existing taxonomy.
+- Voice transcription: Deferred to Phase 2+.
+- Skills/plugin system: Deferred to Phase 2+.
+- Subagent spawning: Deferred to Phase 2+.
+
+### Interview Summary
+
+The specification interview resolved 22 decisions across 9 dimensions. The most impactful findings:
+
+1. **Proxy fallback simplification**: Instead of fragile text-parsed tool calls when proxy is down, TinyClaw cleanly disables tools and operates in text-only mode. This eliminates the complex `HybridLlmRouter` fallback path and makes the degraded mode reliable.
+
+2. **Security-first auth default**: Requiring non-empty `allow_from` prevents accidental exposure of filesystem+shell tools to unauthorized users. This is a breaking change from the original design's "empty = allow all" default.
+
+3. **Role management via `/role` command**: KG enrichment is controlled through the same role-switching mechanism as terraphim-agent's REPL, making it a natural extension rather than a new concept. Global role scope keeps state management simple for Phase 1.
+
+4. **Two-layer system prompt (SYSTEM.md + role KG)**: Combines PicoClaw's SYSTEM.md pattern with Terraphim's role-based KG enrichment, giving users both persona customization and domain-specific knowledge injection.
+
+---
+
 ## Approval
 
 - [ ] Technical review complete
 - [ ] Test strategy approved
 - [ ] Performance targets agreed
+- [ ] Specification interview complete
 - [ ] Human approval received
