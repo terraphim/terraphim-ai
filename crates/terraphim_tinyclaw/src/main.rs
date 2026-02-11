@@ -1,3 +1,4 @@
+mod agent;
 mod bus;
 mod channel;
 mod channels;
