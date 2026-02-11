@@ -1,8 +1,14 @@
 mod bus;
+mod channel;
+mod channels;
 mod config;
 
+use crate::bus::MessageBus;
+use crate::channel::{Channel, ChannelManager};
+use crate::channels::cli::CliChannel;
 use clap::{Parser, Subcommand};
 use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Multi-channel AI assistant powered by Terraphim.
 #[derive(Parser, Debug)]
@@ -82,7 +88,17 @@ async fn main() -> anyhow::Result<()> {
 async fn run_agent_mode() -> anyhow::Result<()> {
     println!("TinyClaw Agent Mode");
     println!("===================");
-    println!("(Implementation in progress - Step 1 complete)");
+
+    // Create message bus
+    let bus = Arc::new(MessageBus::new());
+
+    // Create CLI channel
+    let cli_channel = CliChannel::new();
+
+    // For now, just run the CLI channel directly
+    // In the full implementation, we'd also start the agent loop
+    cli_channel.start(bus).await?;
+
     Ok(())
 }
 
