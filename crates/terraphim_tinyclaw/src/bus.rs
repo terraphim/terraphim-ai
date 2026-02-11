@@ -1,7 +1,7 @@
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use tokio::sync::mpsc;
+use tokio::sync::{Mutex, mpsc};
 
 /// Message received from a chat channel.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,9 +91,9 @@ const CHANNEL_CAPACITY: usize = 1000;
 /// Async message bus using tokio mpsc channels.
 pub struct MessageBus {
     pub inbound_tx: mpsc::Sender<InboundMessage>,
-    pub inbound_rx: mpsc::Receiver<InboundMessage>,
+    pub inbound_rx: Mutex<mpsc::Receiver<InboundMessage>>,
     pub outbound_tx: mpsc::Sender<OutboundMessage>,
-    pub outbound_rx: mpsc::Receiver<OutboundMessage>,
+    pub outbound_rx: Mutex<mpsc::Receiver<OutboundMessage>>,
 }
 
 impl MessageBus {
@@ -104,9 +104,9 @@ impl MessageBus {
 
         Self {
             inbound_tx,
-            inbound_rx,
+            inbound_rx: Mutex::new(inbound_rx),
             outbound_tx,
-            outbound_rx,
+            outbound_rx: Mutex::new(outbound_rx),
         }
     }
 
@@ -150,7 +150,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_message_bus_roundtrip() {
-        let mut bus = MessageBus::new();
+        let bus = MessageBus::new();
 
         // Send a message through inbound
         let sender = bus.inbound_sender();
@@ -158,7 +158,7 @@ mod tests {
         sender.send(msg.clone()).await.unwrap();
 
         // Receive it
-        let received = bus.inbound_rx.recv().await.unwrap();
+        let received = bus.inbound_rx.lock().await.recv().await.unwrap();
         assert_eq!(received.channel, "telegram");
         assert_eq!(received.sender_id, "user123");
         assert_eq!(received.content, "Hello");
