@@ -4,8 +4,9 @@
 **Research Doc**: [tinyclaw-terraphim-research.md](tinyclaw-terraphim-research.md)
 **Author**: Terraphim AI Design
 **Date**: 2026-02-11
-**Revised**: 2026-02-11 (v3 -- hybrid proxy routing + execution threat scoring)
-**Estimated Effort**: ~5,300 LOC Rust + ~400 LOC TypeScript (WhatsApp bridge)
+**Revised**: 2026-02-11 (v4 -- reconcile spec interview findings)
+**Revised**: 2026-02-11 (v4 -- reconcile spec interview findings)
+**Estimated Effort**: ~3,400 LOC new Rust (+ ~5,600 LOC reused from terraphim ecosystem)
 
 ---
 
@@ -29,7 +30,7 @@ The design follows PicoClaw's proven architecture -- channel trait, message bus,
 
 | Component | Source | What It Provides | What TinyClaw Adds |
 |-----------|--------|------------------|-------------------|
-| `terraphim-llm-proxy` | Separate binary | 6-phase intelligent routing, tool-calling across 9+ providers, SSE streaming, circuit breaker, KG-based pattern routing (186 tests) | HTTP client wrapper with task-type signaling headers |
+| `terraphim-llm-proxy` | Separate binary | 6-phase intelligent routing, tool-calling across 9+ providers, SSE streaming, circuit breaker, KG-based pattern routing (186 tests) | HTTP client wrapper with on-failure health tracking |
 | `GenAiLlmClient` | `terraphim_multi_agent` | Multi-provider LLM (Ollama, OpenAI, Anthropic) via rust-genai | Used ONLY for cheap/local tasks (context compression, summarization) |
 | `AgentContext` | `terraphim_multi_agent` | Token-aware context windowing with 3 eviction strategies, pinned items | LLM-based summarization trigger before eviction |
 | `PromptSanitizer` | `terraphim_multi_agent` | Prompt injection defense (9 patterns, Unicode obfuscation, control chars) | Applied to inbound user messages from channels |
@@ -123,9 +124,8 @@ The design follows PicoClaw's proven architecture -- channel trait, message bus,
   |  |  +-----------------------------+  +---------------------------+  |   |
   |  |  | ProxyClient (NEW ~180 LOC)  |  | GenAiLlmClient (REUSED)  |  |   |
   |  |  | - tool_call requests        |  | - context compression    |  |   |
-  |  |  | - final responses           |  | - summarization          |  |   |
-  |  |  | - SSE streaming             |  | - cheap/local tasks      |  |   |
-  |  |  | - task-type headers         |  | - Ollama direct calls    |  |   |
+  |  |  | - SSE streaming             |  | - text-only fallback     |  |   |
+  |  |  | - on-failure health track   |  | - Ollama direct calls    |  |   |
   |  |  +----------+------------------+  +----------+----------------+  |   |
   |  |             |                                |                   |   |
   |  +-------------|--------------------------------|-------------------+   |
@@ -207,9 +207,9 @@ The agent loop classifies each LLM call by **task type** and routes accordingly:
 | `final_response` | terraphim-llm-proxy | Quality-critical user-facing output. Proxy's KG routing can select model by domain (code->deepseek, creative->claude) | Proxy decides via 6-phase routing |
 | `simple_qa` | Direct GenAiLlmClient | Simple factual answers don't need tool calling or intelligent routing | Ollama or cheapest cloud |
 
-**Task-type signaling**: The proxy client sends an `X-Task-Type` header with each request. The proxy's Phase 5 (scenario-based routing) already supports custom scenarios via the `Custom(String)` variant, so task types map to routing scenarios without proxy modifications.
+**Task-type signaling**: Deferred to Phase 2. Phase 1 uses the proxy's default routing for all requests. Phase 2 will add `X-Task-Type` header support mapping to the proxy's `Custom(String)` routing scenario.
 
-**Fallback**: If proxy is unreachable, all requests fall back to direct `GenAiLlmClient`. Tool calling degrades to "generate text, parse tool calls from markdown" -- functional but less reliable.
+**Fallback**: If proxy is unreachable, tools are disabled entirely. The agent responds in text-only mode: "Tools are currently unavailable, answering from knowledge only." No fragile text-parsed tool calls. Direct `GenAiLlmClient` handles text-only responses in degraded mode.
 
 ### Execution Threat Scoring
 
@@ -284,7 +284,7 @@ Tool call from LLM
 
 > **What if this could be easy?**
 
-The simplest design: one binary with a channel trait, a message bus (two tokio channels), and a thin tool-calling loop that wraps the existing `TerraphimAgent`. Context management, prompt sanitization, KG enrichment, execution tracking, and threat scoring are already built -- we compose with them. LLM access splits into two paths: a 180-LOC HTTP client to `terraphim-llm-proxy` for tool calls (leveraging 4,200 LOC of existing routing + provider conversion), and direct `GenAiLlmClient` for compression. The new code is: channel adapters, proxy client, execution guard, tool implementations, JSONL sessions, and ~250 LOC of iterative tool-calling glue. PicoClaw proves this architecture works in ~6,000 LOC Go. We target ~3,100 LOC of new Rust code on top of ~5,600 LOC of reused infrastructure (multi_agent + proxy).
+The simplest design: one binary with a channel trait, a message bus (two tokio channels), and a thin tool-calling loop that wraps the existing `TerraphimAgent`. Context management, prompt sanitization, KG enrichment, execution tracking, and threat scoring are already built -- we compose with them. LLM access splits into two paths: a 180-LOC HTTP client to `terraphim-llm-proxy` for tool calls (leveraging 4,200 LOC of existing routing + provider conversion), and direct `GenAiLlmClient` for compression. The new code is: channel adapters, proxy client, execution guard, tool implementations, JSONL sessions, and ~300 LOC of iterative tool-calling glue. PicoClaw proves this architecture works in ~6,000 LOC Go. We target ~3,400 LOC of new Rust code on top of ~5,600 LOC of reused infrastructure (multi_agent + proxy).
 
 **Senior Engineer Test**: This is a straightforward port of a working Go architecture to Rust, with the LLM layer delegated to an existing proxy rather than reimplemented. No novel algorithms, no distributed systems, no custom protocols. The proxy sidecar is a standard pattern (envoy, linkerd). The only complexity is in the channel SDK integrations, which are well-documented third-party libraries.
 
@@ -314,7 +314,7 @@ The simplest design: one binary with a channel trait, a message bus (two tokio c
 | `terraphim_tinyclaw/src/channels/cli.rs` | Interactive CLI adapter (stdin/stdout) | 80 |
 | `terraphim_tinyclaw/src/agent/mod.rs` | Agent module root | 10 |
 | `terraphim_tinyclaw/src/agent/loop.rs` | Tool-calling loop wrapping TerraphimAgent + hybrid LLM | 300 |
-| `terraphim_tinyclaw/src/agent/proxy_client.rs` | HTTP client for terraphim-llm-proxy (tool calls, streaming, task-type headers) | 180 |
+| `terraphim_tinyclaw/src/agent/proxy_client.rs` | HTTP client for terraphim-llm-proxy (tool calls, streaming, on-failure health) | 180 |
 | `terraphim_tinyclaw/src/agent/execution_guard.rs` | Tool safety: DangerousPatternHook + ExecutionConfidence scoring (wraps vm_execution) | 120 |
 | `terraphim_tinyclaw/src/session.rs` | Session + SessionManager with JSONL persistence | 200 |
 | `terraphim_tinyclaw/src/tools/mod.rs` | Tool trait + ToolRegistry | 100 |
@@ -506,6 +506,16 @@ pub struct ToolCallingConfig {
 /// - `ExecutionGuard` for tool safety (DangerousPatternHook + confidence scoring)
 /// - `PromptSanitizer` for input sanitization
 /// - `CommandHistory` for execution tracking
+///
+/// System prompt: loaded from SYSTEM.md file (workspace) + KG enrichment from
+/// active role. Two-layer: SYSTEM.md provides persona, role KG adds domain knowledge.
+///
+/// Slash commands: `/role list`, `/role select <name>`, `/reset` are intercepted
+/// before entering the tool-calling loop. Role changes are global and queued
+/// (applied after current message finishes processing).
+///
+/// Graceful shutdown: on shutdown signal, finishes current tool iteration (with
+/// timeout), saves session, sends partial response if available, then exits.
 pub struct ToolCallingLoop {
     config: ToolCallingConfig,
     agent: TerraphimAgent,        // reuse: KG, context, tracking
@@ -513,12 +523,19 @@ pub struct ToolCallingLoop {
     guard: ExecutionGuard,        // tool safety evaluation
     tools: Arc<ToolRegistry>,
     sessions: SessionManager,
+    system_prompt: String,        // loaded from SYSTEM.md at startup
+    shutdown: CancellationToken,  // for graceful shutdown
+    pending_role: Mutex<Option<String>>,  // queued role switch
 }
 
 impl ToolCallingLoop {
     pub async fn run(&mut self, bus: Arc<MessageBus>) -> Result<()>;
     async fn process_message(&mut self, msg: InboundMessage) -> Result<OutboundMessage>;
     async fn compress_if_needed(&self, session: &mut Session) -> Result<()>;
+    /// Handle slash commands (/role, /reset). Returns true if command was handled.
+    fn handle_slash_command(&self, msg: &InboundMessage) -> Option<OutboundMessage>;
+    /// Apply queued role switch between messages.
+    async fn apply_pending_role_switch(&mut self) -> Result<()>;
 }
 ```
 
@@ -538,7 +555,9 @@ pub struct Config {
 pub struct AgentConfig {
     pub max_iterations: usize,        // Default: 20
     pub workspace: PathBuf,
-    pub system_prompt: Option<String>,
+    pub system_prompt_file: Option<PathBuf>,  // Default: workspace/SYSTEM.md
+    pub max_session_messages: usize,  // Default: 200 (cap per session, older summarized)
+    pub default_role: Option<String>, // Initial active role name
 }
 
 /// Hybrid LLM configuration.
@@ -591,54 +610,54 @@ pub struct DiscordConfig {
 ```rust
 // agent/proxy_client.rs -- HTTP client for tool-calling via terraphim-llm-proxy
 
-/// Task type determines proxy routing scenario.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum TaskType {
-    ToolCall,         // Needs tool-call format conversion -> proxy routes to capable model
-    FinalResponse,    // Quality-critical user-facing output -> proxy routes to quality model
-    CodeAnalysis,     // Code understanding tasks -> proxy KG routes to code-specialized model
-}
-
 /// Configuration for the proxy client.
 #[derive(Debug, Clone, Deserialize)]
 pub struct ProxyClientConfig {
     pub base_url: String,           // e.g., "http://127.0.0.1:3456"
-    pub api_key: String,            // Proxy API key
+    pub api_key: String,            // Proxy API key (supports $ENV_VAR expansion)
     pub timeout_ms: u64,            // Request timeout (default: 60_000)
     pub model: Option<String>,      // Override model (default: proxy decides via routing)
+    pub retry_after_secs: u64,      // Backoff before retrying after failure (default: 60)
 }
 
 /// HTTP client wrapping terraphim-llm-proxy's Anthropic-compatible API.
 ///
-/// Sends requests to `/v1/messages` with `X-Task-Type` header for routing hints.
-/// The proxy's 6-phase routing (Pattern-KG, Session, Cost, Performance, Scenario,
-/// Default) selects the optimal provider+model. Tool-call format conversion is
-/// handled transparently by the proxy.
+/// Sends requests to `/v1/messages`. The proxy's 6-phase routing selects the
+/// optimal provider+model. Tool-call format conversion is handled transparently.
+///
+/// Health is tracked on-failure: when a request fails, proxy is marked unhealthy
+/// and retried after `retry_after_secs`. No background polling.
 pub struct ProxyClient {
     config: ProxyClientConfig,
     http: reqwest::Client,
+    healthy: AtomicBool,            // Set false on failure, true on success
+    last_failure: Mutex<Option<Instant>>,  // For backoff timing
 }
 
 impl ProxyClient {
     pub fn new(config: ProxyClientConfig) -> Self;
 
+    /// Returns true if proxy is considered healthy (no recent failure or
+    /// backoff period has elapsed since last failure).
+    pub fn is_available(&self) -> bool;
+
     /// Send a chat request with tool definitions through the proxy.
     /// Returns parsed response with optional tool_calls.
     /// Proxy handles format conversion (OpenAI/Anthropic/DeepSeek tool formats).
+    /// On failure: marks proxy unhealthy, returns error.
     pub async fn chat_with_tools(
         &self,
         messages: Vec<Message>,
         system: Option<String>,
         tools: Vec<ToolDefinition>,
-        task_type: TaskType,
     ) -> Result<ProxyResponse>;
 
     /// Send a simple chat request (no tools) through the proxy.
+    /// On failure: marks proxy unhealthy, returns error.
     pub async fn chat(
         &self,
         messages: Vec<Message>,
         system: Option<String>,
-        task_type: TaskType,
     ) -> Result<ProxyResponse>;
 
     /// Send a streaming chat request. Returns an async stream of SSE events.
@@ -649,11 +668,7 @@ impl ProxyClient {
         messages: Vec<Message>,
         system: Option<String>,
         tools: Vec<ToolDefinition>,
-        task_type: TaskType,
     ) -> Result<impl Stream<Item = Result<StreamEvent>>>;
-
-    /// Check proxy health. Falls back to direct GenAiLlmClient if unhealthy.
-    pub async fn health_check(&self) -> Result<bool>;
 }
 
 /// Parsed response from the proxy.
@@ -735,33 +750,32 @@ impl ExecutionGuard {
 ```rust
 // agent/loop.rs -- Part of ToolCallingLoop
 
-/// Routes LLM calls to either proxy or direct client based on task type.
+/// Routes LLM calls to either proxy or direct client.
 ///
-/// - tool_call, final_response, code_analysis -> ProxyClient (intelligent routing)
-/// - compression, simple_qa -> GenAiLlmClient (direct, cheap/local)
-/// - If proxy unreachable -> all fall back to GenAiLlmClient (degraded mode)
+/// - Tool-calling requests -> ProxyClient (intelligent routing + format conversion)
+/// - Compression/summarization -> GenAiLlmClient (direct, cheap/local Ollama)
+/// - If proxy unavailable -> tools disabled, text-only via GenAiLlmClient
+///
+/// Health tracked on-failure: no background polling. When proxy.is_available()
+/// returns false, tool_call() returns Err and the caller disables tools.
 pub struct HybridLlmRouter {
     proxy: ProxyClient,
-    direct: GenAiLlmClient,           // For compression and fallback
-    proxy_healthy: AtomicBool,         // Cached health status
+    direct: GenAiLlmClient,           // For compression + degraded text-only mode
 }
 
 impl HybridLlmRouter {
+    /// Returns true if proxy is available for tool-calling requests.
+    pub fn tools_available(&self) -> bool {
+        self.proxy.is_available()
+    }
+
     /// Route a tool-calling request through the proxy.
-    /// Falls back to direct client if proxy is down (tool calls parsed from text).
+    /// Returns Err if proxy is unavailable -- caller should disable tools.
     pub async fn tool_call(
         &self,
         messages: Vec<Message>,
         system: Option<String>,
         tools: Vec<ToolDefinition>,
-    ) -> Result<ProxyResponse>;
-
-    /// Route a quality-critical final response through the proxy.
-    /// Falls back to direct client if proxy is down.
-    pub async fn final_response(
-        &self,
-        messages: Vec<Message>,
-        system: Option<String>,
     ) -> Result<ProxyResponse>;
 
     /// Route context compression through direct GenAiLlmClient (cheap/local).
@@ -772,8 +786,12 @@ impl HybridLlmRouter {
         system: String,
     ) -> Result<String>;
 
-    /// Periodic health check of proxy. Updates proxy_healthy flag.
-    pub async fn check_proxy_health(&self);
+    /// Text-only response via direct GenAiLlmClient (degraded mode when proxy down).
+    pub async fn text_only(
+        &self,
+        messages: Vec<Message>,
+        system: Option<String>,
+    ) -> Result<String>;
 }
 ```
 
@@ -829,17 +847,21 @@ pub enum TinyClawError {
 | `test_proxy_response_parse` | `agent/proxy_client.rs` | Parse Anthropic-format JSON with tool_calls |
 | `test_proxy_response_parse_no_tools` | `agent/proxy_client.rs` | Parse text-only response |
 | `test_hybrid_router_compression_direct` | `agent/loop.rs` | Compression always uses direct client, never proxy |
-| `test_hybrid_router_fallback` | `agent/loop.rs` | Proxy down -> falls back to direct |
+| `test_tools_disabled_when_proxy_down` | `agent/loop.rs` | Proxy unavailable -> tools_available() returns false, text_only() used |
 | `test_session_add_get_history` | `session.rs` | Add messages, get truncated history |
 | `test_session_jsonl_persistence` | `session.rs` | Save and reload from JSONL file |
 | `test_context_eviction_trigger` | `agent/loop.rs` | Verify AgentContext evicts when over token limit |
 | `test_summarization_trigger` | `agent/loop.rs` | Trigger LLM summarization at 75% token ratio |
 | `test_prompt_sanitization` | `agent/loop.rs` | Verify PromptSanitizer strips injection attempts |
-| `test_is_allowed_empty_list` | `channel.rs` | Empty allow-list permits all |
+| `test_config_rejects_empty_allow_from` | `config.rs` | Config validation refuses to start with empty allow_from |
 | `test_is_allowed_whitelist` | `channel.rs` | Only listed senders permitted |
 | `test_config_from_toml` | `config.rs` | Parse config with proxy + direct LLM sections |
 | `test_markdown_to_telegram_html` | `format.rs` | Convert markdown bold/italic/code to HTML |
 | `test_markdown_to_discord` | `format.rs` | Pass-through (Discord supports markdown natively) |
+| `test_compression_uses_direct_client` | `agent/loop.rs` | Compression always uses direct GenAiLlmClient, never proxy |
+| `test_edit_tool_uniqueness_guard` | `tools/edit.rs` | Edit rejects non-unique old_string match |
+| `test_slash_command_role_list` | `agent/loop.rs` | /role list returns available roles without entering tool loop |
+| `test_slash_command_reset` | `agent/loop.rs` | /reset clears session, next message starts fresh |
 
 ### Integration Tests
 
@@ -852,7 +874,7 @@ pub enum TinyClawError {
 | `test_kg_enrichment_in_context` | `tests/agent_loop.rs` | Verify KG concepts appear in LLM context |
 | `test_channel_manager_dispatch` | `tests/channel_manager.rs` | Outbound message routes to correct channel |
 | `test_full_roundtrip_cli` | `tests/cli_roundtrip.rs` | CLI input -> bus -> agent -> bus -> CLI output |
-| `test_proxy_health_fallback` | `tests/proxy_fallback.rs` | Proxy process stopped -> tool calls fall back to direct + text parsing |
+| `test_proxy_down_disables_tools` | `tests/proxy_fallback.rs` | Proxy process stopped -> tools disabled, text-only response, user notified |
 
 ### Live Tests (gated by env vars)
 
@@ -877,7 +899,7 @@ pub enum TinyClawError {
 ### Step 2: Channel Trait + CLI Adapter
 **Files:** `src/channel.rs`, `src/channels/mod.rs`, `src/channels/cli.rs`
 **Description:** Define Channel trait, ChannelManager, and CLI adapter for stdin/stdout interaction. Binary runs in agent mode reading from terminal.
-**Tests:** `test_is_allowed_empty_list`, `test_is_allowed_whitelist`
+**Tests:** `test_config_rejects_empty_allow_from`, `test_is_allowed_whitelist`
 **Dependencies:** Step 1
 **Estimated:** 3 hours
 
@@ -906,8 +928,9 @@ pub enum TinyClawError {
 **Tests:**
 - `test_proxy_response_parse`: Parse Anthropic-format JSON with tool_calls from fixture
 - `test_proxy_response_parse_no_tools`: Parse text-only response
+- `test_proxy_on_failure_marks_unhealthy`: Failed request sets is_available() to false
 - `test_execution_guard_dangerous_patterns`: All 7 patterns produce Block
-- `test_execution_guard_shell_deny_list`: Additional denials
+- `test_execution_guard_shell_deny_list`: Additional denials (shutdown, reboot, passwd)
 - `test_execution_confidence_python`: Python multi-line > 0.8
 - `test_execution_confidence_plaintext`: Plaintext < 0.5
 
@@ -928,9 +951,9 @@ pub enum TinyClawError {
   - For each tool_call: `execution_guard.evaluate(tool, args)` -> execute if allowed
   - Record `ExecutionStep` (reuse CommandHistory)
   - Repeat until no tool_calls or max_iterations
-  - If proxy down: falls back to `hybrid_router.direct` with text-parsing for tool calls
+  - If `hybrid_router.tools_available()` is false: skip tool-calling loop, use `hybrid_router.text_only()` for text-only response, notify user "tools unavailable"
 - Saves session and publishes outbound
-**Tests:** `test_context_eviction_trigger`, `test_hybrid_router_compression_direct`, `test_hybrid_router_fallback`, integration tests
+**Tests:** `test_context_eviction_trigger`, `test_hybrid_router_compression_direct`, `test_tools_disabled_when_proxy_down`, integration tests
 **Dependencies:** Steps 2, 3, 4, 5
 **Estimated:** 7 hours
 
@@ -984,12 +1007,16 @@ pub enum TinyClawError {
 | `dirs` | 5.x | always | Platform-appropriate config/data directories |
 | `reqwest-eventsource` | latest | always | SSE stream parsing for proxy streaming responses |
 | `regex` | 1.x | always | ExecutionGuard shell deny patterns (additional to DangerousPatternHook) |
+| `async-trait` | 0.1.x | always | Channel and Tool async traits |
+| `serde` + `serde_json` | 1.x | always | Config parsing, message serialization (direct use via derive macros) |
+| `tokio-util` | latest | always | `CancellationToken` for graceful shutdown |
 
 ### Internal Crate Dependencies
 
 | Crate | What It Provides |
 |-------|------------------|
 | `terraphim_multi_agent` | `TerraphimAgent`, `GenAiLlmClient` (compression path), `AgentContext`, `PromptSanitizer`, `CommandHistory`, `DangerousPatternHook`, `CodeBlockExtractor`, `LlmRequest`/`LlmResponse` types |
+| `terraphim_automata` | `find_paragraph_end()` for message chunking, automata loading for role switching |
 | `terraphim_config` | `Role` configuration type |
 | `terraphim_agent_evolution` | `VersionedMemory`, `VersionedTaskList`, `VersionedLessons` (via TerraphimAgent) |
 | `terraphim_rolegraph` | `RoleGraph` for KG enrichment (via TerraphimAgent) |
@@ -1074,9 +1101,9 @@ No database migrations, no shared state changes, no modifications to existing cr
 
 | Item | Status | Owner |
 |------|--------|-------|
-| Proxy auto-launch: should TinyClaw spawn terraphim-llm-proxy as a sidecar, or require it pre-started? | Decision needed | Alex |
-| Proxy taxonomy customization: should TinyClaw ship its own taxonomy files for chat-specific routing rules? | Decision needed | Alex |
-| Degraded mode UX: when proxy is down, should tool calls be attempted (text-parsing) or disabled entirely? | Decision needed | Alex |
+| Proxy auto-launch as sidecar | Resolved: pre-started (spec interview) | Alex |
+| Proxy taxonomy customization | Resolved: use existing taxonomy, defer custom (spec interview) | Alex |
+| Degraded mode UX when proxy down | Resolved: disable tools, text-only (spec interview) | Alex |
 | WhatsApp bridge strategy (Phase 2) | Deferred | Alex |
 | Feishu SDK availability in Rust | Deferred | Alex |
 | Voice transcription provider choice | Deferred | Alex |
