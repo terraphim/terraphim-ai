@@ -2,6 +2,7 @@ mod bus;
 mod channel;
 mod channels;
 mod config;
+mod session;
 
 use crate::bus::MessageBus;
 use crate::channel::{Channel, ChannelManager};
