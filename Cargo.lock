@@ -10467,6 +10467,7 @@ dependencies = [
  "env_home",
  "env_logger 0.11.8",
  "log",
+ "parking_lot 0.12.5",
  "regex",
  "reqwest 0.12.28",
  "reqwest-eventsource 0.6.0",

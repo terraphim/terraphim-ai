@@ -52,6 +52,9 @@ dirs = "5"
 # Regex for ExecutionGuard
 regex = "1"
 
+# Concurrency
+parking_lot = "0.12"
+
 # CLI
 clap = { version = "4", features = ["derive"] }
 
