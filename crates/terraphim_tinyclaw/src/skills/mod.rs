@@ -4,7 +4,9 @@
 //! Each skill consists of sequential steps (tool calls or LLM prompts).
 
 pub mod executor;
+pub mod monitor;
 pub mod types;
 
 pub use executor::SkillExecutor;
-pub use types::{Skill, SkillResult, SkillStep, SkillStatus};
+pub use monitor::{ExecutionReport, ProgressTracker, SkillMonitor};
+pub use types::{Skill, SkillInput, SkillResult, SkillStatus, SkillStep};
