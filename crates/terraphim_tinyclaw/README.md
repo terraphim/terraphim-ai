@@ -108,7 +108,7 @@ max_iterations = 10
 
 [llm.proxy]
 base_url = "https://api.openai.com/v1"
-api_key = "${OPENAI_API_KEY}"
+# api-key = "your-api-key-here"  # Or use ${API_KEY} env var
 model = "gpt-4"
 
 [channels.telegram]
