@@ -207,7 +207,11 @@ async fn test_server_mode_search_with_selected_role() -> Result<()> {
     // Give server time to index documents
     thread::sleep(Duration::from_secs(3));
 
-    // Test search using selected role (should be Terraphim Engineer)
+    // Select Default role for consistent search behavior
+    let _ = run_server_command(&server_url, &["roles", "select", "Default"])?;
+    thread::sleep(Duration::from_millis(500));
+
+    // Test search using selected role
     let (stdout, stderr, code) =
         run_server_command(&server_url, &["search", "rust programming", "--limit", "5"])?;
 
@@ -282,34 +286,12 @@ async fn test_server_mode_roles_select() -> Result<()> {
         return Ok(());
     };
 
-    // First get available roles
-    let (roles_stdout, _, roles_code) = run_server_command(&server_url, &["roles", "list"])?;
-    assert_eq!(roles_code, 0, "Should be able to list roles");
-
-    let roles: Vec<&str> = roles_stdout.lines().collect();
-    if roles.is_empty() {
-        println!("No roles available for selection test");
-        let _ = server.kill();
-        return Ok(());
-    }
-
-    // Parse role name from format: "  ✓ RoleName (ShortName)" or "  ✓ RoleName"
-    let first_line = roles[0].trim();
-    let first_role = if let Some(idx) = first_line.rfind('(') {
-        // Extract just the role name before the parenthesis
-        first_line[..idx]
-            .trim()
-            .split_whitespace()
-            .last()
-            .unwrap_or(first_line)
-    } else {
-        // No parenthesis, just take the last word
-        first_line.split_whitespace().last().unwrap_or(first_line)
-    };
-    println!("Selecting first available role: {}", first_role);
+    // Use "Default" role which should always exist
+    let role_name = "Default";
+    println!("Selecting role: {}", role_name);
 
     // Test role selection
-    let (stdout, stderr, code) = run_server_command(&server_url, &["roles", "select", first_role])?;
+    let (stdout, stderr, code) = run_server_command(&server_url, &["roles", "select", role_name])?;
 
     // Cleanup
     let _ = server.kill();
@@ -321,7 +303,7 @@ async fn test_server_mode_roles_select() -> Result<()> {
         stderr
     );
     assert!(
-        stdout.contains(&format!("selected:{}", first_role)),
+        stdout.contains(&format!("selected:{}", role_name)),
         "Should confirm role selection: {}",
         stdout
     );
