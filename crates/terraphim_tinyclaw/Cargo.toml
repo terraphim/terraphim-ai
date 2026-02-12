@@ -66,3 +66,8 @@ discord = ["dep:serenity"]
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3"
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "tinyclaw_benchmarks"
+harness = false
