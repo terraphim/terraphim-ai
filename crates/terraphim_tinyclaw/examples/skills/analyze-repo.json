@@ -1,0 +1,40 @@
+{
+  "name": "analyze-repo",
+  "version": "1.0.0",
+  "description": "Analyze a git repository structure and provide insights",
+  "author": "TinyClaw Examples",
+  "inputs": [
+    {
+      "name": "repo_path",
+      "description": "Path to the git repository",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "analysis_type",
+      "description": "Type of analysis (structure, dependencies, complexity)",
+      "required": false,
+      "default": "structure"
+    }
+  ],
+  "steps": [
+    {
+      "type": "shell",
+      "command": "cd {repo_path} && git log --oneline -10",
+      "working_dir": null
+    },
+    {
+      "type": "tool",
+      "tool": "filesystem",
+      "args": {
+        "operation": "list_directory",
+        "path": "{repo_path}"
+      }
+    },
+    {
+      "type": "llm",
+      "prompt": "Analyze this repository at {repo_path}. Recent commits and file structure are provided above. Provide insights about: 1) Project type and purpose 2) Code organization 3) Recent development activity. Analysis type: {analysis_type}",
+      "use_context": true
+    }
+  ]
+}
