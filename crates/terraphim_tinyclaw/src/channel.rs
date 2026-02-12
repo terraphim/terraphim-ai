@@ -109,6 +109,17 @@ pub fn build_channels_from_config(
         }
     }
 
+    // Note: matrix channel disabled due to sqlite dependency conflict
+    // Re-enable when matrix-sdk updates to compatible rusqlite version
+    // #[cfg(feature = "matrix")]
+    // {
+    //     use crate::channels::matrix::MatrixChannel;
+    //
+    //     if let Some(ref cfg) = config.matrix {
+    //         channels.push(Box::new(MatrixChannel::new(cfg.clone())));
+    //     }
+    // }
+
     Ok(channels)
 }
 
