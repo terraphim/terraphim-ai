@@ -1384,6 +1384,34 @@ dependencies = [
 
 [[package]]
 name = "criterion"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f2b12d017a929603d80db1831cd3a24082f8137ce19c69e6447f54f5fc8d692f"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot 0.5.0",
+ "futures",
+ "is-terminal",
+ "itertools 0.10.5",
+ "num-traits",
+ "once_cell",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "tinytemplate",
+ "tokio",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
 version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4d883447757bb0ee46f233e9dc22eb84d93a9508c9b868687b274fc431d886bf"
@@ -1393,7 +1421,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap",
- "criterion-plot",
+ "criterion-plot 0.8.1",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -1405,6 +1433,16 @@ dependencies = [
  "serde_json",
  "tinytemplate",
  "walkdir",
+]
+
+[[package]]
+name = "criterion-plot"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
+dependencies = [
+ "cast",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -9599,7 +9637,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored 2.2.0",
- "criterion",
+ "criterion 0.8.1",
  "csv",
  "dialoguer 0.12.0",
  "glob",
@@ -9736,7 +9774,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.1",
  "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
@@ -9835,7 +9873,7 @@ dependencies = [
  "aho-corasick",
  "bincode",
  "cached",
- "criterion",
+ "criterion 0.8.1",
  "fst",
  "getrandom 0.3.4",
  "lazy_static",
@@ -9984,7 +10022,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.1",
  "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
@@ -10168,7 +10206,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.1",
  "futures",
  "genai",
  "lazy_static",
@@ -10244,7 +10282,7 @@ version = "1.4.10"
 dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
- "criterion",
+ "criterion 0.8.1",
  "itertools 0.14.0",
  "lazy_static",
  "log",
@@ -10391,7 +10429,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "criterion",
+ "criterion 0.8.1",
  "env_logger 0.11.8",
  "futures-util",
  "indexmap 2.12.1",
@@ -10424,6 +10462,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
+ "criterion 0.5.1",
  "env_home",
  "env_logger 0.11.8",
  "log",
