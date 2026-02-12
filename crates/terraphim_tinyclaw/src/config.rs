@@ -225,6 +225,9 @@ pub struct ChannelsConfig {
 
     #[cfg(feature = "discord")]
     pub discord: Option<DiscordConfig>,
+    // Note: matrix config disabled due to sqlite dependency conflict
+    // #[cfg(feature = "matrix")]
+    // pub matrix: Option<MatrixConfig>,
 }
 
 impl ChannelsConfig {
@@ -238,6 +241,12 @@ impl ChannelsConfig {
         if let Some(ref cfg) = self.discord {
             cfg.validate()?;
         }
+
+        // Note: matrix validation disabled due to sqlite dependency conflict
+        // #[cfg(feature = "matrix")]
+        // if let Some(ref cfg) = self.matrix {
+        //     cfg.validate()?;
+        // }
 
         Ok(())
     }
@@ -293,6 +302,46 @@ impl DiscordConfig {
         if self.allow_from.is_empty() {
             anyhow::bail!(
                 "discord.allow_from cannot be empty - \
+                 at least one user must be authorized for security"
+            );
+        }
+        Ok(())
+    }
+
+    /// Check if a sender is allowed.
+    pub fn is_allowed(&self, sender_id: &str) -> bool {
+        self.allow_from.contains(&sender_id.to_string())
+    }
+}
+
+/// Matrix channel configuration for WhatsApp bridge.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct MatrixConfig {
+    /// Matrix homeserver URL (e.g., "https://matrix.example.com")
+    pub homeserver_url: String,
+    /// Matrix username
+    pub username: String,
+    /// Matrix password
+    pub password: String,
+    /// List of allowed sender IDs (Matrix MXIDs like "@user:example.com")
+    /// Must be non-empty for security.
+    pub allow_from: Vec<String>,
+}
+
+impl MatrixConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.homeserver_url.is_empty() {
+            anyhow::bail!("matrix.homeserver_url cannot be empty");
+        }
+        if self.username.is_empty() {
+            anyhow::bail!("matrix.username cannot be empty");
+        }
+        if self.password.is_empty() {
+            anyhow::bail!("matrix.password cannot be empty");
+        }
+        if self.allow_from.is_empty() {
+            anyhow::bail!(
+                "matrix.allow_from cannot be empty - \
                  at least one user must be authorized for security"
             );
         }

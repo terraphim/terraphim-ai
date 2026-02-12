@@ -57,11 +57,15 @@ clap = { version = "4", features = ["derive"] }
 # Channel adapters (feature-gated)
 teloxide = { version = "0.13", optional = true, features = ["macros"] }
 serenity = { version = "0.12", optional = true }
+# Note: matrix-sdk disabled due to sqlite dependency conflict with terraphim_persistence
+# Re-enable when matrix-sdk updates to rusqlite 0.32+ or when conflict resolved
+# matrix-sdk = { version = "0.7", optional = true, default-features = false, features = ["native-tls"] }
 
 [features]
 default = ["telegram", "discord"]
 telegram = ["dep:teloxide"]
 discord = ["dep:serenity"]
+# matrix = ["dep:matrix-sdk"]
 
 [dev-dependencies]
 tokio-test = "0.4"
