@@ -10463,6 +10463,7 @@ dependencies = [
  "chrono",
  "clap",
  "criterion 0.5.1",
+ "dirs 5.0.1",
  "env_home",
  "env_logger 0.11.8",
  "log",
