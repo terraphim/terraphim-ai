@@ -1,0 +1,82 @@
+{
+  "id": "Server",
+  "global_shortcut": "Ctrl+Shift+T",
+  "roles": {
+    "Test Engineer": {
+      "shortname": "TestEng",
+      "name": "Test Engineer",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "crates/terraphim_agent/tests/test_kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": null,
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are a test assistant.",
+      "extra": {}
+    },
+    "Quickwit Logs": {
+      "shortname": "QuickwitLogs",
+      "name": "Quickwit Logs",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "darkly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:7280",
+          "service": "Quickwit",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "max_hits": "100",
+            "sort_by": "-timestamp"
+          }
+        }
+      ],
+      "llm_provider": null,
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are a log analysis expert.",
+      "extra": {}
+    },
+    "Default": {
+      "shortname": "Default",
+      "name": "Default",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": null,
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are a helpful assistant.",
+      "extra": {}
+    }
+  },
+  "default_role": "Test Engineer",
+  "selected_role": "Test Engineer"
+}
