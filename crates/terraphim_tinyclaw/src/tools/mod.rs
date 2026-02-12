@@ -3,6 +3,7 @@
 pub mod edit;
 pub mod filesystem;
 pub mod shell;
+pub mod voice_transcribe;
 pub mod web;
 
 use async_trait::async_trait;
@@ -151,6 +152,7 @@ pub fn create_default_registry() -> ToolRegistry {
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::shell::ShellTool;
+    use crate::tools::voice_transcribe::VoiceTranscribeTool;
     use crate::tools::web::{WebFetchTool, WebSearchTool};
 
     let mut registry = ToolRegistry::new();
@@ -159,6 +161,7 @@ pub fn create_default_registry() -> ToolRegistry {
     registry.register(Box::new(ShellTool::new()));
     registry.register(Box::new(WebSearchTool::new()));
     registry.register(Box::new(WebFetchTool::new()));
+    registry.register(Box::new(VoiceTranscribeTool::new()));
     registry
 }
 
