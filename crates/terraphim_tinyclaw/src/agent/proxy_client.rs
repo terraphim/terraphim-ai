@@ -251,7 +251,7 @@ impl Message {
     }
 
     /// Create a tool result message.
-    pub fn tool(tool_use_id: impl Into<String>, content: impl Into<String>) -> Self {
+    pub fn tool(_tool_use_id: impl Into<String>, content: impl Into<String>) -> Self {
         Self {
             role: "user".to_string(),
             content: format!("<tool_result>{}</tool_result>", content.into()),
