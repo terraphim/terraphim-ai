@@ -126,7 +126,6 @@ pub fn build_channels_from_config(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::bus::InboundMessage;
 
     struct MockChannel {
         name: String,

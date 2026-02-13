@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 /// A single chat message in a session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -224,7 +224,7 @@ impl SessionManager {
         let reader = BufReader::new(file);
 
         // Read the last line (most recent save)
-        let last_line = reader.lines().filter_map(|l| l.ok()).last()?;
+        let last_line = reader.lines().map_while(Result::ok).last()?;
 
         serde_json::from_str(&last_line).ok()
     }
@@ -341,7 +341,7 @@ mod tests {
     #[test]
     fn test_session_manager_get_or_create() {
         let temp_dir = TempDir::new().unwrap();
-        let mut manager = SessionManager::new(temp_dir.path().to_path_buf());
+        let manager = SessionManager::new(temp_dir.path().to_path_buf());
 
         // Create a session and add a message
         let mut session = Session::new("new:session");

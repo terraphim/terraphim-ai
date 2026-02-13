@@ -4,7 +4,6 @@ use reqwest::Client;
 
 /// Web search tool using search providers.
 pub struct WebSearchTool {
-    client: Client,
     provider: String,
 }
 
@@ -12,7 +11,6 @@ impl WebSearchTool {
     /// Create a new web search tool.
     pub fn new() -> Self {
         Self {
-            client: Client::new(),
             provider: "brave".to_string(),
         }
     }
@@ -20,7 +18,6 @@ impl WebSearchTool {
     /// Create with a specific provider.
     pub fn with_provider(provider: impl Into<String>) -> Self {
         Self {
-            client: Client::new(),
             provider: provider.into(),
         }
     }

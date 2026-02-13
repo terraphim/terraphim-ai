@@ -1,6 +1,6 @@
 //! Discord channel adapter using serenity.
 
-use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
+use crate::bus::{MessageBus, OutboundMessage};
 use crate::channel::Channel;
 use crate::config::DiscordConfig;
 use async_trait::async_trait;

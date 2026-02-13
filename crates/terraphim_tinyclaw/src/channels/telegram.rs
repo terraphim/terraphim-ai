@@ -1,6 +1,6 @@
 //! Telegram channel adapter using teloxide.
 
-use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
+use crate::bus::{MessageBus, OutboundMessage};
 use crate::channel::Channel;
 use crate::config::TelegramConfig;
 use async_trait::async_trait;

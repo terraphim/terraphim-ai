@@ -101,7 +101,7 @@ async fn start_test_server() -> Result<(Child, String)> {
             workspace_root.join("terraphim_server/default/terraphim_engineer_config.json"),
         )
     };
-    let config_path = config_path_str;
+    let _config_path = config_path_str;
     let config_path_absolute = config_path_buf.to_string_lossy().to_string();
 
     // Clear any existing saved config to prevent it from overriding our test config

@@ -8,6 +8,7 @@
 //! - **Tools**: Extensible tool system for filesystem, web, shell operations
 //! - **Skills**: JSON-based reusable workflows
 //! - **Session Management**: Persistent conversation history
+#![allow(dead_code)]
 
 pub mod agent;
 pub mod bus;

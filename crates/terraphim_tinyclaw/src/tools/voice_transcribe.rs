@@ -5,13 +5,11 @@
 
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// Tool for transcribing voice messages to text.
 pub struct VoiceTranscribeTool {
     temp_dir: PathBuf,
-    #[cfg(feature = "voice")]
-    whisper: Option<WhisperContext>,
 }
 
 impl VoiceTranscribeTool {
@@ -19,16 +17,11 @@ impl VoiceTranscribeTool {
     pub fn new() -> Self {
         Self {
             temp_dir: std::env::temp_dir().join("terraphim_tinyclaw"),
-            #[cfg(feature = "voice")]
-            whisper: None,
         }
     }
 
     /// Initialize Whisper model (downloads on first use).
-    #[cfg(feature = "voice")]
     pub async fn init_whisper(&mut self) -> anyhow::Result<()> {
-        // TODO: Initialize Whisper context with base model
-        // This requires whisper-rs which is currently disabled
         log::info!("Whisper initialization would happen here with voice feature enabled");
         Ok(())
     }
@@ -77,33 +70,15 @@ impl VoiceTranscribeTool {
     }
 
     /// Convert audio to WAV format (16kHz, mono) for Whisper.
-    #[cfg(feature = "voice")]
-    async fn convert_to_wav(&self, input: &PathBuf) -> Result<PathBuf, ToolError> {
-        use symphonia::core::audio::{AudioBufferRef, SampleBuffer};
-        use symphonia::core::codecs::DecoderOptions;
-        use symphonia::core::formats::FormatOptions;
-        use symphonia::core::io::MediaSourceStream;
-        use symphonia::core::meta::MetadataOptions;
-        use symphonia::core::probe::Hint;
-
-        // TODO: Implement audio conversion using symphonia
-        // This is a placeholder that just returns the input
+    async fn convert_to_wav(&self, input: &Path) -> Result<PathBuf, ToolError> {
+        // Placeholder implementation returns the input path unchanged.
         log::info!("Audio conversion would happen here with voice feature enabled");
-        Ok(input.clone())
+        Ok(input.to_path_buf())
     }
 
     /// Transcribe audio file using Whisper.
-    #[cfg(feature = "voice")]
-    async fn transcribe(&self, audio_path: &PathBuf) -> Result<String, ToolError> {
-        // TODO: Implement Whisper transcription
-        // This requires whisper-rs which is currently disabled
+    async fn transcribe(&self, _audio_path: &PathBuf) -> Result<String, ToolError> {
         Ok("[Voice transcription requires voice feature enabled]".to_string())
-    }
-
-    /// Placeholder transcription without voice feature.
-    #[cfg(not(feature = "voice"))]
-    async fn transcribe_placeholder(&self, _audio_path: &PathBuf) -> Result<String, ToolError> {
-        Ok("[Voice transcription is a placeholder - enable voice feature for actual transcription]".to_string())
     }
 }
 
@@ -166,28 +141,14 @@ impl Tool for VoiceTranscribeTool {
         // Download audio
         let audio_path = self.download_audio(audio_url).await?;
 
-        // Transcribe
-        #[cfg(feature = "voice")]
-        {
-            let wav_path = self.convert_to_wav(&audio_path).await?;
-            let text = self.transcribe(&wav_path).await?;
+        let wav_path = self.convert_to_wav(&audio_path).await?;
+        let text = self.transcribe(&wav_path).await?;
 
-            // Cleanup temp files
-            let _ = tokio::fs::remove_file(&audio_path).await;
-            let _ = tokio::fs::remove_file(&wav_path).await;
+        // Cleanup temp files
+        let _ = tokio::fs::remove_file(&audio_path).await;
+        let _ = tokio::fs::remove_file(&wav_path).await;
 
-            Ok(text)
-        }
-
-        #[cfg(not(feature = "voice"))]
-        {
-            let text = self.transcribe_placeholder(&audio_path).await?;
-
-            // Cleanup temp file
-            let _ = tokio::fs::remove_file(&audio_path).await;
-
-            Ok(text)
-        }
+        Ok(text)
     }
 }
 

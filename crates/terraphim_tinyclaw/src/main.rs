@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 mod agent;
 mod bus;
 mod channel;

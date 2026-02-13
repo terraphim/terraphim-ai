@@ -6,8 +6,8 @@ use crate::agent::proxy_client::{
 };
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::config::{AgentConfig, DirectLlmConfig};
-use crate::session::{ChatMessage, MessageRole, Session, SessionManager};
-use crate::tools::{ToolCall, ToolError, ToolRegistry};
+use crate::session::{ChatMessage, MessageRole, SessionManager};
+use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -426,24 +426,6 @@ impl ToolCallingLoop {
         }
     }
 
-    /// Compress session if it gets too long.
-    async fn compress_session(&self, session: &mut Session) -> anyhow::Result<()> {
-        log::info!(
-            "Compressing session {} ({} messages)",
-            session.key,
-            session.message_count()
-        );
-
-        let summary = self
-            .router
-            .compress(session.messages.clone(), self.system_prompt.clone())
-            .await?;
-        session.set_summary(summary);
-        session.clear_messages();
-
-        Ok(())
-    }
-
     /// Trigger graceful shutdown.
     pub fn shutdown(&self) {
         self.shutdown.cancel();
@@ -453,7 +435,6 @@ impl ToolCallingLoop {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::ProxyConfig;
     use tempfile::TempDir;
 
     fn create_test_router() -> HybridLlmRouter {
