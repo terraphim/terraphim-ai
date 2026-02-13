@@ -276,7 +276,7 @@ mod tests {
     fn test_chunk_message_telegram() {
         let text = "a ".repeat(5000);
         let chunks = chunk_message(&text, 4096);
-        assert!(chunks.len() >= 1);
+        assert!(!chunks.is_empty());
         // Verify we got chunks back (exact length check skipped due to HTML escaping)
     }
 

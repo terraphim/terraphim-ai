@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::path::{Path, PathBuf};
 
 /// Root configuration for terraphim-tinyclaw.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct Config {
     pub agent: AgentConfig,
     pub llm: LlmConfig,
@@ -41,17 +41,6 @@ impl Config {
     /// Default configuration file path.
     pub fn default_path() -> Option<PathBuf> {
         env_home::env_home_dir().map(|home| home.join(".config/terraphim/tinyclaw.toml"))
-    }
-}
-
-impl Default for Config {
-    fn default() -> Self {
-        Self {
-            agent: AgentConfig::default(),
-            llm: LlmConfig::default(),
-            channels: ChannelsConfig::default(),
-            tools: ToolsConfig::default(),
-        }
     }
 }
 
@@ -116,22 +105,13 @@ fn default_max_session_messages() -> usize {
 }
 
 /// Hybrid LLM configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct LlmConfig {
     /// Proxy configuration for tool-calling and quality responses.
     pub proxy: ProxyConfig,
 
     /// Direct LLM configuration for compression and simple QA.
     pub direct: DirectLlmConfig,
-}
-
-impl Default for LlmConfig {
-    fn default() -> Self {
-        Self {
-            proxy: ProxyConfig::default(),
-            direct: DirectLlmConfig::default(),
-        }
-    }
 }
 
 impl LlmConfig {
@@ -148,6 +128,7 @@ pub struct ProxyConfig {
     pub base_url: String,
 
     /// API key for proxy authentication.
+    #[serde(default)]
     pub api_key: String,
 
     /// Request timeout in milliseconds.
@@ -429,7 +410,6 @@ max_iterations = 10
 
 [llm.proxy]
 base_url = "http://localhost:3456"
-api_key = "example_only_not_real"
 
 [llm.direct]
 provider = "ollama"
@@ -499,11 +479,16 @@ model = "llama3.2"
 
     #[test]
     fn test_config_validation() {
-        let mut cfg = AgentConfig::default();
-        cfg.max_iterations = 0;
+        let cfg = AgentConfig {
+            max_iterations: 0,
+            ..Default::default()
+        };
         assert!(cfg.validate().is_err());
 
-        cfg.max_iterations = 1;
+        let cfg = AgentConfig {
+            max_iterations: 1,
+            ..Default::default()
+        };
         assert!(cfg.validate().is_ok());
     }
 }
