@@ -1,0 +1,87 @@
+[package]
+name = "terraphim_tinyclaw"
+version.workspace = true
+edition.workspace = true
+description = "Multi-channel AI assistant for Terraphim - Telegram, Discord, and CLI"
+license = "MIT OR Apache-2.0"
+authors = ["Terraphim AI"]
+
+[[bin]]
+name = "terraphim-tinyclaw"
+path = "src/main.rs"
+
+[dependencies]
+# Terraphim crates
+terraphim_multi_agent = { path = "../terraphim_multi_agent" }
+terraphim_config = { path = "../terraphim_config" }
+terraphim_automata = { path = "../terraphim_automata" }
+
+# Async runtime
+tokio = { workspace = true }
+tokio-util = { version = "0.7", features = ["rt"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+toml = "0.8"
+
+# HTTP client
+reqwest = { workspace = true }
+reqwest-eventsource = "0.6"
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Async traits
+async-trait = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+uuid = { workspace = true }
+
+# Logging
+tracing = "0.1"
+log = { workspace = true }
+env_logger = "0.11"
+
+# Environment
+env_home = "0.1"
+dirs = "5"
+
+# Regex for ExecutionGuard
+regex = "1"
+
+# Concurrency
+parking_lot = "0.12"
+
+# CLI
+clap = { version = "4", features = ["derive"] }
+
+# Channel adapters (feature-gated)
+teloxide = { version = "0.13", optional = true, features = ["macros"] }
+serenity = { version = "0.12", optional = true }
+# Note: matrix-sdk disabled due to sqlite dependency conflict with terraphim_persistence
+# Re-enable when matrix-sdk updates to rusqlite 0.32+ or when conflict resolved
+# matrix-sdk = { version = "0.7", optional = true, default-features = false, features = ["native-tls"] }
+
+# Voice transcription (optional)
+# whisper-rs = { version = "0.11", optional = true }
+# symphonia = { version = "0.5", optional = true, features = ["ogg", "pcm"] }
+
+[features]
+default = ["telegram", "discord"]
+telegram = ["dep:teloxide"]
+discord = ["dep:serenity"]
+voice = []
+# matrix = ["dep:matrix-sdk"]
+# voice = ["dep:whisper-rs", "dep:symphonia"]
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3"
+criterion = { version = "0.5", features = ["async_tokio"] }
+
+[[bench]]
+name = "tinyclaw_benchmarks"
+harness = false

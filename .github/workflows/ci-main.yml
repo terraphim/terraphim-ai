@@ -41,6 +41,12 @@ jobs:
       targets: ${{ steps.matrix.outputs.targets }}
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -94,6 +100,12 @@ jobs:
         target: ${{ fromJson(needs.setup.outputs.targets) }}
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -393,7 +405,7 @@ jobs:
 
       - name: Run cargo audit
         run: |
-          cargo install cargo-audit --features=fix
+          cargo install cargo-audit --no-default-features
           # Fetch fresh advisory database to handle CVSS format updates
           cargo audit --fetch || true
           # Run audit, continuing on advisory DB parse errors (CVSS 4.0 format issue)

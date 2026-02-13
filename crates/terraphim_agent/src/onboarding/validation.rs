@@ -9,7 +9,6 @@ use thiserror::Error;
 
 /// Validation errors that can occur
 #[derive(Debug, Error, Clone)]
-#[allow(dead_code)]
 pub enum ValidationError {
     /// A required field is empty
     #[error("Field '{0}' cannot be empty")]

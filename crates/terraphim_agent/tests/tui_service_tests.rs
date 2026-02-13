@@ -65,8 +65,11 @@ async fn test_tui_service_new_uses_host_settings_path() -> Result<()> {
 async fn test_tui_service_search() -> Result<()> {
     let service = TuiService::new_with_embedded_defaults().await?;
 
-    // Search with the default search method (uses selected role)
-    let results = service.search("test", Some(5)).await;
+    // Search with the selected role
+    let selected_role = service.get_selected_role().await;
+    let results = service
+        .search_with_role("test", &selected_role, Some(5))
+        .await;
 
     // Search may return empty or results depending on data, but should not panic
     match results {

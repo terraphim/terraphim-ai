@@ -374,13 +374,10 @@ impl ReplHandler {
             );
 
             if let Some(service) = &self.service {
-                // Offline mode - use search_with_role if role specified, otherwise use default search
-                let results = if let Some(role) = role {
-                    let role_name = terraphim_types::RoleName::new(&role);
-                    service.search_with_role(&query, &role_name, limit).await?
-                } else {
-                    service.search(&query, limit).await?
-                };
+                // Offline mode - use search_with_role if role specified, otherwise use current role
+                let effective_role = role.unwrap_or_else(|| self.current_role.clone());
+                let role_name = terraphim_types::RoleName::new(&effective_role);
+                let results = service.search_with_role(&query, &role_name, limit).await?;
 
                 if results.is_empty() {
                     println!("{} No results found", "ℹ".blue().bold());
@@ -411,10 +408,11 @@ impl ReplHandler {
                     );
                 }
             } else if let Some(api_client) = &self.api_client {
-                // Server mode
+                // Server mode - use current role if no role specified
                 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
-                let role_name = role.map(|r| RoleName::new(&r));
+                let effective_role = role.unwrap_or_else(|| self.current_role.clone());
+                let role_name = Some(RoleName::new(&effective_role));
                 let search_query = SearchQuery {
                     search_term: NormalizedTermValue::from(query.as_str()),
                     search_terms: None,

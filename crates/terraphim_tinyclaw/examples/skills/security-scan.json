@@ -1,0 +1,39 @@
+{
+  "name": "security-scan",
+  "version": "1.0.0",
+  "description": "Basic security scan of files for common vulnerabilities",
+  "author": "TinyClaw Examples",
+  "inputs": [
+    {
+      "name": "scan_path",
+      "description": "Path to scan for security issues",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "severity",
+      "description": "Minimum severity to report (low, medium, high, critical)",
+      "required": false,
+      "default": "medium"
+    }
+  ],
+  "steps": [
+    {
+      "type": "shell",
+      "command": "find {scan_path} -type f \( -name '*.rs' -o -name '*.py' -o -name '*.js' -o -name '*.ts' \) | head -20",
+      "working_dir": null
+    },
+    {
+      "type": "tool",
+      "tool": "shell",
+      "args": {
+        "command": "grep -r -n 'password\|secret\|key\|token' {scan_path} --include='*.env' --include='*.config' 2>/dev/null | head -10 || echo 'No obvious secrets found'"
+      }
+    },
+    {
+      "type": "llm",
+      "prompt": "Analyze the file listing and grep results from security scan of {scan_path}. Identify: 1) Hardcoded secrets or credentials 2) Insecure dependencies 3) Unsafe code patterns 4) Configuration issues. Severity threshold: {severity}",
+      "use_context": true
+    }
+  ]
+}

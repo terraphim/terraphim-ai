@@ -30,7 +30,6 @@ use thiserror::Error;
 
 /// Errors that can occur during onboarding
 #[derive(Debug, Error)]
-#[allow(dead_code)]
 pub enum OnboardingError {
     /// User cancelled the setup wizard
     #[error("User cancelled setup")]
@@ -57,6 +56,10 @@ pub enum OnboardingError {
     /// JSON serialization/deserialization error
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+
+    /// Path does not exist
+    #[error("Path does not exist: {0}")]
+    PathNotFound(String),
 
     /// User went back in wizard navigation
     #[error("User navigated back")]

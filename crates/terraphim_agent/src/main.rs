@@ -47,8 +47,7 @@ fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
     println!();
     println!("Interactive Mode (requires TTY):");
-    println!("  terraphim-agent              # Start REPL (default)");
-    println!("  terraphim-agent --tui        # Start TUI (requires server)");
+    println!("  terraphim-agent              # Start REPL or TUI");
     println!("  terraphim-agent repl         # Explicit REPL mode");
     println!();
     println!("Common Commands:");
@@ -363,151 +362,6 @@ mod tests {
         let text2 = "use npm, please";
         assert!(is_at_word_boundary(text2, 4, 7)); // "npm" followed by comma
     }
-
-    // TUI Rendering Tests
-    use ratatui::backend::TestBackend;
-
-    #[test]
-    fn test_render_search_view_empty() {
-        let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        terminal
-            .draw(|f| {
-                render_search_view(f, "", &[], &[], 0, "Default", false);
-            })
-            .unwrap();
-
-        // Verify the buffer was written to (basic sanity check)
-        let buffer = terminal.backend().buffer();
-        assert!(!buffer.content.is_empty());
-
-        // Check that role name appears somewhere in the buffer
-        let buffer_text: String = buffer.content.iter().map(|c| c.symbol()).collect();
-        assert!(buffer_text.contains("Default"));
-        assert!(buffer_text.contains("Search"));
-    }
-
-    #[test]
-    fn test_render_search_view_with_data() {
-        let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        let suggestions = vec!["rust".to_string(), "react".to_string()];
-        let results = vec!["Result 1".to_string(), "Result 2".to_string()];
-
-        terminal
-            .draw(|f| {
-                render_search_view(f, "ru", &suggestions, &results, 0, "Rust Engineer", false);
-            })
-            .unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let buffer_text: String = buffer.content.iter().map(|c| c.symbol()).collect();
-
-        // Check that key elements are rendered
-        assert!(buffer_text.contains("Rust Engineer"));
-        assert!(buffer_text.contains("ru"));
-        assert!(buffer_text.contains("Result 1"));
-        assert!(buffer_text.contains("Result 2"));
-    }
-
-    #[test]
-    fn test_render_detail_view() {
-        let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        let doc = terraphim_types::Document {
-            id: "test-1".to_string(),
-            title: "Test Document".to_string(),
-            url: "https://example.com/test".to_string(),
-            body: "This is the document content".to_string(),
-            description: None,
-            summarization: None,
-            stub: None,
-            rank: None,
-            tags: None,
-            source_haystack: None,
-            doc_type: terraphim_types::DocumentType::Document,
-            synonyms: None,
-            route: None,
-            priority: None,
-        };
-
-        terminal
-            .draw(|f| {
-                render_detail_view(f, &doc, false);
-            })
-            .unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let buffer_text: String = buffer.content.iter().map(|c| c.symbol()).collect();
-
-        // Check that document fields are rendered
-        assert!(buffer_text.contains("Test Document"));
-        assert!(buffer_text.contains("This is the document content"));
-        assert!(buffer_text.contains("test-1"));
-    }
-
-    #[test]
-    fn test_render_detail_view_empty_body() {
-        let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        let doc = terraphim_types::Document {
-            id: "empty-doc".to_string(),
-            title: "Empty Document".to_string(),
-            url: "".to_string(),
-            body: "".to_string(),
-            description: None,
-            summarization: None,
-            stub: None,
-            rank: None,
-            tags: None,
-            source_haystack: None,
-            doc_type: terraphim_types::DocumentType::Document,
-            synonyms: None,
-            route: None,
-            priority: None,
-        };
-
-        terminal
-            .draw(|f| {
-                render_detail_view(f, &doc, false);
-            })
-            .unwrap();
-
-        let buffer = terminal.backend().buffer();
-        let buffer_text: String = buffer.content.iter().map(|c| c.symbol()).collect();
-
-        // Check that placeholder text appears for empty body
-        assert!(buffer_text.contains("No content available"));
-        assert!(buffer_text.contains("N/A")); // Empty URL should show N/A
-    }
-
-    #[test]
-    fn test_render_search_view_with_selection() {
-        let backend = TestBackend::new(80, 24);
-        let mut terminal = Terminal::new(backend).unwrap();
-
-        let results = vec![
-            "First Result".to_string(),
-            "Second Result".to_string(),
-            "Third Result".to_string(),
-        ];
-
-        // Render with second item selected (index 1)
-        terminal
-            .draw(|f| {
-                render_search_view(f, "test", &[], &results, 1, "Default", false);
-            })
-            .unwrap();
-
-        let buffer = terminal.backend().buffer();
-
-        // Verify buffer was written
-        assert!(!buffer.content.is_empty());
-    }
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Default)]
@@ -539,9 +393,6 @@ struct Cli {
     /// Output format (human, json, json-compact)
     #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
     format: OutputFormat,
-    /// Force TUI mode (default is REPL)
-    #[arg(long, default_value_t = false)]
-    tui: bool,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -734,8 +585,7 @@ fn main() -> Result<()> {
     });
 
     match cli.command {
-        Some(Command::Interactive) => {
-            // Explicit interactive command - force TUI mode
+        Some(Command::Interactive) | None => {
             // Check if we're in a TTY for interactive mode (both stdout and stdin required)
             use atty::Stream;
             if !atty::is(Stream::Stdout) {
@@ -753,48 +603,6 @@ fn main() -> Result<()> {
             } else {
                 // Run TUI mode - it will create its own runtime
                 run_tui_offline_mode(cli.transparent)
-            }
-        }
-
-        None => {
-            // No command specified - default to REPL mode or TUI mode if --tui flag is set
-            if cli.tui {
-                // Check if we're in a TTY for TUI mode
-                use atty::Stream;
-                if !atty::is(Stream::Stdout) {
-                    eprintln!("Error: TUI mode requires a TTY (terminal)");
-                    std::process::exit(1);
-                }
-
-                if !atty::is(Stream::Stdin) {
-                    eprintln!("Error: TUI mode requires a TTY (terminal)");
-                    std::process::exit(1);
-                }
-
-                if cli.server {
-                    run_tui_server_mode(&cli.server_url, cli.transparent)
-                } else {
-                    run_tui_offline_mode(cli.transparent)
-                }
-            } else {
-                // Default to REPL mode
-                #[cfg(feature = "repl")]
-                {
-                    let rt = Runtime::new()?;
-                    if cli.server {
-                        rt.block_on(repl::run_repl_server_mode(&cli.server_url))
-                    } else {
-                        rt.block_on(repl::run_repl_offline_mode())
-                    }
-                }
-
-                #[cfg(not(feature = "repl"))]
-                {
-                    // If repl feature is not enabled, show error
-                    anyhow::bail!(
-                        "REPL mode requires 'repl' feature. Build with: cargo build --features repl"
-                    );
-                }
             }
         }
 
@@ -2074,104 +1882,6 @@ fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
     }
 }
 
-/// Render the search view with input, suggestions, results, and status
-fn render_search_view(
-    f: &mut ratatui::Frame,
-    input: &str,
-    suggestions: &[String],
-    results: &[String],
-    selected_result_index: usize,
-    current_role: &str,
-    transparent: bool,
-) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // input
-            Constraint::Length(5), // suggestions
-            Constraint::Min(3),    // results
-            Constraint::Length(3), // status
-        ])
-        .split(f.area());
-
-    let input_title = format!(
-        "Search [Role: {}] • Enter: search, Tab: autocomplete, Ctrl+r: switch role, q: quit",
-        current_role
-    );
-    let input_widget =
-        Paragraph::new(Line::from(input)).block(create_block(&input_title, transparent));
-    f.render_widget(input_widget, chunks[0]);
-
-    // Suggestions (fixed height 5)
-    let sug_items: Vec<ListItem> = suggestions
-        .iter()
-        .take(5)
-        .map(|s| ListItem::new(s.as_str()))
-        .collect();
-    let sug_list = List::new(sug_items).block(create_block("Suggestions", transparent));
-    f.render_widget(sug_list, chunks[1]);
-
-    let items: Vec<ListItem> = results
-        .iter()
-        .enumerate()
-        .map(|(i, r)| {
-            let item = ListItem::new(r.as_str());
-            if i == selected_result_index {
-                item.style(Style::default().add_modifier(Modifier::REVERSED))
-            } else {
-                item
-            }
-        })
-        .collect();
-    let list = List::new(items).block(create_block(
-        "Results • ↑↓: select, Enter: view details, Ctrl+s: summarize",
-        transparent,
-    ));
-    f.render_widget(list, chunks[2]);
-
-    let status_text = format!("Terraphim TUI • {} results • Mode: Search", results.len());
-    let status = Paragraph::new(Line::from(status_text)).block(create_block("", transparent));
-    f.render_widget(status, chunks[3]);
-}
-
-/// Render the document detail view
-fn render_detail_view(f: &mut ratatui::Frame, doc: &Document, transparent: bool) {
-    let chunks = Layout::default()
-        .direction(Direction::Vertical)
-        .constraints([
-            Constraint::Length(3), // title
-            Constraint::Min(5),    // content
-            Constraint::Length(3), // status
-        ])
-        .split(f.area());
-
-    let title_widget = Paragraph::new(Line::from(doc.title.as_str()))
-        .block(create_block("Document Title", transparent))
-        .wrap(ratatui::widgets::Wrap { trim: true });
-    f.render_widget(title_widget, chunks[0]);
-
-    let content_text = if doc.body.is_empty() {
-        "No content available"
-    } else {
-        &doc.body
-    };
-    let content_widget = Paragraph::new(content_text)
-        .block(create_block(
-            "Content • Ctrl+s: summarize, Esc: back to search",
-            transparent,
-        ))
-        .wrap(ratatui::widgets::Wrap { trim: true });
-    f.render_widget(content_widget, chunks[1]);
-
-    let status_text = format!(
-        "Document Detail • ID: {} • URL: {}",
-        doc.id,
-        if doc.url.is_empty() { "N/A" } else { &doc.url }
-    );
-    let status = Paragraph::new(Line::from(status_text)).block(create_block("", transparent));
-    f.render_widget(status, chunks[2]);
-}
-
 fn ui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     server_url: Option<String>,
@@ -2204,22 +1914,91 @@ fn ui_loop(
     }
 
     loop {
-        terminal.draw(|f| match view_mode {
-            ViewMode::Search => {
-                render_search_view(
-                    f,
-                    &input,
-                    &suggestions,
-                    &results,
-                    selected_result_index,
-                    &current_role,
-                    transparent,
-                );
-            }
-            ViewMode::ResultDetail => {
-                if selected_result_index < detailed_results.len() {
-                    let doc = &detailed_results[selected_result_index];
-                    render_detail_view(f, doc, transparent);
+        terminal.draw(|f| {
+            match view_mode {
+                ViewMode::Search => {
+                    let chunks = Layout::default()
+                        .direction(Direction::Vertical)
+                        .constraints([
+                            Constraint::Length(3), // input
+                            Constraint::Length(5), // suggestions
+                            Constraint::Min(3),    // results
+                            Constraint::Length(3), // status
+                        ])
+                        .split(f.area());
+
+                    let input_title = format!(
+                        "Search [Role: {}] • Enter: search, Tab: autocomplete, Ctrl+r: switch role, q: quit",
+                        current_role
+                    );
+                    let input_widget = Paragraph::new(Line::from(input.as_str())).block(
+                        create_block(&input_title, transparent)
+                    );
+                    f.render_widget(input_widget, chunks[0]);
+
+                    // Suggestions (fixed height 5)
+                    let sug_items: Vec<ListItem> = suggestions
+                        .iter()
+                        .take(5)
+                        .map(|s| ListItem::new(s.as_str()))
+                        .collect();
+                    let sug_list = List::new(sug_items)
+                        .block(create_block("Suggestions", transparent));
+                    f.render_widget(sug_list, chunks[1]);
+
+                    let items: Vec<ListItem> = results.iter().enumerate().map(|(i, r)| {
+                        let item = ListItem::new(r.as_str());
+                        if i == selected_result_index {
+                            item.style(Style::default().add_modifier(Modifier::REVERSED))
+                        } else {
+                            item
+                        }
+                    }).collect();
+                    let list = List::new(items).block(create_block(
+                        "Results • ↑↓: select, Enter: view details, Ctrl+s: summarize",
+                        transparent,
+                    ));
+                    f.render_widget(list, chunks[2]);
+
+                    let status_text = format!("Terraphim TUI • {} results • Mode: Search", results.len());
+                    let status = Paragraph::new(Line::from(status_text))
+                        .block(create_block("", transparent));
+                    f.render_widget(status, chunks[3]);
+                }
+                ViewMode::ResultDetail => {
+                    if selected_result_index < detailed_results.len() {
+                        let doc = &detailed_results[selected_result_index];
+
+                        let chunks = Layout::default()
+                            .direction(Direction::Vertical)
+                            .constraints([
+                                Constraint::Length(3), // title
+                                Constraint::Min(5),    // content
+                                Constraint::Length(3), // status
+                            ])
+                            .split(f.area());
+
+                        let title_widget = Paragraph::new(Line::from(doc.title.as_str()))
+                            .block(create_block("Document Title", transparent))
+                            .wrap(ratatui::widgets::Wrap { trim: true });
+                        f.render_widget(title_widget, chunks[0]);
+
+                        let content_text = if doc.body.is_empty() { "No content available" } else { &doc.body };
+                        let content_widget = Paragraph::new(content_text)
+                            .block(create_block(
+                                "Content • Ctrl+s: summarize, Esc: back to search",
+                                transparent,
+                            ))
+                            .wrap(ratatui::widgets::Wrap { trim: true });
+                        f.render_widget(content_widget, chunks[1]);
+
+                        let status_text = format!("Document Detail • ID: {} • URL: {}",
+                                                doc.id,
+                                                if doc.url.is_empty() { "N/A" } else { &doc.url });
+                        let status = Paragraph::new(Line::from(status_text))
+                            .block(create_block("", transparent));
+                        f.render_widget(status, chunks[2]);
+                    }
                 }
             }
         })?;

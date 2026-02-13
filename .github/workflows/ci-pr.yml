@@ -380,7 +380,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --features=fix
+        run: cargo install cargo-audit --no-default-features
 
       - name: Run security audit
         run: |

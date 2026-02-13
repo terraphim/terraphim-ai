@@ -32,16 +32,6 @@ pub enum PromptResult<T> {
     Back,
 }
 
-impl<T> PromptResult<T> {
-    #[allow(dead_code)]
-    pub fn into_result(self) -> Result<T, OnboardingError> {
-        match self {
-            PromptResult::Value(v) => Ok(v),
-            PromptResult::Back => Err(OnboardingError::NavigateBack),
-        }
-    }
-}
-
 /// Prompt for role basic info (name, shortname)
 pub fn prompt_role_basics() -> Result<PromptResult<(String, Option<String>)>, OnboardingError> {
     let theme = ColorfulTheme::default();
@@ -573,36 +563,13 @@ pub fn prompt_knowledge_graph() -> Result<PromptResult<Option<KnowledgeGraph>>, 
     }
 }
 
-/// Prompt for confirmation with custom message
-#[allow(dead_code)]
-pub fn prompt_confirm(message: &str, default: bool) -> Result<bool, OnboardingError> {
-    let theme = ColorfulTheme::default();
-    Ok(Confirm::with_theme(&theme)
-        .with_prompt(message)
-        .default(default)
-        .interact()?)
-}
-
-/// Prompt for simple text input
-#[allow(dead_code)]
-pub fn prompt_input(message: &str, default: Option<&str>) -> Result<String, OnboardingError> {
-    let theme = ColorfulTheme::default();
-    let mut input = Input::with_theme(&theme).with_prompt(message);
-
-    if let Some(d) = default {
-        input = input.default(d.to_string());
-    }
-
-    Ok(input.interact_text()?)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn test_available_themes_not_empty() {
-        assert!(!AVAILABLE_THEMES.is_empty());
+        assert!(AVAILABLE_THEMES.len() > 1);
         assert!(AVAILABLE_THEMES.contains(&"spacelab"));
         assert!(AVAILABLE_THEMES.contains(&"darkly"));
     }

@@ -44,12 +44,13 @@ mod tests {
         // }
         println!("{:#?}", thesaurus);
         assert_eq!(thesaurus.len(), 7);
+        // Verify "example bar" maps to "example" concept (id may vary based on processing order)
+        let example_bar_term = thesaurus
+            .get(&NormalizedTermValue::new("example bar".to_string()))
+            .unwrap();
         assert_eq!(
-            thesaurus
-                .get(&NormalizedTermValue::new("example bar".to_string()))
-                .unwrap()
-                .id,
-            2
+            example_bar_term.value,
+            NormalizedTermValue::new("example".to_string())
         );
         assert_eq!(
             thesaurus

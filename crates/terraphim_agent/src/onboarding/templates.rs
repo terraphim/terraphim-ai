@@ -299,12 +299,6 @@ impl TemplateRegistry {
     pub fn list(&self) -> &[ConfigTemplate] {
         &self.templates
     }
-
-    /// Get template IDs as a vec (test only)
-    #[cfg(test)]
-    pub fn ids(&self) -> Vec<&str> {
-        self.templates.iter().map(|t| t.id.as_str()).collect()
-    }
 }
 
 #[cfg(test)]
@@ -337,13 +331,12 @@ mod tests {
         let registry = TemplateRegistry::new();
         assert_eq!(registry.list().len(), 6);
 
-        let ids = registry.ids();
-        assert!(ids.contains(&"terraphim-engineer"));
-        assert!(ids.contains(&"llm-enforcer"));
-        assert!(ids.contains(&"rust-engineer"));
-        assert!(ids.contains(&"local-notes"));
-        assert!(ids.contains(&"ai-engineer"));
-        assert!(ids.contains(&"log-analyst"));
+        assert!(registry.get("terraphim-engineer").is_some());
+        assert!(registry.get("llm-enforcer").is_some());
+        assert!(registry.get("rust-engineer").is_some());
+        assert!(registry.get("local-notes").is_some());
+        assert!(registry.get("ai-engineer").is_some());
+        assert!(registry.get("log-analyst").is_some());
     }
 
     #[test]

@@ -1,0 +1,42 @@
+{
+  "name": "research-topic",
+  "version": "1.0.0",
+  "description": "Research a topic using web search and summarize findings",
+  "author": "TinyClaw Examples",
+  "inputs": [
+    {
+      "name": "topic",
+      "description": "Topic to research",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "num_results",
+      "description": "Number of search results to analyze",
+      "required": false,
+      "default": "5"
+    }
+  ],
+  "steps": [
+    {
+      "type": "tool",
+      "tool": "web_search",
+      "args": {
+        "query": "{topic}",
+        "num_results": "{num_results}"
+      }
+    },
+    {
+      "type": "llm",
+      "prompt": "Based on the search results for '{topic}', provide: 1) Key findings summary 2) Main sources and their reliability 3) Any conflicting information 4) Suggested next steps for deeper research",
+      "use_context": true
+    },
+    {
+      "type": "tool",
+      "tool": "shell",
+      "args": {
+        "command": "echo 'Research on {topic} completed at $(date)'"
+      }
+    }
+  ]
+}
