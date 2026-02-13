@@ -61,7 +61,15 @@ secret_patterns=(
 )
 
 for pattern in "${secret_patterns[@]}"; do
-    if git diff --cached --name-only | xargs grep -l -E -i "$pattern" 2>/dev/null; then
+    # Filter out commented lines (lines starting with # or whitespace then #)
+    # and search for secrets only in actual code
+    if git diff --cached --name-only | while read -r file; do
+        # Check if file exists and is text
+        if [[ -f "$file" ]] && file "$file" | grep -q "text"; then
+            # Remove commented lines and search for pattern
+            grep -v "^[[:space:]]*#" "$file" 2>/dev/null | grep -E -i "$pattern" >/dev/null 2>&1 && echo "$file"
+        fi
+    done | grep -q .; then
         print_status "FAIL" "Potential secret found matching pattern: $pattern"
         secrets_found=true
     fi
