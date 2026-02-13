@@ -1,10 +1,10 @@
 use axum::http::StatusCode;
 use axum::{
-    response::{IntoResponse, Response},
     Json,
+    response::{IntoResponse, Response},
 };
 use serde::{Deserialize, Serialize};
-use terraphim_service::error::TerraphimError;
+use terraphim_service::error::{CommonError, ErrorCategory, TerraphimError};
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum Status {
@@ -67,6 +67,29 @@ impl IntoResponse for ApiError {
     }
 }
 
+fn status_code_from_category(category: ErrorCategory) -> StatusCode {
+    match category {
+        ErrorCategory::Validation | ErrorCategory::Configuration => StatusCode::BAD_REQUEST,
+        ErrorCategory::Auth => StatusCode::UNAUTHORIZED,
+        ErrorCategory::Network | ErrorCategory::Integration => StatusCode::BAD_GATEWAY,
+        ErrorCategory::Storage | ErrorCategory::System => StatusCode::INTERNAL_SERVER_ERROR,
+    }
+}
+
+fn status_code_from_error(error: &anyhow::Error) -> StatusCode {
+    for cause in error.chain() {
+        if let Some(service_err) = cause.downcast_ref::<terraphim_service::ServiceError>() {
+            return status_code_from_category(service_err.category());
+        }
+
+        if let Some(common_err) = cause.downcast_ref::<CommonError>() {
+            return status_code_from_category(common_err.category());
+        }
+    }
+
+    StatusCode::INTERNAL_SERVER_ERROR
+}
+
 // This enables using `?` on functions that return `Result<_, anyhow::Error>` to
 // turn them into `Result<_, ApiError>`.
 // That way you don't need to do that manually (e.g. `map_err(ApiError::from)`).
@@ -75,7 +98,9 @@ where
     E: Into<anyhow::Error>,
 {
     fn from(err: E) -> Self {
-        ApiError(StatusCode::INTERNAL_SERVER_ERROR, err.into())
+        let error = err.into();
+        let status = status_code_from_error(&error);
+        ApiError(status, error)
     }
 }
 

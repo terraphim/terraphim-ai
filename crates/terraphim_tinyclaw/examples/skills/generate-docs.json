@@ -1,0 +1,49 @@
+{
+  "name": "generate-docs",
+  "version": "1.0.0",
+  "description": "Generate documentation for a codebase",
+  "author": "TinyClaw Examples",
+  "inputs": [
+    {
+      "name": "source_path",
+      "description": "Path to source code directory",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "output_path",
+      "description": "Where to save generated documentation",
+      "required": false,
+      "default": "./docs/generated"
+    }
+  ],
+  "steps": [
+    {
+      "type": "tool",
+      "tool": "filesystem",
+      "args": {
+        "operation": "list_directory",
+        "path": "{source_path}"
+      }
+    },
+    {
+      "type": "llm",
+      "prompt": "Based on the file structure of {source_path}, create a comprehensive documentation outline including: 1) Project overview 2) Architecture description 3) Module/component descriptions 4) API documentation structure 5) Usage examples",
+      "use_context": true
+    },
+    {
+      "type": "shell",
+      "command": "mkdir -p {output_path} && echo 'Documentation structure prepared at {output_path}'",
+      "working_dir": null
+    },
+    {
+      "type": "tool",
+      "tool": "filesystem",
+      "args": {
+        "operation": "write_file",
+        "path": "{output_path}/README.md",
+        "content": "Generated documentation based on analysis of {source_path}"
+      }
+    }
+  ]
+}

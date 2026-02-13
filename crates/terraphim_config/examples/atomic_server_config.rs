@@ -34,12 +34,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "spacelab".to_string(),
                 kg: None,
-                haystacks: vec![Haystack::new(
-                    "http://localhost:9883".to_string(), // Atomic server URL
-                    ServiceType::Atomic,
-                    true,
-                )
-                .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
+                haystacks: vec![
+                    Haystack::new(
+                        "http://localhost:9883".to_string(), // Atomic server URL
+                        ServiceType::Atomic,
+                        true,
+                    )
+                    .with_atomic_secret(Some("your-base64-secret-here".to_string())),
+                ],
                 llm_enabled: false,
                 llm_api_key: None,
                 llm_model: None,
@@ -422,8 +424,10 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
                 relevance_function: RelevanceFunction::TitleScorer,
                 theme: "default".to_string(),
                 kg: None,
-                haystacks: vec![Haystack::new(server_url, ServiceType::Atomic, read_only)
-                    .with_atomic_secret(secret)],
+                haystacks: vec![
+                    Haystack::new(server_url, ServiceType::Atomic, read_only)
+                        .with_atomic_secret(secret),
+                ],
                 extra: ahash::AHashMap::new(),
                 llm_enabled: false,
                 llm_api_key: None,
@@ -445,8 +449,8 @@ fn create_config_from_environment() -> Result<Config, Box<dyn std::error::Error>
 /// Helper function to create test storage (would be imported from multi-agent crate)
 // Commented out - requires terraphim_multi_agent dependency
 #[allow(dead_code)]
-async fn create_test_storage(
-) -> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
+async fn create_test_storage()
+-> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
     // Use the safe Arc method instead of unsafe ptr::read
     let storage = DeviceStorage::arc_memory_only().await?;
     Ok(storage)

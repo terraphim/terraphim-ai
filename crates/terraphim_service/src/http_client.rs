@@ -54,11 +54,12 @@ pub fn create_client_with_timeout(timeout_secs: u64) -> reqwest::Result<Client> 
 ///
 /// # Example
 ///
-/// ```rust
+/// ```rust,no_run
 /// use terraphim_service::http_client::create_custom_client;
 /// use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 /// use std::time::Duration;
 ///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// let mut headers = HeaderMap::new();
 /// headers.insert(AUTHORIZATION, HeaderValue::from_static("Bearer token"));
 ///
@@ -67,6 +68,8 @@ pub fn create_client_with_timeout(timeout_secs: u64) -> reqwest::Result<Client> 
 ///     Some(headers),
 ///     None
 /// )?;
+/// # Ok(())
+/// # }
 /// ```
 pub fn create_custom_client(
     timeout: Option<Duration>,
@@ -99,7 +102,7 @@ pub fn create_custom_client(
 /// - JSON content type header
 /// - Accept JSON responses
 pub fn create_api_client() -> reqwest::Result<Client> {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
+    use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
 
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -119,7 +122,7 @@ pub fn create_api_client() -> reqwest::Result<Client> {
 /// - Browser-like headers to avoid blocking
 /// - HTML content acceptance
 pub fn create_scraping_client() -> reqwest::Result<Client> {
-    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT};
+    use reqwest::header::{ACCEPT, HeaderMap, HeaderValue};
 
     let mut headers = HeaderMap::new();
     headers.insert(

@@ -31,6 +31,15 @@ jobs:
       should-run-full-ci: ${{ steps.changes.outputs.should-run_full_ci }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          # Clean up files that may have different permissions from previous Docker runs
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -83,6 +92,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -131,6 +145,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -150,6 +169,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -176,6 +200,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -220,6 +249,11 @@ jobs:
     if: needs.changes.outputs.frontend-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/node_modules" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -251,6 +285,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -298,6 +337,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -324,6 +368,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -331,7 +380,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --features=fix
+        run: cargo install cargo-audit --no-default-features
 
       - name: Run security audit
         run: |

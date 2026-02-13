@@ -55,3 +55,8 @@ keys/
 
 # Claude Code working files
 .claude/plans/
+
+# Auto-updated test settings
+crates/terraphim_settings/test_settings/settings.toml
+# Nightshift plan artifacts (keep out of version control)
+.nightshift-plan

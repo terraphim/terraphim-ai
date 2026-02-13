@@ -437,6 +437,10 @@ mod tests {
             tags: Some(vec!["test".to_string(), "document".to_string()]),
             rank: Some(10),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         let context = context_manager.create_document_context(&document);
@@ -464,6 +468,10 @@ mod tests {
                 tags: None,
                 rank: Some(5),
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
             Document {
                 id: "doc2".to_string(),
@@ -476,6 +484,10 @@ mod tests {
                 tags: None,
                 rank: Some(3),
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             },
         ];
 
@@ -527,10 +539,12 @@ mod tests {
 
         // Check system message with global context
         assert_eq!(messages[0]["role"], "system");
-        assert!(messages[0]["content"]
-            .as_str()
-            .unwrap()
-            .contains("This is system information"));
+        assert!(
+            messages[0]["content"]
+                .as_str()
+                .unwrap()
+                .contains("This is system information")
+        );
 
         // Check user message with message context
         assert_eq!(messages[1]["role"], "user");
@@ -714,6 +728,10 @@ mod tests {
             tags: Some(vec!["test".to_string(), "summary".to_string()]),
             rank: Some(88),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         let context_item = context_manager.create_document_context(&document);
@@ -724,9 +742,11 @@ mod tests {
             Some("This is the document description that becomes the summary".to_string())
         );
         assert_eq!(context_item.title, "Document with Summary");
-        assert!(context_item
-            .content
-            .contains("This is the document description that becomes the summary"));
+        assert!(
+            context_item
+                .content
+                .contains("This is the document description that becomes the summary")
+        );
 
         // Test search result context with summary
         let documents = vec![document];
@@ -734,16 +754,20 @@ mod tests {
 
         // Verify search context has a summary
         assert!(search_context.summary.is_some());
-        assert!(search_context
-            .summary
-            .as_ref()
-            .unwrap()
-            .contains("test query"));
-        assert!(search_context
-            .summary
-            .as_ref()
-            .unwrap()
-            .contains("1 documents found"));
+        assert!(
+            search_context
+                .summary
+                .as_ref()
+                .unwrap()
+                .contains("test query")
+        );
+        assert!(
+            search_context
+                .summary
+                .as_ref()
+                .unwrap()
+                .contains("1 documents found")
+        );
     }
 
     #[tokio::test]

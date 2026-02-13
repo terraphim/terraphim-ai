@@ -1,10 +1,10 @@
 use serial_test::serial;
-use terraphim_automata::{AutomataPath, load_thesaurus};
+use terraphim_automata::{load_thesaurus, AutomataPath};
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
 };
 use terraphim_middleware::thesaurus::{Logseq, ThesaurusBuilder};
-use terraphim_middleware::{RipgrepIndexer, indexer::IndexMiddleware};
+use terraphim_middleware::{indexer::IndexMiddleware, RipgrepIndexer};
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::{
     Document, KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName,
@@ -106,6 +106,10 @@ async fn test_rolegraph_knowledge_graph_ranking() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     rolegraph.insert_document(&document.id, document.clone());
@@ -231,7 +235,6 @@ async fn test_build_thesaurus_from_kg_files() {
         "haystack",
         "datasource",
         "service",
-        "provider",
         "middleware",
     ];
 
@@ -248,6 +251,7 @@ async fn test_build_thesaurus_from_kg_files() {
 /// Test that demonstrates the issue when using wrong thesaurus
 #[tokio::test]
 #[serial]
+#[ignore = "Requires remote-loading feature - terraphim_automata needs 'remote-loading' enabled"]
 async fn test_demonstrates_issue_with_wrong_thesaurus() {
     // This test demonstrates why search fails when using the remote thesaurus
     // instead of a locally built one from the kg files

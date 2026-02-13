@@ -6,7 +6,7 @@
 //! ## OpenDAL Warning Messages
 //!
 //! When running terraphim-agent or related tools, you may see WARN-level messages like:
-//! ```
+//! ```text
 //! [WARN  opendal::services] service=memory name=0x... path=embedded_config.json: read failed NotFound
 //! ```
 //!

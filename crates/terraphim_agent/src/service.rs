@@ -1,10 +1,10 @@
 use anyhow::Result;
 use std::sync::Arc;
-use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
+use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
-use terraphim_service::llm::{build_llm_from_role, ChatOptions};
 use terraphim_service::TerraphimService;
-use terraphim_settings::DeviceSettings;
+use terraphim_service::llm::{ChatOptions, build_llm_from_role};
+use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
@@ -24,12 +24,27 @@ impl TuiService {
 
         log::info!("Initializing TUI service with embedded configuration");
 
-        // Load device settings
-        let device_settings = DeviceSettings::load_from_env_and_file(None)?;
+        // Load device settings, falling back to embedded defaults when running in sandboxes/tests
+        let device_settings = match DeviceSettings::load_from_env_and_file(None) {
+            Ok(settings) => settings,
+            Err(DeviceSettingsError::IoError(err))
+                if err.kind() == std::io::ErrorKind::NotFound =>
+            {
+                log::warn!(
+                    "Device settings not found ({}); using embedded defaults",
+                    err
+                );
+                DeviceSettings::default_embedded()
+            }
+            Err(err) => {
+                log::error!("Failed to load device settings: {err:?}");
+                return Err(err.into());
+            }
+        };
         log::debug!("Device settings: {:?}", device_settings);
 
         // Try to load existing configuration, fallback to default embedded config
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+        let config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
                     log::debug!("Loaded existing embedded configuration");
@@ -38,23 +53,30 @@ impl TuiService {
                 Err(_) => {
                     // No saved config found is expected on first run - use default
                     log::debug!("No saved config found, using default embedded");
-                    ConfigBuilder::new_with_id(ConfigId::Embedded)
-                        .build_default_embedded()
-                        .build()?
+                    return Self::new_with_embedded_defaults().await;
                 }
             },
             Err(e) => {
                 log::warn!("Failed to build config: {:?}, using default", e);
-                ConfigBuilder::new_with_id(ConfigId::Embedded)
-                    .build_default_embedded()
-                    .build()?
+                return Self::new_with_embedded_defaults().await;
             }
         };
 
-        // Create config state
-        let config_state = ConfigState::new(&mut config).await?;
+        Self::from_config(config).await
+    }
 
-        // Create service
+    /// Initialize service strictly from the embedded default configuration.
+    ///
+    /// This constructor avoids touching host-specific config/state and is used by tests.
+    pub async fn new_with_embedded_defaults() -> Result<Self> {
+        let config = ConfigBuilder::new_with_id(ConfigId::Embedded)
+            .build_default_embedded()
+            .build()?;
+        Self::from_config(config).await
+    }
+
+    async fn from_config(mut config: Config) -> Result<Self> {
+        let config_state = ConfigState::new(&mut config).await?;
         let service = TerraphimService::new(config_state.clone());
 
         Ok(Self {
@@ -116,14 +138,6 @@ impl TuiService {
         }
 
         None
-    }
-
-    /// Search documents using the current selected role
-    #[allow(dead_code)]
-    pub async fn search(&self, search_term: &str, limit: Option<usize>) -> Result<Vec<Document>> {
-        let selected_role = self.get_selected_role().await;
-        self.search_with_role(search_term, &selected_role, limit)
-            .await
     }
 
     /// Search documents with a specific role
@@ -277,7 +291,7 @@ impl TuiService {
     }
 
     /// Perform autocomplete search using thesaurus for a role
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "repl-mcp"), allow(dead_code))]
     pub async fn autocomplete(
         &self,
         role_name: &RoleName,
@@ -303,7 +317,6 @@ impl TuiService {
     }
 
     /// Find matches in text using thesaurus
-    #[allow(dead_code)]
     pub async fn find_matches(
         &self,
         role_name: &RoleName,
@@ -317,7 +330,7 @@ impl TuiService {
     }
 
     /// Replace matches in text with links using thesaurus
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "repl-mcp"), allow(dead_code))]
     pub async fn replace_matches(
         &self,
         role_name: &RoleName,
@@ -333,7 +346,7 @@ impl TuiService {
     }
 
     /// Summarize content using available AI services
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "repl-chat"), allow(dead_code))]
     pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
         // For now, use the chat method with a summarization prompt
         let prompt = format!("Please summarize the following content:\n\n{}", content);

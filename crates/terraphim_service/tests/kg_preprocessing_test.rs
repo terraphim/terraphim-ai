@@ -4,7 +4,7 @@ use terraphim_config::ConfigState;
 use terraphim_config::{Config, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
 use terraphim_persistence::DeviceStorage;
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, KnowledgeGraphInputType, RoleName};
+use terraphim_types::{Document, DocumentType, KnowledgeGraphInputType, RoleName};
 
 /// Test that KG preprocessing respects configuration and doesn't crash
 #[tokio::test]
@@ -68,6 +68,10 @@ async fn test_kg_preprocessing_basic_functionality() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     // Basic test: just verify the service can be created and document is preserved
@@ -157,6 +161,10 @@ async fn test_kg_preprocessing_respects_terraphim_it_flag() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     // Basic test: just verify we can create services with different terraphim_it settings
@@ -228,6 +236,10 @@ async fn test_kg_preprocessing_prevents_double_processing() {
         tags: None,
         rank: None,
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     };
 
     let original_body = pre_processed_document.body.clone();

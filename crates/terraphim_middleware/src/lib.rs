@@ -8,7 +8,7 @@ pub mod indexer;
 pub mod thesaurus;
 
 pub use haystack::QueryRsHaystackIndexer;
-pub use indexer::{RipgrepIndexer, search_haystacks};
+pub use indexer::{search_haystacks, RipgrepIndexer};
 
 // #[cfg(test)]
 // mod tests; // Removed - no tests module

@@ -11,12 +11,18 @@
 //! 5. Testing both service layer and API layer functionality
 
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
-use terraphim_server::{axum_server, SearchResponse};
+use terraphim_server::{SearchResponse, axum_server};
 use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
 
 #[tokio::test]
 async fn test_e2e_kg_haystack_lookup_comprehensive() {
+    if std::env::var("RUN_E2E_KG_HAYSTACK_TESTS").ok().as_deref() != Some("1") {
+        eprintln!(
+            "Skipping: set RUN_E2E_KG_HAYSTACK_TESTS=1 to run KG↔haystack E2E tests (requires docs/src/kg fixtures)"
+        );
+        return;
+    }
     // Initialize logging for test debugging
     terraphim_service::logging::init_logging(terraphim_service::logging::LoggingConfig::Test);
 
@@ -214,6 +220,12 @@ async fn test_e2e_kg_haystack_lookup_comprehensive() {
 
 #[tokio::test]
 async fn test_kg_haystack_specific_document_validation() {
+    if std::env::var("RUN_E2E_KG_HAYSTACK_TESTS").ok().as_deref() != Some("1") {
+        eprintln!(
+            "Skipping: set RUN_E2E_KG_HAYSTACK_TESTS=1 to run KG↔haystack E2E tests (requires docs/src/kg fixtures)"
+        );
+        return;
+    }
     println!("🔍 Testing specific haystack document validation");
 
     // This test specifically validates that the haystack.md document

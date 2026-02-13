@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_rolegraph"
 version = "1.4.10"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Terraphim rolegraph module, which provides role handling for Terraphim AI."
 documentation = "https://terraphim.ai"
@@ -28,7 +28,7 @@ thiserror = "1.0.30"
 tokio = { version = "1.27", features = ["fs", "macros", "rt-multi-thread"] }
 ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 unicode-segmentation = "1.10.1"
-url = "2.5.0"
+url = "2.5.8"
 
 [[bench]]
 name = "throughput"

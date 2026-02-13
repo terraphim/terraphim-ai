@@ -1,5 +1,5 @@
 [package]
-edition = "2021"
+edition.workspace = true
 name = "terraphim_ai_nodejs"
 version = "1.0.0"
 license = "MIT"
@@ -12,18 +12,18 @@ crate-type = ["cdylib"]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
 napi = { version = "2.12.2", default-features = false, features = ["napi8", "tokio_rt"] }
 napi-derive = "2.12.2"
-serde_json = "1.0.128"
-terraphim_automata = { path = "../crates/terraphim_automata" }
+serde_json = { workspace = true }
+terraphim_automata = { path = "../crates/terraphim_automata", default-features = false }
 terraphim_service = { path = "../crates/terraphim_service" }
-terraphim_config = { path = "../crates/terraphim_config" }
+terraphim_config = { path = "../crates/terraphim_config", default-features = false }
 terraphim_persistence = { path = "../crates/terraphim_persistence" }
 terraphim_settings = { path = "../crates/terraphim_settings" }
-terraphim_types = { path = "../crates/terraphim_types" }
+terraphim_types = { path = "../crates/terraphim_types", default-features = false }
 terraphim_rolegraph = { path = "../crates/terraphim_rolegraph" }
-anyhow = "1.0.89"
-tokio = { version = "1.40.0", features = ["full"] }
+anyhow = { workspace = true }
+tokio = { workspace = true }
 ahash = "0.8.12"
-serde = { version = "1.0.128", features = ["derive"] }
+serde = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3.14"

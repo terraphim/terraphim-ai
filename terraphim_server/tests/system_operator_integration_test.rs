@@ -5,7 +5,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
+use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
 
 /// Integration test for System Operator configuration with remote knowledge graph
 ///
@@ -129,10 +129,12 @@ async fn test_system_operator_remote_kg_integration() {
         .expect("Failed to parse config response");
 
     assert_eq!(config_json.config.default_role, "System Operator".into());
-    assert!(config_json
-        .config
-        .roles
-        .contains_key(&"System Operator".into()));
+    assert!(
+        config_json
+            .config
+            .roles
+            .contains_key(&"System Operator".into())
+    );
     log::info!("✅ Configuration endpoint validated");
 
     // Test 3: Search with System Operator role

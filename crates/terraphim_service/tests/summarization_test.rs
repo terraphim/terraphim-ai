@@ -3,7 +3,7 @@ use serial_test::serial;
 use terraphim_config::Role;
 use terraphim_service::summarization_manager::{SummarizationManager, SummarizationManagerBuilder};
 use terraphim_service::summarization_queue::QueueConfig;
-use terraphim_types::Document;
+use terraphim_types::{Document, DocumentType};
 
 /// Helper function to create a test role configuration
 fn create_test_role() -> Role {
@@ -32,6 +32,10 @@ fn create_test_document(id: &str, body: &str) -> Document {
         tags: Some(vec!["test".to_string()]),
         rank: Some(100),
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     }
 }
 
@@ -78,6 +82,10 @@ fn create_comprehensive_test_document() -> Document {
         ]),
         rank: Some(200),
         source_haystack: None,
+        doc_type: DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
     }
 }
 
@@ -444,19 +452,23 @@ async fn test_document_fields_integration_with_persistence() -> Result<()> {
     assert_eq!(loaded_doc.summarization, doc.summarization);
 
     // Verify extracted description makes sense
-    assert!(loaded_doc
-        .description
-        .as_ref()
-        .unwrap()
-        .to_lowercase()
-        .contains("software architecture"));
+    assert!(
+        loaded_doc
+            .description
+            .as_ref()
+            .unwrap()
+            .to_lowercase()
+            .contains("software architecture")
+    );
 
     // Verify summarization is preserved
-    assert!(loaded_doc
-        .summarization
-        .as_ref()
-        .unwrap()
-        .contains("comprehensive guide"));
+    assert!(
+        loaded_doc
+            .summarization
+            .as_ref()
+            .unwrap()
+            .contains("comprehensive guide")
+    );
 
     Ok(())
 }

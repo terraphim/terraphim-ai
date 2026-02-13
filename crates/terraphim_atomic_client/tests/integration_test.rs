@@ -39,6 +39,16 @@ mod tests {
         // Load .env file if present
         dotenv().ok();
 
+        // Skip test in CI if environment variables are not set
+        if std::env::var("ATOMIC_SERVER_URL").is_err()
+            || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+        {
+            eprintln!(
+                "Skipping test_crud_operations: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+            );
+            return;
+        }
+
         // Load configuration and ensure agent is present
         let config = Config::from_env()
             .expect("Environment variables ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET must be set");
@@ -100,9 +110,11 @@ mod tests {
 
         // Verify the retrieved resource
         assert_eq!(retrieved_resource.subject, test_resource_id);
-        assert!(retrieved_resource
-            .properties
-            .contains_key("https://atomicdata.dev/properties/shortname"));
+        assert!(
+            retrieved_resource
+                .properties
+                .contains_key("https://atomicdata.dev/properties/shortname")
+        );
 
         // Update the resource
         let mut update_map = HashMap::new();
@@ -150,6 +162,13 @@ async fn test_search() {
     // Load .env file if present
     dotenv().ok();
 
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
+        eprintln!("Skipping test_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        return;
+    }
+
     let config = Config::from_env().expect("Environment variables must be set");
     let store = Store::new(config).expect("Failed to create Store");
 
@@ -162,6 +181,13 @@ async fn test_search() {
 async fn test_query() {
     // Load .env file if present
     dotenv().ok();
+
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
+        eprintln!("Skipping test_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set");
+        return;
+    }
 
     let config = Config::from_env().expect("Environment variables must be set");
     let store = Store::new(config).expect("Failed to create Store");
@@ -189,6 +215,15 @@ async fn test_query() {
 async fn test_create_and_search() {
     // Load .env file if present
     dotenv().ok();
+
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
+        eprintln!(
+            "Skipping test_create_and_search: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+        );
+        return;
+    }
 
     let config = Config::from_env().expect("Environment variables must be set");
     assert!(
@@ -261,6 +296,15 @@ async fn test_create_and_query() {
     // Load .env file if present
     dotenv().ok();
 
+    // Skip test in CI if environment variables are not set
+    if std::env::var("ATOMIC_SERVER_URL").is_err() || std::env::var("ATOMIC_SERVER_SECRET").is_err()
+    {
+        eprintln!(
+            "Skipping test_create_and_query: ATOMIC_SERVER_URL and ATOMIC_SERVER_SECRET not set"
+        );
+        return;
+    }
+
     let config = Config::from_env().expect("Environment variables must be set");
     assert!(
         config.agent.is_some(),
@@ -318,8 +362,10 @@ async fn test_create_and_query() {
     tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
     // Use the API endpoint directly to query by class
-    let query_url = format!("{}/query?property=https://atomicdata.dev/properties/isA&value=https://atomicdata.dev/classes/Article",
-                           store.config.server_url.trim_end_matches('/'));
+    let query_url = format!(
+        "{}/query?property=https://atomicdata.dev/properties/isA&value=https://atomicdata.dev/classes/Article",
+        store.config.server_url.trim_end_matches('/')
+    );
     let query_resource = store.get_resource(&query_url).await.expect("Query failed");
     let query_results = [query_resource];
 

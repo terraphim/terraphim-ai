@@ -5,7 +5,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
+use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
 
 /// Integration test for Knowledge Graph term to document lookup functionality
 ///
@@ -18,6 +18,10 @@ use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
 #[tokio::test]
 #[serial]
 async fn test_kg_term_to_document_lookup() {
+    if std::env::var("RUN_E2E_KG_HAYSTACK_TESTS").ok().as_deref() != Some("1") {
+        eprintln!("Skipping: set RUN_E2E_KG_HAYSTACK_TESTS=1 to run KG term↔document lookup tests");
+        return;
+    }
     // Set up logging
     let _ = env_logger::builder()
         .filter_level(log::LevelFilter::Info)

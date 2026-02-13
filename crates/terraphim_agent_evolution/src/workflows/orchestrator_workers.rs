@@ -13,11 +13,11 @@ use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 
 use crate::{
+    CompletionOptions, EvolutionResult, LlmAdapter,
     workflows::{
         ExecutionStep, ResourceUsage, StepType, TaskAnalysis, TaskComplexity, WorkflowInput,
         WorkflowMetadata, WorkflowOutput, WorkflowPattern,
     },
-    CompletionOptions, EvolutionResult, LlmAdapter,
 };
 
 /// Orchestrator-Workers workflow with hierarchical task management
@@ -668,12 +668,24 @@ Format your response as a detailed execution plan."#,
     /// Create specialized prompt for each worker role
     fn create_worker_prompt(&self, task: &WorkerTask, context: &str) -> String {
         let role_instructions = match task.worker_role {
-            WorkerRole::Analyst => "You are a skilled analyst. Focus on breaking down complex information, identifying patterns, and providing insights.",
-            WorkerRole::Researcher => "You are a thorough researcher. Gather comprehensive information, verify facts, and provide well-sourced findings.",
-            WorkerRole::Writer => "You are an expert writer. Create clear, engaging, and well-structured content that effectively communicates ideas.",
-            WorkerRole::Reviewer => "You are a meticulous reviewer. Evaluate content for quality, accuracy, completeness, and provide constructive feedback.",
-            WorkerRole::Validator => "You are a validation specialist. Verify claims, check consistency, and ensure accuracy of information.",
-            WorkerRole::Synthesizer => "You are a synthesis expert. Combine multiple inputs into a coherent, comprehensive, and well-integrated response.",
+            WorkerRole::Analyst => {
+                "You are a skilled analyst. Focus on breaking down complex information, identifying patterns, and providing insights."
+            }
+            WorkerRole::Researcher => {
+                "You are a thorough researcher. Gather comprehensive information, verify facts, and provide well-sourced findings."
+            }
+            WorkerRole::Writer => {
+                "You are an expert writer. Create clear, engaging, and well-structured content that effectively communicates ideas."
+            }
+            WorkerRole::Reviewer => {
+                "You are a meticulous reviewer. Evaluate content for quality, accuracy, completeness, and provide constructive feedback."
+            }
+            WorkerRole::Validator => {
+                "You are a validation specialist. Verify claims, check consistency, and ensure accuracy of information."
+            }
+            WorkerRole::Synthesizer => {
+                "You are a synthesis expert. Combine multiple inputs into a coherent, comprehensive, and well-integrated response."
+            }
         };
 
         let context_section = if context.is_empty() {
@@ -787,8 +799,7 @@ Format your response as a detailed execution plan."#,
 
         let synthesis_prompt = format!(
             "Original request: {}\n\nWorker contributions:\n{}\n\nSynthesize these contributions into a comprehensive, coherent response that addresses the original request:",
-            original_prompt,
-            synthesis_input
+            original_prompt, synthesis_input
         );
 
         self.orchestrator_adapter

@@ -1,16 +1,16 @@
 use std::sync::Arc;
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tokio::task::JoinHandle;
 
 use terraphim_config::Role;
 use terraphim_types::Document;
 
+use crate::ServiceError;
 use crate::summarization_queue::{
     Priority, QueueCommand, QueueConfig, QueueStats, SubmitResult, SummarizationQueue,
     SummarizationTask, TaskId, TaskStatus,
 };
 use crate::summarization_worker::SummarizationWorker;
-use crate::ServiceError;
 
 /// High-level manager for the summarization system
 pub struct SummarizationManager {
@@ -436,6 +436,10 @@ mod tests {
             tags: Some(vec![]),
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 

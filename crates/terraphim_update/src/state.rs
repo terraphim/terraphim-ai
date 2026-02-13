@@ -126,6 +126,15 @@ mod tests {
     /// Helper to create a temporary config directory for testing
     fn setup_temp_config_dir() -> TempDir {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");
+        let xdg_config_home = temp_dir.path().join(".config");
+        // SAFETY: This test runs in isolation before spawning other threads
+        unsafe {
+            std::env::set_var("HOME", temp_dir.path());
+            std::env::set_var("USERPROFILE", temp_dir.path());
+            std::env::set_var("XDG_CONFIG_HOME", &xdg_config_home);
+            std::env::set_var("APPDATA", temp_dir.path());
+            std::env::set_var("LOCALAPPDATA", temp_dir.path());
+        }
         let config_path = temp_dir.path().join("terraphim");
         fs::create_dir_all(&config_path).expect("Failed to create config dir");
         temp_dir
@@ -134,6 +143,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_save_and_load_history() {
+        let _temp_dir = setup_temp_config_dir();
         // Clean up first
         let _ = delete_update_history();
 
@@ -152,6 +162,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_load_default_when_missing() {
+        let _temp_dir = setup_temp_config_dir();
         // Clean up any existing history file first
         let _ = delete_update_history();
 
@@ -164,6 +175,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_history_with_check_entries() {
+        let _temp_dir = setup_temp_config_dir();
         let _ = delete_update_history();
 
         let mut history = UpdateHistory {
@@ -186,6 +198,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_history_with_pending_update() {
+        let _temp_dir = setup_temp_config_dir();
         let _ = delete_update_history();
 
         let info = crate::config::UpdateInfo {
@@ -213,6 +226,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_history_with_backups() {
+        let _temp_dir = setup_temp_config_dir();
         let _ = delete_update_history();
 
         let mut history = UpdateHistory {
@@ -233,6 +247,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_delete_history() {
+        let _temp_dir = setup_temp_config_dir();
         let _ = delete_update_history();
 
         let history = UpdateHistory {
@@ -250,6 +265,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_delete_nonexistent_history() {
+        let _temp_dir = setup_temp_config_dir();
         let result = delete_update_history();
         assert!(
             result.is_ok(),
@@ -294,6 +310,7 @@ mod tests {
     #[test]
     #[serial]
     fn test_get_history_path() {
+        let _temp_dir = setup_temp_config_dir();
         let path = get_history_path();
         assert!(path.is_ok(), "Should get history path");
 

@@ -346,7 +346,10 @@ impl RoleGraph {
         for node_id in node_ids {
             // Check if node exists, skip if not (node from thesaurus but no documents indexed yet)
             let Some(node) = self.nodes.get(&node_id) else {
-                log::trace!("Node ID {} from thesaurus not found in graph - no documents contain this term yet", node_id);
+                log::trace!(
+                    "Node ID {} from thesaurus not found in graph - no documents contain this term yet",
+                    node_id
+                );
                 continue;
             };
 
@@ -795,7 +798,7 @@ impl RoleGraph {
     }
 
     fn init_or_update_edge(&mut self, edge_key: u64, document_id: &str) -> Edge {
-        let edge = match self.edges.entry(edge_key) {
+        match self.edges.entry(edge_key) {
             Entry::Vacant(_) => {
                 let edge = Edge::new(edge_key, document_id.to_string());
                 self.edges.insert(edge.id, edge.clone());
@@ -804,11 +807,9 @@ impl RoleGraph {
             Entry::Occupied(entry) => {
                 let edge = entry.into_mut();
                 *edge.doc_hash.entry(document_id.to_string()).or_insert(1) += 1;
-
                 edge.clone()
             }
-        };
-        edge
+        }
     }
 
     /// Get a document by its ID
@@ -914,11 +915,7 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 /// also using memoize macro with Ahash hasher
 #[memoize(CustomHasher: ahash::AHashMap)]
 pub fn magic_pair(x: u64, y: u64) -> u64 {
-    if x >= y {
-        x * x + x + y
-    } else {
-        y * y + x
-    }
+    if x >= y { x * x + x + y } else { y * y + x }
 }
 
 /// Magic unpair
@@ -934,11 +931,7 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 pub fn magic_unpair(z: u64) -> (u64, u64) {
     let q = (z as f32).sqrt().floor() as u64;
     let l = z - q * q;
-    if l < q {
-        (l, q)
-    } else {
-        (q, l - q)
-    }
+    if l < q { (l, q) } else { (q, l - q) }
 }
 
 // Examples for serialization usage
@@ -1009,7 +1002,7 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 mod tests {
     use super::*;
 
-    use terraphim_automata::{load_thesaurus, AutomataPath};
+    use terraphim_automata::{AutomataPath, load_thesaurus};
     use tokio::test;
     use ulid::Ulid;
 
@@ -1031,7 +1024,10 @@ mod tests {
         assert_eq!(sentences[4], "This is the second sentence!");
         assert_eq!(sentences[5], "This is the third sentence.");
         assert_eq!(sentences[6], "Mr.");
-        assert_eq!(sentences[7],"John Johnson Jr. was born in the U.S.A but earned his Ph.D. in Israel before joining Nike Inc. as an engineer.");
+        assert_eq!(
+            sentences[7],
+            "John Johnson Jr. was born in the U.S.A but earned his Ph.D. in Israel before joining Nike Inc. as an engineer."
+        );
         assert_eq!(
             sentences[8],
             "He also worked at craigslist.org as a business analyst."
@@ -1115,6 +1111,10 @@ mod tests {
             body: test_document.to_string(),
             description: None,
             summarization: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         rolegraph.insert_document(&document_id, document);
         println!("query with terraphim-graph and service");
@@ -1152,6 +1152,10 @@ mod tests {
             body: test_document2.to_string(),
             description: None,
             summarization: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         rolegraph.insert_document(&document_id2, document2);
         log::debug!("Query graph");
@@ -1204,6 +1208,10 @@ mod tests {
             body: query4.to_string(),
             description: None,
             summarization: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         rolegraph.insert_document(&document_id4, document);
         log::debug!("Query graph");
@@ -1306,6 +1314,10 @@ mod tests {
             description: Some("Test document with thesaurus terms".to_string()),
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Insert document into rolegraph (this should create nodes and edges)
@@ -1406,6 +1418,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         // Insert document into rolegraph
@@ -1490,6 +1506,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -1545,6 +1565,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         rolegraph.insert_document(&document_id, test_document);
@@ -1609,6 +1633,10 @@ mod tests {
             stub: None,
             summarization: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         single_rolegraph.insert_document(&document_id, simple_document);

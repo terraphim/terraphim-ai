@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_atomic_client"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 license = "MIT"
 
 [dependencies]
@@ -15,7 +15,7 @@ jiff = { version = "0.2", features = ["serde"] }
 wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.42", optional = true }
 dotenvy = "0.15.7"
-url = { version = "2.5.4", features = ["serde"] }
+url = { version = "2.5.8", features = ["serde"] }
 ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 thiserror = "2.0.12"
 rand_core = { version = "0.6", features = ["getrandom"] }

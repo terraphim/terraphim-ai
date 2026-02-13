@@ -74,7 +74,10 @@ impl BuildTarget {
         match self {
             BuildTarget::CrossCompile(triple) | BuildTarget::Custom(triple) => {
                 if !is_valid_target_triple(triple) {
-                    return Err(Error::target(format!("Invalid target triple '{}': must follow '<arch>-<vendor>-<sys>-<abi>' format", triple)));
+                    return Err(Error::target(format!(
+                        "Invalid target triple '{}': must follow '<arch>-<vendor>-<sys>-<abi>' format",
+                        triple
+                    )));
                 }
             }
             _ => {}

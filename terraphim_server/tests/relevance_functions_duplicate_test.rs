@@ -6,7 +6,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
-use terraphim_server::{axum_server, SearchResponse};
+use terraphim_server::{SearchResponse, axum_server};
 use terraphim_types::RelevanceFunction;
 
 /// Integration test for relevance functions with duplicate handling from multiple haystacks
@@ -275,7 +275,7 @@ fn analyze_duplicates(search_response: &SearchResponse, _query: &str) -> Duplica
     // Find duplicate URLs
     let duplicate_urls: Vec<String> = url_counts
         .iter()
-        .filter(|(_, &count)| count > 1)
+        .filter(|(_, count)| **count > 1)
         .map(|(url, _)| url.clone())
         .collect();
 
@@ -294,6 +294,12 @@ fn analyze_duplicates(search_response: &SearchResponse, _query: &str) -> Duplica
 #[tokio::test]
 #[serial]
 async fn test_terraphim_graph_with_duplicates() {
+    if std::env::var("RUN_E2E_KG_HAYSTACK_TESTS").ok().as_deref() != Some("1") {
+        eprintln!(
+            "Skipping: set RUN_E2E_KG_HAYSTACK_TESTS=1 to run TerraphimGraph duplicate test (requires local KG fixtures)"
+        );
+        return;
+    }
     let current_dir = std::env::current_dir().unwrap();
 
     // Check if we have the KG directory

@@ -1,12 +1,12 @@
 use axum::{extract::State, http::StatusCode, response::Json};
 use serde::Serialize;
 use serde_json::json;
-use tokio::time::{sleep, Duration};
+use tokio::time::{Duration, sleep};
 
 use super::{
+    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
     complete_workflow_session, create_workflow_session, fail_workflow_session,
     generate_workflow_id, multi_agent_handlers::MultiAgentWorkflowExecutor, update_workflow_status,
-    ExecutionStatus, WorkflowMetadata, WorkflowRequest, WorkflowResponse,
 };
 use crate::AppState;
 
@@ -467,22 +467,40 @@ fn generate_route_output(
 
     match (&route.id[..], role) {
         ("openai_gpt35", "technical_writer") => {
-            format!("# Technical Implementation for {}\n\nThis implementation provides a balanced approach to {} with good performance and cost efficiency. The solution includes:\n\n## Core Components\n- Modular architecture for maintainability\n- Standard API patterns for integration\n- Basic monitoring and logging\n\n## Implementation Notes\n- Optimized for {} complexity requirements\n- Cost-effective approach suitable for production\n- Performance targets: <2s response time", topic, topic, complexity_level)
+            format!(
+                "# Technical Implementation for {}\n\nThis implementation provides a balanced approach to {} with good performance and cost efficiency. The solution includes:\n\n## Core Components\n- Modular architecture for maintainability\n- Standard API patterns for integration\n- Basic monitoring and logging\n\n## Implementation Notes\n- Optimized for {} complexity requirements\n- Cost-effective approach suitable for production\n- Performance targets: <2s response time",
+                topic, topic, complexity_level
+            )
         }
         ("openai_gpt4", "technical_writer") => {
-            format!("# Advanced Technical Solution for {}\n\nThis comprehensive implementation leverages advanced capabilities for {}. The solution features:\n\n## Architecture Overview\n- Microservices-based design with event sourcing\n- Advanced caching and optimization strategies\n- Comprehensive error handling and resilience patterns\n\n## Technical Excellence\n- Handles {} complexity with sophisticated algorithms\n- Enterprise-grade security and compliance\n- Advanced monitoring with predictive analytics\n- Scalable to handle 10,000+ concurrent users", topic, topic, complexity_level)
+            format!(
+                "# Advanced Technical Solution for {}\n\nThis comprehensive implementation leverages advanced capabilities for {}. The solution features:\n\n## Architecture Overview\n- Microservices-based design with event sourcing\n- Advanced caching and optimization strategies\n- Comprehensive error handling and resilience patterns\n\n## Technical Excellence\n- Handles {} complexity with sophisticated algorithms\n- Enterprise-grade security and compliance\n- Advanced monitoring with predictive analytics\n- Scalable to handle 10,000+ concurrent users",
+                topic, topic, complexity_level
+            )
         }
         ("claude_opus", "technical_writer") => {
-            format!("# Expert-Level Technical Architecture for {}\n\nThis cutting-edge implementation represents the pinnacle of technical excellence for {}. Features include:\n\n## Innovative Design\n- Event-driven architecture with CQRS patterns\n- AI-powered optimization and self-healing capabilities\n- Advanced security with zero-trust architecture\n\n## Expert Implementation\n- Handles {} complexity with state-of-the-art algorithms\n- Custom performance optimizations achieving sub-millisecond latency\n- Predictive scaling and intelligent resource management\n- Advanced observability with machine learning insights", topic, topic, complexity_level)
+            format!(
+                "# Expert-Level Technical Architecture for {}\n\nThis cutting-edge implementation represents the pinnacle of technical excellence for {}. Features include:\n\n## Innovative Design\n- Event-driven architecture with CQRS patterns\n- AI-powered optimization and self-healing capabilities\n- Advanced security with zero-trust architecture\n\n## Expert Implementation\n- Handles {} complexity with state-of-the-art algorithms\n- Custom performance optimizations achieving sub-millisecond latency\n- Predictive scaling and intelligent resource management\n- Advanced observability with machine learning insights",
+                topic, topic, complexity_level
+            )
         }
         ("openai_gpt35", "content_creator") => {
-            format!("# Engaging Content Strategy for {}\n\nCreating compelling content around {} requires a strategic approach that balances creativity with effectiveness.\n\n## Content Framework\n- Clear value proposition that resonates with your audience\n- Engaging storytelling that builds emotional connection\n- Strategic calls-to-action that drive desired outcomes\n\n## Execution Plan\n- Tailored for {} complexity with optimal resource allocation\n- Cost-effective content production workflow\n- Performance tracking and optimization strategy", topic, topic, complexity_level)
+            format!(
+                "# Engaging Content Strategy for {}\n\nCreating compelling content around {} requires a strategic approach that balances creativity with effectiveness.\n\n## Content Framework\n- Clear value proposition that resonates with your audience\n- Engaging storytelling that builds emotional connection\n- Strategic calls-to-action that drive desired outcomes\n\n## Execution Plan\n- Tailored for {} complexity with optimal resource allocation\n- Cost-effective content production workflow\n- Performance tracking and optimization strategy",
+                topic, topic, complexity_level
+            )
         }
         ("openai_gpt4", "content_creator") => {
-            format!("# Premium Content Experience for {}\n\nDeveloping sophisticated content for {} demands advanced creative strategies and deep audience understanding.\n\n## Advanced Content Strategy\n- Multi-layered narrative architecture with emotional journey mapping\n- Personalization engines for dynamic content adaptation\n- Cross-platform content optimization with advanced analytics\n\n## Creative Excellence\n- Sophisticated approach for {} complexity requirements\n- Advanced A/B testing and conversion optimization\n- Premium brand storytelling with measurable ROI\n- Integrated content ecosystem with omnichannel distribution", topic, topic, complexity_level)
+            format!(
+                "# Premium Content Experience for {}\n\nDeveloping sophisticated content for {} demands advanced creative strategies and deep audience understanding.\n\n## Advanced Content Strategy\n- Multi-layered narrative architecture with emotional journey mapping\n- Personalization engines for dynamic content adaptation\n- Cross-platform content optimization with advanced analytics\n\n## Creative Excellence\n- Sophisticated approach for {} complexity requirements\n- Advanced A/B testing and conversion optimization\n- Premium brand storytelling with measurable ROI\n- Integrated content ecosystem with omnichannel distribution",
+                topic, topic, complexity_level
+            )
         }
         ("claude_opus", "content_creator") => {
-            format!("# Masterclass Content Creation for {}\n\nCrafting exceptional content for {} requires artistic vision combined with strategic mastery and technical precision.\n\n## Visionary Content Framework\n- Revolutionary narrative structures that redefine audience engagement\n- AI-powered content personalization with predictive audience modeling\n- Immersive storytelling experiences across emerging media platforms\n\n## Creative Mastery\n- Expert-level complexity handling with innovative creative solutions ({})\n- Cutting-edge content technologies including interactive and immersive formats\n- Advanced psychological triggers and persuasion architecture\n- Cultural trend analysis and future-proofed content strategies", topic, topic, complexity_level)
+            format!(
+                "# Masterclass Content Creation for {}\n\nCrafting exceptional content for {} requires artistic vision combined with strategic mastery and technical precision.\n\n## Visionary Content Framework\n- Revolutionary narrative structures that redefine audience engagement\n- AI-powered content personalization with predictive audience modeling\n- Immersive storytelling experiences across emerging media platforms\n\n## Creative Mastery\n- Expert-level complexity handling with innovative creative solutions ({})\n- Cutting-edge content technologies including interactive and immersive formats\n- Advanced psychological triggers and persuasion architecture\n- Cultural trend analysis and future-proofed content strategies",
+                topic, topic, complexity_level
+            )
         }
         (route_id, _) => {
             let capability_desc = match route_id {
@@ -494,8 +512,10 @@ fn generate_route_output(
                 _ => "capable and reliable",
             };
 
-            format!("# {} Solution for {}\n\nUsing {} processing capabilities, this solution addresses {} with a focus on quality and efficiency.\n\n## Key Features\n- Optimized for {} complexity level\n- Role-specific customization for {}\n- Performance-tuned execution\n\n## Delivery\n- High-quality output meeting all requirements\n- Cost-effective approach with optimal resource utilization\n- Scalable solution architecture",
-                    route.capability, topic, capability_desc, topic, complexity_level, role)
+            format!(
+                "# {} Solution for {}\n\nUsing {} processing capabilities, this solution addresses {} with a focus on quality and efficiency.\n\n## Key Features\n- Optimized for {} complexity level\n- Role-specific customization for {}\n- Performance-tuned execution\n\n## Delivery\n- High-quality output meeting all requirements\n- Cost-effective approach with optimal resource utilization\n- Scalable solution architecture",
+                route.capability, topic, capability_desc, topic, complexity_level, role
+            )
         }
     }
 }

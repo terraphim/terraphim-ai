@@ -1,5 +1,5 @@
-use crate::Result;
 use crate::indexer::IndexMiddleware;
+use crate::Result;
 use grepapp_haystack::{GrepAppClient, SearchParams};
 use terraphim_config::Haystack;
 use terraphim_types::Index;
@@ -29,20 +29,29 @@ impl IndexMiddleware for GrepAppHaystackIndexer {
             log::info!("GrepApp: Starting search for query: '{}'", needle);
 
             // Extract optional filters from haystack extra_parameters
-            let language = haystack
-                .extra_parameters
-                .get("language")
-                .and_then(|v| if v.is_empty() { None } else { Some(v.clone()) });
+            let language = haystack.extra_parameters.get("language").and_then(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.clone())
+                }
+            });
 
-            let repo = haystack
-                .extra_parameters
-                .get("repo")
-                .and_then(|v| if v.is_empty() { None } else { Some(v.clone()) });
+            let repo = haystack.extra_parameters.get("repo").and_then(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.clone())
+                }
+            });
 
-            let path = haystack
-                .extra_parameters
-                .get("path")
-                .and_then(|v| if v.is_empty() { None } else { Some(v.clone()) });
+            let path = haystack.extra_parameters.get("path").and_then(|v| {
+                if v.is_empty() {
+                    None
+                } else {
+                    Some(v.clone())
+                }
+            });
 
             log::debug!(
                 "GrepApp: Filters - language: {:?}, repo: {:?}, path: {:?}",

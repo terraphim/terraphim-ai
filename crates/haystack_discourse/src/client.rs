@@ -130,13 +130,27 @@ mod tests {
     use super::*;
     use serde_json::json;
     use wiremock::{
-        matchers::{header, method, path, query_param},
         Mock, MockServer, ResponseTemplate,
+        matchers::{header, method, path, query_param},
     };
+
+    fn can_bind_localhost() -> bool {
+        std::net::TcpListener::bind("127.0.0.1:0").is_ok()
+    }
+
+    async fn start_mock_server() -> Option<MockServer> {
+        if !can_bind_localhost() {
+            eprintln!("Skipping wiremock test: cannot bind to localhost");
+            return None;
+        }
+        Some(MockServer::start().await)
+    }
 
     #[tokio::test]
     async fn test_search_posts() {
-        let mock_server = MockServer::start().await;
+        let Some(mock_server) = start_mock_server().await else {
+            return;
+        };
 
         let mock_response = json!({
             "posts": [{
@@ -194,7 +208,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_fetch_post_details() {
-        let mock_server = MockServer::start().await;
+        let Some(mock_server) = start_mock_server().await else {
+            return;
+        };
 
         // Test successful post fetch
         let post_response = json!({

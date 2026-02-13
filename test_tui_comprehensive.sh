@@ -65,7 +65,6 @@ cleanup() {
         # Clean up test persistence files
         rm -rf /tmp/terraphim_sqlite || true
         rm -rf /tmp/dashmaptest || true
-        rm -rf /tmp/terraphim_rocksdb || true
         rm -rf /tmp/opendal || true
 
         log_info "Cleanup completed"

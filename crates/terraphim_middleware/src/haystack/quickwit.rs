@@ -1,24 +1,27 @@
-use crate::Result;
 use crate::indexer::IndexMiddleware;
+use crate::Result;
 use reqwest::Client;
 use serde::Deserialize;
+use std::time::Duration;
 use terraphim_config::Haystack;
+use terraphim_persistence::Persistable;
 use terraphim_types::Index;
 
 /// Response structure from Quickwit search API
-/// Corresponds to GET /v1/{index}/search response
+/// Corresponds to GET /api/v1/{index}/search response
 #[derive(Debug, Deserialize)]
-#[allow(dead_code)]
 struct QuickwitSearchResponse {
     num_hits: u64,
     hits: Vec<serde_json::Value>,
     elapsed_time_micros: u64,
+    /// Error messages from Quickwit (kept for API compatibility and debugging)
     #[serde(default)]
+    #[allow(dead_code)]
     errors: Vec<String>,
 }
 
 /// Index metadata from Quickwit indexes listing
-/// Corresponds to GET /v1/indexes response items
+/// Corresponds to GET /api/v1/indexes response items
 #[derive(Debug, Deserialize, Clone)]
 struct QuickwitIndexInfo {
     index_id: String,
@@ -26,7 +29,6 @@ struct QuickwitIndexInfo {
 
 /// Configuration parsed from Haystack extra_parameters
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 struct QuickwitConfig {
     auth_token: Option<String>,
     auth_username: Option<String>,
@@ -34,6 +36,8 @@ struct QuickwitConfig {
     default_index: Option<String>,
     index_filter: Option<String>,
     max_hits: u64,
+    /// Timeout for requests (kept for future use with custom HTTP client)
+    #[allow(dead_code)]
     timeout_seconds: u64,
     sort_by: String,
 }
@@ -258,9 +262,10 @@ impl QuickwitHaystackIndexer {
 
         log::debug!("Searching Quickwit index '{}': {}", index, url);
 
-        // Build request with authentication
+        // Build request with authentication and timeout
         let mut request = self.client.get(&url);
         request = self.add_auth_header(request, config);
+        request = request.timeout(Duration::from_secs(config.timeout_seconds));
 
         // Execute request
         match request.send().await {
@@ -407,14 +412,16 @@ impl QuickwitHaystackIndexer {
             tags: Some(tags),
             rank,
             source_haystack: Some(base_url.to_string()),
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         })
     }
 
     /// Normalize document ID for persistence layer
     /// Follows pattern from QueryRsHaystackIndexer
     fn normalize_document_id(&self, index_name: &str, doc_id: &str) -> String {
-        use terraphim_persistence::Persistable;
-
         let original_id = format!("quickwit_{}_{}", index_name, doc_id);
 
         // Use Persistable trait to normalize the ID
@@ -429,6 +436,10 @@ impl QuickwitHaystackIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
 
         dummy_doc.normalize_key(&original_id)

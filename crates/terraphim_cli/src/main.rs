@@ -359,6 +359,13 @@ async fn handle_search(
 
     let documents = service.search(&query, &role_name, limit).await?;
 
+    // Apply limit client-side since the service may return more results
+    let documents = if let Some(max) = limit {
+        &documents[..documents.len().min(max)]
+    } else {
+        &documents
+    };
+
     let results: Vec<DocumentResult> = documents
         .iter()
         .map(|doc| DocumentResult {
