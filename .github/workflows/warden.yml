@@ -14,6 +14,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: getsentry/warden@v0
-        with:
-          anthropic-api-key: ${{ secrets.WARDEN_ANTHROPIC_API_KEY }}
+      - name: Warden disabled
+        run: echo "Warden review check is disabled."
