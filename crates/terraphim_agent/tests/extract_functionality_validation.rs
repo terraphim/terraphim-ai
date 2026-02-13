@@ -103,6 +103,7 @@ fn ensure_server_running() -> Result<u16> {
 }
 
 /// Detect if running in CI environment (GitHub Actions, Docker containers in CI, etc.)
+#[allow(dead_code)]
 fn is_ci_environment() -> bool {
     // Check standard CI environment variables
     std::env::var("CI").is_ok()
@@ -163,6 +164,7 @@ fn run_extract_command_with_port(args: &[&str], port: u16) -> Result<(String, St
 }
 
 /// Helper function to run TUI extract command (legacy, uses default port)
+#[allow(dead_code)]
 fn run_extract_command(args: &[&str]) -> Result<(String, String, i32)> {
     run_extract_command_with_port(args, 8000)
 }

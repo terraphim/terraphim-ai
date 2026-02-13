@@ -156,7 +156,7 @@ mod tests {
         let deserialized: SkillStep = serde_json::from_str(&json).unwrap();
         match deserialized {
             SkillStep::Tool { tool, .. } => assert_eq!(tool, "filesystem"),
-            _ => assert!(false, "Expected Tool step"),
+            _ => panic!("Expected Tool step"),
         }
     }
 

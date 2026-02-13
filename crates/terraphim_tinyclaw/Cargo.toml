@@ -73,6 +73,7 @@ serenity = { version = "0.12", optional = true }
 default = ["telegram", "discord"]
 telegram = ["dep:teloxide"]
 discord = ["dep:serenity"]
+voice = []
 # matrix = ["dep:matrix-sdk"]
 # voice = ["dep:whisper-rs", "dep:symphonia"]
 

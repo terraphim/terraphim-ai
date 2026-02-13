@@ -48,7 +48,7 @@ Create `/tmp/tinyclaw-test.toml`:
 ```toml
 [proxy]
 endpoint = "http://localhost:3001/v1/chat/completions"
-# Set API key via environment variable or config
+api_key = "${PROXY_API_KEY}"
 model = "gpt-4o-mini"
 max_tokens = 4096
 
@@ -62,12 +62,12 @@ max_iterations = 20
 
 [channels.telegram]
 enabled = true
-# Set bot token via environment variable
+bot_token = "${TELEGRAM_BOT_TOKEN}"
 allow_from = ["@your_telegram_username"]
 
 [channels.discord]
 enabled = true
-# Set bot token via environment variable
+bot_token = "${DISCORD_BOT_TOKEN}"
 allow_from = ["your_discord_user_id"]
 ```
 

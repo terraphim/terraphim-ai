@@ -1,6 +1,8 @@
 //! Skill executor for loading and executing skill workflows.
 
-use crate::skills::types::{Skill, SkillInput, SkillResult, SkillStatus, SkillStep, StepResult};
+#[cfg(test)]
+use crate::skills::types::SkillInput;
+use crate::skills::types::{Skill, SkillResult, SkillStatus, SkillStep, StepResult};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -91,7 +93,7 @@ impl SkillExecutor {
             let entry = entry?;
             let path = entry.path();
 
-            if path.extension().map_or(false, |ext| ext == "json") {
+            if path.extension().is_some_and(|ext| ext == "json") {
                 let json = std::fs::read_to_string(&path)?;
                 if let Ok(skill) = serde_json::from_str::<Skill>(&json) {
                     skills.push(skill);
@@ -571,8 +573,6 @@ mod tests {
 
         // Start execution in a separate task and cancel it mid-execution
         let exec_clone = Arc::new(executor_clone);
-        let skill_clone = skill.clone();
-
         let handle = tokio::spawn(async move {
             // Give a small delay then cancel
             tokio::time::sleep(tokio::time::Duration::from_millis(1)).await;

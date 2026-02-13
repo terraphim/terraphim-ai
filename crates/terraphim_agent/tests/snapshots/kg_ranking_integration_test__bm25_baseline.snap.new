@@ -1,0 +1,6 @@
+---
+source: crates/terraphim_agent/tests/kg_ranking_integration_test.rs
+assertion_line: 526
+description: BM25 baseline results
+---
+[]

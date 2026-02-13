@@ -10,8 +10,7 @@ use std::collections::HashMap;
 use std::time::Duration;
 use tempfile::TempDir;
 use terraphim_tinyclaw::skills::{
-    ExecutionReport, Skill, SkillExecutor, SkillInput, SkillMonitor, SkillResult, SkillStatus,
-    SkillStep,
+    ExecutionReport, Skill, SkillExecutor, SkillInput, SkillMonitor, SkillStatus, SkillStep,
 };
 
 /// Creates a temporary directory and skill executor for testing.
