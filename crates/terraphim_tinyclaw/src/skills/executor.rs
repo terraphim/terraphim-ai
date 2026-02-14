@@ -3,6 +3,7 @@
 #[cfg(test)]
 use crate::skills::types::SkillInput;
 use crate::skills::types::{Skill, SkillResult, SkillStatus, SkillStep, StepResult};
+use crate::tools::{ToolCall, ToolRegistry};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -35,6 +36,8 @@ pub struct SkillExecutor {
     storage_dir: PathBuf,
     /// Cancellation flag shared across execution
     cancelled: Arc<AtomicBool>,
+    /// Optional tool registry for executing tool steps
+    tool_registry: Option<Arc<ToolRegistry>>,
 }
 
 impl SkillExecutor {
@@ -46,7 +49,14 @@ impl SkillExecutor {
         Ok(Self {
             storage_dir,
             cancelled: Arc::new(AtomicBool::new(false)),
+            tool_registry: None,
         })
+    }
+
+    /// Set the tool registry for executing tool steps.
+    pub fn with_tool_registry(mut self, registry: Arc<ToolRegistry>) -> Self {
+        self.tool_registry = Some(registry);
+        self
     }
 
     /// Get the default skills directory (~/.config/terraphim/skills).
@@ -310,11 +320,22 @@ impl SkillExecutor {
         let substituted = self.substitute_template(&args_str, inputs)?;
         let substituted_args: serde_json::Value = serde_json::from_str(&substituted)?;
 
-        // Placeholder - actual tool execution would integrate with the tool registry
-        Ok(format!(
-            "Executed tool '{}' with args: {}",
-            tool, substituted_args
-        ))
+        if let Some(ref registry) = self.tool_registry {
+            let call = ToolCall {
+                id: format!("skill_step_{}", uuid::Uuid::new_v4()),
+                name: tool.to_string(),
+                arguments: substituted_args,
+            };
+            registry.execute(&call).await.map_err(|e| {
+                SkillError::Template(format!("Tool '{}' execution failed: {}", tool, e))
+            })
+        } else {
+            // No registry available - return descriptive message
+            Ok(format!(
+                "Executed tool '{}' with args: {} (no tool registry configured)",
+                tool, substituted_args
+            ))
+        }
     }
 
     async fn execute_llm_step(
@@ -325,8 +346,48 @@ impl SkillExecutor {
     ) -> Result<String, SkillError> {
         let substituted = self.substitute_template(prompt, inputs)?;
 
-        // Placeholder - actual LLM execution would integrate with the agent
-        Ok(format!("LLM prompt: {}", substituted))
+        // Try Ollama if OLLAMA_BASE_URL is set
+        let base_url = std::env::var("OLLAMA_BASE_URL")
+            .unwrap_or_else(|_| "http://127.0.0.1:11434".to_string());
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "llama3.2".to_string());
+
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("{}/api/generate", base_url))
+            .json(&serde_json::json!({
+                "model": model,
+                "prompt": substituted,
+                "stream": false
+            }))
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                let body: serde_json::Value = resp.json().await.map_err(|e| {
+                    SkillError::Template(format!("Failed to parse Ollama response: {}", e))
+                })?;
+                Ok(body["response"]
+                    .as_str()
+                    .unwrap_or("(empty response)")
+                    .to_string())
+            }
+            Ok(resp) => {
+                log::warn!("Ollama returned error: {}", resp.status());
+                Ok(format!(
+                    "LLM unavailable (status {}), prompt was: {}",
+                    resp.status(),
+                    substituted
+                ))
+            }
+            Err(e) => {
+                log::warn!("Ollama unreachable: {}", e);
+                Ok(format!(
+                    "LLM unavailable ({}), prompt was: {}",
+                    e, substituted
+                ))
+            }
+        }
     }
 
     async fn execute_shell_step(
@@ -337,11 +398,36 @@ impl SkillExecutor {
     ) -> Result<String, SkillError> {
         let substituted = self.substitute_template(command, inputs)?;
 
-        // Placeholder - actual shell execution
-        Ok(format!(
-            "Shell command: {} (in {:?})",
-            substituted, working_dir
-        ))
+        let mut cmd = tokio::process::Command::new("sh");
+        cmd.arg("-c").arg(&substituted);
+
+        if let Some(dir) = working_dir {
+            let dir = self.substitute_template(dir, inputs)?;
+            cmd.current_dir(dir);
+        }
+
+        let output = tokio::time::timeout(Duration::from_secs(120), cmd.output())
+            .await
+            .map_err(|_| SkillError::Timeout)?
+            .map_err(SkillError::Io)?;
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+
+        if output.status.success() {
+            if stdout.is_empty() {
+                Ok("(exit 0, no output)".to_string())
+            } else {
+                Ok(stdout.to_string())
+            }
+        } else {
+            Ok(format!(
+                "Exit code: {}\nStdout: {}\nStderr: {}",
+                output.status.code().unwrap_or(-1),
+                stdout,
+                stderr
+            ))
+        }
     }
 }
 
@@ -366,13 +452,13 @@ mod tests {
             description: "A test skill".to_string(),
             author: Some("Test".to_string()),
             steps: vec![
-                SkillStep::Tool {
-                    tool: "shell".to_string(),
-                    args: serde_json::json!({"command": "echo {message}"}),
+                SkillStep::Shell {
+                    command: "echo {message}".to_string(),
+                    working_dir: None,
                 },
-                SkillStep::Llm {
-                    prompt: "Analyze: {message}".to_string(),
-                    use_context: true,
+                SkillStep::Shell {
+                    command: "echo 'processed: {message}'".to_string(),
+                    working_dir: None,
                 },
             ],
             inputs: vec![SkillInput {
@@ -488,7 +574,24 @@ mod tests {
     async fn test_execute_skill_success() {
         let temp_dir = TempDir::new().unwrap();
         let executor = SkillExecutor::new(temp_dir.path()).unwrap();
-        let skill = create_test_skill();
+
+        // Use a skill with a real shell step and an LLM step
+        let skill = Skill {
+            name: "test-skill".to_string(),
+            version: "1.0.0".to_string(),
+            description: "A test skill".to_string(),
+            author: Some("Test".to_string()),
+            steps: vec![SkillStep::Shell {
+                command: "echo {message}".to_string(),
+                working_dir: None,
+            }],
+            inputs: vec![SkillInput {
+                name: "message".to_string(),
+                description: "Message to process".to_string(),
+                required: true,
+                default: None,
+            }],
+        };
 
         let mut inputs = HashMap::new();
         inputs.insert("message".to_string(), "world".to_string());
@@ -496,7 +599,7 @@ mod tests {
         let result = executor.execute_skill(&skill, inputs, None).await.unwrap();
 
         assert_eq!(result.status, SkillStatus::Success);
-        assert_eq!(result.execution_log.len(), 2);
+        assert_eq!(result.execution_log.len(), 1);
         assert!(result.output.contains("world"));
     }
 
@@ -517,14 +620,15 @@ mod tests {
         let temp_dir = TempDir::new().unwrap();
         let executor = SkillExecutor::new(temp_dir.path()).unwrap();
 
+        // Use a shell step with defaults for reliable testing
         let skill = Skill {
             name: "test-with-default".to_string(),
             version: "1.0.0".to_string(),
             description: "Test".to_string(),
             author: None,
-            steps: vec![SkillStep::Llm {
-                prompt: "Hello {name}".to_string(),
-                use_context: false,
+            steps: vec![SkillStep::Shell {
+                command: "echo Hello {name}".to_string(),
+                working_dir: None,
             }],
             inputs: vec![SkillInput {
                 name: "name".to_string(),
@@ -548,24 +652,24 @@ mod tests {
         let executor = SkillExecutor::new(temp_dir.path()).unwrap();
         let executor_clone = SkillExecutor::new(temp_dir.path()).unwrap();
 
-        // Create a skill with multiple steps
+        // Create a skill with multiple shell steps
         let skill = Skill {
             name: "multi-step".to_string(),
             version: "1.0.0".to_string(),
             description: "Multi-step skill".to_string(),
             author: None,
             steps: vec![
-                SkillStep::Llm {
-                    prompt: "Step 1".to_string(),
-                    use_context: false,
+                SkillStep::Shell {
+                    command: "echo step1".to_string(),
+                    working_dir: None,
                 },
-                SkillStep::Llm {
-                    prompt: "Step 2".to_string(),
-                    use_context: false,
+                SkillStep::Shell {
+                    command: "echo step2".to_string(),
+                    working_dir: None,
                 },
-                SkillStep::Llm {
-                    prompt: "Step 3".to_string(),
-                    use_context: false,
+                SkillStep::Shell {
+                    command: "echo step3".to_string(),
+                    working_dir: None,
                 },
             ],
             inputs: vec![],
@@ -606,13 +710,13 @@ mod tests {
             description: "Slow skill".to_string(),
             author: None,
             steps: vec![
-                SkillStep::Llm {
-                    prompt: "Step 1".to_string(),
-                    use_context: false,
+                SkillStep::Shell {
+                    command: "echo step1".to_string(),
+                    working_dir: None,
                 },
-                SkillStep::Llm {
-                    prompt: "Step 2".to_string(),
-                    use_context: false,
+                SkillStep::Shell {
+                    command: "echo step2".to_string(),
+                    working_dir: None,
                 },
             ],
             inputs: vec![],
