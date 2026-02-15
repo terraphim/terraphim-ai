@@ -517,7 +517,11 @@ impl SummarizationWorker {
                             if let Err(e) = task_sender_clone.send(retry_task).await {
                                 log::error!("Failed to re-queue retry task {}: {}", task_id, e);
                             } else {
-                                log::info!("Task {} re-queued for retry after {:?} delay", task_id, delay);
+                                log::info!(
+                                    "Task {} re-queued for retry after {:?} delay",
+                                    task_id,
+                                    delay
+                                );
                             }
                         });
                     } else {
