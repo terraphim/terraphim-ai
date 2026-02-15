@@ -26,7 +26,13 @@
 mod capture;
 mod redaction;
 
-pub use capture::{capture_failed_command, CapturedLearning, LearningContext, LearningError, LearningSource};
+pub use capture::{capture_failed_command, list_learnings, query_learnings, LearningSource};
+
+// Re-export for testing - not used by CLI yet
+#[allow(unused_imports)]
+pub use capture::{CapturedLearning, LearningContext, LearningError};
+
+#[allow(unused_imports)]
 pub use redaction::redact_secrets;
 
 use std::path::PathBuf;
@@ -72,6 +78,7 @@ impl Default for LearningCaptureConfig {
 
 impl LearningCaptureConfig {
     /// Create config with custom directories
+    #[allow(dead_code)]
     pub fn new(project_dir: PathBuf, global_dir: PathBuf) -> Self {
         Self {
             project_dir,
@@ -82,7 +89,13 @@ impl LearningCaptureConfig {
 
     /// Determine storage location based on availability
     pub fn storage_location(&self) -> PathBuf {
-        if self.project_dir.exists() || self.project_dir.parent().map(|p| p.exists()).unwrap_or(false) {
+        if self.project_dir.exists()
+            || self
+                .project_dir
+                .parent()
+                .map(|p| p.exists())
+                .unwrap_or(false)
+        {
             self.project_dir.clone()
         } else {
             self.global_dir.clone()
