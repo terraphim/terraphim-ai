@@ -1,29 +1,27 @@
-//! Secret redaction using terraphim_automata pattern matching.
+//! Secret redaction using regex pattern matching.
 //!
-//! Instead of building custom redaction logic, we reuse `replace_matches()`
-//! with a secret-patterns thesaurus. This leverages the existing Aho-Corasick
-//! infrastructure for efficient pattern matching.
-
-use std::sync::LazyLock;
-use terraphim_automata::{replace_matches, LinkType};
-use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
+//! This module provides regex-based redaction of secrets like AWS keys,
+//! API tokens, and connection strings from text before storage.
 
 /// Standard secret patterns for redaction.
-/// Patterns are matched case-insensitively via Aho-Corasick.
+/// Patterns are matched using regex.
 const SECRET_PATTERNS: &[(&str, &str)] = &[
     // AWS Access Key IDs (AKIA followed by 16 alphanumeric chars)
     (r"AKIA[A-Z0-9]{16}", "[AWS_KEY_REDACTED]"),
     // AWS Secret Access Keys (40 char base64-ish)
     (r"[A-Za-z0-9/+=]{40}", "[AWS_SECRET_REDACTED]"),
     // Generic API keys with common prefixes
-    (r"sk-[A-Za-z0-9]{20,}", "[OPENAI_KEY_REDACTED]"),
+    (r"sk-[A-Za-z0-9-_]{20,}", "[OPENAI_KEY_REDACTED]"),
     (r"xox[baprs]-[A-Za-z0-9-]+", "[SLACK_TOKEN_REDACTED]"),
     (r"ghp_[A-Za-z0-9]{36}", "[GITHUB_TOKEN_REDACTED]"),
     (r"gho_[A-Za-z0-9]{36}", "[GITHUB_TOKEN_REDACTED]"),
     // Connection strings
     (r"postgresql://[^@\s]+:[^@\s]+@", "postgresql://[REDACTED]@"),
     (r"mysql://[^@\s]+:[^@\s]+@", "mysql://[REDACTED]@"),
-    (r"mongodb(\+srv)?://[^@\s]+:[^@\s]+@", "mongodb://[REDACTED]@"),
+    (
+        r"mongodb(\+srv)?://[^@\s]+:[^@\s]+@",
+        "mongodb://[REDACTED]@",
+    ),
     (r"redis://[^@\s]+:[^@\s]+@", "redis://[REDACTED]@"),
 ];
 
@@ -41,27 +39,10 @@ const ENV_VAR_PATTERNS: &[&str] = &[
     "CREDENTIAL",
 ];
 
-/// Build the secret redaction thesaurus.
-/// This is cached for performance.
-static SECRET_THESAURUS: LazyLock<Thesaurus> = LazyLock::new(build_secret_thesaurus_internal);
-
-fn build_secret_thesaurus_internal() -> Thesaurus {
-    let mut thesaurus = Thesaurus::new("secrets".to_string());
-    let mut id = 1u64;
-
-    for (pattern, replacement) in SECRET_PATTERNS {
-        let nterm = NormalizedTerm::new(id, NormalizedTermValue::new(replacement.to_string()));
-        thesaurus.insert(NormalizedTermValue::new(pattern.to_string()), nterm);
-        id += 1;
-    }
-
-    thesaurus
-}
-
-/// Redact secrets from text using pattern matching.
+/// Redact secrets from text using regex pattern matching.
 ///
-/// This function uses the existing Aho-Corasick infrastructure from
-/// `terraphim_automata` to efficiently find and replace secret patterns.
+/// This function applies regex patterns to find and replace secret patterns
+/// like AWS keys, API tokens, and connection strings.
 ///
 /// # Arguments
 ///
@@ -82,16 +63,16 @@ fn build_secret_thesaurus_internal() -> Thesaurus {
 /// ```
 pub fn redact_secrets(text: &str) -> String {
     // First, strip environment variable values
-    let text = strip_env_vars(text);
+    let mut result = strip_env_vars(text);
 
-    // Then apply pattern-based redaction via automata
-    match replace_matches(&text, SECRET_THESAURUS.clone(), LinkType::PlainText) {
-        Ok(bytes) => String::from_utf8(bytes).unwrap_or_else(|_| text),
-        Err(e) => {
-            log::warn!("Secret redaction failed: {}", e);
-            text
+    // Apply regex-based redaction patterns
+    for (pattern, replacement) in SECRET_PATTERNS {
+        if let Ok(re) = regex::Regex::new(pattern) {
+            result = re.replace_all(&result, *replacement).to_string();
         }
     }
+
+    result
 }
 
 /// Strip environment variable values from text.
@@ -103,9 +84,9 @@ fn strip_env_vars(text: &str) -> String {
 
     for var_name in ENV_VAR_PATTERNS {
         // Match VAR=value or VAR="value" or VAR='value'
-        let pattern_unquoted = format!(r"{0}\s*=\s*[^\s]+", var_name);
-        let pattern_double = format!(r"{0}\s*=\s*\"[^\"]+\"", var_name);
-        let pattern_single = format!(r"{0}\s*=\s*'[^']+'", var_name);
+        let pattern_unquoted = format!("{0}\\s*=\\s*[^\\s]+", var_name);
+        let pattern_double = format!("{0}\\s*=\\s*\"[^\"]+\"", var_name);
+        let pattern_single = format!("{0}\\s*=\\s*'[^']+'", var_name);
         let patterns = [pattern_unquoted, pattern_double, pattern_single];
 
         for pattern in patterns {
@@ -122,6 +103,7 @@ fn strip_env_vars(text: &str) -> String {
 /// Check if text contains potential secrets.
 ///
 /// This is a quick check that can be used before capture to warn users.
+#[allow(dead_code)]
 pub fn contains_secrets(text: &str) -> bool {
     // Check for common secret patterns
     let patterns = [

@@ -28,6 +28,9 @@ mod service;
 mod forgiving;
 mod robot;
 
+// Learning capture for failed commands
+mod learnings;
+
 #[cfg(feature = "repl")]
 mod repl;
 
@@ -559,6 +562,58 @@ enum Command {
 
     /// Update to latest version if available
     Update,
+
+    /// Learning capture for failed commands
+    Learn {
+        #[command(subcommand)]
+        sub: LearnSub,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum LearnSub {
+    /// Capture a failed command as a learning
+    Capture {
+        /// The command that failed
+        command: String,
+        /// The error output (stderr)
+        #[arg(long)]
+        error: String,
+        /// The exit code
+        #[arg(long, default_value_t = 1)]
+        exit_code: i32,
+        /// Enable debug output
+        #[arg(long, default_value_t = false)]
+        debug: bool,
+    },
+    /// List recent learnings
+    List {
+        /// Number of recent learnings to show
+        #[arg(long, default_value_t = 10)]
+        recent: usize,
+        /// Show global learnings instead of project
+        #[arg(long, default_value_t = false)]
+        global: bool,
+    },
+    /// Query learnings by pattern
+    Query {
+        /// Search pattern
+        pattern: String,
+        /// Use exact match instead of substring
+        #[arg(long, default_value_t = false)]
+        exact: bool,
+        /// Show global learnings instead of project
+        #[arg(long, default_value_t = false)]
+        global: bool,
+    },
+    /// Add correction to an existing learning
+    Correct {
+        /// Learning ID
+        id: String,
+        /// The correction to add
+        #[arg(long)]
+        correction: String,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1372,6 +1427,100 @@ async fn run_offline_command(command: Command) -> Result<()> {
                 }
             }
         }
+        Command::Learn { sub } => {
+            use learnings::{capture_failed_command, list_learnings, query_learnings, LearningCaptureConfig};
+            let config = LearningCaptureConfig::default();
+
+            match sub {
+                LearnSub::Capture { command, error, exit_code, debug } => {
+                    if debug {
+                        eprintln!("Capturing learning: command='{}', exit_code={}", command, exit_code);
+                    }
+                    match capture_failed_command(&command, &error, exit_code, &config) {
+                        Ok(path) => {
+                            println!("Captured learning: {}", path.display());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            if debug {
+                                eprintln!("Failed to capture learning: {}", e);
+                            }
+                            Err(e.into())
+                        }
+                    }
+                }
+                LearnSub::List { recent, global } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match list_learnings(storage_dir, recent) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings found.");
+                            } else {
+                                println!("Recent learnings:");
+                                for (i, learning) in learnings.iter().enumerate() {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!("  {}. {} {} (exit: {})",
+                                        i + 1,
+                                        source_indicator,
+                                        learning.command,
+                                        learning.exit_code
+                                    );
+                                    if let Some(ref correction) = learning.correction {
+                                        println!("     Correction: {}", correction);
+                                    }
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into())
+                    }
+                }
+                LearnSub::Query { pattern, exact, global } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match query_learnings(storage_dir, &pattern, exact) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings matching '{}'.", pattern);
+                            } else {
+                                println!("Learnings matching '{}':", pattern);
+                                for learning in learnings {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!("  {} {} (exit: {})",
+                                        source_indicator,
+                                        learning.command,
+                                        learning.exit_code
+                                    );
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into())
+                    }
+                }
+                LearnSub::Correct { id, correction } => {
+                    // TODO: Implement correction addition
+                    println!("Adding correction to learning {}: {}", id, correction);
+                    println!("(Not yet implemented)");
+                    Ok(())
+                }
+            }
+        }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -1809,6 +1958,101 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 }
             }
             Ok(())
+        }
+        Command::Learn { sub } => {
+            // Learn command works the same in server mode - no server needed
+            use learnings::{capture_failed_command, list_learnings, query_learnings, LearningCaptureConfig};
+            let config = LearningCaptureConfig::default();
+
+            match sub {
+                LearnSub::Capture { command, error, exit_code, debug } => {
+                    if debug {
+                        eprintln!("Capturing learning: command='{}', exit_code={}", command, exit_code);
+                    }
+                    match capture_failed_command(&command, &error, exit_code, &config) {
+                        Ok(path) => {
+                            println!("Captured learning: {}", path.display());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            if debug {
+                                eprintln!("Failed to capture learning: {}", e);
+                            }
+                            Err(e.into())
+                        }
+                    }
+                }
+                LearnSub::List { recent, global } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match list_learnings(storage_dir, recent) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings found.");
+                            } else {
+                                println!("Recent learnings:");
+                                for (i, learning) in learnings.iter().enumerate() {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!("  {}. {} {} (exit: {})",
+                                        i + 1,
+                                        source_indicator,
+                                        learning.command,
+                                        learning.exit_code
+                                    );
+                                    if let Some(ref correction) = learning.correction {
+                                        println!("     Correction: {}", correction);
+                                    }
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into())
+                    }
+                }
+                LearnSub::Query { pattern, exact, global } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match query_learnings(storage_dir, &pattern, exact) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings matching '{}'.", pattern);
+                            } else {
+                                println!("Learnings matching '{}':", pattern);
+                                for learning in learnings {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!("  {} {} (exit: {})",
+                                        source_indicator,
+                                        learning.command,
+                                        learning.exit_code
+                                    );
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into())
+                    }
+                }
+                LearnSub::Correct { id, correction } => {
+                    // TODO: Implement correction addition
+                    println!("Adding correction to learning {}: {}", id, correction);
+                    println!("(Not yet implemented)");
+                    Ok(())
+                }
+            }
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
