@@ -527,6 +527,12 @@ enum Command {
         /// Suppress errors and pass through unchanged on failure
         #[arg(long, default_value_t = false)]
         fail_open: bool,
+        /// Path to custom destructive patterns thesaurus JSON file
+        #[arg(long)]
+        guard_thesaurus: Option<String>,
+        /// Path to custom allowlist thesaurus JSON file
+        #[arg(long)]
+        guard_allowlist: Option<String>,
     },
     Interactive,
 
@@ -698,6 +704,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
         command,
         json,
         fail_open,
+        guard_thesaurus,
+        guard_allowlist,
     } = &command
     {
         let input_command = match command {
@@ -710,7 +718,33 @@ async fn run_offline_command(command: Command) -> Result<()> {
             }
         };
 
-        let guard = guard_patterns::CommandGuard::new();
+        let guard = match (guard_thesaurus, guard_allowlist) {
+            (Some(thesaurus_path), Some(allowlist_path)) => {
+                let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to load custom guard thesauruses: {}", e)
+                    })?
+            }
+            (Some(thesaurus_path), None) => {
+                let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                guard_patterns::CommandGuard::from_json(
+                    &destructive_json,
+                    guard_patterns::CommandGuard::default_allowlist_json(),
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to load custom guard thesaurus: {}", e))?
+            }
+            (None, Some(allowlist_path)) => {
+                let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                guard_patterns::CommandGuard::from_json(
+                    guard_patterns::CommandGuard::default_destructive_json(),
+                    &allowlist_json,
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to load custom guard allowlist: {}", e))?
+            }
+            (None, None) => guard_patterns::CommandGuard::new(),
+        };
         let result = guard.check(&input_command);
 
         if *json {
@@ -1867,6 +1901,8 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             command,
             json,
             fail_open,
+            guard_thesaurus,
+            guard_allowlist,
         } => {
             // Guard works the same in server mode - no server needed for pattern matching
             let input_command = match command {
@@ -1879,7 +1915,31 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 }
             };
 
-            let guard = guard_patterns::CommandGuard::new();
+            let guard = match (guard_thesaurus, guard_allowlist) {
+                (Some(thesaurus_path), Some(allowlist_path)) => {
+                    let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                    let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                    guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json)
+                        .map_err(|e| anyhow::anyhow!("{}", e))?
+                }
+                (Some(thesaurus_path), None) => {
+                    let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                    guard_patterns::CommandGuard::from_json(
+                        &destructive_json,
+                        guard_patterns::CommandGuard::default_allowlist_json(),
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+                }
+                (None, Some(allowlist_path)) => {
+                    let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                    guard_patterns::CommandGuard::from_json(
+                        guard_patterns::CommandGuard::default_destructive_json(),
+                        &allowlist_json,
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+                }
+                (None, None) => guard_patterns::CommandGuard::new(),
+            };
             let result = guard.check(&input_command);
 
             if json {
