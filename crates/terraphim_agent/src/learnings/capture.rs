@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::learnings::redaction::redact_secrets;
 use crate::learnings::LearningCaptureConfig;
+use crate::learnings::redaction::redact_secrets;
 
 /// Errors that can occur during learning capture.
 #[derive(Error, Debug)]
