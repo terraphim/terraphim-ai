@@ -1,4 +1,4 @@
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -55,18 +55,18 @@ struct WorkerStats {
     total_successful: u64,
     total_failed: u64,
     total_cancelled: u64,
-    processing_times: Vec<Duration>,
+    processing_times: VecDeque<Duration>,
 }
 
 impl WorkerStats {
     fn record_success(&mut self, duration: Duration) {
         self.total_processed += 1;
         self.total_successful += 1;
-        self.processing_times.push(duration);
+        self.processing_times.push_back(duration);
 
         // Keep only last 100 processing times for average calculation
         if self.processing_times.len() > 100 {
-            self.processing_times.remove(0);
+            self.processing_times.pop_front();
         }
     }
 
