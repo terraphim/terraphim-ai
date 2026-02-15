@@ -129,6 +129,7 @@ impl SummarizationWorker {
 
         for worker_id in 0..self.config.max_concurrent_workers {
             let task_receiver = Arc::clone(&task_receiver);
+            let task_sender = task_sender.clone();
             let task_status = Arc::clone(&self.task_status);
             let stats = Arc::clone(&self.stats);
             let retry_delay = self.config.retry_delay;
@@ -138,6 +139,7 @@ impl SummarizationWorker {
                 Self::worker_loop(
                     worker_id,
                     task_receiver,
+                    task_sender,
                     task_status,
                     stats,
                     retry_delay,
@@ -386,6 +388,7 @@ impl SummarizationWorker {
     async fn worker_loop(
         worker_id: usize,
         task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<SummarizationTask>>>,
+        task_sender: mpsc::Sender<SummarizationTask>,
         task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
         stats: Arc<RwLock<WorkerStats>>,
         retry_delay: Duration,
@@ -507,8 +510,16 @@ impl SummarizationWorker {
                             },
                         );
 
-                        // TODO: Re-queue the task after delay
-                        // For now, we'll just mark it as failed
+                        // Re-queue the task after delay
+                        let task_sender_clone = task_sender.clone();
+                        tokio::spawn(async move {
+                            sleep(delay).await;
+                            if let Err(e) = task_sender_clone.send(retry_task).await {
+                                log::error!("Failed to re-queue retry task {}: {}", task_id, e);
+                            } else {
+                                log::info!("Task {} re-queued for retry after {:?} delay", task_id, delay);
+                            }
+                        });
                     } else {
                         let mut status_map = task_status.write().await;
                         status_map.insert(
