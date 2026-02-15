@@ -1428,13 +1428,23 @@ async fn run_offline_command(command: Command) -> Result<()> {
             }
         }
         Command::Learn { sub } => {
-            use learnings::{capture_failed_command, list_learnings, query_learnings, LearningCaptureConfig};
+            use learnings::{
+                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+            };
             let config = LearningCaptureConfig::default();
 
             match sub {
-                LearnSub::Capture { command, error, exit_code, debug } => {
+                LearnSub::Capture {
+                    command,
+                    error,
+                    exit_code,
+                    debug,
+                } => {
                     if debug {
-                        eprintln!("Capturing learning: command='{}', exit_code={}", command, exit_code);
+                        eprintln!(
+                            "Capturing learning: command='{}', exit_code={}",
+                            command, exit_code
+                        );
                     }
                     match capture_failed_command(&command, &error, exit_code, &config) {
                         Ok(path) => {
@@ -1467,7 +1477,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
                                         learnings::LearningSource::Project => "[P]",
                                         learnings::LearningSource::Global => "[G]",
                                     };
-                                    println!("  {}. {} {} (exit: {})",
+                                    println!(
+                                        "  {}. {} {} (exit: {})",
                                         i + 1,
                                         source_indicator,
                                         learning.command,
@@ -1480,10 +1491,14 @@ async fn run_offline_command(command: Command) -> Result<()> {
                             }
                             Ok(())
                         }
-                        Err(e) => Err(e.into())
+                        Err(e) => Err(e.into()),
                     }
                 }
-                LearnSub::Query { pattern, exact, global } => {
+                LearnSub::Query {
+                    pattern,
+                    exact,
+                    global,
+                } => {
                     let storage_loc = config.storage_location();
                     let storage_dir = if global {
                         &config.global_dir
@@ -1501,16 +1516,15 @@ async fn run_offline_command(command: Command) -> Result<()> {
                                         learnings::LearningSource::Project => "[P]",
                                         learnings::LearningSource::Global => "[G]",
                                     };
-                                    println!("  {} {} (exit: {})",
-                                        source_indicator,
-                                        learning.command,
-                                        learning.exit_code
+                                    println!(
+                                        "  {} {} (exit: {})",
+                                        source_indicator, learning.command, learning.exit_code
                                     );
                                 }
                             }
                             Ok(())
                         }
-                        Err(e) => Err(e.into())
+                        Err(e) => Err(e.into()),
                     }
                 }
                 LearnSub::Correct { id, correction } => {
@@ -1961,13 +1975,23 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
         }
         Command::Learn { sub } => {
             // Learn command works the same in server mode - no server needed
-            use learnings::{capture_failed_command, list_learnings, query_learnings, LearningCaptureConfig};
+            use learnings::{
+                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+            };
             let config = LearningCaptureConfig::default();
 
             match sub {
-                LearnSub::Capture { command, error, exit_code, debug } => {
+                LearnSub::Capture {
+                    command,
+                    error,
+                    exit_code,
+                    debug,
+                } => {
                     if debug {
-                        eprintln!("Capturing learning: command='{}', exit_code={}", command, exit_code);
+                        eprintln!(
+                            "Capturing learning: command='{}', exit_code={}",
+                            command, exit_code
+                        );
                     }
                     match capture_failed_command(&command, &error, exit_code, &config) {
                         Ok(path) => {
@@ -2000,7 +2024,8 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                                         learnings::LearningSource::Project => "[P]",
                                         learnings::LearningSource::Global => "[G]",
                                     };
-                                    println!("  {}. {} {} (exit: {})",
+                                    println!(
+                                        "  {}. {} {} (exit: {})",
                                         i + 1,
                                         source_indicator,
                                         learning.command,
@@ -2013,10 +2038,14 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                             }
                             Ok(())
                         }
-                        Err(e) => Err(e.into())
+                        Err(e) => Err(e.into()),
                     }
                 }
-                LearnSub::Query { pattern, exact, global } => {
+                LearnSub::Query {
+                    pattern,
+                    exact,
+                    global,
+                } => {
                     let storage_loc = config.storage_location();
                     let storage_dir = if global {
                         &config.global_dir
@@ -2034,16 +2063,15 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                                         learnings::LearningSource::Project => "[P]",
                                         learnings::LearningSource::Global => "[G]",
                                     };
-                                    println!("  {} {} (exit: {})",
-                                        source_indicator,
-                                        learning.command,
-                                        learning.exit_code
+                                    println!(
+                                        "  {} {} (exit: {})",
+                                        source_indicator, learning.command, learning.exit_code
                                     );
                                 }
                             }
                             Ok(())
                         }
-                        Err(e) => Err(e.into())
+                        Err(e) => Err(e.into()),
                     }
                 }
                 LearnSub::Correct { id, correction } => {
