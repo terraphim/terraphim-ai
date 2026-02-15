@@ -97,7 +97,6 @@ pub struct SummarizationWorker {
     task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
     stats: Arc<RwLock<WorkerStats>>,
     is_paused: bool,
-    active_workers: usize,
     worker_handles: Vec<JoinHandle<()>>,
 }
 
@@ -110,7 +109,6 @@ impl SummarizationWorker {
             task_status,
             stats: Arc::new(RwLock::new(WorkerStats::default())),
             is_paused: false,
-            active_workers: 0,
             worker_handles: Vec::new(),
         }
     }
@@ -247,10 +245,8 @@ impl SummarizationWorker {
         }
 
         // If not paused, try to send directly to workers
-        if !self.is_paused
-            && self.active_workers < self.config.max_concurrent_workers
-            && task_sender.try_send(task.clone()).is_ok()
-        {
+        // Channel backpressure provides natural concurrency control
+        if !self.is_paused && task_sender.try_send(task.clone()).is_ok() {
             log::debug!("Task {} sent directly to worker", task_id);
             return Ok(());
         }
@@ -337,7 +333,7 @@ impl SummarizationWorker {
                 stats.avg_processing_time().map(|d| d.as_secs())
             },
             is_paused: self.is_paused,
-            active_workers: self.active_workers,
+            active_workers: processing, // Use actual processing count from status map
             rate_limiter_status: std::collections::HashMap::new(), // Rate limiting removed
         }
     }
