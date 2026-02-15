@@ -164,17 +164,10 @@ impl OpenRouterService {
             return Ok("No content available for summarization.".to_string());
         }
 
-        // Truncate content to avoid token limits while preserving meaning
-        let truncated_content = if content.len() > MAX_CONTENT_LENGTH {
-            &content[..MAX_CONTENT_LENGTH]
-        } else {
-            content
-        };
-
         // Create the prompt for summarization
         let prompt = format!(
             "Please provide a concise and informative summary of the following article content. The summary should be approximately {} characters long and capture the main ideas, key points, and essential information. Focus on being clear and helpful to someone browsing search results.\n\nArticle content:\n{}",
-            max_length, truncated_content
+            max_length, content
         );
 
         // Prepare the API request
