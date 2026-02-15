@@ -1,0 +1,165 @@
+{
+  "name": "guard_destructive",
+  "data": {
+    "git reset --hard": {
+      "id": 1,
+      "nterm": "git_destructive_reset",
+      "url": "Blocked: 'git reset --hard' discards all uncommitted changes. Use 'git stash' to save changes first, or 'git reset --soft' to keep changes staged."
+    },
+    "git reset --merge": {
+      "id": 1,
+      "nterm": "git_destructive_reset",
+      "url": "Blocked: 'git reset --merge' can discard uncommitted changes. Use 'git stash' to save changes first, then reset."
+    },
+    "git checkout -- ": {
+      "id": 2,
+      "nterm": "git_discard_changes",
+      "url": "Blocked: 'git checkout -- <file>' discards unstaged changes permanently. Use 'git stash' to save changes first."
+    },
+    "git restore --worktree": {
+      "id": 2,
+      "nterm": "git_discard_changes",
+      "url": "Blocked: 'git restore --worktree' discards working tree changes permanently. Use 'git stash' to save changes first."
+    },
+    "rm -rf": {
+      "id": 3,
+      "nterm": "destructive_file_removal",
+      "url": "Blocked: 'rm -rf' recursively removes files without confirmation. Verify the target path carefully or use 'trash' instead."
+    },
+    "rm -fr": {
+      "id": 3,
+      "nterm": "destructive_file_removal",
+      "url": "Blocked: 'rm -fr' recursively removes files without confirmation. Verify the target path carefully or use 'trash' instead."
+    },
+    "rm -rfi": {
+      "id": 3,
+      "nterm": "destructive_file_removal",
+      "url": "Blocked: 'rm -rfi' involves recursive forced removal. Verify the target path carefully or use 'trash' instead."
+    },
+    "rm -fri": {
+      "id": 3,
+      "nterm": "destructive_file_removal",
+      "url": "Blocked: 'rm -fri' involves recursive forced removal. Verify the target path carefully or use 'trash' instead."
+    },
+    "shred": {
+      "id": 3,
+      "nterm": "destructive_file_removal",
+      "url": "Blocked: 'shred' overwrites file contents making recovery impossible. This is an irreversible operation."
+    },
+    "rmdir": {
+      "id": 4,
+      "nterm": "directory_removal",
+      "url": "Blocked: 'rmdir' removes directories. Verify the target directory is correct before proceeding."
+    },
+    "chmod": {
+      "id": 5,
+      "nterm": "permission_change",
+      "url": "Blocked: 'chmod' changes file permissions which can affect security. Review the permission changes carefully."
+    },
+    "chown": {
+      "id": 5,
+      "nterm": "permission_change",
+      "url": "Blocked: 'chown' changes file ownership which can affect access control. Review the ownership changes carefully."
+    },
+    "git clean -f": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -f' permanently deletes untracked files. Use 'git clean -n' for a dry run first."
+    },
+    "git clean -fd": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -fd' permanently deletes untracked files and directories. Use 'git clean -nd' for a dry run first."
+    },
+    "git clean -fx": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -fx' permanently deletes untracked and ignored files. Use 'git clean -nx' for a dry run first."
+    },
+    "git clean -xf": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -xf' permanently deletes untracked and ignored files. Use 'git clean -nx' for a dry run first."
+    },
+    "git clean -xfd": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -xfd' permanently deletes untracked files, directories, and ignored files. Use 'git clean -nxd' for a dry run first."
+    },
+    "git clean -fxd": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -fxd' permanently deletes untracked files, directories, and ignored files. Use 'git clean -nxd' for a dry run first."
+    },
+    "git clean -dfx": {
+      "id": 6,
+      "nterm": "git_clean_untracked",
+      "url": "Blocked: 'git clean -dfx' permanently deletes untracked files, directories, and ignored files. Use 'git clean -ndx' for a dry run first."
+    },
+    "git push --force": {
+      "id": 7,
+      "nterm": "git_force_push",
+      "url": "Blocked: 'git push --force' overwrites remote history and can destroy collaborators' work. Use 'git push --force-with-lease' for a safer alternative."
+    },
+    "git push -f": {
+      "id": 7,
+      "nterm": "git_force_push",
+      "url": "Blocked: 'git push -f' overwrites remote history and can destroy collaborators' work. Use 'git push --force-with-lease' for a safer alternative."
+    },
+    "git branch -d": {
+      "id": 8,
+      "nterm": "git_branch_force_delete",
+      "url": "Blocked: 'git branch -d/-D' deletes branches which may contain unmerged work. Verify the branch has been merged or backed up first."
+    },
+    "git stash drop": {
+      "id": 9,
+      "nterm": "git_stash_destroy",
+      "url": "Blocked: 'git stash drop' permanently deletes a stash entry. Verify you no longer need the stashed changes."
+    },
+    "git stash clear": {
+      "id": 9,
+      "nterm": "git_stash_destroy",
+      "url": "Blocked: 'git stash clear' permanently deletes ALL stash entries. Verify you no longer need any stashed changes."
+    },
+    "git commit --no-verify": {
+      "id": 10,
+      "nterm": "git_hook_bypass",
+      "url": "Blocked: 'git commit --no-verify' skips pre-commit hooks that enforce code quality. Fix hook issues instead of bypassing them."
+    },
+    "git push --no-verify": {
+      "id": 10,
+      "nterm": "git_hook_bypass",
+      "url": "Blocked: 'git push --no-verify' skips pre-push hooks that enforce quality checks. Fix hook issues instead of bypassing them."
+    },
+    "dd if=/dev/zero": {
+      "id": 11,
+      "nterm": "disk_wipe",
+      "url": "Blocked: 'dd if=/dev/zero' writes zeros to a device or file, which can destroy data or entire disks irreversibly."
+    },
+    "dd if=/dev/urandom": {
+      "id": 11,
+      "nterm": "disk_wipe",
+      "url": "Blocked: 'dd if=/dev/urandom' writes random data to a device or file, which can destroy data or entire disks irreversibly."
+    },
+    "mkfs": {
+      "id": 11,
+      "nterm": "disk_wipe",
+      "url": "Blocked: 'mkfs' creates a new filesystem, destroying all existing data on the target device."
+    },
+    "fdisk": {
+      "id": 11,
+      "nterm": "disk_wipe",
+      "url": "Blocked: 'fdisk' modifies disk partition tables, which can cause catastrophic data loss."
+    },
+    "truncate": {
+      "id": 12,
+      "nterm": "file_truncation",
+      "url": "Blocked: 'truncate' changes file size, potentially destroying file contents. Verify the operation is intended."
+    },
+    "git restore ": {
+      "id": 13,
+      "nterm": "git_restore_working",
+      "url": "Blocked: 'git restore' discards working tree changes by default. Use 'git restore --staged' to unstage files safely."
+    }
+  }
+}
