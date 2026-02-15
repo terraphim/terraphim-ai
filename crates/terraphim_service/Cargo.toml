@@ -36,6 +36,7 @@ chrono = { workspace = true }
 
 # HTTP client for API calls and OpenRouter integration
 reqwest = { workspace = true }
+once_cell = "1.19"
 
 # LLM Router integration
 

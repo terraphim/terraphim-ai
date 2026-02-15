@@ -10361,6 +10361,7 @@ dependencies = [
  "env_logger 0.11.8",
  "futures-util",
  "log",
+ "once_cell",
  "opendal",
  "regex",
  "reqwest 0.12.28",
