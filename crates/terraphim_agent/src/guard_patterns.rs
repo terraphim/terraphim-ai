@@ -1,10 +1,19 @@
 //! Guard patterns for blocking destructive git and filesystem commands.
 //!
-//! This module defines patterns that should be blocked to prevent accidental
-//! destruction of uncommitted work or important files.
+//! This module uses terraphim's Aho-Corasick thesaurus matching to detect
+//! destructive commands. Patterns are defined in JSON thesaurus files where
+//! command variants (synonyms) map to concept categories via `nterm`, and
+//! the `url` field carries the human-readable block reason.
 
-use regex::Regex;
 use serde::{Deserialize, Serialize};
+use terraphim_automata::{find_matches, load_thesaurus_from_json};
+use terraphim_types::Thesaurus;
+
+/// Default destructive patterns thesaurus (embedded at compile time)
+const DEFAULT_DESTRUCTIVE_JSON: &str = include_str!("../data/guard_destructive.json");
+
+/// Default allowlist thesaurus (embedded at compile time)
+const DEFAULT_ALLOWLIST_JSON: &str = include_str!("../data/guard_allowlist.json");
 
 /// Result of checking a command against guard patterns
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -43,40 +52,11 @@ impl GuardResult {
     }
 }
 
-/// A pattern that should be blocked with its reason
-struct DestructivePattern {
-    regex: Regex,
-    reason: &'static str,
-    pattern_str: &'static str,
-}
-
-impl DestructivePattern {
-    fn new(pattern: &'static str, reason: &'static str) -> Self {
-        Self {
-            regex: Regex::new(pattern).expect("Invalid regex pattern"),
-            reason,
-            pattern_str: pattern,
-        }
-    }
-}
-
-/// A pattern that is explicitly safe (allowlist)
-struct SafePattern {
-    regex: Regex,
-}
-
-impl SafePattern {
-    fn new(pattern: &'static str) -> Self {
-        Self {
-            regex: Regex::new(pattern).expect("Invalid regex pattern"),
-        }
-    }
-}
-
-/// Guard that checks commands against destructive patterns
+/// Guard that checks commands against destructive patterns using terraphim
+/// thesaurus-driven Aho-Corasick matching.
 pub struct CommandGuard {
-    destructive_patterns: Vec<DestructivePattern>,
-    safe_patterns: Vec<SafePattern>,
+    destructive_thesaurus: Thesaurus,
+    allowlist_thesaurus: Thesaurus,
 }
 
 impl Default for CommandGuard {
@@ -86,123 +66,75 @@ impl Default for CommandGuard {
 }
 
 impl CommandGuard {
-    /// Create a new command guard with default patterns
+    /// Create a new command guard with default embedded thesauruses
     pub fn new() -> Self {
-        let destructive_patterns = vec![
-            // Git commands that discard uncommitted changes
-            DestructivePattern::new(
-                r"git\s+checkout\s+--\s+",
-                "git checkout -- discards uncommitted changes permanently. Use 'git stash' first.",
-            ),
-            // git checkout <ref> -- <path> - safe patterns (checkout -b, --orphan) handled in allowlist
-            DestructivePattern::new(
-                r"git\s+checkout\s+[^\s]+\s+--\s+",
-                "git checkout <ref> -- <path> overwrites working tree. Use 'git stash' first.",
-            ),
-            // git restore without --staged - safe pattern handled in allowlist
-            DestructivePattern::new(
-                r"git\s+restore\s+[^\s]",
-                "git restore discards uncommitted changes. Use 'git stash' or 'git diff' first.",
-            ),
-            DestructivePattern::new(
-                r"git\s+restore\s+--worktree",
-                "git restore --worktree discards uncommitted changes permanently.",
-            ),
-            // Git reset variants
-            DestructivePattern::new(
-                r"git\s+reset\s+--hard",
-                "git reset --hard destroys uncommitted changes. Use 'git stash' first.",
-            ),
-            DestructivePattern::new(
-                r"git\s+reset\s+--merge",
-                "git reset --merge can lose uncommitted changes.",
-            ),
-            // Git clean
-            DestructivePattern::new(
-                r"git\s+clean\s+-[a-z]*f",
-                "git clean -f removes untracked files permanently. Review with 'git clean -n' first.",
-            ),
-            // Force operations - safe pattern (--force-with-lease) handled in allowlist
-            DestructivePattern::new(
-                r"git\s+push\s+.*--force",
-                "Force push can destroy remote history. Use --force-with-lease if necessary.",
-            ),
-            DestructivePattern::new(
-                r"git\s+push\s+-f\b",
-                "Force push (-f) can destroy remote history. Use --force-with-lease if necessary.",
-            ),
-            DestructivePattern::new(
-                r"git\s+branch\s+-D\b",
-                "git branch -D force-deletes without merge check. Use -d for safety.",
-            ),
-            // Destructive filesystem commands
-            DestructivePattern::new(
-                r"rm\s+-[a-z]*r[a-z]*f|rm\s+-[a-z]*f[a-z]*r",
-                "rm -rf is destructive. List files first, then delete individually with permission.",
-            ),
-            // Git stash drop/clear
-            DestructivePattern::new(
-                r"git\s+stash\s+drop",
-                "git stash drop permanently deletes stashed changes. List stashes first.",
-            ),
-            DestructivePattern::new(
-                r"git\s+stash\s+clear",
-                "git stash clear permanently deletes ALL stashed changes.",
-            ),
-        ];
-
-        let safe_patterns = vec![
-            // Git checkout variants that are safe
-            SafePattern::new(r"git\s+checkout\s+-b\s+"),
-            SafePattern::new(r"git\s+checkout\s+--orphan\s+"),
-            // Git restore --staged is safe (only unstages)
-            SafePattern::new(r"git\s+restore\s+--staged"),
-            // Git clean dry run is safe
-            SafePattern::new(r"git\s+clean\s+-n"),
-            SafePattern::new(r"git\s+clean\s+--dry-run"),
-            // --force-with-lease is safer than --force
-            SafePattern::new(r"git\s+push\s+.*--force-with-lease"),
-            // rm -rf on temp directories is safe
-            SafePattern::new(r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/tmp/"),
-            SafePattern::new(r"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+/var/tmp/"),
-            SafePattern::new(r#"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+\$TMPDIR/"#),
-            SafePattern::new(r#"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+\$\{TMPDIR"#),
-            SafePattern::new(r#"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+"\$TMPDIR/"#),
-            SafePattern::new(r#"rm\s+-[a-z]*r[a-z]*f[a-z]*\s+"\$\{TMPDIR"#),
-        ];
+        let destructive_thesaurus = load_thesaurus_from_json(DEFAULT_DESTRUCTIVE_JSON)
+            .expect("Failed to load embedded guard_destructive.json");
+        let allowlist_thesaurus = load_thesaurus_from_json(DEFAULT_ALLOWLIST_JSON)
+            .expect("Failed to load embedded guard_allowlist.json");
 
         Self {
-            destructive_patterns,
-            safe_patterns,
+            destructive_thesaurus,
+            allowlist_thesaurus,
         }
     }
 
-    /// Check if a command matches any safe pattern (allowlist)
-    fn is_safe(&self, command: &str) -> bool {
-        self.safe_patterns.iter().any(|p| p.regex.is_match(command))
+    /// Get the default embedded destructive patterns JSON string
+    pub fn default_destructive_json() -> &'static str {
+        DEFAULT_DESTRUCTIVE_JSON
+    }
+
+    /// Get the default embedded allowlist JSON string
+    pub fn default_allowlist_json() -> &'static str {
+        DEFAULT_ALLOWLIST_JSON
+    }
+
+    /// Create a command guard with custom thesaurus JSON strings
+    pub fn from_json(destructive_json: &str, allowlist_json: &str) -> Result<Self, String> {
+        let destructive_thesaurus =
+            load_thesaurus_from_json(destructive_json).map_err(|e| e.to_string())?;
+        let allowlist_thesaurus =
+            load_thesaurus_from_json(allowlist_json).map_err(|e| e.to_string())?;
+
+        Ok(Self {
+            destructive_thesaurus,
+            allowlist_thesaurus,
+        })
     }
 
     /// Check a command against guard patterns
     ///
     /// Returns a GuardResult indicating whether the command should be allowed or blocked.
+    /// Priority: allowlist first, then destructive check, then default allow.
     pub fn check(&self, command: &str) -> GuardResult {
-        // Check safe patterns first (allowlist)
-        if self.is_safe(command) {
-            return GuardResult::allow(command.to_string());
+        // Check allowlist first -- if any safe pattern matches, allow immediately
+        match find_matches(command, self.allowlist_thesaurus.clone(), false) {
+            Ok(matches) if !matches.is_empty() => {
+                return GuardResult::allow(command.to_string());
+            }
+            Ok(_) => {}  // no allowlist match, continue
+            Err(_) => {} // fail open on error
         }
 
         // Check destructive patterns
-        for pattern in &self.destructive_patterns {
-            if pattern.regex.is_match(command) {
-                return GuardResult::block(
-                    command.to_string(),
-                    pattern.reason.to_string(),
-                    pattern.pattern_str.to_string(),
-                );
+        match find_matches(command, self.destructive_thesaurus.clone(), false) {
+            Ok(matches) if !matches.is_empty() => {
+                // Use the first match (LeftmostLongest gives the best match)
+                let first_match = &matches[0];
+                let reason = first_match.normalized_term.url.clone().unwrap_or_else(|| {
+                    format!(
+                        "Blocked: matched destructive pattern '{}'",
+                        first_match.term
+                    )
+                });
+                let pattern = first_match.term.clone();
+                return GuardResult::block(command.to_string(), reason, pattern);
             }
+            Ok(_) => {}  // no destructive match
+            Err(_) => {} // fail open on error
         }
 
-        // No match - allow
+        // No match -- allow
         GuardResult::allow(command.to_string())
     }
 }
@@ -210,6 +142,8 @@ impl CommandGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // === Existing tests (must all pass) ===
 
     #[test]
     fn test_git_checkout_double_dash_blocked() {
@@ -301,6 +235,212 @@ mod tests {
     fn test_normal_command_allowed() {
         let guard = CommandGuard::new();
         let result = guard.check("cargo build --release");
+        assert_eq!(result.decision, "allow");
+    }
+
+    // === New tests for newly covered commands ===
+
+    #[test]
+    fn test_rmdir_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("rmdir /Users/alex/important-dir");
+        assert_eq!(result.decision, "block");
+        assert!(result.reason.is_some());
+    }
+
+    #[test]
+    fn test_chmod_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("chmod +x /usr/local/bin/script.sh");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_chown_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("chown root:root /etc/passwd");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_commit_no_verify_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git commit --no-verify -m 'skip hooks'");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_push_no_verify_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git push --no-verify origin main");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_shred_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("shred -vfz /home/user/secret.txt");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_truncate_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("truncate -s 0 /var/log/syslog");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_dd_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("dd if=/dev/zero of=/dev/sda bs=1M");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_mkfs_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("mkfs.ext4 /dev/sda1");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_rm_fr_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("rm -fr /home/user/project");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_stash_clear_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git stash clear");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_reset_merge_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git reset --merge");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_restore_worktree_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git restore --worktree file.txt");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_checkout_orphan_allowed() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git checkout --orphan new-root");
+        assert_eq!(result.decision, "allow");
+    }
+
+    #[test]
+    fn test_git_clean_dry_run_long_allowed() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git clean --dry-run");
+        assert_eq!(result.decision, "allow");
+    }
+
+    #[test]
+    fn test_fdisk_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("fdisk /dev/sda");
+        assert_eq!(result.decision, "block");
+    }
+
+    #[test]
+    fn test_git_branch_force_delete_blocked() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git branch -D old-branch");
+        assert_eq!(result.decision, "block");
+    }
+
+    // === Structural tests ===
+
+    #[test]
+    fn test_custom_thesaurus() {
+        let destructive = r#"{
+            "name": "custom_destructive",
+            "data": {
+                "dangerous-cmd": {
+                    "id": 1,
+                    "nterm": "test_dangerous",
+                    "url": "This is a test block reason"
+                }
+            }
+        }"#;
+        let allowlist = r#"{
+            "name": "custom_allowlist",
+            "data": {
+                "safe-cmd": {
+                    "id": 1,
+                    "nterm": "test_safe",
+                    "url": "This is safe"
+                }
+            }
+        }"#;
+
+        let guard = CommandGuard::from_json(destructive, allowlist).unwrap();
+
+        let result = guard.check("run dangerous-cmd now");
+        assert_eq!(result.decision, "block");
+        assert_eq!(result.reason.unwrap(), "This is a test block reason");
+
+        let result = guard.check("run safe-cmd now");
+        assert_eq!(result.decision, "allow");
+
+        let result = guard.check("run normal-cmd");
+        assert_eq!(result.decision, "allow");
+    }
+
+    #[test]
+    fn test_guard_json_output_format() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git reset --hard HEAD");
+        let json = serde_json::to_string(&result).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["decision"], "block");
+        assert!(parsed["reason"].is_string());
+        assert_eq!(parsed["command"], "git reset --hard HEAD");
+        assert!(parsed["pattern"].is_string());
+    }
+
+    #[test]
+    fn test_allow_result_json_format() {
+        let guard = CommandGuard::new();
+        let result = guard.check("git status");
+        let json = serde_json::to_string(&result).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&json).unwrap();
+
+        assert_eq!(parsed["decision"], "allow");
+        // reason and pattern should not be present (skip_serializing_if)
+        assert!(parsed.get("reason").is_none());
+        assert!(parsed.get("pattern").is_none());
+    }
+
+    #[test]
+    fn test_thesaurus_load_from_embedded() {
+        // Verify the embedded JSON files parse without error
+        let _guard = CommandGuard::new();
+    }
+
+    #[test]
+    fn test_rm_rf_var_tmp_allowed() {
+        let guard = CommandGuard::new();
+        let result = guard.check("rm -rf /var/tmp/build-cache");
+        assert_eq!(result.decision, "allow");
+    }
+
+    #[test]
+    fn test_rm_fr_tmp_allowed() {
+        let guard = CommandGuard::new();
+        let result = guard.check("rm -fr /tmp/test-output");
         assert_eq!(result.decision, "allow");
     }
 }
