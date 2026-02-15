@@ -26,7 +26,7 @@
 mod capture;
 mod redaction;
 
-pub use capture::{capture_failed_command, list_learnings, query_learnings, LearningSource};
+pub use capture::{LearningSource, capture_failed_command, list_learnings, query_learnings};
 
 // Re-export for testing - not used by CLI yet
 #[allow(unused_imports)]
