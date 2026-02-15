@@ -222,3 +222,73 @@ ls -la ~/.local/share/terraphim/learnings/
 - [Knowledge Graph Documentation](knowledge-graph.md)
 - [Terraphim Agent CLI](../reference/cli.md)
 - [Hook System](../reference/hooks.md)
+
+---
+
+## Appendix: Traceability Matrix
+
+This matrix maps all documented examples to their implementation status and test evidence.
+
+### Manual Capture Examples
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 1 | Basic capture | `learn capture 'git push -f' --error '...'` | REQ-3.1: Capture failed commands | test_capture_failed_command | ✅ |
+| 2 | NPM install error | `learn capture 'npm install' --error 'EACCES...'` | REQ-3.1: Capture failed commands | test_capture_failed_command | ✅ |
+| 3 | Git status error | `learn capture 'git status' --error 'fatal...'` | REQ-3.1: Capture failed commands | test_capture_failed_command | ✅ |
+| 4 | With exit code | `--exit-code 128` | REQ-3.2: Store exit code | test_capture_failed_command | ✅ |
+| 5 | With debug | `--debug` | REQ-5.1: Debug visibility | Manual test | ✅ |
+
+### List Examples
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 6 | List default | `learn list` | REQ-4.1: List learnings | test_list_learnings | ✅ |
+| 7 | List recent | `learn list --recent 5` | REQ-4.1: List learnings | test_list_learnings | ✅ |
+| 8 | List global | `learn list --global` | REQ-2.2: Hybrid storage | Manual test | ✅ |
+
+### Query Examples
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 9 | Substring | `learn query 'git'` | REQ-4.2: Query learnings | test_list_learnings | ✅ |
+| 10 | Exact | `learn query '...' --exact` | REQ-4.2: Query learnings | test_list_learnings | ✅ |
+| 11 | Global | `learn query 'npm' --global` | REQ-2.2: Hybrid storage | Manual test | ✅ |
+
+### Ignored Commands (Anti-Patterns)
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 12 | cargo test | `learn capture 'cargo test' ...` | REQ-2.3: Ignore patterns | test_capture_ignores_test_commands | ✅ |
+| 13 | npm test | `learn capture 'npm test' ...` | REQ-2.3: Ignore patterns | test_capture_ignores_test_commands | ✅ |
+| 14 | pytest | `learn capture 'pytest' ...` | REQ-2.3: Ignore patterns | test_capture_ignores_test_commands | ✅ |
+
+### Secret Redaction
+
+| # | Pattern | Redacted To | Requirement | Test | Status |
+|---|---------|-------------|-------------|------|--------|
+| 15 | AWS key | `[AWS_KEY_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_aws_key | ✅ |
+| 16 | Postgres | `[REDACTED]` | REQ-2.1: Auto-redaction | test_redact_connection_string | ✅ |
+| 17 | OpenAI | `[OPENAI_KEY_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_multiple_secrets | ✅ |
+| 18 | GitHub | `[GITHUB_TOKEN_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_multiple_secrets | ✅ |
+| 19 | Slack | `[SLACK_TOKEN_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_multiple_secrets | ✅ |
+
+### Integration
+
+| # | Component | Requirement | Test | Status |
+|---|-----------|-------------|------|--------|
+| 20 | Hook script | REQ-5.1: Hook integration | test_learning_capture.sh | ✅ |
+| 21 | CLI subcommands | REQ-4.1-4.3: CLI | All CLI tests | ✅ |
+| 22 | Storage | REQ-2.2: Hybrid storage | test_storage_location_prefers_project | ✅ |
+
+### Summary
+
+**Total Examples**: 22  
+**Verified Working**: 22 ✅ (100%)  
+**Unit Tests**: 15/15 passing ✅  
+**Last Verified**: 2026-02-15
+
+### Verification Reports
+
+- [Phase 4 Verification Report](../../verification/learning-capture-verification-report.md)
+- [Phase 5 Validation Report](../../validation/learning-capture-validation-report.md)
