@@ -25,6 +25,7 @@
 
 mod capture;
 mod hook;
+mod install;
 mod redaction;
 
 pub use capture::{LearningSource, capture_failed_command, list_learnings, query_learnings};
@@ -37,8 +38,10 @@ pub use capture::{CapturedLearning, LearningContext, LearningError};
 pub use redaction::redact_secrets;
 
 // Hook types for AI agent integration
-#[allow(unused_imports)]
-pub use hook::{HookError, HookInput, ToolInput, ToolResult};
+pub use hook::{AgentFormat, process_hook_input};
+
+// Install types for AI agent hook installation
+pub use install::{AgentType, InstallError, install_hook};
 
 use std::path::PathBuf;
 

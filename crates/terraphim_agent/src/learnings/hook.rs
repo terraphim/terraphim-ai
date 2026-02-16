@@ -18,11 +18,90 @@
 //! ```
 
 use std::collections::HashMap;
+use std::path::PathBuf;
 
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::learnings::LearningError;
+use crate::learnings::{LearningCaptureConfig, LearningError, capture_failed_command};
+
+/// AI agent format for hook processing.
+#[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]
+#[allow(dead_code)]
+pub enum AgentFormat {
+    /// Claude Code format
+    Claude,
+    /// Codex format
+    Codex,
+    /// Opencode format
+    Opencode,
+}
+
+/// Capture learning from hook input.
+///
+/// Extracts the command, error output, and exit code from the hook input
+/// and delegates to `capture_failed_command` for storage.
+///
+/// # Arguments
+///
+/// * `input` - The parsed hook input
+///
+/// # Returns
+///
+/// Path to the saved learning file, or error if capture failed/ignored.
+pub fn capture_from_hook(input: &HookInput) -> Result<PathBuf, LearningError> {
+    let command = input
+        .command()
+        .ok_or_else(|| LearningError::Ignored("No command in input".to_string()))?;
+
+    let error_output = input.error_output();
+    let exit_code = input.tool_result.exit_code;
+
+    let config = LearningCaptureConfig::default();
+    capture_failed_command(command, &error_output, exit_code, &config)
+}
+
+/// Process hook input from stdin.
+///
+/// Reads JSON from stdin, captures failed commands if applicable,
+/// and passes through the original JSON to stdout (fail-open).
+///
+/// # Arguments
+///
+/// * `_format` - The agent format (for future format-specific handling)
+///
+/// # Returns
+///
+/// Ok(()) if processing succeeded (even if capture was skipped).
+pub async fn process_hook_input(_format: AgentFormat) -> Result<(), HookError> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+    // Read stdin
+    let mut buffer = String::new();
+    tokio::io::stdin()
+        .read_to_string(&mut buffer)
+        .await
+        .map_err(HookError::StdinError)?;
+
+    // Parse JSON
+    let input = HookInput::from_json(&buffer)?;
+
+    // Capture if needed
+    if input.should_capture() {
+        if let Err(e) = capture_from_hook(&input) {
+            // Log error but continue (fail-open)
+            log::debug!("Hook capture failed: {}", e);
+        }
+    }
+
+    // Pass through original JSON
+    tokio::io::stdout()
+        .write_all(buffer.as_bytes())
+        .await
+        .map_err(HookError::StdinError)?;
+
+    Ok(())
+}
 
 /// Errors that can occur during hook processing.
 #[derive(Debug, Error)]
@@ -407,5 +486,60 @@ mod tests {
             },
         };
         assert!(!input.should_capture());
+    }
+
+    #[test]
+    fn test_capture_from_hook_success() {
+        let input = HookInput {
+            tool_name: "Bash".to_string(),
+            tool_input: ToolInput {
+                command: Some("git push".to_string()),
+                extra: HashMap::new(),
+            },
+            tool_result: ToolResult {
+                exit_code: 1,
+                stdout: String::new(),
+                stderr: "rejected".to_string(),
+            },
+        };
+
+        // Should succeed and return a path
+        let result = capture_from_hook(&input);
+        // Note: This may fail if global dir is not writable, so we check it's not Ignored
+        // for having no command
+        if let Err(LearningError::Ignored(msg)) = &result {
+            assert_ne!(msg, "No command in input");
+        }
+    }
+
+    #[test]
+    fn test_capture_from_hook_no_command() {
+        let input = HookInput {
+            tool_name: "Edit".to_string(),
+            tool_input: ToolInput {
+                command: None,
+                extra: HashMap::new(),
+            },
+            tool_result: ToolResult {
+                exit_code: 0,
+                stdout: String::new(),
+                stderr: String::new(),
+            },
+        };
+
+        let result = capture_from_hook(&input);
+        assert!(result.is_err());
+        match result.unwrap_err() {
+            LearningError::Ignored(msg) => assert_eq!(msg, "No command in input"),
+            _ => panic!("Expected Ignored error"),
+        }
+    }
+
+    #[test]
+    fn test_agent_format_variants() {
+        // Verify AgentFormat enum variants exist and are distinct
+        assert_ne!(AgentFormat::Claude, AgentFormat::Codex);
+        assert_ne!(AgentFormat::Claude, AgentFormat::Opencode);
+        assert_ne!(AgentFormat::Codex, AgentFormat::Opencode);
     }
 }
