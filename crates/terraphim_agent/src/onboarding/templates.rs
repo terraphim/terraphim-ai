@@ -41,10 +41,12 @@ impl ConfigTemplate {
             "terraphim-engineer-v2" => self.build_terraphim_engineer_v2(custom_path),
             "llm-enforcer" => self.build_llm_enforcer(custom_path),
             "rust-engineer" => self.build_rust_engineer(),
+            "rust-engineer-v2" => self.build_rust_engineer_v2(custom_path),
             "local-notes" => self.build_local_notes(custom_path),
             "ai-engineer" => self.build_ai_engineer(custom_path),
             "log-analyst" => self.build_log_analyst(),
             "frontend-engineer" => self.build_frontend_engineer(custom_path),
+            "python-engineer" => self.build_python_engineer(custom_path),
             _ => self.build_terraphim_engineer(custom_path), // Default fallback
         }
     }
@@ -158,6 +160,47 @@ impl ConfigTemplate {
             atomic_server_secret: None,
             extra_parameters: Default::default(),
         }];
+        role.llm_enabled = false;
+        role
+    }
+
+    fn build_rust_engineer_v2(&self, custom_path: Option<&str>) -> Role {
+        let location = custom_path
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "~/projects".to_string());
+
+        let mut role = Role::new("Rust Engineer v2");
+        role.shortname = Some("rust2".to_string());
+        role.relevance_function = RelevanceFunction::BM25F;
+        role.terraphim_it = false;
+        role.theme = "cosmo".to_string();
+        role.kg = Some(KnowledgeGraph {
+            automata_path: None,
+            knowledge_graph_local: Some(KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/rust"),
+            }),
+            public: false,
+            publish: false,
+        });
+        role.haystacks = vec![
+            Haystack {
+                location: "https://query.rs".to_string(),
+                service: ServiceType::QueryRs,
+                read_only: true,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: Default::default(),
+            },
+            Haystack {
+                location,
+                service: ServiceType::Ripgrep,
+                read_only: true,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: Default::default(),
+            },
+        ];
         role.llm_enabled = false;
         role
     }
@@ -277,6 +320,37 @@ impl ConfigTemplate {
         role.llm_enabled = false;
         role
     }
+
+    fn build_python_engineer(&self, custom_path: Option<&str>) -> Role {
+        let location = custom_path
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "~/projects".to_string());
+
+        let mut role = Role::new("Python Engineer");
+        role.shortname = Some("python".to_string());
+        role.relevance_function = RelevanceFunction::BM25F;
+        role.terraphim_it = false;
+        role.theme = "flatly".to_string();
+        role.kg = Some(KnowledgeGraph {
+            automata_path: None,
+            knowledge_graph_local: Some(KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/python"),
+            }),
+            public: false,
+            publish: false,
+        });
+        role.haystacks = vec![Haystack {
+            location,
+            service: ServiceType::Ripgrep,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: Default::default(),
+        }];
+        role.llm_enabled = false;
+        role
+    }
 }
 
 /// Registry of all available templates
@@ -362,12 +436,31 @@ impl TemplateRegistry {
                 has_kg: true,
             },
             ConfigTemplate {
-                id: "terraphim-engineer-v2".to_string(),
-                name: "Terraphim Engineer v2".to_string(),
-                description: "Terraphim development with hybrid KG (remote + local)".to_string(),
+                id: "python-engineer".to_string(),
+                name: "Python Engineer".to_string(),
+                description: "Python development with BM25F field-weighted ranking".to_string(),
                 requires_path: true,
                 default_path: Some("~/projects".to_string()),
                 has_llm: false,
+                has_kg: true,
+            },
+            ConfigTemplate {
+                id: "rust-engineer-v2".to_string(),
+                name: "Rust Engineer v2".to_string(),
+                description: "Advanced Rust search with BM25F field-weighted ranking".to_string(),
+                requires_path: false,
+                default_path: None,
+                has_llm: false,
+                has_kg: true,
+            },
+            ConfigTemplate {
+                id: "terraphim-engineer-v2".to_string(),
+                name: "Terraphim Engineer v2".to_string(),
+                description: "Enhanced semantic search with knowledge graph and LLM integration"
+                    .to_string(),
+                requires_path: false,
+                default_path: Some("~/Documents".to_string()),
+                has_llm: true,
                 has_kg: true,
             },
         ];
@@ -412,18 +505,48 @@ mod tests {
     }
 
     #[test]
-    fn test_template_registry_has_all_eight_templates() {
+    fn test_template_registry_has_all_ten_templates() {
         let registry = TemplateRegistry::new();
-        assert_eq!(registry.list().len(), 8);
+        assert_eq!(registry.list().len(), 10);
 
+        // Existing
         assert!(registry.get("terraphim-engineer").is_some());
-        assert!(registry.get("terraphim-engineer-v2").is_some());
         assert!(registry.get("llm-enforcer").is_some());
         assert!(registry.get("rust-engineer").is_some());
         assert!(registry.get("local-notes").is_some());
         assert!(registry.get("ai-engineer").is_some());
         assert!(registry.get("log-analyst").is_some());
+
+        // New
         assert!(registry.get("frontend-engineer").is_some());
+        assert!(registry.get("python-engineer").is_some());
+        assert!(registry.get("rust-engineer-v2").is_some());
+        assert!(registry.get("terraphim-engineer-v2").is_some());
+    }
+
+    #[test]
+    fn test_ranking_diversity() {
+        let registry = TemplateRegistry::new();
+
+        // Collect all relevance functions used
+        let mut functions: Vec<RelevanceFunction> = Vec::new();
+
+        for template in registry.list() {
+            let role = template.build_role(None);
+            if !functions.contains(&role.relevance_function) {
+                functions.push(role.relevance_function);
+            }
+        }
+
+        // Check that BM25Plus and BM25F are used (new diversity)
+        assert!(
+            functions.contains(&RelevanceFunction::BM25Plus),
+            "BM25Plus not used"
+        );
+        assert!(
+            functions.contains(&RelevanceFunction::BM25F),
+            "BM25F not used"
+        );
     }
 
     #[test]
@@ -488,6 +611,17 @@ mod tests {
         assert_eq!(role.shortname, Some("frontend".to_string()));
         assert_eq!(role.relevance_function, RelevanceFunction::BM25Plus);
         assert!(role.kg.is_some());
+    }
+
+    #[test]
+    fn test_build_rust_engineer_v2() {
+        let registry = TemplateRegistry::new();
+        let template = registry.get("rust-engineer-v2").unwrap();
+        let role = template.build_role(None);
+
+        assert_eq!(role.name.to_string(), "Rust Engineer v2");
+        assert_eq!(role.shortname, Some("rust2".to_string()));
+        assert_eq!(role.haystacks.len(), 2); // Dual haystack
     }
 
     #[test]
