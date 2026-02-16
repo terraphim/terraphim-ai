@@ -620,6 +620,18 @@ enum LearnSub {
         #[arg(long)]
         correction: String,
     },
+    /// Process hook input from AI agents (reads JSON from stdin)
+    Hook {
+        /// AI agent format
+        #[arg(long, value_enum, default_value = "claude")]
+        format: learnings::AgentFormat,
+    },
+    /// Install hook for AI agent
+    InstallHook {
+        /// AI agent to install hook for
+        #[arg(value_enum)]
+        agent: learnings::AgentType,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -1567,6 +1579,12 @@ async fn run_offline_command(command: Command) -> Result<()> {
                     println!("(Not yet implemented)");
                     Ok(())
                 }
+                LearnSub::Hook { format } => learnings::process_hook_input(format)
+                    .await
+                    .map_err(|e| e.into()),
+                LearnSub::InstallHook { agent } => {
+                    learnings::install_hook(agent).await.map_err(|e| e.into())
+                }
             }
         }
         Command::Interactive => {
@@ -2139,6 +2157,12 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                     println!("Adding correction to learning {}: {}", id, correction);
                     println!("(Not yet implemented)");
                     Ok(())
+                }
+                LearnSub::Hook { format } => learnings::process_hook_input(format)
+                    .await
+                    .map_err(|e| e.into()),
+                LearnSub::InstallHook { agent } => {
+                    learnings::install_hook(agent).await.map_err(|e| e.into())
                 }
             }
         }
