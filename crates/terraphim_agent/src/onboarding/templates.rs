@@ -9,6 +9,7 @@
 //! - Log Analyst
 
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
@@ -297,14 +298,28 @@ impl ConfigTemplate {
             public: false,
             publish: false,
         });
-        role.haystacks = vec![Haystack {
-            location,
-            service: ServiceType::Ripgrep,
-            read_only: true,
-            fetch_content: false,
-            atomic_server_secret: None,
-            extra_parameters: Default::default(),
-        }];
+        role.haystacks = vec![
+            Haystack {
+                location,
+                service: ServiceType::Ripgrep,
+                read_only: true,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: Default::default(),
+            },
+            Haystack {
+                location: "https://grep.app".to_string(),
+                service: ServiceType::GrepApp,
+                read_only: true,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: {
+                    let mut params = HashMap::new();
+                    params.insert("language".to_string(), "javascript".to_string());
+                    params
+                },
+            },
+        ];
         role.llm_enabled = false;
         role
     }
@@ -328,14 +343,28 @@ impl ConfigTemplate {
             public: false,
             publish: false,
         });
-        role.haystacks = vec![Haystack {
-            location,
-            service: ServiceType::Ripgrep,
-            read_only: true,
-            fetch_content: false,
-            atomic_server_secret: None,
-            extra_parameters: Default::default(),
-        }];
+        role.haystacks = vec![
+            Haystack {
+                location,
+                service: ServiceType::Ripgrep,
+                read_only: true,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: Default::default(),
+            },
+            Haystack {
+                location: "https://grep.app".to_string(),
+                service: ServiceType::GrepApp,
+                read_only: true,
+                fetch_content: false,
+                atomic_server_secret: None,
+                extra_parameters: {
+                    let mut params = HashMap::new();
+                    params.insert("language".to_string(), "python".to_string());
+                    params
+                },
+            },
+        ];
         role.llm_enabled = false;
         role
     }
@@ -599,6 +628,15 @@ mod tests {
         assert_eq!(role.shortname, Some("frontend".to_string()));
         assert_eq!(role.relevance_function, RelevanceFunction::BM25Plus);
         assert!(role.kg.is_some());
+
+        // Verify dual haystack configuration
+        assert_eq!(role.haystacks.len(), 2);
+        assert_eq!(role.haystacks[0].service, ServiceType::Ripgrep);
+        assert_eq!(role.haystacks[1].service, ServiceType::GrepApp);
+        assert_eq!(
+            role.haystacks[1].extra_parameters.get("language"),
+            Some(&"javascript".to_string())
+        );
     }
 
     #[test]
@@ -611,6 +649,15 @@ mod tests {
         assert_eq!(role.shortname, Some("python".to_string()));
         assert_eq!(role.relevance_function, RelevanceFunction::BM25F);
         assert!(role.kg.is_some());
+
+        // Verify dual haystack configuration
+        assert_eq!(role.haystacks.len(), 2);
+        assert_eq!(role.haystacks[0].service, ServiceType::Ripgrep);
+        assert_eq!(role.haystacks[1].service, ServiceType::GrepApp);
+        assert_eq!(
+            role.haystacks[1].extra_parameters.get("language"),
+            Some(&"python".to_string())
+        );
     }
 
     #[test]
