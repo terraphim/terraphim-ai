@@ -38,11 +38,13 @@ impl ConfigTemplate {
     pub fn build_role(&self, custom_path: Option<&str>) -> Role {
         match self.id.as_str() {
             "terraphim-engineer" => self.build_terraphim_engineer(custom_path),
+            "terraphim-engineer-v2" => self.build_terraphim_engineer_v2(custom_path),
             "llm-enforcer" => self.build_llm_enforcer(custom_path),
             "rust-engineer" => self.build_rust_engineer(),
             "local-notes" => self.build_local_notes(custom_path),
             "ai-engineer" => self.build_ai_engineer(custom_path),
             "log-analyst" => self.build_log_analyst(),
+            "frontend-engineer" => self.build_frontend_engineer(custom_path),
             _ => self.build_terraphim_engineer(custom_path), // Default fallback
         }
     }
@@ -62,6 +64,39 @@ impl ConfigTemplate {
                 "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json".to_string(),
             )),
             knowledge_graph_local: None,
+            public: true,
+            publish: false,
+        });
+        role.haystacks = vec![Haystack {
+            location,
+            service: ServiceType::Ripgrep,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: Default::default(),
+        }];
+        role.llm_enabled = false;
+        role
+    }
+
+    fn build_terraphim_engineer_v2(&self, custom_path: Option<&str>) -> Role {
+        let location = custom_path
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "~/projects".to_string());
+
+        let mut role = Role::new("Terraphim Engineer v2");
+        role.shortname = Some("terra2".to_string());
+        role.relevance_function = RelevanceFunction::TerraphimGraph;
+        role.terraphim_it = true;
+        role.theme = "spacelab".to_string();
+        role.kg = Some(KnowledgeGraph {
+            automata_path: Some(AutomataPath::Remote(
+                "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json".to_string(),
+            )),
+            knowledge_graph_local: Some(KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/terraphim"),
+            }),
             public: true,
             publish: false,
         });
@@ -211,6 +246,37 @@ impl ConfigTemplate {
         role.llm_enabled = false;
         role
     }
+
+    fn build_frontend_engineer(&self, custom_path: Option<&str>) -> Role {
+        let location = custom_path
+            .map(|s| s.to_string())
+            .unwrap_or_else(|| "~/projects".to_string());
+
+        let mut role = Role::new("FrontEnd Engineer");
+        role.shortname = Some("frontend".to_string());
+        role.relevance_function = RelevanceFunction::BM25Plus;
+        role.terraphim_it = false;
+        role.theme = "yeti".to_string();
+        role.kg = Some(KnowledgeGraph {
+            automata_path: None,
+            knowledge_graph_local: Some(KnowledgeGraphLocal {
+                input_type: KnowledgeGraphInputType::Markdown,
+                path: PathBuf::from("docs/frontend"),
+            }),
+            public: false,
+            publish: false,
+        });
+        role.haystacks = vec![Haystack {
+            location,
+            service: ServiceType::Ripgrep,
+            read_only: true,
+            fetch_content: false,
+            atomic_server_secret: None,
+            extra_parameters: Default::default(),
+        }];
+        role.llm_enabled = false;
+        role
+    }
 }
 
 /// Registry of all available templates
@@ -285,6 +351,25 @@ impl TemplateRegistry {
                 has_llm: false,
                 has_kg: false,
             },
+            ConfigTemplate {
+                id: "frontend-engineer".to_string(),
+                name: "FrontEnd Engineer".to_string(),
+                description: "JavaScript/TypeScript/CSS development with BM25Plus ranking"
+                    .to_string(),
+                requires_path: true,
+                default_path: Some("~/projects".to_string()),
+                has_llm: false,
+                has_kg: true,
+            },
+            ConfigTemplate {
+                id: "terraphim-engineer-v2".to_string(),
+                name: "Terraphim Engineer v2".to_string(),
+                description: "Terraphim development with hybrid KG (remote + local)".to_string(),
+                requires_path: true,
+                default_path: Some("~/projects".to_string()),
+                has_llm: false,
+                has_kg: true,
+            },
         ];
 
         Self { templates }
@@ -327,16 +412,18 @@ mod tests {
     }
 
     #[test]
-    fn test_template_registry_has_all_six_templates() {
+    fn test_template_registry_has_all_eight_templates() {
         let registry = TemplateRegistry::new();
-        assert_eq!(registry.list().len(), 6);
+        assert_eq!(registry.list().len(), 8);
 
         assert!(registry.get("terraphim-engineer").is_some());
+        assert!(registry.get("terraphim-engineer-v2").is_some());
         assert!(registry.get("llm-enforcer").is_some());
         assert!(registry.get("rust-engineer").is_some());
         assert!(registry.get("local-notes").is_some());
         assert!(registry.get("ai-engineer").is_some());
         assert!(registry.get("log-analyst").is_some());
+        assert!(registry.get("frontend-engineer").is_some());
     }
 
     #[test]
@@ -389,5 +476,33 @@ mod tests {
         assert!(role.llm_enabled);
         assert!(role.extra.contains_key("llm_provider"));
         assert!(role.extra.contains_key("ollama_model"));
+    }
+
+    #[test]
+    fn test_build_frontend_engineer() {
+        let registry = TemplateRegistry::new();
+        let template = registry.get("frontend-engineer").unwrap();
+        let role = template.build_role(None);
+
+        assert_eq!(role.name.to_string(), "FrontEnd Engineer");
+        assert_eq!(role.shortname, Some("frontend".to_string()));
+        assert_eq!(role.relevance_function, RelevanceFunction::BM25Plus);
+        assert!(role.kg.is_some());
+    }
+
+    #[test]
+    fn test_build_terraphim_engineer_v2() {
+        let registry = TemplateRegistry::new();
+        let template = registry.get("terraphim-engineer-v2").unwrap();
+        let role = template.build_role(None);
+
+        assert_eq!(role.name.to_string(), "Terraphim Engineer v2");
+        assert_eq!(role.shortname, Some("terra2".to_string()));
+        assert_eq!(role.relevance_function, RelevanceFunction::TerraphimGraph);
+
+        // Check hybrid KG
+        let kg = role.kg.unwrap();
+        assert!(kg.automata_path.is_some()); // Remote
+        assert!(kg.knowledge_graph_local.is_some()); // Local
     }
 }
