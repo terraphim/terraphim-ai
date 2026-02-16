@@ -41,7 +41,7 @@ impl ConfigTemplate {
             "terraphim-engineer-v2" => self.build_terraphim_engineer_v2(custom_path),
             "llm-enforcer" => self.build_llm_enforcer(custom_path),
             "rust-engineer" => self.build_rust_engineer(),
-            "rust-engineer-v2" => self.build_rust_engineer_v2(custom_path),
+            "rust-engineer-v2" => self.build_rust_engineer_v2(),
             "local-notes" => self.build_local_notes(custom_path),
             "ai-engineer" => self.build_ai_engineer(custom_path),
             "log-analyst" => self.build_log_analyst(),
@@ -164,25 +164,13 @@ impl ConfigTemplate {
         role
     }
 
-    fn build_rust_engineer_v2(&self, custom_path: Option<&str>) -> Role {
-        let location = custom_path
-            .map(|s| s.to_string())
-            .unwrap_or_else(|| "~/projects".to_string());
-
+    fn build_rust_engineer_v2(&self) -> Role {
         let mut role = Role::new("Rust Engineer v2");
         role.shortname = Some("rust2".to_string());
-        role.relevance_function = RelevanceFunction::BM25F;
+        role.relevance_function = RelevanceFunction::TitleScorer;
         role.terraphim_it = false;
         role.theme = "cosmo".to_string();
-        role.kg = Some(KnowledgeGraph {
-            automata_path: None,
-            knowledge_graph_local: Some(KnowledgeGraphLocal {
-                input_type: KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/rust"),
-            }),
-            public: false,
-            publish: false,
-        });
+        role.kg = None;
         role.haystacks = vec![
             Haystack {
                 location: "https://query.rs".to_string(),
@@ -193,7 +181,7 @@ impl ConfigTemplate {
                 extra_parameters: Default::default(),
             },
             Haystack {
-                location,
+                location: "~/projects".to_string(),
                 service: ServiceType::Ripgrep,
                 read_only: true,
                 fetch_content: false,
@@ -330,7 +318,7 @@ impl ConfigTemplate {
         role.shortname = Some("python".to_string());
         role.relevance_function = RelevanceFunction::BM25F;
         role.terraphim_it = false;
-        role.theme = "flatly".to_string();
+        role.theme = "sandstone".to_string();
         role.kg = Some(KnowledgeGraph {
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
@@ -447,11 +435,11 @@ impl TemplateRegistry {
             ConfigTemplate {
                 id: "rust-engineer-v2".to_string(),
                 name: "Rust Engineer v2".to_string(),
-                description: "Advanced Rust search with BM25F field-weighted ranking".to_string(),
+                description: "Rust development with docs.rs + local code search".to_string(),
                 requires_path: false,
                 default_path: None,
                 has_llm: false,
-                has_kg: true,
+                has_kg: false,
             },
             ConfigTemplate {
                 id: "terraphim-engineer-v2".to_string(),
@@ -610,6 +598,18 @@ mod tests {
         assert_eq!(role.name.to_string(), "FrontEnd Engineer");
         assert_eq!(role.shortname, Some("frontend".to_string()));
         assert_eq!(role.relevance_function, RelevanceFunction::BM25Plus);
+        assert!(role.kg.is_some());
+    }
+
+    #[test]
+    fn test_build_python_engineer() {
+        let registry = TemplateRegistry::new();
+        let template = registry.get("python-engineer").unwrap();
+        let role = template.build_role(None);
+
+        assert_eq!(role.name.to_string(), "Python Engineer");
+        assert_eq!(role.shortname, Some("python".to_string()));
+        assert_eq!(role.relevance_function, RelevanceFunction::BM25F);
         assert!(role.kg.is_some());
     }
 
