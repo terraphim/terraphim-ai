@@ -97,7 +97,19 @@ Add to your Claude Code configuration to automatically capture failed Bash comma
 ```json
 {
   "hooks": {
-    "PostToolUse": ".claude/hooks/learning-capture.sh"
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tools": ["BashTool"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/learning-capture.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
