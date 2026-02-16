@@ -36,10 +36,22 @@ terraphim-agent learn capture "git push -f" \
 Enable automatic capture of all failed Bash commands:
 
 ```bash
-# Add to .claude/config.json
+# Add to .claude/settings.json
 {
   "hooks": {
-    "PostToolUse": ".claude/hooks/learning-capture.sh"
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tools": ["BashTool"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/learning-capture.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
@@ -150,12 +162,24 @@ The following are automatically ignored (not captured):
 
 ### Hook Configuration
 
-Create or edit `.claude/config.json`:
+Create or edit `.claude/settings.json`:
 
 ```json
 {
   "hooks": {
-    "PostToolUse": ".claude/hooks/learning-capture.sh"
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tools": ["BashTool"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/learning-capture.sh"
+          }
+        ]
+      }
+    ]
   }
 }
 ```
