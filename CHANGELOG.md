@@ -28,6 +28,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Hook Integration**:
   - `.claude/hooks/learning-capture.sh` - PostToolUse hook for automatic capture
+  - **Native Hook Support** (`terraphim-agent learn hook`):
+    - Process hook input directly without bash wrapper
+    - `terraphim-agent learn hook [--format=claude]` - Reads JSON from stdin
+    - `terraphim-agent learn install-hook <claude|codex|opencode>` - One-command setup
+    - No external dependencies (no jq required)
+    - 156 tests covering hook functionality
   - Automatic capture of failed Bash commands
   - Secret redaction before storage
   - Fail-open design (continues even if capture fails)
