@@ -9,7 +9,7 @@ use terraphim_types::RelevanceFunction;
 // Re-export from the agent crate's onboarding module
 // Note: These tests use the public API of the onboarding module
 
-/// Test that all 6 templates are available and can be applied
+/// Test that all 10 templates are available and can be applied
 #[test]
 fn test_all_templates_available() {
     use terraphim_agent::onboarding::TemplateRegistry;
@@ -17,15 +17,19 @@ fn test_all_templates_available() {
     let registry = TemplateRegistry::new();
     let templates = registry.list();
 
-    assert_eq!(templates.len(), 6, "Should have exactly 6 templates");
+    assert_eq!(templates.len(), 10, "Should have exactly 10 templates");
 
     let expected_ids = [
         "terraphim-engineer",
+        "terraphim-engineer-v2",
         "llm-enforcer",
         "rust-engineer",
+        "rust-engineer-v2",
         "local-notes",
         "ai-engineer",
         "log-analyst",
+        "frontend-engineer",
+        "python-engineer",
     ];
 
     for id in expected_ids {
