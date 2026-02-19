@@ -16,7 +16,6 @@
 //! 2. Create correction knowledge graph (wrong -> right)
 //! 3. Use replace tool to suggest corrections
 
-use std::collections::HashMap;
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::{
     Document, DocumentType, NormalizedTerm, NormalizedTermValue, RoleName, Thesaurus,
@@ -27,6 +26,7 @@ use terraphim_types::{
 struct FailedCommand {
     wrong_command: String,
     error_output: String,
+    #[allow(dead_code)]
     correct_command: String,
     context: String,
 }
@@ -360,6 +360,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for query in test_queries {
         println!("\n--- Query: '{}' ---", query);
 
+        // Use demonstrate_correction function
+        demonstrate_correction(&initial_graph, query).await;
+        demonstrate_correction(&enhanced_graph, query).await;
+
         // Initial
         let initial_results = initial_graph
             .query_graph(query, Some(0), Some(3))
@@ -368,7 +372,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             println!("  Initial: No correction found");
         } else {
             println!("  Initial: {} results", initial_results.len());
-            for (doc_id, doc) in initial_results.iter().take(1) {
+            for (doc_id, _doc) in initial_results.iter().take(1) {
                 println!("    -> {}", doc_id);
             }
         }
