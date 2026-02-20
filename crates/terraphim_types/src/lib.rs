@@ -77,7 +77,8 @@
 //! );
 //! ```
 
-// HGNC Gene Normalization module
+// HGNC Gene Normalization module (feature-gated)
+#[cfg(feature = "hgnc")]
 pub mod hgnc;
 
 use ahash::AHashMap;
@@ -2132,7 +2133,8 @@ impl CoverageSignal {
     }
 }
 
-/// Entity types for oncology schema
+/// Entity types for oncology schema (feature-gated)
+#[cfg(feature = "medical")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum EntityType {
@@ -2145,7 +2147,8 @@ pub enum EntityType {
     SideEffect,
 }
 
-/// Relationship types for oncology schema
+/// Relationship types for oncology schema (feature-gated)
+#[cfg(feature = "medical")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum RelationshipType {
@@ -2160,8 +2163,8 @@ pub enum RelationshipType {
 /// Extracted entity from text
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractedEntity {
-    /// Type of entity
-    pub entity_type: EntityType,
+    /// Type of entity (string for generic cross-domain use)
+    pub entity_type: String,
     /// Raw value from text
     pub raw_value: String,
     /// Normalized value if available
@@ -2173,8 +2176,8 @@ pub struct ExtractedEntity {
 /// Extracted relationship from text
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExtractedRelationship {
-    /// Type of relationship
-    pub relationship_type: RelationshipType,
+    /// Type of relationship (string for generic cross-domain use)
+    pub relationship_type: String,
     /// Source entity
     pub source: String,
     /// Target entity

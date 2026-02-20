@@ -34,4 +34,8 @@ uuid = { version = "1.19.0", features = ["v4", "serde", "js"] }
 getrandom = { version = "0.3", features = ["wasm_js"] }
 
 [features]
+default = ["ontology"]
+ontology = []       # Core generic ontology (string-based types)
+medical = ["ontology"]  # Medical/oncology extensions
+hgnc = ["medical"] # HGNC gene normalization
 typescript = ["tsify", "wasm-bindgen"]
