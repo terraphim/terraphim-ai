@@ -3,9 +3,9 @@
 //! Specialized gene normalization for HGNC (HUGO Gene Nomenclature Committee) gene symbols.
 //! Handles exact matches, aliases, and fuzzy matching for gene names.
 
+use crate::GroundingMetadata;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::GroundingMetadata;
 
 /// HGNC gene entry
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -42,11 +42,7 @@ impl HgncNormalizer {
         normalizer.add_gene(HgncGene {
             symbol: "EGFR".to_string(),
             hgnc_id: "HGNC:3236".to_string(),
-            aliases: vec![
-                "ERBB".to_string(),
-                "ERBB1".to_string(),
-                "HER1".to_string(),
-            ],
+            aliases: vec!["ERBB".to_string(), "ERBB1".to_string(), "HER1".to_string()],
             name: "epidermal growth factor receptor".to_string(),
             gene_family: Some("EGFR".to_string()),
         });
@@ -151,7 +147,8 @@ impl HgncNormalizer {
             symbol: "PIK3CA".to_string(),
             hgnc_id: "HGNC:8979".to_string(),
             aliases: vec!["PI3K".to_string()],
-            name: "phosphatidylinositol-4,5-bisphosphate 3-kinase catalytic subunit alpha".to_string(),
+            name: "phosphatidylinositol-4,5-bisphosphate 3-kinase catalytic subunit alpha"
+                .to_string(),
             gene_family: Some("PI3K".to_string()),
         });
 
@@ -221,7 +218,8 @@ impl HgncNormalizer {
 
         // Add aliases
         for alias in &gene.aliases {
-            self.alias_map.insert(alias.to_lowercase(), symbol_lower.clone());
+            self.alias_map
+                .insert(alias.to_lowercase(), symbol_lower.clone());
         }
     }
 
@@ -232,8 +230,10 @@ impl HgncNormalizer {
         // Check direct symbol match
         if let Some(gene) = self.symbol_map.get(&symbol_lower) {
             return Some(GroundingMetadata::new(
-                format!("https://www.genenames.org/data/hgnc_data.php?appid={}",
-                    gene.hgnc_id.trim_start_matches("HGNC:")),
+                format!(
+                    "https://www.genenames.org/data/hgnc_data.php?appid={}",
+                    gene.hgnc_id.trim_start_matches("HGNC:")
+                ),
                 gene.symbol.clone(),
                 "HGNC".to_string(),
                 1.0,
@@ -245,8 +245,10 @@ impl HgncNormalizer {
         if let Some(symbol_key) = self.alias_map.get(&symbol_lower) {
             if let Some(gene) = self.symbol_map.get(symbol_key) {
                 return Some(GroundingMetadata::new(
-                    format!("https://www.genenames.org/data/hgnc_data.php?appid={}",
-                        gene.hgnc_id.trim_start_matches("HGNC:")),
+                    format!(
+                        "https://www.genenames.org/data/hgnc_data.php?appid={}",
+                        gene.hgnc_id.trim_start_matches("HGNC:")
+                    ),
                     gene.symbol.clone(),
                     "HGNC".to_string(),
                     0.95,
@@ -318,8 +320,10 @@ impl HgncNormalizer {
         // Fall back to fuzzy matching
         if let Some((gene, score)) = self.normalize_fuzzy(symbol) {
             return Some(GroundingMetadata::new(
-                format!("https://www.genenames.org/data/hgnc_data.php?appid={}",
-                    gene.hgnc_id.trim_start_matches("HGNC:")),
+                format!(
+                    "https://www.genenames.org/data/hgnc_data.php?appid={}",
+                    gene.hgnc_id.trim_start_matches("HGNC:")
+                ),
                 gene.symbol.clone(),
                 "HGNC".to_string(),
                 score,

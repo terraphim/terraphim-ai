@@ -3,18 +3,20 @@
 //! This example demonstrates how to use the Dynamic Ontology pipeline
 //! for extracting entities from text and normalizing them to an ontology.
 
+#[cfg(feature = "hgnc")]
 use terraphim_types::hgnc::HgncNormalizer;
-use terraphim_types::{
-    CoverageSignal, EntityType, ExtractedEntity, GroundingMetadata, RelationshipType, SchemaSignal,
-};
+use terraphim_types::{CoverageSignal, ExtractedEntity, GroundingMetadata, SchemaSignal};
 
 fn main() {
-    println!("=== Dynamic Ontology Usage Examples ===\n");
+    println!("=== Dynamic Ontology Usage Examples\n");
 
-    // Example 1: HGNC Gene Normalization
-    println!("1. HGNC Gene Normalization");
-    println!("---------------------------");
-    example_hgnc_normalization();
+    // Example 1: HGNC Gene Normalization (requires hgnc feature)
+    #[cfg(feature = "hgnc")]
+    {
+        println!("1. HGNC Gene Normalization");
+        println!("---------------------------");
+        example_hgnc_normalization();
+    }
 
     // Example 2: Coverage Signal
     println!("\n2. Coverage Signal Calculation");
@@ -32,6 +34,7 @@ fn main() {
     example_full_pipeline();
 }
 
+#[cfg(feature = "hgnc")]
 fn example_hgnc_normalization() {
     // Create a new HGNC normalizer with oncology genes
     let normalizer = HgncNormalizer::new();
@@ -68,10 +71,10 @@ fn example_hgnc_normalization() {
 }
 
 fn example_coverage_signal() {
-    // Create entities with varying grounding
+    // Create entities with varying grounding using string-based entity_type
     let entities = vec![
         ExtractedEntity {
-            entity_type: EntityType::CancerDiagnosis,
+            entity_type: "cancer_diagnosis".to_string(),
             raw_value: "non-small cell lung cancer".to_string(),
             normalized_value: Some("Non-Small Cell Lung Cancer".to_string()),
             grounding: Some(GroundingMetadata::new(
@@ -83,7 +86,7 @@ fn example_coverage_signal() {
             )),
         },
         ExtractedEntity {
-            entity_type: EntityType::Drug,
+            entity_type: "drug".to_string(),
             raw_value: "Osimertinib".to_string(),
             normalized_value: Some("Osimertinib".to_string()),
             grounding: Some(GroundingMetadata::new(
@@ -95,7 +98,7 @@ fn example_coverage_signal() {
             )),
         },
         ExtractedEntity {
-            entity_type: EntityType::GenomicVariant,
+            entity_type: "genomic_variant".to_string(),
             raw_value: "Unknown mutation".to_string(),
             normalized_value: None,
             grounding: None,
@@ -122,10 +125,10 @@ fn example_coverage_signal() {
 }
 
 fn example_schema_signal() {
-    // Create a schema signal from extracted oncology data
+    // Create a schema signal from extracted oncology data using string-based types
     let entities = vec![
         ExtractedEntity {
-            entity_type: EntityType::CancerDiagnosis,
+            entity_type: "cancer_diagnosis".to_string(),
             raw_value: "lung carcinoma".to_string(),
             normalized_value: Some("Lung Carcinoma".to_string()),
             grounding: Some(GroundingMetadata::new(
@@ -137,7 +140,7 @@ fn example_schema_signal() {
             )),
         },
         ExtractedEntity {
-            entity_type: EntityType::GenomicVariant,
+            entity_type: "genomic_variant".to_string(),
             raw_value: "EGFR L858R".to_string(),
             normalized_value: Some("EGFR L858R".to_string()),
             grounding: None,
@@ -163,24 +166,32 @@ fn example_full_pipeline() {
         "    Input: 'Patient with EGFR L858R mutation in lung carcinoma treated with Osimertinib'"
     );
     println!(
-        "    -> Extract: EGFR L858R (GenomicVariant), lung carcinoma (CancerDiagnosis), Osimertinib (Drug)"
+        "    -> Extract: EGFR L858R (genomic_variant), lung carcinoma (cancer_diagnosis), Osimertinib (drug)"
     );
 
     println!("\n  Step 2: Normalize entities to ontology");
-    let normalizer = HgncNormalizer::new();
 
-    // Normalize EGFR
-    let egfr = normalizer.normalize("EGFR");
-    println!(
-        "    EGFR -> {}",
-        egfr.as_ref()
-            .map(|g| format!(
-                "{} (score: {:.2})",
-                g.normalized_label.as_ref().unwrap(),
-                g.normalized_score.unwrap()
-            ))
-            .unwrap_or_else(|| "Not found".to_string())
-    );
+    #[cfg(feature = "hgnc")]
+    {
+        let normalizer = HgncNormalizer::new();
+        // Normalize EGFR
+        let egfr = normalizer.normalize("EGFR");
+        println!(
+            "    EGFR -> {}",
+            egfr.as_ref()
+                .map(|g| format!(
+                    "{} (score: {:.2})",
+                    g.normalized_label.as_ref().unwrap(),
+                    g.normalized_score.unwrap()
+                ))
+                .unwrap_or_else(|| "Not found".to_string())
+        );
+    }
+
+    #[cfg(not(feature = "hgnc"))]
+    {
+        println!("    (Enable 'hgnc' feature for gene normalization)");
+    }
 
     println!("\n  Step 3: Check coverage");
     println!("    2/3 entities grounded = 66.7% coverage");

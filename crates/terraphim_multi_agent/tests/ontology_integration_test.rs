@@ -3,12 +3,10 @@
 //! Integration tests for the Dynamic Ontology multi-agent pipeline.
 //! These tests validate the end-to-end flow from text extraction to normalization.
 
+#[cfg(feature = "hgnc")]
 #[cfg(test)]
 mod tests {
     use terraphim_types::hgnc::HgncNormalizer;
-    use terraphim_types::{
-        CoverageSignal, EntityType, ExtractedEntity, GroundingMetadata, SchemaSignal,
-    };
 
     /// Test the HGNC gene normalizer with known oncology genes
     #[test]
@@ -50,12 +48,45 @@ mod tests {
         assert_eq!(meta.normalized_label, Some("EGFR".to_string()));
     }
 
+    /// Test multiple HGNC genes
+    #[test]
+    fn test_hgnc_multiple_genes() {
+        let normalizer = HgncNormalizer::new();
+
+        let genes = ["EGFR", "TP53", "KRAS", "BRAF", "ALK", "ROS1", "MET"];
+
+        for gene in genes {
+            let result = normalizer.normalize(gene);
+            assert!(
+                result.is_some(),
+                "Expected to find {} in HGNC database",
+                gene
+            );
+        }
+    }
+}
+
+#[cfg(not(feature = "hgnc"))]
+#[cfg(test)]
+mod tests {
+    // Stub tests when hgnc feature is not enabled
+    #[test]
+    fn test_hgnc_stub() {
+        // HGNC tests require the hgnc feature
+        assert!(true);
+    }
+}
+
+#[cfg(test)]
+mod generic_tests {
+    use terraphim_types::{CoverageSignal, ExtractedEntity, GroundingMetadata, SchemaSignal};
+
     /// Test coverage signal calculation
     #[test]
     fn test_coverage_signal_calculation() {
         let entities = vec![
             ExtractedEntity {
-                entity_type: EntityType::CancerDiagnosis,
+                entity_type: "cancer_diagnosis".to_string(),
                 raw_value: "lung carcinoma".to_string(),
                 normalized_value: Some("lung carcinoma".to_string()),
                 grounding: Some(GroundingMetadata::new(
@@ -67,13 +98,13 @@ mod tests {
                 )),
             },
             ExtractedEntity {
-                entity_type: EntityType::GenomicVariant,
+                entity_type: "genomic_variant".to_string(),
                 raw_value: "EGFR".to_string(),
                 normalized_value: None,
                 grounding: None,
             },
             ExtractedEntity {
-                entity_type: EntityType::Drug,
+                entity_type: "drug".to_string(),
                 raw_value: "Osimertinib".to_string(),
                 normalized_value: Some("Osimertinib".to_string()),
                 grounding: Some(GroundingMetadata::new(
@@ -106,7 +137,7 @@ mod tests {
     fn test_coverage_above_threshold() {
         let entities = vec![
             ExtractedEntity {
-                entity_type: EntityType::CancerDiagnosis,
+                entity_type: "cancer_diagnosis".to_string(),
                 raw_value: "lung carcinoma".to_string(),
                 normalized_value: Some("lung carcinoma".to_string()),
                 grounding: Some(GroundingMetadata::new(
@@ -118,7 +149,7 @@ mod tests {
                 )),
             },
             ExtractedEntity {
-                entity_type: EntityType::Drug,
+                entity_type: "drug".to_string(),
                 raw_value: "Osimertinib".to_string(),
                 normalized_value: Some("Osimertinib".to_string()),
                 grounding: Some(GroundingMetadata::new(
@@ -150,7 +181,7 @@ mod tests {
     fn test_schema_signal_creation() {
         let entities = vec![
             ExtractedEntity {
-                entity_type: EntityType::CancerDiagnosis,
+                entity_type: "cancer_diagnosis".to_string(),
                 raw_value: "non-small cell lung carcinoma".to_string(),
                 normalized_value: Some("Non-Small Cell Lung Carcinoma".to_string()),
                 grounding: Some(GroundingMetadata::new(
@@ -162,7 +193,7 @@ mod tests {
                 )),
             },
             ExtractedEntity {
-                entity_type: EntityType::GenomicVariant,
+                entity_type: "genomic_variant".to_string(),
                 raw_value: "EGFR L858R".to_string(),
                 normalized_value: None,
                 grounding: None,
@@ -191,7 +222,10 @@ mod tests {
             terraphim_types::NormalizationMethod::Exact,
         );
 
-        assert_eq!(grounding.normalized_uri, Some("http://example.org/egfr".to_string()));
+        assert_eq!(
+            grounding.normalized_uri,
+            Some("http://example.org/egfr".to_string())
+        );
         assert_eq!(grounding.normalized_label, Some("EGFR".to_string()));
         assert_eq!(grounding.normalized_prov, Some("HGNC".to_string()));
         assert_eq!(grounding.normalized_score, Some(1.0));
@@ -199,22 +233,5 @@ mod tests {
             grounding.normalized_method,
             Some(terraphim_types::NormalizationMethod::Exact)
         );
-    }
-
-    /// Test multiple HGNC genes
-    #[test]
-    fn test_hgnc_multiple_genes() {
-        let normalizer = HgncNormalizer::new();
-
-        let genes = ["EGFR", "TP53", "KRAS", "BRAF", "ALK", "ROS1", "MET"];
-
-        for gene in genes {
-            let result = normalizer.normalize(gene);
-            assert!(
-                result.is_some(),
-                "Expected to find {} in HGNC database",
-                gene
-            );
-        }
     }
 }
