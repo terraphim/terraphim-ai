@@ -2025,6 +2025,164 @@ pub struct AgentCommunication {
     pub timestamp: chrono::DateTime<chrono::Utc>,
 }
 
+// ============================================================================
+// Dynamic Ontology Types - Schema-First Knowledge Graph with Grounding
+// ============================================================================
+
+/// Normalization method used for grounding
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum NormalizationMethod {
+    /// Exact match via Aho-Corasick
+    Exact,
+    /// Fuzzy match via Levenshtein or Jaro-Winkler
+    Fuzzy,
+    /// Graph rank-based prioritization
+    GraphRank,
+}
+
+impl Default for NormalizationMethod {
+    fn default() -> Self {
+        NormalizationMethod::Exact
+    }
+}
+
+/// Grounding metadata for normalized terms (Dynamic Ontology)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GroundingMetadata {
+    /// Canonical URI from ontology (NCIt, HGNC, etc.)
+    pub normalized_uri: Option<String>,
+    /// Human-friendly label for display
+    pub normalized_label: Option<String>,
+    /// Source ontology (NCIt, HGNC, custom)
+    pub normalized_prov: Option<String>,
+    /// Similarity/confidence score (0.0 - 1.0)
+    pub normalized_score: Option<f32>,
+    /// Method used for normalization
+    pub normalized_method: Option<NormalizationMethod>,
+}
+
+impl GroundingMetadata {
+    /// Create new grounding metadata with URI and score
+    pub fn new(uri: String, label: String, prov: String, score: f32, method: NormalizationMethod) -> Self {
+        Self {
+            normalized_uri: Some(uri),
+            normalized_label: Some(label),
+            normalized_prov: Some(prov),
+            normalized_score: Some(score),
+            normalized_method: Some(method),
+        }
+    }
+}
+
+impl Default for GroundingMetadata {
+    fn default() -> Self {
+        Self {
+            normalized_uri: None,
+            normalized_label: None,
+            normalized_prov: None,
+            normalized_score: None,
+            normalized_method: None,
+        }
+    }
+}
+
+/// Coverage governance signal
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CoverageSignal {
+    /// Total categories in extracted schema
+    pub total_categories: usize,
+    /// Categories matched in ontology catalog
+    pub matched_categories: usize,
+    /// Coverage ratio = matched/total
+    pub coverage_ratio: f32,
+    /// Threshold for needing review
+    pub threshold: f32,
+    /// Whether this needs human review
+    pub needs_review: bool,
+}
+
+impl CoverageSignal {
+    /// Compute coverage signal from categories and matched count
+    pub fn compute(categories: &[String], matched: usize, threshold: f32) -> Self {
+        let total = categories.len();
+        let ratio = if total > 0 {
+            matched as f32 / total as f32
+        } else {
+            0.0
+        };
+        Self {
+            total_categories: total,
+            matched_categories: matched,
+            coverage_ratio: ratio,
+            threshold,
+            needs_review: ratio < threshold,
+        }
+    }
+}
+
+/// Entity types for oncology schema
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum EntityType {
+    CancerDiagnosis,
+    Tumor,
+    GenomicVariant,
+    Biomarker,
+    Drug,
+    Treatment,
+    SideEffect,
+}
+
+/// Relationship types for oncology schema
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum RelationshipType {
+    HasTumor,
+    HasVariant,
+    HasBiomarker,
+    TreatedWith,
+    Causes,
+    HasDiagnosis,
+}
+
+/// Extracted entity from text
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractedEntity {
+    /// Type of entity
+    pub entity_type: EntityType,
+    /// Raw value from text
+    pub raw_value: String,
+    /// Normalized value if available
+    pub normalized_value: Option<String>,
+    /// Grounding metadata
+    pub grounding: Option<GroundingMetadata>,
+}
+
+/// Extracted relationship from text
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExtractedRelationship {
+    /// Type of relationship
+    pub relationship_type: RelationshipType,
+    /// Source entity
+    pub source: String,
+    /// Target entity
+    pub target: String,
+    /// Confidence score
+    pub confidence: f32,
+}
+
+/// Schema signal extracted from text
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SchemaSignal {
+    /// Extracted entities
+    pub entities: Vec<ExtractedEntity>,
+    /// Extracted relationships
+    pub relationships: Vec<ExtractedRelationship>,
+    /// Overall confidence score
+    pub confidence: f32,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
