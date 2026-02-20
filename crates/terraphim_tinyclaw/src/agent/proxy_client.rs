@@ -269,6 +269,7 @@ pub struct ToolDefinition {
 
 /// Response from the proxy.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ProxyResponse {
     pub content: Option<String>,
     pub tool_calls: Vec<ToolCall>,
@@ -279,6 +280,7 @@ pub struct ProxyResponse {
 
 /// Token usage information.
 #[derive(Debug, Default)]
+#[allow(dead_code)]
 pub struct TokenUsage {
     pub input_tokens: u32,
     pub output_tokens: u32,

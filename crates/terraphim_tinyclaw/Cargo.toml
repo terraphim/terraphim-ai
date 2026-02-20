@@ -11,11 +11,6 @@ name = "terraphim-tinyclaw"
 path = "src/main.rs"
 
 [dependencies]
-# Terraphim crates
-terraphim_multi_agent = { path = "../terraphim_multi_agent" }
-terraphim_config = { path = "../terraphim_config" }
-terraphim_automata = { path = "../terraphim_automata" }
-
 # Async runtime
 tokio = { workspace = true }
 tokio-util = { version = "0.7", features = ["rt"] }
