@@ -4,9 +4,11 @@
 //! to provide specific functionality like summarization, chat, and other domain-specific tasks.
 
 pub mod chat_agent;
+pub mod ontology_agents;
 pub mod summarization_agent;
 
 pub use chat_agent::*;
+pub use ontology_agents::*;
 pub use summarization_agent::*;
 
 // Re-export commonly used types

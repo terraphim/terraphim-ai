@@ -9,13 +9,12 @@
 //! The workflow returns a grounded knowledge graph with normalized entities.
 
 use crate::{
-    GenAiLlmClient, LlmMessage, LlmRequest, MultiAgentError, MultiAgentResult,
-    ProviderConfig,
+    GenAiLlmClient, LlmMessage, LlmRequest, MultiAgentError, MultiAgentResult, ProviderConfig,
 };
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use terraphim_types::{CoverageSignal, ExtractedEntity, GroundingMetadata, SchemaSignal};
 use tokio::sync::RwLock;
-use std::sync::Arc;
 
 /// Result of the Dynamic Ontology workflow
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -118,7 +117,10 @@ pub struct OntologyWorkflow {
 
 impl OntologyWorkflow {
     /// Create a new ontology workflow
-    pub fn new(config: OntologyWorkflowConfig, ontology_terms: Vec<String>) -> MultiAgentResult<Self> {
+    pub fn new(
+        config: OntologyWorkflowConfig,
+        ontology_terms: Vec<String>,
+    ) -> MultiAgentResult<Self> {
         let llm_client = GenAiLlmClient::new(
             config.provider.clone(),
             ProviderConfig {
@@ -180,7 +182,9 @@ impl OntologyWorkflow {
             review_triggered = true;
             log::info!("Low coverage detected, routing to Review Agent");
 
-            let reviewed = self.review_and_improve(&mut grounded_entities, &coverage).await?;
+            let reviewed = self
+                .review_and_improve(&mut grounded_entities, &coverage)
+                .await?;
             grounded_entities = reviewed;
             normalization_iterations += 1;
         }
@@ -248,7 +252,9 @@ Text to analyze:
         );
 
         let request = LlmRequest::new(vec![
-            LlmMessage::system("You extract entities and relationships for ontology building.".to_string()),
+            LlmMessage::system(
+                "You extract entities and relationships for ontology building.".to_string(),
+            ),
             LlmMessage::user(extraction_prompt),
         ])
         .with_temperature(self.config.temperature)
@@ -257,8 +263,9 @@ Text to analyze:
         let response = client.generate(request).await?;
 
         // Parse the JSON response
-        let schema_signal: SchemaSignal = serde_json::from_str(&response.content)
-            .map_err(|e| MultiAgentError::LlmError(format!("Failed to parse extraction response: {}", e)))?;
+        let schema_signal: SchemaSignal = serde_json::from_str(&response.content).map_err(|e| {
+            MultiAgentError::LlmError(format!("Failed to parse extraction response: {}", e))
+        })?;
 
         Ok(schema_signal)
     }
@@ -303,7 +310,9 @@ If no match found, respond with:
   "normalized_score": null,
   "normalized_method": null
 }}"#,
-                ontology_list, entity.raw_value, format!("{:?}", entity.entity_type)
+                ontology_list,
+                entity.raw_value,
+                format!("{:?}", entity.entity_type)
             );
 
             let request = LlmRequest::new(vec![
@@ -335,7 +344,10 @@ If no match found, respond with:
     }
 
     /// Coverage Agent: Check ontology coverage
-    async fn check_coverage(&self, entities: &[ExtractedEntity]) -> MultiAgentResult<CoverageSignal> {
+    async fn check_coverage(
+        &self,
+        entities: &[ExtractedEntity],
+    ) -> MultiAgentResult<CoverageSignal> {
         // Extract unique entity categories (types + raw values)
         let categories: Vec<String> = entities
             .iter()
@@ -343,13 +355,11 @@ If no match found, respond with:
             .collect();
 
         // Count matched entities (those with grounding)
-        let matched = entities
-            .iter()
-            .filter(|e| e.grounding.is_some())
-            .count();
+        let matched = entities.iter().filter(|e| e.grounding.is_some()).count();
 
         // Calculate coverage
-        let coverage = CoverageSignal::compute(&categories, matched, self.config.coverage_threshold);
+        let coverage =
+            CoverageSignal::compute(&categories, matched, self.config.coverage_threshold);
 
         Ok(coverage)
     }
@@ -364,10 +374,7 @@ If no match found, respond with:
         client.set_model(self.config.review_model.clone());
 
         // Find unmatched entities
-        let unmatched: Vec<_> = entities
-            .iter()
-            .filter(|e| e.grounding.is_none())
-            .collect();
+        let unmatched: Vec<_> = entities.iter().filter(|e| e.grounding.is_none()).collect();
 
         let review_prompt = format!(
             r#"You are a Review Agent for Dynamic Ontology.
@@ -403,7 +410,9 @@ Respond with ONLY valid JSON array:
         );
 
         let request = LlmRequest::new(vec![
-            LlmMessage::system("You improve ontology coverage by suggesting better matches.".to_string()),
+            LlmMessage::system(
+                "You improve ontology coverage by suggesting better matches.".to_string(),
+            ),
             LlmMessage::user(review_prompt),
         ])
         .with_temperature(self.config.temperature)
@@ -424,8 +433,13 @@ Respond with ONLY valid JSON array:
 
         if let Ok(suggestions) = serde_json::from_str::<Vec<ReviewSuggestion>>(&response.content) {
             for suggestion in suggestions {
-                if let Some(entity) = entities.iter_mut().find(|e| e.raw_value == suggestion.original) {
-                    if let (Some(uri), Some(label)) = (suggestion.suggested_uri, suggestion.suggested_label) {
+                if let Some(entity) = entities
+                    .iter_mut()
+                    .find(|e| e.raw_value == suggestion.original)
+                {
+                    if let (Some(uri), Some(label)) =
+                        (suggestion.suggested_uri, suggestion.suggested_label)
+                    {
                         entity.grounding = Some(GroundingMetadata::new(
                             uri,
                             label.clone(),
