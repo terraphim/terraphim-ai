@@ -8,6 +8,8 @@
 //! - **Conversation Context**: [`Conversation`], [`ChatMessage`], [`ContextItem`]
 //! - **LLM Routing**: [`RoutingRule`], [`RoutingDecision`], [`Priority`]
 //! - **Multi-Agent Coordination**: [`MultiAgentContext`], [`AgentInfo`]
+//! - **Dynamic Ontology**: [`SchemaSignal`], [`ExtractedEntity`], [`CoverageSignal`], [`GroundingMetadata`]
+//! - **HGNC Gene Normalization**: [`HgncGene`], [`HgncNormalizer`]
 //!
 //! # Features
 //!
@@ -74,6 +76,9 @@
 //!         .with_url("https://rust-lang.org".to_string())
 //! );
 //! ```
+
+// HGNC Gene Normalization module
+pub mod hgnc;
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -2064,7 +2069,13 @@ pub struct GroundingMetadata {
 
 impl GroundingMetadata {
     /// Create new grounding metadata with URI and score
-    pub fn new(uri: String, label: String, prov: String, score: f32, method: NormalizationMethod) -> Self {
+    pub fn new(
+        uri: String,
+        label: String,
+        prov: String,
+        score: f32,
+        method: NormalizationMethod,
+    ) -> Self {
         Self {
             normalized_uri: Some(uri),
             normalized_label: Some(label),
