@@ -1,6 +1,6 @@
 [package]
 name = "terraphim_types"
-version = "1.4.10"
+version = "1.6.0"
 edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Core types crate for Terraphim AI"
