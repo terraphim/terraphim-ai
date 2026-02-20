@@ -57,6 +57,10 @@
 - [Bug Reporting Terminology](./kg/bug-reporting.md)
 - [Issue Tracking Terminology](./kg/issue-tracking.md)
 
+## Dynamic Ontology
+
+- [Dynamic Ontology](./dynamic-ontology.md)
+
 ## Domains
 
 - [VM](./domains/vm/README.md)
