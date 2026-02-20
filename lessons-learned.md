@@ -491,3 +491,143 @@ git merge origin/main
 ```
 
 **Best Practice**: Before starting fix work, always check if main has moved ahead with `git log HEAD..origin/main --oneline`.
+
+---
+
+## 2026-02-20: Rusty-Claw Evaluation -- Multi-Agent Orchestration Comparison
+
+### Context
+
+Evaluated [jurgen-siegel/rusty-claw](https://github.com/jurgen-siegel/rusty-claw) (cloned to `~/projects/terraphim/rusty-claw/`) against terraphim-ai's `terraphim_tinyclaw` + `terraphim_multi_agent` crates. Rusty-claw is a multi-agent AI orchestration system in Rust that wraps Claude, Codex, and OpenCode CLIs as persistent daemons with team coordination.
+
+### Architecture Differences
+
+| Dimension | rusty-claw | terraphim-ai |
+|---|---|---|
+| Agent invocation | CLI subprocess (`claude -p`, `codex exec`) | Direct LLM API via `ProxyClient` + `GenAiLlmClient` |
+| Multi-agent coordination | Team-based `@mention` handoffs parsed from LLM output | `AgentRegistry` with capability-based discovery (UUID agents) |
+| Skills | `SKILL.md` with YAML frontmatter (passive context injection) | JSON workflows with typed steps: tool/llm/shell (active execution) |
+| Knowledge graph | None | `RoleGraph` + `AutocompleteIndex` (Aho-Corasick automata) |
+| Context | String concatenation of identity files in XML tags | Typed `ContextItem` with relevance scoring and token tracking |
+| Failover | Per-model cooldowns with cascading fallback chains | Binary proxy/fallback toggle in `HybridLlmRouter` |
+| Identity | SOUL.md + IDENTITY.md + USER.md + MEMORY.md + TOOLS.md | Role config + KG capabilities |
+
+### What Rusty-Claw Does Better
+
+**1. Handoff protocol with regex parsing**
+- Bracket syntax: `[@agent: message]` for teammates, `[@!agent: message]` for cross-team
+- Natural mention fallback: `@agent:` or `@agent --` at start of line
+- Markdown-bold awareness: handles `**@agent**` and `*@agent*`
+- Comma-separated multi-target: `[@coder,reviewer: message]`
+- Deduplication and shared-context stripping built in
+- **Relevant code:** `rustyclaw-core/src/routing.rs` functions `extract_teammate_mentions()`, `extract_cross_team_mentions()`, `extract_natural_handoffs()`
+
+**Lesson:** Terraphim `terraphim_multi_agent` lacks freeform inter-agent communication parsed from LLM output. The structured registry/capability approach is good for programmatic routing but doesn't handle the common case where an LLM spontaneously decides to delegate to another agent in its response text.
+
+**2. Model failover with cooldown tracking**
+- `failover.rs`: Per-model cooldown keys (`provider/model`), failure classification, cascading fallback chains
+- Each agent can declare `fallbacks: ["sonnet", "gpt-5.3-codex"]` in config
+- Cooldowns are persisted to `cooldowns.json` and respected across restarts
+- **Lesson:** Our `HybridLlmRouter` only has a binary proxy-available/fallback toggle. Should adopt per-model cooldown tracking, especially for the judge system's three-tier cascade.
+
+**3. Smart routing via keyword patterns**
+- Agents declare `route_patterns: ["code", "bug", "fix"]` with word-boundary regex matching
+- Priority tie-breaking when multiple agents match
+- Falls back to default only when no patterns match
+- **Lesson:** This is a fast-path complement to our heavier KG-based routing. For messages with obvious intent keywords, skip the automata entirely.
+
+**4. SKILL.md discovery engine**
+- `skills.rs`: Discovers SKILL.md files from multiple directories with later-wins precedence
+- Binary availability checking (`which` on PATH) and env var checking
+- Eligibility filtering before context injection
+- **Lesson:** Our SKILL.md frontmatter format is already identical (name, description, requires.bins, requires.env). Rusty-claw adds the runtime discovery + eligibility engine that terraphim-skills lacks as a Rust crate.
+
+**5. Context compaction as explicit subsystem**
+- Tracks total chars per session, triggers LLM summarization at configurable threshold
+- Writes compaction entries to transcript log
+- Resets session char count to summary length post-compaction
+- **Lesson:** tinyclaw has a placeholder `compress()` method. Rusty-claw's is fully implemented and production-ready.
+
+### What Terraphim-AI Does Better
+
+**1. Knowledge graph integration**
+- `RoleGraph` + Aho-Corasick `AutocompleteIndex` for domain-aware term matching
+- `ContextItemType::Concept` for KG-sourced context items with relevance scoring
+- This is terraphim-ai's core differentiator. Rusty-claw has no semantic understanding.
+
+**2. Typed context management**
+- `ContextItem` with 9 types (System, User, Assistant, Tool, Document, Concept, Memory, Task, Lesson)
+- Per-item relevance scoring and token counting
+- vs. rusty-claw's string concatenation of flat files in XML tags
+
+**3. Agent evolution**
+- `VersionedLessons`, `VersionedMemory`, `VersionedTaskList` (structured, versioned)
+- vs. rusty-claw's flat MEMORY.md + daily notes files
+
+**4. Skill execution with typed steps**
+- JSON skills: `SkillStep::Tool`, `SkillStep::Llm`, `SkillStep::Shell`
+- Input parameters, execution monitoring, cancellation support
+- vs. rusty-claw's passive markdown injection only
+
+**5. Direct LLM API integration**
+- Token/cost tracking, proxy client, tool-calling loop with execution guard
+- vs. rusty-claw delegating everything to CLI subprocesses (no telemetry)
+
+### Overlap / Duplication With terraphim_tinyclaw
+
+Both projects have essentially duplicated:
+- Session management (tinyclaw `SessionManager` vs rustyclaw `session.rs`)
+- Channel adapters (Telegram, Discord, CLI)
+- Context compression/compaction
+- Agent configuration types
+- Slash command handling
+
+`terraphim_tinyclaw` is terraphim-ai's answer to the same problem rusty-claw solves, but with direct API calls and KG integration rather than CLI wrapping.
+
+### Concrete Leverage Opportunities
+
+**High value -- port from rusty-claw into terraphim-ai:**
+
+1. **Handoff protocol** (`routing.rs`) into `terraphim_multi_agent`
+   - Add `extract_teammate_mentions()`, `extract_cross_team_mentions()`, `extract_natural_handoffs()`
+   - Enables freeform LLM-output-based agent delegation alongside registry-based routing
+   - File: `rustyclaw-core/src/routing.rs` (984 lines, well-tested)
+
+2. **Failover with cooldowns** (`failover.rs`) into tinyclaw's `HybridLlmRouter`
+   - Replace binary toggle with cascading model chains + per-model cooldown tracking
+   - Directly applicable to judge system three-tier cascade
+
+3. **Dual skills layer** -- keep both formats
+   - tinyclaw JSON skills = active execution workflows (programmatic)
+   - SKILL.md discovery = passive context injection (prompt augmentation)
+   - Two complementary mechanisms, not competing ones
+
+4. **Smart routing as fast-path** -- add `route_patterns` keyword matching
+   - Pre-filter before heavier KG-based `AutocompleteIndex` routing
+   - For messages with obvious `@mention` or keyword matches, skip automata
+
+**Low value -- terraphim-ai already handles these better:**
+- CLI subprocess wrapping (our direct API approach gives better telemetry)
+- File-based message queue (our in-process message bus is faster)
+- WASM visualizer (we have TUI/Tauri desktop)
+- Agent identity files (our Role + KG is more semantically rich)
+
+### Decision: Don't Merge, Extract
+
+Do NOT merge rusty-claw into terraphim-ai. They solve overlapping but different problems:
+- Rusty-claw = external orchestrator for CLI tools
+- Terraphim-ai = integrated agent platform with KG intelligence
+
+Extract specific modules as shared crates or port targeted functions instead.
+
+### Best Practice: Evaluating External Agent Frameworks
+
+When evaluating third-party agent orchestration projects against terraphim-ai:
+
+1. **Check skills format compatibility** -- SKILL.md frontmatter is a de facto standard. If compatible, the discovery/eligibility engine may be reusable.
+2. **Look at inter-agent communication** -- Most frameworks either do structured routing (registry/capability) OR freeform parsing (regex on LLM output). Both are needed.
+3. **Check failover sophistication** -- Binary on/off is insufficient for production. Need per-model cooldowns with cascading chains.
+4. **Evaluate context management** -- String concatenation vs typed items with relevance scoring. The typed approach scales better.
+5. **Assess KG integration** -- This is terraphim-ai's moat. Most frameworks have none.
+
+---
