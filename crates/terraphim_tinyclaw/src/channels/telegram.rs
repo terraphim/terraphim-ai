@@ -43,10 +43,7 @@ impl Channel for TelegramChannel {
             let inbound_tx = bus.inbound_sender();
             let running = self.running.clone();
 
-            log::info!(
-                "Telegram bot starting (token: {}...)",
-                &self.config.token[..self.config.token.len().min(10)]
-            );
+            log::info!("Telegram bot starting");
 
             tokio::spawn(async move {
                 let handler = Update::filter_message().endpoint(
