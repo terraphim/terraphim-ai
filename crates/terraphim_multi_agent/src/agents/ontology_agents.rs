@@ -10,9 +10,7 @@ use crate::{GenAiLlmClient, LlmMessage, LlmRequest, MultiAgentResult, ProviderCo
 use log::info;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use terraphim_types::{
-    CoverageSignal, EntityType, ExtractedEntity, GroundingMetadata, SchemaSignal,
-};
+use terraphim_types::{CoverageSignal, ExtractedEntity, GroundingMetadata, SchemaSignal};
 use tokio::sync::RwLock;
 
 /// Configuration for ontology agents
@@ -108,13 +106,9 @@ Text to analyze:
 
         let response = client.generate(request).await?;
 
-        let schema_signal: SchemaSignal =
-            serde_json::from_str(&response.content).map_err(|e| {
-                crate::MultiAgentError::LlmError(format!(
-                    "Failed to parse extraction response: {}",
-                    e
-                ))
-            })?;
+        let schema_signal: SchemaSignal = serde_json::from_str(&response.content).map_err(|e| {
+            crate::MultiAgentError::LlmError(format!("Failed to parse extraction response: {}", e))
+        })?;
 
         info!(
             "Extracted {} entities and {} relationships",
@@ -136,10 +130,7 @@ pub struct NormalizationAgent {
 
 impl NormalizationAgent {
     /// Create a new Normalization Agent
-    pub fn new(
-        config: OntologyAgentConfig,
-        ontology_terms: Vec<String>,
-    ) -> MultiAgentResult<Self> {
+    pub fn new(config: OntologyAgentConfig, ontology_terms: Vec<String>) -> MultiAgentResult<Self> {
         let llm_client = GenAiLlmClient::new(
             config.provider.clone(),
             ProviderConfig {
@@ -206,8 +197,7 @@ If no match found, respond with:
 
             let response = client.generate(request).await?;
 
-            let grounding: Option<GroundingMetadata> =
-                serde_json::from_str(&response.content).ok();
+            let grounding: Option<GroundingMetadata> = serde_json::from_str(&response.content).ok();
 
             let mut normalized_entity = entity;
             normalized_entity.grounding = grounding.clone();
@@ -359,8 +349,7 @@ Respond with ONLY valid JSON array:
             reason: Option<String>,
         }
 
-        if let Ok(suggestions) = serde_json::from_str::<Vec<ReviewSuggestion>>(&response.content)
-        {
+        if let Ok(suggestions) = serde_json::from_str::<Vec<ReviewSuggestion>>(&response.content) {
             for suggestion in suggestions {
                 if let Some(entity) = entities
                     .iter_mut()
@@ -397,7 +386,7 @@ mod tests {
         let agent = CoverageAgent::new(0.7);
         let entities = vec![
             ExtractedEntity {
-                entity_type: EntityType::CancerDiagnosis,
+                entity_type: "cancer_diagnosis".to_string(),
                 raw_value: "lung carcinoma".to_string(),
                 normalized_value: Some("lung carcinoma".to_string()),
                 grounding: Some(GroundingMetadata::new(
@@ -409,7 +398,7 @@ mod tests {
                 )),
             },
             ExtractedEntity {
-                entity_type: EntityType::GenomicVariant,
+                entity_type: "genomic_variant".to_string(),
                 raw_value: "EGFR".to_string(),
                 normalized_value: None,
                 grounding: None,
