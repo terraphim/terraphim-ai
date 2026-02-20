@@ -8,6 +8,7 @@ license = "MIT"
 [features]
 default = ["test-utils"]
 test-utils = []
+hgnc = ["terraphim_types/hgnc"]
 
 [dependencies]
 # Workspace dependencies
