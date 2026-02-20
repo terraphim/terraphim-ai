@@ -1,0 +1,79 @@
+# TinyClaw Configuration Example
+# Copy this file to ~/.config/terraphim/tinyclaw.toml and customize
+
+# =============================================================================
+# Agent Configuration
+# =============================================================================
+[agent]
+# Workspace directory for sessions, skills, and data
+workspace = "~/.config/terraphim"
+
+# Maximum tool-calling iterations per message
+max_iterations = 20
+
+# Path to system prompt file
+system_prompt = "~/.config/terraphim/SYSTEM.md"
+
+# =============================================================================
+# LLM Configuration
+# =============================================================================
+
+# Proxy LLM (for tool-calling and high-quality responses)
+[llm.proxy]
+base_url = "https://api.openai.com/v1"
+# Use environment variable: ${OPENAI_API_KEY}
+api_key = "${OPENAI_API_KEY}"
+model = "gpt-4"
+timeout_ms = 60000
+retry_after_secs = 5
+
+# Direct LLM (for compression and fallback)
+[llm.direct]
+provider = "ollama"
+base_url = "http://127.0.0.1:11434"
+model = "llama3.2"
+
+# =============================================================================
+# Channel Configuration
+# =============================================================================
+
+# Telegram Bot Configuration
+# Get your bot token from @BotFather on Telegram
+[channels.telegram]
+token = "${TELEGRAM_BOT_TOKEN}"
+# List of allowed user IDs or usernames
+# Use "*" to allow all (not recommended for production)
+allow_from = [
+    "your_telegram_username",
+    "123456789",  # User ID
+]
+
+# Discord Bot Configuration
+# Create a bot at https://discord.com/developers/applications
+[channels.discord]
+token = "${DISCORD_BOT_TOKEN}"
+# List of allowed user IDs or usernames
+allow_from = [
+    "your_discord_username",
+    "123456789012345678",  # User ID
+]
+
+# =============================================================================
+# Advanced Configuration
+# =============================================================================
+
+# Session compression settings
+[agent.compression]
+# Token ratio at which to trigger compression
+summarize_at_token_ratio = 0.75
+# Number of messages to keep after summarization
+keep_last_messages = 4
+
+# Tool execution settings
+[agent.execution]
+# Shell command timeout in seconds
+shell_timeout_secs = 120
+# Maximum file size to read (in bytes)
+max_file_size = 10485760  # 10MB
+# Blocked commands (always blocked)
+blocked_commands = ["rm -rf /", "mkfs", "dd if=/dev/zero"]

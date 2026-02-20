@@ -32,8 +32,7 @@ impl MockChannel {
         )
     }
 
-    fn get_sent_messages(&self,
-    ) -> Arc<tokio::sync::Mutex<Vec<OutboundMessage>>> {
+    fn get_sent_messages(&self) -> Arc<tokio::sync::Mutex<Vec<OutboundMessage>>> {
         self.sent_messages.clone()
     }
 }
@@ -44,21 +43,19 @@ impl Channel for MockChannel {
         &self.name
     }
 
-    async fn start(&self,
-        _bus: Arc<MessageBus>,
-    ) -> anyhow::Result<()> {
-        self.running.store(true, std::sync::atomic::Ordering::SeqCst);
+    async fn start(&self, _bus: Arc<MessageBus>) -> anyhow::Result<()> {
+        self.running
+            .store(true, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
     async fn stop(&self) -> anyhow::Result<()> {
-        self.running.store(false, std::sync::atomic::Ordering::SeqCst);
+        self.running
+            .store(false, std::sync::atomic::Ordering::SeqCst);
         Ok(())
     }
 
-    async fn send(&self,
-        msg: OutboundMessage,
-    ) -> anyhow::Result<()> {
+    async fn send(&self, msg: OutboundMessage) -> anyhow::Result<()> {
         self.sent_messages.lock().await.push(msg);
         Ok(())
     }
@@ -67,9 +64,7 @@ impl Channel for MockChannel {
         self.running.load(std::sync::atomic::Ordering::SeqCst)
     }
 
-    fn is_allowed(&self,
-        _sender_id: &str,
-    ) -> bool {
+    fn is_allowed(&self, _sender_id: &str) -> bool {
         self.allowed_senders.contains(&"*".to_string())
             || self.allowed_senders.contains(&_sender_id.to_string())
     }
@@ -102,7 +97,10 @@ async fn test_outbound_message_dispatch() {
 
     // Send an outbound message
     let test_message = OutboundMessage::new("test-channel", "chat-1", "Hello, World!");
-    bus.outbound_sender().send(test_message.clone()).await.unwrap();
+    bus.outbound_sender()
+        .send(test_message.clone())
+        .await
+        .unwrap();
 
     // Wait for message to be dispatched
     let messages = timeout(Duration::from_secs(5), async {
