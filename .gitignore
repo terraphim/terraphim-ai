@@ -61,5 +61,8 @@ crates/terraphim_settings/test_settings/settings.toml
 # Nightshift plan artifacts (keep out of version control)
 .nightshift-plan
 
-# Cachebro SQLite cache
+# Build artifacts
+a.out
+
+# Cache
 .cachebro/
