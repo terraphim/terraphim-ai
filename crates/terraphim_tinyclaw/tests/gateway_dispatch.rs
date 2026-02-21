@@ -32,6 +32,7 @@ impl MockChannel {
         )
     }
 
+    #[allow(dead_code)]
     fn get_sent_messages(&self) -> Arc<tokio::sync::Mutex<Vec<OutboundMessage>>> {
         self.sent_messages.clone()
     }
