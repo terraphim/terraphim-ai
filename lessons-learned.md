@@ -730,3 +730,108 @@ hgnc = ["terraphim_types/hgnc"]  # thread the feature through
 **Rule**: `cfg(feature = "X")` in a crate always refers to that crate's own features. To gate on a dependency's feature, you must re-declare it as a pass-through feature.
 
 ---
+
+## 2026-02-21: multi_agent_implementation completion
+
+### serde rename_all and LLM prompt alignment
+
+**Lesson**: When prompting an LLM to return an enum value as JSON, the string in the prompt must exactly match the serde serialization of the enum.
+
+**Discovery**: `NormalizationMethod::GraphRank` with `#[serde(rename_all = "snake_case")]`
+serializes to `"graph_rank"`, not `"graphrank"` or `"similarity"`. Both prior prompts
+were wrong, causing silent deserialization failures (`serde_json::from_str(...).ok()` → `None`).
+
+**Rule**: Always check `#[serde(rename_all = "...")]` on enums before writing LLM prompts that
+instruct the model to return a specific variant. Snake case of `GraphRank` is `graph_rank`
+(underscore between `graph` and `rank`).
+
+---
+
+### HashSet vs Vec for character membership testing
+
+**Lesson**: `UNICODE_SPECIAL_CHARS: Vec<char>` with `.contains(ch)` is O(n) per character.
+For a prompt sanitizer called per-message, this is fast enough in release but creates
+flaky timing failures in debug builds when combined with `lazy_static!` regex compilation.
+
+**Discovery**: `test_sanitization_performance_normal_prompt` failed with 100.25ms vs 100ms
+threshold on the first cold run. After changing to `HashSet<char>`, the test stabilizes.
+
+**Pattern**:
+```rust
+lazy_static! {
+    static ref CHAR_SET: HashSet<char> = [
+        '\u{202E}', '\u{200B}', /* ... */
+    ].iter().copied().collect();
+}
+// Usage: CHAR_SET.contains(&ch)  // O(1) not O(n)
+```
+
+**Rule**: Never use `Vec<char>` for membership testing in hot paths. Always use `HashSet<char>`
+or a lookup table. The 20-element vec in prompt_sanitizer is iterated for every character
+in every prompt — O(n*m) where n is prompt length.
+
+---
+
+### dead_code in test files: implement, don't suppress
+
+**Lesson**: When a test helper method triggers a `dead_code` warning, the right fix is to
+restructure the API so the method is actually called, not to add `#[allow(dead_code)]`.
+
+**Discovery**: `MockChannel::get_sent_messages()` was never called because `new()` returned
+`(Self, Arc<...>)` — the Arc was captured from the tuple. Fix: change `new()` to return
+`Self` only, forcing callers to use `get_sent_messages()` before registering.
+
+**Pattern**:
+```rust
+// Before (bad — get_sent_messages dead):
+let (ch, msgs) = MockChannel::new("name");
+channel_manager.register(Box::new(ch));
+
+// After (good — get_sent_messages required):
+let ch = MockChannel::new("name");
+let msgs = ch.get_sent_messages(); // must call before move
+channel_manager.register(Box::new(ch));
+```
+
+**Rule**: `#[allow(dead_code)]` in test files is a code smell. If the method exists, use it.
+If it's not needed, delete it. Never suppress the warning.
+
+---
+
+### CARGO_MANIFEST_DIR for repo-relative example paths
+
+**Lesson**: Example binaries hardcoding absolute paths break on any machine other than the
+author's. Use `CARGO_MANIFEST_DIR` with `concat!` for compile-time relative paths.
+
+**Discovery**: `kg_normalization.rs` hardcoded `/Users/alex/cto-executive-system/knowledge`.
+The corpus was always available at `docs/src/kg` in this very repo.
+
+**Pattern**:
+```rust
+// In crates/terraphim_types/examples/kg_normalization.rs:
+let corpus_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/src/kg");
+// Resolves to: <workspace_root>/docs/src/kg at compile time
+```
+
+**Rule**: Never hardcode absolute paths in examples or tests. `CARGO_MANIFEST_DIR` points
+to the crate directory; navigate from there to workspace-relative locations with `../../`.
+
+---
+
+### disciplined-research → disciplined-design → disciplined-implementation workflow
+
+**Lesson**: Using the three-phase skills in sequence (research, design, implement) produces
+significantly better outcomes than jumping straight to fixes. The research phase caught 5
+distinct issues that would have been missed or addressed incorrectly.
+
+**Key value of research phase**: Found the `NormalizationMethod` serde mismatch by reading
+both the type definition and the LLM prompt — something a quick "fix the warning" approach
+would have missed entirely.
+
+**Key value of design phase**: Identified that `get_sent_messages` needed *implementation*,
+not suppression — and designed the correct `new()` refactor before touching any code.
+
+**Rule**: For non-trivial bug fixes across multiple files, always research first. The time
+spent reading pays back in avoiding fixes that create new bugs.
+
+---
