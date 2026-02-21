@@ -19,20 +19,15 @@ struct MockChannel {
 }
 
 impl MockChannel {
-    fn new(name: &str) -> (Self, Arc<tokio::sync::Mutex<Vec<OutboundMessage>>>) {
-        let sent = Arc::new(tokio::sync::Mutex::new(Vec::new()));
-        (
-            Self {
-                name: name.to_string(),
-                sent_messages: sent.clone(),
-                running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
-                allowed_senders: vec!["*".to_string()], // Allow all by default
-            },
-            sent,
-        )
+    fn new(name: &str) -> Self {
+        Self {
+            name: name.to_string(),
+            sent_messages: Arc::new(tokio::sync::Mutex::new(Vec::new())),
+            running: Arc::new(std::sync::atomic::AtomicBool::new(false)),
+            allowed_senders: vec!["*".to_string()], // Allow all by default
+        }
     }
 
-    #[allow(dead_code)]
     fn get_sent_messages(&self) -> Arc<tokio::sync::Mutex<Vec<OutboundMessage>>> {
         self.sent_messages.clone()
     }
@@ -77,8 +72,9 @@ async fn test_outbound_message_dispatch() {
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create mock channels
-    let (mock_channel, received_messages) = MockChannel::new("test-channel");
+    // Create mock channel and capture the Arc before registration
+    let mock_channel = MockChannel::new("test-channel");
+    let received_messages = mock_channel.get_sent_messages();
 
     // Create channel manager and register mock channel
     let mut channel_manager = ChannelManager::new();
@@ -130,9 +126,11 @@ async fn test_message_routing_to_multiple_channels() {
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create mock channels
-    let (telegram_mock, telegram_messages) = MockChannel::new("telegram");
-    let (discord_mock, discord_messages) = MockChannel::new("discord");
+    // Create mock channels and capture Arcs before registration
+    let telegram_mock = MockChannel::new("telegram");
+    let telegram_messages = telegram_mock.get_sent_messages();
+    let discord_mock = MockChannel::new("discord");
+    let discord_messages = discord_mock.get_sent_messages();
 
     // Create channel manager
     let mut channel_manager = ChannelManager::new();
@@ -224,8 +222,9 @@ async fn test_high_throughput_dispatch() {
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create mock channel
-    let (mock_channel, received_messages) = MockChannel::new("high-throughput");
+    // Create mock channel and capture Arc before registration
+    let mock_channel = MockChannel::new("high-throughput");
+    let received_messages = mock_channel.get_sent_messages();
 
     // Create channel manager
     let mut channel_manager = ChannelManager::new();
@@ -247,7 +246,7 @@ async fn test_high_throughput_dispatch() {
     for i in 0..message_count {
         let msg = OutboundMessage::new(
             "high-throughput",
-            &format!("chat-{}", i % 10),
+            format!("chat-{}", i % 10),
             format!("Message {}", i),
         );
         bus.outbound_sender().send(msg).await.unwrap();
