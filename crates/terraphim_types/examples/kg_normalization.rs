@@ -363,8 +363,8 @@ fn main() {
     // Initialize the normalizer
     let mut normalizer = KgNormalizer::new();
 
-    // Load corpus from the knowledge directory
-    let corpus_path = "/Users/alex/cto-executive-system/knowledge";
+    // Load corpus from the docs/src/kg directory in this workspace
+    let corpus_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/src/kg");
     println!("Loading corpus from: {}", corpus_path);
 
     let documents = normalizer.load_corpus(corpus_path);
