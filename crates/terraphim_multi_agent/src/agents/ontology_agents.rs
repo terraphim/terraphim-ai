@@ -172,7 +172,7 @@ Respond with ONLY valid JSON:
   "normalized_label": "canonical term",
   "normalized_prov": "ontology_source",
   "normalized_score": 0.95,
-  "normalized_method": "exact|fuzzy|graphrank"
+  "normalized_method": "exact|fuzzy|graph_rank"
 }}
 
 If no match found, respond with:

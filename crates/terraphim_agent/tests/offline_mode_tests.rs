@@ -43,7 +43,7 @@ async fn test_offline_help_command() -> Result<()> {
 
     assert_eq!(code, 0, "Help command should succeed");
     assert!(
-        stdout.contains("Terraphim TUI interface"),
+        stdout.contains("server-backed fullscreen TUI"),
         "Should show main help"
     );
     assert!(stdout.contains("--server"), "Should show server flag");
@@ -61,6 +61,20 @@ async fn test_offline_help_command() -> Result<()> {
         stdout.contains("interactive"),
         "Should list interactive command"
     );
+
+    Ok(())
+}
+
+#[tokio::test]
+#[serial]
+async fn test_non_tty_usage_clarifies_mode_contract() -> Result<()> {
+    let (stdout, _stderr, code) = run_offline_command(&[])?;
+
+    assert_eq!(code, 0, "Non-TTY usage should exit cleanly");
+    assert!(stdout.contains("Interactive Modes (requires TTY)"));
+    assert!(stdout.contains("fullscreen TUI (requires running server)"));
+    assert!(stdout.contains("repl"));
+    assert!(stdout.contains("offline-capable by default"));
 
     Ok(())
 }

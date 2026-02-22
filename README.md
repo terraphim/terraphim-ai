@@ -187,8 +187,11 @@ pip install terraphim-automata
 
 ### 🦀 Rust CLI/TUI
 ```bash
-# Interactive mode with full features
+# Fullscreen TUI (requires a running server at TERRAPHIM_SERVER or localhost:8000)
 terraphim-agent
+
+# Offline-capable REPL
+terraphim-agent repl
 
 # Search commands
 terraphim-agent search "Rust async programming"
@@ -382,8 +385,11 @@ $ terraphim-agent update
 # Build with all features
 cargo build -p terraphim_agent --features repl-full --release
 
-# Launch interactive REPL
+# Launch fullscreen TUI (server-backed)
 ./target/release/terraphim-agent
+
+# Launch REPL (offline-capable by default)
+./target/release/terraphim-agent repl
 
 # Available REPL commands:
 /help           # Show all commands
@@ -418,8 +424,8 @@ Search across AI coding assistant history from Claude Code, Cursor, and Aider se
 # Install with session search support
 cargo install terraphim_agent --features repl-full
 
-# Launch REPL
-terraphim-agent
+# Launch REPL (offline-capable)
+terraphim-agent repl
 
 # In REPL:
 /sessions sources          # Detect available session sources (e.g., 419 Claude Code sessions)

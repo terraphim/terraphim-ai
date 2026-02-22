@@ -112,6 +112,20 @@ pub mod markdown_directives;
 pub mod matcher;
 pub mod url_protector;
 
+// Medical entity extraction modules (SNOMED CT and UMLS)
+#[cfg(feature = "medical")]
+pub mod medical_artifact;
+#[cfg(feature = "medical")]
+pub mod medical_extractor;
+#[cfg(feature = "medical")]
+pub mod sharded_extractor;
+#[cfg(feature = "medical")]
+pub mod snomed;
+#[cfg(feature = "medical")]
+pub mod umls;
+#[cfg(feature = "medical")]
+pub mod umls_extractor;
+
 pub use autocomplete::{
     AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
@@ -123,6 +137,18 @@ pub use markdown_directives::{
 pub use matcher::{
     LinkType, Matched, extract_paragraphs_from_automata, find_matches, replace_matches,
 };
+
+// Medical entity extraction re-exports
+#[cfg(feature = "medical")]
+pub use medical_extractor::{EntityExtractor, ExtractedEntity};
+#[cfg(feature = "medical")]
+pub use sharded_extractor::ShardedUmlsExtractor;
+#[cfg(feature = "medical")]
+pub use snomed::{SemanticType, SnomedConcept, SnomedMatch};
+#[cfg(feature = "medical")]
+pub use umls::{UmlsConcept, UmlsDataset, UmlsStats};
+#[cfg(feature = "medical")]
+pub use umls_extractor::{UmlsExtractor, UmlsExtractorStats, UmlsMatch};
 
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
 pub mod autocomplete_helpers {

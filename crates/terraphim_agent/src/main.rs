@@ -49,12 +49,13 @@ enum LogicalOperatorCli {
 fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
     println!();
-    println!("Interactive Mode (requires TTY):");
-    println!("  terraphim-agent              # Start REPL or TUI");
-    println!("  terraphim-agent repl         # Explicit REPL mode");
+    println!("Interactive Modes (requires TTY):");
+    println!("  terraphim-agent              # Start fullscreen TUI (requires running server)");
+    println!("  terraphim-agent repl         # Start REPL (offline-capable by default)");
+    println!("  terraphim-agent repl --server # Start REPL in server mode");
     println!();
     println!("Common Commands:");
-    println!("  search <query>               # Search documents");
+    println!("  search <query>               # Search documents (offline-capable by default)");
     println!("  roles list                   # List available roles");
     println!("  config show                  # Show configuration");
     println!("  replace <text>               # Replace terms using thesaurus");
@@ -63,6 +64,38 @@ fn show_usage_info() {
     println!("For more information:");
     println!("  terraphim-agent --help       # Show full help");
     println!("  terraphim-agent help         # Show command-specific help");
+}
+
+fn resolve_tui_server_url(explicit: Option<&str>) -> String {
+    let env_server = std::env::var("TERRAPHIM_SERVER").ok();
+    resolve_tui_server_url_with_env(explicit, env_server.as_deref())
+}
+
+fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&str>) -> String {
+    explicit
+        .map(ToOwned::to_owned)
+        .or_else(|| env_server.map(ToOwned::to_owned))
+        .unwrap_or_else(|| "http://localhost:8000".to_string())
+}
+
+fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Fullscreen TUI requires a running Terraphim server at {}. \
+         Start terraphim_server or use offline mode with `terraphim-agent repl`. \
+         Connection error: {}",
+        url,
+        cause
+    )
+}
+
+fn ensure_tui_server_reachable(
+    runtime: &tokio::runtime::Runtime,
+    api: &ApiClient,
+    url: &str,
+) -> Result<()> {
+    runtime
+        .block_on(api.health())
+        .map_err(|err| tui_server_requirement_error(url, &err))
 }
 
 impl From<LogicalOperatorCli> for LogicalOperator {
@@ -365,6 +398,28 @@ mod tests {
         let text2 = "use npm, please";
         assert!(is_at_word_boundary(text2, 4, 7)); // "npm" followed by comma
     }
+
+    #[test]
+    fn resolve_tui_server_url_uses_explicit_then_env_then_default() {
+        let explicit = resolve_tui_server_url_with_env(Some("http://explicit:9000"), None);
+        assert_eq!(explicit, "http://explicit:9000");
+
+        let from_env = resolve_tui_server_url_with_env(None, Some("http://env:7000"));
+        assert_eq!(from_env, "http://env:7000");
+
+        let defaulted = resolve_tui_server_url_with_env(None, None);
+        assert_eq!(defaulted, "http://localhost:8000");
+    }
+
+    #[test]
+    fn tui_server_requirement_error_mentions_repl_fallback() {
+        let cause = anyhow::anyhow!("connect error");
+        let err = tui_server_requirement_error("http://localhost:8000", &cause);
+        let msg = err.to_string();
+        assert!(msg.contains("Fullscreen TUI requires a running Terraphim server"));
+        assert!(msg.contains("terraphim-agent repl"));
+        assert!(msg.contains("http://localhost:8000"));
+    }
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Default)]
@@ -379,7 +434,11 @@ pub enum OutputFormat {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "terraphim-agent", version, about = "Terraphim TUI interface")]
+#[command(
+    name = "terraphim-agent",
+    version,
+    about = "Terraphim Agent: server-backed fullscreen TUI with offline-capable REPL and CLI commands"
+)]
 struct Cli {
     /// Use server API mode instead of self-contained offline mode
     #[arg(long, default_value_t = false)]
@@ -700,9 +759,8 @@ fn main() -> Result<()> {
     }
 }
 fn run_tui_offline_mode(transparent: bool) -> Result<()> {
-    // Note: TUI mode currently requires a running server to connect to.
-    // It will try TERRAPHIM_SERVER env var, or default to http://localhost:8000.
-    // For fully offline operation, use 'terraphim-agent repl' instead.
+    // Fullscreen TUI mode requires a running server.
+    // For offline operation, use `terraphim-agent repl`.
     run_tui(None, transparent)
 }
 
@@ -2251,15 +2309,13 @@ fn ui_loop(
     let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
     let mut selected_result_index = 0;
     let mut view_mode = ViewMode::Search;
-    // Use provided server_url, then TERRAPHIM_SERVER env var, then default to localhost
-    let effective_url = server_url.unwrap_or_else(|| {
-        std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string())
-    });
-    let api = ApiClient::new(effective_url);
+    let effective_url = resolve_tui_server_url(server_url.as_deref());
+    let api = ApiClient::new(effective_url.clone());
 
     // Create a tokio runtime for this TUI session
     // We need a local runtime because we're in a synchronous function (terminal event loop)
     let rt = tokio::runtime::Runtime::new()?;
+    ensure_tui_server_reachable(&rt, &api, &effective_url)?;
 
     // Initialize terms from rolegraph (selected role)
     if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
