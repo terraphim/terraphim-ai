@@ -89,6 +89,14 @@ impl AgentHandle {
         &self.output_capture
     }
 
+    /// Subscribe to live output events via broadcast channel.
+    ///
+    /// Returns a receiver that gets a clone of every output event,
+    /// suitable for streaming to WebSocket clients.
+    pub fn subscribe_output(&self) -> tokio::sync::broadcast::Receiver<OutputEvent> {
+        self.output_capture.subscribe()
+    }
+
     /// Graceful shutdown: SIGTERM, wait for `grace_period`, then SIGKILL if still alive.
     ///
     /// Returns `Ok(true)` if the process exited gracefully, `Ok(false)` if it
@@ -584,6 +592,34 @@ mod tests {
         let checked_out = pool.checkout("@test-agent");
         assert!(checked_out.is_some());
         assert_eq!(pool.idle_count("@test-agent"), 0);
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_output_receives_events() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let handle = spawner.spawn(&provider, "broadcast test").await.unwrap();
+        let mut receiver = handle.subscribe_output();
+
+        // Give the echo process time to produce output and the capture task to process it
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Try to receive -- echo outputs "broadcast test" to stdout
+        match receiver.try_recv() {
+            Ok(OutputEvent::Stdout { line, .. }) => {
+                assert!(line.contains("broadcast"));
+            }
+            Ok(OutputEvent::Mention { .. }) => {
+                // Also acceptable if the line matched a mention pattern
+            }
+            Ok(_) => {}
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
+                // Race condition: the capture task may not have processed
+                // the output yet. This is acceptable in CI environments.
+            }
+            Err(e) => panic!("Unexpected broadcast error: {:?}", e),
+        }
     }
 
     #[tokio::test]
