@@ -33,16 +33,16 @@ pub use output::{OutputCapture, OutputEvent};
 pub enum SpawnerError {
     #[error("Agent validation failed: {0}")]
     ValidationError(String),
-    
+
     #[error("Failed to spawn agent: {0}")]
     SpawnError(String),
-    
+
     #[error("Agent process exited unexpectedly: {0}")]
     ProcessExit(String),
-    
+
     #[error("Health check failed: {0}")]
     HealthCheckFailed(String),
-    
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -70,17 +70,17 @@ impl AgentHandle {
     pub fn process_id(&self) -> ProcessId {
         self.process_id
     }
-    
+
     /// Check if the agent is healthy
     pub async fn is_healthy(&self) -> bool {
         self.health_checker.is_healthy().await
     }
-    
+
     /// Get the last health status
     pub fn health_status(&self) -> HealthStatus {
         self.health_checker.status()
     }
-    
+
     /// Kill the agent process
     pub async fn kill(mut self) -> Result<(), SpawnerError> {
         self.child.kill().await?;
@@ -111,27 +111,28 @@ impl AgentSpawner {
             max_restarts: 3,
         }
     }
-    
+
     /// Set default working directory
     pub fn with_working_dir(mut self, dir: impl Into<PathBuf>) -> Self {
         self.default_working_dir = dir.into();
         self
     }
-    
+
     /// Set environment variables
     pub fn with_env_vars(mut self, vars: HashMap<String, String>) -> Self {
         self.env_vars = vars;
         self
     }
-    
+
     /// Set auto-restart behavior
     pub fn with_auto_restart(mut self, enabled: bool) -> Self {
         self.auto_restart = enabled;
         self
     }
-    
+
     /// Spawn an agent from a provider configuration
-    pub async fn spawn(&self,
+    pub async fn spawn(
+        &self,
         provider: &Provider,
         task: &str,
     ) -> Result<AgentHandle, SpawnerError> {
@@ -139,28 +140,27 @@ impl AgentSpawner {
         let config = AgentConfig::from_provider(provider)?;
         let validator = AgentValidator::new(&config);
         validator.validate().await?;
-        
+
         // Spawn the agent process
         let process_id = ProcessId::new();
         let mut child = self.spawn_process(&config, task).await?;
-        
+
         // Set up health checking
         let health_checker = HealthChecker::new(process_id, Duration::from_secs(30));
-        
+
         // Set up output capture
-        let stdout = child.stdout.take().ok_or_else(|| 
-            SpawnerError::SpawnError("Failed to capture stdout".to_string())
-        )?;
-        let stderr = child.stderr.take().ok_or_else(|| 
-            SpawnerError::SpawnError("Failed to capture stderr".to_string())
-        )?;
-        
-        let output_capture = OutputCapture::new(
-            process_id,
-            BufReader::new(stdout),
-            BufReader::new(stderr),
-        );
-        
+        let stdout = child
+            .stdout
+            .take()
+            .ok_or_else(|| SpawnerError::SpawnError("Failed to capture stdout".to_string()))?;
+        let stderr = child
+            .stderr
+            .take()
+            .ok_or_else(|| SpawnerError::SpawnError("Failed to capture stderr".to_string()))?;
+
+        let output_capture =
+            OutputCapture::new(process_id, BufReader::new(stdout), BufReader::new(stderr));
+
         Ok(AgentHandle {
             process_id,
             provider: provider.clone(),
@@ -169,16 +169,14 @@ impl AgentSpawner {
             output_capture,
         })
     }
-    
+
     /// Spawn the actual process
-    async fn spawn_process(
-        &self,
-        config: &AgentConfig,
-        task: &str,
-    ) -> Result<Child, SpawnerError> {
-        let working_dir = config.working_dir.as_ref()
+    async fn spawn_process(&self, config: &AgentConfig, task: &str) -> Result<Child, SpawnerError> {
+        let working_dir = config
+            .working_dir
+            .as_ref()
             .unwrap_or(&self.default_working_dir);
-        
+
         let mut cmd = Command::new(&config.cli_command);
         cmd.current_dir(working_dir)
             .args(&config.args)
@@ -186,19 +184,19 @@ impl AgentSpawner {
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .stdin(Stdio::null());
-        
+
         // Add environment variables
         for (key, value) in &self.env_vars {
             cmd.env(key, value);
         }
-        
+
         // Add provider-specific env vars
         for (key, value) in &config.env_vars {
             cmd.env(key, value);
         }
-        
+
         let child = cmd.spawn()?;
-        
+
         Ok(child)
     }
 }
@@ -232,7 +230,7 @@ mod tests {
         let spawner = AgentSpawner::new()
             .with_auto_restart(false)
             .with_working_dir("/workspace");
-        
+
         assert!(!spawner.auto_restart);
         assert_eq!(spawner.default_working_dir, PathBuf::from("/workspace"));
     }
@@ -241,13 +239,12 @@ mod tests {
     async fn test_spawn_echo_agent() {
         let spawner = AgentSpawner::new();
         let provider = create_test_agent_provider();
-        
-        let handle = spawner.spawn(&provider, "Hello World"
-        ).await;
-        
+
+        let handle = spawner.spawn(&provider, "Hello World").await;
+
         // Echo command should succeed
         assert!(handle.is_ok());
-        
+
         let handle = handle.unwrap();
         assert_eq!(handle.provider.id, "@test-agent");
     }

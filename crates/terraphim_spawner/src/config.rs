@@ -25,22 +25,22 @@ impl AgentConfig {
     /// Create agent config from a provider
     pub fn from_provider(provider: &Provider) -> Result<Self, ValidationError> {
         match &provider.provider_type {
-            ProviderType::Agent { agent_id, cli_command, working_dir } => {
-                Ok(Self {
-                    agent_id: agent_id.clone(),
-                    cli_command: cli_command.clone(),
-                    args: Vec::new(),
-                    working_dir: Some(working_dir.clone()),
-                    env_vars: HashMap::new(),
-                    required_api_keys: Self::infer_api_keys(cli_command),
-                })
-            }
-            ProviderType::Llm { .. } => {
-                Err(ValidationError::NotAnAgent(provider.id.clone()))
-            }
+            ProviderType::Agent {
+                agent_id,
+                cli_command,
+                working_dir,
+            } => Ok(Self {
+                agent_id: agent_id.clone(),
+                cli_command: cli_command.clone(),
+                args: Vec::new(),
+                working_dir: Some(working_dir.clone()),
+                env_vars: HashMap::new(),
+                required_api_keys: Self::infer_api_keys(cli_command),
+            }),
+            ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
         }
     }
-    
+
     /// Infer required API keys from CLI command
     fn infer_api_keys(cli_command: &str) -> Vec<String> {
         match cli_command {
@@ -56,13 +56,13 @@ impl AgentConfig {
 pub enum ValidationError {
     #[error("Provider {0} is not an agent")]
     NotAnAgent(String),
-    
+
     #[error("CLI command not found: {0}")]
     CliNotFound(String),
-    
+
     #[error("Required API key not set: {0}")]
     ApiKeyNotSet(String),
-    
+
     #[error("Working directory does not exist: {0}")]
     WorkingDirNotFound(PathBuf),
 }
@@ -79,37 +79,37 @@ impl AgentValidator {
             config: config.clone(),
         }
     }
-    
+
     /// Validate the agent configuration
     pub async fn validate(&self) -> Result<(), ValidationError> {
         // Check CLI command exists
         self.validate_cli().await?;
-        
+
         // Check required API keys
         self.validate_api_keys().await?;
-        
+
         // Check working directory
         self.validate_working_dir().await?;
-        
+
         Ok(())
     }
-    
+
     /// Validate CLI command exists
     async fn validate_cli(&self) -> Result<(), ValidationError> {
         let cmd = &self.config.cli_command;
-        
+
         // Check if command exists in PATH
         let check = tokio::process::Command::new("which")
             .arg(cmd)
             .output()
             .await;
-        
+
         match check {
             Ok(output) if output.status.success() => Ok(()),
             _ => Err(ValidationError::CliNotFound(cmd.clone())),
         }
     }
-    
+
     /// Validate API keys are set
     async fn validate_api_keys(&self) -> Result<(), ValidationError> {
         for key in &self.config.required_api_keys {
@@ -119,7 +119,7 @@ impl AgentValidator {
         }
         Ok(())
     }
-    
+
     /// Validate working directory exists
     async fn validate_working_dir(&self) -> Result<(), ValidationError> {
         if let Some(dir) = &self.config.working_dir {
@@ -139,10 +139,10 @@ mod tests {
     fn test_infer_api_keys() {
         let keys = AgentConfig::infer_api_keys("claude");
         assert!(keys.contains(&"ANTHROPIC_API_KEY".to_string()));
-        
+
         let keys = AgentConfig::infer_api_keys("opencode");
         assert!(keys.contains(&"OPENAI_API_KEY".to_string()));
-        
+
         let keys = AgentConfig::infer_api_keys("unknown");
         assert!(keys.is_empty());
     }
