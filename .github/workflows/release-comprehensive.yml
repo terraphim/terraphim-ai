@@ -252,15 +252,15 @@ jobs:
           VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
           mkdir -p artifacts
-          # Create zip archives with version in filename for auto-update compatibility
-          if [ -f "target/${{ matrix.target }}/release/terraphim_server.exe" ]; then
-            zip -j "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.zip" \
-              "target/${{ matrix.target }}/release/terraphim_server.exe"
+          # Create zip archives using 7z (pre-installed on windows-latest runners)
+          # cd into release dir so zip contains only the exe filename (like zip -j)
+          cd "target/${{ matrix.target }}/release"
+          if [ -f "terraphim_server.exe" ]; then
+            7z a -tzip "../../../artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.zip" terraphim_server.exe
           fi
-          zip -j "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" \
-            "target/${{ matrix.target }}/release/terraphim-agent.exe"
-          zip -j "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" \
-            "target/${{ matrix.target }}/release/terraphim-cli.exe"
+          7z a -tzip "../../../artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" terraphim-agent.exe
+          7z a -tzip "../../../artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" terraphim-cli.exe
+          cd -
           # Also copy raw binaries for backward compatibility
           cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
