@@ -1,0 +1,31 @@
+[package]
+name = "terraphim_spawner"
+version = "1.8.0"
+edition = "2021"
+authors = ["Terraphim Team"]
+description = "Agent spawner for Terraphim with health checking and output capture"
+license = "Apache-2.0"
+repository = "https://github.com/terraphim/terraphim-ai"
+
+[dependencies]
+# Terraphim internal crates
+terraphim_types = { path = "../terraphim_types", version = "1.8.0" }
+terraphim_router = { path = "../terraphim_router", version = "1.8.0" }
+
+# Core dependencies
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+thiserror = "1.0"
+anyhow = "1.0"
+log = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
+regex = "1.10"
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Process management
+nix = { version = "0.27", features = ["process", "signal"] }
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
