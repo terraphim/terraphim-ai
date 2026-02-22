@@ -946,7 +946,7 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 /// }
 #[memoize(CustomHasher: ahash::AHashMap)]
 pub fn magic_unpair(z: u64) -> (u64, u64) {
-    let q = (z as f32).sqrt().floor() as u64;
+    let q = (z as f64).sqrt().floor() as u64;
     let l = z - q * q;
     if l < q { (l, q) } else { (q, l - q) }
 }

@@ -139,9 +139,7 @@ impl EntityExtractor {
             let end = mat.end();
 
             // Skip if overlapping with existing match
-            let overlaps = matches.iter().any(|m| {
-                (start >= m.span.0 && start < m.span.1) || (end > m.span.0 && end <= m.span.1)
-            });
+            let overlaps = matches.iter().any(|m| start < m.span.1 && end > m.span.0);
 
             if !overlaps {
                 matches.push(ExtractedEntity {
