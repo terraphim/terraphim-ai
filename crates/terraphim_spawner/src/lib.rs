@@ -19,11 +19,13 @@ use tokio::time::{interval, timeout};
 use terraphim_types::capability::{ProcessId, Provider};
 
 pub mod config;
+pub mod gitea;
 pub mod health;
 pub mod mention;
 pub mod output;
 
 pub use config::{AgentConfig, AgentValidator, ValidationError};
+pub use gitea::{AgentStatus, GiteaAgentAuth, GiteaAuthError};
 pub use health::{HealthChecker, HealthStatus};
 pub use mention::{MentionEvent, MentionRouter};
 pub use output::{OutputCapture, OutputEvent};
