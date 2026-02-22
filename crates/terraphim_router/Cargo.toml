@@ -1,0 +1,39 @@
+[package]
+name = "terraphim_router"
+version = "1.8.0"
+edition.workspace = true
+authors = ["Terraphim Contributors"]
+description = "Unified routing engine for LLM and Agent providers"
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["routing", "llm", "agent", "capability", "ai"]
+license = "Apache-2.0"
+readme = "../../README.md"
+
+[dependencies]
+# Terraphim internal crates
+terraphim_types = { path = "../terraphim_types" }
+terraphim_persistence = { path = "../terraphim_persistence" }
+
+# Core dependencies
+serde = { workspace = true }
+serde_yaml = { workspace = true }
+serde_json = { workspace = true }
+regex = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+log = { workspace = true }
+chrono = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+# Markdown parsing
+pulldown-cmark = "0.9"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.8"
+
+[features]
+default = []

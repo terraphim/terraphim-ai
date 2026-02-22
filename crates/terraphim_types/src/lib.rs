@@ -100,6 +100,9 @@ use std::str::FromStr;
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
+/// Capability-based routing types for unified LLM and Agent routing
+pub mod capability;
+
 /// A role name with case-insensitive lookup support.
 ///
 /// Stores both the original casing and a lowercase version for efficient
