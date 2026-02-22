@@ -3,24 +3,16 @@
 
 ARG UBUNTU_VERSION=22.04
 ARG RUST_VERSION=1.85.0
-ARG NODE_VERSION=20
 
 # ================================
-# Frontend Build Stage
+# Frontend Assets Stage
 # ================================
-FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
-
-WORKDIR /app
-# Copy package files - yarn.lock is optional
-COPY desktop/package*.json ./
-COPY desktop/yarn.lock* ./
-RUN yarn install --frozen-lockfile --network-timeout 300000
-
-COPY desktop ./
-RUN yarn run build
-
-# Verify frontend build
-RUN ls -la dist/ && test -f dist/index.html
+# Desktop has been moved to a separate repository.
+# The CI pipeline (docker-multiarch.yml) pre-builds the frontend
+# and places the dist/ output in the Docker build context at desktop/dist/.
+# We simply copy those pre-built assets here.
+FROM scratch AS frontend-assets
+COPY desktop/dist/ /dist/
 
 # ================================
 # Rust Build Stage
@@ -124,7 +116,7 @@ RUN . /root/.profile && \
 # Copy source code
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
-COPY --from=frontend-builder /app/dist ./terraphim_server/dist
+COPY --from=frontend-assets /dist ./terraphim_server/dist
 
 # Build the application
 RUN . /root/.profile && \
