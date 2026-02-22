@@ -28,6 +28,7 @@ chrono = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
 uuid = { workspace = true }
+dirs = "5.0"
 
 # Markdown parsing
 pulldown-cmark = "0.9"

@@ -26,6 +26,7 @@ log = "0.4"
 regex = "1.10"
 serde_yaml = "0.9"
 pulldown-cmark = "0.9"
+dirs = "5.0"
 
 # LLM Router integration
 
