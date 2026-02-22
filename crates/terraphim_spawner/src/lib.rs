@@ -24,7 +24,9 @@ pub mod mention;
 pub mod output;
 
 pub use config::{AgentConfig, AgentValidator, ValidationError};
-pub use health::{HealthChecker, HealthStatus};
+pub use health::{
+    CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthChecker, HealthHistory, HealthStatus,
+};
 pub use mention::{MentionEvent, MentionRouter};
 pub use output::{OutputCapture, OutputEvent};
 
