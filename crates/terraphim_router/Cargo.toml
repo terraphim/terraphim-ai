@@ -46,5 +46,6 @@ tempfile = "3.8"
 tracing-test = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 serial_test = "3.2"
+proptest = "1.4"
 terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_spawner = { path = "../terraphim_spawner" }

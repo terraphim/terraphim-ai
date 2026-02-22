@@ -603,3 +603,61 @@ mod tests {
         assert_eq!(format!("{}", CircuitState::HalfOpen), "half_open");
     }
 }
+
+#[cfg(test)]
+mod proptest_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn circuit_breaker_state_always_valid(
+            actions in prop::collection::vec(prop::bool::ANY, 1..50),
+        ) {
+            let config = CircuitBreakerConfig {
+                failure_threshold: 3,
+                cooldown: Duration::from_millis(1),
+                success_threshold: 1,
+            };
+            let mut cb = CircuitBreaker::new(config);
+
+            for success in &actions {
+                if *success {
+                    cb.record_success();
+                } else {
+                    cb.record_failure();
+                }
+
+                // State should always be one of the valid variants
+                let state = cb.state();
+                prop_assert!(
+                    state == CircuitState::Closed
+                    || state == CircuitState::Open
+                    || state == CircuitState::HalfOpen
+                );
+            }
+        }
+
+        #[test]
+        fn health_history_success_rate_in_range(
+            statuses in prop::collection::vec(
+                prop_oneof![
+                    Just(HealthStatus::Healthy),
+                    Just(HealthStatus::Unhealthy),
+                    Just(HealthStatus::Degraded),
+                ],
+                1..100,
+            ),
+        ) {
+            let mut history = HealthHistory::new(200, Duration::from_secs(600));
+
+            for status in &statuses {
+                history.record(*status);
+            }
+
+            let rate = history.success_rate();
+            prop_assert!(rate >= 0.0);
+            prop_assert!(rate <= 1.0);
+        }
+    }
+}

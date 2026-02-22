@@ -295,3 +295,38 @@ mod tests {
         assert!(!router.has_keywords("Hello world"));
     }
 }
+
+#[cfg(test)]
+mod proptest_tests {
+    use super::*;
+    use proptest::prelude::*;
+
+    proptest! {
+        #[test]
+        fn extract_capabilities_never_panics(text in "\\PC{0,500}") {
+            let router = KeywordRouter::new();
+            // Should never panic, regardless of input
+            let _ = router.extract_capabilities(&text);
+        }
+
+        #[test]
+        fn extract_capabilities_returns_subset_of_all(text in "\\PC{0,200}") {
+            let router = KeywordRouter::new();
+            let all_caps = Capability::all();
+            let extracted = router.extract_capabilities(&text);
+
+            for cap in &extracted {
+                prop_assert!(all_caps.contains(cap));
+            }
+        }
+
+        #[test]
+        fn has_keywords_consistent_with_extract(text in "\\PC{0,200}") {
+            let router = KeywordRouter::new();
+            let has = router.has_keywords(&text);
+            let extracted = router.extract_capabilities(&text);
+
+            prop_assert_eq!(has, !extracted.is_empty());
+        }
+    }
+}

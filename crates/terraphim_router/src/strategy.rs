@@ -586,3 +586,99 @@ mod tests {
         assert_eq!(sel2.unwrap().id, "a");
     }
 }
+
+#[cfg(test)]
+mod proptest_tests {
+    use super::*;
+    use proptest::prelude::*;
+    use terraphim_types::capability::{Capability, ProviderType};
+
+    fn arb_cost_level() -> impl Strategy<Value = CostLevel> {
+        prop_oneof![
+            Just(CostLevel::Cheap),
+            Just(CostLevel::Moderate),
+            Just(CostLevel::Expensive),
+        ]
+    }
+
+    fn arb_latency() -> impl Strategy<Value = Latency> {
+        prop_oneof![
+            Just(Latency::Fast),
+            Just(Latency::Medium),
+            Just(Latency::Slow),
+        ]
+    }
+
+    fn arb_provider(id: &str) -> impl Strategy<Value = Provider> {
+        let id = id.to_string();
+        (arb_cost_level(), arb_latency()).prop_map(move |(cost, latency)| {
+            Provider::new(
+                id.clone(),
+                format!("Provider {}", id),
+                ProviderType::Llm {
+                    model_id: "test".to_string(),
+                    api_endpoint: "https://api.test.com".to_string(),
+                },
+                Capability::all(),
+            )
+            .with_cost(cost)
+            .with_latency(latency)
+        })
+    }
+
+    proptest! {
+        #[test]
+        fn cost_optimized_always_picks_cheapest(
+            p1 in arb_provider("p1"),
+            p2 in arb_provider("p2"),
+            p3 in arb_provider("p3"),
+        ) {
+            let strategy = CostOptimized;
+            let providers = vec![p1.clone(), p2.clone(), p3.clone()];
+            let candidates: Vec<&Provider> = providers.iter().collect();
+
+            if let Some(selected) = strategy.select_provider(candidates) {
+                // Selected provider's cost should be <= all others
+                for p in &providers {
+                    prop_assert!(selected.cost_level <= p.cost_level);
+                }
+            }
+        }
+
+        #[test]
+        fn latency_optimized_always_picks_fastest(
+            p1 in arb_provider("p1"),
+            p2 in arb_provider("p2"),
+            p3 in arb_provider("p3"),
+        ) {
+            let strategy = LatencyOptimized;
+            let providers = vec![p1.clone(), p2.clone(), p3.clone()];
+            let candidates: Vec<&Provider> = providers.iter().collect();
+
+            if let Some(selected) = strategy.select_provider(candidates) {
+                for p in &providers {
+                    prop_assert!(selected.latency <= p.latency);
+                }
+            }
+        }
+
+        #[test]
+        fn round_robin_cycles_through_all(
+            p1 in arb_provider("rr1"),
+            p2 in arb_provider("rr2"),
+        ) {
+            let strategy = RoundRobin::new();
+            let providers = vec![p1.clone(), p2.clone()];
+
+            let mut seen = std::collections::HashSet::new();
+            for _ in 0..providers.len() {
+                let candidates: Vec<&Provider> = providers.iter().collect();
+                if let Some(selected) = strategy.select_provider(candidates) {
+                    seen.insert(selected.id.clone());
+                }
+            }
+            // After N iterations with N providers, all should have been selected
+            prop_assert_eq!(seen.len(), providers.len());
+        }
+    }
+}

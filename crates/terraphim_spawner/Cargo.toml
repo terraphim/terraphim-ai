@@ -27,5 +27,6 @@ uuid = { version = "1.0", features = ["v4", "serde"] }
 nix = { version = "0.27", features = ["process", "signal", "resource"] }
 
 [dev-dependencies]
+proptest = "1.4"
 tokio-test = "0.4"
 tempfile = "3.8"
