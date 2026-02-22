@@ -8,13 +8,13 @@
 //! ```
 //! use terraphim_router::{Router, RoutingContext};
 //!
-//! async fn route_task() {
-//!     let router = Router::new().await.unwrap();
+//! fn route_task() {
+//!     let router = Router::new();
 //!     
 //!     let decision = router.route(
 //!         "Implement a secure authentication system",
 //!         &RoutingContext::default(),
-//!     ).await.unwrap();
+//!     ).unwrap();
 //!     
 //!     println!("Routed to: {}", decision.provider.id);
 //! }
