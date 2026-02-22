@@ -21,13 +21,19 @@
 //! ```
 
 pub mod engine;
+pub mod fallback;
 pub mod keyword;
+pub mod knowledge_graph;
+pub mod metrics;
 pub mod registry;
 pub mod strategy;
 pub mod types;
 
 pub use engine::{Router, RoutingEngine};
+pub use fallback::{FallbackRouter, FallbackStrategy};
 pub use keyword::KeywordRouter;
+pub use knowledge_graph::KnowledgeGraphRouter;
+pub use metrics::{RouterMetrics, Timer};
 pub use registry::ProviderRegistry;
 pub use strategy::{CapabilityFirst, CostOptimized, LatencyOptimized, RoundRobin, RoutingStrategy};
 pub use types::{RoutingContext, RoutingDecision, RoutingError, RoutingResult};
