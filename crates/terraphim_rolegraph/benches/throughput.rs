@@ -5,15 +5,15 @@
 //! ```sh
 //! cargo bench --bench throughput -- query
 //! ```
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use tokio::runtime::Runtime;
 
-use terraphim_automata::AutomataPath;
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::matcher::find_matches;
-use terraphim_rolegraph::RoleGraph;
+use terraphim_automata::AutomataPath;
 use terraphim_rolegraph::input::TEST_CORPUS;
 use terraphim_rolegraph::split_paragraphs;
+use terraphim_rolegraph::RoleGraph;
 use terraphim_types::{Document, DocumentType, Thesaurus};
 
 lazy_static::lazy_static! {

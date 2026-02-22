@@ -299,7 +299,7 @@ async fn export_resources(args: &[String]) -> Result<(), Box<dyn std::error::Err
         // Always send JSON-AD regardless of chosen output format.
         let body = serde_json::to_vec(&resources)?;
 
-        use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
+        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Terraphim-Atomic-Client/1.0")
@@ -507,7 +507,11 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
     let ontology_path = {
         let url = ontology_subject.trim_end_matches('/');
         let after = url.split('/').next_back().unwrap_or("");
-        if after.is_empty() { url } else { after }
+        if after.is_empty() {
+            url
+        } else {
+            after
+        }
     };
 
     let mut mapping: std::collections::HashMap<String, String> = std::collections::HashMap::new();
@@ -770,7 +774,7 @@ async fn export_ontology(args: &[String]) -> Result<(), Box<dyn std::error::Erro
         // Always send JSON-AD transformed payload for validation
         let body = serde_json::to_vec(&transformed)?;
 
-        use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
+        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Terraphim-Atomic-Client/1.0")
@@ -1156,7 +1160,7 @@ async fn export_to_local(args: &[String]) -> Result<(), Box<dyn std::error::Erro
             import_url.push_str(&encoded_agent);
         }
         let body = serde_json::to_vec(&transformed)?;
-        use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderValue};
+        use reqwest::header::{HeaderValue, ACCEPT, CONTENT_TYPE};
         let client = reqwest::Client::builder()
             .timeout(std::time::Duration::from_secs(30))
             .user_agent("Terraphim-Atomic-Client/1.0")

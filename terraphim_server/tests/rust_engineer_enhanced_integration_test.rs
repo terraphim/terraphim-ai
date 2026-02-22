@@ -6,7 +6,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
+use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
 
 /// Integration test for Rust Engineer configuration with QueryRs + GrepApp haystacks
 ///
@@ -154,12 +154,10 @@ async fn test_rust_engineer_dual_haystack_integration() {
         .await
         .expect("Failed to parse config response");
 
-    assert!(
-        config_json
-            .config
-            .roles
-            .contains_key(&"Rust Engineer".into())
-    );
+    assert!(config_json
+        .config
+        .roles
+        .contains_key(&"Rust Engineer".into()));
     log::info!("✅ Configuration endpoint validated");
 
     // Test 3: Search with Rust Engineer role for common Rust terms

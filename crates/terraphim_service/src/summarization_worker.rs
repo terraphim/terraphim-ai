@@ -4,7 +4,7 @@ use std::time::{Duration, Instant};
 
 use chrono::Utc;
 
-use tokio::sync::{RwLock, mpsc};
+use tokio::sync::{mpsc, RwLock};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
 
@@ -12,10 +12,10 @@ use terraphim_persistence::Persistable;
 
 use crate::llm::SummarizeOptions;
 // Rate limiter imports removed - not needed for sequential processing
-use crate::ServiceError;
 use crate::summarization_queue::{
     QueueCommand, QueueConfig, QueueStats, SummarizationTask, TaskId, TaskStatus,
 };
+use crate::ServiceError;
 
 /// A task wrapper for priority queue ordering
 #[derive(Debug)]

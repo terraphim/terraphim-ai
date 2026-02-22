@@ -1,6 +1,6 @@
 //! Command definitions for REPL interface (minimal release)
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]

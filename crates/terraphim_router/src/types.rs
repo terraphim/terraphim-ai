@@ -2,7 +2,7 @@
 
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use terraphim_types::capability::{Provider, Capability};
+use terraphim_types::capability::{Capability, Provider};
 use thiserror::Error;
 
 /// Result of a routing decision
@@ -102,19 +102,19 @@ impl fmt::Display for ProcessId {
 pub enum RoutingError {
     #[error("No provider found for capabilities: {0:?}")]
     NoProviderFound(Vec<Capability>),
-    
+
     #[error("Provider not found: {0}")]
     ProviderNotFound(String),
-    
+
     #[error("Registry error: {0}")]
     RegistryError(String),
-    
+
     #[error("Execution error: {0}")]
     ExecutionError(String),
-    
+
     #[error("IO error: {0}")]
     Io(String),
-    
+
     #[error("Serialization error: {0}")]
     Serialization(String),
 }
@@ -137,7 +137,7 @@ mod tests {
     fn test_process_id_generation() {
         let id1 = ProcessId::new();
         let id2 = ProcessId::new();
-        
+
         assert_ne!(id1.0, id2.0);
         assert!(!id1.0.is_empty());
     }
@@ -148,7 +148,7 @@ mod tests {
             keyword: "think".to_string(),
         };
         assert_eq!(reason.to_string(), "keyword match: 'think'");
-        
+
         let reason = RoutingReason::Fallback;
         assert_eq!(reason.to_string(), "fallback to default");
     }

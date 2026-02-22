@@ -9,9 +9,9 @@ use serial_test::serial;
 use std::{net::SocketAddr, time::Duration};
 use terraphim_config::{Config, ConfigBuilder, Role};
 use terraphim_server::{
-    AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
+    axum_server, AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, CreateConversationRequest, CreateConversationResponse,
-    GetConversationResponse, ListConversationsResponse, Status, axum_server,
+    GetConversationResponse, ListConversationsResponse, Status,
 };
 use terraphim_service::http_client;
 use terraphim_settings::DeviceSettings;
@@ -1124,11 +1124,9 @@ async fn test_conversation_context_workflow() {
         "I need help with Rust programming"
     );
     assert_eq!(conversation.messages[1].role, "assistant");
-    assert!(
-        conversation.messages[1]
-            .content
-            .contains("async programming")
-    );
+    assert!(conversation.messages[1]
+        .content
+        .contains("async programming"));
 
     // Check global context
     assert_eq!(conversation.global_context.len(), 2);

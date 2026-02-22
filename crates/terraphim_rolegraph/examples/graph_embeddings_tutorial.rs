@@ -533,21 +533,15 @@ mod tests {
         assert!(enhanced.len() > initial.len());
 
         // Check specific terms exist
-        assert!(
-            initial
-                .get(&NormalizedTermValue::new("active recall".to_string()))
-                .is_some()
-        );
-        assert!(
-            enhanced
-                .get(&NormalizedTermValue::new("cap theorem".to_string()))
-                .is_some()
-        );
-        assert!(
-            enhanced
-                .get(&NormalizedTermValue::new("raft".to_string()))
-                .is_some()
-        );
+        assert!(initial
+            .get(&NormalizedTermValue::new("active recall".to_string()))
+            .is_some());
+        assert!(enhanced
+            .get(&NormalizedTermValue::new("cap theorem".to_string()))
+            .is_some());
+        assert!(enhanced
+            .get(&NormalizedTermValue::new("raft".to_string()))
+            .is_some());
     }
 
     #[tokio::test]

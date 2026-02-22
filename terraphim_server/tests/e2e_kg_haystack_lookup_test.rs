@@ -11,7 +11,7 @@
 //! 5. Testing both service layer and API layer functionality
 
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
-use terraphim_server::{SearchResponse, axum_server};
+use terraphim_server::{axum_server, SearchResponse};
 use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
 

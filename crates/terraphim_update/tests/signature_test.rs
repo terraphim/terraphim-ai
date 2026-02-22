@@ -10,7 +10,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use tar::Builder;
 use tempfile::TempDir;
-use terraphim_update::signature::{VerificationResult, verify_archive_signature};
+use terraphim_update::signature::{verify_archive_signature, VerificationResult};
 
 /// Helper function to create a test tar.gz archive
 fn create_test_archive(dir: &Path, name: &str) -> PathBuf {

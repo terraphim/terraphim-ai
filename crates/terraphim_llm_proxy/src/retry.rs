@@ -655,9 +655,9 @@ mod tests {
             limit_type: "requests".to_string(),
             retry_after: Duration::from_secs(60),
         }));
-        assert!(is_fallback_eligible(
-            &ProxyError::InvalidProviderResponse("bad json".to_string())
-        ));
+        assert!(is_fallback_eligible(&ProxyError::InvalidProviderResponse(
+            "bad json".to_string()
+        )));
         assert!(is_fallback_eligible(&ProxyError::DnsResolutionFailed(
             "nxdomain".to_string()
         )));

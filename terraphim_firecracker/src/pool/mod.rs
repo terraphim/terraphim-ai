@@ -5,7 +5,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
 
-use crate::performance::{PREWARMED_ALLOCATION_TARGET, Sub2SecondOptimizer};
+use crate::performance::{Sub2SecondOptimizer, PREWARMED_ALLOCATION_TARGET};
 use crate::vm::{Vm, VmInstance, VmManager, VmState};
 
 pub mod allocation;

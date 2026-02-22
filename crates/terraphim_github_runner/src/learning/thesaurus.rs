@@ -146,25 +146,17 @@ mod tests {
         assert!(thesaurus.len() > 30);
 
         // Check some specific commands exist using get with NormalizedTermValue
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("cargo build".to_string()))
-                .is_some()
-        );
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("git clone".to_string()))
-                .is_some()
-        );
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("npm install".to_string()))
-                .is_some()
-        );
-        assert!(
-            thesaurus
-                .get(&NormalizedTermValue::new("docker build".to_string()))
-                .is_some()
-        );
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("cargo build".to_string()))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("git clone".to_string()))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("npm install".to_string()))
+            .is_some());
+        assert!(thesaurus
+            .get(&NormalizedTermValue::new("docker build".to_string()))
+            .is_some());
     }
 }

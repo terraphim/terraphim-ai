@@ -452,23 +452,19 @@ async fn test_document_fields_integration_with_persistence() -> Result<()> {
     assert_eq!(loaded_doc.summarization, doc.summarization);
 
     // Verify extracted description makes sense
-    assert!(
-        loaded_doc
-            .description
-            .as_ref()
-            .unwrap()
-            .to_lowercase()
-            .contains("software architecture")
-    );
+    assert!(loaded_doc
+        .description
+        .as_ref()
+        .unwrap()
+        .to_lowercase()
+        .contains("software architecture"));
 
     // Verify summarization is preserved
-    assert!(
-        loaded_doc
-            .summarization
-            .as_ref()
-            .unwrap()
-            .contains("comprehensive guide")
-    );
+    assert!(loaded_doc
+        .summarization
+        .as_ref()
+        .unwrap()
+        .contains("comprehensive guide"));
 
     Ok(())
 }

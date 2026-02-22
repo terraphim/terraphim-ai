@@ -602,15 +602,13 @@ fn fetch_kimi_models() -> Result<Vec<KimiModelData>, String> {
 
 /// Get fallback Kimi models from static list
 fn get_kimi_fallback_models() -> Vec<KimiModelData> {
-    vec![
-        KimiModelData {
-            id: "kimi-for-coding".to_string(),
-            created: 1761264000,
-            display_name: "Kimi For Coding".to_string(),
-            context_length: 262144,
-            supports_reasoning: true,
-        },
-    ]
+    vec![KimiModelData {
+        id: "kimi-for-coding".to_string(),
+        created: 1761264000,
+        display_name: "Kimi For Coding".to_string(),
+        context_length: 262144,
+        supports_reasoning: true,
+    }]
 }
 
 /// Generate Rust code for the Kimi models module

@@ -7,15 +7,15 @@ use crossterm::{
         self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
     },
     execute,
-    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
+    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use ratatui::{
-    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
+    Terminal,
 };
 use tokio::runtime::Runtime;
 
@@ -1409,8 +1409,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
             list_templates,
         } => {
             use onboarding::{
-                SetupMode, SetupResult, apply_template, list_templates as get_templates,
-                run_setup_wizard,
+                apply_template, list_templates as get_templates, run_setup_wizard, SetupMode,
+                SetupResult,
             };
 
             // List templates and exit if requested
@@ -1533,7 +1533,7 @@ async fn run_offline_command(command: Command) -> Result<()> {
         }
         Command::Learn { sub } => {
             use learnings::{
-                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+                capture_failed_command, list_learnings, query_learnings, LearningCaptureConfig,
             };
             let config = LearningCaptureConfig::default();
 
@@ -2112,7 +2112,7 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
         Command::Learn { sub } => {
             // Learn command works the same in server mode - no server needed
             use learnings::{
-                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+                capture_failed_command, list_learnings, query_learnings, LearningCaptureConfig,
             };
             let config = LearningCaptureConfig::default();
 

@@ -1,6 +1,6 @@
 use ahash::AHashMap;
 use terraphim_service::context::{ContextConfig, ContextManager};
-use terraphim_service::llm::{ChatOptions, build_llm_from_role};
+use terraphim_service::llm::{build_llm_from_role, ChatOptions};
 use terraphim_types::{ContextItem, ContextType, ConversationId, RoleName};
 
 /// Test chat completion with context using real Ollama (requires Ollama running)

@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use twelf::reexports::toml;
-use twelf::{Layer, config};
+use twelf::{config, Layer};
 
 #[cfg(feature = "onepassword")]
 use terraphim_onepassword_cli::{OnePasswordLoader, SecretLoader};

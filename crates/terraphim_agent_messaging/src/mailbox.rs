@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
-use tokio::sync::{Mutex, Notify, mpsc};
+use tokio::sync::{mpsc, Mutex, Notify};
 
 use crate::{AgentMessage, AgentPid, MessagingError, MessagingResult};
 

@@ -13,7 +13,7 @@ use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::Command;
-use tempfile::{NamedTempFile, tempdir};
+use tempfile::{tempdir, NamedTempFile};
 use terraphim_session_analyzer::{Analyzer, Reporter};
 
 /// Test data directory path

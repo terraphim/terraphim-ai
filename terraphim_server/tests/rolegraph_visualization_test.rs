@@ -8,7 +8,7 @@ mod tests {
     #[allow(unused_imports)]
     use ahash::AHashMap;
 
-    use terraphim_server::{Status, axum_server};
+    use terraphim_server::{axum_server, Status};
     use terraphim_settings::DeviceSettings;
 
     use std::{net::SocketAddr, path::PathBuf, time::Duration};

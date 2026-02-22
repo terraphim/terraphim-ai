@@ -422,11 +422,9 @@ async fn test_web_workflow_status_monitoring() {
     assert_eq!(trace_body["workflow_id"].as_str().unwrap(), workflow_id);
     assert!(trace_body["timeline"].is_object());
     assert!(trace_body["performance"].is_object());
-    assert!(
-        trace_body["performance"]["execution_time_ms"]
-            .as_i64()
-            .is_some()
-    );
+    assert!(trace_body["performance"]["execution_time_ms"]
+        .as_i64()
+        .is_some());
 }
 
 #[tokio::test]

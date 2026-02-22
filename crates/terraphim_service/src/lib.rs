@@ -2,7 +2,7 @@ use ahash::AHashMap;
 use regex::Regex;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
-use terraphim_automata::{LinkType, replace_matches};
+use terraphim_automata::{replace_matches, LinkType};
 use terraphim_config::{ConfigState, Role};
 use terraphim_middleware::thesaurus::build_thesaurus_from_haystack;
 use terraphim_persistence::Persistable;
@@ -1151,7 +1151,7 @@ impl TerraphimService {
         mut documents: Vec<Document>,
         role: &Role,
     ) -> Result<Vec<Document>> {
-        use crate::llm::{SummarizeOptions, build_llm_from_role};
+        use crate::llm::{build_llm_from_role, SummarizeOptions};
 
         eprintln!("🤖 Attempting to build LLM client for role: {}", role.name);
         let llm = match build_llm_from_role(role) {

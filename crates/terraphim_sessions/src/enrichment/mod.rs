@@ -28,5 +28,5 @@ mod enricher;
 
 pub use concept::{ConceptMatch, ConceptOccurrence, SessionConcepts};
 pub use enricher::{
-    EnrichmentConfig, EnrichmentResult, SessionEnricher, find_related_sessions, search_by_concept,
+    find_related_sessions, search_by_concept, EnrichmentConfig, EnrichmentResult, SessionEnricher,
 };

@@ -50,7 +50,7 @@ static DEFAULT_CLIENT: Lazy<Client> = Lazy::new(|| {
 /// - JSON content type and accept headers
 /// - Connection pooling for repeated API calls
 static API_CLIENT: Lazy<Client> = Lazy::new(|| {
-    use reqwest::header::{ACCEPT, CONTENT_TYPE, HeaderMap, HeaderValue};
+    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT, CONTENT_TYPE};
 
     let mut headers = HeaderMap::new();
     headers.insert(CONTENT_TYPE, HeaderValue::from_static("application/json"));
@@ -73,7 +73,7 @@ static API_CLIENT: Lazy<Client> = Lazy::new(|| {
 /// - Browser-like user agent
 /// - HTML content acceptance
 static SCRAPING_CLIENT: Lazy<Client> = Lazy::new(|| {
-    use reqwest::header::{ACCEPT, HeaderMap, HeaderValue};
+    use reqwest::header::{HeaderMap, HeaderValue, ACCEPT};
 
     let mut headers = HeaderMap::new();
     headers.insert(

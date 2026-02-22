@@ -702,7 +702,7 @@ mod tests {
     }
 
     async fn create_test_role_graph() -> Arc<RoleGraph> {
-        use terraphim_automata::{AutomataPath, load_thesaurus};
+        use terraphim_automata::{load_thesaurus, AutomataPath};
         use terraphim_types::RoleName;
 
         let role_name = RoleName::new("test_role");

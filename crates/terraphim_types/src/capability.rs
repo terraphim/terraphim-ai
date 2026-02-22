@@ -269,23 +269,21 @@ impl Provider {
     }
 
     /// Check if provider matches any of the given capabilities
-    pub fn has_any_capability(
-        &self, capabilities: &[Capability]) -> bool {
+    pub fn has_any_capability(&self, capabilities: &[Capability]) -> bool {
         capabilities.iter().any(|c| self.has_capability(c))
     }
 
     /// Check if provider matches all given capabilities
-    pub fn has_all_capabilities(
-        &self, capabilities: &[Capability]) -> bool {
+    pub fn has_all_capabilities(&self, capabilities: &[Capability]) -> bool {
         capabilities.iter().all(|c| self.has_capability(c))
     }
 
     /// Check if provider matches keywords
     pub fn matches_keywords(&self, text: &str) -> bool {
         let text_lower = text.to_lowercase();
-        self.keywords.iter().any(|k| {
-            text_lower.contains(&k.to_lowercase())
-        })
+        self.keywords
+            .iter()
+            .any(|k| text_lower.contains(&k.to_lowercase()))
     }
 }
 
@@ -338,10 +336,7 @@ mod tests {
             Capability::DeepThinking.description(),
             "Complex reasoning and multi-step analysis"
         );
-        assert_eq!(
-            Capability::CodeGeneration.description(),
-            "Write code"
-        );
+        assert_eq!(Capability::CodeGeneration.description(), "Write code");
     }
 
     #[test]

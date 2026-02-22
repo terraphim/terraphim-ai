@@ -6,7 +6,7 @@
 
 use async_trait::async_trait;
 use log::{debug, error, warn};
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use tokio::time::Duration;
 
 use super::ChatOptions;

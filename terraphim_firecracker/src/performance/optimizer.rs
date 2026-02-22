@@ -1,5 +1,5 @@
 use crate::performance::{OptimizationStrategy, SUB2_TARGET_BOOT_TIME};
-use crate::vm::config::{VmConfig, get_vm_type_config};
+use crate::vm::config::{get_vm_type_config, VmConfig};
 use anyhow::Result;
 use log::{debug, info, warn};
 use std::time::Duration;
@@ -473,10 +473,8 @@ mod tests {
 
         let recommendations = optimizer
             .get_performance_recommendations(Duration::from_millis(5000), "terraphim-development");
-        assert!(
-            recommendations
-                .iter()
-                .any(|r| r.contains("Development VMs"))
-        );
+        assert!(recommendations
+            .iter()
+            .any(|r| r.contains("Development VMs")));
     }
 }

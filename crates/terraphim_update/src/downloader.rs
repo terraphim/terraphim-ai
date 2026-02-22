@@ -7,7 +7,7 @@
 //! - Progress tracking
 //! - Timeout handling
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};

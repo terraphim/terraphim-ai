@@ -1,5 +1,5 @@
 use std::path::PathBuf;
-use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
+use terraphim_automata::{builder::Logseq, ThesaurusBuilder};
 
 /// Detect if running in CI environment (GitHub Actions, Docker containers in CI, etc.)
 fn is_ci_environment() -> bool {

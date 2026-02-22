@@ -2,7 +2,7 @@ use anyhow::Result;
 use salvo::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use tracing::{Level, error, info};
+use tracing::{error, info, Level};
 
 mod config;
 mod github;

@@ -6,7 +6,7 @@ use anyhow::Result;
 use tempfile::TempDir;
 use terraphim_session_analyzer::models::ToolCategory;
 use terraphim_session_analyzer::patterns::knowledge_graph::{
-    PatternLearner, infer_category_from_contexts,
+    infer_category_from_contexts, PatternLearner,
 };
 
 #[test]

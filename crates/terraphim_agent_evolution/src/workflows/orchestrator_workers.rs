@@ -13,11 +13,11 @@ use futures::future::join_all;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CompletionOptions, EvolutionResult, LlmAdapter,
     workflows::{
         ExecutionStep, ResourceUsage, StepType, TaskAnalysis, TaskComplexity, WorkflowInput,
         WorkflowMetadata, WorkflowOutput, WorkflowPattern,
     },
+    CompletionOptions, EvolutionResult, LlmAdapter,
 };
 
 /// Orchestrator-Workers workflow with hierarchical task management

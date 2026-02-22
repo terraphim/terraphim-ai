@@ -1,22 +1,22 @@
 use axum::{
-    Extension, Json,
     extract::{Path, Query, State},
     http::StatusCode,
     response::IntoResponse,
+    Extension, Json,
 };
 #[cfg(feature = "schema")]
 use schemars::schema_for;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::sync::Arc;
-use tokio::sync::Mutex;
 use tokio::sync::broadcast::Sender;
+use tokio::sync::Mutex;
 
 use crate::AppState;
 use terraphim_config::Config;
 use terraphim_persistence::Persistable;
-use terraphim_rolegraph::RoleGraph;
 use terraphim_rolegraph::magic_unpair;
+use terraphim_rolegraph::RoleGraph;
 use terraphim_service::TerraphimService;
 use terraphim_types::RoleName;
 use terraphim_types::{Document, IndexedDocument, SearchQuery};

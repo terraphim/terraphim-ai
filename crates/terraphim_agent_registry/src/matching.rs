@@ -880,7 +880,7 @@ mod tests {
 
     async fn create_test_role_graph() -> Arc<RoleGraph> {
         use std::path::Path;
-        use terraphim_automata::{AutomataPath, load_thesaurus};
+        use terraphim_automata::{load_thesaurus, AutomataPath};
         use terraphim_types::RoleName;
         use terraphim_types::Thesaurus;
 

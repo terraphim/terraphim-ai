@@ -96,11 +96,9 @@ async fn test_routing_workflow() {
         // Verify routing decisions
         let routing_result = &result["result"];
         assert!(routing_result["selected_route"].is_object());
-        assert!(
-            routing_result["task_analysis"]["complexity"]["level"]
-                .as_str()
-                .is_some()
-        );
+        assert!(routing_result["task_analysis"]["complexity"]["level"]
+            .as_str()
+            .is_some());
 
         // The complexity detection might not be perfect, but verify it exists
         let complexity = routing_result["task_analysis"]["complexity"]["level"]
@@ -267,11 +265,9 @@ async fn test_optimization_workflow() {
     // Verify final optimized content
     let final_content = &optimization_result["final_optimized_content"];
     assert!(final_content["content"].as_str().is_some());
-    assert!(
-        final_content["quality_metrics"]["overall_quality"]
-            .as_f64()
-            .is_some()
-    );
+    assert!(final_content["quality_metrics"]["overall_quality"]
+        .as_f64()
+        .is_some());
 }
 
 #[tokio::test]
@@ -339,11 +335,9 @@ async fn test_workflow_trace_endpoint() {
     let trace_body = trace_response.json::<serde_json::Value>();
     assert_eq!(trace_body["workflow_id"].as_str().unwrap(), workflow_id);
     assert!(trace_body["timeline"]["started_at"].as_str().is_some());
-    assert!(
-        trace_body["performance"]["execution_time_ms"]
-            .as_i64()
-            .is_some()
-    );
+    assert!(trace_body["performance"]["execution_time_ms"]
+        .as_i64()
+        .is_some());
 }
 
 #[tokio::test]

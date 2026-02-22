@@ -1,6 +1,6 @@
 use crate::models::{
-    AgentInvocation, ContentBlock, FileOpType, FileOperation, Message, SessionEntry, ToolCategory,
-    ToolInvocation, extract_file_path, parse_timestamp,
+    extract_file_path, parse_timestamp, AgentInvocation, ContentBlock, FileOpType, FileOperation,
+    Message, SessionEntry, ToolCategory, ToolInvocation,
 };
 use crate::patterns::PatternMatcher;
 use crate::tool_analyzer;

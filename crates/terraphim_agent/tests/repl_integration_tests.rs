@@ -225,8 +225,8 @@ fn test_repl_command_edge_cases() {
 /// Test the TUI render functions using ratatui's TestBackend
 #[test]
 fn test_tui_render_search_view() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -274,8 +274,8 @@ fn test_tui_render_search_view() {
 /// Test TUI render with detail view
 #[test]
 fn test_tui_render_detail_view() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
     use terraphim_types::Document;
 
     let backend = TestBackend::new(80, 24);
@@ -335,8 +335,8 @@ fn test_tui_render_detail_view() {
 /// Test TUI render with suggestions
 #[test]
 fn test_tui_render_with_suggestions() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -376,8 +376,8 @@ fn test_tui_render_with_suggestions() {
 /// Test that terminal size constraints are handled
 #[test]
 fn test_tui_render_small_terminal() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     // Test with a very small terminal (20x10)
     let backend = TestBackend::new(20, 10);
@@ -449,8 +449,8 @@ async fn test_repl_integration_components() {
 /// Test that render functions handle empty results gracefully
 #[test]
 fn test_render_empty_results() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -480,8 +480,8 @@ fn test_render_empty_results() {
 /// Test TUI rendering with long content
 #[test]
 fn test_render_long_content() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
+    use ratatui::Terminal;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -513,9 +513,9 @@ fn test_render_long_content() {
 /// Test TUI with selected item highlighting
 #[test]
 fn test_render_with_selection() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::style::{Modifier, Style};
+    use ratatui::Terminal;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();
@@ -559,9 +559,9 @@ fn test_render_with_selection() {
 /// Test TUI with transparent background option
 #[test]
 fn test_render_transparent_background() {
-    use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::style::{Color, Style};
+    use ratatui::Terminal;
 
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).unwrap();

@@ -7,7 +7,7 @@ mod tests {
     #[allow(unused_imports)]
     use ahash::AHashMap;
     use terraphim_automata::AutomataPath;
-    use terraphim_server::{CreateDocumentResponse, SearchResponse, Status, axum_server};
+    use terraphim_server::{axum_server, CreateDocumentResponse, SearchResponse, Status};
     use terraphim_settings::DeviceSettings;
 
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
@@ -285,18 +285,14 @@ mod tests {
         // Check that the config is valid JSON and contains the expected roles
         let response: ConfigResponse = response.json().await.unwrap();
         assert!(matches!(response.status, Status::Success));
-        assert!(
-            response
-                .config
-                .roles
-                .contains_key(&RoleName::new("System Operator"))
-        );
-        assert!(
-            response
-                .config
-                .roles
-                .contains_key(&RoleName::new("Engineer"))
-        );
+        assert!(response
+            .config
+            .roles
+            .contains_key(&RoleName::new("System Operator")));
+        assert!(response
+            .config
+            .roles
+            .contains_key(&RoleName::new("Engineer")));
     }
 
     /// test update config

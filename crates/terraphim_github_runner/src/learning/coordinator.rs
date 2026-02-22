@@ -14,8 +14,8 @@ use std::sync::Arc;
 use uuid::Uuid;
 
 use super::knowledge_graph::{CommandGraphStats, CommandKnowledgeGraph};
-use crate::Result;
 use crate::models::{WorkflowContext, WorkflowResult};
+use crate::Result;
 
 /// Threshold for identical failures before creating a lesson
 const FAILURE_THRESHOLD: u32 = 3;

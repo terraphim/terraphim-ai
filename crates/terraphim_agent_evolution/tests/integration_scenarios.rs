@@ -51,12 +51,10 @@ async fn test_memory_evolution_integration() {
 
     // Memory should contain domain-relevant content
     let memory_contents: Vec<_> = memory_state.short_term.iter().map(|m| &m.content).collect();
-    assert!(
-        memory_contents
-            .iter()
-            .any(|content| content.to_lowercase().contains("renewable")
-                || content.to_lowercase().contains("energy"))
-    );
+    assert!(memory_contents
+        .iter()
+        .any(|content| content.to_lowercase().contains("renewable")
+            || content.to_lowercase().contains("energy")));
 }
 
 #[tokio::test]

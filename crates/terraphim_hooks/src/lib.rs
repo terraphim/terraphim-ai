@@ -6,7 +6,7 @@
 mod discovery;
 mod replacement;
 
-pub use discovery::{BinaryLocation, discover_binary};
+pub use discovery::{discover_binary, BinaryLocation};
 pub use replacement::{HookResult, LinkType, ReplacementService};
 
 /// Re-export key types from terraphim_automata for convenience.

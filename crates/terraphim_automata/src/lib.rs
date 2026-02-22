@@ -127,15 +127,15 @@ pub mod umls;
 pub mod umls_extractor;
 
 pub use autocomplete::{
-    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
+    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
 };
 pub use markdown_directives::{
-    MarkdownDirectiveWarning, MarkdownDirectivesParseResult, parse_markdown_directives_dir,
+    parse_markdown_directives_dir, MarkdownDirectiveWarning, MarkdownDirectivesParseResult,
 };
 pub use matcher::{
-    LinkType, Matched, extract_paragraphs_from_automata, find_matches, replace_matches,
+    extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,
 };
 
 // Medical entity extraction re-exports

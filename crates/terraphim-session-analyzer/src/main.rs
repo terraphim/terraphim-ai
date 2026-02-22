@@ -15,7 +15,7 @@ use tracing::{info, warn};
 
 use analyzer::Analyzer;
 use parser::SessionParser;
-use patterns::{AhoCorasickMatcher, PatternMatcher, load_all_patterns};
+use patterns::{load_all_patterns, AhoCorasickMatcher, PatternMatcher};
 use reporter::Reporter;
 
 #[derive(Parser)]

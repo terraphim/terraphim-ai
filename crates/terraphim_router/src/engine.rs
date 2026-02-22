@@ -24,7 +24,7 @@ impl RoutingEngine {
             strategy: Box::new(CostOptimized::default()),
         }
     }
-    
+
     /// Create with custom components
     pub fn with_components(
         keyword_router: KeywordRouter,
@@ -37,23 +37,18 @@ impl RoutingEngine {
             strategy,
         }
     }
-    
+
     /// Set the routing strategy
-    pub fn with_strategy(
-        mut self,
-        strategy: Box<dyn RoutingStrategy>,
-    ) -> Self {
+    pub fn with_strategy(mut self, strategy: Box<dyn RoutingStrategy>) -> Self {
         self.strategy = strategy;
         self
     }
-    
+
     /// Add a provider to the registry
-    pub fn add_provider(&mut self,
-        provider: Provider,
-    ) {
+    pub fn add_provider(&mut self, provider: Provider) {
         self.registry.add_provider(provider);
     }
-    
+
     /// Route a prompt to the best provider
     pub fn route(
         &self,
@@ -62,32 +57,27 @@ impl RoutingEngine {
     ) -> Result<RoutingDecision, RoutingError> {
         // 1. Extract capabilities from prompt
         let capabilities = self.keyword_router.extract_capabilities(prompt);
-        
+
         if capabilities.is_empty() {
             // No capabilities found - use fallback
             return self.fallback_decision();
         }
-        
+
         // 2. Find providers that can fulfill these capabilities
-        let candidates = self.registry.find_by_capabilities(&capabilities
-        );
-        
+        let candidates = self.registry.find_by_capabilities(&capabilities);
+
         if candidates.is_empty() {
             return Err(RoutingError::NoProviderFound(capabilities));
         }
-        
+
         // 3. Apply routing strategy to select best provider
         let selected = self.strategy.select_provider(candidates);
-        
+
         match selected {
             Some(provider) => {
                 // Calculate confidence based on match quality
-                let confidence = self.calculate_confidence(
-                    prompt,
-                    provider,
-                    &capabilities
-                );
-                
+                let confidence = self.calculate_confidence(prompt, provider, &capabilities);
+
                 Ok(RoutingDecision {
                     provider: provider.clone(),
                     matched_capabilities: capabilities.clone(),
@@ -98,7 +88,7 @@ impl RoutingEngine {
             None => self.fallback_decision(),
         }
     }
-    
+
     /// Calculate confidence score for a routing decision
     fn calculate_confidence(
         &self,
@@ -107,26 +97,24 @@ impl RoutingEngine {
         matched_caps: &[Capability],
     ) -> f32 {
         let mut score = 0.5f32; // Base score
-        
+
         // Boost for keyword matches
         if provider.matches_keywords(prompt) {
             score += 0.3;
         }
-        
+
         // Boost for capability coverage
-        let coverage = matched_caps.len() as f32 /
-            provider.capabilities.len().max(1) as f32;
+        let coverage = matched_caps.len() as f32 / provider.capabilities.len().max(1) as f32;
         score += coverage * 0.2;
-        
+
         score.min(1.0)
     }
-    
+
     /// Get fallback decision when no good match
-    fn fallback_decision(&self,
-    ) -> Result<RoutingDecision, RoutingError> {
+    fn fallback_decision(&self) -> Result<RoutingDecision, RoutingError> {
         // Try to get any provider as fallback
         let all = self.registry.all();
-        
+
         if let Some(provider) = all.first() {
             Ok(RoutingDecision {
                 provider: (*provider).clone(),
@@ -158,19 +146,17 @@ impl Router {
             engine: RoutingEngine::new(),
         }
     }
-    
+
     /// Create from existing engine
     pub fn from_engine(engine: RoutingEngine) -> Self {
         Self { engine }
     }
-    
+
     /// Add a provider
-    pub fn add_provider(&mut self,
-        provider: Provider,
-    ) {
+    pub fn add_provider(&mut self, provider: Provider) {
         self.engine.add_provider(provider);
     }
-    
+
     /// Route a prompt
     pub fn route(
         &self,
@@ -191,16 +177,10 @@ impl Default for Router {
 mod tests {
     use super::*;
     use crate::strategy::CostOptimized;
-    use terraphim_types::capability::{
-        ProviderType, CostLevel, Latency
-    };
     use std::path::PathBuf;
+    use terraphim_types::capability::{CostLevel, Latency, ProviderType};
 
-    fn create_test_provider(
-        id: &str,
-        cost: CostLevel,
-        caps: Vec<Capability>,
-    ) -> Provider {
+    fn create_test_provider(id: &str, cost: CostLevel, caps: Vec<Capability>) -> Provider {
         Provider {
             id: id.to_string(),
             name: id.to_string(),
@@ -218,60 +198,60 @@ mod tests {
     #[test]
     fn test_route_by_capability() {
         let mut engine = RoutingEngine::new();
-        
+
         // Add providers
         engine.add_provider(create_test_provider(
             "cheap-coder",
             CostLevel::Cheap,
             vec![Capability::CodeGeneration],
         ));
-        
+
         engine.add_provider(create_test_provider(
             "expensive-thinker",
             CostLevel::Expensive,
             vec![Capability::DeepThinking],
         ));
-        
+
         // Route a coding task
-        let decision = engine.route(
-            "Implement a function to parse JSON",
-            &RoutingContext::default(),
-        ).unwrap();
-        
+        let decision = engine
+            .route(
+                "Implement a function to parse JSON",
+                &RoutingContext::default(),
+            )
+            .unwrap();
+
         assert_eq!(decision.provider.id, "cheap-coder");
-        assert!(decision.matched_capabilities.contains(&Capability::CodeGeneration));
+        assert!(decision
+            .matched_capabilities
+            .contains(&Capability::CodeGeneration));
     }
 
     #[test]
     fn test_no_provider_found() {
         let engine = RoutingEngine::new();
-        
+
         // No providers registered
-        let result = engine.route(
-            "Implement a function",
-            &RoutingContext::default(),
-        );
-        
+        let result = engine.route("Implement a function", &RoutingContext::default());
+
         assert!(result.is_err());
     }
 
     #[test]
     fn test_fallback() {
         let mut engine = RoutingEngine::new();
-        
+
         // Add only one provider
         engine.add_provider(create_test_provider(
             "only-provider",
             CostLevel::Moderate,
             vec![Capability::CodeGeneration],
         ));
-        
+
         // Route something that doesn't match well
-        let decision = engine.route(
-            "Hello world",
-            &RoutingContext::default(),
-        ).unwrap();
-        
+        let decision = engine
+            .route("Hello world", &RoutingContext::default())
+            .unwrap();
+
         // Should fallback to the only provider
         assert_eq!(decision.provider.id, "only-provider");
         assert_eq!(decision.reason, RoutingReason::Fallback);

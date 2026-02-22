@@ -12,7 +12,7 @@ pub mod scheduler;
 pub mod signature;
 pub mod state;
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use self_update::cargo_crate_version;
 use self_update::version::bump_is_greater;

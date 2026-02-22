@@ -7,8 +7,8 @@
 
 use async_trait::async_trait;
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 use terraphim_github_runner::error::Result;
 use terraphim_github_runner::models::{

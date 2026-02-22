@@ -260,10 +260,8 @@ mod tests {
 
         concepts.calculate_co_occurrences();
         assert_eq!(concepts.co_occurrences.len(), 1);
-        assert!(
-            concepts
-                .co_occurrences
-                .contains(&("Rust".to_string(), "Tokio".to_string()))
-        );
+        assert!(concepts
+            .co_occurrences
+            .contains(&("Rust".to_string(), "Tokio".to_string())));
     }
 }

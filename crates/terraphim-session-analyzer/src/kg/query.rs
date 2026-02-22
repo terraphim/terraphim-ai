@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 
 /// Query AST node representing a parsed query
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -157,7 +157,7 @@ impl ParserState {
     fn parse_not_expression(&mut self) -> Result<QueryNode> {
         if let Some(Token::Not) = self.peek() {
             self.consume(); // consume NOT
-            // Recursively parse NOT expressions to support "not not X"
+                            // Recursively parse NOT expressions to support "not not X"
             let operand = self.parse_not_expression()?;
             Ok(QueryNode::Not(Box::new(operand)))
         } else {
@@ -494,12 +494,10 @@ mod tests {
         let query = "(deploy and publish";
         let result = QueryParser::parse(query);
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("closing parenthesis")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("closing parenthesis"));
     }
 
     #[test]

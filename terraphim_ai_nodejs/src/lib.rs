@@ -6,10 +6,9 @@ extern crate napi_derive;
 use anyhow::Context;
 use napi::bindgen_prelude::{Buffer, Status};
 use terraphim_automata::{
-  LinkType,
   autocomplete::{autocomplete_search, build_autocomplete_index},
   deserialize_autocomplete_index, load_thesaurus_from_json, load_thesaurus_from_json_and_replace,
-  serialize_autocomplete_index,
+  serialize_autocomplete_index, LinkType,
 };
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;

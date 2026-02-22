@@ -18,7 +18,7 @@ mod tools;
 use crate::agent::agent_loop::{HybridLlmRouter, ToolCallingLoop};
 use crate::agent::proxy_client::ProxyClientConfig;
 use crate::bus::MessageBus;
-use crate::channel::{Channel, ChannelManager, build_channels_from_config};
+use crate::channel::{build_channels_from_config, Channel, ChannelManager};
 use crate::channels::cli::CliChannel;
 use crate::config::Config;
 use crate::session::SessionManager;

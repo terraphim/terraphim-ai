@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use terraphim_automata::matcher::{Matched, find_matches};
+use terraphim_automata::matcher::{find_matches, Matched};
 use terraphim_rolegraph::RoleGraph;
 use terraphim_types::Thesaurus;
 use tokio::sync::RwLock;

@@ -9,9 +9,9 @@ use std::sync::Arc;
 use chrono::Utc;
 
 use crate::{
-    AgentEvolutionSystem, AgentId, EvolutionResult, LlmAdapter,
     llm_adapter::LlmAdapterFactory,
     workflows::{TaskAnalysis, WorkflowFactory, WorkflowInput, WorkflowParameters},
+    AgentEvolutionSystem, AgentId, EvolutionResult, LlmAdapter,
 };
 
 /// Integrated evolution workflow manager that combines workflow execution with evolution tracking

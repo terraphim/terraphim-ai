@@ -7,7 +7,7 @@ use std::fs;
 use std::path::Path;
 use std::time::{Duration, Instant};
 use terraphim_config::{Haystack, Role, ServiceType};
-use terraphim_service::llm::{ChatOptions, build_llm_from_role};
+use terraphim_service::llm::{build_llm_from_role, ChatOptions};
 use tokio::time::sleep;
 
 /// Load configuration from .env file

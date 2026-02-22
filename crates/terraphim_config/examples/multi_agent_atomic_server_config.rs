@@ -31,14 +31,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         relevance_function: RelevanceFunction::TitleScorer,
         theme: "spacelab".to_string(),
         kg: None,
-        haystacks: vec![
-            Haystack::new(
-                "http://localhost:9883".to_string(),
-                ServiceType::Atomic,
-                true,
-            )
-            .with_atomic_secret(Some("your-base64-secret-here".to_string())),
-        ],
+        haystacks: vec![Haystack::new(
+            "http://localhost:9883".to_string(),
+            ServiceType::Atomic,
+            true,
+        )
+        .with_atomic_secret(Some("your-base64-secret-here".to_string()))],
         extra: {
             let mut extra = AHashMap::new();
 
@@ -212,8 +210,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 /// Helper function to create test storage (would be imported from multi-agent crate)
 #[allow(dead_code)]
-async fn create_test_storage()
--> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
+async fn create_test_storage(
+) -> Result<std::sync::Arc<terraphim_persistence::DeviceStorage>, Box<dyn std::error::Error>> {
     use terraphim_persistence::DeviceStorage;
 
     // Use the safe Arc method instead of unsafe ptr::read

@@ -44,8 +44,8 @@ pub use service::SessionService;
 
 #[cfg(feature = "enrichment")]
 pub use enrichment::{
-    ConceptMatch, ConceptOccurrence, EnrichmentConfig, EnrichmentResult, SessionConcepts,
-    SessionEnricher, find_related_sessions, search_by_concept,
+    find_related_sessions, search_by_concept, ConceptMatch, ConceptOccurrence, EnrichmentConfig,
+    EnrichmentResult, SessionConcepts, SessionEnricher,
 };
 
 /// Crate version

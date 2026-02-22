@@ -9,8 +9,8 @@ use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::{ToolError, ToolRegistry};
 use std::collections::HashMap;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::sync::Mutex;
 use tokio_util::sync::CancellationToken;
 

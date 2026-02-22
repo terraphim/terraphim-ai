@@ -3,17 +3,17 @@
 //! Provides the interactive setup wizard flow for first-time users
 //! and add-role capability for extending existing configurations.
 
-use dialoguer::{Confirm, Select, theme::ColorfulTheme};
+use dialoguer::{theme::ColorfulTheme, Confirm, Select};
 use terraphim_config::Role;
 use terraphim_types::RelevanceFunction;
 
-use super::OnboardingError;
 use super::prompts::{
-    PromptResult, prompt_haystacks, prompt_knowledge_graph, prompt_llm_config,
-    prompt_relevance_function, prompt_role_basics, prompt_theme,
+    prompt_haystacks, prompt_knowledge_graph, prompt_llm_config, prompt_relevance_function,
+    prompt_role_basics, prompt_theme, PromptResult,
 };
 use super::templates::{ConfigTemplate, TemplateRegistry};
 use super::validation::validate_role;
+use super::OnboardingError;
 
 /// Result of running the setup wizard
 #[derive(Debug)]

@@ -110,11 +110,9 @@ mod tests {
 
         // Verify the retrieved resource
         assert_eq!(retrieved_resource.subject, test_resource_id);
-        assert!(
-            retrieved_resource
-                .properties
-                .contains_key("https://atomicdata.dev/properties/shortname")
-        );
+        assert!(retrieved_resource
+            .properties
+            .contains_key("https://atomicdata.dev/properties/shortname"));
 
         // Update the resource
         let mut update_map = HashMap::new();

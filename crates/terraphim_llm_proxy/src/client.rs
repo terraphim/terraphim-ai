@@ -917,8 +917,14 @@ impl LlmClient {
                                 if let Some(choice) = choices.first() {
                                     if let Some(delta) = choice.get("delta") {
                                         // GLM-4.7 may use "reasoning_content" instead of "content"
-                                        let content = delta.get("content").and_then(|c| c.as_str())
-                                            .or_else(|| delta.get("reasoning_content").and_then(|c| c.as_str()));
+                                        let content = delta
+                                            .get("content")
+                                            .and_then(|c| c.as_str())
+                                            .or_else(|| {
+                                                delta
+                                                    .get("reasoning_content")
+                                                    .and_then(|c| c.as_str())
+                                            });
                                         if let Some(text) = content {
                                             debug!(content = %text, "Extracted content from delta");
                                             return Ok(ChatStreamEvent::Chunk(StreamChunk {

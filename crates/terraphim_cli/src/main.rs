@@ -5,7 +5,7 @@
 
 use anyhow::{Context, Result};
 use clap::{CommandFactory, Parser, Subcommand};
-use clap_complete::{Shell, generate};
+use clap_complete::{generate, Shell};
 use serde::Serialize;
 use std::io;
 

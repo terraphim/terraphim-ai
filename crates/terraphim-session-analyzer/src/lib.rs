@@ -49,14 +49,14 @@ pub mod connectors;
 // Re-export main types for convenience
 pub use analyzer::{Analyzer, SummaryStats};
 pub use models::{
-    AgentAttribution, AgentInvocation, AgentStatistics, AgentToolCorrelation, AnalyzerConfig,
-    CollaborationPattern, FileOperation, SessionAnalysis, ToolAnalysis, ToolCategory, ToolChain,
-    ToolInvocation, ToolStatistics, get_agent_category, normalize_agent_name,
+    get_agent_category, normalize_agent_name, AgentAttribution, AgentInvocation, AgentStatistics,
+    AgentToolCorrelation, AnalyzerConfig, CollaborationPattern, FileOperation, SessionAnalysis,
+    ToolAnalysis, ToolCategory, ToolChain, ToolInvocation, ToolStatistics,
 };
 pub use parser::{SessionParser, TimelineEvent, TimelineEventType};
 pub use patterns::{
-    AhoCorasickMatcher, PatternMatcher, ToolMatch, ToolMetadata, ToolPattern, create_matcher,
-    load_patterns,
+    create_matcher, load_patterns, AhoCorasickMatcher, PatternMatcher, ToolMatch, ToolMetadata,
+    ToolPattern,
 };
 pub use reporter::Reporter;
 

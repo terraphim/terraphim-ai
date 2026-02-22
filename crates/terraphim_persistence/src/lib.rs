@@ -9,9 +9,9 @@ pub mod thesaurus;
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
 use opendal::Operator;
-use serde::{Serialize, de::DeserializeOwned};
+use serde::{de::DeserializeOwned, Serialize};
 use terraphim_settings::DeviceSettings;
-use tracing::{Instrument, debug_span};
+use tracing::{debug_span, Instrument};
 
 use std::collections::HashMap;
 use std::sync::Arc;

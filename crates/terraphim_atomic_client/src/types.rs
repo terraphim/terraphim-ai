@@ -1,5 +1,5 @@
 use crate::auth::Agent;
-use crate::{Result, error::AtomicError};
+use crate::{error::AtomicError, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;

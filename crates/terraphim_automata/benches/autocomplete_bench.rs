@@ -12,18 +12,18 @@
 //! cargo bench --bench autocomplete_bench
 //! ```
 
-use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 
 use terraphim_automata::autocomplete::{
-    AutocompleteIndex, autocomplete_search, build_autocomplete_index,
-    deserialize_autocomplete_index, fuzzy_autocomplete_search,
-    fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
+    autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
+    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
+    AutocompleteIndex,
 };
 use terraphim_automata::matcher::extract_paragraphs_from_automata;
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 #[cfg(all(feature = "remote-loading", feature = "tokio-runtime"))]
-use terraphim_automata::{AutomataPath, load_thesaurus};
+use terraphim_automata::{load_thesaurus, AutomataPath};
 
 #[cfg(feature = "tokio-runtime")]
 use tokio::runtime::Runtime;

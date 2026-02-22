@@ -23,7 +23,7 @@ use std::path::PathBuf;
 use serde::Deserialize;
 use thiserror::Error;
 
-use crate::learnings::{LearningCaptureConfig, LearningError, capture_failed_command};
+use crate::learnings::{capture_failed_command, LearningCaptureConfig, LearningError};
 
 /// AI agent format for hook processing.
 #[derive(Debug, Clone, Copy, PartialEq, clap::ValueEnum)]

@@ -4,8 +4,8 @@ use crate::bus::{MessageBus, OutboundMessage};
 use crate::channel::Channel;
 use crate::config::DiscordConfig;
 use async_trait::async_trait;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 
 /// Discord channel adapter.
 pub struct DiscordChannel {

@@ -29,7 +29,7 @@ impl KeywordRouter {
     }
 
     /// Create with custom mappings
-    pub fn with_mappings(mappings: Vec<( Vec<String>, Capability, u32)>) -> Self {
+    pub fn with_mappings(mappings: Vec<(Vec<String>, Capability, u32)>) -> Self {
         let mappings = mappings
             .into_iter()
             .map(|(keywords, capability, priority)| KeywordMapping {
@@ -38,14 +38,12 @@ impl KeywordRouter {
                 priority,
             })
             .collect();
-        
+
         Self { mappings }
     }
 
     /// Extract capabilities from text
-    pub fn extract_capabilities(&self,
-        text: &str,
-    ) -> Vec<Capability> {
+    pub fn extract_capabilities(&self, text: &str) -> Vec<Capability> {
         let text_lower = text.to_lowercase();
         let mut caps = HashSet::new();
         let mut matched_keywords = Vec::new();
@@ -62,14 +60,12 @@ impl KeywordRouter {
 
         // Sort by priority (higher priority first)
         matched_keywords.sort_by(|a, b| b.1.cmp(&a.1));
-        
+
         caps.into_iter().collect()
     }
 
     /// Check if text contains any capability-indicating keywords
-    pub fn has_keywords(&self,
-        text: &str,
-    ) -> bool {
+    pub fn has_keywords(&self, text: &str) -> bool {
         !self.extract_capabilities(text).is_empty()
     }
 
@@ -91,7 +87,6 @@ impl KeywordRouter {
                 capability: Capability::DeepThinking,
                 priority: 100,
             },
-            
             // Fast thinking (lower priority)
             KeywordMapping {
                 keywords: vec![
@@ -105,7 +100,6 @@ impl KeywordRouter {
                 capability: Capability::FastThinking,
                 priority: 50,
             },
-            
             // Code generation
             KeywordMapping {
                 keywords: vec![
@@ -120,7 +114,6 @@ impl KeywordRouter {
                 capability: Capability::CodeGeneration,
                 priority: 90,
             },
-            
             // Code review
             KeywordMapping {
                 keywords: vec![
@@ -133,7 +126,6 @@ impl KeywordRouter {
                 capability: Capability::CodeReview,
                 priority: 85,
             },
-            
             // Architecture
             KeywordMapping {
                 keywords: vec![
@@ -146,7 +138,6 @@ impl KeywordRouter {
                 capability: Capability::Architecture,
                 priority: 88,
             },
-            
             // Testing
             KeywordMapping {
                 keywords: vec![
@@ -159,7 +150,6 @@ impl KeywordRouter {
                 capability: Capability::Testing,
                 priority: 80,
             },
-            
             // Refactoring
             KeywordMapping {
                 keywords: vec![
@@ -172,7 +162,6 @@ impl KeywordRouter {
                 capability: Capability::Refactoring,
                 priority: 75,
             },
-            
             // Documentation
             KeywordMapping {
                 keywords: vec![
@@ -185,7 +174,6 @@ impl KeywordRouter {
                 capability: Capability::Documentation,
                 priority: 70,
             },
-            
             // Explanation
             KeywordMapping {
                 keywords: vec![
@@ -198,7 +186,6 @@ impl KeywordRouter {
                 capability: Capability::Explanation,
                 priority: 65,
             },
-            
             // Security audit
             KeywordMapping {
                 keywords: vec![
@@ -212,7 +199,6 @@ impl KeywordRouter {
                 capability: Capability::SecurityAudit,
                 priority: 95,
             },
-            
             // Performance
             KeywordMapping {
                 keywords: vec![
@@ -243,44 +229,39 @@ mod tests {
     #[test]
     fn test_extract_deep_thinking() {
         let router = KeywordRouter::new();
-        
-        let caps = router.extract_capabilities(
-            "I need you to think carefully about this complex problem"
-        );
-        
+
+        let caps =
+            router.extract_capabilities("I need you to think carefully about this complex problem");
+
         assert!(caps.contains(&Capability::DeepThinking));
     }
 
     #[test]
     fn test_extract_code_generation() {
         let router = KeywordRouter::new();
-        
-        let caps = router.extract_capabilities(
-            "Please implement a function to parse JSON"
-        );
-        
+
+        let caps = router.extract_capabilities("Please implement a function to parse JSON");
+
         assert!(caps.contains(&Capability::CodeGeneration));
     }
 
     #[test]
     fn test_extract_security_audit() {
         let router = KeywordRouter::new();
-        
-        let caps = router.extract_capabilities(
-            "Audit this code for security vulnerabilities"
-        );
-        
+
+        let caps = router.extract_capabilities("Audit this code for security vulnerabilities");
+
         assert!(caps.contains(&Capability::SecurityAudit));
     }
 
     #[test]
     fn test_multiple_capabilities() {
         let router = KeywordRouter::new();
-        
+
         let caps = router.extract_capabilities(
-            "Implement a secure authentication system and write tests for it"
+            "Implement a secure authentication system and write tests for it",
         );
-        
+
         assert!(caps.contains(&Capability::CodeGeneration));
         assert!(caps.contains(&Capability::SecurityAudit));
         assert!(caps.contains(&Capability::Testing));
@@ -289,22 +270,20 @@ mod tests {
     #[test]
     fn test_no_capabilities() {
         let router = KeywordRouter::new();
-        
-        let caps = router.extract_capabilities(
-            "Hello, how are you today?"
-        );
-        
+
+        let caps = router.extract_capabilities("Hello, how are you today?");
+
         assert!(caps.is_empty());
     }
 
     #[test]
     fn test_case_insensitive() {
         let router = KeywordRouter::new();
-        
+
         let caps1 = router.extract_capabilities("IMPLEMENT this feature");
         let caps2 = router.extract_capabilities("implement this feature");
         let caps3 = router.extract_capabilities("Implement this feature");
-        
+
         assert_eq!(caps1, caps2);
         assert_eq!(caps2, caps3);
     }
@@ -312,7 +291,7 @@ mod tests {
     #[test]
     fn test_has_keywords() {
         let router = KeywordRouter::new();
-        
+
         assert!(router.has_keywords("Think about this problem"));
         assert!(!router.has_keywords("Hello world"));
     }

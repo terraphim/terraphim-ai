@@ -3,9 +3,9 @@
 //! This module bridges HTTP workflow endpoints with the TerraphimAgent system,
 //! replacing mock implementations with actual multi-agent execution.
 
-use serde_json::{Value, json};
+use serde_json::{json, Value};
 use std::sync::Arc;
-use tokio::time::{Duration, sleep};
+use tokio::time::{sleep, Duration};
 
 use ahash::AHashMap;
 use terraphim_config::Role;
@@ -16,8 +16,8 @@ use terraphim_persistence::DeviceStorage;
 use terraphim_types::RelevanceFunction;
 
 use super::{
-    ExecutionStatus, LlmConfig, StepConfig, WebSocketBroadcaster, WorkflowSessions,
-    update_workflow_status,
+    update_workflow_status, ExecutionStatus, LlmConfig, StepConfig, WebSocketBroadcaster,
+    WorkflowSessions,
 };
 use terraphim_config::ConfigState;
 

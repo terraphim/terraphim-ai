@@ -12,18 +12,18 @@ mod tests {
     use std::path::PathBuf;
 
     // Import all the types we need for tests
-    use crate::CommandExecutionResult;
     use crate::commands::executor;
     use crate::commands::registry::CommandRegistry;
     use crate::commands::validator::{CommandValidator, SecurityAction, SecurityResult};
     use crate::commands::{
+        hooks::{BackupHook, EnvironmentHook, LoggingHook, PreflightCheckHook},
+        HookContext,
+    };
+    use crate::commands::{
         CommandDefinition, CommandHook, CommandParameter, ExecutionMode, HookManager,
         ParsedCommand, RiskLevel,
     };
-    use crate::commands::{
-        HookContext,
-        hooks::{BackupHook, EnvironmentHook, LoggingHook, PreflightCheckHook},
-    };
+    use crate::CommandExecutionResult;
 
     // Test data and helper functions
     fn create_test_command_definition() -> CommandDefinition {
@@ -134,11 +134,9 @@ test-command --input "hello" --verbose
         assert_eq!(parsed.definition.parameters.len(), 2);
         // Test that markdown structure is preserved
         assert!(parsed.content.contains("# Test Command"));
-        assert!(
-            parsed
-                .content
-                .contains("This is a test command for unit testing purposes.")
-        );
+        assert!(parsed
+            .content
+            .contains("This is a test command for unit testing purposes."));
     }
 
     #[tokio::test]

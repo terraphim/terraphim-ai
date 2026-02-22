@@ -3,8 +3,8 @@
 use crate::tools::ToolCall;
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
-use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 /// Configuration for the proxy client.

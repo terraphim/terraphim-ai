@@ -12,11 +12,11 @@ use chrono::Utc;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    CompletionOptions, EvolutionResult, LlmAdapter,
     workflows::{
         ExecutionStep, ResourceUsage, StepType, TaskAnalysis, TaskComplexity, WorkflowInput,
         WorkflowMetadata, WorkflowOutput, WorkflowPattern,
     },
+    CompletionOptions, EvolutionResult, LlmAdapter,
 };
 
 /// Routing workflow that selects the best execution path

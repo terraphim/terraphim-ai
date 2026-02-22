@@ -57,7 +57,7 @@ impl ProviderRegistry {
             source_path: None,
         }
     }
-    
+
     /// Create with a source path for loading
     pub fn with_path(path: impl Into<PathBuf>) -> Self {
         Self {
@@ -65,189 +65,181 @@ impl ProviderRegistry {
             source_path: Some(path.into()),
         }
     }
-    
+
     /// Add a provider to the registry
-    pub fn add_provider(
-        &mut self,
-        provider: Provider,
-    ) {
+    pub fn add_provider(&mut self, provider: Provider) {
         self.providers.insert(provider.id.clone(), provider);
     }
-    
+
     /// Get a provider by ID
     pub fn get(&self, id: &str) -> Option<&Provider> {
         self.providers.get(id)
     }
-    
+
     /// Get all providers
     pub fn all(&self) -> Vec<&Provider> {
         self.providers.values().collect()
     }
-    
+
     /// Find providers that have a specific capability
-    pub fn find_by_capability(
-        &self,
-        capability: &Capability,
-    ) -> Vec<&Provider> {
+    pub fn find_by_capability(&self, capability: &Capability) -> Vec<&Provider> {
         self.providers
             .values()
             .filter(|p| p.has_capability(capability))
             .collect()
     }
-    
+
     /// Find providers that match all given capabilities
-    pub fn find_by_capabilities(
-        &self,
-        capabilities: &[Capability],
-    ) -> Vec<&Provider> {
+    pub fn find_by_capabilities(&self, capabilities: &[Capability]) -> Vec<&Provider> {
         self.providers
             .values()
             .filter(|p| p.has_all_capabilities(capabilities))
             .collect()
     }
-    
+
     /// Load providers from a directory of markdown files
-    pub async fn load_from_dir(
-        &mut self,
-        dir: impl AsRef<Path>,
-    ) -> Result<usize, RoutingError> {
+    pub async fn load_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<usize, RoutingError> {
         let dir = dir.as_ref();
         let mut count = 0;
-        
+
         // Read directory entries
-        let mut entries = tokio::fs::read_dir(dir).await
+        let mut entries = tokio::fs::read_dir(dir)
+            .await
             .map_err(|e| RoutingError::Io(e.to_string()))?;
-        
-        while let Some(entry) = entries.next_entry().await
-            .map_err(|e| RoutingError::Io(e.to_string()))? 
+
+        while let Some(entry) = entries
+            .next_entry()
+            .await
+            .map_err(|e| RoutingError::Io(e.to_string()))?
         {
             let path = entry.path();
-            
+
             // Only process .md files
             if path.extension().map(|e| e == "md").unwrap_or(false) {
                 match Self::load_markdown_file(&path).await {
-                    Ok(markdown) => {
-                        match Self::provider_from_markdown(markdown) {
-                            Ok(provider) => {
-                                self.add_provider(provider);
-                                count += 1;
-                            }
-                            Err(e) => {
-                                log::warn!("Failed to parse provider from {:?}: {}", path, e);
-                            }
+                    Ok(markdown) => match Self::provider_from_markdown(markdown) {
+                        Ok(provider) => {
+                            self.add_provider(provider);
+                            count += 1;
                         }
-                    }
+                        Err(e) => {
+                            log::warn!("Failed to parse provider from {:?}: {}", path, e);
+                        }
+                    },
                     Err(e) => {
                         log::warn!("Failed to load markdown from {:?}: {}", path, e);
                     }
                 }
             }
         }
-        
+
         Ok(count)
     }
-    
+
     /// Load a single markdown file with YAML frontmatter
-    async fn load_markdown_file(
-        path: &Path,
-    ) -> Result<MarkdownProvider, RoutingError> {
-        let content = tokio::fs::read_to_string(path).await
+    async fn load_markdown_file(path: &Path) -> Result<MarkdownProvider, RoutingError> {
+        let content = tokio::fs::read_to_string(path)
+            .await
             .map_err(|e| RoutingError::Io(e.to_string()))?;
-        
+
         Self::parse_markdown(content, path.to_path_buf())
     }
-    
+
     /// Parse markdown content with YAML frontmatter
-    fn parse_markdown(
-        content: String,
-        path: PathBuf,
-    ) -> Result<MarkdownProvider, RoutingError> {
+    fn parse_markdown(content: String, path: PathBuf) -> Result<MarkdownProvider, RoutingError> {
         // Check for YAML frontmatter (starts with ---)
         if !content.starts_with("---") {
-            return Err(RoutingError::RegistryError(
-                format!("No YAML frontmatter found in {:?}", path)
-            ));
+            return Err(RoutingError::RegistryError(format!(
+                "No YAML frontmatter found in {:?}",
+                path
+            )));
         }
-        
+
         // Find the end of frontmatter (second ---)
         let rest = &content[3..]; // Skip first ---
         let Some(end_pos) = rest.find("---") else {
-            return Err(RoutingError::RegistryError(
-                format!("Unclosed YAML frontmatter in {:?}", path)
-            ));
+            return Err(RoutingError::RegistryError(format!(
+                "Unclosed YAML frontmatter in {:?}",
+                path
+            )));
         };
-        
+
         let yaml_content = &rest[..end_pos];
         let body = &rest[end_pos + 3..];
-        
+
         // Parse YAML frontmatter
-        let frontmatter: ProviderFrontmatter = serde_yaml::from_str(yaml_content)
-            .map_err(|e| RoutingError::Serialization(
-                format!("Failed to parse YAML frontmatter: {}", e)
-            ))?;
-        
+        let frontmatter: ProviderFrontmatter = serde_yaml::from_str(yaml_content).map_err(|e| {
+            RoutingError::Serialization(format!("Failed to parse YAML frontmatter: {}", e))
+        })?;
+
         Ok(MarkdownProvider {
             frontmatter,
             body: body.trim().to_string(),
             path,
         })
     }
-    
+
     /// Convert MarkdownProvider to Provider
-    fn provider_from_markdown(
-        markdown: MarkdownProvider,
-    ) -> Result<Provider, RoutingError> {
+    fn provider_from_markdown(markdown: MarkdownProvider) -> Result<Provider, RoutingError> {
         let fm = markdown.frontmatter;
-        
+
         // Parse provider type
         let provider_type = match fm.provider_type.as_str() {
             "llm" => {
-                let model_id = fm.model_id.ok_or_else(|| 
+                let model_id = fm.model_id.ok_or_else(|| {
                     RoutingError::RegistryError("LLM provider missing model_id".to_string())
-                )?;
-                let api_endpoint = fm.api_endpoint.unwrap_or_else(|| 
-                    "https://api.openai.com/v1".to_string()
-                );
-                ProviderType::Llm { model_id, api_endpoint }
+                })?;
+                let api_endpoint = fm
+                    .api_endpoint
+                    .unwrap_or_else(|| "https://api.openai.com/v1".to_string());
+                ProviderType::Llm {
+                    model_id,
+                    api_endpoint,
+                }
             }
             "agent" => {
-                let agent_id = fm.agent_id.clone().ok_or_else(|| 
+                let agent_id = fm.agent_id.clone().ok_or_else(|| {
                     RoutingError::RegistryError("Agent provider missing agent_id".to_string())
-                )?;
-                let cli_command = fm.cli_command.ok_or_else(|| 
+                })?;
+                let cli_command = fm.cli_command.ok_or_else(|| {
                     RoutingError::RegistryError("Agent provider missing cli_command".to_string())
-                )?;
-                let working_dir = fm.working_dir.unwrap_or_else(|| 
-                    PathBuf::from("/tmp")
-                );
-                ProviderType::Agent { agent_id, cli_command, working_dir }
+                })?;
+                let working_dir = fm.working_dir.unwrap_or_else(|| PathBuf::from("/tmp"));
+                ProviderType::Agent {
+                    agent_id,
+                    cli_command,
+                    working_dir,
+                }
             }
             other => {
-                return Err(RoutingError::RegistryError(
-                    format!("Unknown provider type: {}", other)
-                ));
+                return Err(RoutingError::RegistryError(format!(
+                    "Unknown provider type: {}",
+                    other
+                )));
             }
         };
-        
+
         // Parse capabilities from strings
-        let capabilities = fm.capabilities.iter()
+        let capabilities = fm
+            .capabilities
+            .iter()
             .filter_map(|c| Self::parse_capability(c))
             .collect();
-        
+
         // Parse cost level
         let cost_level = match fm.cost.to_lowercase().as_str() {
             "cheap" | "low" => CostLevel::Cheap,
             "expensive" | "high" => CostLevel::Expensive,
             _ => CostLevel::Moderate,
         };
-        
+
         // Parse latency
         let latency = match fm.latency.to_lowercase().as_str() {
             "fast" | "quick" => Latency::Fast,
             "slow" => Latency::Slow,
             _ => Latency::Medium,
         };
-        
+
         Ok(Provider {
             id: fm.id,
             name: fm.name,
@@ -258,7 +250,7 @@ impl ProviderRegistry {
             keywords: fm.keywords,
         })
     }
-    
+
     /// Parse capability from string
     fn parse_capability(s: &str) -> Option<Capability> {
         match s.to_lowercase().replace("-", "_").as_str() {
@@ -279,20 +271,20 @@ impl ProviderRegistry {
             }
         }
     }
-    
+
     /// Load from default location (~/.terraphim/providers/)
     pub async fn load_default() -> Result<Self, RoutingError> {
         let mut registry = Self::new();
-        
+
         let home = dirs::home_dir()
             .ok_or_else(|| RoutingError::Io("Could not find home directory".to_string()))?;
-        
+
         let providers_dir = home.join(".terraphim").join("providers");
-        
+
         if providers_dir.exists() {
             registry.load_from_dir(&providers_dir).await?;
         }
-        
+
         Ok(registry)
     }
 }
@@ -326,11 +318,10 @@ keywords:
 Anthropic's most capable model.
 "#;
 
-        let markdown = ProviderRegistry::parse_markdown(
-            content.to_string(),
-            PathBuf::from("test.md"),
-        ).unwrap();
-        
+        let markdown =
+            ProviderRegistry::parse_markdown(content.to_string(), PathBuf::from("test.md"))
+                .unwrap();
+
         assert_eq!(markdown.frontmatter.id, "claude-opus");
         assert_eq!(markdown.frontmatter.provider_type, "llm");
         assert_eq!(markdown.frontmatter.capabilities.len(), 2);
@@ -357,9 +348,9 @@ Anthropic's most capable model.
             body: "Test body".to_string(),
             path: PathBuf::from("test.md"),
         };
-        
+
         let provider = ProviderRegistry::provider_from_markdown(markdown).unwrap();
-        
+
         assert_eq!(provider.id, "test-llm");
         assert!(provider.has_capability(&Capability::CodeGeneration));
         assert_eq!(provider.cost_level, CostLevel::Moderate);
@@ -385,9 +376,9 @@ Anthropic's most capable model.
             body: "Test body".to_string(),
             path: PathBuf::from("test.md"),
         };
-        
+
         let provider = ProviderRegistry::provider_from_markdown(markdown).unwrap();
-        
+
         assert_eq!(provider.id, "@coder");
         assert!(matches!(provider.provider_type, ProviderType::Agent { .. }));
         assert_eq!(provider.cost_level, CostLevel::Cheap);
@@ -396,10 +387,11 @@ Anthropic's most capable model.
     #[tokio::test]
     async fn test_load_from_dir() {
         let temp_dir = tempfile::tempdir().unwrap();
-        
+
         // Create a test markdown file
         let mut file = NamedTempFile::new_in(temp_dir.path()).unwrap();
-        file.write_all(r#"---
+        file.write_all(
+            r#"---
 id: "test-provider"
 name: "Test Provider"
 type: "llm"
@@ -415,15 +407,18 @@ keywords:
 # Test Provider
 
 This is a test.
-"#.as_bytes()).unwrap();
-        
+"#
+            .as_bytes(),
+        )
+        .unwrap();
+
         // Rename to .md extension
         let md_path = temp_dir.path().join("test.md");
         std::fs::rename(file.path(), &md_path).unwrap();
-        
+
         let mut registry = ProviderRegistry::new();
         let count = registry.load_from_dir(temp_dir.path()).await.unwrap();
-        
+
         assert_eq!(count, 1);
         assert!(registry.get("test-provider").is_some());
     }

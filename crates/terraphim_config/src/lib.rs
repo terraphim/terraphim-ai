@@ -1,9 +1,8 @@
 use std::{path::PathBuf, sync::Arc};
 
 use terraphim_automata::{
-    AutomataPath,
     builder::{Logseq, ThesaurusBuilder},
-    load_thesaurus,
+    load_thesaurus, AutomataPath,
 };
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};

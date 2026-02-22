@@ -1,7 +1,7 @@
 use axum::http::StatusCode;
 use axum::{
-    Json,
     response::{IntoResponse, Response},
+    Json,
 };
 use serde::{Deserialize, Serialize};
 use terraphim_service::error::{CommonError, ErrorCategory, TerraphimError};

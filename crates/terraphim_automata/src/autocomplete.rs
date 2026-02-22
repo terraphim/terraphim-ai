@@ -1,11 +1,11 @@
 use crate::{Result, TerraphimAutomataError};
 use ahash::AHashMap;
-use fst::{Automaton, IntoStreamer, Map, MapBuilder, Streamer, automaton::Str};
+use fst::{automaton::Str, Automaton, IntoStreamer, Map, MapBuilder, Streamer};
 use serde::{Deserialize, Serialize};
 use terraphim_types::{NormalizedTermValue, Thesaurus};
 
 #[cfg(feature = "remote-loading")]
-use crate::{AutomataPath, load_thesaurus};
+use crate::{load_thesaurus, AutomataPath};
 
 /// Autocomplete index built from thesaurus data using FST
 #[derive(Debug, Clone)]

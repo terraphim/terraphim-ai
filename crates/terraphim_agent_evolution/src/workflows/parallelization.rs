@@ -13,11 +13,11 @@ use serde::{Deserialize, Serialize};
 use tokio::time::timeout;
 
 use crate::{
-    CompletionOptions, EvolutionResult, LlmAdapter,
     workflows::{
         ExecutionStep, ResourceUsage, StepType, TaskAnalysis, TaskComplexity, WorkflowInput,
         WorkflowMetadata, WorkflowOutput, WorkflowPattern,
     },
+    CompletionOptions, EvolutionResult, LlmAdapter,
 };
 
 /// Parallelization workflow that executes multiple prompts concurrently

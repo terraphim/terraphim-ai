@@ -160,7 +160,10 @@ impl KimiClient {
             if let Some(role) = msg_value.get("role").and_then(|r| r.as_str()) {
                 if role == "developer" {
                     if let Some(obj) = msg_value.as_object_mut() {
-                        obj.insert("role".to_string(), serde_json::Value::String("system".to_string()));
+                        obj.insert(
+                            "role".to_string(),
+                            serde_json::Value::String("system".to_string()),
+                        );
                     }
                 }
             }

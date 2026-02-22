@@ -243,7 +243,7 @@ impl WorkflowParser {
                 },
             ],
             cleanup_commands: vec![
-                "cargo clean -p $(cargo read-manifest | jq -r .name)".to_string(),
+                "cargo clean -p $(cargo read-manifest | jq -r .name)".to_string()
             ],
             cache_paths: vec![
                 "~/.cargo/registry".to_string(),

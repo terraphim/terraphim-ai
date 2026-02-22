@@ -525,12 +525,10 @@ mod tests {
 
         let command_str = "rm -rf /important/data";
         let settings = RiskAssessmentSettings::default();
-        assert!(
-            settings
-                .high_risk_keywords
-                .iter()
-                .any(|k| command_str.contains(k))
-        );
+        assert!(settings
+            .high_risk_keywords
+            .iter()
+            .any(|k| command_str.contains(k)));
     }
 
     #[test]

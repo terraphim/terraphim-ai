@@ -2,8 +2,8 @@
 //!
 //! Uses dialoguer for cross-platform terminal prompts with themes.
 
-use crate::onboarding::{OnboardingError, validation};
-use dialoguer::{Confirm, Input, Password, Select, theme::ColorfulTheme};
+use crate::onboarding::{validation, OnboardingError};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Password, Select};
 use std::path::PathBuf;
 use terraphim_automata::AutomataPath;
 use terraphim_config::{Haystack, KnowledgeGraph, KnowledgeGraphLocal, ServiceType};

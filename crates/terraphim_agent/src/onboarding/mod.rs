@@ -24,7 +24,7 @@ mod validation;
 mod wizard;
 
 pub use templates::{ConfigTemplate, TemplateRegistry};
-pub use wizard::{SetupMode, SetupResult, apply_template, run_setup_wizard};
+pub use wizard::{apply_template, run_setup_wizard, SetupMode, SetupResult};
 
 use thiserror::Error;
 

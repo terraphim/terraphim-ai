@@ -932,7 +932,11 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 /// also using memoize macro with Ahash hasher
 #[memoize(CustomHasher: ahash::AHashMap)]
 pub fn magic_pair(x: u64, y: u64) -> u64 {
-    if x >= y { x * x + x + y } else { y * y + x }
+    if x >= y {
+        x * x + x + y
+    } else {
+        y * y + x
+    }
 }
 
 /// Magic unpair
@@ -948,7 +952,11 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 pub fn magic_unpair(z: u64) -> (u64, u64) {
     let q = (z as f64).sqrt().floor() as u64;
     let l = z - q * q;
-    if l < q { (l, q) } else { (q, l - q) }
+    if l < q {
+        (l, q)
+    } else {
+        (q, l - q)
+    }
 }
 
 // Examples for serialization usage
@@ -1019,7 +1027,7 @@ pub fn magic_unpair(z: u64) -> (u64, u64) {
 mod tests {
     use super::*;
 
-    use terraphim_automata::{AutomataPath, load_thesaurus};
+    use terraphim_automata::{load_thesaurus, AutomataPath};
     use tokio::test;
     use ulid::Ulid;
 

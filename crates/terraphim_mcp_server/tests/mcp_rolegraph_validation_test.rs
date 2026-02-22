@@ -9,8 +9,8 @@ use terraphim_types::{KnowledgeGraphInputType, RelevanceFunction};
 use tokio::process::Command;
 
 // Additional imports for thesaurus building
-use terraphim_automata::AutomataPath;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
+use terraphim_automata::AutomataPath;
 use terraphim_persistence::DeviceStorage;
 use terraphim_persistence::Persistable;
 

@@ -8,7 +8,7 @@
 use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
-use terraphim_rolegraph::{RoleGraph, magic_pair};
+use terraphim_rolegraph::{magic_pair, RoleGraph};
 use tokio::sync::RwLock;
 
 use super::thesaurus::{build_command_thesaurus, get_command_id, normalize_command};

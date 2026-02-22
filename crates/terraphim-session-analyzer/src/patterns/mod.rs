@@ -38,17 +38,17 @@ pub mod matcher;
 
 // Re-export main types
 pub use loader::load_all_patterns;
-#[allow(unused_imports)] // Used in doc examples
-pub use loader::{ToolMetadata, ToolPattern};
 #[allow(unused_imports)] // Available for user configuration
 pub use loader::{load_patterns, load_user_patterns};
-pub use matcher::{AhoCorasickMatcher, PatternMatcher};
 #[allow(unused_imports)] // Used in doc examples
-pub use matcher::{ToolMatch, create_matcher};
+pub use loader::{ToolMetadata, ToolPattern};
+#[allow(unused_imports)] // Used in doc examples
+pub use matcher::{create_matcher, ToolMatch};
+pub use matcher::{AhoCorasickMatcher, PatternMatcher};
 
 // Re-export knowledge graph types for Phase 3 - pattern learning and caching
 #[allow(unused_imports)] // Public API for pattern learning (Phase 3)
-pub use knowledge_graph::{LearnedPattern, PatternLearner, infer_category_from_contexts};
+pub use knowledge_graph::{infer_category_from_contexts, LearnedPattern, PatternLearner};
 
 // Re-export terraphim feature types
 #[cfg(feature = "terraphim")]

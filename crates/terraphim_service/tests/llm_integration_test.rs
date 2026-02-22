@@ -1,6 +1,6 @@
 use ahash::AHashMap;
 use serial_test::serial;
-use terraphim_service::llm::{ChatOptions, SummarizeOptions, build_llm_from_role};
+use terraphim_service::llm::{build_llm_from_role, ChatOptions, SummarizeOptions};
 
 /// Test LLM client integration with real Ollama
 #[tokio::test]

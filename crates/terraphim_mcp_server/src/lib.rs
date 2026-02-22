@@ -3,12 +3,12 @@ use std::sync::Arc;
 use anyhow::Result;
 use base64::Engine;
 use rmcp::{
-    RoleServer, ServerHandler,
     model::{
         CallToolRequestParam, CallToolResult, Content, ErrorData, ListResourcesResult,
         ListToolsResult, ReadResourceRequestParam, ReadResourceResult, ServerInfo, Tool,
     },
     service::RequestContext,
+    RoleServer, ServerHandler,
 };
 use terraphim_automata::builder::json_decode;
 use terraphim_automata::matcher::{extract_paragraphs_from_automata, find_matches};

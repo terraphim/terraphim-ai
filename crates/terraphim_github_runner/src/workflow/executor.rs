@@ -560,7 +560,7 @@ mod tests {
     async fn test_execute_workflow_with_failure() {
         let session_manager = Arc::new(SessionManager::new(SessionManagerConfig::default()));
         let mock_executor = Arc::new(MockCommandExecutor::with_failures(vec![
-            "cargo test".to_string(),
+            "cargo test".to_string()
         ]));
 
         let executor = WorkflowExecutor::with_executor(
@@ -592,7 +592,7 @@ mod tests {
     async fn test_execute_workflow_continue_on_error() {
         let session_manager = Arc::new(SessionManager::new(SessionManagerConfig::default()));
         let mock_executor = Arc::new(MockCommandExecutor::with_failures(vec![
-            "cargo test".to_string(),
+            "cargo test".to_string()
         ]));
 
         let executor = WorkflowExecutor::with_executor(
@@ -654,7 +654,7 @@ mod tests {
     async fn test_setup_command_failure() {
         let session_manager = Arc::new(SessionManager::new(SessionManagerConfig::default()));
         let mock_executor = Arc::new(MockCommandExecutor::with_failures(vec![
-            "setup-fail".to_string(),
+            "setup-fail".to_string()
         ]));
 
         let executor = WorkflowExecutor::with_executor(

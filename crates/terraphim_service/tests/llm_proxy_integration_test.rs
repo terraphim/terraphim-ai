@@ -30,11 +30,9 @@ async fn test_llm_proxy_auto_configuration() {
     let client = LlmProxyClient::new("anthropic".to_string()).unwrap();
 
     // Verify auto-configuration
-    assert!(
-        client
-            .configured_providers()
-            .contains(&"anthropic".to_string())
-    );
+    assert!(client
+        .configured_providers()
+        .contains(&"anthropic".to_string()));
 
     let config = client.get_config("anthropic").unwrap();
     assert_eq!(config.provider, "anthropic");

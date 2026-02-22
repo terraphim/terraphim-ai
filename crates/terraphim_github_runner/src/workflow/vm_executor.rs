@@ -9,8 +9,8 @@ use crate::session::Session;
 use crate::workflow::executor::{CommandExecutor, CommandResult};
 use async_trait::async_trait;
 use log::{debug, info, warn};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 use std::time::Duration;
 
 /// Command executor that uses Firecracker VMs via HTTP API

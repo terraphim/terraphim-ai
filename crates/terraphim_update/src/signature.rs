@@ -5,7 +5,7 @@
 //! Uses zipsign-api (included via self_update's "signatures" feature)
 //! to verify Ed25519 signatures embedded in .tar.gz release archives.
 
-use anyhow::{Context, Result, anyhow};
+use anyhow::{anyhow, Context, Result};
 use base64::Engine;
 use chrono::{DateTime, Utc};
 use std::fs;

@@ -5,7 +5,7 @@ use serial_test::serial;
 use tokio::time::sleep;
 
 use terraphim_config::{Config, ConfigState};
-use terraphim_server::{ConfigResponse, SearchResponse, axum_server};
+use terraphim_server::{axum_server, ConfigResponse, SearchResponse};
 
 /// Integration test for Default role configuration with Ripgrep haystack
 ///

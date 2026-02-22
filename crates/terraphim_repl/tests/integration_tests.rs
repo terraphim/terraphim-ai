@@ -4,7 +4,7 @@
 //! including role switching, KG search, and replace operations.
 
 use std::path::PathBuf;
-use terraphim_automata::{ThesaurusBuilder, builder::Logseq};
+use terraphim_automata::{builder::Logseq, ThesaurusBuilder};
 
 /// Build a test thesaurus from the docs/src/kg directory
 async fn build_test_thesaurus() -> Result<terraphim_types::Thesaurus, Box<dyn std::error::Error>> {

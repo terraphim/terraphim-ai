@@ -3,7 +3,7 @@
 use ahash::AHashMap;
 use serial_test::serial;
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
-use terraphim_service::{TerraphimService, llm};
+use terraphim_service::{llm, TerraphimService};
 use terraphim_types::{NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
 
 /// Comprehensive integration test suite for Ollama LLM integration with llama3.2:3b

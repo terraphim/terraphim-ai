@@ -6,8 +6,8 @@ use crate::skills::types::{Skill, SkillResult, SkillStatus, SkillStep, StepResul
 use crate::tools::{ToolCall, ToolRegistry};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 

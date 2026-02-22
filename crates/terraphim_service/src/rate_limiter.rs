@@ -236,7 +236,7 @@ pub fn estimate_tokens(text: &str) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::time::{Duration, sleep};
+    use tokio::time::{sleep, Duration};
 
     fn create_test_config() -> RateLimitConfig {
         RateLimitConfig {

@@ -8,7 +8,7 @@ use anyhow::Result;
 use std::fs;
 use std::io::Write;
 use std::path::PathBuf;
-use tempfile::{NamedTempFile, tempdir};
+use tempfile::{tempdir, NamedTempFile};
 use terraphim_session_analyzer::models::*;
 use terraphim_session_analyzer::utils;
 use terraphim_session_analyzer::{Analyzer, Reporter, SessionParser, TimelineEventType};

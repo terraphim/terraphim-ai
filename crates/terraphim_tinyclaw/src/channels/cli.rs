@@ -2,8 +2,8 @@ use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::channel::Channel;
 use async_trait::async_trait;
 use std::io::{self, Write};
-use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 
 /// CLI channel adapter for interactive terminal use.
