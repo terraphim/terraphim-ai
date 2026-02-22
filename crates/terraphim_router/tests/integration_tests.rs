@@ -2,14 +2,12 @@
 
 use std::path::PathBuf;
 use terraphim_router::{Router, RoutingContext};
-use terraphim_types::capability::{
-    Capability, CostLevel, Latency, Provider, ProviderType,
-};
+use terraphim_types::capability::{Capability, CostLevel, Provider, ProviderType};
 
 #[test]
 fn test_route_to_llm_provider() {
     let mut router = Router::new();
-    
+
     let llm = Provider::new(
         "gpt-4",
         "GPT-4",
@@ -19,22 +17,26 @@ fn test_route_to_llm_provider() {
         },
         vec![Capability::DeepThinking],
     );
-    
+
     router.add_provider(llm);
-    
-    let decision = router.route(
-        "Think deeply about system design",
-        &RoutingContext::default(),
-    ).unwrap();
-    
+
+    let decision = router
+        .route(
+            "Think deeply about system design",
+            &RoutingContext::default(),
+        )
+        .unwrap();
+
     assert_eq!(decision.provider.id, "gpt-4");
-    assert!(decision.matched_capabilities.contains(&Capability::DeepThinking));
+    assert!(decision
+        .matched_capabilities
+        .contains(&Capability::DeepThinking));
 }
 
 #[test]
 fn test_route_to_agent_provider() {
     let mut router = Router::new();
-    
+
     let agent = Provider::new(
         "@codex",
         "Codex",
@@ -45,14 +47,13 @@ fn test_route_to_agent_provider() {
         },
         vec![Capability::CodeGeneration],
     );
-    
+
     router.add_provider(agent);
-    
-    let decision = router.route(
-        "Implement a function",
-        &RoutingContext::default(),
-    ).unwrap();
-    
+
+    let decision = router
+        .route("Implement a function", &RoutingContext::default())
+        .unwrap();
+
     assert_eq!(decision.provider.id, "@codex");
     assert!(matches!(
         decision.provider.provider_type,
@@ -63,7 +64,7 @@ fn test_route_to_agent_provider() {
 #[test]
 fn test_capability_based_selection() {
     let mut router = Router::new();
-    
+
     // Cheap agent for code generation
     let agent = Provider::new(
         "@codex",
@@ -76,7 +77,7 @@ fn test_capability_based_selection() {
         vec![Capability::CodeGeneration],
     )
     .with_cost(CostLevel::Cheap);
-    
+
     // Expensive LLM for deep thinking
     let llm = Provider::new(
         "claude-opus",
@@ -88,22 +89,23 @@ fn test_capability_based_selection() {
         vec![Capability::DeepThinking, Capability::CodeGeneration],
     )
     .with_cost(CostLevel::Expensive);
-    
+
     router.add_provider(agent);
     router.add_provider(llm);
-    
+
     // Deep thinking task should route to LLM
-    let decision = router.route(
-        "Think deeply about architecture",
-        &RoutingContext::default(),
-    ).unwrap();
+    let decision = router
+        .route(
+            "Think deeply about architecture",
+            &RoutingContext::default(),
+        )
+        .unwrap();
     assert_eq!(decision.provider.id, "claude-opus");
-    
+
     // Code generation could go to either, but agent is cheaper
-    let decision = router.route(
-        "Implement a function",
-        &RoutingContext::default(),
-    ).unwrap();
+    let decision = router
+        .route("Implement a function", &RoutingContext::default())
+        .unwrap();
     // With CostOptimized strategy, should pick cheaper option
     assert_eq!(decision.provider.cost_level, CostLevel::Cheap);
 }
