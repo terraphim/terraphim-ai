@@ -176,6 +176,12 @@ impl Router {
     ) -> Result<RoutingDecision, RoutingError> {
         self.engine.route(prompt, context)
     }
+
+    /// Set the routing strategy on the inner engine
+    pub fn with_strategy(mut self, strategy: Box<dyn RoutingStrategy>) -> Self {
+        self.engine = self.engine.with_strategy(strategy);
+        self
+    }
 }
 
 impl Default for Router {

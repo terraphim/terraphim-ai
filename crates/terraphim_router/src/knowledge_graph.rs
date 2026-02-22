@@ -5,9 +5,7 @@
 
 use std::collections::HashMap;
 
-use terraphim_types::{
-    Concept, NormalizedTermValue, RoleName, Thesaurus,
-};
+use terraphim_types::{Concept, NormalizedTermValue, RoleName, Thesaurus};
 
 /// Knowledge graph aware router
 #[derive(Debug, Clone)]
@@ -34,11 +32,7 @@ impl KnowledgeGraphRouter {
     }
 
     /// Add a thesaurus for a role
-    pub fn add_thesaurus(
-        &mut self,
-        role: RoleName,
-        thesaurus: Thesaurus,
-    ) {
+    pub fn add_thesaurus(&mut self, role: RoleName, thesaurus: Thesaurus) {
         self.thesauri.insert(role, thesaurus);
     }
 
@@ -74,11 +68,7 @@ impl KnowledgeGraphRouter {
     }
 
     /// Score a provider's relevance to a concept
-    pub fn score_provider_relevance(
-        &self,
-        _provider_id: &str,
-        _concept: &Concept,
-    ) -> f64 {
+    pub fn score_provider_relevance(&self, _provider_id: &str, _concept: &Concept) -> f64 {
         // In a real implementation, this would:
         // 1. Look up provider in knowledge graph
         // 2. Check relationships to the concept
@@ -89,11 +79,7 @@ impl KnowledgeGraphRouter {
     }
 
     /// Find related concepts for a query
-    pub fn find_related_concepts(
-        &self,
-        query: &str,
-        _role: Option<&RoleName>,
-    ) -> Vec<Concept> {
+    pub fn find_related_concepts(&self, query: &str, _role: Option<&RoleName>) -> Vec<Concept> {
         // In a real implementation, this would:
         // 1. Parse the query
         // 2. Find matching concepts in KG
@@ -117,13 +103,9 @@ mod tests {
 
     #[test]
     fn test_kg_router_creation() {
-        let router = KnowledgeGraphRouter::new()
-            .with_default_role(RoleName::new("engineer"));
+        let router = KnowledgeGraphRouter::new().with_default_role(RoleName::new("engineer"));
 
-        assert_eq!(
-            router.default_role,
-            Some(RoleName::new("engineer"))
-        );
+        assert_eq!(router.default_role, Some(RoleName::new("engineer")));
     }
 
     #[test]
@@ -132,23 +114,14 @@ mod tests {
 
         // Create a thesaurus with synonyms
         let mut thesaurus = Thesaurus::new("programming".to_string());
-        let term = NormalizedTerm::new(
-            1,
-            NormalizedTermValue::from("rust"),
-        );
-        thesaurus.insert(
-            NormalizedTermValue::from("rust"),
-            term,
-        );
+        let term = NormalizedTerm::new(1, NormalizedTermValue::from("rust"));
+        thesaurus.insert(NormalizedTermValue::from("rust"), term);
 
         router.add_thesaurus(RoleName::new("engineer"), thesaurus);
 
         // Expand terms
         let terms = vec![NormalizedTermValue::from("rust")];
-        let expanded = router.expand_terms(
-            &terms,
-            Some(&RoleName::new("engineer")),
-        );
+        let expanded = router.expand_terms(&terms, Some(&RoleName::new("engineer")));
 
         assert!(!expanded.is_empty());
         assert!(expanded.contains(&NormalizedTermValue::from("rust")));
