@@ -6,7 +6,7 @@ license = "MIT"
 
 [dependencies]
 # Web framework
-salvo = { version = "0.74.3" }
+salvo = { version = "0.88.1" }
 tokio = { version = "1.36", features = ["full"] }
 
 # GitHub integration
@@ -56,5 +56,5 @@ ollama = ["terraphim_service/ollama"]
 openrouter = ["terraphim_service/openrouter"]
 
 [dev-dependencies]
-salvo = { version = "0.74.3", features = ["test"] }
+salvo = { version = "0.88.1", features = ["test"] }
 terraphim_test_utils = { path = "../terraphim_test_utils" }
