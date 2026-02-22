@@ -13,6 +13,8 @@ pub mod input;
 #[cfg(feature = "medical")]
 pub mod medical;
 #[cfg(feature = "medical")]
+pub mod medical_loaders;
+#[cfg(feature = "medical")]
 pub mod symbolic_embeddings;
 
 use aho_corasick::{AhoCorasick, MatchKind};
@@ -111,6 +113,15 @@ pub struct RoleGraph {
 impl RoleGraph {
     /// Creates a new `RoleGraph` with the given role and thesaurus
     pub async fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
+        Self::new_sync(role, thesaurus)
+    }
+
+    /// Creates a new `RoleGraph` synchronously.
+    ///
+    /// This is identical to [`new`] but does not require an async runtime.
+    /// The async version exists for API compatibility; the actual construction
+    /// is fully synchronous.
+    pub fn new_sync(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
         let (ac, aho_corasick_values, ac_reverse_nterm) = Self::build_aho_corasick(&thesaurus)?;
 
         Ok(Self {

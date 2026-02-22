@@ -10220,7 +10220,9 @@ version = "1.4.10"
 dependencies = [
  "ahash 0.8.12",
  "aho-corasick",
+ "anyhow",
  "criterion 0.8.2",
+ "csv",
  "itertools 0.14.0",
  "lazy_static",
  "log",

@@ -73,6 +73,26 @@ impl MedicalRoleGraph {
         })
     }
 
+    /// Create a new empty MedicalRoleGraph without requiring a Thesaurus.
+    ///
+    /// Use this when populating the graph via data loaders (SNOMED, PrimeKG)
+    /// that add nodes and edges directly rather than relying on Aho-Corasick
+    /// thesaurus matching.
+    pub fn new_empty() -> Result<Self> {
+        let empty_thesaurus = Thesaurus::new("empty".to_string());
+        let role_graph = RoleGraph::new_sync("empty".into(), empty_thesaurus)?;
+        Ok(Self {
+            role_graph,
+            node_types: AHashMap::new(),
+            node_terms: AHashMap::new(),
+            edge_types: AHashMap::new(),
+            isa_parents: AHashMap::new(),
+            isa_children: AHashMap::new(),
+            snomed_to_id: AHashMap::new(),
+            embedding_index: None,
+        })
+    }
+
     /// Register a medical node with its type, display term, and optional SNOMED ID.
     ///
     /// This does not create a node in the underlying RoleGraph (which is driven
