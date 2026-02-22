@@ -26,7 +26,7 @@ ulid = { version = "1.0.0", features = ["serde", "uuid"] }
 
 # Default uuid for native targets
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-uuid = { version = "1.19.0", features = ["v4", "serde"] }
+uuid = { version = "1.21.0", features = ["v4", "serde"] }
 
 # WASM-specific dependencies (uuid with js feature, getrandom with wasm_js)
 [target.'cfg(target_arch = "wasm32")'.dependencies]
