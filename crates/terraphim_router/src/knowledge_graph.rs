@@ -48,7 +48,10 @@ impl KnowledgeGraphRouter {
         terms: &[NormalizedTermValue],
         role: Option<&RoleName>,
     ) -> Vec<NormalizedTermValue> {
-        let role = role.or(self.default_role.as_ref())?;
+        let role = match role.or(self.default_role.as_ref()) {
+            Some(r) => r,
+            None => return terms.to_vec(),
+        };
         let thesaurus = match self.thesauri.get(role) {
             Some(t) => t,
             None => return terms.to_vec(),
@@ -57,13 +60,12 @@ impl KnowledgeGraphRouter {
         let mut expanded = terms.to_vec();
 
         for term in terms {
-            // Look up synonyms in thesaurus
+            // Look up related terms in thesaurus
             if let Some(normalized) = thesaurus.get(term) {
-                // Add synonyms to expanded terms
-                for synonym in &normalized.synonyms {
-                    if !expanded.contains(synonym) {
-                        expanded.push(synonym.clone());
-                    }
+                // Add the normalized value as an expanded term
+                let val = normalized.value.clone();
+                if !expanded.contains(&val) {
+                    expanded.push(val);
                 }
             }
         }
@@ -130,11 +132,10 @@ mod tests {
 
         // Create a thesaurus with synonyms
         let mut thesaurus = Thesaurus::new("programming".to_string());
-        let mut term = NormalizedTerm::new(
+        let term = NormalizedTerm::new(
             1,
             NormalizedTermValue::from("rust"),
         );
-        term.synonyms.push(NormalizedTermValue::from("rustlang"));
         thesaurus.insert(
             NormalizedTermValue::from("rust"),
             term,
@@ -149,7 +150,7 @@ mod tests {
             Some(&RoleName::new("engineer")),
         );
 
-        assert!(expanded.len() >= 1);
+        assert!(!expanded.is_empty());
         assert!(expanded.contains(&NormalizedTermValue::from("rust")));
     }
 }

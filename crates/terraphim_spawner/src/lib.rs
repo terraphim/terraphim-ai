@@ -45,6 +45,9 @@ pub enum SpawnerError {
     
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    #[error("Config validation error: {0}")]
+    ConfigValidation(#[from] ValidationError),
 }
 
 /// Handle to a spawned agent process

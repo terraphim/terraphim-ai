@@ -15,6 +15,16 @@ pub struct RoutingEngine {
     strategy: Box<dyn RoutingStrategy>,
 }
 
+impl std::fmt::Debug for RoutingEngine {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("RoutingEngine")
+            .field("keyword_router", &self.keyword_router)
+            .field("registry", &self.registry)
+            .field("strategy", &self.strategy.name())
+            .finish()
+    }
+}
+
 impl RoutingEngine {
     /// Create a new routing engine with default settings
     pub fn new() -> Self {
@@ -135,6 +145,7 @@ impl Default for RoutingEngine {
 }
 
 /// Convenience wrapper for the routing engine
+#[derive(Debug)]
 pub struct Router {
     engine: RoutingEngine,
 }

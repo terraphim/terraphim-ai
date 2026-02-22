@@ -168,6 +168,12 @@ impl Provider {
         capabilities.iter().all(|c| self.has_capability(c))
     }
 
+    /// Check if any of the provider's keywords match the given text
+    pub fn matches_keywords(&self, text: &str) -> bool {
+        let text_lower = text.to_lowercase();
+        self.keywords.iter().any(|k| text_lower.contains(&k.to_lowercase()))
+    }
+
     /// Get capabilities as strings
     pub fn capability_names(&self) -> Vec<String> {
         self.capabilities

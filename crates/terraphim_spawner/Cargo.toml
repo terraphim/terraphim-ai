@@ -9,8 +9,8 @@ repository = "https://github.com/terraphim/terraphim-ai"
 
 [dependencies]
 # Terraphim internal crates
-terraphim_types = { path = "../terraphim_types", version = "1.8.0" }
-terraphim_router = { path = "../terraphim_router", version = "1.8.0" }
+terraphim_types = { path = "../terraphim_types" }
+terraphim_router = { path = "../terraphim_router" }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full"] }
