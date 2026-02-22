@@ -10338,6 +10338,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
+ "criterion 0.8.2",
  "dirs 5.0.1",
  "notify",
  "proptest",
