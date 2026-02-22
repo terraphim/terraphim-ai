@@ -82,6 +82,11 @@ impl AgentHandle {
         self.health_checker.status()
     }
 
+    /// Get the output capture handle
+    pub fn output_capture(&self) -> &OutputCapture {
+        &self.output_capture
+    }
+
     /// Graceful shutdown: SIGTERM, wait for `grace_period`, then SIGKILL if still alive.
     ///
     /// Returns `Ok(true)` if the process exited gracefully, `Ok(false)` if it
@@ -104,19 +109,19 @@ impl AgentHandle {
             use nix::unistd::Pid;
             let nix_pid = Pid::from_raw(pid as i32);
             if let Err(e) = kill(nix_pid, Signal::SIGTERM) {
-                log::warn!("Failed to send SIGTERM to {}: {}", pid, e);
+                tracing::warn!(pid = pid, error = %e, "Failed to send SIGTERM");
             } else {
-                log::info!("Sent SIGTERM to process {} ({})", pid, self.process_id);
+                tracing::info!(pid = pid, process_id = %self.process_id, "Sent SIGTERM");
             }
         }
 
         // Wait for graceful exit or timeout
         match timeout(grace_period, self.child.wait()).await {
             Ok(Ok(status)) => {
-                log::info!(
-                    "Process {} exited gracefully with status: {}",
-                    self.process_id,
-                    status
+                tracing::info!(
+                    process_id = %self.process_id,
+                    status = %status,
+                    "Process exited gracefully"
                 );
                 self.health_checker.mark_terminated();
                 Ok(true)
@@ -130,10 +135,10 @@ impl AgentHandle {
             }
             Err(_) => {
                 // Timeout expired -- force kill
-                log::warn!(
-                    "Process {} did not exit within {:?}, sending SIGKILL",
-                    self.process_id,
-                    grace_period
+                tracing::warn!(
+                    process_id = %self.process_id,
+                    grace_period_ms = grace_period.as_millis() as u64,
+                    "Process did not exit within grace period, sending SIGKILL"
                 );
                 self.child.kill().await?;
                 self.health_checker.mark_terminated();
@@ -315,6 +320,13 @@ impl AgentSpawner {
         provider: &Provider,
         task: &str,
     ) -> Result<AgentHandle, SpawnerError> {
+        let _span = tracing::info_span!(
+            "spawner.spawn",
+            provider_id = provider.id.as_str(),
+            task_len = task.len(),
+        )
+        .entered();
+
         // Validate the provider
         let config = AgentConfig::from_provider(provider)?;
         let validator = AgentValidator::new(&config);

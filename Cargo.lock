@@ -10408,7 +10408,6 @@ version = "1.8.0"
 dependencies = [
  "anyhow",
  "chrono",
- "log",
  "nix 0.27.1",
  "regex",
  "serde",
@@ -10419,6 +10418,7 @@ dependencies = [
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
+ "tracing",
  "uuid",
 ]
 

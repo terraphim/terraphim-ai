@@ -83,6 +83,16 @@ impl ProviderRegistry {
         self.providers.get(id)
     }
 
+    /// Get the source path this registry was loaded from, if any.
+    pub fn source_path(&self) -> Option<&Path> {
+        self.source_path.as_deref()
+    }
+
+    /// Remove a provider by ID (in-memory only, not persisted).
+    pub fn remove_provider(&mut self, id: &str) -> Option<Provider> {
+        self.providers.remove(id)
+    }
+
     /// Get all providers
     pub fn all(&self) -> Vec<&Provider> {
         self.providers.values().collect()

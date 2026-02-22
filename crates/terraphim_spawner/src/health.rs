@@ -138,7 +138,7 @@ impl CircuitBreaker {
                 if self.consecutive_successes >= self.config.success_threshold {
                     self.transition(CircuitState::Closed);
                     self.consecutive_successes = 0;
-                    log::info!("Circuit breaker closed after successful probe");
+                    tracing::info!("Circuit breaker closed after successful probe");
                 }
             }
             CircuitState::Closed => {
@@ -159,16 +159,16 @@ impl CircuitBreaker {
             CircuitState::Closed => {
                 if self.consecutive_failures >= self.config.failure_threshold {
                     self.transition(CircuitState::Open);
-                    log::warn!(
-                        "Circuit breaker opened after {} consecutive failures",
-                        self.consecutive_failures
+                    tracing::warn!(
+                        consecutive_failures = self.consecutive_failures,
+                        "Circuit breaker opened"
                     );
                 }
             }
             CircuitState::HalfOpen => {
                 // Probe failed -> back to open with fresh cooldown
                 self.transition(CircuitState::Open);
-                log::warn!("Circuit breaker re-opened after failed probe");
+                tracing::warn!("Circuit breaker re-opened after failed probe");
             }
             CircuitState::Open => {
                 // Already open
@@ -370,15 +370,15 @@ impl HealthChecker {
                 // Check the healthy flag
                 if !healthy.load(Ordering::Relaxed) {
                     let current = *status.lock().unwrap();
-                    log::debug!(
-                        "Process {} health check: {} (exiting loop)",
-                        process_id,
-                        current
+                    tracing::debug!(
+                        process_id = %process_id,
+                        status = %current,
+                        "Health check exiting loop"
                     );
                     break;
                 }
 
-                log::debug!("Process {} health check: healthy", process_id);
+                tracing::debug!(process_id = %process_id, "Health check: healthy");
             }
         });
     }

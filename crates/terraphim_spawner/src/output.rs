@@ -97,7 +97,7 @@ impl OutputCapture {
                             .await;
                     }
                     Err(e) => {
-                        log::error!("Error reading stdout for process {}: {}", process_id, e);
+                        tracing::error!(process_id = %process_id, error = %e, "Error reading stdout");
                         break;
                     }
                 }
