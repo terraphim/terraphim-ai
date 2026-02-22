@@ -87,6 +87,10 @@ pub use medical_types::*;
 #[cfg(feature = "hgnc")]
 pub mod hgnc;
 
+// Capability-based routing types
+pub mod capability;
+pub use capability::*;
+
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashSet;
