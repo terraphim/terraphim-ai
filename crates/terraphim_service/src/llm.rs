@@ -8,11 +8,9 @@ pub use self::router_config::{MergedRouterConfig, RouterMode};
 #[cfg(feature = "llm_router")]
 use crate::llm::proxy_client::ProxyLlmClient;
 #[cfg(feature = "llm_router")]
-use crate::llm::routed_adapter::RoutedLlmClient;
+mod bridge;
 #[cfg(feature = "llm_router")]
 mod proxy_client;
-#[cfg(feature = "llm_router")]
-mod routed_adapter;
 #[cfg(feature = "llm_router")]
 mod router_config;
 
@@ -140,44 +138,64 @@ pub fn build_llm_from_role(role: &terraphim_config::Role) -> Option<Arc<dyn LlmC
         log::debug!("Found Ollama hints in extra");
         if let Some(client) = build_ollama_from_role(role) {
             log::debug!("Built Ollama client from hints");
-            // Wrap with RoutedLlmClient if llm_router is enabled
+            // When routing is enabled, skip early return -- the bridge block below
+            // handles capability-based routing with all available providers
             #[cfg(feature = "llm_router")]
-            if role.llm_router_enabled {
-                log::info!("🛣️  Intelligent routing enabled for role: {}", role.name);
-                let router_config =
-                    MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
-                return Some(
-                    Arc::new(RoutedLlmClient::new(client, router_config)) as Arc<dyn LlmClient>
-                );
+            {
+                if !role.llm_router_enabled {
+                    return Some(client);
+                }
             }
-            return Some(client);
+            #[cfg(not(feature = "llm_router"))]
+            {
+                return Some(client);
+            }
         }
     }
 
     // Check if intelligent routing is enabled at the role level
     #[cfg(feature = "llm_router")]
     if role.llm_router_enabled {
-        log::info!("🛣️  Intelligent routing enabled for role: {}", role.name);
+        log::info!("Intelligent routing enabled for role: {}", role.name);
         let router_config = MergedRouterConfig::from_role_and_env(role.llm_router_config.as_ref());
 
         match router_config.mode {
             RouterMode::Library => {
-                // Library mode: wrap static client with in-process routing
-                if let Some(static_client) =
-                    build_ollama_from_role(role).or_else(|| build_openrouter_from_role(role))
-                {
-                    return Some(Arc::new(RoutedLlmClient::new(static_client, router_config))
-                        as Arc<dyn LlmClient>);
+                // Library mode: use RouterBridgeLlmClient with real capability-based routing
+                let mut available_clients: Vec<bridge::LlmProviderDescriptor> = Vec::new();
+
+                if let Some(ollama) = build_ollama_from_role(role) {
+                    available_clients.push(bridge::LlmProviderDescriptor {
+                        provider: bridge::provider_from_llm_client(ollama.as_ref(), role),
+                        client: ollama,
+                    });
                 }
-                log::warn!(
-                    "🛣️  Library routing enabled but no static LLM client could be built for role: {}",
-                    role.name
-                );
+                if let Some(openrouter) = build_openrouter_from_role(role) {
+                    available_clients.push(bridge::LlmProviderDescriptor {
+                        provider: bridge::provider_from_llm_client(openrouter.as_ref(), role),
+                        client: openrouter,
+                    });
+                }
+
+                if available_clients.is_empty() {
+                    log::warn!(
+                        "Library routing enabled but no providers available for role: {}",
+                        role.name
+                    );
+                } else {
+                    let fallback = available_clients[0].client.clone();
+                    let mut bridge_client =
+                        bridge::RouterBridgeLlmClient::new(fallback, router_config);
+                    for descriptor in available_clients {
+                        bridge_client.register_provider(descriptor);
+                    }
+                    return Some(Arc::new(bridge_client) as Arc<dyn LlmClient>);
+                }
             }
             RouterMode::Service => {
                 // Service mode: use external HTTP proxy client
                 let proxy_url = router_config.get_proxy_url();
-                log::info!("🛣️  Service mode routing to: {}", proxy_url);
+                log::info!("Service mode routing to: {}", proxy_url);
                 let proxy_config = crate::llm::proxy_client::ProxyClientConfig {
                     base_url: proxy_url,
                     timeout_secs: 60,

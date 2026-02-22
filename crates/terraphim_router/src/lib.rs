@@ -40,7 +40,5 @@ pub use registry::ProviderRegistry;
 pub use strategy::{CapabilityFirst, CostOptimized, LatencyOptimized, RoundRobin, RoutingStrategy};
 pub use types::{RoutingContext, RoutingDecision, RoutingError, RoutingResult};
 
-use terraphim_types::capability::Provider;
-
 /// Re-export capability types for convenience
-pub use terraphim_types::capability::{Capability, CostLevel, Latency, ProviderType};
+pub use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};

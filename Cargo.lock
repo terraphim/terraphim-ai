@@ -10351,6 +10351,7 @@ dependencies = [
  "terraphim_middleware",
  "terraphim_persistence",
  "terraphim_rolegraph",
+ "terraphim_router",
  "terraphim_settings",
  "terraphim_test_utils",
  "terraphim_types",
