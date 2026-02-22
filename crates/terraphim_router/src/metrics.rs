@@ -38,11 +38,13 @@ impl RouterMetrics {
         self.routing_requests.fetch_add(1, Ordering::Relaxed);
         self.routing_success.fetch_add(1, Ordering::Relaxed);
 
-        log::info!(
+        tracing::info!(
             target: "terraphim_router::metrics",
-            "routing_request{{provider=\"{}\", duration_ms={}}}",
-            provider.id,
-            duration_ms
+            routing_requests = 1_u64,
+            routing_success = 1_u64,
+            routing_duration_ms = duration_ms,
+            provider_id = provider.id.as_str(),
+            "Routing request completed"
         );
     }
 
@@ -50,10 +52,11 @@ impl RouterMetrics {
     pub fn record_routing_failure(&self, reason: &str) {
         self.routing_failures.fetch_add(1, Ordering::Relaxed);
 
-        log::warn!(
+        tracing::warn!(
             target: "terraphim_router::metrics",
-            "routing_failure{{reason=\"{}\"}}",
-            reason
+            routing_failures = 1_u64,
+            reason = reason,
+            "Routing failure recorded"
         );
     }
 
@@ -61,10 +64,11 @@ impl RouterMetrics {
     pub fn record_spawn_attempt(&self, provider: &Provider) {
         self.spawn_attempts.fetch_add(1, Ordering::Relaxed);
 
-        log::info!(
+        tracing::info!(
             target: "terraphim_router::metrics",
-            "spawn_attempt{{provider=\"{}\"}}",
-            provider.id
+            spawn_attempts = 1_u64,
+            provider_id = provider.id.as_str(),
+            "Spawn attempt recorded"
         );
     }
 
@@ -72,11 +76,12 @@ impl RouterMetrics {
     pub fn record_spawn_success(&self, process_id: ProcessId, duration_ms: u64) {
         self.spawn_success.fetch_add(1, Ordering::Relaxed);
 
-        log::info!(
+        tracing::info!(
             target: "terraphim_router::metrics",
-            "spawn_success{{process_id=\"{}\", duration_ms={}}}",
-            process_id,
-            duration_ms
+            spawn_success = 1_u64,
+            spawn_duration_ms = duration_ms,
+            process_id = %process_id,
+            "Spawn success recorded"
         );
     }
 
@@ -84,11 +89,12 @@ impl RouterMetrics {
     pub fn record_spawn_failure(&self, provider: &Provider, error: &str) {
         self.spawn_failures.fetch_add(1, Ordering::Relaxed);
 
-        log::error!(
+        tracing::error!(
             target: "terraphim_router::metrics",
-            "spawn_failure{{provider=\"{}\", error=\"{}\"}}",
-            provider.id,
-            error
+            spawn_failures = 1_u64,
+            provider_id = provider.id.as_str(),
+            error = error,
+            "Spawn failure recorded"
         );
     }
 
@@ -96,10 +102,11 @@ impl RouterMetrics {
     pub fn record_health_failure(&self, process_id: ProcessId) {
         self.health_failures.fetch_add(1, Ordering::Relaxed);
 
-        log::warn!(
+        tracing::warn!(
             target: "terraphim_router::metrics",
-            "health_failure{{process_id=\"{}\"}}",
-            process_id
+            health_failures = 1_u64,
+            process_id = %process_id,
+            "Health check failure recorded"
         );
     }
 

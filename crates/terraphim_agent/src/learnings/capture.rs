@@ -25,6 +25,8 @@ pub enum LearningError {
     StorageError(String),
     #[error("Command ignored due to pattern match: {0}")]
     Ignored(String),
+    #[error("Learning not found: {0}")]
+    NotFound(String),
 }
 
 /// Source of the learning (project-specific or global).
@@ -451,6 +453,39 @@ pub fn query_learnings(
     Ok(filtered)
 }
 
+/// Add a correction to an existing learning document.
+///
+/// Finds the learning by exact ID or prefix match, updates the correction
+/// field, and overwrites the markdown file.
+pub fn correct_learning(
+    storage_dir: &PathBuf,
+    id: &str,
+    correction: &str,
+) -> Result<PathBuf, LearningError> {
+    if !storage_dir.exists() {
+        return Err(LearningError::NotFound(id.to_string()));
+    }
+
+    let entries = fs::read_dir(storage_dir)?;
+
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().map(|e| e == "md").unwrap_or(false) {
+            if let Ok(content) = fs::read_to_string(&path) {
+                if let Some(mut learning) = CapturedLearning::from_markdown(&content) {
+                    if learning.id == id || learning.id.starts_with(id) {
+                        learning.correction = Some(correction.to_string());
+                        fs::write(&path, learning.to_markdown())?;
+                        return Ok(path);
+                    }
+                }
+            }
+        }
+    }
+
+    Err(LearningError::NotFound(id.to_string()))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -535,6 +570,74 @@ mod tests {
         let (cmd2, chain2) = parse_chained_command("git status", 0);
         assert_eq!(cmd2, "git status");
         assert_eq!(chain2, None);
+    }
+
+    #[test]
+    fn test_correct_learning() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        let config = LearningCaptureConfig::new(storage.clone(), temp_dir.path().join("global"));
+
+        // Capture a learning
+        let path =
+            capture_failed_command("bad-cmd --test", "command not found", 127, &config).unwrap();
+        assert!(path.exists());
+
+        // Read back to get the ID
+        let content = fs::read_to_string(&path).unwrap();
+        let learning = CapturedLearning::from_markdown(&content).unwrap();
+        let id = learning.id.clone();
+        assert!(learning.correction.is_none());
+
+        // Add correction
+        let result = correct_learning(&storage, &id, "Use 'good-cmd --test' instead");
+        assert!(result.is_ok());
+
+        // Verify correction persisted
+        let updated_content = fs::read_to_string(&path).unwrap();
+        let updated = CapturedLearning::from_markdown(&updated_content).unwrap();
+        assert_eq!(
+            updated.correction.as_deref(),
+            Some("Use 'good-cmd --test' instead")
+        );
+        assert_eq!(updated.command, "bad-cmd --test");
+        assert_eq!(updated.exit_code, 127);
+    }
+
+    #[test]
+    fn test_correct_learning_not_found() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        let result = correct_learning(&storage, "nonexistent-id", "some correction");
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), LearningError::NotFound(_)));
+    }
+
+    #[test]
+    fn test_correct_learning_prefix_match() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        let config = LearningCaptureConfig::new(storage.clone(), temp_dir.path().join("global"));
+
+        // Capture a learning
+        let path = capture_failed_command("git push -f", "remote: rejected", 1, &config).unwrap();
+
+        // Get the full ID
+        let content = fs::read_to_string(&path).unwrap();
+        let learning = CapturedLearning::from_markdown(&content).unwrap();
+        let full_id = learning.id.clone();
+
+        // Use only the first 8 characters as prefix
+        let prefix = &full_id[..8];
+        let result = correct_learning(&storage, prefix, "git push origin main");
+        assert!(result.is_ok());
+
+        // Verify
+        let updated_content = fs::read_to_string(&path).unwrap();
+        let updated = CapturedLearning::from_markdown(&updated_content).unwrap();
+        assert_eq!(updated.correction.as_deref(), Some("git push origin main"));
     }
 
     #[test]

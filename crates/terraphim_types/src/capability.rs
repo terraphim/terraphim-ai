@@ -4,7 +4,6 @@
 //! LLM models and spawned agents, using the same routing logic.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::path::PathBuf;
 
 /// A capability that a provider can fulfill

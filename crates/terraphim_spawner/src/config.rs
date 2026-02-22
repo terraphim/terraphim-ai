@@ -4,6 +4,22 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use terraphim_types::capability::{Provider, ProviderType};
 
+/// Resource limits for spawned agent processes.
+///
+/// These are lightweight process-level limits applied via `setrlimit(2)`.
+/// For full sandboxing (VM isolation), use the `terraphim_firecracker` crate.
+#[derive(Debug, Clone, Default)]
+pub struct ResourceLimits {
+    /// Maximum virtual memory (bytes). Maps to RLIMIT_AS.
+    pub max_memory_bytes: Option<u64>,
+    /// Maximum CPU time (seconds). Maps to RLIMIT_CPU.
+    pub max_cpu_seconds: Option<u64>,
+    /// Maximum file size the process can create (bytes). Maps to RLIMIT_FSIZE.
+    pub max_file_size_bytes: Option<u64>,
+    /// Maximum number of open file descriptors. Maps to RLIMIT_NOFILE.
+    pub max_open_files: Option<u64>,
+}
+
 /// Configuration for an agent
 #[derive(Debug, Clone)]
 pub struct AgentConfig {
@@ -19,6 +35,8 @@ pub struct AgentConfig {
     pub env_vars: HashMap<String, String>,
     /// Required API keys
     pub required_api_keys: Vec<String>,
+    /// Resource limits for the spawned process
+    pub resource_limits: ResourceLimits,
 }
 
 impl AgentConfig {
@@ -36,6 +54,7 @@ impl AgentConfig {
                 working_dir: Some(working_dir.clone()),
                 env_vars: HashMap::new(),
                 required_api_keys: Self::infer_api_keys(cli_command),
+                resource_limits: ResourceLimits::default(),
             }),
             ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
         }
@@ -134,6 +153,15 @@ impl AgentValidator {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_resource_limits_default() {
+        let limits = ResourceLimits::default();
+        assert!(limits.max_memory_bytes.is_none());
+        assert!(limits.max_cpu_seconds.is_none());
+        assert!(limits.max_file_size_bytes.is_none());
+        assert!(limits.max_open_files.is_none());
+    }
 
     #[test]
     fn test_infer_api_keys() {

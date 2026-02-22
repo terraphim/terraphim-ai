@@ -1533,7 +1533,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
         }
         Command::Learn { sub } => {
             use learnings::{
-                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+                LearningCaptureConfig, capture_failed_command, correct_learning, list_learnings,
+                query_learnings,
             };
             let config = LearningCaptureConfig::default();
 
@@ -1624,6 +1625,9 @@ async fn run_offline_command(command: Command) -> Result<()> {
                                         "  {} {} (exit: {})",
                                         source_indicator, learning.command, learning.exit_code
                                     );
+                                    if let Some(ref correction) = learning.correction {
+                                        println!("     Correction: {}", correction);
+                                    }
                                 }
                             }
                             Ok(())
@@ -1632,10 +1636,17 @@ async fn run_offline_command(command: Command) -> Result<()> {
                     }
                 }
                 LearnSub::Correct { id, correction } => {
-                    // TODO: Implement correction addition
-                    println!("Adding correction to learning {}: {}", id, correction);
-                    println!("(Not yet implemented)");
-                    Ok(())
+                    let storage_loc = config.storage_location();
+                    match correct_learning(&storage_loc, &id, &correction) {
+                        Ok(path) => {
+                            println!("Correction added to learning {}: {}", id, path.display());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to add correction: {}", e);
+                            Err(e.into())
+                        }
+                    }
                 }
                 LearnSub::Hook { format } => learnings::process_hook_input(format)
                     .await
@@ -2112,7 +2123,8 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
         Command::Learn { sub } => {
             // Learn command works the same in server mode - no server needed
             use learnings::{
-                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+                LearningCaptureConfig, capture_failed_command, correct_learning, list_learnings,
+                query_learnings,
             };
             let config = LearningCaptureConfig::default();
 
@@ -2203,6 +2215,9 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                                         "  {} {} (exit: {})",
                                         source_indicator, learning.command, learning.exit_code
                                     );
+                                    if let Some(ref correction) = learning.correction {
+                                        println!("     Correction: {}", correction);
+                                    }
                                 }
                             }
                             Ok(())
@@ -2211,10 +2226,17 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                     }
                 }
                 LearnSub::Correct { id, correction } => {
-                    // TODO: Implement correction addition
-                    println!("Adding correction to learning {}: {}", id, correction);
-                    println!("(Not yet implemented)");
-                    Ok(())
+                    let storage_loc = config.storage_location();
+                    match correct_learning(&storage_loc, &id, &correction) {
+                        Ok(path) => {
+                            println!("Correction added to learning {}: {}", id, path.display());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            eprintln!("Failed to add correction: {}", e);
+                            Err(e.into())
+                        }
+                    }
                 }
                 LearnSub::Hook { format } => learnings::process_hook_input(format)
                     .await
