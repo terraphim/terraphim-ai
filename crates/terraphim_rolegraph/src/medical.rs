@@ -44,6 +44,10 @@ pub struct MedicalRoleGraph {
     node_terms: AHashMap<u64, String>,
     /// Edge ID (magic_pair) -> medical edge type
     edge_types: AHashMap<u64, MedicalEdgeType>,
+    /// Source node -> list of (target, edge_type) for outgoing edges
+    outgoing_edges: AHashMap<u64, Vec<(u64, MedicalEdgeType)>>,
+    /// Target node -> list of (source, edge_type) for incoming edges
+    incoming_edges: AHashMap<u64, Vec<(u64, MedicalEdgeType)>>,
     /// IS-A parent map: child_id -> set of parent_ids
     isa_parents: AHashMap<u64, AHashSet<u64>>,
     /// IS-A child map: parent_id -> set of child_ids
@@ -66,6 +70,8 @@ impl MedicalRoleGraph {
             node_types: AHashMap::new(),
             node_terms: AHashMap::new(),
             edge_types: AHashMap::new(),
+            outgoing_edges: AHashMap::new(),
+            incoming_edges: AHashMap::new(),
             isa_parents: AHashMap::new(),
             isa_children: AHashMap::new(),
             snomed_to_id: AHashMap::new(),
@@ -86,6 +92,8 @@ impl MedicalRoleGraph {
             node_types: AHashMap::new(),
             node_terms: AHashMap::new(),
             edge_types: AHashMap::new(),
+            outgoing_edges: AHashMap::new(),
+            incoming_edges: AHashMap::new(),
             isa_parents: AHashMap::new(),
             isa_children: AHashMap::new(),
             snomed_to_id: AHashMap::new(),
@@ -122,6 +130,16 @@ impl MedicalRoleGraph {
     pub fn add_medical_edge(&mut self, source: u64, target: u64, edge_type: MedicalEdgeType) {
         let edge_id = magic_pair(source, target);
         self.edge_types.insert(edge_id, edge_type);
+
+        // Populate adjacency index for O(degree) lookups
+        self.outgoing_edges
+            .entry(source)
+            .or_default()
+            .push((target, edge_type));
+        self.incoming_edges
+            .entry(target)
+            .or_default()
+            .push((source, edge_type));
 
         if edge_type == MedicalEdgeType::IsA {
             // source IS-A target means target is a parent of source
@@ -208,18 +226,24 @@ impl MedicalRoleGraph {
 
     /// Find all nodes connected to `condition_id` via a Treats edge.
     ///
-    /// Scans all edge types looking for edges where one endpoint is
-    /// `condition_id` and the edge type is Treats. Returns the other
-    /// endpoint (the treatment node).
+    /// Uses the adjacency index for O(degree) lookups instead of scanning
+    /// all edges. Checks both outgoing and incoming Treats edges since the
+    /// relationship can be stored in either direction.
     pub fn get_treatments(&self, condition_id: u64) -> Vec<u64> {
         let mut treatments = Vec::new();
-        for (&edge_id, &edge_type) in &self.edge_types {
-            if edge_type == MedicalEdgeType::Treats {
-                let (a, b) = crate::magic_unpair(edge_id);
-                if a == condition_id {
-                    treatments.push(b);
-                } else if b == condition_id {
-                    treatments.push(a);
+        // Outgoing: condition_id -> target via Treats
+        if let Some(edges) = self.outgoing_edges.get(&condition_id) {
+            for &(target, edge_type) in edges {
+                if edge_type == MedicalEdgeType::Treats {
+                    treatments.push(target);
+                }
+            }
+        }
+        // Incoming: source -> condition_id via Treats (drug treats condition)
+        if let Some(edges) = self.incoming_edges.get(&condition_id) {
+            for &(source, edge_type) in edges {
+                if edge_type == MedicalEdgeType::Treats {
+                    treatments.push(source);
                 }
             }
         }
@@ -228,18 +252,26 @@ impl MedicalRoleGraph {
 
     /// Check if a drug has contraindications with any of the given conditions.
     ///
-    /// Returns a list of (drug_id, condition_id) pairs for each
+    /// Uses the adjacency index for O(degree) lookups instead of computing
+    /// magic_pair. Returns a list of (drug_id, condition_id) pairs for each
     /// Contraindicates edge found.
     pub fn check_contraindication(&self, drug_id: u64, conditions: &[u64]) -> Vec<(u64, u64)> {
         let mut contraindications = Vec::new();
         for &condition_id in conditions {
-            // Check both directions: magic_pair(drug, condition) and magic_pair(condition, drug)
-            let edge_id_1 = magic_pair(drug_id, condition_id);
-            let edge_id_2 = magic_pair(condition_id, drug_id);
-
-            let is_contraindicated = self.edge_types.get(&edge_id_1)
-                == Some(&MedicalEdgeType::Contraindicates)
-                || self.edge_types.get(&edge_id_2) == Some(&MedicalEdgeType::Contraindicates);
+            let is_contraindicated =
+                // drug -> condition
+                self.outgoing_edges.get(&drug_id).map_or(false, |edges| {
+                    edges
+                        .iter()
+                        .any(|&(t, et)| t == condition_id && et == MedicalEdgeType::Contraindicates)
+                })
+                ||
+                // condition -> drug
+                self.outgoing_edges.get(&condition_id).map_or(false, |edges| {
+                    edges
+                        .iter()
+                        .any(|&(t, et)| t == drug_id && et == MedicalEdgeType::Contraindicates)
+                });
             if is_contraindicated {
                 contraindications.push((drug_id, condition_id));
             }
@@ -298,6 +330,16 @@ impl MedicalRoleGraph {
     /// Get a reference to the embedding index, if built.
     pub fn embedding_index(&self) -> Option<&SymbolicEmbeddingIndex> {
         self.embedding_index.as_ref()
+    }
+
+    /// Iterate over all registered medical node IDs and their display terms.
+    ///
+    /// Useful for search operations that need to match query terms against
+    /// all nodes in the graph.
+    pub fn iter_node_terms(&self) -> impl Iterator<Item = (u64, &str)> {
+        self.node_terms
+            .iter()
+            .map(|(&id, term)| (id, term.as_str()))
     }
 }
 
