@@ -8,8 +8,7 @@ use tokio::sync::mpsc;
 
 use terraphim_types::capability::ProcessId;
 
-use crate::output::OutputEvent;
-use crate::{AgentHandle, AgentSpawner, SpawnerError};
+use crate::{AgentSpawner, SpawnerError};
 
 /// Router for @mention messages between agents
 #[derive(Debug)]
@@ -56,26 +55,29 @@ impl MentionRouter {
     }
 
     /// Route mentions to their targets
-    pub async fn route_mentions(&mut self, spawner: &AgentSpawner) -> Result<(), SpawnerError> {
+    pub async fn route_mentions(&mut self, _spawner: &AgentSpawner) -> Result<(), SpawnerError> {
         while let Some(event) = self.mention_receiver.recv().await {
-            log::info!(
-                "Routing mention from {} to @{}: {}",
-                event.from,
-                event.target,
-                event.message
+            tracing::info!(
+                from = %event.from,
+                target = event.target.as_str(),
+                message = event.message.as_str(),
+                "Routing mention"
             );
 
             // Check if target agent is registered
             if let Some(&target_pid) = self.agents.get(&event.target) {
-                log::debug!(
-                    "Target agent {} found with PID {}",
-                    event.target,
-                    target_pid
+                tracing::debug!(
+                    target_agent = event.target.as_str(),
+                    target_pid = %target_pid,
+                    "Target agent found"
                 );
                 // In a real implementation, this would forward the message
                 // to the target agent's input channel
             } else {
-                log::warn!("Target agent @{} not found, message dropped", event.target);
+                tracing::warn!(
+                    target_agent = event.target.as_str(),
+                    "Target agent not found, message dropped"
+                );
                 // Could spawn a new agent here if configured
             }
         }

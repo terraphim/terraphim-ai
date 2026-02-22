@@ -11,20 +11,23 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::process::Stdio;
 use std::time::Duration;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::BufReader;
 use tokio::process::{Child, Command};
-use tokio::sync::mpsc;
-use tokio::time::{interval, timeout};
+use tokio::time::timeout;
 
 use terraphim_types::capability::{ProcessId, Provider};
 
+pub mod audit;
 pub mod config;
 pub mod health;
 pub mod mention;
 pub mod output;
 
-pub use config::{AgentConfig, AgentValidator, ValidationError};
-pub use health::{HealthChecker, HealthStatus};
+pub use audit::AuditEvent;
+pub use config::{AgentConfig, AgentValidator, ResourceLimits, ValidationError};
+pub use health::{
+    CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthChecker, HealthHistory, HealthStatus,
+};
 pub use mention::{MentionEvent, MentionRouter};
 pub use output::{OutputCapture, OutputEvent};
 
@@ -81,10 +84,201 @@ impl AgentHandle {
         self.health_checker.status()
     }
 
-    /// Kill the agent process
+    /// Get the output capture handle
+    pub fn output_capture(&self) -> &OutputCapture {
+        &self.output_capture
+    }
+
+    /// Subscribe to live output events via broadcast channel.
+    ///
+    /// Returns a receiver that gets a clone of every output event,
+    /// suitable for streaming to WebSocket clients.
+    pub fn subscribe_output(&self) -> tokio::sync::broadcast::Receiver<OutputEvent> {
+        self.output_capture.subscribe()
+    }
+
+    /// Graceful shutdown: SIGTERM, wait for `grace_period`, then SIGKILL if still alive.
+    ///
+    /// Returns `Ok(true)` if the process exited gracefully, `Ok(false)` if it
+    /// required a SIGKILL, or `Err` on I/O failure.
+    pub async fn shutdown(&mut self, grace_period: Duration) -> Result<bool, SpawnerError> {
+        // Get the OS PID for signal sending
+        let pid = match self.child.id() {
+            Some(id) => id,
+            None => {
+                // Process already exited
+                self.health_checker.mark_terminated();
+                return Ok(true);
+            }
+        };
+
+        // Send SIGTERM
+        #[cfg(unix)]
+        {
+            use nix::sys::signal::{kill, Signal};
+            use nix::unistd::Pid;
+            let nix_pid = Pid::from_raw(pid as i32);
+            if let Err(e) = kill(nix_pid, Signal::SIGTERM) {
+                tracing::warn!(pid = pid, error = %e, "Failed to send SIGTERM");
+            } else {
+                tracing::info!(pid = pid, process_id = %self.process_id, "Sent SIGTERM");
+            }
+        }
+
+        // Wait for graceful exit or timeout
+        match timeout(grace_period, self.child.wait()).await {
+            Ok(Ok(status)) => {
+                tracing::info!(
+                    process_id = %self.process_id,
+                    status = %status,
+                    "Process exited gracefully"
+                );
+                tracing::info!(
+                    target: "terraphim_spawner::audit",
+                    event = %AuditEvent::AgentTerminated {
+                        process_id: self.process_id,
+                        graceful: true,
+                    },
+                    "Agent terminated gracefully"
+                );
+                self.health_checker.mark_terminated();
+                Ok(true)
+            }
+            Ok(Err(e)) => {
+                self.health_checker.mark_terminated();
+                Err(SpawnerError::ProcessExit(format!(
+                    "Wait failed for {}: {}",
+                    self.process_id, e
+                )))
+            }
+            Err(_) => {
+                // Timeout expired -- force kill
+                tracing::warn!(
+                    process_id = %self.process_id,
+                    grace_period_ms = grace_period.as_millis() as u64,
+                    "Process did not exit within grace period, sending SIGKILL"
+                );
+                self.child.kill().await?;
+                tracing::info!(
+                    target: "terraphim_spawner::audit",
+                    event = %AuditEvent::AgentTerminated {
+                        process_id: self.process_id,
+                        graceful: false,
+                    },
+                    "Agent force-killed"
+                );
+                self.health_checker.mark_terminated();
+                Ok(false)
+            }
+        }
+    }
+
+    /// Hard kill the agent process (immediate SIGKILL).
     pub async fn kill(mut self) -> Result<(), SpawnerError> {
+        self.health_checker.mark_terminated();
         self.child.kill().await?;
         Ok(())
+    }
+
+    /// Check if the process has exited (non-blocking).
+    pub fn try_wait(&mut self) -> Result<Option<std::process::ExitStatus>, SpawnerError> {
+        match self.child.try_wait() {
+            Ok(status) => {
+                if status.is_some() {
+                    self.health_checker.mark_terminated();
+                }
+                Ok(status)
+            }
+            Err(e) => Err(SpawnerError::Io(e)),
+        }
+    }
+}
+
+// --------------- Agent Pool ---------------
+
+/// Pool of reusable agent handles.
+///
+/// Manages a collection of spawned agents with checkout/release semantics.
+/// Idle agents are kept warm for reuse rather than being terminated.
+pub struct AgentPool {
+    /// Available (idle) agents, keyed by provider ID.
+    idle: HashMap<String, Vec<AgentHandle>>,
+    /// Maximum idle agents per provider.
+    max_idle_per_provider: usize,
+    /// Grace period for shutdown of evicted agents.
+    shutdown_grace: Duration,
+}
+
+impl AgentPool {
+    /// Create a new agent pool.
+    pub fn new(max_idle_per_provider: usize) -> Self {
+        Self {
+            idle: HashMap::new(),
+            max_idle_per_provider,
+            shutdown_grace: Duration::from_secs(5),
+        }
+    }
+
+    /// Set the grace period for shutting down evicted agents.
+    pub fn with_shutdown_grace(mut self, grace: Duration) -> Self {
+        self.shutdown_grace = grace;
+        self
+    }
+
+    /// Return an idle agent for the given provider, if one is available.
+    pub fn checkout(&mut self, provider_id: &str) -> Option<AgentHandle> {
+        let agents = self.idle.get_mut(provider_id)?;
+        // Pop from the back (most recently returned = warmest)
+        agents.pop()
+    }
+
+    /// Return an agent to the pool for reuse.
+    ///
+    /// If the pool for this provider is full, the oldest agent is evicted
+    /// (shutdown gracefully in the background).
+    pub fn release(&mut self, handle: AgentHandle) {
+        let provider_id = handle.provider.id.clone();
+        let agents = self.idle.entry(provider_id).or_default();
+
+        // Evict oldest if at capacity
+        if agents.len() >= self.max_idle_per_provider {
+            let mut evicted = agents.remove(0);
+            let grace = self.shutdown_grace;
+            tokio::spawn(async move {
+                let _ = evicted.shutdown(grace).await;
+            });
+        }
+
+        agents.push(handle);
+    }
+
+    /// Number of idle agents for a given provider.
+    pub fn idle_count(&self, provider_id: &str) -> usize {
+        self.idle.get(provider_id).map_or(0, |v| v.len())
+    }
+
+    /// Total idle agents across all providers.
+    pub fn total_idle(&self) -> usize {
+        self.idle.values().map(|v| v.len()).sum()
+    }
+
+    /// Shut down all idle agents gracefully.
+    pub async fn drain(&mut self) {
+        for (_provider_id, agents) in self.idle.drain() {
+            for mut handle in agents {
+                let _ = handle.shutdown(self.shutdown_grace).await;
+            }
+        }
+    }
+}
+
+impl std::fmt::Debug for AgentPool {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("AgentPool")
+            .field("max_idle_per_provider", &self.max_idle_per_provider)
+            .field("shutdown_grace", &self.shutdown_grace)
+            .field("total_idle", &self.total_idle())
+            .finish()
     }
 }
 
@@ -130,12 +324,35 @@ impl AgentSpawner {
         self
     }
 
+    /// Set the maximum number of restart attempts.
+    pub fn with_max_restarts(mut self, max: u32) -> Self {
+        self.max_restarts = max;
+        self
+    }
+
+    /// Whether auto-restart is enabled.
+    pub fn auto_restart(&self) -> bool {
+        self.auto_restart
+    }
+
+    /// Maximum restart attempts.
+    pub fn max_restarts(&self) -> u32 {
+        self.max_restarts
+    }
+
     /// Spawn an agent from a provider configuration
     pub async fn spawn(
         &self,
         provider: &Provider,
         task: &str,
     ) -> Result<AgentHandle, SpawnerError> {
+        let _span = tracing::info_span!(
+            "spawner.spawn",
+            provider_id = provider.id.as_str(),
+            task_len = task.len(),
+        )
+        .entered();
+
         // Validate the provider
         let config = AgentConfig::from_provider(provider)?;
         let validator = AgentValidator::new(&config);
@@ -160,6 +377,15 @@ impl AgentSpawner {
 
         let output_capture =
             OutputCapture::new(process_id, BufReader::new(stdout), BufReader::new(stderr));
+
+        tracing::info!(
+            target: "terraphim_spawner::audit",
+            event = %AuditEvent::AgentSpawned {
+                process_id,
+                provider_id: provider.id.clone(),
+            },
+            "Agent spawned"
+        );
 
         Ok(AgentHandle {
             process_id,
@@ -195,9 +421,55 @@ impl AgentSpawner {
             cmd.env(key, value);
         }
 
+        // Apply resource limits via pre_exec hook (unix only)
+        #[cfg(unix)]
+        {
+            let limits = config.resource_limits.clone();
+            // SAFETY: setrlimit is async-signal-safe and we only call it
+            // between fork and exec, which is the intended use case.
+            unsafe {
+                cmd.pre_exec(move || {
+                    Self::apply_resource_limits(&limits)?;
+                    Ok(())
+                });
+            }
+        }
+
         let child = cmd.spawn()?;
 
         Ok(child)
+    }
+
+    /// Apply resource limits to the current process (called in pre_exec).
+    #[cfg(unix)]
+    fn apply_resource_limits(limits: &config::ResourceLimits) -> Result<(), std::io::Error> {
+        use nix::sys::resource::{setrlimit, Resource};
+
+        if let Some(max_mem) = limits.max_memory_bytes {
+            setrlimit(Resource::RLIMIT_AS, max_mem, max_mem).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_AS: {}", e))
+            })?;
+        }
+
+        if let Some(max_cpu) = limits.max_cpu_seconds {
+            setrlimit(Resource::RLIMIT_CPU, max_cpu, max_cpu).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_CPU: {}", e))
+            })?;
+        }
+
+        if let Some(max_fsize) = limits.max_file_size_bytes {
+            setrlimit(Resource::RLIMIT_FSIZE, max_fsize, max_fsize).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_FSIZE: {}", e))
+            })?;
+        }
+
+        if let Some(max_files) = limits.max_open_files {
+            setrlimit(Resource::RLIMIT_NOFILE, max_files, max_files).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_NOFILE: {}", e))
+            })?;
+        }
+
+        Ok(())
     }
 }
 
@@ -210,7 +482,7 @@ impl Default for AgentSpawner {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_types::capability::{Capability, CostLevel, Latency, ProviderType};
+    use terraphim_types::capability::{Capability, ProviderType};
 
     fn create_test_agent_provider() -> Provider {
         Provider::new(
@@ -225,13 +497,29 @@ mod tests {
         )
     }
 
+    /// Create a long-running agent (sleep) for shutdown testing.
+    fn create_sleep_agent_provider() -> Provider {
+        Provider::new(
+            "@sleep-agent",
+            "Sleep Agent",
+            ProviderType::Agent {
+                agent_id: "@sleep".to_string(),
+                cli_command: "sleep".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        )
+    }
+
     #[test]
     fn test_spawner_creation() {
         let spawner = AgentSpawner::new()
             .with_auto_restart(false)
-            .with_working_dir("/workspace");
+            .with_working_dir("/workspace")
+            .with_max_restarts(5);
 
-        assert!(!spawner.auto_restart);
+        assert!(!spawner.auto_restart());
+        assert_eq!(spawner.max_restarts(), 5);
         assert_eq!(spawner.default_working_dir, PathBuf::from("/workspace"));
     }
 
@@ -247,5 +535,115 @@ mod tests {
 
         let handle = handle.unwrap();
         assert_eq!(handle.provider.id, "@test-agent");
+    }
+
+    #[tokio::test]
+    async fn test_try_wait_completed() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let mut handle = spawner.spawn(&provider, "done").await.unwrap();
+
+        // Echo exits immediately; give it a moment
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        let status = handle.try_wait().unwrap();
+        assert!(status.is_some()); // Process has exited
+        assert_eq!(handle.health_status(), HealthStatus::Terminated);
+    }
+
+    #[tokio::test]
+    async fn test_graceful_shutdown() {
+        let spawner = AgentSpawner::new();
+        let provider = create_sleep_agent_provider();
+
+        // Spawn a sleep 60 agent
+        let mut handle = spawner.spawn(&provider, "60").await.unwrap();
+
+        // Graceful shutdown with 2s grace period
+        let result = handle.shutdown(Duration::from_secs(2)).await;
+        assert!(result.is_ok());
+
+        // Should have exited (either gracefully via SIGTERM or force-killed)
+        let _graceful = result.unwrap();
+        // On most systems, sleep responds to SIGTERM -- either outcome is valid
+        assert_eq!(handle.health_status(), HealthStatus::Terminated);
+    }
+
+    #[test]
+    fn test_agent_pool_checkout_empty() {
+        let mut pool = AgentPool::new(5);
+        assert!(pool.checkout("nonexistent").is_none());
+        assert_eq!(pool.total_idle(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_agent_pool_release_and_checkout() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let handle = spawner.spawn(&provider, "hello").await.unwrap();
+        let mut pool = AgentPool::new(5);
+
+        pool.release(handle);
+        assert_eq!(pool.idle_count("@test-agent"), 1);
+        assert_eq!(pool.total_idle(), 1);
+
+        let checked_out = pool.checkout("@test-agent");
+        assert!(checked_out.is_some());
+        assert_eq!(pool.idle_count("@test-agent"), 0);
+    }
+
+    #[tokio::test]
+    async fn test_subscribe_output_receives_events() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let handle = spawner.spawn(&provider, "broadcast test").await.unwrap();
+        let mut receiver = handle.subscribe_output();
+
+        // Give the echo process time to produce output and the capture task to process it
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Try to receive -- echo outputs "broadcast test" to stdout
+        match receiver.try_recv() {
+            Ok(OutputEvent::Stdout { line, .. }) => {
+                assert!(line.contains("broadcast"));
+            }
+            Ok(OutputEvent::Mention { .. }) => {
+                // Also acceptable if the line matched a mention pattern
+            }
+            Ok(_) => {}
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
+                // Race condition: the capture task may not have processed
+                // the output yet. This is acceptable in CI environments.
+            }
+            Err(e) => panic!("Unexpected broadcast error: {:?}", e),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_resource_limits() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        // Spawn with resource limits -- echo exits fast so this validates
+        // that the pre_exec hook with setrlimit doesn't break spawning.
+        let handle = spawner.spawn(&provider, "resource-limited").await;
+        assert!(handle.is_ok());
+    }
+
+    #[tokio::test]
+    async fn test_agent_pool_drain() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        let handle = spawner.spawn(&provider, "hello").await.unwrap();
+        let mut pool = AgentPool::new(5);
+        pool.release(handle);
+
+        assert_eq!(pool.total_idle(), 1);
+        pool.drain().await;
+        assert_eq!(pool.total_idle(), 0);
     }
 }

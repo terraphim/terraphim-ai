@@ -79,7 +79,7 @@ impl KnowledgeGraphRouter {
     }
 
     /// Find related concepts for a query
-    pub fn find_related_concepts(&self, query: &str, _role: Option<&RoleName>) -> Vec<Concept> {
+    pub fn find_related_concepts(&self, _query: &str, _role: Option<&RoleName>) -> Vec<Concept> {
         // In a real implementation, this would:
         // 1. Parse the query
         // 2. Find matching concepts in KG

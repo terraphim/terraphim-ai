@@ -1,10 +1,9 @@
 //! Output capture with @mention detection
 
 use regex::Regex;
-use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{ChildStderr, ChildStdout};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 use terraphim_types::capability::ProcessId;
 
@@ -34,6 +33,8 @@ pub struct OutputCapture {
     process_id: ProcessId,
     mention_regex: Regex,
     event_sender: mpsc::Sender<OutputEvent>,
+    /// Broadcast sender for live output streaming (e.g., WebSocket subscribers)
+    broadcast_sender: broadcast::Sender<OutputEvent>,
 }
 
 impl OutputCapture {
@@ -44,11 +45,13 @@ impl OutputCapture {
         _stderr: BufReader<ChildStderr>,
     ) -> Self {
         let (event_sender, _event_receiver) = mpsc::channel(100);
+        let (broadcast_sender, _) = broadcast::channel(256);
 
         let capture = Self {
             process_id,
             mention_regex: Regex::new(r"@(\w+)").unwrap(),
             event_sender,
+            broadcast_sender,
         };
 
         // Start capturing stdout
@@ -57,11 +60,25 @@ impl OutputCapture {
         capture
     }
 
+    /// Subscribe to live output events via broadcast channel.
+    ///
+    /// Returns a receiver that gets a clone of every output event.
+    /// Suitable for streaming to WebSocket clients.
+    pub fn subscribe(&self) -> broadcast::Receiver<OutputEvent> {
+        self.broadcast_sender.subscribe()
+    }
+
+    /// Get a reference to the broadcast sender.
+    pub fn broadcaster(&self) -> &broadcast::Sender<OutputEvent> {
+        &self.broadcast_sender
+    }
+
     /// Start capturing stdout
     fn capture_stdout(&self, mut stdout: BufReader<ChildStdout>) {
         let process_id = self.process_id;
         let mention_regex = self.mention_regex.clone();
         let event_sender = self.event_sender.clone();
+        let broadcast_sender = self.broadcast_sender.clone();
 
         tokio::spawn(async move {
             let mut line = String::new();
@@ -82,23 +99,23 @@ impl OutputCapture {
                                 let target = target.as_str().to_string();
                                 let message = line.clone();
 
-                                let _ = event_sender
-                                    .send(OutputEvent::Mention {
-                                        process_id,
-                                        target,
-                                        message,
-                                    })
-                                    .await;
+                                let mention_event = OutputEvent::Mention {
+                                    process_id,
+                                    target,
+                                    message,
+                                };
+                                let _ = event_sender.send(mention_event.clone()).await;
+                                let _ = broadcast_sender.send(mention_event);
                             }
                         }
 
                         // Send stdout event
-                        let _ = event_sender
-                            .send(OutputEvent::Stdout { process_id, line })
-                            .await;
+                        let stdout_event = OutputEvent::Stdout { process_id, line };
+                        let _ = event_sender.send(stdout_event.clone()).await;
+                        let _ = broadcast_sender.send(stdout_event);
                     }
                     Err(e) => {
-                        log::error!("Error reading stdout for process {}: {}", process_id, e);
+                        tracing::error!(process_id = %process_id, error = %e, "Error reading stdout");
                         break;
                     }
                 }
