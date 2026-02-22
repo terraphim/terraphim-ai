@@ -9,6 +9,12 @@ use terraphim_types::{
 };
 use tokio::sync::{Mutex, MutexGuard};
 pub mod input;
+
+#[cfg(feature = "medical")]
+pub mod medical;
+#[cfg(feature = "medical")]
+pub mod symbolic_embeddings;
+
 use aho_corasick::{AhoCorasick, MatchKind};
 use unicode_segmentation::UnicodeSegmentation;
 
