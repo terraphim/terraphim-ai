@@ -17,12 +17,14 @@ use tokio::time::timeout;
 
 use terraphim_types::capability::{ProcessId, Provider};
 
+pub mod audit;
 pub mod config;
 pub mod health;
 pub mod mention;
 pub mod output;
 
-pub use config::{AgentConfig, AgentValidator, ValidationError};
+pub use audit::AuditEvent;
+pub use config::{AgentConfig, AgentValidator, ResourceLimits, ValidationError};
 pub use health::{
     CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthChecker, HealthHistory, HealthStatus,
 };
@@ -123,6 +125,14 @@ impl AgentHandle {
                     status = %status,
                     "Process exited gracefully"
                 );
+                tracing::info!(
+                    target: "terraphim_spawner::audit",
+                    event = %AuditEvent::AgentTerminated {
+                        process_id: self.process_id,
+                        graceful: true,
+                    },
+                    "Agent terminated gracefully"
+                );
                 self.health_checker.mark_terminated();
                 Ok(true)
             }
@@ -141,6 +151,14 @@ impl AgentHandle {
                     "Process did not exit within grace period, sending SIGKILL"
                 );
                 self.child.kill().await?;
+                tracing::info!(
+                    target: "terraphim_spawner::audit",
+                    event = %AuditEvent::AgentTerminated {
+                        process_id: self.process_id,
+                        graceful: false,
+                    },
+                    "Agent force-killed"
+                );
                 self.health_checker.mark_terminated();
                 Ok(false)
             }
@@ -352,6 +370,15 @@ impl AgentSpawner {
         let output_capture =
             OutputCapture::new(process_id, BufReader::new(stdout), BufReader::new(stderr));
 
+        tracing::info!(
+            target: "terraphim_spawner::audit",
+            event = %AuditEvent::AgentSpawned {
+                process_id,
+                provider_id: provider.id.clone(),
+            },
+            "Agent spawned"
+        );
+
         Ok(AgentHandle {
             process_id,
             provider: provider.clone(),
@@ -386,9 +413,55 @@ impl AgentSpawner {
             cmd.env(key, value);
         }
 
+        // Apply resource limits via pre_exec hook (unix only)
+        #[cfg(unix)]
+        {
+            let limits = config.resource_limits.clone();
+            // SAFETY: setrlimit is async-signal-safe and we only call it
+            // between fork and exec, which is the intended use case.
+            unsafe {
+                cmd.pre_exec(move || {
+                    Self::apply_resource_limits(&limits)?;
+                    Ok(())
+                });
+            }
+        }
+
         let child = cmd.spawn()?;
 
         Ok(child)
+    }
+
+    /// Apply resource limits to the current process (called in pre_exec).
+    #[cfg(unix)]
+    fn apply_resource_limits(limits: &config::ResourceLimits) -> Result<(), std::io::Error> {
+        use nix::sys::resource::{setrlimit, Resource};
+
+        if let Some(max_mem) = limits.max_memory_bytes {
+            setrlimit(Resource::RLIMIT_AS, max_mem, max_mem).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_AS: {}", e))
+            })?;
+        }
+
+        if let Some(max_cpu) = limits.max_cpu_seconds {
+            setrlimit(Resource::RLIMIT_CPU, max_cpu, max_cpu).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_CPU: {}", e))
+            })?;
+        }
+
+        if let Some(max_fsize) = limits.max_file_size_bytes {
+            setrlimit(Resource::RLIMIT_FSIZE, max_fsize, max_fsize).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_FSIZE: {}", e))
+            })?;
+        }
+
+        if let Some(max_files) = limits.max_open_files {
+            setrlimit(Resource::RLIMIT_NOFILE, max_files, max_files).map_err(|e| {
+                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_NOFILE: {}", e))
+            })?;
+        }
+
+        Ok(())
     }
 }
 
@@ -511,6 +584,17 @@ mod tests {
         let checked_out = pool.checkout("@test-agent");
         assert!(checked_out.is_some());
         assert_eq!(pool.idle_count("@test-agent"), 0);
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_resource_limits() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        // Spawn with resource limits -- echo exits fast so this validates
+        // that the pre_exec hook with setrlimit doesn't break spawning.
+        let handle = spawner.spawn(&provider, "resource-limited").await;
+        assert!(handle.is_ok());
     }
 
     #[tokio::test]
