@@ -64,14 +64,14 @@ pub struct RoutingContext {
 }
 
 /// Result of executing a routing decision
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum RoutingResult {
     /// LLM response
     LlmResponse(String),
     /// Agent spawned
     AgentSpawned(ProcessId),
     /// Error occurred
-    Error(RoutingError),
+    Error(String),
 }
 
 /// Process ID for spawned agents
@@ -98,7 +98,7 @@ impl fmt::Display for ProcessId {
 }
 
 /// Routing errors
-#[derive(Error, Debug)]
+#[derive(Error, Debug, Clone)]
 pub enum RoutingError {
     #[error("No provider found for capabilities: {0:?}")]
     NoProviderFound(Vec<Capability>),
@@ -113,10 +113,10 @@ pub enum RoutingError {
     ExecutionError(String),
     
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(String),
     
     #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    Serialization(String),
 }
 
 /// Task for routing

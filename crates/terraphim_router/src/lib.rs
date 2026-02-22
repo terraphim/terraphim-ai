@@ -29,15 +29,14 @@ pub mod types;
 pub use engine::{RoutingEngine, Router};
 pub use keyword::KeywordRouter;
 pub use registry::ProviderRegistry;
-pub use strategy::{RoutingStrategy, CostOptimized, LatencyOptimized, CapabilityFirst};
+pub use strategy::{RoutingStrategy, CostOptimized, LatencyOptimized, CapabilityFirst, RoundRobin};
 pub use types::{RoutingDecision, RoutingContext, RoutingResult, RoutingError};
 
-use terraphim_types::capability::{Provider, Capability};
+use terraphim_types::capability::Provider;
 
 /// Re-export capability types for convenience
 pub use terraphim_types::capability::{
     Capability,
-    Provider,
     ProviderType,
     CostLevel,
     Latency,

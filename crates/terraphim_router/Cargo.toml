@@ -27,6 +27,7 @@ log = { workspace = true }
 chrono = { workspace = true }
 tokio = { workspace = true }
 async-trait = { workspace = true }
+uuid = { workspace = true }
 
 # Markdown parsing
 pulldown-cmark = "0.9"

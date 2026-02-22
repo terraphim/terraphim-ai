@@ -1,0 +1,346 @@
+# Terraphim LLM Proxy - Rust Development Guidelines
+
+## Project Context
+
+This is a production-ready intelligent LLM routing proxy with sophisticated 6-phase routing architecture. Focus on sub-millisecond performance (<1ms overhead), zero-copy where possible, and comprehensive error handling.
+
+## Core Rust Principles
+
+### Code Style
+- Write clear, idiomatic Rust code following project patterns
+- Use expressive variable names: `is_ready`, `has_data`, `provider_name`
+- Follow Rust naming conventions: `snake_case` for variables/functions, `PascalCase` for types/structs
+- Avoid code duplication through functions and modules
+- Embrace Rust's ownership and type system for safety
+
+### Error Handling (Critical)
+- Use `Result<T, ProxyError>` throughout - see `src/error.rs` for all error types
+- Propagate errors with `?` operator in async functions
+- Use custom `ProxyError` enum with `thiserror` for descriptive errors
+- Map HTTP status codes correctly (400/401/403/429/500/502/503/504)
+- Handle errors early, return specific error variants
+- Example pattern:
+  ```rust
+  pub async fn route_request(&self, hints: &RoutingHints) -> Result<RoutingDecision> {
+      let provider = self.find_provider()
+          .ok_or_else(|| ProxyError::NoProviderFound)?;
+      Ok(provider)
+  }
+  ```
+
+## Async Programming
+
+### Tokio Runtime
+- All I/O uses tokio async runtime (tokio 1.x with "full" features)
+- Use `async fn` syntax for async functions
+- Spawn tasks with `tokio::spawn` for true concurrency
+- Use `tokio::select!` for managing multiple async tasks/cancellations
+- Prefer structured concurrency: scoped tasks, clean cancellation
+
+### Channels and Concurrency
+- `tokio::sync::mpsc`: Multi-producer, single-consumer (bounded preferred)
+- `tokio::sync::broadcast`: Broadcasting to multiple consumers
+- `tokio::sync::oneshot`: One-time communication between tasks
+- `tokio::sync::Mutex`/`RwLock`: Shared state across tasks
+- Always prefer bounded channels for backpressure
+- Example: `mpsc::channel(100)` for request queue
+
+### Key Patterns
+- Use `Arc<T>` for shared state across async tasks
+- Avoid blocking operations in async functions
+- Use `tokio::time::sleep`/`interval` for time-based operations
+- No `std::thread::sleep` in async code
+- Pattern for shared state:
+  ```rust
+  #[derive(Clone)]
+  pub struct AppState {
+      pub config: Arc<ProxyConfig>,
+      pub router: Arc<RouterAgent>,
+      pub session_manager: Arc<SessionManager>,
+  }
+  ```
+
+## Testing Strategy
+
+### Test Organization
+- Unit tests: `#[cfg(test)] mod tests` in source files
+- Integration tests: `tests/` directory
+- Use `#[tokio::test]` for async tests
+- **Never use mocks** - use real integrations or test doubles
+- Current test suite: 186 tests (158 unit + 6 integration + 10 RoleGraph + 12 session)
+
+### Test Patterns
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_synchronous_logic() {
+        let result = calculate_score("test");
+        assert_eq!(result, 42);
+    }
+
+    #[tokio::test]
+    async fn test_async_operation() {
+        let router = create_test_router();
+        let decision = router.route_request(&hints).await.unwrap();
+        assert_eq!(decision.provider.name, "openrouter");
+    }
+}
+```
+
+### Testing Requirements
+- Test against real services or test instances (no mocks)
+- Use `tempfile::TempDir` for temporary file tests
+- Integration tests should validate real routing/provider logic
+- Check test coverage after implementation with `cargo tarpaulin` (if available)
+
+## Performance Optimization
+
+### Critical Requirements
+- **Routing overhead target**: <1ms (measured: 0.22ms)
+- **Token counting**: 2.8M tokens/sec with tiktoken-rs
+- **Request throughput**: >4,000 req/sec
+- **Memory overhead**: <2MB
+
+### Optimization Patterns
+- Minimize async overhead; use sync code where async not needed
+- Use `Aho-Corasick` automaton for pattern matching (<1ms)
+- Prefer `Arc<T>` over `Mutex<T>` where possible
+- Avoid allocations in hot paths
+- Use `tokio::task::yield_now` for cooperative multitasking
+- Profile with `cargo bench` for critical paths
+
+### Streaming
+- Full Claude API SSE format with axum's `Sse<Stream>`
+- Events: `message_start`, `content_block_delta`, `message_delta`, `message_stop`
+- Use `futures::Stream` for async streaming
+- Graceful error handling and stream termination
+
+## Architecture Patterns
+
+### Module Organization
+See `src/lib.rs` for canonical module structure:
+- `router.rs`: 6-phase routing engine (57KB)
+- `server.rs`: Axum HTTP server with SSE streaming (63KB)
+- `rolegraph_client.rs`: Taxonomy pattern matching (20KB)
+- `token_counter.rs`: Fast token counting (19KB)
+- `analyzer.rs`: Request analysis and hint generation (12KB)
+- `session.rs`: Session management (14KB)
+- `client.rs`: LLM client via genai 0.4 (23KB)
+- `transformer/`: Request/response transformers per provider
+- `cost/`: Budget management, pricing, calculator
+- `performance/`: Metrics, provider health monitoring
+- `security/`: API key validation, rate limiting, SSRF protection
+
+### Configuration
+- Use `twelf` crate for layered config: file → environment → CLI args
+- TOML for config files (see `config.test.toml`)
+- Environment variables via `.env` (use `dotenvy` crate)
+- Example:
+  ```rust
+  #[derive(Debug, Clone, Serialize, Deserialize)]
+  pub struct ProxyConfig {
+      pub proxy: ProxySettings,
+      pub router: RouterSettings,
+      pub providers: Vec<Provider>,
+      pub security: SecuritySettings,
+  }
+  ```
+
+### Provider Integration
+- All providers use genai 0.4 `ServiceTargetResolver`
+- Custom transformers per provider in `src/transformer/`
+- Support: OpenRouter, Anthropic, DeepSeek, Ollama, Gemini, OpenAI
+- Configuration via TOML with `${ENV_VAR}` substitution
+
+## Logging and Observability
+
+### Structured Logging
+- Use `tracing` crate with `debug!`, `info!`, `warn!`, `error!` macros
+- Include context: `provider = %name`, `elapsed = ?duration`
+- Example:
+  ```rust
+  use tracing::{debug, info, warn};
+  
+  info!(
+      provider = %decision.provider.name,
+      model = %decision.model,
+      scenario = %decision.scenario,
+      "Routing decision made"
+  );
+  
+  debug!(elapsed_us = elapsed.as_micros(), "Token counting completed");
+  ```
+
+### Metrics
+- Use `src/metrics.rs` for request/response/routing metrics
+- Production metrics in `src/production_metrics.rs`
+- Log metrics at key points: auth, token counting, analysis, routing, transformer
+
+## Development Workflow
+
+### Pre-commit Checks
+```bash
+# Format code (required)
+cargo fmt
+
+# Check compilation
+cargo check
+
+# Run clippy (zero warnings required)
+cargo clippy -- -D warnings
+
+# Run all tests (186 must pass)
+cargo test
+```
+
+### Using tmux for Development
+Never use `sleep` - use tmux for background processes:
+```bash
+# Start proxy in tmux session
+tmux new-session -d -s proxy 'cargo run --release -- --config config.test.toml'
+
+# Run tests while proxy runs
+cargo test --test integration_test
+
+# Check proxy logs
+tmux capture-pane -t proxy -p
+
+# Kill session when done
+tmux kill-session -t proxy
+```
+
+### Git Workflow
+- Use `gh` tool to update GitHub issues
+- Commit every change with descriptive messages
+- Keep issues updated with progress
+- Example commit: "feat(router): Add Phase 1 pattern matching with RoleGraph"
+
+## Project-Specific Rules
+
+### Documentation
+- Maintain comprehensive inline comments (never remove existing)
+- Use Rustdoc for public APIs: `///` for items, `//!` for modules
+- Update relevant docs: `README.md`, `docs/ROUTING_ARCHITECTURE.md`
+- Document all public functions, structs, and modules
+
+### Dependencies
+- `genai` from Terraphim fork (multi-provider support)
+- `tiktoken-rs 0.5` for token counting
+- `axum 0.7` for HTTP framework
+- `aho-corasick 1.1` for pattern matching
+- `terraphim_types` for knowledge graph integration
+
+### Key Files to Reference
+- `WARP.md`: Project overview and commands
+- `docs/ROUTING_ARCHITECTURE.md`: Complete routing documentation
+- `src/error.rs`: All error types and HTTP status mappings
+- `src/router.rs`: 6-phase routing implementation
+- `config.test.toml`: Example configuration
+
+### Rust Version
+- Minimum: Rust 1.70 (for dependencies)
+- Recommended: Rust 1.80+
+- Current: Rust 1.90.0
+
+## Common Patterns
+
+### Routing Decision
+```rust
+pub struct RoutingDecision {
+    pub provider: Provider,
+    pub model: String,
+    pub scenario: RoutingScenario,
+    pub priority: Priority,
+    pub confidence: f64,
+    pub reason: String,
+}
+```
+
+### Shared State
+```rust
+#[derive(Clone)]
+pub struct AppState {
+    pub config: Arc<ProxyConfig>,
+    pub router: Arc<RouterAgent>,
+    // ... other shared components
+}
+```
+
+### Error Propagation
+```rust
+pub async fn process_request(&self, req: ChatRequest) -> Result<Response> {
+    let tokens = self.token_counter.count_tokens(&req)?;
+    let hints = self.analyzer.analyze(&req, tokens).await?;
+    let decision = self.router.route_request(&hints).await?;
+    Ok(self.execute_request(decision).await?)
+}
+```
+
+### Pattern Matching with RoleGraph
+```rust
+// Load taxonomy from docs/taxonomy/routing_scenarios/
+let rolegraph = RoleGraphClient::new(&taxonomy_path)?;
+rolegraph.load_taxonomy()?;
+
+// Match patterns (Aho-Corasick, <1ms)
+if let Some((concept, score)) = rolegraph.match_patterns(query) {
+    info!(concept = %concept, score, "Pattern matched");
+}
+```
+
+## Anti-Patterns to Avoid
+
+❌ **Don't use mocks in tests** - Use real integrations
+❌ **Don't use `std::thread::sleep` in async code** - Use `tokio::time::sleep`
+❌ **Don't block in async functions** - Offload to blocking threads
+❌ **Don't use unwrap/expect in production code** - Use proper error handling
+❌ **Don't remove inline comments** - Maintain comprehensive documentation
+❌ **Don't use generic error messages** - Use specific `ProxyError` variants
+❌ **Don't ignore clippy warnings** - Zero warnings required
+
+## Quick Reference Commands
+
+```bash
+# Build and run
+cargo build --release
+cargo run --release -- --config config.test.toml
+
+# Testing
+cargo test                              # All tests
+cargo test --test integration_test      # Specific test suite
+cargo test test_pattern_matching        # Specific test
+cargo test -- --nocapture              # With output
+
+# Quality checks
+cargo fmt                               # Format code
+cargo clippy -- -D warnings            # Lint (zero warnings)
+cargo check                            # Fast compile check
+
+# Development
+cargo watch -x check -x test           # Watch mode
+cargo doc --open                       # Build docs
+```
+
+## Environment Setup
+
+```bash
+# Copy and configure
+cp .env.example .env
+cp config.example.toml config.toml
+
+# Required environment variables
+PROXY_API_KEY=sk_your_proxy_api_key_here_minimum_32_characters
+OPENROUTER_API_KEY=sk_your_openrouter_key
+ANTHROPIC_API_KEY=sk_your_anthropic_key
+DEEPSEEK_API_KEY=sk_your_deepseek_key
+```
+
+## References
+
+- **WARP.md**: Complete project guide
+- **README.md**: Quick start and overview
+- **docs/ROUTING_ARCHITECTURE.md**: Routing system details
+- **Cargo.toml**: Dependencies and project metadata

@@ -9,7 +9,6 @@ use crate::{
 use terraphim_types::capability::{Capability, Provider};
 
 /// Main routing engine
-#[derive(Debug)]
 pub struct RoutingEngine {
     keyword_router: KeywordRouter,
     registry: ProviderRegistry,
@@ -148,7 +147,6 @@ impl Default for RoutingEngine {
 }
 
 /// Convenience wrapper for the routing engine
-#[derive(Debug)]
 pub struct Router {
     engine: RoutingEngine,
 }

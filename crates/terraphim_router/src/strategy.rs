@@ -5,10 +5,10 @@ use terraphim_types::capability::{Provider, CostLevel, Latency};
 /// Trait for routing strategies
 pub trait RoutingStrategy: Send + Sync {
     /// Select the best provider from candidates
-    fn select_provider(
+    fn select_provider<'a>(
         &self,
-        candidates: Vec<&Provider>,
-    ) -> Option<&Provider>;
+        candidates: Vec<&'a Provider>,
+    ) -> Option<&'a Provider>;
     
     /// Get strategy name
     fn name(&self) -> &'static str;
@@ -19,10 +19,10 @@ pub trait RoutingStrategy: Send + Sync {
 pub struct CostOptimized;
 
 impl RoutingStrategy for CostOptimized {
-    fn select_provider(
+    fn select_provider<'a>(
         &self,
-        candidates: Vec<&Provider>,
-    ) -> Option<&Provider> {
+        candidates: Vec<&'a Provider>,
+    ) -> Option<&'a Provider> {
         candidates.into_iter()
             .min_by_key(|p| p.cost_level)
     }
@@ -37,10 +37,10 @@ impl RoutingStrategy for CostOptimized {
 pub struct LatencyOptimized;
 
 impl RoutingStrategy for LatencyOptimized {
-    fn select_provider(
+    fn select_provider<'a>(
         &self,
-        candidates: Vec<&Provider>,
-    ) -> Option<&Provider> {
+        candidates: Vec<&'a Provider>,
+    ) -> Option<&'a Provider> {
         candidates.into_iter()
             .min_by_key(|p| p.latency)
     }
@@ -55,10 +55,10 @@ impl RoutingStrategy for LatencyOptimized {
 pub struct CapabilityFirst;
 
 impl RoutingStrategy for CapabilityFirst {
-    fn select_provider(
+    fn select_provider<'a>(
         &self,
-        candidates: Vec<&Provider>,
-    ) -> Option<&Provider> {
+        candidates: Vec<&'a Provider>,
+    ) -> Option<&'a Provider> {
         // For now, just pick the first one with the most capabilities
         // In a real implementation, this would score by relevance
         candidates.into_iter()
@@ -71,7 +71,7 @@ impl RoutingStrategy for CapabilityFirst {
 }
 
 /// Strategy: Round-robin for load balancing
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct RoundRobin {
     index: std::sync::atomic::AtomicUsize,
 }
@@ -91,10 +91,10 @@ impl Default for RoundRobin {
 }
 
 impl RoutingStrategy for RoundRobin {
-    fn select_provider(
+    fn select_provider<'a>(
         &self,
-        candidates: Vec<&Provider>,
-    ) -> Option<&Provider> {
+        candidates: Vec<&'a Provider>,
+    ) -> Option<&'a Provider> {
         if candidates.is_empty() {
             return None;
         }
