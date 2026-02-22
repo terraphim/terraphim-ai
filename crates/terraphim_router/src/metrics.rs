@@ -34,10 +34,7 @@ impl RouterMetrics {
     }
 
     /// Record a routing request
-    pub fn record_routing_request(&self,
-        provider: &Provider,
-        duration_ms: u64,
-    ) {
+    pub fn record_routing_request(&self, provider: &Provider, duration_ms: u64) {
         self.routing_requests.fetch_add(1, Ordering::Relaxed);
         self.routing_success.fetch_add(1, Ordering::Relaxed);
 
@@ -50,9 +47,7 @@ impl RouterMetrics {
     }
 
     /// Record a routing failure
-    pub fn record_routing_failure(&self,
-        reason: &str,
-    ) {
+    pub fn record_routing_failure(&self, reason: &str) {
         self.routing_failures.fetch_add(1, Ordering::Relaxed);
 
         log::warn!(
@@ -63,9 +58,7 @@ impl RouterMetrics {
     }
 
     /// Record an agent spawn attempt
-    pub fn record_spawn_attempt(&self,
-        provider: &Provider,
-    ) {
+    pub fn record_spawn_attempt(&self, provider: &Provider) {
         self.spawn_attempts.fetch_add(1, Ordering::Relaxed);
 
         log::info!(
@@ -76,10 +69,7 @@ impl RouterMetrics {
     }
 
     /// Record a successful spawn
-    pub fn record_spawn_success(&self,
-        process_id: ProcessId,
-        duration_ms: u64,
-    ) {
+    pub fn record_spawn_success(&self, process_id: ProcessId, duration_ms: u64) {
         self.spawn_success.fetch_add(1, Ordering::Relaxed);
 
         log::info!(
@@ -91,10 +81,7 @@ impl RouterMetrics {
     }
 
     /// Record a spawn failure
-    pub fn record_spawn_failure(&self,
-        provider: &Provider,
-        error: &str,
-    ) {
+    pub fn record_spawn_failure(&self, provider: &Provider, error: &str) {
         self.spawn_failures.fetch_add(1, Ordering::Relaxed);
 
         log::error!(
@@ -106,9 +93,7 @@ impl RouterMetrics {
     }
 
     /// Record a health check failure
-    pub fn record_health_failure(&self,
-        process_id: ProcessId,
-    ) {
+    pub fn record_health_failure(&self, process_id: ProcessId) {
         self.health_failures.fetch_add(1, Ordering::Relaxed);
 
         log::warn!(
@@ -154,9 +139,7 @@ impl RouterMetrics {
     }
 
     /// Print metrics summary
-    pub fn print_summary(&self,
-        f: &mut std::fmt::Formatter<'_>,
-    ) -> std::fmt::Result {
+    pub fn print_summary(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "Router Metrics Summary:")?;
         writeln!(f, "  Routing Requests: {}", self.routing_requests())?;
         writeln!(f, "  Routing Success: {}", self.routing_success())?;
