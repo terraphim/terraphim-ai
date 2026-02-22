@@ -56,14 +56,17 @@ impl FallbackRouter {
     }
 
     /// Route with fallback on failure
+    ///
+    /// The `execute` closure receives a cloned `Provider` to avoid
+    /// lifetime issues with async closures.
     pub async fn route_with_fallback<F, Fut>(
         &self,
         prompt: &str,
         context: &RoutingContext,
-        execute: F,
+        mut execute: F,
     ) -> Result<RoutingDecision, RoutingError>
     where
-        F: Fn(&Provider) -> Fut,
+        F: FnMut(Provider) -> Fut,
         Fut: std::future::Future<Output = Result<(), String>>,
     {
         let mut attempts = 0;
@@ -72,7 +75,7 @@ impl FallbackRouter {
         loop {
             // Get routing decision
             let decision = self.router.route(&current_prompt, context)?;
-            let provider = &decision.provider;
+            let provider = decision.provider.clone();
 
             log::info!(
                 "Attempt {}: Routing to {} ({})",
@@ -82,17 +85,13 @@ impl FallbackRouter {
             );
 
             // Try to execute with the provider
-            match execute(provider).await {
+            match execute(provider.clone()).await {
                 Ok(()) => {
                     log::info!("Successfully executed with {}", provider.id);
                     return Ok(decision);
                 }
                 Err(error) => {
-                    log::warn!(
-                        "Provider {} failed: {}",
-                        provider.id,
-                        error
-                    );
+                    log::warn!("Provider {} failed: {}", provider.id, error);
 
                     attempts += 1;
                     if attempts >= self.max_fallbacks {
@@ -113,19 +112,12 @@ impl FallbackRouter {
                         }
                         FallbackStrategy::NextBestProvider => {
                             // Exclude failed provider and retry
-                            current_prompt = format!(
-                                "{} [exclude:{}]",
-                                prompt,
-                                provider.id
-                            );
+                            current_prompt = format!("{} [exclude:{}]", prompt, provider.id);
                         }
                         FallbackStrategy::LlmFallback => {
                             // If agent failed, try to find LLM
                             if matches!(provider.provider_type, ProviderType::Agent { .. }) {
-                                current_prompt = format!(
-                                    "{} [prefer:llm]",
-                                    prompt
-                                );
+                                current_prompt = format!("{} [prefer:llm]", prompt);
                             }
                         }
                     }
@@ -148,8 +140,8 @@ impl FallbackRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use terraphim_types::capability::{Capability, CostLevel, Latency};
     use std::path::PathBuf;
+    use terraphim_types::capability::{Capability, CostLevel, Latency};
 
     fn create_test_router() -> Router {
         let mut router = Router::new();
@@ -187,16 +179,16 @@ mod tests {
             .with_strategy(FallbackStrategy::NextBestProvider)
             .with_max_fallbacks(2);
 
-        let mut attempts = 0;
+        let attempts = std::sync::atomic::AtomicU32::new(0);
         let result = fallback_router
             .route_with_fallback(
                 "Implement a function",
                 &RoutingContext::default(),
                 |_provider| {
-                    attempts += 1;
+                    let n = attempts.fetch_add(1, std::sync::atomic::Ordering::SeqCst) + 1;
                     async move {
                         // First attempt fails, second succeeds
-                        if attempts == 1 {
+                        if n == 1 {
                             Err("First provider failed".to_string())
                         } else {
                             Ok(())
@@ -207,22 +199,19 @@ mod tests {
             .await;
 
         assert!(result.is_ok());
-        assert_eq!(attempts, 2);
+        assert_eq!(attempts.load(std::sync::atomic::Ordering::SeqCst), 2);
     }
 
     #[tokio::test]
     async fn test_fail_fast() {
         let router = create_test_router();
-        let fallback_router = FallbackRouter::new(router)
-            .with_strategy(FallbackStrategy::FailFast);
+        let fallback_router = FallbackRouter::new(router).with_strategy(FallbackStrategy::FailFast);
 
         let result = fallback_router
             .route_with_fallback(
                 "Implement a function",
                 &RoutingContext::default(),
-                |_provider| async move {
-                    Err("Always fails".to_string())
-                },
+                |_provider| async { Err("Always fails".to_string()) },
             )
             .await;
 

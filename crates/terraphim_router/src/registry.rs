@@ -89,11 +89,11 @@ impl ProviderRegistry {
             .collect()
     }
 
-    /// Find providers that match all given capabilities
+    /// Find providers that match any of the given capabilities
     pub fn find_by_capabilities(&self, capabilities: &[Capability]) -> Vec<&Provider> {
         self.providers
             .values()
-            .filter(|p| p.has_all_capabilities(capabilities))
+            .filter(|p| capabilities.iter().any(|c| p.has_capability(c)))
             .collect()
     }
 

@@ -7,12 +7,10 @@
 
 use std::path::PathBuf;
 use terraphim_router::{
-    FallbackRouter, FallbackStrategy, KnowledgeGraphRouter,
-    Router, RouterMetrics, RoutingContext, Timer,
+    FallbackRouter, FallbackStrategy, KnowledgeGraphRouter, Router, RouterMetrics, RoutingContext,
+    Timer,
 };
-use terraphim_types::capability::{
-    Capability, CostLevel, Latency, Provider, ProviderType,
-};
+use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, RoleName, Thesaurus};
 
 #[tokio::main]
@@ -26,30 +24,36 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut router = Router::new();
 
     // Register providers
-    router.add_provider(Provider::new(
-        "gpt-4",
-        "GPT-4",
-        ProviderType::Llm {
-            model_id: "gpt-4".to_string(),
-            api_endpoint: "https://api.openai.com".to_string(),
-        },
-        vec![Capability::DeepThinking, Capability::CodeGeneration],
-    ).with_cost(CostLevel::Expensive));
+    router.add_provider(
+        Provider::new(
+            "gpt-4",
+            "GPT-4",
+            ProviderType::Llm {
+                model_id: "gpt-4".to_string(),
+                api_endpoint: "https://api.openai.com".to_string(),
+            },
+            vec![Capability::DeepThinking, Capability::CodeGeneration],
+        )
+        .with_cost(CostLevel::Expensive),
+    );
 
-    router.add_provider(Provider::new(
-        "@codex",
-        "Codex Agent",
-        ProviderType::Agent {
-            agent_id: "@codex".to_string(),
-            cli_command: "opencode".to_string(),
-            working_dir: PathBuf::from("/workspace"),
-        },
-        vec![Capability::CodeGeneration],
-    ).with_cost(CostLevel::Cheap));
+    router.add_provider(
+        Provider::new(
+            "@codex",
+            "Codex Agent",
+            ProviderType::Agent {
+                agent_id: "@codex".to_string(),
+                cli_command: "opencode".to_string(),
+                working_dir: PathBuf::from("/workspace"),
+            },
+            vec![Capability::CodeGeneration],
+        )
+        .with_cost(CostLevel::Cheap),
+    );
 
     // Example 1: Fallback routing
     println!("=== Example 1: Fallback Routing ===");
-    let fallback_router = FallbackRouter::new(router.clone())
+    let fallback_router = FallbackRouter::new(router)
         .with_strategy(FallbackStrategy::NextBestProvider)
         .with_max_fallbacks(3);
 
@@ -73,9 +77,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     match result {
         Ok(decision) => {
             println!("  ✓ Successfully routed to: {}", decision.provider.id);
-            metrics.record_routing_request(&decision.provider,
-                timer.elapsed_ms()
-            );
+            metrics.record_routing_request(&decision.provider, timer.elapsed_ms());
         }
         Err(e) => {
             println!("  ✗ Routing failed: {}", e);
@@ -85,37 +87,52 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Example 2: Knowledge graph term expansion
     println!("\n=== Example 2: Knowledge Graph Integration ===");
-    let mut kg_router = KnowledgeGraphRouter::new()
-        .with_default_role(RoleName::new("engineer"));
+    let mut kg_router = KnowledgeGraphRouter::new().with_default_role(RoleName::new("engineer"));
 
     // Create a thesaurus with synonyms
     let mut thesaurus = Thesaurus::new("programming".to_string());
-    let mut term = NormalizedTerm::new(
-        1,
-        NormalizedTermValue::from("rust"),
-    );
-    term.synonyms.push(NormalizedTermValue::from("rustlang"));
-    term.synonyms.push(NormalizedTermValue::from("rust-lang"));
-    thesaurus.insert(
-        NormalizedTermValue::from("rust"),
-        term,
-    );
+    let term = NormalizedTerm::new(1, NormalizedTermValue::from("rust"));
+    thesaurus.insert(NormalizedTermValue::from("rust"), term);
 
     kg_router.add_thesaurus(RoleName::new("engineer"), thesaurus);
 
     let terms = vec![NormalizedTermValue::from("rust")];
-    let expanded = kg_router.expand_terms(
-        &terms,
-        Some(&RoleName::new("engineer")),
-    );
+    let expanded = kg_router.expand_terms(&terms, Some(&RoleName::new("engineer")));
 
     println!("  Original terms: {:?}", terms);
     println!("  Expanded terms: {:?}", expanded);
 
     // Example 3: LLM fallback when agent fails
     println!("\n=== Example 3: LLM Fallback Strategy ===");
-    let llm_fallback_router = FallbackRouter::new(router.clone())
-        .with_strategy(FallbackStrategy::LlmFallback);
+    // Create a fresh router for this example
+    let mut router2 = Router::new();
+    router2.add_provider(
+        Provider::new(
+            "gpt-4",
+            "GPT-4",
+            ProviderType::Llm {
+                model_id: "gpt-4".to_string(),
+                api_endpoint: "https://api.openai.com".to_string(),
+            },
+            vec![Capability::DeepThinking, Capability::CodeGeneration],
+        )
+        .with_cost(CostLevel::Expensive),
+    );
+    router2.add_provider(
+        Provider::new(
+            "@codex",
+            "Codex Agent",
+            ProviderType::Agent {
+                agent_id: "@codex".to_string(),
+                cli_command: "opencode".to_string(),
+                working_dir: PathBuf::from("/workspace"),
+            },
+            vec![Capability::CodeGeneration],
+        )
+        .with_cost(CostLevel::Cheap),
+    );
+    let llm_fallback_router =
+        FallbackRouter::new(router2).with_strategy(FallbackStrategy::LlmFallback);
 
     let result = llm_fallback_router
         .route_with_fallback(
