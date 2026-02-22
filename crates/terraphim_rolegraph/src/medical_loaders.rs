@@ -298,18 +298,46 @@ const SNOMED_IS_A_TYPE_ID: u64 = 116680003;
 /// SNOMED CT description type ID for Fully Specified Name.
 const SNOMED_FSN_TYPE_ID: u64 = 900000000000003001;
 
+/// Map a SNOMED CT semantic tag (from FSN parentheses) to a [`MedicalNodeType`].
+///
+/// SNOMED FSN terms end with a semantic tag in parentheses, e.g.
+/// "Appendectomy (procedure)" or "Acetaminophen (substance)".
+/// This function maps those tags to the closest `MedicalNodeType` variant.
+fn snomed_tag_to_node_type(tag: &str) -> MedicalNodeType {
+    match tag.to_lowercase().as_str() {
+        "disorder" | "disease" | "finding" | "clinical finding" => MedicalNodeType::Disease,
+        "procedure" | "regime/therapy" => MedicalNodeType::Procedure,
+        "substance" | "product" | "medicinal product" | "clinical drug" => MedicalNodeType::Drug,
+        "body structure" | "cell structure" | "morphologic abnormality" => MedicalNodeType::Anatomy,
+        "organism" => MedicalNodeType::Organism,
+        "observable entity" | "qualifier value" | "attribute" => MedicalNodeType::Concept,
+        "situation" | "event" | "environment" | "geographic location" | "social context" => {
+            MedicalNodeType::Concept
+        }
+        "physical object" | "specimen" | "record artifact" => MedicalNodeType::Concept,
+        "physical force" | "occupation" | "person" | "ethnic group" | "religion/philosophy" => {
+            MedicalNodeType::Concept
+        }
+        "linkage concept" | "namespace concept" | "metadata" | "foundation metadata concept" => {
+            MedicalNodeType::Concept
+        }
+        _ => MedicalNodeType::Concept,
+    }
+}
+
 /// Load SNOMED RF2 data into a MedicalRoleGraph.
 ///
-/// Loads concepts as Disease-typed nodes, IS-A relationships as edges,
-/// and builds the IS-A hierarchy for ancestor/descendant queries.
+/// Loads concepts as typed nodes (using FSN semantic tags to determine
+/// the [`MedicalNodeType`]), IS-A relationships as edges, and builds
+/// the IS-A hierarchy for ancestor/descendant queries.
 ///
 /// The loader processes three RF2 files (all optional):
 /// 1. **Concept file**: Identifies active concepts and their IDs
-/// 2. **Description file**: Maps concept IDs to human-readable terms
+/// 2. **Description file**: Maps concept IDs to human-readable terms and semantic tags
 /// 3. **Relationship file**: Loads IS-A hierarchy edges
 ///
 /// Active concepts without a description file get a placeholder term
-/// of the form "SNOMED <concept_id>".
+/// of the form "SNOMED <concept_id>" and default to `MedicalNodeType::Concept`.
 pub fn load_snomed_rf2(
     graph: &mut MedicalRoleGraph,
     config: &SnomedConfig,
@@ -324,27 +352,32 @@ pub fn load_snomed_rf2(
         AHashMap::new()
     };
 
-    // Step 2: Load descriptions (concept_id -> preferred term)
-    let descriptions: AHashMap<u64, String> = if let Some(ref path) = config.description_path {
-        load_descriptions(path)?
-    } else {
-        AHashMap::new()
-    };
+    // Step 2: Load descriptions (concept_id -> (preferred term, semantic tag))
+    let descriptions: AHashMap<u64, (String, Option<String>)> =
+        if let Some(ref path) = config.description_path {
+            load_descriptions(path)?
+        } else {
+            AHashMap::new()
+        };
 
     // Step 3: Add nodes for all active concepts
     for (&concept_id, &active) in &active_concepts {
         if !active {
             continue;
         }
-        let term = descriptions
+        let (term, semantic_tag) = descriptions
             .get(&concept_id)
             .cloned()
-            .unwrap_or_else(|| format!("SNOMED {}", concept_id));
-        graph.add_medical_node(concept_id, term, MedicalNodeType::Disease, Some(concept_id));
+            .unwrap_or_else(|| (format!("SNOMED {}", concept_id), None));
+        let node_type = semantic_tag
+            .as_deref()
+            .map(snomed_tag_to_node_type)
+            .unwrap_or(MedicalNodeType::Concept);
+        graph.add_medical_node(concept_id, term, node_type, Some(concept_id));
         stats.node_count += 1;
         *stats
             .node_type_counts
-            .entry("disease".to_string())
+            .entry(format!("{:?}", node_type).to_lowercase())
             .or_insert(0) += 1;
     }
 
@@ -418,10 +451,13 @@ fn parse_concept_line(line: &str) -> Option<(u64, bool)> {
 /// RF2 format: id\teffectiveTime\tactive\tmoduleId\tconceptId\tlanguageCode\ttypeId\tterm\tcaseSignificanceId
 ///
 /// Prefers FSN (type_id = 900000000000003001), falls back to any active description.
-fn load_descriptions<P: AsRef<Path>>(path: P) -> anyhow::Result<AHashMap<u64, String>> {
+/// Returns `(clean_term, Option<semantic_tag>)` for each concept.
+fn load_descriptions<P: AsRef<Path>>(
+    path: P,
+) -> anyhow::Result<AHashMap<u64, (String, Option<String>)>> {
     let file = std::fs::File::open(path)?;
     let reader = BufReader::with_capacity(1024 * 1024, file);
-    let mut descriptions: AHashMap<u64, String> = AHashMap::new();
+    let mut descriptions: AHashMap<u64, (String, Option<String>)> = AHashMap::new();
     // Track whether we have an FSN for each concept (prefer FSN over synonym)
     let mut has_fsn: AHashMap<u64, bool> = AHashMap::new();
     let mut line_num: usize = 0;
@@ -446,15 +482,19 @@ fn load_descriptions<P: AsRef<Path>>(path: P) -> anyhow::Result<AHashMap<u64, St
 
             // Insert if we have no term yet, or if this is an FSN and we only had a synonym
             if !descriptions.contains_key(&concept_id) || (is_fsn && !already_has_fsn) {
-                // Strip semantic tag from FSN: "Term (semantic tag)" -> "Term"
-                let clean_term = if is_fsn {
-                    term.rfind(" (")
-                        .map(|pos| term[..pos].to_string())
-                        .unwrap_or(term)
+                // Extract semantic tag and clean term from FSN:
+                // "Term (semantic tag)" -> ("Term", Some("semantic tag"))
+                let (clean_term, semantic_tag) = if is_fsn {
+                    if let Some(pos) = term.rfind(" (") {
+                        let tag = term[pos + 2..term.len() - 1].to_string();
+                        (term[..pos].to_string(), Some(tag))
+                    } else {
+                        (term, None)
+                    }
                 } else {
-                    term
+                    (term, None)
                 };
-                descriptions.insert(concept_id, clean_term);
+                descriptions.insert(concept_id, (clean_term, semantic_tag));
                 if is_fsn {
                     has_fsn.insert(concept_id, true);
                 }
@@ -516,12 +556,13 @@ fn load_isa_relationships<P: AsRef<Path>>(
                     && active_concepts.get(&dest_id).copied().unwrap_or(false));
 
             if both_known {
-                // Ensure both nodes exist in the graph
+                // Ensure both nodes exist in the graph (use Concept for
+                // placeholder nodes since we do not know their semantic type)
                 if graph.get_node_type(source_id).is_none() {
                     graph.add_medical_node(
                         source_id,
                         format!("SNOMED {}", source_id),
-                        MedicalNodeType::Disease,
+                        MedicalNodeType::Concept,
                         Some(source_id),
                     );
                 }
@@ -529,7 +570,7 @@ fn load_isa_relationships<P: AsRef<Path>>(
                     graph.add_medical_node(
                         dest_id,
                         format!("SNOMED {}", dest_id),
-                        MedicalNodeType::Disease,
+                        MedicalNodeType::Concept,
                         Some(dest_id),
                     );
                 }
@@ -831,32 +872,137 @@ mod tests {
     }
 
     #[test]
+    fn test_snomed_tag_to_node_type_disorders() {
+        assert_eq!(
+            snomed_tag_to_node_type("disorder"),
+            MedicalNodeType::Disease
+        );
+        assert_eq!(snomed_tag_to_node_type("disease"), MedicalNodeType::Disease);
+        assert_eq!(snomed_tag_to_node_type("finding"), MedicalNodeType::Disease);
+        assert_eq!(
+            snomed_tag_to_node_type("clinical finding"),
+            MedicalNodeType::Disease
+        );
+        // Case insensitive
+        assert_eq!(
+            snomed_tag_to_node_type("Disorder"),
+            MedicalNodeType::Disease
+        );
+        assert_eq!(snomed_tag_to_node_type("FINDING"), MedicalNodeType::Disease);
+    }
+
+    #[test]
+    fn test_snomed_tag_to_node_type_procedures() {
+        assert_eq!(
+            snomed_tag_to_node_type("procedure"),
+            MedicalNodeType::Procedure
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("regime/therapy"),
+            MedicalNodeType::Procedure
+        );
+    }
+
+    #[test]
+    fn test_snomed_tag_to_node_type_drugs() {
+        assert_eq!(snomed_tag_to_node_type("substance"), MedicalNodeType::Drug);
+        assert_eq!(snomed_tag_to_node_type("product"), MedicalNodeType::Drug);
+        assert_eq!(
+            snomed_tag_to_node_type("medicinal product"),
+            MedicalNodeType::Drug
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("clinical drug"),
+            MedicalNodeType::Drug
+        );
+    }
+
+    #[test]
+    fn test_snomed_tag_to_node_type_anatomy() {
+        assert_eq!(
+            snomed_tag_to_node_type("body structure"),
+            MedicalNodeType::Anatomy
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("cell structure"),
+            MedicalNodeType::Anatomy
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("morphologic abnormality"),
+            MedicalNodeType::Anatomy
+        );
+    }
+
+    #[test]
+    fn test_snomed_tag_to_node_type_organism() {
+        assert_eq!(
+            snomed_tag_to_node_type("organism"),
+            MedicalNodeType::Organism
+        );
+    }
+
+    #[test]
+    fn test_snomed_tag_to_node_type_concept_fallbacks() {
+        assert_eq!(
+            snomed_tag_to_node_type("observable entity"),
+            MedicalNodeType::Concept
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("qualifier value"),
+            MedicalNodeType::Concept
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("situation"),
+            MedicalNodeType::Concept
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("physical object"),
+            MedicalNodeType::Concept
+        );
+        assert_eq!(
+            snomed_tag_to_node_type("linkage concept"),
+            MedicalNodeType::Concept
+        );
+        // Unknown tags fall back to Concept
+        assert_eq!(
+            snomed_tag_to_node_type("totally unknown"),
+            MedicalNodeType::Concept
+        );
+    }
+
+    #[test]
     fn test_load_snomed_rf2_with_temp_files() {
-        // Create temporary RF2 files
+        // Create temporary RF2 files with diverse semantic tags
         let temp_dir = tempfile::tempdir().expect("Failed to create temp dir");
 
-        // Concept file
+        // Concept file: 5 active concepts, 1 inactive
         let concept_path = temp_dir.path().join("sct2_Concept.txt");
         std::fs::write(
             &concept_path,
             "id\teffectiveTime\tactive\tmoduleId\tdefinitionStatusId\n\
              100001\t20240101\t1\t900000000000207008\t900000000000073002\n\
              100002\t20240101\t1\t900000000000207008\t900000000000073002\n\
-             100003\t20240101\t0\t900000000000207008\t900000000000073002\n",
+             100003\t20240101\t0\t900000000000207008\t900000000000073002\n\
+             100004\t20240101\t1\t900000000000207008\t900000000000073002\n\
+             100005\t20240101\t1\t900000000000207008\t900000000000073002\n\
+             100006\t20240101\t1\t900000000000207008\t900000000000073002\n",
         )
         .expect("Failed to write concept file");
 
-        // Description file
+        // Description file with diverse semantic tags in FSN entries
         let description_path = temp_dir.path().join("sct2_Description.txt");
         std::fs::write(
             &description_path,
             "id\teffectiveTime\tactive\tmoduleId\tconceptId\tlanguageCode\ttypeId\tterm\tcaseSignificanceId\n\
-             1\t20240101\t1\t900000000000207008\t100001\ten\t900000000000003001\tDisease (disorder)\t900000000000020002\n\
-             2\t20240101\t1\t900000000000207008\t100002\ten\t900000000000003001\tInfection (disorder)\t900000000000020002\n",
+             1\t20240101\t1\t900000000000207008\t100001\ten\t900000000000003001\tDiabetes mellitus (disorder)\t900000000000020002\n\
+             2\t20240101\t1\t900000000000207008\t100002\ten\t900000000000003001\tAppendectomy (procedure)\t900000000000020002\n\
+             3\t20240101\t1\t900000000000207008\t100004\ten\t900000000000003001\tAcetaminophen (substance)\t900000000000020002\n\
+             4\t20240101\t1\t900000000000207008\t100005\ten\t900000000000003001\tHeart structure (body structure)\t900000000000020002\n\
+             5\t20240101\t1\t900000000000207008\t100006\ten\t900000000000003001\tBlood pressure (observable entity)\t900000000000020002\n",
         )
         .expect("Failed to write description file");
 
-        // Relationship file
+        // Relationship file: Appendectomy IS-A procedure concept (100002 IS-A 100001)
         let relationship_path = temp_dir.path().join("sct2_Relationship.txt");
         std::fs::write(
             &relationship_path,
@@ -874,21 +1020,73 @@ mod tests {
         let mut graph = MedicalRoleGraph::new_empty().expect("Failed to create empty graph");
         let stats = load_snomed_rf2(&mut graph, &config).expect("Failed to load SNOMED RF2");
 
-        // Should have 2 active concepts (100003 is inactive)
-        assert_eq!(stats.node_count, 2, "Expected 2 active concept nodes");
+        // Should have 5 active concepts (100003 is inactive)
+        assert_eq!(stats.node_count, 5, "Expected 5 active concept nodes");
 
         // Should have 1 IS-A edge (100002 IS-A 100001)
         assert_eq!(stats.edge_count, 1, "Expected 1 IS-A edge");
 
         // Verify node terms (FSN with semantic tag stripped)
-        assert_eq!(graph.get_node_term(100001), Some("Disease"));
-        assert_eq!(graph.get_node_term(100002), Some("Infection"));
+        assert_eq!(graph.get_node_term(100001), Some("Diabetes mellitus"));
+        assert_eq!(graph.get_node_term(100002), Some("Appendectomy"));
+        assert_eq!(graph.get_node_term(100004), Some("Acetaminophen"));
+        assert_eq!(graph.get_node_term(100005), Some("Heart structure"));
+        assert_eq!(graph.get_node_term(100006), Some("Blood pressure"));
+
+        // Verify node types derived from semantic tags
+        assert_eq!(
+            graph.get_node_type(100001),
+            Some(MedicalNodeType::Disease),
+            "disorder tag should map to Disease"
+        );
+        assert_eq!(
+            graph.get_node_type(100002),
+            Some(MedicalNodeType::Procedure),
+            "procedure tag should map to Procedure"
+        );
+        assert_eq!(
+            graph.get_node_type(100004),
+            Some(MedicalNodeType::Drug),
+            "substance tag should map to Drug"
+        );
+        assert_eq!(
+            graph.get_node_type(100005),
+            Some(MedicalNodeType::Anatomy),
+            "body structure tag should map to Anatomy"
+        );
+        assert_eq!(
+            graph.get_node_type(100006),
+            Some(MedicalNodeType::Concept),
+            "observable entity tag should map to Concept"
+        );
+
+        // Verify node_type_counts reflect actual types
+        assert!(
+            stats.node_type_counts.contains_key("disease"),
+            "Should have disease count"
+        );
+        assert!(
+            stats.node_type_counts.contains_key("procedure"),
+            "Should have procedure count"
+        );
+        assert!(
+            stats.node_type_counts.contains_key("drug"),
+            "Should have drug count"
+        );
+        assert!(
+            stats.node_type_counts.contains_key("anatomy"),
+            "Should have anatomy count"
+        );
+        assert!(
+            stats.node_type_counts.contains_key("concept"),
+            "Should have concept count"
+        );
 
         // Verify IS-A hierarchy
         let ancestors = graph.get_ancestors(100002);
         assert!(
             ancestors.contains(&100001),
-            "Infection should have Disease as ancestor"
+            "Appendectomy should have Diabetes mellitus as ancestor via IS-A"
         );
 
         // Verify SNOMED ID mapping
