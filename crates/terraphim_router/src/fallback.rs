@@ -8,9 +8,10 @@ use terraphim_types::capability::{Provider, ProviderType};
 use tracing::{info, info_span, warn, Instrument};
 
 /// Fallback strategy when primary provider fails
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FallbackStrategy {
     /// Try next best provider from routing
+    #[default]
     NextBestProvider,
     /// Fall back to LLM if agent fails
     LlmFallback,
@@ -18,12 +19,6 @@ pub enum FallbackStrategy {
     Retry { max_attempts: u32 },
     /// Fail immediately
     FailFast,
-}
-
-impl Default for FallbackStrategy {
-    fn default() -> Self {
-        FallbackStrategy::NextBestProvider
-    }
 }
 
 /// Router with fallback capabilities
@@ -189,7 +184,7 @@ impl FallbackRouter {
 mod tests {
     use super::*;
     use std::path::PathBuf;
-    use terraphim_types::capability::{Capability, CostLevel, Latency};
+    use terraphim_types::capability::Capability;
 
     fn create_test_router() -> Router {
         let mut router = Router::new();

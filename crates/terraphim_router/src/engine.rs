@@ -53,7 +53,7 @@ impl RoutingEngine {
         Self {
             keyword_router: KeywordRouter::new(),
             registry: ProviderRegistry::new(),
-            strategy: Box::new(CostOptimized::default()),
+            strategy: Box::new(CostOptimized),
             strategy_registry: StrategyRegistry::new(),
         }
     }
@@ -182,7 +182,7 @@ impl RoutingEngine {
             )
             .entered();
             let sel = active_strategy.select_provider(candidates);
-            if let Some(ref p) = sel {
+            if let Some(p) = &sel {
                 tracing::Span::current().record("selected_provider", p.id.as_str());
             }
             sel

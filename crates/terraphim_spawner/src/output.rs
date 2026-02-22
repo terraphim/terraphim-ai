@@ -1,7 +1,6 @@
 //! Output capture with @mention detection
 
 use regex::Regex;
-use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{ChildStderr, ChildStdout};
 use tokio::sync::mpsc;
