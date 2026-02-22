@@ -100,6 +100,7 @@ impl ProviderRegistry {
     /// Load providers from a directory of markdown files
     pub async fn load_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<usize, RoutingError> {
         let dir = dir.as_ref();
+        let _span = tracing::info_span!("router.registry.load", directory = ?dir).entered();
         let mut count = 0;
 
         // Read directory entries
@@ -123,11 +124,19 @@ impl ProviderRegistry {
                             count += 1;
                         }
                         Err(e) => {
-                            log::warn!("Failed to parse provider from {:?}: {}", path, e);
+                            tracing::warn!(
+                                file_path = ?path,
+                                error = %e,
+                                "Failed to parse provider from markdown file"
+                            );
                         }
                     },
                     Err(e) => {
-                        log::warn!("Failed to load markdown from {:?}: {}", path, e);
+                        tracing::warn!(
+                            file_path = ?path,
+                            error = %e,
+                            "Failed to load markdown file"
+                        );
                     }
                 }
             }
@@ -266,7 +275,7 @@ impl ProviderRegistry {
             "security_audit" | "securityaudit" => Some(Capability::SecurityAudit),
             "performance" => Some(Capability::Performance),
             _ => {
-                log::warn!("Unknown capability: {}", s);
+                tracing::warn!(capability_string = s, "Unknown capability string, skipping");
                 None
             }
         }

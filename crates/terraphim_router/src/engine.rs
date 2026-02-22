@@ -7,6 +7,26 @@ use crate::{
     types::{RoutingContext, RoutingDecision, RoutingError, RoutingReason},
 };
 use terraphim_types::capability::{Capability, Provider};
+use tracing::{debug, info, info_span, warn};
+
+/// Truncate prompt to first 50 chars for safe logging (privacy).
+fn prompt_preview(prompt: &str) -> String {
+    let truncated: String = prompt.chars().take(50).collect();
+    if prompt.chars().count() > 50 {
+        format!("{}...", truncated)
+    } else {
+        truncated
+    }
+}
+
+/// Hash a prompt for correlation without exposing content.
+fn prompt_hash(prompt: &str) -> u64 {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let mut hasher = DefaultHasher::new();
+    prompt.hash(&mut hasher);
+    hasher.finish()
+}
 
 /// Main routing engine
 pub struct RoutingEngine {
@@ -65,28 +85,86 @@ impl RoutingEngine {
         prompt: &str,
         _context: &RoutingContext,
     ) -> Result<RoutingDecision, RoutingError> {
+        let span = info_span!(
+            "router.route",
+            prompt_len = prompt.len(),
+            prompt_hash = prompt_hash(prompt),
+            prompt_preview = %prompt_preview(prompt),
+            strategy = self.strategy.name(),
+            selected_provider = tracing::field::Empty,
+            confidence = tracing::field::Empty,
+            reason = tracing::field::Empty,
+        );
+        let _guard = span.enter();
+
         // 1. Extract capabilities from prompt
-        let capabilities = self.keyword_router.extract_capabilities(prompt);
+        let capabilities = {
+            let _cap_span = info_span!(
+                "router.extract_capabilities",
+                prompt_len = prompt.len(),
+                capabilities_found = tracing::field::Empty,
+            )
+            .entered();
+            let caps = self.keyword_router.extract_capabilities(prompt);
+            tracing::Span::current().record("capabilities_found", caps.len());
+            debug!(capabilities = ?caps, "Extracted capabilities from prompt");
+            caps
+        };
 
         if capabilities.is_empty() {
-            // No capabilities found - use fallback
+            info!("No capabilities extracted, using fallback");
+            span.record("reason", "fallback_no_capabilities");
             return self.fallback_decision();
         }
 
         // 2. Find providers that can fulfill these capabilities
-        let candidates = self.registry.find_by_capabilities(&capabilities);
+        let candidates = {
+            let _find_span = info_span!(
+                "router.find_providers",
+                capabilities_count = capabilities.len(),
+                candidates_found = tracing::field::Empty,
+            )
+            .entered();
+            let cands = self.registry.find_by_capabilities(&capabilities);
+            tracing::Span::current().record("candidates_found", cands.len());
+            debug!(candidates_count = cands.len(), "Found matching providers");
+            cands
+        };
 
         if candidates.is_empty() {
+            warn!(capabilities = ?capabilities, "No provider found for capabilities");
             return Err(RoutingError::NoProviderFound(capabilities));
         }
 
         // 3. Apply routing strategy to select best provider
-        let selected = self.strategy.select_provider(candidates);
+        let selected = {
+            let _sel_span = info_span!(
+                "router.select_provider",
+                strategy = self.strategy.name(),
+                candidates_count = candidates.len(),
+                selected_provider = tracing::field::Empty,
+            )
+            .entered();
+            let sel = self.strategy.select_provider(candidates);
+            if let Some(ref p) = sel {
+                tracing::Span::current().record("selected_provider", p.id.as_str());
+            }
+            sel
+        };
 
         match selected {
             Some(provider) => {
-                // Calculate confidence based on match quality
                 let confidence = self.calculate_confidence(prompt, provider, &capabilities);
+                span.record("selected_provider", provider.id.as_str());
+                span.record("confidence", confidence as f64);
+                span.record("reason", "capability_match");
+
+                info!(
+                    provider_id = provider.id.as_str(),
+                    provider_name = provider.name.as_str(),
+                    confidence = confidence,
+                    "Routing decision made"
+                );
 
                 Ok(RoutingDecision {
                     provider: provider.clone(),
@@ -95,7 +173,10 @@ impl RoutingEngine {
                     reason: RoutingReason::CapabilityMatch { capabilities },
                 })
             }
-            None => self.fallback_decision(),
+            None => {
+                span.record("reason", "fallback_no_selection");
+                self.fallback_decision()
+            }
         }
     }
 

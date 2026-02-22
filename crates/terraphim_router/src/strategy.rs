@@ -17,7 +17,13 @@ pub struct CostOptimized;
 
 impl RoutingStrategy for CostOptimized {
     fn select_provider<'a>(&self, candidates: Vec<&'a Provider>) -> Option<&'a Provider> {
-        candidates.into_iter().min_by_key(|p| p.cost_level)
+        let result = candidates.into_iter().min_by_key(|p| p.cost_level);
+        tracing::debug!(
+            strategy = "cost_optimized",
+            selected_provider = result.map(|p| p.id.as_str()),
+            "Strategy selection complete"
+        );
+        result
     }
 
     fn name(&self) -> &'static str {
@@ -31,7 +37,13 @@ pub struct LatencyOptimized;
 
 impl RoutingStrategy for LatencyOptimized {
     fn select_provider<'a>(&self, candidates: Vec<&'a Provider>) -> Option<&'a Provider> {
-        candidates.into_iter().min_by_key(|p| p.latency)
+        let result = candidates.into_iter().min_by_key(|p| p.latency);
+        tracing::debug!(
+            strategy = "latency_optimized",
+            selected_provider = result.map(|p| p.id.as_str()),
+            "Strategy selection complete"
+        );
+        result
     }
 
     fn name(&self) -> &'static str {
@@ -45,9 +57,13 @@ pub struct CapabilityFirst;
 
 impl RoutingStrategy for CapabilityFirst {
     fn select_provider<'a>(&self, candidates: Vec<&'a Provider>) -> Option<&'a Provider> {
-        // For now, just pick the first one with the most capabilities
-        // In a real implementation, this would score by relevance
-        candidates.into_iter().max_by_key(|p| p.capabilities.len())
+        let result = candidates.into_iter().max_by_key(|p| p.capabilities.len());
+        tracing::debug!(
+            strategy = "capability_first",
+            selected_provider = result.map(|p| p.id.as_str()),
+            "Strategy selection complete"
+        );
+        result
     }
 
     fn name(&self) -> &'static str {
@@ -86,7 +102,14 @@ impl RoutingStrategy for RoundRobin {
             .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         let selected = index % candidates.len();
 
-        candidates.into_iter().nth(selected)
+        let result = candidates.into_iter().nth(selected);
+        tracing::debug!(
+            strategy = "round_robin",
+            selected_provider = result.map(|p| p.id.as_str()),
+            index = index,
+            "Strategy selection complete"
+        );
+        result
     }
 
     fn name(&self) -> &'static str {

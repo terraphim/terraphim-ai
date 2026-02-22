@@ -5,6 +5,7 @@
 
 use crate::{Router, RoutingContext, RoutingDecision, RoutingError};
 use terraphim_types::capability::{Provider, ProviderType};
+use tracing::{info, info_span, warn, Instrument};
 
 /// Fallback strategy when primary provider fails
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -72,58 +73,105 @@ impl FallbackRouter {
         let mut attempts = 0;
         let mut current_prompt = prompt.to_string();
 
-        loop {
-            // Get routing decision
-            let decision = self.router.route(&current_prompt, context)?;
-            let provider = decision.provider.clone();
+        let fallback_span = info_span!(
+            "router.route_with_fallback",
+            prompt_len = prompt.len(),
+            fallback_strategy = ?self.fallback_strategy,
+            max_fallbacks = self.max_fallbacks,
+            total_attempts = tracing::field::Empty,
+            final_provider = tracing::field::Empty,
+            outcome = tracing::field::Empty,
+        );
 
-            log::info!(
-                "Attempt {}: Routing to {} ({})",
-                attempts + 1,
-                provider.name,
-                provider.id
-            );
+        async {
+            loop {
+                let decision = self.router.route(&current_prompt, context)?;
+                let provider = decision.provider.clone();
 
-            // Try to execute with the provider
-            match execute(provider.clone()).await {
-                Ok(()) => {
-                    log::info!("Successfully executed with {}", provider.id);
-                    return Ok(decision);
-                }
-                Err(error) => {
-                    log::warn!("Provider {} failed: {}", provider.id, error);
+                let attempt_span = info_span!(
+                    "router.fallback_attempt",
+                    attempt_number = attempts + 1,
+                    provider_id = provider.id.as_str(),
+                    provider_type = ?provider.provider_type,
+                    outcome = tracing::field::Empty,
+                );
 
-                    attempts += 1;
-                    if attempts >= self.max_fallbacks {
-                        return Err(RoutingError::NoProviderFound(vec![]));
+                let execute_result = async {
+                    info!(
+                        attempt = attempts + 1,
+                        provider_id = provider.id.as_str(),
+                        provider_name = provider.name.as_str(),
+                        "Attempting provider execution"
+                    );
+
+                    match execute(provider.clone()).await {
+                        Ok(()) => {
+                            info!(
+                                provider_id = provider.id.as_str(),
+                                "Provider execution succeeded"
+                            );
+                            tracing::Span::current().record("outcome", "success");
+                            Ok(decision.clone())
+                        }
+                        Err(error) => {
+                            warn!(
+                                provider_id = provider.id.as_str(),
+                                error = error.as_str(),
+                                "Provider execution failed"
+                            );
+                            tracing::Span::current().record("outcome", "failed");
+                            Err(error)
+                        }
                     }
+                }
+                .instrument(attempt_span)
+                .await;
 
-                    // Apply fallback strategy
-                    match self.fallback_strategy {
-                        FallbackStrategy::FailFast => {
+                match execute_result {
+                    Ok(decision) => {
+                        tracing::Span::current().record("total_attempts", attempts + 1);
+                        tracing::Span::current()
+                            .record("final_provider", decision.provider.id.as_str());
+                        tracing::Span::current().record("outcome", "success");
+                        return Ok(decision);
+                    }
+                    Err(_error) => {
+                        attempts += 1;
+                        if attempts >= self.max_fallbacks {
+                            tracing::Span::current().record("total_attempts", attempts);
+                            tracing::Span::current().record("outcome", "exhausted");
                             return Err(RoutingError::NoProviderFound(vec![]));
                         }
-                        FallbackStrategy::Retry { max_attempts } => {
-                            if attempts >= max_attempts {
-                                continue; // Will fail on next loop check
+
+                        match self.fallback_strategy {
+                            FallbackStrategy::FailFast => {
+                                tracing::Span::current().record("outcome", "fail_fast");
+                                return Err(RoutingError::NoProviderFound(vec![]));
                             }
-                            // Retry same provider
-                            tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
-                        }
-                        FallbackStrategy::NextBestProvider => {
-                            // Exclude failed provider and retry
-                            current_prompt = format!("{} [exclude:{}]", prompt, provider.id);
-                        }
-                        FallbackStrategy::LlmFallback => {
-                            // If agent failed, try to find LLM
-                            if matches!(provider.provider_type, ProviderType::Agent { .. }) {
-                                current_prompt = format!("{} [prefer:llm]", prompt);
+                            FallbackStrategy::Retry { max_attempts } => {
+                                if attempts >= max_attempts {
+                                    continue;
+                                }
+                                info!(delay_ms = 1000, "Retrying same provider after delay");
+                                tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
+                            }
+                            FallbackStrategy::NextBestProvider => {
+                                info!("Excluding failed provider, trying next best");
+                                current_prompt = format!("{} [exclude:{}]", prompt, provider.id);
+                            }
+                            FallbackStrategy::LlmFallback => {
+                                if matches!(provider.provider_type, ProviderType::Agent { .. }) {
+                                    info!("Agent failed, falling back to LLM preference");
+                                    current_prompt = format!("{} [prefer:llm]", prompt);
+                                }
                             }
                         }
                     }
                 }
             }
         }
+        .instrument(fallback_span)
+        .await
     }
 
     /// Get inner router
