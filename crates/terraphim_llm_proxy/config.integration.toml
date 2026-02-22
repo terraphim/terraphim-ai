@@ -1,0 +1,66 @@
+# Terraphim LLM Proxy - Integration Test Configuration
+# Uses real API keys from 1Password
+# Load with: op inject -i .env.integration.op.template | source && cargo run -- --config config.integration.toml
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "terraphim-test-key-2026"
+timeout_ms = 60000
+
+[router]
+# Default routing - uses OpenRouter for diverse model support
+default = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Background routing - uses Groq for fast inference
+background = "groq,llama-3.1-8b-instant"
+
+# Think routing - uses DeepSeek for reasoning
+think = "deepseek,deepseek-reasoner"
+
+# Long context routing - uses Gemini
+long_context = "openrouter,google/gemini-2.0-flash-exp:free"
+long_context_threshold = 60000
+
+# OpenRouter Provider - Primary provider with Anthropic models
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3.5-haiku",
+    "anthropic/claude-sonnet-4.5",
+    "google/gemini-2.0-flash-exp:free"
+]
+transformers = ["openrouter"]
+
+# Groq Provider - Fast inference with Llama models
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = [
+    "llama-3.1-8b-instant",
+    "llama-3.1-70b-versatile"
+]
+transformers = ["openai"]
+
+# DeepSeek Provider - Reasoning models
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com/v1"
+api_key = "$DEEPSEEK_API_KEY"
+models = [
+    "deepseek-chat",
+    "deepseek-reasoner"
+]
+transformers = ["openai"]
+
+[security.rate_limiting]
+enabled = false
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = false
+allow_private_ips = false

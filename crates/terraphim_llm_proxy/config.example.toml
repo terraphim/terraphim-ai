@@ -1,0 +1,185 @@
+# Terraphim LLM Proxy Configuration Example
+# Copy this file to config.toml and customize for your setup
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "$PROXY_API_KEY"  # Set via environment variable
+timeout_ms = 600000  # 10 minutes
+
+[router]
+# Default routing for general requests
+default = "deepseek,deepseek-chat"
+
+# Background task routing (haiku model detection)
+background = "ollama,qwen2.5-coder:latest"
+
+# Thinking/reasoning mode routing
+think = "deepseek,deepseek-reasoner"
+
+# Long context routing (>60K tokens)
+long_context = "openrouter,google/gemini-2.0-flash-exp"
+long_context_threshold = 60000
+
+# Web search routing (when web_search tool detected)
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image routing (when image content detected)
+image = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Routing strategy: FillFirst (default), RoundRobin, LatencyOptimized, CostOptimized
+strategy = "FillFirst"
+
+# Model name mappings - remap client-requested model names
+# Use this to map Claude Code model names to provider-specific formats
+# Supports glob patterns for flexible matching
+
+# Example: Map Claude 3.5 Sonnet (latest) to OpenRouter format
+[[router.model_mappings]]
+from = "claude-3-5-sonnet-20241022"
+to = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Example: Map Claude 3 Opus to OpenRouter format
+[[router.model_mappings]]
+from = "claude-3-opus-20240229"
+to = "openrouter,anthropic/claude-3-opus"
+
+# Example: Use glob pattern to match all Claude 3.5 variants
+# [[router.model_mappings]]
+# from = "claude-3-5-*"
+# to = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Example: Bidirectional mapping (response model name mapped back)
+# [[router.model_mappings]]
+# from = "my-claude"
+# to = "openrouter,anthropic/claude-3.5-sonnet"
+# bidirectional = true
+
+# Model exclusion patterns - filter out unwanted models per provider
+# Use glob patterns to exclude preview, beta, or experimental models
+[[router.model_exclusions]]
+provider = "openrouter"
+patterns = ["*-preview", "*-beta", "*-experimental"]
+
+# Exclude test models from deepseek
+# [[router.model_exclusions]]
+# provider = "deepseek"
+# patterns = ["*-test", "*-dev"]
+
+[security.rate_limiting]
+enabled = true
+requests_per_minute = 60
+concurrent_requests = 10
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = false  # Set to true only for development
+allow_private_ips = false  # Set to true only for internal deployments
+
+# Providers configuration
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com/chat/completions"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek", "tooluse"]
+
+[[providers]]
+name = "ollama"
+api_base_url = "http://localhost:11434/v1/chat/completions"
+api_key = "ollama"
+models = ["qwen2.5-coder:latest"]
+transformers = ["anthropic"]
+
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1/chat/completions"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "google/gemini-2.0-flash-exp",
+    "anthropic/claude-3.5-sonnet",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+# ============================================================
+# OAuth Authentication Settings
+# Enable browser-based login flows for LLM providers
+# ============================================================
+
+[oauth]
+# Token storage backend: "file" (default) or "redis"
+storage_backend = "file"
+# Redis URL for distributed token storage (optional)
+# redis_url = "redis://localhost:6379"
+
+# Claude (Anthropic) OAuth settings
+[oauth.claude]
+enabled = false
+callback_port = 9999
+# client_id = "your-claude-client-id"
+# client_secret = "your-claude-client-secret"
+# auth_mode: "bearer" (use OAuth token directly) or "api_key" (create permanent API key)
+# auth_mode = "bearer"
+# scopes: override default scopes for the OAuth flow
+# scopes = ["user:inference", "user:profile"]
+# anthropic_beta: beta header for Bearer token auth (only for auth_mode = "bearer")
+# anthropic_beta = "oauth-2025-04-20"
+
+# Gemini (Google) OAuth settings
+[oauth.gemini]
+enabled = false
+callback_port = 9998
+# client_id = "your-google-client-id"
+# client_secret = "your-google-client-secret"
+
+# GitHub Copilot OAuth settings (device flow)
+[oauth.copilot]
+enabled = false
+callback_port = 9997
+# client_id = "your-copilot-client-id"
+
+# ============================================================
+# Management API Settings
+# Runtime configuration without restarts
+# ============================================================
+
+[management]
+enabled = false
+# Management API secret key (required if enabled)
+# All management endpoints require X-Management-Key header
+# secret_key = "your-management-secret-key"
+
+# Allow remote access (default: false, localhost only)
+allow_remote = false
+
+# Logging configuration
+[management.logging]
+level = "info"
+max_entries = 1000
+
+# ============================================================
+# Webhook Settings
+# Get notified of important events
+# ============================================================
+
+[webhooks]
+enabled = false
+# Webhook endpoint URL
+# url = "https://your-server.com/hooks/llm-proxy"
+
+# Webhook secret for HMAC-SHA256 signing
+# Verify X-Webhook-Signature header
+# secret = "your-webhook-secret"
+
+# Events to subscribe to:
+# - oauth_refresh: OAuth token refreshed
+# - circuit_breaker: Provider circuit opened/closed
+# - quota_exceeded: Provider quota limit hit
+# - config_updated: Configuration changed
+# - api_key_revoked: API key deleted
+events = ["circuit_breaker", "config_updated"]
+
+# Retry configuration
+retry_count = 3
+timeout_seconds = 5

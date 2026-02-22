@@ -1,0 +1,40 @@
+# Validation Test Configuration for OpenClaw Smart Routing
+# Used to verify all commands in documentation
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "validation-test-key"
+timeout_ms = 60000
+
+[router]
+# Strategic planning - TOP TIER
+default = "openrouter,anthropic/claude-3.5-sonnet"
+think = "openrouter,anthropic/claude-3-opus"
+
+# Plan implementation - SMALLER/CHEAPER
+plan_implementation = "openrouter,anthropic/claude-3.5-haiku"
+
+# Emergency backup
+background = "groq,llama-3.1-8b-instant"
+
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-3-opus",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3.5-haiku"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = ["llama-3.1-8b-instant"]
+transformers = ["openai"]
+
+[security.rate_limiting]
+enabled = false

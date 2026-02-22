@@ -1,0 +1,89 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">OpenClaw and Terraphim LLM Proxy Multi-Model Routing</title>
+  <desc id="desc">Diagram showing OpenClaw sending requests to Terraphim LLM Proxy, then routing to OpenAI Codex, Z.ai GLM-5, and MiniMax M2.5 with intelligent routing and fallback.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1324"/>
+      <stop offset="1" stop-color="#1A2847"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#182746"/>
+      <stop offset="1" stop-color="#22355E"/>
+    </linearGradient>
+    <linearGradient id="proxy" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#173B2E"/>
+      <stop offset="1" stop-color="#1F5A44"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%" color-interpolation-filters="sRGB">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#030712" flood-opacity="0.45"/>
+    </filter>
+    <marker id="arrow" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M0 0L12 6L0 12V0Z" fill="#8FB8FF"/>
+    </marker>
+    <style>
+      .h1 { font: 700 56px "Menlo", "SF Mono", monospace; fill: #F4F7FF; }
+      .h2 { font: 600 26px "Menlo", "SF Mono", monospace; fill: #D9E6FF; }
+      .body { font: 500 22px "Menlo", "SF Mono", monospace; fill: #C8D7F5; }
+      .small { font: 500 18px "Menlo", "SF Mono", monospace; fill: #AFC2E8; }
+      .pill { font: 600 18px "Menlo", "SF Mono", monospace; fill: #EAF2FF; }
+    </style>
+  </defs>
+
+  <rect width="1600" height="900" fill="url(#bg)"/>
+
+  <circle cx="1460" cy="110" r="230" fill="#2D4D8A" opacity="0.14"/>
+  <circle cx="180" cy="780" r="260" fill="#2A7A63" opacity="0.12"/>
+
+  <text x="90" y="120" class="h1">Intelligent Multi-Model Proxy</text>
+  <text x="92" y="165" class="h2">OpenClaw -> Terraphim LLM Proxy -> OpenAI, Z.ai, MiniMax</text>
+
+  <g filter="url(#shadow)">
+    <rect x="120" y="280" width="360" height="260" rx="20" fill="url(#card)"/>
+    <text x="160" y="350" class="h2">OpenClaw</text>
+    <text x="160" y="395" class="body">Single endpoint client</text>
+    <text x="160" y="430" class="small">baseUrl: 127.0.0.1:3456/v1</text>
+    <text x="160" y="465" class="small">api: openai-completions</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="620" y="220" width="430" height="380" rx="20" fill="url(#proxy)"/>
+    <text x="660" y="300" class="h2">Terraphim LLM Proxy</text>
+    <text x="660" y="345" class="body">Route chains</text>
+    <text x="660" y="380" class="small">openai-codex,gpt-5.2|zai,glm-5</text>
+    <text x="660" y="415" class="small">think: ...|minimax,MiniMax-M2.5|...</text>
+
+    <rect x="660" y="455" width="165" height="38" rx="10" fill="#2E6C56"/>
+    <text x="676" y="480" class="pill">Intelligent Routing</text>
+
+    <rect x="840" y="455" width="130" height="38" rx="10" fill="#2D5B94"/>
+    <text x="862" y="480" class="pill">Fallback</text>
+
+    <text x="660" y="545" class="small">keyword: minimax -> MiniMax-M2.5</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1160" y="190" width="320" height="150" rx="18" fill="url(#card)"/>
+    <text x="1190" y="245" class="h2">OpenAI Codex</text>
+    <text x="1190" y="285" class="small">gpt-5.2 / gpt-5.2-codex</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1160" y="380" width="320" height="150" rx="18" fill="url(#card)"/>
+    <text x="1190" y="435" class="h2">Z.ai</text>
+    <text x="1190" y="475" class="small">glm-5 (fallback)</text>
+  </g>
+
+  <g filter="url(#shadow)">
+    <rect x="1160" y="570" width="320" height="150" rx="18" fill="url(#card)"/>
+    <text x="1190" y="625" class="h2">MiniMax</text>
+    <text x="1190" y="665" class="small">MiniMax-M2.5 (keyword route)</text>
+  </g>
+
+  <path d="M490 410H600" stroke="#8FB8FF" stroke-width="6" marker-end="url(#arrow)"/>
+  <path d="M1060 300H1140" stroke="#8FB8FF" stroke-width="6" marker-end="url(#arrow)"/>
+  <path d="M1060 460H1140" stroke="#8FB8FF" stroke-width="6" marker-end="url(#arrow)"/>
+  <path d="M1060 640H1140" stroke="#8FB8FF" stroke-width="6" marker-end="url(#arrow)"/>
+
+  <text x="90" y="840" class="small">Proven live: model routing, intelligent keyword routing, and runtime fallback.</text>
+</svg>

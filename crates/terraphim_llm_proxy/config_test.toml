@@ -1,0 +1,72 @@
+# Terraphim LLM Proxy Configuration - Test Version
+# Complete configuration for Anthropic API compatibility with 4 routing scenarios
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "terraphim-llm-proxy-key-2024"
+timeout_ms = 120000
+
+[router]
+# Fast & Expensive scenario - High throughput, premium models
+default = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Intelligent scenario - Routes based on keywords like "think" or "plan"
+think = "openrouter,deepseek/deepseek-v3.1-terminus"
+
+# Balanced scenario - Cost/performance balance
+background = "openrouter,anthropic/claude-haiku-3.5"
+
+# Slow & Cheap scenario - Background tasks, cost-optimized
+long_context = "openrouter,google/gemini-2.5-flash-preview-09-2025"
+
+long_context_threshold = 60000
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+image = "openrouter,anthropic/claude-sonnet-4.5"
+
+# OpenRouter Provider - Primary provider with access to Claude and other models
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "dummy_key_for_testing"
+models = [
+    # Fast & Expensive - High performance Claude models
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-3.5-sonnet",
+
+    # Intelligent - Advanced reasoning models
+    "deepseek/deepseek-v3.1-terminus",
+    "deepseek/deepseek-v3.1-32b",
+    "openai/o1-preview",
+    "openai/o1-mini",
+
+    # Balanced - Cost-effective models
+    "anthropic/claude-haiku-3.5",
+    "anthropic/claude-3-haiku",
+    "openai/gpt-4o-mini",
+
+    # Slow & Cheap - Background processing models
+    "google/gemini-2.5-flash-preview-09-2025",
+    "google/gemini-2.0-flash-exp",
+    "meta-llama/llama-3.1-8b-instruct",
+
+    # Web Search - Perplexity models
+    "perplexity/llama-3.1-sonar-large-128k-online",
+    "perplexity/llama-3.1-sonar-small-128k-online",
+
+    # Vision models
+    "anthropic/claude-3.5-sonnet",
+    "openai/gpt-4o",
+    "google/gemini-pro-vision"
+]
+transformers = ["openrouter"]
+
+[security.rate_limiting]
+enabled = true
+requests_per_minute = 120
+concurrent_requests = 20
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = false
+allow_private_ips = false

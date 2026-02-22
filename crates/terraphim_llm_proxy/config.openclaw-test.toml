@@ -1,0 +1,93 @@
+# Terraphim LLM Proxy - OpenClaw Test Configuration
+# Uses 1Password references for API keys
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 600000
+
+[router]
+# Default routing
+default = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Model mappings for OpenClaw compatibility
+[[router.model_mappings]]
+from = "claude-sonnet-4-5"
+to = "openrouter,anthropic/claude-sonnet-4.5"
+
+[[router.model_mappings]]
+from = "claude-opus-4-5"
+to = "openrouter,anthropic/claude-opus-4.5"
+
+[[router.model_mappings]]
+from = "claude-haiku-3-5"
+to = "openrouter,anthropic/claude-3.5-haiku"
+
+[[router.model_mappings]]
+from = "claude-3-5-sonnet"
+to = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Background task routing
+background = "groq,llama-3.3-70b-versatile"
+
+# Thinking/reasoning mode
+think = "openrouter,deepseek/deepseek-v3.1-terminus"
+
+# Long context routing
+long_context = "openrouter,google/gemini-2.5-flash-preview-09-2025"
+long_context_threshold = 60000
+
+# Web search routing
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image routing
+image = "openrouter,anthropic/claude-sonnet-4.5"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# OpenRouter provider
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-3.5-sonnet",
+    "google/gemini-2.5-flash-preview-09-2025",
+    "deepseek/deepseek-v3.1-terminus",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+# Groq provider - fast inference
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+transformers = ["openai"]
+
+# Cerebras provider - ultra-fast inference
+[[providers]]
+name = "cerebras"
+api_base_url = "https://api.cerebras.ai/v1"
+api_key = "$CEREBRAS_API_KEY"
+models = ["llama3.1-70b", "llama3.1-8b"]
+transformers = ["openai"]
+
+# DeepSeek provider - for think/reasoning routing
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek"]

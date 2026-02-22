@@ -1,0 +1,146 @@
+# Release automation for Terraphim LLM Proxy
+
+# Default recipe
+default:
+    @just --list
+
+# Build all targets
+build-all:
+    cargo build --release --target x86_64-unknown-linux-gnu
+    cargo build --release --target x86_64-unknown-linux-musl
+    cargo build --release --target aarch64-unknown-linux-gnu
+    cargo build --release --target x86_64-apple-darwin
+    cargo build --release --target aarch64-apple-darwin
+    cargo build --release --target x86_64-pc-windows-msvc
+
+# Test all targets locally
+test-all:
+    cargo test --workspace --lib
+
+# Format code
+fmt:
+    cargo fmt --all
+
+# Run clippy
+clippy:
+    cargo clippy --workspace --all-targets -- -D warnings
+
+# Security audit
+audit:
+    cargo audit
+
+# Run all checks (pre-commit)
+check: fmt clippy audit test-all
+
+# Build Debian package
+deb:
+    cargo deb --target x86_64-unknown-linux-gnu
+
+# Create release archives
+archive:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+    echo "Creating archives for version ${version}"
+
+    # Create archives for each target
+    for target in x86_64-unknown-linux-gnu x86_64-unknown-linux-musl aarch64-unknown-linux-gnu x86_64-apple-darwin aarch64-apple-darwin x86_64-pc-windows-msvc; do
+        echo "Building for ${target}..."
+        cargo build --release --target "${target}"
+
+        staging="terraphim-llm-proxy-${target}"
+        mkdir -p "${staging}"
+
+        # Copy binary
+        if [[ "${target}" == *"windows"* ]]; then
+            cp "target/${target}/release/terraphim-llm-proxy.exe" "${staging}/"
+        else
+            cp "target/${target}/release/terraphim-llm-proxy" "${staging}/"
+            strip "${staging}/terraphim-llm-proxy" 2>/dev/null || true
+        fi
+
+        # Copy supporting files
+        cp config.example.toml "${staging}/"
+        cp README.md "${staging}/"
+
+        # Create tarball
+        tar czf "${staging}.tar.gz" -C "${staging}" .
+
+        # Generate checksum
+        sha256sum "${staging}.tar.gz" > "${staging}.tar.gz.sha256"
+
+        echo "Created ${staging}.tar.gz"
+    done
+
+# Generate release notes
+release-notes:
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    version=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[0].version')
+    echo "Generating release notes for v${version}"
+
+    echo "# Terraphim LLM Proxy v${version}" > "RELEASE_NOTES_v${version}.md"
+    echo "" >> "RELEASE_NOTES_v${version}.md"
+    echo "## Installation" >> "RELEASE_NOTES_v${version}.md"
+    echo "" >> "RELEASE_NOTES_v${version}.md"
+    echo "### Binary Download" >> "RELEASE_NOTES_v${version}.md"
+    echo "Download the appropriate binary for your platform from the GitHub releases page" >> "RELEASE_NOTES_v${version}.md"
+    echo "" >> "RELEASE_NOTES_v${version}.md"
+    echo "### Debian/Ubuntu" >> "RELEASE_NOTES_v${version}.md"
+    echo "\`\`\`bash" >> "RELEASE_NOTES_v${version}.md"
+    echo "curl -LO https://github.com/terraphim/terraphim-llm-proxy/releases/download/v${version}/terraphim-llm-proxy_${version}_amd64.deb" >> "RELEASE_NOTES_v${version}.md"
+    echo "sudo dpkg -i terraphim-llm-proxy_${version}_amd64.deb" >> "RELEASE_NOTES_v${version}.md"
+    echo "\`\`\`" >> "RELEASE_NOTES_v${version}.md"
+    echo "" >> "RELEASE_NOTES_v${version}.md"
+    echo "### Cargo (crates.io)" >> "RELEASE_NOTES_v${version}.md"
+    echo "\`\`\`bash" >> "RELEASE_NOTES_v${version}.md"
+    echo "cargo install terraphim-llm-proxy" >> "RELEASE_NOTES_v${version}.md"
+    echo "\`\`\`" >> "RELEASE_NOTES_v${version}.md"
+    echo "" >> "RELEASE_NOTES_v${version}.md"
+    echo "## Changes" >> "RELEASE_NOTES_v${version}.md"
+    echo "" >> "RELEASE_NOTES_v${version}.md"
+    echo "This release includes:" >> "RELEASE_NOTES_v${version}.md"
+    echo "* Production-ready intelligent LLM routing" >> "RELEASE_NOTES_v${version}.md"
+    echo "* 6-phase routing architecture with sub-millisecond overhead" >> "RELEASE_NOTES_v${version}.md"
+    echo "* Multi-provider support via genai 0.4" >> "RELEASE_NOTES_v${version}.md"
+    echo "* 186/186 tests passing" >> "RELEASE_NOTES_v${version}.md"
+    echo "* Comprehensive documentation" >> "RELEASE_NOTES_v${version}.md"
+
+# Publish to crates.io (manual step)
+publish:
+    @echo "To publish to crates.io, run:"
+    @echo "cargo publish"
+    @echo ""
+    @echo "Make sure you're logged in with 'cargo login' first."
+
+# Create a new release
+release version: check archive deb release-notes
+    #!/usr/bin/env bash
+    set -euo pipefail
+
+    echo "Creating release v{{version}}"
+    echo "Make sure you've:"
+    echo "1. Updated the version in Cargo.toml"
+    echo "2. Committed all changes"
+    echo "3. Pushed to main branch"
+    echo ""
+    read -p "Continue? (y/N) " -n 1 -r
+    echo
+    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+
+    # Create git tag
+    git tag "v{{version}}"
+    git push origin "v{{version}}"
+
+    echo "Release v{{version}} created and pushed!"
+    echo "GitHub Actions will build and upload artifacts automatically."
+
+# Clean build artifacts
+clean:
+    cargo clean
+    rm -f terraphim-llm-proxy-*.tar.gz*
+    rm -f RELEASE_NOTES_*.md

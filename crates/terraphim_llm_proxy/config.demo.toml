@@ -1,0 +1,19 @@
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "test-key"
+timeout_ms = 60000
+
+[router]
+default = "local,llama3.1"
+background = "local,llama3.1"
+
+[[providers]]
+name = "local"
+api_base_url = "http://127.0.0.1:11434/v1"
+api_key = "ollama"
+models = ["llama3.1", "llama3.2"]
+transformers = ["openai"]
+
+[security.rate_limiting]
+enabled = false

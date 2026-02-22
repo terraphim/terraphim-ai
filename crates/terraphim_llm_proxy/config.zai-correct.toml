@@ -1,0 +1,83 @@
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "$PROXY_API_KEY"
+timeout_ms = 600000
+
+[router]
+default = "groq,llama-3.3-70b-versatile"
+background = "cerebras,llama3.1-8b"
+think = "zai,glm-4.7"
+long_context = "groq,llama-3.1-8b-instant"
+long_context_threshold = 60000
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+image = "openrouter,anthropic/claude-3.5-sonnet"
+strategy = "fill_first"
+
+# Model mappings for keyword-based routing
+[[router.model_mappings]]
+from = "fastest"
+to = "groq,llama-3.3-70b-versatile"
+
+[[router.model_mappings]]
+from = "thinking"
+to = "zai,glm-4.7"
+
+[[router.model_mappings]]
+from = "cheapest"
+to = "groq,llama-3.1-8b-instant"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "op://TerraphimPlatform/TruthForge.api-keys/groq-api-key"
+models = [
+    "llama-3.3-70b-versatile",
+    "llama-3.1-8b-instant",
+    "mixtral-8x7b-32768"
+]
+transformers = ["openai"]
+
+[[providers]]
+name = "cerebras"
+api_base_url = "https://api.cerebras.ai/v1"
+api_key = "op://TerraphimPlatform/TruthForge.api-keys/cerebras-api-key"
+models = [
+    "llama3.1-8b",
+    "llama3.1-70b"
+]
+transformers = ["openai"]
+
+[[providers]]
+name = "zai"
+api_base_url = "https://api.z.ai/api/coding/paas/v4"
+api_key = "op://TerraphimPlatform/TruthForge.api-keys/z.ai-api-key"
+models = ["glm-4.7", "glm-4.5"]
+transformers = ["openai"]
+
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1/chat/completions"
+api_key = "op://TerraphimPlatform/TruthForge.api-keys/openrouter-api-key"
+models = [
+    "anthropic/claude-3.5-sonnet",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "xai"
+api_base_url = "https://api.x.ai/v1"
+api_key = "op://TerraphimPlatform/TruthForge.api-keys/x.ai-api-key"
+models = ["grok-3", "grok-2"]
+transformers = ["openai"]

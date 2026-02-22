@@ -1,0 +1,13 @@
+Scenario,RequestID,StatusCode,ResponseTime(ms),TokensUsed,RoutingDecision
+Fast_Expensive,Fast_Expensive_1760632540_1,,,0,unknown
+Fast_Expensive,Fast_Expensive_1760632541_2,,,0,unknown
+Fast_Expensive,Fast_Expensive_1760632541_3,,,0,unknown
+Intelligent,Intelligent_1760632542_1,,,0,unknown
+Intelligent,Intelligent_1760632542_2,,,0,unknown
+Intelligent,Intelligent_1760632543_3,,,0,unknown
+Balanced,Balanced_1760632543_1,,,0,unknown
+Balanced,Balanced_1760632544_2,,,0,unknown
+Balanced,Balanced_1760632544_3,,,0,unknown
+Slow_Cheap,Slow_Cheap_1760632545_1,,,0,unknown
+Slow_Cheap,Slow_Cheap_1760632545_2,,,0,unknown
+Slow_Cheap,Slow_Cheap_1760632546_3,,,0,unknown

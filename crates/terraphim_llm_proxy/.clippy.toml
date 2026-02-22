@@ -1,0 +1,15 @@
+msrv = "1.70.0"
+avoid-breaking-exported-api = false
+allow-mixed-uninlined-format-args = true
+allow-unwrap-in-tests = true
+allow-expect-in-tests = true
+allow-dbg-in-tests = true
+too-many-arguments-threshold = 12
+type-complexity-threshold = 250
+cognitive-complexity-threshold = 30
+disallowed-names = []
+doc-valid-idents = ["Cli", "TODO", "FIXME", "XXX", "WIP", "WARN", "NOTE", "INFO", "DEBUG"]
+max-trait-bounds = 3
+max-fn-params-bools = 3
+enum-variant-name-threshold = 50
+single-char-binding-names-threshold = 4

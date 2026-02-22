@@ -1,0 +1,54 @@
+# Integration Test Configuration for Plan Implementation Routing
+#
+# This config demonstrates the plan vs plan implementation routing feature.
+#
+# Setup:
+#   op inject -i .env.integration.op.template | source
+#   cargo run -- --config config.plan_test.toml
+#
+# Test queries:
+#   "plan the system architecture" -> routes to think (Claude Opus)
+#   "plan implementation of the API" -> routes to plan_implementation (Haiku)
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "test-key"
+timeout_ms = 60000
+
+[router]
+# Strategic planning - TOP TIER models
+default = "openrouter,anthropic/claude-3.5-sonnet"
+think = "openrouter,anthropic/claude-3-opus"
+
+# Plan implementation - SMALLER models (for coding/implementation)
+plan_implementation = "openrouter,anthropic/claude-3.5-haiku"
+
+# Fast background tasks
+background = "groq,llama-3.1-8b-instant"
+
+# OpenRouter with multiple model tiers
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-3-opus",       # Top tier - for "plan"
+    "anthropic/claude-3.5-sonnet",   # Mid tier - default
+    "anthropic/claude-3.5-haiku"     # Fast/cheap - for "plan implementation"
+]
+transformers = ["openrouter"]
+
+# Groq for fast inference
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = [
+    "llama-3.1-8b-instant",
+    "llama-3.1-70b-versatile"
+]
+transformers = ["openai"]
+
+[security.rate_limiting]
+enabled = false

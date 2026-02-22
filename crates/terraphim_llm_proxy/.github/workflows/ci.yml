@@ -1,0 +1,342 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main ]
+    tags:
+      - 'v*'
+  pull_request:
+    branches: [ main ]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Test Suite
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+          - beta
+          - nightly
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@master
+      with:
+        toolchain: ${{ matrix.rust }}
+
+    - name: Install Rust components
+      run: rustup component add rustfmt clippy
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Check formatting (stable only)
+      if: matrix.rust == 'stable'
+      run: cargo fmt --all -- --check
+
+    - name: Run clippy (strict on stable)
+      if: matrix.rust == 'stable'
+      run: cargo clippy --workspace --all-targets -- -D warnings
+
+    - name: Run clippy (warnings only on beta/nightly)
+      if: matrix.rust != 'stable'
+      run: cargo clippy --workspace --all-targets || true
+
+    - name: Build
+      run: cargo build --workspace --verbose
+
+    - name: Run tests
+      run: cargo test --workspace --lib --verbose
+
+  priority-routing-tests:
+    name: Priority Routing Tests
+    runs-on: ubuntu-latest
+    needs: test
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run priority routing tests
+      run: cargo test --test priority_routing_tests --verbose
+
+  integration-tests:
+    name: Integration Tests
+    runs-on: ubuntu-latest
+    needs: test
+
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+        
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Run integration tests
+      run: cargo test --test integration_test --verbose
+      env:
+        REDIS_URL: redis://localhost:6379
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+        
+    - name: Install cargo-audit
+      run: cargo install cargo-audit
+
+    - name: Run security audit
+      run: cargo audit
+
+  build-release:
+    name: Build Release
+    runs-on: ubuntu-latest
+    needs: [test, priority-routing-tests, integration-tests]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+        
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-release-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Build release
+      run: cargo build --workspace --release
+
+    - name: Upload binary artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: terraphim-llm-proxy-release
+        path: target/release/terraphim-llm-proxy
+        retention-days: 30
+
+  coverage:
+    name: Code Coverage
+    runs-on: ubuntu-latest
+    needs: test
+    continue-on-error: true
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+
+    - name: Cache cargo tarpaulin
+      uses: actions/cache@v4
+      with:
+        path: ~/.cargo/bin/cargo-tarpaulin
+        key: ${{ runner.os }}-cargo-tarpaulin-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install cargo-tarpaulin
+      run: |
+        if ! command -v cargo-tarpaulin &> /dev/null; then
+          cargo install cargo-tarpaulin --locked
+        fi
+
+    - name: Generate coverage reports
+      run: |
+        # Create separate directories for different formats
+        mkdir -p coverage/xml coverage/html
+
+        # Generate XML report (machine-readable)
+        cargo tarpaulin --workspace --out Xml --output-dir ./coverage/xml || echo "XML coverage generation failed"
+
+        # Generate HTML report (human-readable)
+        cargo tarpaulin --workspace --out Html --output-dir ./coverage/html || echo "HTML coverage generation failed"
+
+        # List what was generated
+        echo "=== XML Coverage Files ==="
+        find ./coverage/xml -name "*.xml" -type f -exec ls -la {} \; || echo "No XML files found"
+        echo "=== HTML Coverage Files ==="
+        find ./coverage/html -name "*.html" -type f -exec ls -la {} \; || echo "No HTML files found"
+
+    - name: Upload coverage artifacts
+      uses: actions/upload-artifact@v4
+      with:
+        name: coverage-reports-${{ github.run_number }}
+        path: ./coverage/
+        retention-days: 30
+        if-no-files-found: warn
+
+  # Release job - builds and uploads artifacts for all platforms
+  release:
+    name: Build and Release
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [test, priority-routing-tests, integration-tests]
+    strategy:
+      matrix:
+        include:
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: terraphim-llm-proxy-linux-amd64
+          - target: x86_64-unknown-linux-musl
+            os: ubuntu-latest
+            name: terraphim-llm-proxy-linux-amd64-musl
+          - target: aarch64-unknown-linux-gnu
+            os: ubuntu-latest
+            name: terraphim-llm-proxy-linux-arm64
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            name: terraphim-llm-proxy-macos-amd64
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            name: terraphim-llm-proxy-macos-arm64
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            name: terraphim-llm-proxy-windows-amd64
+            extension: .exe
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        targets: ${{ matrix.target }}
+        
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: Install cross-compilation tools (Linux ARM64)
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y gcc-aarch64-linux-gnu g++-aarch64-linux-gnu
+        echo '[target.aarch64-unknown-linux-gnu]' >> ~/.cargo/config.toml
+        echo 'linker = "aarch64-linux-gnu-gcc"' >> ~/.cargo/config.toml
+
+    - name: Install musl tools (Linux musl)
+      if: matrix.target == 'x86_64-unknown-linux-musl'
+      run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+    - name: Install cargo-deb (Linux only)
+      if: matrix.os == 'ubuntu-latest' && matrix.target == 'x86_64-unknown-linux-gnu'
+      run: cargo install cargo-deb
+
+    - name: Build release binary
+      run: cargo build --release --target ${{ matrix.target }}
+      env:
+        CC_aarch64_unknown_linux_gnu: aarch64-linux-gnu-gcc
+        CXX_aarch64_unknown_linux_gnu: aarch64-linux-gnu-g++
+
+    - name: Strip binary (Unix native)
+      if: matrix.os != 'windows-latest' && matrix.target != 'aarch64-unknown-linux-gnu'
+      run: strip target/${{ matrix.target }}/release/terraphim-llm-proxy${{ matrix.extension }}
+
+    - name: Strip binary (Linux ARM64 cross)
+      if: matrix.target == 'aarch64-unknown-linux-gnu'
+      run: aarch64-linux-gnu-strip target/${{ matrix.target }}/release/terraphim-llm-proxy
+
+    - name: Create archive
+      shell: bash
+      run: |
+        staging="terraphim-llm-proxy-${{ matrix.target }}"
+        mkdir -p "$staging"
+
+        # Copy binary
+        cp "target/${{ matrix.target }}/release/terraphim-llm-proxy${{ matrix.extension }}" "$staging/"
+
+        # Copy configuration examples
+        cp config.example.toml "$staging/"
+        cp README.md "$staging/"
+
+        # Create tarball
+        tar czf "$staging.tar.gz" -C "$staging" .
+
+        # Generate checksum
+        if [ "${{ runner.os }}" = "windows-latest" ]; then
+          sha256sum "$staging.tar.gz" > "$staging.tar.gz.sha256"
+        else
+          sha256sum "$staging.tar.gz" > "$staging.tar.gz.sha256"
+        fi
+
+    - name: Build Debian package
+      if: matrix.os == 'ubuntu-latest' && matrix.target == 'x86_64-unknown-linux-gnu'
+      run: cargo deb --target ${{ matrix.target }}
+
+    - name: Upload release artifacts
+      uses: softprops/action-gh-release@v2
+      with:
+        files: |
+          terraphim-llm-proxy-${{ matrix.target }}.tar.gz
+          terraphim-llm-proxy-${{ matrix.target }}.tar.gz.sha256
+          target/${{ matrix.target }}/debian/*.deb
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

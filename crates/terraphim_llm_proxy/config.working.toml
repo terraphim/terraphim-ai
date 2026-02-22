@@ -1,0 +1,30 @@
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 600000
+
+[router]
+# Use a working model for testing
+default = "openrouter,anthropic/claude-3.5-sonnet"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# OpenRouter provider with working configuration
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-3.5-sonnet",
+    "deepseek/deepseek-chat"
+]
+transformers = ["openrouter"]

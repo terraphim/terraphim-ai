@@ -1,0 +1,35 @@
+#clawdbot #openclaw #modbot For those who, like me, keep running out of GPT 5.2 tokens, here is an intelligent proxy with smart routing:
+Smart Routing
+Automatically route requests to the best provider based on task type. Use fast models for simple tasks, powerful models for complex reasoning.
+Pattern-based intent detection
+ Automatic failover
+ Cost optimization
+ Performance tracking
+15+ Providers
+One API endpoint, access to all major AI providers. Switch providers without changing your code.
+OpenAI, Anthropic, Google
+ Groq, Cerebras (fastest)
+ DeepSeek, Mistral
+ OpenRouter, Together AI
+Coding Plans
+ Use coding plan subscription
+Codex 
+  Z.ai GLM
+MiniMax M2.1
+Kimi coding 
+Claude Code (?)
+Usage: 
+$ terraphim-llm-proxy -c config.toml
+Terraphim LLM Proxy v0.1.5
+Loaded 120 routing patterns
+Providers: groq, cerebras, openrouter, zai
+Server running on http://127.0.0.1:3456
+[INFO] Request: "think step by step about..."
+[INFO] Pattern match: think_routing
+[INFO] Routed to: deepseek/deepseek-reasoner
+[INFO] Request: "Say hello"
+[INFO] Routed to: groq/llama-3.3-70b (fastest)
+It's currently donateware: 3 USD per month unlocks access to a private repo with release binaries for major platforms:
+https://github.com/sponsors/terraphim
+Unlock a link to a private repository and pass it to your OpenClaw agent to install.  Any problems, email to alex@terraphim.ai 
+More updates and cool graph embeddings announcement to follow

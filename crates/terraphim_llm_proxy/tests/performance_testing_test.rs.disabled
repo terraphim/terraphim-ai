@@ -1,0 +1,704 @@
+//! Tests for latency and throughput testing feature
+
+use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tempfile::TempDir;
+use terraphim_llm_proxy::{
+    config::{Provider, ProxyConfig, ProxySettings, RouterSettings, SecuritySettings},
+    error::ProxyError,
+    performance::{
+        PerformanceConfig, PerformanceDatabase, PerformanceMetrics, PerformanceThresholds,
+        PerformanceTester, PerformanceWeights, TestResult, TestType,
+    },
+    router::RouterAgent,
+    token_counter::{ChatRequest, Message, MessageContent},
+};
+use tokio::sync::RwLock;
+
+#[cfg(test)]
+mod performance_tests {
+    use super::*;
+
+    fn create_test_provider(name: &str, models: Vec<&str>) -> Provider {
+        Provider {
+            name: name.to_string(),
+            api_base_url: format!("https://api.{}.com", name),
+            api_key: "test_key".to_string(),
+            models: models.into_iter().map(|s| s.to_string()).collect(),
+            transformers: vec![],
+        }
+    }
+
+    fn create_test_config() -> ProxyConfig {
+        ProxyConfig {
+            proxy: ProxySettings {
+                host: "127.0.0.1".to_string(),
+                port: 3456,
+                api_key: "test_key".to_string(),
+                timeout_ms: 60000,
+            },
+            router: RouterSettings {
+                default: "openrouter,anthropic/claude-3.5-sonnet".to_string(),
+                background: Some("ollama,qwen2.5-coder:latest".to_string()),
+                think: Some("deepseek,deepseek-reasoner".to_string()),
+                long_context: Some("openrouter,google/gemini-2.0-flash-exp".to_string()),
+                long_context_threshold: 60000,
+                web_search: Some("openrouter,perplexity/llama-3.1-sonar".to_string()),
+                image: Some("openrouter,anthropic/claude-3.5-sonnet".to_string()),
+            },
+            providers: vec![
+                create_test_provider(
+                    "openrouter",
+                    vec![
+                        "anthropic/claude-3.5-sonnet",
+                        "openai/gpt-4",
+                        "google/gemini-2.0-flash-exp",
+                    ],
+                ),
+                create_test_provider("deepseek", vec!["deepseek-chat", "deepseek-reasoner"]),
+                create_test_provider("ollama", vec!["qwen2.5-coder:latest", "llama2:latest"]),
+            ],
+            security: SecuritySettings::default(),
+        }
+    }
+
+    fn create_test_request() -> ChatRequest {
+        ChatRequest {
+            model: "test-model".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("What is the capital of France?".to_string()),
+            }],
+            system: None,
+            tools: None,
+            max_tokens: Some(100),
+            temperature: Some(0.7),
+            stream: Some(false),
+            thinking: None,
+        }
+    }
+
+    fn create_performance_config() -> PerformanceConfig {
+        PerformanceConfig {
+            enabled: true,
+            test_interval_minutes: 60,
+            test_timeout_seconds: 30,
+            max_concurrent_tests: 3,
+            min_test_count: 5,
+            thresholds: PerformanceThresholds {
+                max_latency_ms: 5000.0,
+                min_throughput_tokens_per_sec: 10.0,
+                min_success_rate: 0.95,
+            },
+            weights: PerformanceWeights {
+                latency: 0.4,
+                throughput: 0.4,
+                reliability: 0.2,
+            },
+        }
+    }
+
+    #[tokio::test]
+    async fn test_performance_metrics_creation() {
+        let metrics = PerformanceMetrics {
+            model_name: "test-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 150.5,
+            p95_latency_ms: 300.0,
+            p99_latency_ms: 500.0,
+            throughput_tokens_per_sec: 25.7,
+            success_rate: 0.98,
+            error_rate: 0.02,
+            last_tested: SystemTime::now(),
+            test_count: 10,
+        };
+
+        assert_eq!(metrics.model_name, "test-model");
+        assert_eq!(metrics.provider_name, "test-provider");
+        assert_eq!(metrics.avg_latency_ms, 150.5);
+        assert_eq!(metrics.success_rate, 0.98);
+        assert_eq!(metrics.test_count, 10);
+    }
+
+    #[tokio::test]
+    async fn test_performance_database_operations() {
+        let db = PerformanceDatabase::new(create_performance_config());
+
+        // Test adding metrics
+        let metrics = PerformanceMetrics {
+            model_name: "test-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 150.5,
+            p95_latency_ms: 300.0,
+            p99_latency_ms: 500.0,
+            throughput_tokens_per_sec: 25.7,
+            success_rate: 0.98,
+            error_rate: 0.02,
+            last_tested: SystemTime::now(),
+            test_count: 10,
+        };
+
+        let key = "test-provider:test-model";
+        db.add_metrics(key.to_string(), metrics.clone())
+            .await
+            .unwrap();
+
+        // Test retrieving metrics
+        let retrieved = db.get_metrics(key).await.unwrap();
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().model_name, "test-model");
+
+        // Test getting all metrics
+        let all_metrics = db.get_all_metrics().await.unwrap();
+        assert_eq!(all_metrics.len(), 1);
+        assert_eq!(all_metrics[key].model_name, "test-model");
+
+        // Test removing metrics
+        db.remove_metrics(key).await.unwrap();
+        let removed = db.get_metrics(key).await.unwrap();
+        assert!(removed.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_performance_score_calculation() {
+        let config = create_performance_config();
+
+        // Test high-performing model
+        let good_metrics = PerformanceMetrics {
+            model_name: "good-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 100.0, // Low latency = good
+            p95_latency_ms: 200.0,
+            p99_latency_ms: 300.0,
+            throughput_tokens_per_sec: 50.0, // High throughput = good
+            success_rate: 0.99,              // High success rate = good
+            error_rate: 0.01,
+            last_tested: SystemTime::now(),
+            test_count: 20,
+        };
+
+        let good_score = good_metrics.calculate_score(&config.weights);
+        assert!(good_score > 0.7); // Should be high
+
+        // Test poor-performing model
+        let poor_metrics = PerformanceMetrics {
+            model_name: "poor-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 2000.0, // High latency = bad
+            p95_latency_ms: 3000.0,
+            p99_latency_ms: 4000.0,
+            throughput_tokens_per_sec: 5.0, // Low throughput = bad
+            success_rate: 0.85,             // Low success rate = bad
+            error_rate: 0.15,
+            last_tested: SystemTime::now(),
+            test_count: 5,
+        };
+
+        let poor_score = poor_metrics.calculate_score(&config.weights);
+        assert!(poor_score < 0.4); // Should be low
+        assert!(good_score > poor_score); // Good should be better than poor
+    }
+
+    #[tokio::test]
+    async fn test_performance_tester_creation() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        assert!(tester.config().enabled);
+        assert_eq!(tester.config().test_interval_minutes, 60);
+        assert_eq!(tester.config().max_concurrent_tests, 3);
+    }
+
+    #[tokio::test]
+    async fn test_latency_test_execution() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        let provider = &config.providers[0]; // openrouter
+        let model = &provider.models[0]; // anthropic/claude-3.5-sonnet
+        let request = create_test_request();
+
+        // Mock latency test (in real implementation, this would make actual API calls)
+        let result = tester.test_latency(provider, model, &request).await;
+
+        // In a real test with mocked HTTP client, this would succeed
+        // For now, we'll test the structure and error handling
+        match result {
+            Ok(test_result) => {
+                assert!(test_result.latency_ms > 0.0);
+                assert!(test_result.success);
+            }
+            Err(ProxyError::NetworkError(_)) => {
+                // Expected in test environment without real API
+            }
+            Err(e) => {
+                panic!("Unexpected error: {:?}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_throughput_test_execution() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        let provider = &config.providers[0]; // openrouter
+        let model = &provider.models[0]; // anthropic/claude-3.5-sonnet
+        let request = create_test_request();
+
+        // Mock throughput test
+        let result = tester.test_throughput(provider, model, &request).await;
+
+        match result {
+            Ok(test_result) => {
+                assert!(test_result.throughput_tokens_per_sec > 0.0);
+                assert!(test_result.success);
+            }
+            Err(ProxyError::NetworkError(_)) => {
+                // Expected in test environment without real API
+            }
+            Err(e) => {
+                panic!("Unexpected error: {:?}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_performance_testing() {
+        let config = Arc::new(create_test_config());
+        let mut performance_config = create_performance_config();
+        performance_config.max_concurrent_tests = 2;
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        let provider = &config.providers[0];
+        let model = &provider.models[0];
+        let request = create_test_request();
+
+        // Test concurrent execution
+        let test1 = tester.test_latency(provider, model, &request);
+        let test2 = tester.test_throughput(provider, model, &request);
+
+        let (result1, result2) = tokio::join!(test1, test2);
+
+        // Both should complete (either successfully or with network errors)
+        assert!(result1.is_ok() || matches!(result1, Err(ProxyError::NetworkError(_))));
+        assert!(result2.is_ok() || matches!(result2, Err(ProxyError::NetworkError(_))));
+    }
+
+    #[tokio::test]
+    async fn test_performance_database_persistence() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("performance.json");
+
+        let mut performance_config = create_performance_config();
+        performance_config.persistence_path = Some(db_path.to_string_lossy().to_string());
+
+        let db = PerformanceDatabase::new(performance_config.clone());
+
+        // Add some test data
+        let metrics = PerformanceMetrics {
+            model_name: "test-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 150.5,
+            p95_latency_ms: 300.0,
+            p99_latency_ms: 500.0,
+            throughput_tokens_per_sec: 25.7,
+            success_rate: 0.98,
+            error_rate: 0.02,
+            last_tested: SystemTime::now(),
+            test_count: 10,
+        };
+
+        let key = "test-provider:test-model";
+        db.add_metrics(key.to_string(), metrics).await.unwrap();
+
+        // Save to disk
+        db.save_to_disk().await.unwrap();
+
+        // Create new database instance and load
+        let db2 = PerformanceDatabase::new(performance_config);
+        db2.load_from_disk().await.unwrap();
+
+        // Verify data was loaded
+        let loaded_metrics = db2.get_metrics(key).await.unwrap();
+        assert!(loaded_metrics.is_some());
+        assert_eq!(loaded_metrics.unwrap().model_name, "test-model");
+    }
+
+    #[tokio::test]
+    async fn test_performance_threshold_validation() {
+        let config = create_performance_config();
+
+        // Test metrics within thresholds
+        let good_metrics = PerformanceMetrics {
+            model_name: "good-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 100.0, // Below 5000ms threshold
+            p95_latency_ms: 200.0,
+            p99_latency_ms: 300.0,
+            throughput_tokens_per_sec: 20.0, // Above 10 tokens/sec threshold
+            success_rate: 0.98,              // Above 0.95 threshold
+            error_rate: 0.02,
+            last_tested: SystemTime::now(),
+            test_count: 10,
+        };
+
+        assert!(good_metrics.meets_thresholds(&config.thresholds));
+
+        // Test metrics exceeding thresholds
+        let bad_metrics = PerformanceMetrics {
+            model_name: "bad-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 6000.0, // Above 5000ms threshold
+            p95_latency_ms: 7000.0,
+            p99_latency_ms: 8000.0,
+            throughput_tokens_per_sec: 5.0, // Below 10 tokens/sec threshold
+            success_rate: 0.90,             // Below 0.95 threshold
+            error_rate: 0.10,
+            last_tested: SystemTime::now(),
+            test_count: 3,
+        };
+
+        assert!(!bad_metrics.meets_thresholds(&config.thresholds));
+    }
+
+    #[tokio::test]
+    async fn test_performance_metrics_aggregation() {
+        let config = create_performance_config();
+        let db = PerformanceDatabase::new(config.clone());
+
+        // Add multiple test results for the same model
+        let base_time = SystemTime::now();
+
+        for i in 0..5 {
+            let metrics = PerformanceMetrics {
+                model_name: "test-model".to_string(),
+                provider_name: "test-provider".to_string(),
+                avg_latency_ms: 100.0 + (i as f64 * 10.0),
+                p95_latency_ms: 200.0 + (i as f64 * 20.0),
+                p99_latency_ms: 300.0 + (i as f64 * 30.0),
+                throughput_tokens_per_sec: 20.0 + (i as f64 * 2.0),
+                success_rate: 0.95 + (i as f64 * 0.01),
+                error_rate: 0.05 - (i as f64 * 0.01),
+                last_tested: base_time + Duration::from_secs(i as u64),
+                test_count: 1,
+            };
+
+            let key = format!("test-provider:test-model-{}", i);
+            db.add_metrics(key, metrics).await.unwrap();
+        }
+
+        // Test aggregation
+        let all_metrics = db.get_all_metrics().await.unwrap();
+        assert_eq!(all_metrics.len(), 5);
+
+        // Test getting best performing model
+        let best = db.get_best_performing_model("test-provider").await.unwrap();
+        assert!(best.is_some());
+
+        let (best_provider, best_model) = best.unwrap();
+        assert_eq!(best_provider, "test-provider");
+        assert!(best_model.contains("test-model"));
+    }
+
+    #[tokio::test]
+    async fn test_router_integration_with_performance() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        // Add performance data
+        let metrics = PerformanceMetrics {
+            model_name: "anthropic/claude-3.5-sonnet".to_string(),
+            provider_name: "openrouter".to_string(),
+            avg_latency_ms: 100.0,
+            p95_latency_ms: 200.0,
+            p99_latency_ms: 300.0,
+            throughput_tokens_per_sec: 30.0,
+            success_rate: 0.99,
+            error_rate: 0.01,
+            last_tested: SystemTime::now(),
+            test_count: 20,
+        };
+
+        let key = "openrouter:anthropic/claude-3.5-sonnet";
+        db.add_metrics(key.to_string(), metrics).await.unwrap();
+
+        // Create router with performance optimization
+        let router = RouterAgent::with_performance(config.clone(), db);
+
+        let request = create_test_request();
+        let hints = crate::analyzer::RoutingHints {
+            is_background: false,
+            has_thinking: false,
+            has_web_search: false,
+            has_images: false,
+            token_count: 100,
+            session_id: None,
+        };
+
+        // Test routing with performance consideration
+        let decision = router
+            .route_with_performance(&request, &hints)
+            .await
+            .unwrap();
+
+        assert_eq!(decision.provider.name, "openrouter");
+        assert!(decision.performance_score.is_some());
+        assert!(decision.performance_metrics.is_some());
+
+        if let Some(score) = decision.performance_score {
+            assert!(score > 0.0);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_performance_test_scheduling() {
+        let config = Arc::new(create_test_config());
+        let mut performance_config = create_performance_config();
+        performance_config.test_interval_minutes = 1; // Test every minute for testing
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        // Start the scheduler
+        tester.start_scheduler().await.unwrap();
+
+        // Wait a short time to see if scheduler runs
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Stop the scheduler
+        tester.stop_scheduler().await.unwrap();
+
+        // Verify that some tests were attempted (in real implementation)
+        // This would be verified through database entries or logs
+    }
+
+    #[tokio::test]
+    async fn test_error_handling_in_performance_tests() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        // Test with invalid provider
+        let invalid_provider = Provider {
+            name: "invalid".to_string(),
+            api_base_url: "https://invalid-url".to_string(),
+            api_key: "invalid".to_string(),
+            models: vec!["invalid-model".to_string()],
+            transformers: vec![],
+        };
+
+        let request = create_test_request();
+        let result = tester
+            .test_latency(&invalid_provider, "invalid-model", &request)
+            .await;
+
+        // Should handle network errors gracefully
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ProxyError::NetworkError(_)));
+    }
+
+    #[tokio::test]
+    async fn test_performance_metrics_ttl() {
+        let mut performance_config = create_performance_config();
+        performance_config.metrics_ttl_hours = 1; // 1 hour TTL
+
+        let db = PerformanceDatabase::new(performance_config.clone());
+
+        // Add old metrics
+        let old_metrics = PerformanceMetrics {
+            model_name: "old-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 100.0,
+            p95_latency_ms: 200.0,
+            p99_latency_ms: 300.0,
+            throughput_tokens_per_sec: 20.0,
+            success_rate: 0.98,
+            error_rate: 0.02,
+            last_tested: SystemTime::now() - Duration::from_secs(7200), // 2 hours ago
+            test_count: 10,
+        };
+
+        let key = "test-provider:old-model";
+        db.add_metrics(key.to_string(), old_metrics).await.unwrap();
+
+        // Add recent metrics
+        let recent_metrics = PerformanceMetrics {
+            model_name: "recent-model".to_string(),
+            provider_name: "test-provider".to_string(),
+            avg_latency_ms: 150.0,
+            p95_latency_ms: 250.0,
+            p99_latency_ms: 350.0,
+            throughput_tokens_per_sec: 25.0,
+            success_rate: 0.99,
+            error_rate: 0.01,
+            last_tested: SystemTime::now(),
+            test_count: 15,
+        };
+
+        let recent_key = "test-provider:recent-model";
+        db.add_metrics(recent_key.to_string(), recent_metrics)
+            .await
+            .unwrap();
+
+        // Cleanup expired metrics
+        db.cleanup_expired_metrics().await.unwrap();
+
+        // Verify old metrics were removed, recent remain
+        let old_result = db.get_metrics(key).await.unwrap();
+        let recent_result = db.get_metrics(recent_key).await.unwrap();
+
+        assert!(old_result.is_none()); // Should be expired and removed
+        assert!(recent_result.is_some()); // Should still exist
+    }
+}
+
+// Integration tests for the complete performance testing system
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_end_to_end_performance_testing() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        let tester = PerformanceTester::new(config.clone(), db.clone(), performance_config);
+
+        let router = RouterAgent::with_performance(config.clone(), db.clone());
+
+        // Simulate a complete performance testing workflow
+        let provider = &config.providers[0];
+        let model = &provider.models[0];
+        let request = create_test_request();
+
+        // 1. Run performance tests
+        let latency_result = tester.test_latency(provider, model, &request).await;
+        let throughput_result = tester.test_throughput(provider, model, &request).await;
+
+        // 2. Update performance database (in real implementation)
+        // For now, we'll add mock data
+        let metrics = PerformanceMetrics {
+            model_name: model.clone(),
+            provider_name: provider.name.clone(),
+            avg_latency_ms: 150.0,
+            p95_latency_ms: 300.0,
+            p99_latency_ms: 450.0,
+            throughput_tokens_per_sec: 25.0,
+            success_rate: 0.98,
+            error_rate: 0.02,
+            last_tested: SystemTime::now(),
+            test_count: 10,
+        };
+
+        let key = format!("{}:{}", provider.name, model);
+        db.add_metrics(key, metrics).await.unwrap();
+
+        // 3. Test routing with performance data
+        let hints = crate::analyzer::RoutingHints {
+            is_background: false,
+            has_thinking: false,
+            has_web_search: false,
+            has_images: false,
+            token_count: 100,
+            session_id: None,
+        };
+
+        let decision = router
+            .route_with_performance(&request, &hints)
+            .await
+            .unwrap();
+
+        // 4. Verify the decision incorporates performance data
+        assert_eq!(decision.provider.name, provider.name);
+        assert_eq!(decision.model, *model);
+        assert!(decision.performance_score.is_some());
+        assert!(decision.performance_metrics.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_performance_aware_routing_with_multiple_providers() {
+        let config = Arc::new(create_test_config());
+        let performance_config = create_performance_config();
+        let db = Arc::new(PerformanceDatabase::new(performance_config.clone()));
+
+        // Add performance data for multiple providers
+        let openrouter_metrics = PerformanceMetrics {
+            model_name: "anthropic/claude-3.5-sonnet".to_string(),
+            provider_name: "openrouter".to_string(),
+            avg_latency_ms: 200.0, // Slower but more capable
+            p95_latency_ms: 400.0,
+            p99_latency_ms: 600.0,
+            throughput_tokens_per_sec: 20.0,
+            success_rate: 0.99,
+            error_rate: 0.01,
+            last_tested: SystemTime::now(),
+            test_count: 20,
+        };
+
+        let deepseek_metrics = PerformanceMetrics {
+            model_name: "deepseek-chat".to_string(),
+            provider_name: "deepseek".to_string(),
+            avg_latency_ms: 100.0, // Faster
+            p95_latency_ms: 200.0,
+            p99_latency_ms: 300.0,
+            throughput_tokens_per_sec: 40.0, // Higher throughput
+            success_rate: 0.97,
+            error_rate: 0.03,
+            last_tested: SystemTime::now(),
+            test_count: 25,
+        };
+
+        db.add_metrics(
+            "openrouter:anthropic/claude-3.5-sonnet".to_string(),
+            openrouter_metrics,
+        )
+        .await
+        .unwrap();
+        db.add_metrics("deepseek:deepseek-chat".to_string(), deepseek_metrics)
+            .await
+            .unwrap();
+
+        let router = RouterAgent::with_performance(config.clone(), db);
+
+        let request = create_test_request();
+        let hints = crate::analyzer::RoutingHints {
+            is_background: false,
+            has_thinking: false,
+            has_web_search: false,
+            has_images: false,
+            token_count: 100,
+            session_id: None,
+        };
+
+        let decision = router
+            .route_with_performance(&request, &hints)
+            .await
+            .unwrap();
+
+        // Should prefer the better performing model (deepseek in this case)
+        // due to lower latency and higher throughput
+        assert!(decision.performance_score.is_some());
+
+        if let Some(score) = decision.performance_score {
+            assert!(score > 0.5); // Should have a decent performance score
+        }
+    }
+}

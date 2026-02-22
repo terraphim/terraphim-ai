@@ -1,0 +1,866 @@
+//! Tests for cost-based prioritization feature
+
+use serde_json::json;
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::{Duration, SystemTime};
+use tempfile::TempDir;
+use terraphim_llm_proxy::{
+    config::{Provider, ProxyConfig},
+    cost::{BudgetManager, CostCalculator, CostConfig, CostEstimate, ModelPricing, PricingDatabase},
+    error::ProxyError,
+    router::RouterAgent,
+    token_counter::{ChatRequest, Message, MessageContent},
+};
+use tokio::sync::RwLock;
+
+#[cfg(test)]
+mod cost_tests {
+    use super::*;
+
+    fn create_test_provider(name: &str, models: Vec<&str>) -> Provider {
+        Provider {
+            name: name.to_string(),
+            api_base_url: format!("https://api.{}.com", name),
+            api_key: "test_key".to_string(),
+            models: models.into_iter().map(|s| s.to_string()).collect(),
+            transformers: vec![],
+        }
+    }
+
+    fn create_test_config() -> ProxyConfig {
+        ProxyConfig {
+            proxy: crate::config::ProxySettings {
+                host: "127.0.0.1".to_string(),
+                port: 3456,
+                api_key: "test_key".to_string(),
+                timeout_ms: 60000,
+            },
+            router: crate::config::RouterSettings {
+                default: "openrouter,anthropic/claude-3.5-sonnet".to_string(),
+                background: Some("ollama,qwen2.5-coder:latest".to_string()),
+                think: Some("deepseek,deepseek-reasoner".to_string()),
+                long_context: Some("openrouter,google/gemini-2.0-flash-exp".to_string()),
+                long_context_threshold: 60000,
+                web_search: Some("openrouter,perplexity/llama-3.1-sonar".to_string()),
+                image: Some("openrouter,anthropic/claude-3.5-sonnet".to_string()),
+            },
+            providers: vec![
+                create_test_provider(
+                    "openrouter",
+                    vec![
+                        "anthropic/claude-3.5-sonnet",
+                        "openai/gpt-4",
+                        "google/gemini-2.0-flash-exp",
+                    ],
+                ),
+                create_test_provider("deepseek", vec!["deepseek-chat", "deepseek-reasoner"]),
+                create_test_provider("ollama", vec!["qwen2.5-coder:latest", "llama2:latest"]),
+            ],
+            security: crate::config::SecuritySettings::default(),
+        }
+    }
+
+    fn create_test_request() -> ChatRequest {
+        ChatRequest {
+            model: "test-model".to_string(),
+            messages: vec![Message {
+                role: "user".to_string(),
+                content: MessageContent::Text("What is the capital of France?".to_string()),
+            }],
+            system: None,
+            tools: None,
+            max_tokens: Some(100),
+            temperature: Some(0.7),
+            stream: Some(false),
+            thinking: None,
+        }
+    }
+
+    fn create_cost_config() -> CostConfig {
+        CostConfig {
+            enabled: true,
+            pricing_update_interval_hours: 24,
+            daily_limit: 10.0,
+            monthly_limit: 300.0,
+            weights: CostWeights {
+                quality: 0.6,
+                cost: 0.4,
+            },
+            thresholds: CostThresholds {
+                max_cost_per_request: 1.0,
+                max_cost_per_1k_tokens: 0.10,
+                min_cost_effectiveness_score: 0.5,
+            },
+        }
+    }
+
+    fn create_sample_pricing_data() -> Vec<ModelPricing> {
+        vec![
+            ModelPricing {
+                model_id: "anthropic/claude-3.5-sonnet".to_string(),
+                model_name: "Claude 3.5 Sonnet".to_string(),
+                provider: "openrouter".to_string(),
+                input_cost_per_1k_tokens: 0.003,
+                output_cost_per_1k_tokens: 0.015,
+                context_window: 200000,
+                supports_images: true,
+                supports_tools: true,
+                last_updated: SystemTime::now(),
+            },
+            ModelPricing {
+                model_id: "openai/gpt-4".to_string(),
+                model_name: "GPT-4".to_string(),
+                provider: "openrouter".to_string(),
+                input_cost_per_1k_tokens: 0.03,
+                output_cost_per_1k_tokens: 0.06,
+                context_window: 8192,
+                supports_images: false,
+                supports_tools: true,
+                last_updated: SystemTime::now(),
+            },
+            ModelPricing {
+                model_id: "deepseek-chat".to_string(),
+                model_name: "DeepSeek Chat".to_string(),
+                provider: "deepseek".to_string(),
+                input_cost_per_1k_tokens: 0.14,
+                output_cost_per_1k_tokens: 0.28,
+                context_window: 64000,
+                supports_images: false,
+                supports_tools: true,
+                last_updated: SystemTime::now(),
+            },
+            ModelPricing {
+                model_id: "google/gemini-2.0-flash-exp".to_string(),
+                model_name: "Gemini 2.0 Flash".to_string(),
+                provider: "openrouter".to_string(),
+                input_cost_per_1k_tokens: 0.001,
+                output_cost_per_1k_tokens: 0.002,
+                context_window: 1000000,
+                supports_images: true,
+                supports_tools: true,
+                last_updated: SystemTime::now(),
+            },
+        ]
+    }
+
+    #[tokio::test]
+    async fn test_model_pricing_creation() {
+        let pricing = ModelPricing {
+            model_id: "test-model".to_string(),
+            model_name: "Test Model".to_string(),
+            provider: "test-provider".to_string(),
+            input_cost_per_1k_tokens: 0.01,
+            output_cost_per_1k_tokens: 0.02,
+            context_window: 100000,
+            supports_images: true,
+            supports_tools: false,
+            last_updated: SystemTime::now(),
+        };
+
+        assert_eq!(pricing.model_id, "test-model");
+        assert_eq!(pricing.input_cost_per_1k_tokens, 0.01);
+        assert_eq!(pricing.output_cost_per_1k_tokens, 0.02);
+        assert_eq!(pricing.context_window, 100000);
+        assert!(pricing.supports_images);
+        assert!(!pricing.supports_tools);
+    }
+
+    #[tokio::test]
+    async fn test_pricing_database_operations() {
+        let db = PricingDatabase::new(create_cost_config());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Test retrieving pricing
+        let claude_pricing = db
+            .get_model_pricing("anthropic/claude-3.5-sonnet")
+            .await
+            .unwrap();
+        assert!(claude_pricing.is_some());
+        assert_eq!(claude_pricing.unwrap().model_name, "Claude 3.5 Sonnet");
+
+        // Test getting all pricing
+        let all_pricing = db.get_all_pricing().await.unwrap();
+        assert_eq!(all_pricing.len(), 4);
+
+        // Test getting pricing by provider
+        let openrouter_pricing = db.get_provider_pricing("openrouter").await.unwrap();
+        assert_eq!(openrouter_pricing.len(), 3); // Claude, GPT-4, Gemini
+
+        // Test removing pricing
+        db.remove_pricing("deepseek-chat").await.unwrap();
+        let deepseek_pricing = db.get_model_pricing("deepseek-chat").await.unwrap();
+        assert!(deepseek_pricing.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_cost_calculation() {
+        let db = PricingDatabase::new(create_cost_config());
+        let calculator = CostCalculator::new(db.clone(), create_cost_config());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        let request = create_test_request();
+        let model = "anthropic/claude-3.5-sonnet";
+
+        // Estimate cost
+        let estimate = calculator
+            .estimate_request_cost(&request, model)
+            .await
+            .unwrap();
+
+        assert_eq!(estimate.model_id, model);
+        assert!(estimate.input_tokens > 0);
+        assert!(estimate.estimated_output_tokens > 0);
+        assert!(estimate.input_cost > 0.0);
+        assert!(estimate.output_cost > 0.0);
+        assert!(estimate.total_cost > 0.0);
+
+        // Verify calculation: input_cost + output_cost = total_cost
+        assert!((estimate.input_cost + estimate.output_cost - estimate.total_cost).abs() < 0.0001);
+    }
+
+    #[tokio::test]
+    async fn test_cheapest_model_selection() {
+        let db = PricingDatabase::new(create_cost_config());
+        let calculator = CostCalculator::new(db.clone(), create_cost_config());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Define constraints
+        let constraints = ModelConstraints {
+            min_context_window: 50000,
+            supports_images: false,
+            supports_tools: true,
+            max_cost_per_1k_tokens: Some(0.05),
+        };
+
+        // Find cheapest model meeting constraints
+        let cheapest = calculator.get_cheapest_model(&constraints).await.unwrap();
+        assert!(cheapest.is_some());
+
+        // Should be Gemini (cheapest at $0.001/$0.002 per 1k tokens)
+        assert_eq!(cheapest.unwrap(), "google/gemini-2.0-flash-exp");
+    }
+
+    #[tokio::test]
+    async fn test_cost_effectiveness_scoring() {
+        let db = PricingDatabase::new(create_cost_config());
+        let calculator = CostCalculator::new(db.clone(), create_cost_config());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Test cost-effectiveness for different models
+        let claude_score = calculator
+            .calculate_cost_effectiveness_score(
+                0.8, // performance score
+                "anthropic/claude-3.5-sonnet",
+            )
+            .await
+            .unwrap();
+
+        let gemini_score = calculator
+            .calculate_cost_effectiveness_score(
+                0.7, // performance score
+                "google/gemini-2.0-flash-exp",
+            )
+            .await
+            .unwrap();
+
+        // Gemini should have higher cost-effectiveness due to much lower cost
+        assert!(gemini_score > claude_score);
+    }
+
+    #[tokio::test]
+    async fn test_budget_management() {
+        let config = create_cost_config();
+        let budget_manager = BudgetManager::new(config.daily_limit, config.monthly_limit);
+
+        // Test initial state
+        let usage = budget_manager.get_current_usage().await.unwrap();
+        assert_eq!(usage.daily_spend, 0.0);
+        assert_eq!(usage.monthly_spend, 0.0);
+        assert_eq!(usage.request_count, 0);
+
+        // Record some costs
+        budget_manager.record_cost(0.50).await.unwrap();
+        budget_manager.record_cost(0.75).await.unwrap();
+
+        let usage = budget_manager.get_current_usage().await.unwrap();
+        assert_eq!(usage.daily_spend, 1.25);
+        assert_eq!(usage.monthly_spend, 1.25);
+        assert_eq!(usage.request_count, 2);
+
+        // Test budget checking
+        assert!(budget_manager.is_within_budget(5.0).await.unwrap()); // 5.0 < 10.0 daily limit
+        assert!(!budget_manager.is_within_budget(15.0).await.unwrap()); // 15.0 > 10.0 daily limit
+    }
+
+    #[tokio::test]
+    async fn test_cost_tracking() {
+        let config = create_cost_config();
+        let db = PricingDatabase::new(config.clone());
+        let cost_tracker = CostTracker::new(db.clone(), config.clone());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Track a request cost
+        let request = create_test_request();
+        let model = "anthropic/claude-3.5-sonnet";
+        let actual_usage = TokenUsage {
+            input_tokens: 50,
+            output_tokens: 100,
+            total_tokens: 150,
+        };
+
+        cost_tracker
+            .track_request_cost(&request, model, &actual_usage)
+            .await
+            .unwrap();
+
+        // Verify tracking
+        let usage = cost_tracker
+            .get_model_usage("anthropic/claude-3.5-sonnet")
+            .await
+            .unwrap();
+        assert!(usage.is_some());
+        assert_eq!(usage.unwrap().total_requests, 1);
+        assert!(usage.unwrap().total_cost > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_openrouter_pricing_client() {
+        let client = OpenRouterPricingClient::new(
+            "test-api-key".to_string(),
+            "https://openrouter.ai/api/v1".to_string(),
+        );
+
+        // Mock pricing fetch (in real implementation, this would make actual API calls)
+        let result = client.fetch_pricing().await;
+
+        // In test environment, this would typically fail due to invalid API key
+        // In a real test with mocked HTTP client, this would succeed
+        match result {
+            Ok(pricing_data) => {
+                assert!(!pricing_data.is_empty());
+                // Verify structure of returned data
+                for pricing in pricing_data {
+                    assert!(!pricing.model_id.is_empty());
+                    assert!(pricing.input_cost_per_1k_tokens >= 0.0);
+                    assert!(pricing.output_cost_per_1k_tokens >= 0.0);
+                }
+            }
+            Err(ProxyError::NetworkError(_)) => {
+                // Expected in test environment without real API
+            }
+            Err(e) => {
+                panic!("Unexpected error: {:?}", e);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pricing_data_validation() {
+        let db = PricingDatabase::new(create_cost_config());
+
+        // Test valid pricing data
+        let valid_pricing = ModelPricing {
+            model_id: "valid-model".to_string(),
+            model_name: "Valid Model".to_string(),
+            provider: "test-provider".to_string(),
+            input_cost_per_1k_tokens: 0.01,
+            output_cost_per_1k_tokens: 0.02,
+            context_window: 100000,
+            supports_images: true,
+            supports_tools: false,
+            last_updated: SystemTime::now(),
+        };
+
+        assert!(valid_pricing.validate().is_ok());
+
+        // Test invalid pricing data (negative costs)
+        let invalid_pricing = ModelPricing {
+            model_id: "invalid-model".to_string(),
+            model_name: "Invalid Model".to_string(),
+            provider: "test-provider".to_string(),
+            input_cost_per_1k_tokens: -0.01, // Invalid negative cost
+            output_cost_per_1k_tokens: 0.02,
+            context_window: 100000,
+            supports_images: true,
+            supports_tools: false,
+            last_updated: SystemTime::now(),
+        };
+
+        assert!(invalid_pricing.validate().is_err());
+    }
+
+    #[tokio::test]
+    async fn test_cost_threshold_enforcement() {
+        let config = create_cost_config();
+        let db = PricingDatabase::new(config.clone());
+        let calculator = CostCalculator::new(db.clone(), config.clone());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        let request = create_test_request();
+
+        // Test with model that exceeds cost threshold
+        let expensive_estimate = calculator
+            .estimate_request_cost(&request, "openai/gpt-4")
+            .await
+            .unwrap();
+        assert!(expensive_estimate.total_cost > config.thresholds.max_cost_per_1k_tokens);
+
+        // Test with model within cost threshold
+        let cheap_estimate = calculator
+            .estimate_request_cost(&request, "google/gemini-2.0-flash-exp")
+            .await
+            .unwrap();
+        assert!(cheap_estimate.total_cost <= config.thresholds.max_cost_per_1k_tokens);
+    }
+
+    #[tokio::test]
+    async fn test_router_integration_with_cost_optimization() {
+        let config = Arc::new(create_test_config());
+        let cost_config = create_cost_config();
+        let db = Arc::new(PricingDatabase::new(cost_config.clone()));
+        let cost_tracker = Arc::new(CostTracker::new(db.clone(), cost_config.clone()));
+        let budget_manager = Arc::new(BudgetManager::new(
+            cost_config.daily_limit,
+            cost_config.monthly_limit,
+        ));
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Create router with cost optimization
+        let router = RouterAgent::with_cost_optimization(
+            config.clone(),
+            db.clone(),
+            cost_tracker.clone(),
+            budget_manager.clone(),
+        );
+
+        let request = create_test_request();
+        let hints = crate::analyzer::RoutingHints {
+            is_background: false,
+            has_thinking: false,
+            has_web_search: false,
+            has_images: false,
+            token_count: 100,
+            session_id: None,
+        };
+
+        // Test routing with cost optimization
+        let decision = router
+            .route_with_cost_optimization(&request, &hints)
+            .await
+            .unwrap();
+
+        assert!(decision.cost_estimate.is_some());
+        assert!(decision.cost_effectiveness_score.is_some());
+        assert!(decision.budget_impact.is_some());
+
+        if let Some(cost_estimate) = decision.cost_estimate {
+            assert!(cost_estimate.total_cost > 0.0);
+        }
+
+        if let Some(budget_impact) = decision.budget_impact {
+            assert!(budget_impact.within_budget);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_cost_aware_routing_with_budget_constraints() {
+        let config = Arc::new(create_test_config());
+        let mut cost_config = create_cost_config();
+        cost_config.daily_limit = 0.01; // Very low budget for testing
+
+        let db = Arc::new(PricingDatabase::new(cost_config.clone()));
+        let cost_tracker = Arc::new(CostTracker::new(db.clone(), cost_config.clone()));
+        let budget_manager = Arc::new(BudgetManager::new(
+            cost_config.daily_limit,
+            cost_config.monthly_limit,
+        ));
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Use up most of the budget
+        budget_manager.record_cost(0.009).await.unwrap();
+
+        let router = RouterAgent::with_cost_optimization(
+            config.clone(),
+            db.clone(),
+            cost_tracker.clone(),
+            budget_manager.clone(),
+        );
+
+        let request = create_test_request();
+        let hints = crate::analyzer::RoutingHints {
+            is_background: false,
+            has_thinking: false,
+            has_web_search: false,
+            has_images: false,
+            token_count: 100,
+            session_id: None,
+        };
+
+        let decision = router
+            .route_with_cost_optimization(&request, &hints)
+            .await
+            .unwrap();
+
+        // Should either select a very cheap model or indicate budget exceeded
+        if let Some(budget_impact) = decision.budget_impact {
+            if !budget_impact.within_budget {
+                // Router should have handled budget exceeded scenario
+                assert!(budget_impact.request_cost > cost_config.daily_limit - 0.009);
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_pricing_data_persistence() {
+        let temp_dir = TempDir::new().unwrap();
+        let db_path = temp_dir.path().join("pricing.json");
+
+        let mut cost_config = create_cost_config();
+        cost_config.persistence_path = Some(db_path.to_string_lossy().to_string());
+
+        let db = PricingDatabase::new(cost_config.clone());
+
+        // Add some test data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Save to disk
+        db.save_to_disk().await.unwrap();
+
+        // Create new database instance and load
+        let db2 = PricingDatabase::new(cost_config);
+        db2.load_from_disk().await.unwrap();
+
+        // Verify data was loaded
+        let all_pricing = db2.get_all_pricing().await.unwrap();
+        assert_eq!(all_pricing.len(), 4);
+
+        let claude_pricing = db2
+            .get_model_pricing("anthropic/claude-3.5-sonnet")
+            .await
+            .unwrap();
+        assert!(claude_pricing.is_some());
+        assert_eq!(claude_pricing.unwrap().model_name, "Claude 3.5 Sonnet");
+    }
+
+    #[tokio::test]
+    async fn test_cost_analytics() {
+        let config = create_cost_config();
+        let db = Arc::new(PricingDatabase::new(config.clone()));
+        let cost_tracker = Arc::new(CostTracker::new(db.clone(), config.clone()));
+        let analytics = CostAnalytics::new(cost_tracker.clone(), db.clone());
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // Track some requests
+        let request = create_test_request();
+        let usage1 = TokenUsage {
+            input_tokens: 50,
+            output_tokens: 100,
+            total_tokens: 150,
+        };
+        let usage2 = TokenUsage {
+            input_tokens: 75,
+            output_tokens: 125,
+            total_tokens: 200,
+        };
+
+        cost_tracker
+            .track_request_cost(&request, "anthropic/claude-3.5-sonnet", &usage1)
+            .await
+            .unwrap();
+        cost_tracker
+            .track_request_cost(&request, "google/gemini-2.0-flash-exp", &usage2)
+            .await
+            .unwrap();
+
+        // Test analytics
+        let cost_by_model = analytics.get_cost_by_model(TimePeriod::Day).await.unwrap();
+        assert_eq!(cost_by_model.len(), 2);
+
+        let cost_trends = analytics.get_cost_trends(TimePeriod::Week).await.unwrap();
+        assert!(!cost_trends.is_empty());
+
+        let savings = analytics
+            .calculate_savings(TimePeriod::Month)
+            .await
+            .unwrap();
+        assert!(savings.potential_savings >= 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_multi_objective_optimization() {
+        let config = Arc::new(create_test_config());
+        let cost_config = create_cost_config();
+        let db = Arc::new(PricingDatabase::new(cost_config.clone()));
+        let cost_tracker = Arc::new(CostTracker::new(db.clone(), cost_config.clone()));
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        let optimizer = RoutingOptimizer::new(
+            OptimizationConfig {
+                performance_weight: 0.5,
+                cost_weight: 0.3,
+                reliability_weight: 0.1,
+                session_weight: 0.1,
+                budget_constraints: BudgetConstraints::default(),
+                performance_thresholds: PerformanceThresholds::default(),
+            },
+            None, // No performance DB for this test
+            Some(db.clone()),
+            None, // No budget manager for this test
+        );
+
+        // Create candidates
+        let candidates = vec![
+            RoutingCandidate {
+                provider: config.providers[0].clone(), // openrouter
+                model: "anthropic/claude-3.5-sonnet".to_string(),
+                scenario: RoutingScenario::Default,
+                source: CandidateSource::Configuration,
+                confidence: 0.8,
+            },
+            RoutingCandidate {
+                provider: config.providers[0].clone(), // openrouter
+                model: "google/gemini-2.0-flash-exp".to_string(),
+                scenario: RoutingScenario::Default,
+                source: CandidateSource::CostOptimized,
+                confidence: 0.7,
+            },
+        ];
+
+        let request = create_test_request();
+        let decision = optimizer
+            .optimize_routing(candidates, &request)
+            .await
+            .unwrap();
+
+        assert_eq!(decision.provider.name, "openrouter");
+        assert!(decision.optimization_factors.cost_weight > 0.0);
+        assert!(!decision.alternatives.is_empty());
+    }
+}
+
+// Integration tests for the complete cost optimization system
+#[cfg(test)]
+mod integration_tests {
+    use super::*;
+
+    #[tokio::test]
+    async fn test_end_to_end_cost_optimization() {
+        let config = Arc::new(create_test_config());
+        let cost_config = create_cost_config();
+        let db = Arc::new(PricingDatabase::new(cost_config.clone()));
+        let cost_tracker = Arc::new(CostTracker::new(db.clone(), cost_config.clone()));
+        let budget_manager = Arc::new(BudgetManager::new(
+            cost_config.daily_limit,
+            cost_config.monthly_limit,
+        ));
+
+        // 1. Fetch and populate pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        // 2. Create router with cost optimization
+        let router = RouterAgent::with_cost_optimization(
+            config.clone(),
+            db.clone(),
+            cost_tracker.clone(),
+            budget_manager.clone(),
+        );
+
+        // 3. Process a request
+        let request = create_test_request();
+        let hints = crate::analyzer::RoutingHints {
+            is_background: false,
+            has_thinking: false,
+            has_web_search: false,
+            has_images: false,
+            token_count: 100,
+            session_id: None,
+        };
+
+        let decision = router
+            .route_with_cost_optimization(&request, &hints)
+            .await
+            .unwrap();
+
+        // 4. Verify cost optimization was applied
+        assert!(decision.cost_estimate.is_some());
+        assert!(decision.cost_effectiveness_score.is_some());
+        assert!(decision.budget_impact.is_some());
+
+        // 5. Track the actual cost (simulated)
+        if let Some(cost_estimate) = &decision.cost_estimate {
+            let actual_usage = TokenUsage {
+                input_tokens: cost_estimate.input_tokens,
+                output_tokens: cost_estimate.estimated_output_tokens,
+                total_tokens: cost_estimate.input_tokens + cost_estimate.estimated_output_tokens,
+            };
+
+            cost_tracker
+                .track_request_cost(&request, &decision.model, &actual_usage)
+                .await
+                .unwrap();
+            budget_manager
+                .record_cost(cost_estimate.total_cost)
+                .await
+                .unwrap();
+        }
+
+        // 6. Verify tracking worked
+        let usage = cost_tracker.get_model_usage(&decision.model).await.unwrap();
+        assert!(usage.is_some());
+        assert_eq!(usage.unwrap().total_requests, 1);
+
+        let budget_usage = budget_manager.get_current_usage().await.unwrap();
+        assert_eq!(budget_usage.request_count, 1);
+        assert!(budget_usage.daily_spend > 0.0);
+    }
+
+    #[tokio::test]
+    async fn test_cost_optimization_with_multiple_scenarios() {
+        let config = Arc::new(create_test_config());
+        let cost_config = create_cost_config();
+        let db = Arc::new(PricingDatabase::new(cost_config.clone()));
+        let cost_tracker = Arc::new(CostTracker::new(db.clone(), cost_config.clone()));
+        let budget_manager = Arc::new(BudgetManager::new(
+            cost_config.daily_limit,
+            cost_config.monthly_limit,
+        ));
+
+        // Add pricing data
+        let pricing_data = create_sample_pricing_data();
+        for pricing in pricing_data {
+            db.add_pricing(pricing.model_id.clone(), pricing)
+                .await
+                .unwrap();
+        }
+
+        let router = RouterAgent::with_cost_optimization(
+            config.clone(),
+            db.clone(),
+            cost_tracker.clone(),
+            budget_manager.clone(),
+        );
+
+        // Test different scenarios
+        let scenarios = vec![
+            (RoutingScenario::Default, "Simple question"),
+            (RoutingScenario::Think, "Complex reasoning task"),
+            (
+                RoutingScenario::LongContext,
+                "Document analysis with large context",
+            ),
+            (RoutingScenario::Background, "Simple background processing"),
+        ];
+
+        for (scenario, description) in scenarios {
+            let mut request = create_test_request();
+            request.messages[0].content = MessageContent::Text(description.to_string());
+
+            let hints = crate::analyzer::RoutingHints {
+                is_background: matches!(scenario, RoutingScenario::Background),
+                has_thinking: matches!(scenario, RoutingScenario::Think),
+                has_web_search: false,
+                has_images: false,
+                token_count: if matches!(scenario, RoutingScenario::LongContext) {
+                    70000
+                } else {
+                    100
+                },
+                session_id: None,
+            };
+
+            let decision = router
+                .route_with_cost_optimization(&request, &hints)
+                .await
+                .unwrap();
+
+            // Verify each scenario gets appropriate cost optimization
+            assert!(decision.cost_estimate.is_some());
+            assert!(decision.budget_impact.is_some());
+
+            if let Some(budget_impact) = decision.budget_impact {
+                assert!(budget_impact.within_budget);
+            }
+        }
+    }
+}

@@ -1,0 +1,81 @@
+# Terraphim Proxy Configuration for OpenClaw, Codex CLI, and Claude Code
+# 
+# This configuration provides intelligent routing for all three clients:
+# - Claude Code: Uses Anthropic API format (/v1/messages)
+# - Codex CLI: Uses OpenAI API format (/v1/chat/completions)  
+# - OpenClaw: Can use either format (defaults to Anthropic)
+#
+# Features:
+# - Automatic model mapping when routing to different providers
+# - Scenario-based routing (think, background, long_context, etc.)
+# - Support for OpenRouter, Groq, and other providers
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "terraphim-test-key-2026"
+timeout_ms = 300000
+
+[router]
+# Default routing - used for standard requests
+default = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Background routing - used for low-priority tasks (fast & cheap)
+background = "groq,llama-3.1-8b-instant"
+
+# Think routing - used for complex reasoning tasks
+think = "openrouter,deepseek/deepseek-r1"
+
+# Long context routing - used for large inputs
+long_context = "openrouter,google/gemini-2.0-flash-exp:free"
+long_context_threshold = 60000
+
+# Web search routing - used when web search tool is requested
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image routing - used when images are attached
+image = "openrouter,anthropic/claude-3.5-sonnet"
+
+# Routing strategy
+strategy = "fill_first"
+
+# OpenRouter Provider
+# Primary provider for Claude models and diverse options
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3.5-haiku", 
+    "anthropic/claude-3-opus",
+    "anthropic/claude-sonnet-4.5",
+    "deepseek/deepseek-r1",
+    "deepseek/deepseek-chat",
+    "google/gemini-2.0-flash-exp:free",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+# Groq Provider
+# Fast inference for OpenAI-compatible models (Codex CLI)
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = [
+    "llama-3.1-8b-instant",
+    "llama-3.1-70b-versatile",
+    "mixtral-8x7b-32768"
+]
+transformers = ["openai"]
+
+# Security settings
+[security.rate_limiting]
+enabled = true
+requests_per_minute = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = false
+allow_private_ips = false

@@ -1,0 +1,72 @@
+<svg width="1200" height="1200" viewBox="0 0 1200 1200" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">OpenClaw and Terraphim LLM Proxy Social Preview</title>
+  <desc id="desc">Square social image showing intelligent multi-model routing with OpenAI, Z.ai, and MiniMax through Terraphim LLM Proxy.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="1200" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1324"/>
+      <stop offset="1" stop-color="#1A2847"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#182746"/>
+      <stop offset="1" stop-color="#22355E"/>
+    </linearGradient>
+    <linearGradient id="proxy" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#173B2E"/>
+      <stop offset="1" stop-color="#1F5A44"/>
+    </linearGradient>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="5" orient="auto">
+      <path d="M0 0L10 5L0 10V0Z" fill="#8FB8FF"/>
+    </marker>
+    <style>
+      .h1 { font: 700 48px "Menlo", "SF Mono", monospace; fill: #F4F7FF; }
+      .h2 { font: 600 24px "Menlo", "SF Mono", monospace; fill: #D9E6FF; }
+      .body { font: 500 20px "Menlo", "SF Mono", monospace; fill: #C8D7F5; }
+      .small { font: 500 16px "Menlo", "SF Mono", monospace; fill: #AFC2E8; }
+    </style>
+  </defs>
+
+  <rect width="1200" height="1200" fill="url(#bg)"/>
+
+  <circle cx="980" cy="170" r="190" fill="#2D4D8A" opacity="0.14"/>
+  <circle cx="190" cy="1030" r="230" fill="#2A7A63" opacity="0.12"/>
+
+  <text x="80" y="110" class="h1">Intelligent Multi-Model Proxy</text>
+  <text x="82" y="150" class="h2">OpenClaw + Terraphim LLM Proxy</text>
+
+  <rect x="90" y="260" width="300" height="200" rx="18" fill="url(#card)"/>
+  <text x="120" y="320" class="h2">OpenClaw</text>
+  <text x="120" y="358" class="small">single endpoint client</text>
+  <text x="120" y="390" class="small">127.0.0.1:3456/v1</text>
+
+  <rect x="470" y="210" width="360" height="300" rx="18" fill="url(#proxy)"/>
+  <text x="500" y="280" class="h2">Terraphim LLM Proxy</text>
+  <text x="500" y="320" class="small">route chains + fallback</text>
+  <text x="500" y="355" class="small">keyword routing</text>
+  <text x="500" y="420" class="small">openai-codex | zai | minimax</text>
+
+  <rect x="900" y="220" width="230" height="120" rx="14" fill="url(#card)"/>
+  <text x="925" y="268" class="body">OpenAI Codex</text>
+  <text x="925" y="300" class="small">gpt-5.2</text>
+
+  <rect x="900" y="380" width="230" height="120" rx="14" fill="url(#card)"/>
+  <text x="925" y="428" class="body">Z.ai</text>
+  <text x="925" y="460" class="small">glm-5</text>
+
+  <rect x="900" y="540" width="230" height="120" rx="14" fill="url(#card)"/>
+  <text x="925" y="588" class="body">MiniMax</text>
+  <text x="925" y="620" class="small">MiniMax-M2.5</text>
+
+  <path d="M400 350H450" stroke="#8FB8FF" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M840 280H885" stroke="#8FB8FF" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M840 440H885" stroke="#8FB8FF" stroke-width="5" marker-end="url(#arrow)"/>
+  <path d="M840 600H885" stroke="#8FB8FF" stroke-width="5" marker-end="url(#arrow)"/>
+
+  <rect x="90" y="560" width="740" height="220" rx="18" fill="url(#card)"/>
+  <text x="120" y="622" class="h2">Proven Behaviors</text>
+  <text x="120" y="664" class="small">- Direct model routing works (OpenAI, Z.ai, MiniMax)</text>
+  <text x="120" y="700" class="small">- Keyword route: minimax_keyword_routing</text>
+  <text x="120" y="736" class="small">- Fallback: Codex failure -> Z.ai success</text>
+
+  <text x="80" y="1120" class="small">terraphim-llm-proxy</text>
+</svg>

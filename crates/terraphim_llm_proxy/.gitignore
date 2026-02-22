@@ -1,0 +1,33 @@
+# Cache files
+.cachebro/
+*.db
+*.db-wal
+*.db-shm
+
+# Environment files (may contain secrets)
+.env*
+!.env.example
+
+# Session files
+.sessions/
+session-*.md
+
+# Build artifacts
+/target/
+Cargo.lock
+
+# IDE
+.cursorrules
+
+# Test artifacts
+*.pid
+proxy-settings.json
+
+# History files
+*_history.txt
+claude-code-history.txt
+build_history.txt
+
+# OS
+.DS_Store
+Thumbs.db

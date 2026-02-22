@@ -1,0 +1,122 @@
+# Terraphim LLM Proxy Configuration: Coding Plan Subscriptions
+# Use this config with Z.ai, MiniMax, and Kimi coding plan APIs
+#
+# These providers offer Anthropic-compatible endpoints that work with Claude Code.
+# Cost-effective alternative to direct Claude API access.
+#
+# Provider Pricing (as of Feb 2026):
+#   - Z.ai GLM Coding: $3/month unlimited
+#   - MiniMax M2.5: Pay-per-use coding plan
+#   - Kimi: API key only (membership required)
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "$PROXY_API_KEY"
+timeout_ms = 3000000  # 50 minutes (coding plan APIs can be slow)
+
+[router]
+# Default to Z.ai (most reliable, $3/mo unlimited)
+default = "zai,glm-4.7"
+
+# Background tasks use Kimi if available
+background = "kimi,kimi-for-coding"
+
+# Thinking/reasoning mode - route to MiniMax for complex tasks
+think = "minimax,MiniMax-M2.5"
+
+# Long context routing (>60K tokens)
+long_context = "zai,glm-4.7"
+long_context_threshold = 60000
+
+# Model mappings - remap Claude model names to coding plan models
+[[router.model_mappings]]
+from = "claude-3-5-sonnet-20241022"
+to = "zai,glm-4.7"
+
+[[router.model_mappings]]
+from = "claude-sonnet-4-20250514"
+to = "zai,glm-4.7"
+
+[[router.model_mappings]]
+from = "claude-3-5-haiku-20241022"
+to = "kimi,kimi-for-coding"
+
+[[router.model_mappings]]
+from = "claude-3-haiku-20240307"
+to = "kimi,kimi-for-coding"
+
+[[router.model_mappings]]
+from = "claude-3-opus-20240229"
+to = "minimax,MiniMax-M2.5"
+
+# Auto model routing - use Z.ai by default
+[[router.model_mappings]]
+from = "auto"
+to = "zai,glm-4.7"
+
+[security.rate_limiting]
+enabled = true
+requests_per_minute = 60
+concurrent_requests = 10
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = false
+allow_private_ips = false
+
+# ============================================================
+# Coding Plan Providers
+# ============================================================
+
+# Z.ai GLM Coding Plan ($3/month unlimited)
+# Uses OpenAI-compatible API at https://api.z.ai/api/coding/paas/v4
+# Excellent for daily coding tasks
+[[providers]]
+name = "zai"
+api_base_url = "https://api.z.ai/api/coding/paas/v4"
+api_key = "$ZAI_API_KEY"  # Set from ANTHROPIC_AUTH_TOKEN in ~/.claude/settings_zai.json
+models = ["glm-4.7", "glm-4.5", "glm-4.5-air"]
+
+# MiniMax M2.5 Coding Plan
+# Provides Anthropic-compatible API at https://api.minimax.io/anthropic
+# Good for complex reasoning tasks
+[[providers]]
+name = "minimax"
+api_base_url = "https://api.minimax.io/anthropic"
+api_key = "$MINIMAX_API_KEY"  # op://Employee/platform.minimax.io-coding/coding-api-key
+models = ["MiniMax-M2.5", "MiniMax-M2.1"]
+
+# Kimi Coding API (Moonshot AI)
+# Provides Anthropic-compatible API at https://api.kimi.com/coding/
+# Requires active membership subscription
+[[providers]]
+name = "kimi"
+api_base_url = "https://api.kimi.com/coding"
+api_key = "$KIMI_API_KEY"  # op://Employee/kimi_coding/api-key
+models = ["kimi-for-coding"]
+
+# ============================================================
+# Usage Instructions
+# ============================================================
+#
+# 1. Set environment variables:
+#    export PROXY_API_KEY="sk-proxy-your-key"
+#    export ZAI_API_KEY="your-zai-token"        # From ~/.claude/settings_zai.json
+#    export MINIMAX_API_KEY="your-minimax-key"  # op://Employee/platform.minimax.io-coding/coding-api-key
+#    export KIMI_API_KEY="sk-kimi-xxx"          # From ~/.claude/settings_kimi2.json
+#
+# 2. Start proxy:
+#    ./target/release/terraphim-llm-proxy -c config.coding-plans.toml
+#
+# 3. Configure Claude Code:
+#    Create ~/.claude/settings_coding_plans.json:
+#    {
+#      "env": {
+#        "ANTHROPIC_BASE_URL": "http://127.0.0.1:3456",
+#        "ANTHROPIC_API_KEY": "sk-proxy-your-key"
+#      }
+#    }
+#
+# 4. Launch Claude Code:
+#    claude --settings ~/.claude/settings_coding_plans.json

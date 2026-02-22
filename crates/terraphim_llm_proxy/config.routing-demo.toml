@@ -1,0 +1,100 @@
+# Terraphim LLM Proxy - Routing Demonstration Configuration
+# Shows intelligent routing based on keywords in user messages
+#
+# Pattern Routing Examples:
+#   "think", "plan", "reason" -> DeepSeek Reasoner (thinking model)
+#   "fast", "quick", "urgent" -> Groq (fastest inference)
+#   "cheap", "budget", "slow" -> DeepSeek Chat (lowest cost)
+#   default                   -> OpenRouter Claude Sonnet
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 120000
+
+[router]
+# Default: Claude Sonnet via OpenRouter
+default = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Background tasks: Groq for speed
+background = "groq,llama-3.3-70b-versatile"
+
+# Thinking/reasoning mode: DeepSeek Reasoner
+think = "deepseek,deepseek-reasoner"
+
+# Plan implementation: Groq for tactical speed
+plan_implementation = "groq,llama-3.3-70b-versatile"
+
+# Long context: Gemini Flash
+long_context = "openrouter,google/gemini-2.5-flash-preview-09-2025"
+long_context_threshold = 60000
+
+# Web search: Perplexity
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image: Claude Sonnet
+image = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Model mappings for OpenClaw
+[[router.model_mappings]]
+from = "claude-sonnet-4-5"
+to = "openrouter,anthropic/claude-sonnet-4.5"
+
+[[router.model_mappings]]
+from = "claude-opus-4-5"
+to = "openrouter,anthropic/claude-opus-4.5"
+
+# Pattern-based routing rules
+# These match keywords in user messages and route accordingly
+
+[[router.pattern_rules]]
+patterns = ["think", "plan", "reason", "analyze", "step by step", "chain-of-thought", "reasoning", "work through"]
+route = "deepseek,deepseek-reasoner"
+priority = 100
+
+[[router.pattern_rules]]
+patterns = ["fast", "quick", "urgent", "speed", "realtime", "low latency", "fastest", "immediately"]
+route = "groq,llama-3.3-70b-versatile"
+priority = 90
+
+[[router.pattern_rules]]
+patterns = ["cheap", "budget", "slow", "economy", "cost-effective", "low-cost", "affordable", "save money"]
+route = "deepseek,deepseek-chat"
+priority = 80
+
+[security.rate_limiting]
+enabled = false
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# Providers
+
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-opus-4.5",
+    "google/gemini-2.5-flash-preview-09-2025",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+transformers = ["openai"]
+
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek"]

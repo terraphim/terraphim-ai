@@ -1,0 +1,51 @@
+[proxy]
+host = "127.0.0.1"
+port = 3458
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 300000
+
+[router]
+# Default routing - prioritize fastest models
+default = "openrouter,deepseek/deepseek-chat"
+# Thinking - use DeepSeek reasoner (fast reasoning)
+think = "openrouter,deepseek/deepseek-reasoner"
+# Long context - use Gemini Flash (very fast)
+long_context = "openrouter,google/gemini-2.0-flash-exp"
+long_context_threshold = 60000
+# Web search - use Perplexity Sonar (fast online)
+web_search = "openrouter,perplexity/llama-3.1-sonar-small-128k-online"
+# Image - use Claude Sonnet (fast vision)
+image = "openrouter,anthropic/claude-sonnet-4.5"
+# Background - use Ollama (local, fast)
+background = "ollama,llama3.2:latest"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 1200
+concurrent_requests = 200
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# Providers
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+  "deepseek/deepseek-chat",
+  "deepseek/deepseek-reasoner",
+  "google/gemini-2.0-flash-exp",
+  "perplexity/llama-3.1-sonar-small-128k-online",
+  "anthropic/claude-sonnet-4.5"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "ollama"
+api_base_url = "http://127.0.0.1:11434"
+api_key = "ollama"
+models = ["llama3.2:latest", "qwen2.5-coder:latest"]
+transformers = ["ollama"]

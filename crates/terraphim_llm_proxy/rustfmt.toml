@@ -1,0 +1,11 @@
+edition = "2021"
+hard_tabs = false
+tab_spaces = 4
+max_width = 100
+use_small_heuristics = "Default"
+newline_style = "Unix"
+reorder_imports = true
+remove_nested_parens = true
+merge_derives = true
+use_field_init_shorthand = false
+force_explicit_abi = true

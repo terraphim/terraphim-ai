@@ -1,0 +1,132 @@
+# Terraphim LLM Proxy - QUALITY FIRST Configuration
+# Optimized for best output quality with premium models
+#
+# Primary: Claude Sonnet 4.5 (best code quality)
+# Think: Claude Opus 4.5 (maximum reasoning)
+# Image: Claude Sonnet 4.5 (best multimodal)
+# Fallback: Groq for speed when quality equivalent
+#
+# Use this configuration when:
+#   - Output quality is the top priority
+#   - Working on production code
+#   - Complex reasoning tasks
+#   - Enterprise applications
+#
+# Usage:
+#   op run --env-file=.env.quality -- ./target/release/terraphim-llm-proxy -c config.quality-first.toml
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "$PROXY_API_KEY"
+timeout_ms = 300000  # 5 min timeout for complex Opus requests
+
+[router]
+# Default: Claude Sonnet 4.5 - best balance of quality and speed
+default = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Background: Groq for speed on background tasks (still good quality)
+background = "groq,llama-3.3-70b-versatile"
+
+# Think: Claude Opus 4.5 - maximum reasoning capability
+think = "openrouter,anthropic/claude-opus-4.5"
+
+# Plan Implementation: Claude Sonnet for tactical implementation
+plan_implementation = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Long context: Gemini Flash for 1M context (Claude limited to 200K)
+long_context = "openrouter,google/gemini-2.5-flash-preview-09-2025"
+long_context_threshold = 180000  # Use Claude until 180K, then Gemini
+
+# Web search: Perplexity for real-time web access
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image: Claude Sonnet 4.5 - best multimodal understanding
+image = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Model mappings - pass through Claude models to Claude
+[[router.model_mappings]]
+from = "claude-opus-4-5-*"
+to = "openrouter,anthropic/claude-opus-4.5"
+
+[[router.model_mappings]]
+from = "claude-sonnet-4-5-*"
+to = "openrouter,anthropic/claude-sonnet-4.5"
+
+[[router.model_mappings]]
+from = "claude-haiku-4-5-*"
+to = "openrouter,anthropic/claude-3.5-haiku"
+
+[[router.model_mappings]]
+from = "claude-3-5-sonnet-*"
+to = "openrouter,anthropic/claude-3.5-sonnet"
+
+# OpenClaw model mappings
+[[router.model_mappings]]
+from = "claude-sonnet-4-5"
+to = "openrouter,anthropic/claude-sonnet-4.5"
+
+[[router.model_mappings]]
+from = "claude-opus-4-5"
+to = "openrouter,anthropic/claude-opus-4.5"
+
+# GPT mappings - route to best Claude equivalents
+[[router.model_mappings]]
+from = "gpt-4*"
+to = "openrouter,anthropic/claude-sonnet-4.5"
+
+[[router.model_mappings]]
+from = "o1*"
+to = "openrouter,anthropic/claude-opus-4.5"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 300  # Lower rate for premium API protection
+concurrent_requests = 50
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# OpenRouter - Primary provider (access to all premium models)
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-opus-4.5",
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3.5-haiku",
+    "google/gemini-2.5-flash-preview-09-2025",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+# Anthropic Direct - Alternative for direct API access
+[[providers]]
+name = "anthropic"
+api_base_url = "https://api.anthropic.com"
+api_key = "$ANTHROPIC_API_KEY"
+models = [
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022"
+]
+transformers = ["anthropic"]
+
+# Groq - Fast fallback for background tasks
+[[providers]]
+name = "groq"
+api_base_url = "https://api.groq.com/openai/v1"
+api_key = "$GROQ_API_KEY"
+models = ["llama-3.3-70b-versatile", "llama-3.1-8b-instant"]
+transformers = ["openai"]
+
+# DeepSeek - Reasoning fallback
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek"]

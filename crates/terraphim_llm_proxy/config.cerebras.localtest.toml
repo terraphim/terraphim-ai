@@ -1,0 +1,43 @@
+[proxy]
+host = "127.0.0.1"
+port = 44567
+api_key = "sk_local_cerebras_test"
+timeout_ms = 120000
+
+[router]
+default = "cerebras,llama3.1-8b"
+background = "cerebras,llama3.1-8b"
+think = "cerebras,llama3.1-70b"
+long_context = "cerebras,llama3.1-70b"
+long_context_threshold = 12000
+web_search = "cerebras,llama3.1-70b"
+image = "cerebras,llama3.1-8b"
+
+[[router.model_mappings]]
+from = "fastest"
+to = "cerebras,llama3.1-8b"
+
+[[router.model_mappings]]
+from = "thinking"
+to = "cerebras,llama3.1-70b"
+
+[[router.model_mappings]]
+from = "cheapest"
+to = "cerebras,llama3.1-8b"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+[[providers]]
+name = "cerebras"
+api_base_url = "https://api.cerebras.ai/v1"
+api_key = "$CEREBRAS_API_KEY"
+models = ["llama3.1-8b", "llama3.1-70b"]
+transformers = ["openai"]

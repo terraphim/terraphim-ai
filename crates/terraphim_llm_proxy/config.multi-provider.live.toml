@@ -1,0 +1,63 @@
+# Terraphim LLM Proxy - Multi-Provider Demonstration
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 600000
+
+[router]
+default = "openrouter,anthropic/claude-sonnet-4.5"
+background = "ollama,qwen2.5-coder:latest"
+think = "openrouter,deepseek/deepseek-v3.1-terminus"
+long_context = "openrouter,google/gemini-2.5-flash-preview-09-2025"
+long_context_threshold = 60000
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+image = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Model name mappings for Claude Code compatibility
+# Maps Claude Code model names to OpenRouter format
+
+[[router.model_mappings]]
+from = "claude-3-5-sonnet-20241022"
+to = "openrouter,anthropic/claude-3.5-sonnet"
+
+[[router.model_mappings]]
+from = "claude-3-opus-20240229"
+to = "openrouter,anthropic/claude-3-opus"
+
+[[router.model_mappings]]
+from = "claude-sonnet-4-5-20250929"
+to = "openrouter,anthropic/claude-sonnet-4.5"
+
+[[router.model_mappings]]
+from = "claude-opus-4-5-20251101"
+to = "openrouter,anthropic/claude-opus-4.5"
+
+[security.rate_limiting]
+enabled = false
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-opus-4.5",
+    "anthropic/claude-3.5-sonnet",
+    "anthropic/claude-3-opus",
+    "google/gemini-2.5-flash-preview-09-2025",
+    "deepseek/deepseek-v3.1-terminus"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "ollama"
+api_base_url = "http://127.0.0.1:11434"
+api_key = "ollama"
+models = ["qwen2.5-coder:latest"]
+transformers = ["ollama"]

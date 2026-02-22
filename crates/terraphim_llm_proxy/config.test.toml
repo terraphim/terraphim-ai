@@ -1,0 +1,51 @@
+# Terraphim LLM Proxy - E2E Test Configuration
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 600000  # 10 minutes
+
+[router]
+# Default routing for general requests
+default = "openrouter,anthropic/claude-sonnet-4.5"
+
+# Background task routing (not configured - will fall to default)
+# background = "openrouter,anthropic/claude-3.5-haiku"
+
+# Thinking/reasoning mode routing (not configured - will test pattern matching)
+# think = "openrouter,deepseek/deepseek-r1"
+
+# Long context routing (>60K tokens)
+long_context = "openrouter,google/gemini-2.0-flash-exp:free"
+long_context_threshold = 60000
+
+# Web search routing (when web_search tool detected)
+# web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image routing (when image content detected)
+# image = "openrouter,anthropic/claude-3.5-sonnet:beta"
+
+[security.rate_limiting]
+enabled = false  # Disable for testing
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true  # Allow for testing
+allow_private_ips = true  # Allow for testing
+
+# OpenRouter provider
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "${OPENROUTER_API_KEY}"  # Will be read from environment
+models = [
+    "anthropic/claude-sonnet-4.5",
+    "anthropic/claude-3.5-haiku",
+    "google/gemini-2.5-flash-preview-09-2025",
+    "deepseek/deepseek-v3.1-terminus",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]

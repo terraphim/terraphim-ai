@@ -1,0 +1,160 @@
+[package]
+name = "terraphim_llm_proxy"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim Team"]
+license-file = "LICENSE"
+description = "Production-ready LLM proxy with intelligent routing and Terraphim integration"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["llm", "proxy", "claude-code", "ai", "terraphim"]
+categories = ["web-programming::http-server", "api-bindings"]
+
+[dependencies]
+# HTTP Server
+axum = { version = "0.7", features = ["ws", "macros", "multipart"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "timeout", "limit"] }
+tokio = { workspace = true }
+tokio-stream = "0.1"
+
+# Token Counting
+tiktoken-rs = "0.5"
+
+# LLM Client - using Terraphim fork for better provider support
+genai = { git = "https://github.com/terraphim/rust-genai", branch = "main" }
+
+# Configuration
+serde = { workspace = true }
+serde_json = { workspace = true }
+serde_yaml = { workspace = true }
+toml = "0.8"
+twelf = "0.15"
+
+# Time Handling
+chrono = { workspace = true }
+
+# Error Handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Caching
+lru = "0.12"
+redis = { version = "0.24", features = ["tokio-comp", "connection-manager"] }
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+
+# Async utilities
+futures = "0.3"
+async-stream = "0.3"
+async-trait = { workspace = true }
+
+# HTTP client
+reqwest = { workspace = true }
+reqwest-eventsource = "0.6"
+
+# URL parsing
+url = "2"
+
+# Pattern matching
+glob-match = "0.2"
+
+# IP network utilities (for SSRF protection)
+ipnetwork = "0.20"
+
+# Regex (for sanitization)
+regex = { workspace = true }
+
+# Random number generation (for API keys, jitter)
+rand = "0.8"
+
+# UUID generation (for tool IDs and sessions)
+uuid = { workspace = true }
+
+# Hashing (for API key hashing and webhook signing)
+sha2 = "0.10"
+hmac = "0.12"
+hex = "0.4"
+
+# Encoding (for OAuth PKCE)
+base64 = "0.22"
+urlencoding = "2"
+
+# File locking (for concurrent token refresh safety)
+fd-lock = "4"
+
+# Environment variables
+dotenvy = "0.15"
+
+# Directory paths
+dirs = { workspace = true }
+
+# CLI argument parsing
+clap = { version = "4", features = ["derive", "env"] }
+
+# Terraphim Knowledge Graph Integration
+aho-corasick = "1.1"
+terraphim_types = { path = "../terraphim_types" }
+tokio-util = { version = "0.7.18", features = ["io"] }
+
+[dev-dependencies]
+# Testing (no mocks - per requirements)
+tokio-test = "0.4"
+
+# HTTP testing
+axum-test = "15"
+http-body-util = "0.1"
+
+# Temp directories for testing
+tempfile = "3.8"
+
+# Benchmarking
+criterion = "0.5"
+
+[build-dependencies]
+# For fetching Groq models at build time
+reqwest = { workspace = true, features = ["blocking"] }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+
+[profile.dev]
+opt-level = 0
+
+[[bin]]
+name = "terraphim-llm-proxy"
+path = "src/main.rs"
+
+[lib]
+name = "terraphim_llm_proxy"
+path = "src/lib.rs"
+
+# Debian package configuration
+[package.metadata.deb]
+name = "terraphim-llm-proxy"
+maintainer = "Terraphim Team <team@terraphim.ai>"
+copyright = "2025, Terraphim Team"
+license-file = ["LICENSE", "4"]
+extended-description = """\
+Production-ready intelligent LLM routing proxy for Claude Code with 3-phase architecture.
+Provides intelligent, cost-optimized routing for LLM requests with sub-millisecond overhead.
+Features include multi-provider support, pattern-based routing, and seamless Claude Code integration."""
+depends = "$auto, ca-certificates"
+section = "web"
+priority = "optional"
+assets = [
+    ["target/release/terraphim-llm-proxy", "usr/bin/", "755"],
+    ["config.example.toml", "etc/terraphim-llm-proxy/config.toml", "644"],
+    ["README.md", "usr/share/doc/terraphim-llm-proxy/README.md", "644"],
+    ["debian/terraphim-llm-proxy.service", "lib/systemd/system/", "644"]
+]
+conf-files = [
+    "etc/terraphim-llm-proxy/config.toml"
+]

@@ -1,0 +1,70 @@
+# E2E Testing Configuration for Terraphim LLM Proxy
+# This configuration is designed for end-to-end testing with real providers
+
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "$PROXY_API_KEY"
+timeout_ms = 600000  # 10 minutes for testing
+
+[router]
+# Default: DeepSeek Chat (cost-effective, fast)
+default = "deepseek,deepseek-chat"
+
+# Background: Local Ollama (free, fast for background tasks)
+background = "ollama,qwen2.5-coder:latest"
+
+# Thinking: DeepSeek Reasoner (good for reasoning tasks)
+think = "deepseek,deepseek-reasoner"
+
+# Long Context: Gemini 2.0 Flash (2M token context window)
+long_context = "openrouter,google/gemini-2.0-flash-exp"
+long_context_threshold = 60000
+
+# Web Search: Perplexity Sonar (search-enabled model)
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+
+# Image: Claude 3.5 Sonnet via OpenRouter (vision capable)
+image = "openrouter,anthropic/claude-3.5-sonnet"
+
+[security.rate_limiting]
+enabled = false  # Disabled for testing to avoid rate limit interference
+requests_per_minute = 1000
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = false  # Disabled for testing (localhost Ollama access needed)
+allow_localhost = true
+allow_private_ips = true
+
+# Provider: DeepSeek (Default and Think scenarios)
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com/chat/completions"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek"]
+
+# Provider: Ollama (Background scenario - local, free)
+[[providers]]
+name = "ollama"
+api_base_url = "http://localhost:11434/v1/chat/completions"
+api_key = "ollama"
+models = [
+    "qwen2.5-coder:latest",
+    "llama3.2:3b",
+    "gemma2:2b"
+]
+transformers = ["ollama"]
+
+# Provider: OpenRouter (Long context, Web search, Image scenarios)
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1/chat/completions"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+    "google/gemini-2.0-flash-exp",
+    "anthropic/claude-3.5-sonnet",
+    "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]

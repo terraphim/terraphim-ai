@@ -1,0 +1,26 @@
+[Unit]
+Description=Terraphim LLM Proxy
+Documentation=https://github.com/terraphim/terraphim-llm-proxy
+After=network.target
+
+[Service]
+Type=simple
+User=terraphim-llm-proxy
+Group=terraphim-llm-proxy
+ExecStart=/usr/bin/terraphim-llm-proxy --config /etc/terraphim-llm-proxy/config.toml
+Restart=on-failure
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=terraphim-llm-proxy
+
+# Security settings
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/terraphim-llm-proxy
+ReadOnlyPaths=/etc/terraphim-llm-proxy
+
+[Install]
+WantedBy=multi-user.target

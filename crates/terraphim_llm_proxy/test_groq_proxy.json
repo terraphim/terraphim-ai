@@ -1,0 +1,5 @@
+{
+  "model": "claude-3-5-sonnet-20241022",
+  "max_tokens": 50,
+  "messages": [{"role": "user", "content": "What is 2+2? Answer in one word."}]
+}

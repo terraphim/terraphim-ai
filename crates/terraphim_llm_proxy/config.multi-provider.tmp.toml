@@ -1,0 +1,64 @@
+[proxy]
+host = "127.0.0.1"
+port = 3456
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 600000
+
+[router]
+# Default routing
+default = "openrouter,anthropic/claude-sonnet-4.5"
+# Thinking/reasoning: route directly to DeepSeek provider
+think = "deepseek,deepseek-reasoner"
+# Long context via OpenRouter → Gemini
+long_context = "openrouter,google/gemini-2.5-flash-preview-09-2025"
+long_context_threshold = 60000
+# Web search via OpenRouter → Perplexity
+web_search = "openrouter,perplexity/llama-3.1-sonar-large-128k-online"
+# Image via OpenRouter → Anthropic
+image = "openrouter,anthropic/claude-sonnet-4.5"
+# Background via Ollama (optional)
+background = "ollama,qwen2.5-coder:latest"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# Providers
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+  "anthropic/claude-sonnet-4.5",
+  "google/gemini-2.5-flash-preview-09-2025",
+  "deepseek/deepseek-v3.1-terminus",
+  "perplexity/llama-3.1-sonar-large-128k-online"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "anthropic"
+api_base_url = "https://api.anthropic.com"
+api_key = "$ANTHROPIC_API_KEY"
+models = ["claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"]
+transformers = ["anthropic"]
+
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com/chat/completions"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek"]
+
+[[providers]]
+name = "ollama"
+api_base_url = "http://127.0.0.1:11434"
+api_key = "ollama"
+models = ["qwen2.5-coder:latest", "llama3.2:latest"]
+transformers = ["ollama"]

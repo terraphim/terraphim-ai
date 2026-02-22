@@ -1,0 +1,56 @@
+[proxy]
+host = "127.0.0.1"
+port = 3457
+api_key = "sk_test_proxy_key_for_claude_code_testing_12345"
+timeout_ms = 600000
+
+[router]
+# Default routing - prioritize lowest cost
+default = "deepseek,deepseek-chat"
+# Thinking - use DeepSeek reasoner (low cost, high capability)
+think = "deepseek,deepseek-reasoner"
+# Long context - use DeepSeek V3.1 (good value)
+long_context = "deepseek,deepseek-v3.1-terminus"
+long_context_threshold = 60000
+# Web search - use OpenRouter → DeepSeek via OpenRouter
+web_search = "openrouter,deepseek/deepseek-chat"
+# Image - use OpenRouter → Claude (only when needed)
+image = "openrouter,anthropic/claude-sonnet-4.5"
+# Background - use Ollama (free local)
+background = "ollama,qwen2.5-coder:latest"
+
+[security.rate_limiting]
+enabled = false
+requests_per_minute = 600
+concurrent_requests = 100
+
+[security.ssrf_protection]
+enabled = true
+allow_localhost = true
+allow_private_ips = true
+
+# Providers
+[[providers]]
+name = "openrouter"
+api_base_url = "https://openrouter.ai/api/v1"
+api_key = "$OPENROUTER_API_KEY"
+models = [
+  "anthropic/claude-sonnet-4.5",
+  "deepseek/deepseek-chat",
+  "deepseek/deepseek-v3.1-terminus"
+]
+transformers = ["openrouter"]
+
+[[providers]]
+name = "deepseek"
+api_base_url = "https://api.deepseek.com/chat/completions"
+api_key = "$DEEPSEEK_API_KEY"
+models = ["deepseek-chat", "deepseek-reasoner"]
+transformers = ["deepseek"]
+
+[[providers]]
+name = "ollama"
+api_base_url = "http://127.0.0.1:11434"
+api_key = "ollama"
+models = ["qwen2.5-coder:latest", "llama3.2:latest"]
+transformers = ["ollama"]

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>terraphim-llm-proxy</id>
+    <version>{{PACKAGE_VERSION}}</version>
+    <packageSourceUrl>https://github.com/terraphim/terraphim-llm-proxy</packageSourceUrl>
+    <owners>terraphim</owners>
+    <title>Terraphim LLM Proxy</title>
+    <authors>Terraphim Team</authors>
+    <projectUrl>https://github.com/terraphim/terraphim-llm-proxy</projectUrl>
+    <iconUrl>https://raw.githubusercontent.com/terraphim/terraphim-llm-proxy/main/icon.png</iconUrl>
+    <copyright>2025 Terraphim Team</copyright>
+    <licenseUrl>https://github.com/terraphim/terraphim-llm-proxy/blob/main/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://github.com/terraphim/terraphim-llm-proxy</projectSourceUrl>
+    <docsUrl>https://github.com/terraphim/terraphim-llm-proxy/blob/main/README.md</docsUrl>
+    <bugTrackerUrl>https://github.com/terraphim/terraphim-llm-proxy/issues</bugTrackerUrl>
+    <tags>llm proxy ai claude rust terraphim</tags>
+    <summary>Production-ready intelligent LLM routing proxy for Claude Code</summary>
+    <description>
+Terraphim LLM Proxy provides intelligent, cost-optimized routing for LLM requests with sub-millisecond overhead.
+
+Features:
+- 6-phase intelligent routing architecture
+- Multi-provider support (OpenRouter, Anthropic, DeepSeek, Ollama, Gemini, OpenAI)
+- Pattern-based routing with knowledge graph integration
+- Session-aware routing and learning
+- Cost and performance optimization
+- Streaming support with Claude API compatibility
+- Production-ready with 186/186 tests passing
+
+This package includes the terraphim-llm-proxy binary and example configuration files.
+    </description>
+  </metadata>
+  <files>
+    <file src="terraphim-llm-proxy.exe" target="tools" />
+    <file src="config.example.toml" target="tools" />
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
