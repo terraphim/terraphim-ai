@@ -29,22 +29,76 @@ impl Channel for TelegramChannel {
         "telegram"
     }
 
-    async fn start(&self, _bus: Arc<MessageBus>) -> anyhow::Result<()> {
+    async fn start(&self, bus: Arc<MessageBus>) -> anyhow::Result<()> {
         log::info!("Telegram channel starting");
         self.running.store(true, Ordering::SeqCst);
 
         #[cfg(feature = "telegram")]
         {
-            // Simplified implementation - just log for now
-            log::info!(
-                "Telegram bot would start here with token: {}...",
-                &self.config.token[..self.config.token.len().min(10)]
-            );
+            use crate::bus::InboundMessage;
+            use teloxide::prelude::*;
+
+            let bot = teloxide::Bot::new(&self.config.token);
+            let allow_from = self.config.allow_from.clone();
+            let inbound_tx = bus.inbound_sender();
+            let running = self.running.clone();
+
+            log::info!("Telegram bot starting");
+
+            tokio::spawn(async move {
+                let handler = Update::filter_message().endpoint(
+                    move |msg: teloxide::types::Message, _bot: teloxide::Bot| {
+                        let tx = inbound_tx.clone();
+                        let allowed = allow_from.clone();
+                        async move {
+                            let sender_id = msg
+                                .from
+                                .as_ref()
+                                .map(|u| u.id.to_string())
+                                .unwrap_or_default();
+                            let username = msg
+                                .from
+                                .as_ref()
+                                .and_then(|u| u.username.clone())
+                                .unwrap_or_default();
+
+                            // Check allowlist by user ID or username
+                            if !allowed.contains(&sender_id) && !allowed.contains(&username) {
+                                log::warn!(
+                                    "Telegram: rejected message from unauthorized user: {} ({})",
+                                    sender_id,
+                                    username
+                                );
+                                return Ok(());
+                            }
+
+                            if let Some(text) = msg.text() {
+                                let chat_id = msg.chat.id.to_string();
+                                let inbound =
+                                    InboundMessage::new("telegram", &sender_id, &chat_id, text);
+                                if let Err(e) = tx.send(inbound).await {
+                                    log::error!("Failed to forward Telegram message to bus: {}", e);
+                                }
+                            }
+                            Ok::<(), anyhow::Error>(())
+                        }
+                    },
+                );
+
+                let mut dispatcher = Dispatcher::builder(bot, handler)
+                    .default_handler(|_| async {})
+                    .build();
+
+                dispatcher.dispatch().await;
+                running.store(false, Ordering::SeqCst);
+            });
+
             Ok(())
         }
 
         #[cfg(not(feature = "telegram"))]
         {
+            let _ = bus;
             anyhow::bail!("Telegram feature not enabled")
         }
     }

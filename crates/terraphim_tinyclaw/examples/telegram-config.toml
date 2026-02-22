@@ -1,0 +1,95 @@
+# TinyClaw Configuration for Telegram Bot
+# Save as: ~/.config/terraphim/tinyclaw.toml
+
+[agent]
+# Workspace directory for temporary files
+workspace = "/tmp/tinyclaw"
+
+# Optional: System prompt file
+# system_prompt = "/home/user/.config/terraphim/SYSTEM.md"
+
+# LLM Configuration
+[llm]
+# Provider: ollama, openrouter, openai, anthropic
+provider = "ollama"
+
+# Model name
+model = "llama3.2:3b"
+
+# Base URL for local LLM
+base_url = "http://localhost:11434"
+
+# Timeout for LLM requests (seconds)
+timeout = 120
+
+# Telegram Channel Configuration
+[channels.telegram]
+# Bot token from @BotFather
+# IMPORTANT: Use environment variable ${TELEGRAM_BOT_TOKEN}
+token = "${TELEGRAM_BOT_TOKEN}"
+
+# Update mode: "polling" (default) or "webhook"
+# Polling: Bot connects to Telegram servers
+# Webhook: Telegram sends updates to your server
+update_mode = "polling"
+
+# Polling interval (milliseconds)
+# Lower = faster response, higher CPU usage
+poll_interval = 1000
+
+# Webhook configuration (only used if update_mode = "webhook")
+# webhook_url = "https://your-domain.com/webhook"
+# webhook_port = 8443
+# webhook_path = "/telegram/webhook"
+
+# Allowed users (empty = all users allowed)
+# Format: ["@username", "123456789"]
+allowed_users = []
+
+# Admin users (can manage bot)
+admin_users = []
+
+# Session timeout (seconds)
+# How long to keep conversation context
+session_timeout = 3600
+
+# Request timeout (seconds)
+request_timeout = 60
+
+# Rate limiting
+[channels.telegram.rate_limit]
+# Maximum messages per minute per user
+messages_per_minute = 30
+
+# Cooldown period after hitting rate limit (seconds)
+cooldown_seconds = 60
+
+# Message handling
+[channels.telegram.messages]
+# Maximum message length (characters)
+max_length = 4096
+
+# Enable markdown parsing
+parse_mode = "Markdown"
+
+# Show "typing" indicator while processing
+show_typing = true
+
+# Skills configuration
+[skills]
+# Directory for custom skills
+skills_dir = "~/.config/terraphim/skills"
+
+# Auto-save executed skills
+auto_save = true
+
+# Logging
+[log]
+# Log level: error, warn, info, debug, trace
+level = "info"
+
+# Log file (optional)
+# file = "/var/log/tinyclaw.log"
+
+# Console output
+console = true

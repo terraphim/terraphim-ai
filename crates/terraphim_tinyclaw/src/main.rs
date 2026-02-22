@@ -1,12 +1,18 @@
-#![allow(dead_code)]
 mod agent;
+#[allow(dead_code)]
 mod bus;
+#[allow(dead_code)]
 mod channel;
 mod channels;
+#[allow(dead_code)]
 mod config;
+#[allow(dead_code)]
 mod format;
+#[allow(dead_code)]
 mod session;
+#[allow(dead_code)]
 mod skills;
+#[allow(dead_code)]
 mod tools;
 
 use crate::agent::agent_loop::{HybridLlmRouter, ToolCallingLoop};
@@ -250,6 +256,18 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
         }
     });
 
+    // Dispatch outbound messages to channels
+    let bus_clone = bus.clone();
+    tokio::spawn(async move {
+        let mut outbound_rx = bus_clone.outbound_rx.lock().await;
+        while let Some(msg) = outbound_rx.recv().await {
+            log::debug!("Dispatching outbound to channel: {}", msg.channel);
+            if let Err(e) = channel_manager.send(msg).await {
+                log::error!("Failed to dispatch outbound message: {}", e);
+            }
+        }
+    });
+
     // Wait for shutdown signal
     match tokio::signal::ctrl_c().await {
         Ok(()) => {
@@ -259,9 +277,6 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
             log::error!("Error setting up signal handler: {}", err);
         }
     }
-
-    // Graceful shutdown
-    channel_manager.stop_all().await?;
 
     Ok(())
 }

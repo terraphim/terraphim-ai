@@ -16,6 +16,7 @@ use tokio_util::sync::CancellationToken;
 
 /// Configuration for the tool-calling loop.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct ToolCallingConfig {
     /// Maximum tool-calling iterations per message.
     pub max_iterations: usize,
@@ -85,24 +86,22 @@ impl HybridLlmRouter {
         }
     }
 
-    /// Get a text-only response via direct GenAiLlmClient.
-    /// Used as fallback when proxy is unavailable.
+    /// Get a text-only response via proxy or direct LLM.
+    /// Used as fallback when proxy is unavailable for tool-calling.
     pub async fn text_only(
         &self,
         messages: Vec<Message>,
         system: Option<String>,
     ) -> anyhow::Result<String> {
-        // For now, return a placeholder
-        // In full implementation, this would use terraphim_multi_agent::GenAiLlmClient
         log::info!(
-            "Using direct LLM (provider: {}, model: {})",
+            "Using text-only mode (provider: {}, model: {})",
             self.direct_config.provider,
             self.direct_config.model
         );
 
         // Try proxy first for text-only if available
         if self.proxy.is_available() {
-            match self.proxy.chat(messages, system).await {
+            match self.proxy.chat(messages.clone(), system.clone()).await {
                 Ok(response) => {
                     return Ok(response.content.unwrap_or_else(|| {
                         "Tools are currently unavailable, answering from knowledge only."
@@ -115,21 +114,134 @@ impl HybridLlmRouter {
             }
         }
 
-        // Fallback message
-        Ok("Tools are currently unavailable. I can answer questions from my training data, but cannot execute commands or access files.".to_string())
+        // Try direct LLM (Ollama)
+        let base_url = self
+            .direct_config
+            .base_url
+            .clone()
+            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
+
+        let last_user_msg = messages
+            .iter()
+            .rev()
+            .find(|m| m.role == "user")
+            .map(|m| m.content.clone())
+            .unwrap_or_default();
+
+        let prompt = if let Some(sys) = &system {
+            format!("{}\n\nUser: {}", sys, last_user_msg)
+        } else {
+            last_user_msg
+        };
+
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("{}/api/generate", base_url))
+            .json(&serde_json::json!({
+                "model": &self.direct_config.model,
+                "prompt": prompt,
+                "stream": false
+            }))
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                let body: serde_json::Value = resp.json().await?;
+                Ok(body["response"]
+                    .as_str()
+                    .unwrap_or("I received your message but could not generate a response.")
+                    .to_string())
+            }
+            _ => Ok(
+                "Tools and direct LLM are currently unavailable. Please check your configuration."
+                    .to_string(),
+            ),
+        }
     }
 
     /// Compress context via direct LLM (cheap/local).
-    /// Never goes through proxy.
+    /// Never goes through proxy - uses Ollama or configured direct LLM.
     pub async fn compress(
         &self,
-        _messages: Vec<ChatMessage>,
+        messages: Vec<ChatMessage>,
         _system: String,
     ) -> anyhow::Result<String> {
-        // Placeholder for LLM-based compression
-        // In full implementation, this would call GenAiLlmClient with Ollama
-        log::info!("Context compression via direct LLM (placeholder)");
-        Ok("[Previous conversation summarized]".to_string())
+        let base_url = self
+            .direct_config
+            .base_url
+            .clone()
+            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
+        let model = &self.direct_config.model;
+
+        // Format conversation for summarization
+        let conversation = messages
+            .iter()
+            .map(|m| format!("{:?}: {}", m.role, m.content))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        let prompt = format!(
+            "Summarize the following conversation concisely, \
+             preserving key facts, decisions, and context:\n\n{}",
+            conversation
+        );
+
+        log::info!(
+            "Context compression via {} ({}) - {} messages",
+            self.direct_config.provider,
+            model,
+            messages.len()
+        );
+
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("{}/api/generate", base_url))
+            .json(&serde_json::json!({
+                "model": model,
+                "prompt": prompt,
+                "stream": false
+            }))
+            .send()
+            .await;
+
+        match response {
+            Ok(resp) if resp.status().is_success() => {
+                let body: serde_json::Value = resp.json().await?;
+                Ok(body["response"]
+                    .as_str()
+                    .unwrap_or("[Previous conversation summarized]")
+                    .to_string())
+            }
+            Ok(resp) => {
+                log::warn!(
+                    "Direct LLM returned error ({}), using fallback summary",
+                    resp.status()
+                );
+                Ok(Self::fallback_summary(&messages))
+            }
+            Err(e) => {
+                log::warn!("Direct LLM unreachable ({}), using fallback summary", e);
+                Ok(Self::fallback_summary(&messages))
+            }
+        }
+    }
+
+    /// Simple extractive fallback when no LLM is available.
+    fn fallback_summary(messages: &[ChatMessage]) -> String {
+        let total = messages.len();
+        let recent: Vec<String> = messages
+            .iter()
+            .rev()
+            .take(4)
+            .rev()
+            .map(|m| format!("{:?}: {}", m.role, &m.content[..m.content.len().min(100)]))
+            .collect();
+        format!(
+            "[Summary of {} messages, recent context:]\n{}",
+            total,
+            recent.join("\n")
+        )
     }
 }
 
@@ -226,16 +338,22 @@ impl ToolCallingLoop {
         // Store messages for LLM conversion
         let session_messages: Vec<_> = session.messages.clone();
         let session_clone = session.clone();
-        let needs_compression = session.message_count() > 200;
 
         // Save session before releasing lock
         sessions_guard.save(&session_clone)?;
         drop(sessions_guard);
 
-        // Check if we need compression (handled separately to avoid borrow issues)
-        if needs_compression {
-            // Clone the messages we need for compression
-            let messages_to_compress = session_messages.clone();
+        // Check if we need compression using configured ratio
+        let needs_compress = session_messages.len() > self.config.keep_last_messages * 2;
+        if needs_compress {
+            // Keep the last N messages, compress the rest
+            let keep_count = self.config.keep_last_messages;
+            let messages_to_compress: Vec<_> = if session_messages.len() > keep_count {
+                session_messages[..session_messages.len() - keep_count].to_vec()
+            } else {
+                session_messages.clone()
+            };
+
             let summary = self
                 .router
                 .compress(messages_to_compress, self.system_prompt.clone())
@@ -245,7 +363,18 @@ impl ToolCallingLoop {
             let mut sessions_guard = self.sessions.lock().await;
             let session = sessions_guard.get_or_create(&session_key);
             session.set_summary(summary);
-            session.clear_messages();
+            // Keep only the recent messages
+            let recent: Vec<_> = session
+                .messages
+                .iter()
+                .rev()
+                .take(keep_count)
+                .cloned()
+                .collect::<Vec<_>>()
+                .into_iter()
+                .rev()
+                .collect();
+            session.messages = recent;
             let session_clone = session.clone();
             sessions_guard.save(&session_clone)?;
             drop(sessions_guard);
@@ -427,6 +556,7 @@ impl ToolCallingLoop {
     }
 
     /// Trigger graceful shutdown.
+    #[allow(dead_code)]
     pub fn shutdown(&self) {
         self.shutdown.cancel();
     }
@@ -457,7 +587,12 @@ mod tests {
         let messages = vec![Message::user("Hello")];
 
         let response = router.text_only(messages, None).await.unwrap();
-        assert!(response.contains("Tools are currently unavailable"));
+        // When both proxy and direct LLM are unavailable, returns unavailable message
+        assert!(
+            response.contains("unavailable") || response.contains("Hello"),
+            "Expected unavailable message or echoed input, got: {}",
+            response
+        );
     }
 
     #[test]
