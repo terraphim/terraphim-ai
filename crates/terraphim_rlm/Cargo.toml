@@ -25,7 +25,12 @@ log.workspace = true
 terraphim_firecracker = { package = "terraphim-firecracker", path = "../../terraphim_firecracker" }
 terraphim_service = { path = "../terraphim_service", optional = true }
 terraphim_automata = { path = "../terraphim_automata", optional = true }
+terraphim_types = { path = "../terraphim_types", optional = true }
+terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
+
+# Firecracker-rust core for VM and snapshot management
+fcctl-core = { path = "../../../firecracker-rust/fcctl-core" }
 
 # Async utilities
 tokio-util = "0.7"
@@ -42,6 +47,9 @@ reqwest = { workspace = true, optional = true }
 # DNS security
 trust-dns-resolver = { version = "0.23", optional = true }
 
+# MCP (Model Context Protocol)
+rmcp = { version = "0.9.0", features = ["server"], optional = true }
+
 # Utilities
 parking_lot = "0.12"
 dashmap = "6.1"
@@ -53,11 +61,12 @@ test-log = "0.2"
 
 [features]
 default = ["full"]
-full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security"]
+full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security", "mcp"]
 llm = ["dep:terraphim_service"]
-kg-validation = ["dep:terraphim_automata"]
+kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]
 llm-bridge = ["dep:hyper", "dep:hyper-util"]
 docker-backend = ["dep:bollard"]
 e2b-backend = ["dep:reqwest"]
 dns-security = ["dep:trust-dns-resolver"]
+mcp = ["dep:rmcp"]

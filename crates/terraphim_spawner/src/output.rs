@@ -3,7 +3,7 @@
 use regex::Regex;
 use std::sync::Arc;
 use tokio::io::{AsyncBufReadExt, BufReader};
-use tokio::process::ChildStdout;
+use tokio::process::{ChildStderr, ChildStdout};
 use tokio::sync::mpsc;
 
 use terraphim_types::capability::ProcessId;
@@ -38,7 +38,7 @@ impl OutputCapture {
     pub fn new(
         process_id: ProcessId,
         stdout: BufReader<ChildStdout>,
-        _stderr: BufReader<ChildStdout>,
+        _stderr: BufReader<ChildStderr>,
     ) -> Self {
         let (event_sender, _event_receiver) = mpsc::channel(100);
         

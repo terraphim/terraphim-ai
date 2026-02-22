@@ -57,13 +57,26 @@ pub mod budget;
 pub mod llm_bridge;
 pub mod session;
 
-// RLM orchestration (to be implemented in later phases)
-// pub mod rlm;
-// pub mod query_loop;
-// pub mod validator;
-// pub mod command;
+// Command parsing and query loop (Phase 4)
+pub mod parser;
+pub mod query_loop;
+
+// RLM orchestration (Phase 5)
+pub mod rlm;
+
+// Trajectory logging (Phase 5)
+pub mod logger;
+
+// Knowledge graph validation (Phase 5)
+#[cfg(feature = "kg-validation")]
+pub mod validator;
+
+// MCP tools (Phase 6)
+#[cfg(feature = "mcp")]
+pub mod mcp_tools;
+
+// Remaining phases (to be implemented)
 // pub mod preamble;
-// pub mod logger;
 // pub mod autoscaler;
 // pub mod dns_security;
 // pub mod operations;
@@ -78,9 +91,24 @@ pub use executor::{
     ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
+pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read_trajectory_file};
+#[cfg(feature = "mcp")]
+pub use mcp_tools::{
+    RlmBashResponse, RlmCodeResponse, RlmContextResponse, RlmMcpService, RlmQueryResponse,
+    RlmSnapshotResponse,
+};
+pub use parser::CommandParser;
+pub use query_loop::{QueryLoop, QueryLoopConfig, QueryLoopResult, TerminationReason};
+pub use rlm::{LlmQueryResult, SessionStatus, TerraphimRlm};
 pub use session::{SessionManager, SessionStats};
 pub use types::{
-    BudgetStatus, Command, CommandHistory, QueryMetadata, SessionId, SessionInfo, SessionState,
+    BashCommand, BudgetStatus, Command, CommandHistory, LlmQuery, PythonCode, QueryMetadata,
+    SessionId, SessionInfo, SessionState,
+};
+#[cfg(feature = "kg-validation")]
+pub use validator::{
+    KnowledgeGraphValidator, ValidationContext, ValidationResult as KgValidationResult,
+    ValidatorConfig,
 };
 
 /// Crate version

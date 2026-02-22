@@ -5,6 +5,7 @@
 use async_trait::async_trait;
 
 use super::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
+use crate::types::SessionId;
 
 /// The core trait for execution backends.
 ///
@@ -76,21 +77,27 @@ pub trait ExecutionEnvironment: Send + Sync {
     /// `ValidationResult` with matched terms and any unknown terms.
     async fn validate(&self, input: &str) -> Result<ValidationResult, Self::Error>;
 
-    /// Create a named snapshot of the current environment state.
+    /// Create a named snapshot of the current environment state for a session.
     ///
     /// Snapshots capture:
     /// - Python interpreter state (variables, imports)
     /// - Filesystem state (OverlayFS upper layer)
     /// - Environment variables
+    /// - VM state (for Firecracker)
     ///
     /// # Arguments
     ///
+    /// * `session_id` - Session to create snapshot for
     /// * `name` - User-provided name for the snapshot
     ///
     /// # Returns
     ///
     /// `SnapshotId` that can be used to restore this state.
-    async fn create_snapshot(&self, name: &str) -> Result<SnapshotId, Self::Error>;
+    async fn create_snapshot(
+        &self,
+        session_id: &SessionId,
+        name: &str,
+    ) -> Result<SnapshotId, Self::Error>;
 
     /// Restore environment to a previous snapshot.
     ///
@@ -98,6 +105,7 @@ pub trait ExecutionEnvironment: Send + Sync {
     /// - Python interpreter state
     /// - Filesystem state
     /// - Environment variables
+    /// - VM state (for Firecracker)
     ///
     /// Note: External state (APIs, databases) is not restored.
     /// Per spec: "Ignore external state drift on restore".
@@ -107,11 +115,20 @@ pub trait ExecutionEnvironment: Send + Sync {
     /// * `id` - Snapshot to restore
     async fn restore_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error>;
 
-    /// List available snapshots for the current session.
-    async fn list_snapshots(&self) -> Result<Vec<SnapshotId>, Self::Error>;
+    /// List available snapshots for a session.
+    ///
+    /// # Arguments
+    ///
+    /// * `session_id` - Session to list snapshots for
+    async fn list_snapshots(&self, session_id: &SessionId) -> Result<Vec<SnapshotId>, Self::Error>;
 
     /// Delete a snapshot.
     async fn delete_snapshot(&self, id: &SnapshotId) -> Result<(), Self::Error>;
+
+    /// Delete all snapshots for a session.
+    ///
+    /// Called when a session is destroyed.
+    async fn delete_session_snapshots(&self, session_id: &SessionId) -> Result<(), Self::Error>;
 
     /// Get the capabilities supported by this executor.
     ///
