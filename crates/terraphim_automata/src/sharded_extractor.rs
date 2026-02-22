@@ -36,9 +36,12 @@ pub struct ShardedUmlsExtractor {
 }
 
 /// Metadata for each pattern in a shard
+///
+/// Stores all CUIs that map to a given term to prevent data loss
+/// when multiple concepts share the same surface form.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 struct PatternMetadata {
-    cui: String,
+    cuis: Vec<String>,
     term: String,
 }
 
@@ -65,14 +68,35 @@ impl ShardedUmlsExtractor {
             }
         }
 
-        // Sort patterns -- daachorse requires sorted, unique input
+        // Sort patterns by term -- daachorse requires sorted, unique input
         all_patterns.sort_by(|a, b| a.0.cmp(&b.0));
 
-        // Deduplicate by term text: daachorse rejects duplicate patterns.
-        // When multiple CUIs share a term, keep the first (lowest CUI lexically after sort).
-        all_patterns.dedup_by(|a, b| a.0 == b.0);
+        // Merge duplicates: group all CUIs that share the same term.
+        // daachorse rejects duplicate patterns, but we must not silently
+        // drop CUI mappings when multiple concepts share a surface form
+        // (e.g., "cold" = C0009264 "Common Cold" AND C0234192 "Cold Temperature").
+        let mut merged: Vec<(String, Vec<String>)> = Vec::new();
+        for (term, cui) in all_patterns {
+            if let Some(last) = merged.last_mut() {
+                if last.0 == term {
+                    if !last.1.contains(&cui) {
+                        last.1.push(cui);
+                    }
+                    continue;
+                }
+            }
+            merged.push((term, vec![cui]));
+        }
 
-        let total_patterns = all_patterns.len();
+        let multi_cui_count = merged.iter().filter(|(_, cuis)| cuis.len() > 1).count();
+        if multi_cui_count > 0 {
+            log::warn!(
+                "{} terms map to multiple CUIs; all CUIs preserved",
+                multi_cui_count
+            );
+        }
+
+        let total_patterns = merged.len();
         log::info!(
             "Building sharded extractor with {} patterns (max {} per shard)...",
             total_patterns,
@@ -88,16 +112,16 @@ impl ShardedUmlsExtractor {
             let start_idx = shard_idx * max_patterns_per_shard;
             let end_idx = ((shard_idx + 1) * max_patterns_per_shard).min(total_patterns);
 
-            let shard_patterns: Vec<String> = all_patterns[start_idx..end_idx]
+            let shard_patterns: Vec<String> = merged[start_idx..end_idx]
                 .iter()
                 .map(|(term, _)| term.clone())
                 .collect();
 
-            let metadata: Vec<PatternMetadata> = all_patterns[start_idx..end_idx]
+            let metadata: Vec<PatternMetadata> = merged[start_idx..end_idx]
                 .iter()
-                .map(|(term, cui)| PatternMetadata {
+                .map(|(term, cuis)| PatternMetadata {
                     term: term.clone(),
-                    cui: cui.clone(),
+                    cuis: cuis.clone(),
                 })
                 .collect();
 
@@ -154,7 +178,7 @@ impl ShardedUmlsExtractor {
                 shard
                     .iter()
                     .map(|m| PatternMeta {
-                        cui: m.cui.clone(),
+                        cuis: m.cuis.clone(),
                         term: m.term.clone(),
                     })
                     .collect()
@@ -197,7 +221,7 @@ impl ShardedUmlsExtractor {
                 shard
                     .into_iter()
                     .map(|m| PatternMetadata {
-                        cui: m.cui,
+                        cuis: m.cuis,
                         term: m.term,
                     })
                     .collect()
@@ -232,9 +256,16 @@ impl ShardedUmlsExtractor {
                 let pattern_idx = mat.value() as usize;
                 let meta = &metadata[pattern_idx];
 
-                // Get concept details
-                let (canonical, confidence) =
-                    if let Some(concept) = self.concept_index.get(&meta.cui) {
+                let start = mat.start();
+                let end = mat.end();
+
+                // Extract original case text
+                let matched_original = &text[start..end];
+
+                // Emit one match per CUI for this pattern
+                for cui in &meta.cuis {
+                    let (canonical, confidence) = if let Some(concept) = self.concept_index.get(cui)
+                    {
                         let conf = if concept.preferred_term.to_lowercase() == meta.term {
                             1.0
                         } else {
@@ -245,28 +276,27 @@ impl ShardedUmlsExtractor {
                         (meta.term.clone(), 0.8)
                     };
 
-                let start = mat.start();
-                let end = mat.end();
-
-                // Extract original case text
-                let matched_original = &text[start..end];
-
-                all_matches.push(UmlsMatch {
-                    cui: meta.cui.clone(),
-                    matched_term: matched_original.to_string(),
-                    canonical_term: canonical,
-                    span: (start, end),
-                    confidence,
-                });
+                    all_matches.push(UmlsMatch {
+                        cui: cui.clone(),
+                        matched_term: matched_original.to_string(),
+                        canonical_term: canonical,
+                        span: (start, end),
+                        confidence,
+                    });
+                }
             }
         }
 
-        // Remove duplicates (same span, same or different CUI)
-        all_matches.sort_by_key(|m| (m.span.0, m.span.1));
-        all_matches.dedup_by(|a, b| a.span == b.span);
-
-        // Sort by position
-        all_matches.sort_by_key(|m| m.span.0);
+        // Remove duplicates: same span AND same CUI
+        // Different CUIs at the same span are intentional (multi-CUI terms)
+        all_matches.sort_by(|a, b| {
+            a.span
+                .0
+                .cmp(&b.span.0)
+                .then(a.span.1.cmp(&b.span.1))
+                .then(a.cui.cmp(&b.cui))
+        });
+        all_matches.dedup_by(|a, b| a.span == b.span && a.cui == b.cui);
 
         all_matches
     }
@@ -376,5 +406,90 @@ mod tests {
         let cuis: Vec<&str> = results.iter().map(|r| r.cui.as_str()).collect();
         assert!(cuis.contains(&"C0000001"));
         assert!(cuis.contains(&"C0000002"));
+    }
+
+    /// Create a dataset where "cold" maps to two different CUIs
+    fn create_multi_cui_dataset() -> UmlsDataset {
+        let mut file = NamedTempFile::new().unwrap();
+        // "cold" maps to two different concepts
+        writeln!(file, "cold\tC0009264").unwrap(); // Common Cold
+        writeln!(file, "common cold\tC0009264").unwrap();
+        writeln!(file, "cold\tC0234192").unwrap(); // Cold Temperature
+        writeln!(file, "cold temperature\tC0234192").unwrap();
+        writeln!(file, "fever\tC0015967").unwrap(); // Unique term
+
+        UmlsDataset::from_tsv(file.path()).unwrap()
+    }
+
+    #[test]
+    fn test_multi_cui_term_preserved() {
+        // Regression test: "cold" maps to both C0009264 (Common Cold) and
+        // C0234192 (Cold Temperature). The old dedup_by silently dropped one.
+        let dataset = create_multi_cui_dataset();
+        let extractor = ShardedUmlsExtractor::from_dataset(&dataset).unwrap();
+
+        // "cold" is one unique term in the automaton, so pattern count = 4
+        // (cold, cold temperature, common cold, fever)
+        assert_eq!(extractor.pattern_count(), 4);
+
+        let results = extractor.extract("Patient has cold and fever");
+        let cold_matches: Vec<&str> = results
+            .iter()
+            .filter(|m| m.matched_term.to_lowercase() == "cold")
+            .map(|m| m.cui.as_str())
+            .collect();
+
+        // Both CUIs must be present for "cold"
+        assert!(
+            cold_matches.contains(&"C0009264"),
+            "Missing CUI C0009264 (Common Cold) for term 'cold'; got: {:?}",
+            cold_matches
+        );
+        assert!(
+            cold_matches.contains(&"C0234192"),
+            "Missing CUI C0234192 (Cold Temperature) for term 'cold'; got: {:?}",
+            cold_matches
+        );
+
+        // Fever should still match normally
+        let fever_matches: Vec<&str> = results
+            .iter()
+            .filter(|m| m.matched_term.to_lowercase() == "fever")
+            .map(|m| m.cui.as_str())
+            .collect();
+        assert_eq!(fever_matches, vec!["C0015967"]);
+    }
+
+    #[test]
+    fn test_multi_cui_artifact_round_trip() {
+        // Verify multi-CUI mappings survive artifact serialization
+        let dataset = create_multi_cui_dataset();
+        let extractor = ShardedUmlsExtractor::from_dataset(&dataset).unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let artifact_path = dir.path().join("multi_cui_test.bin.zst");
+
+        extractor.save_to_artifact(&artifact_path).unwrap();
+        let loaded = ShardedUmlsExtractor::load_from_artifact(&artifact_path).unwrap();
+
+        assert_eq!(loaded.pattern_count(), extractor.pattern_count());
+
+        let results = loaded.extract("Patient has cold");
+        let cold_cuis: Vec<&str> = results
+            .iter()
+            .filter(|m| m.matched_term.to_lowercase() == "cold")
+            .map(|m| m.cui.as_str())
+            .collect();
+
+        assert!(
+            cold_cuis.contains(&"C0009264"),
+            "After round-trip: missing C0009264; got: {:?}",
+            cold_cuis
+        );
+        assert!(
+            cold_cuis.contains(&"C0234192"),
+            "After round-trip: missing C0234192; got: {:?}",
+            cold_cuis
+        );
     }
 }

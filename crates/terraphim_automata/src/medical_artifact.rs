@@ -17,9 +17,13 @@ use std::path::Path;
 use crate::umls::UmlsConcept;
 
 /// Serializable pattern metadata
+///
+/// A single term may map to multiple CUIs (e.g., "cold" maps to both
+/// C0009264 "Common Cold" and C0234192 "Cold Temperature"). All CUIs
+/// are preserved to avoid silent data loss during deduplication.
 #[derive(Clone, Serialize, Deserialize)]
 pub struct PatternMeta {
-    pub cui: String,
+    pub cuis: Vec<String>,
     pub term: String,
 }
 
@@ -145,16 +149,16 @@ mod tests {
             shard_metadata: vec![
                 vec![
                     PatternMeta {
-                        cui: "C0000001".to_string(),
+                        cuis: vec!["C0000001".to_string()],
                         term: "lung cancer".to_string(),
                     },
                     PatternMeta {
-                        cui: "C0000001".to_string(),
+                        cuis: vec!["C0000001".to_string()],
                         term: "nsclc".to_string(),
                     },
                 ],
                 vec![PatternMeta {
-                    cui: "C0000002".to_string(),
+                    cuis: vec!["C0000002".to_string()],
                     term: "egfr".to_string(),
                 }],
             ],
