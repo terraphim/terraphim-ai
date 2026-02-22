@@ -21,7 +21,7 @@ tokio-stream = "0.1"
 tiktoken-rs = "0.5"
 
 # LLM Client - using Terraphim fork for better provider support
-genai = { git = "https://github.com/terraphim/rust-genai", branch = "main" }
+genai = { workspace = true }
 
 # Configuration
 serde = { workspace = true }

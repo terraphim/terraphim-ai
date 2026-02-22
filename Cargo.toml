@@ -29,6 +29,7 @@ pulldown-cmark = "0.9"
 dirs = "5.0"
 
 # LLM Router integration
+genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
 
 [patch.crates-io]
 genai = { git = "https://github.com/terraphim/rust-genai.git", branch = "merge-upstream-20251103" }
