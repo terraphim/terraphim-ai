@@ -32,6 +32,9 @@ wasm-bindgen = { version = "0.2.51", optional = true }
 cached = { version = "0.56.0", features = ["proc_macro", "async", "serde", "ahash"] }
 tsify = { version = "0.5", features = ["js"], optional = true }
 walkdir = "2.5"
+daachorse = { version = "1.0", optional = true }
+zstd = { version = "0.13", optional = true }
+anyhow = { version = "1.0", optional = true }
 
 # WASM-specific dependencies
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -47,6 +50,7 @@ remote-loading = ["tokio", "reqwest"]
 tokio-runtime = ["tokio"]
 typescript = ["tsify", "dep:wasm-bindgen"]
 wasm = ["typescript", "dep:wasm-bindgen", "dep:wasm-bindgen-futures"]
+medical = ["daachorse", "zstd", "anyhow"]
 
 [dev-dependencies]
 criterion = "0.8"
