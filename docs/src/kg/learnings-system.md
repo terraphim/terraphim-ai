@@ -1,0 +1,306 @@
+# Learning Capture System
+
+The Learning Capture System automatically captures failed commands and their error output as learning documents. This helps build a personal knowledge base of common mistakes and their corrections.
+
+## Overview
+
+When you run a command that fails, the Learning Capture System:
+
+1. **Captures** the command and error output
+2. **Redacts** any secrets (API keys, passwords, etc.)
+3. **Stores** the learning in Markdown format
+4. **Indexes** it for later search and retrieval
+
+## Architecture
+
+```text
+Failed Command → Secret Redaction → Storage → Indexing → Search
+                     ↓
+              Auto-Suggest (future)
+```
+
+## Storage Locations
+
+Learnings are stored in two locations:
+
+### Project-Specific (`.terraphim/learnings/`)
+- Captured when you're in a project directory
+- Shared with project-specific knowledge graph
+- Priority location for queries
+
+### Global (`~/.local/share/terraphim/learnings/`)
+- Fallback when not in a project
+- Common patterns across all projects
+- Always searched as secondary source
+
+## Usage
+
+### Capturing a Failed Command
+
+```bash
+terraphim-agent learn capture "git push -f" \
+  --error "remote: rejected" \
+  --exit-code 1
+```
+
+This creates a Markdown file in your learnings directory with:
+- The command that failed
+- The error output (with secrets redacted)
+- Exit code
+- Timestamp and context
+- Unique ID for reference
+
+### Listing Recent Learnings
+
+```bash
+# Show last 10 learnings (default)
+terraphim-agent learn list
+
+# Show more
+terraphim-agent learn list --recent 20
+
+# Show global learnings
+terraphim-agent learn list --global
+```
+
+Output shows:
+```
+Recent learnings:
+  1. [P] git push -f (exit: 1)
+  2. [G] npm install (exit: 1)
+  3. [P] cargo build (exit: 101)
+```
+
+`[P]` = Project-specific, `[G]` = Global
+
+### Querying Learnings
+
+```bash
+# Search by substring (default)
+terraphim-agent learn query "git push"
+
+# Exact match
+terraphim-agent learn query "git push -f" --exact
+
+# Search global learnings
+terraphim-agent learn query "npm" --global
+```
+
+## Automatic Capture with Hooks
+
+The Learning Capture System can automatically capture failed commands via hooks.
+
+### PostToolUse Hook
+
+Add to your Claude Code configuration to automatically capture failed Bash commands:
+
+```json
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": {
+          "tools": ["BashTool"]
+        },
+        "hooks": [
+          {
+            "type": "command",
+            "command": ".claude/hooks/learning-capture.sh"
+          }
+        ]
+      }
+    ]
+  }
+}
+```
+
+The hook:
+- Only captures **failed** commands (non-zero exit)
+- Automatically **redacts secrets** before storage
+- Is **fail-open** - doesn't block if capture fails
+- Works transparently in the background
+
+### Debug Mode
+
+Enable debug output to see what's being captured:
+
+```bash
+export TERRAPHIM_LEARN_DEBUG=true
+```
+
+## Secret Redaction
+
+Before storing, the system automatically redacts:
+
+- **AWS keys** (`AKIA...`)
+- **API tokens** (`sk-...`, `ghp_...`, `xoxb-...`)
+- **Connection strings** (`postgresql://...`, `mysql://...`)
+- **Environment variables** (`VAR=value` patterns)
+
+Example:
+```
+Before: postgresql://user:secret@localhost/db
+After:  postgresql://[REDACTED]@localhost/db
+```
+
+## Ignored Commands
+
+The following commands are automatically ignored (not captured):
+
+- `cargo test*` - Test commands
+- `npm test*` - Test commands  
+- `pytest*` - Test commands
+- `yarn test*` - Test commands
+
+This prevents test failures from cluttering your learnings.
+
+## Learning Document Format
+
+Learnings are stored as Markdown files with YAML frontmatter:
+
+```markdown
+---
+id: abc123-1708012345678
+command: git push -f
+exit_code: 1
+source: Project
+captured_at: 2024-01-15T10:30:00Z
+working_dir: /home/user/myproject
+---
+
+## Command
+
+`git push -f`
+
+## Error Output
+
+```
+remote: rejected
+```
+```
+
+## Future Features
+
+Coming in future updates:
+
+- **Auto-suggest corrections** - Query existing KG for suggested fixes
+- **Add corrections** - `terraphim-agent learn correct <id> --correction "..."`
+- **Web UI** - Browse and manage learnings visually
+- **Export/Import** - Share learnings between machines
+- **Team sharing** - Share common patterns with team
+
+## Configuration
+
+The Learning Capture System uses sensible defaults but can be configured via environment:
+
+```bash
+# Enable debug output
+export TERRAPHIM_LEARN_DEBUG=true
+
+# Custom directories (future feature)
+export TERRAPHIM_LEARN_PROJECT_DIR=".myproject/learnings"
+export TERRAPHIM_LEARN_GLOBAL_DIR="~/.myapp/learnings"
+```
+
+## Troubleshooting
+
+### Learnings not being captured
+
+1. Check that `terraphim-agent` is in your PATH
+2. Enable debug mode: `export TERRAPHIM_LEARN_DEBUG=true`
+3. Verify storage directory is writable
+4. Check if command matches ignore patterns
+
+### Hook not working
+
+1. Ensure hook script is executable: `chmod +x learning-capture.sh`
+2. Check Claude Code hook configuration
+3. Verify `terraphim-agent` binary exists
+
+### Storage location
+
+Find where learnings are stored:
+
+```bash
+# Check project location
+ls -la .terraphim/learnings/
+
+# Check global location
+ls -la ~/.local/share/terraphim/learnings/
+```
+
+## See Also
+
+- [Knowledge Graph Documentation](knowledge-graph.md)
+- [Terraphim Agent CLI](../reference/cli.md)
+- [Hook System](../reference/hooks.md)
+
+---
+
+## Appendix: Traceability Matrix
+
+This matrix maps all documented examples to their implementation status and test evidence.
+
+### Manual Capture Examples
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 1 | Basic capture | `learn capture 'git push -f' --error '...'` | REQ-3.1: Capture failed commands | test_capture_failed_command | ✅ |
+| 2 | NPM install error | `learn capture 'npm install' --error 'EACCES...'` | REQ-3.1: Capture failed commands | test_capture_failed_command | ✅ |
+| 3 | Git status error | `learn capture 'git status' --error 'fatal...'` | REQ-3.1: Capture failed commands | test_capture_failed_command | ✅ |
+| 4 | With exit code | `--exit-code 128` | REQ-3.2: Store exit code | test_capture_failed_command | ✅ |
+| 5 | With debug | `--debug` | REQ-5.1: Debug visibility | Manual test | ✅ |
+
+### List Examples
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 6 | List default | `learn list` | REQ-4.1: List learnings | test_list_learnings | ✅ |
+| 7 | List recent | `learn list --recent 5` | REQ-4.1: List learnings | test_list_learnings | ✅ |
+| 8 | List global | `learn list --global` | REQ-2.2: Hybrid storage | Manual test | ✅ |
+
+### Query Examples
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 9 | Substring | `learn query 'git'` | REQ-4.2: Query learnings | test_list_learnings | ✅ |
+| 10 | Exact | `learn query '...' --exact` | REQ-4.2: Query learnings | test_list_learnings | ✅ |
+| 11 | Global | `learn query 'npm' --global` | REQ-2.2: Hybrid storage | Manual test | ✅ |
+
+### Ignored Commands (Anti-Patterns)
+
+| # | Example | Command | Requirement | Test | Status |
+|---|---------|---------|-------------|------|--------|
+| 12 | cargo test | `learn capture 'cargo test' ...` | REQ-2.3: Ignore patterns | test_capture_ignores_test_commands | ✅ |
+| 13 | npm test | `learn capture 'npm test' ...` | REQ-2.3: Ignore patterns | test_capture_ignores_test_commands | ✅ |
+| 14 | pytest | `learn capture 'pytest' ...` | REQ-2.3: Ignore patterns | test_capture_ignores_test_commands | ✅ |
+
+### Secret Redaction
+
+| # | Pattern | Redacted To | Requirement | Test | Status |
+|---|---------|-------------|-------------|------|--------|
+| 15 | AWS key | `[AWS_KEY_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_aws_key | ✅ |
+| 16 | Postgres | `[REDACTED]` | REQ-2.1: Auto-redaction | test_redact_connection_string | ✅ |
+| 17 | OpenAI | `[OPENAI_KEY_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_multiple_secrets | ✅ |
+| 18 | GitHub | `[GITHUB_TOKEN_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_multiple_secrets | ✅ |
+| 19 | Slack | `[SLACK_TOKEN_REDACTED]` | REQ-2.1: Auto-redaction | test_redact_multiple_secrets | ✅ |
+
+### Integration
+
+| # | Component | Requirement | Test | Status |
+|---|-----------|-------------|------|--------|
+| 20 | Hook script | REQ-5.1: Hook integration | test_learning_capture.sh | ✅ |
+| 21 | CLI subcommands | REQ-4.1-4.3: CLI | All CLI tests | ✅ |
+| 22 | Storage | REQ-2.2: Hybrid storage | test_storage_location_prefers_project | ✅ |
+
+### Summary
+
+**Total Examples**: 22  
+**Verified Working**: 22 ✅ (100%)  
+**Unit Tests**: 15/15 passing ✅  
+**Last Verified**: 2026-02-15
+
+### Verification Reports
+
+- [Phase 4 Verification Report](../../verification/learning-capture-verification-report.md)
+- [Phase 5 Validation Report](../../validation/learning-capture-validation-report.md)

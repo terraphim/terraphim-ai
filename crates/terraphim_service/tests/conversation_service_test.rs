@@ -1,8 +1,10 @@
+use serial_test::serial;
 use terraphim_persistence::DeviceStorage;
 use terraphim_service::conversation_service::{ConversationFilter, ConversationService};
 use terraphim_types::{ChatMessage, RoleName};
 
 #[tokio::test]
+#[serial]
 async fn test_create_and_get_conversation() {
     // Initialize memory-only storage for testing
     let _ = DeviceStorage::init_memory_only().await.unwrap();
@@ -20,6 +22,7 @@ async fn test_create_and_get_conversation() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_update_conversation() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 
@@ -45,10 +48,18 @@ async fn test_update_conversation() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_list_conversations() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 
     let service = ConversationService::new();
+
+    // Get initial count (tests may share storage)
+    let initial = service
+        .list_conversations(ConversationFilter::default())
+        .await
+        .unwrap();
+    let initial_count = initial.len();
 
     // Create multiple conversations
     service
@@ -64,14 +75,18 @@ async fn test_list_conversations() {
         .await
         .unwrap();
 
-    // List all
+    // List all - should have 3 more than initial
     let all = service
         .list_conversations(ConversationFilter::default())
         .await
         .unwrap();
-    assert_eq!(all.len(), 3);
+    assert_eq!(
+        all.len(),
+        initial_count + 3,
+        "Should have 3 new conversations"
+    );
 
-    // Filter by role
+    // Filter by role - should find our 2 Role A conversations
     let filtered = service
         .list_conversations(ConversationFilter {
             role: Some(RoleName::new("Role A")),
@@ -79,10 +94,26 @@ async fn test_list_conversations() {
         })
         .await
         .unwrap();
-    assert_eq!(filtered.len(), 2);
+    // Verify at least 2 Role A conversations exist (may be more from other tests)
+    assert!(
+        filtered.len() >= 2,
+        "Should have at least 2 Role A conversations, found {}",
+        filtered.len()
+    );
+    // Verify our specific conversations are in the list
+    let titles: Vec<_> = filtered.iter().map(|c| c.title.as_str()).collect();
+    assert!(
+        titles.contains(&"Conv 1"),
+        "Conv 1 should be in filtered results"
+    );
+    assert!(
+        titles.contains(&"Conv 3"),
+        "Conv 3 should be in filtered results"
+    );
 }
 
 #[tokio::test]
+#[serial]
 async fn test_search_conversations() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 
@@ -115,6 +146,7 @@ async fn test_search_conversations() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_delete_conversation() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 
@@ -137,6 +169,7 @@ async fn test_delete_conversation() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_export_import_conversation() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 
@@ -171,14 +204,20 @@ async fn test_export_import_conversation() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_get_statistics() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 
     let service = ConversationService::new();
 
+    // Get initial stats (tests may share storage)
+    let initial_stats = service.get_statistics().await.unwrap();
+    let initial_conversations = initial_stats.total_conversations;
+    let initial_messages = initial_stats.total_messages;
+
     // Create conversations with messages
     let mut conv1 = service
-        .create_conversation("Conv 1".to_string(), RoleName::new("Role A"))
+        .create_conversation("Stat Conv 1".to_string(), RoleName::new("StatRole A"))
         .await
         .unwrap();
     conv1.add_message(ChatMessage::user("Message 1".to_string()));
@@ -186,14 +225,14 @@ async fn test_get_statistics() {
     service.update_conversation(conv1).await.unwrap();
 
     let mut conv2 = service
-        .create_conversation("Conv 2".to_string(), RoleName::new("Role B"))
+        .create_conversation("Stat Conv 2".to_string(), RoleName::new("StatRole B"))
         .await
         .unwrap();
     conv2.add_message(ChatMessage::user("Message 2".to_string()));
     service.update_conversation(conv2).await.unwrap();
 
     let mut conv3 = service
-        .create_conversation("Conv 3".to_string(), RoleName::new("Role A"))
+        .create_conversation("Stat Conv 3".to_string(), RoleName::new("StatRole A"))
         .await
         .unwrap();
     conv3.add_message(ChatMessage::user("Message 3".to_string()));
@@ -202,15 +241,40 @@ async fn test_get_statistics() {
     service.update_conversation(conv3).await.unwrap();
 
     let stats = service.get_statistics().await.unwrap();
-    assert_eq!(stats.total_conversations, 3);
-    assert_eq!(stats.total_messages, 6);
-    assert_eq!(stats.conversations_by_role.len(), 2);
-    assert_eq!(*stats.conversations_by_role.get("Role A").unwrap(), 2);
-    assert_eq!(*stats.conversations_by_role.get("Role B").unwrap(), 1);
-    assert_eq!(stats.average_messages_per_conversation, 2.0);
+    // Verify stats increased by expected amounts
+    assert_eq!(
+        stats.total_conversations,
+        initial_conversations + 3,
+        "Should have 3 new conversations"
+    );
+    assert_eq!(
+        stats.total_messages,
+        initial_messages + 6,
+        "Should have 6 new messages"
+    );
+    // Verify our specific roles are tracked
+    assert!(
+        stats.conversations_by_role.contains_key("StatRole A"),
+        "StatRole A should be tracked"
+    );
+    assert!(
+        stats.conversations_by_role.contains_key("StatRole B"),
+        "StatRole B should be tracked"
+    );
+    assert_eq!(
+        *stats.conversations_by_role.get("StatRole A").unwrap(),
+        2,
+        "StatRole A should have 2 conversations"
+    );
+    assert_eq!(
+        *stats.conversations_by_role.get("StatRole B").unwrap(),
+        1,
+        "StatRole B should have 1 conversation"
+    );
 }
 
 #[tokio::test]
+#[serial]
 async fn test_conversation_ordering() {
     let _ = DeviceStorage::init_memory_only().await.unwrap();
 

@@ -1,6 +1,6 @@
 //! Command definitions for REPL interface
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1604,18 +1604,22 @@ mod tests {
         // Test update without subcommand
         let result = "/update".parse::<ReplCommand>();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("requires a subcommand"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("requires a subcommand")
+        );
 
         // Test update rollback without version
         let result = "/update rollback".parse::<ReplCommand>();
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("requires a version"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("requires a version")
+        );
 
         // Test unknown update subcommand
         let result = "/update unknown".parse::<ReplCommand>();

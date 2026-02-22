@@ -1,3 +1,4 @@
+pub mod compression;
 pub mod conversation;
 pub mod document;
 pub mod error;
@@ -8,12 +9,29 @@ pub mod thesaurus;
 use async_once_cell::OnceCell as AsyncOnceCell;
 use async_trait::async_trait;
 use opendal::Operator;
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{Serialize, de::DeserializeOwned};
 use terraphim_settings::DeviceSettings;
+use tracing::{Instrument, debug_span};
 
 use std::collections::HashMap;
 use std::sync::Arc;
 use terraphim_types::Document;
+
+use crate::compression::{maybe_compress, maybe_decompress};
+
+/// Expand tilde (~) in paths to the user's home directory
+fn expand_tilde(path: &str) -> String {
+    if path.starts_with("~/") {
+        if let Ok(home) = std::env::var("HOME") {
+            return format!("{}{}", home, &path[1..]);
+        }
+    } else if path == "~" {
+        if let Ok(home) = std::env::var("HOME") {
+            return home;
+        }
+    }
+    path.to_string()
+}
 
 pub use error::{Error, Result};
 
@@ -105,6 +123,7 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
     log::info!("Loaded settings: {:?}", settings);
 
     // Pre-create directories for storage backends that need them
+    // Expand tilde in paths to support home directory references
     for profile in settings.profiles.values() {
         let unknown = "unknown".to_string();
         let profile_type = profile.get("type").unwrap_or(&unknown);
@@ -112,11 +131,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "sqlite" => {
                 if let Some(datadir) = profile.get("datadir") {
                     if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating SQLite directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create SQLite directory '{}': {}", datadir, e);
+                        let expanded = expand_tilde(datadir);
+                        log::info!("Pre-creating SQLite directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create SQLite directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created SQLite directory: {}", datadir);
+                            log::info!("Created SQLite directory: {}", expanded);
                         }
                     }
                 }
@@ -124,11 +144,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "redb" => {
                 if let Some(datadir) = profile.get("datadir") {
                     if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating ReDB directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create ReDB directory '{}': {}", datadir, e);
+                        let expanded = expand_tilde(datadir);
+                        log::info!("Pre-creating ReDB directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create ReDB directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created ReDB directory: {}", datadir);
+                            log::info!("Created ReDB directory: {}", expanded);
                         }
                     }
                 }
@@ -136,23 +157,12 @@ async fn init_device_storage_with_settings(settings: DeviceSettings) -> Result<D
             "dashmap" => {
                 if let Some(root) = profile.get("root") {
                     if !root.is_empty() {
-                        log::info!("🔧 Pre-creating DashMap directory: {}", root);
-                        if let Err(e) = std::fs::create_dir_all(root) {
-                            log::warn!("Failed to create DashMap directory '{}': {}", root, e);
+                        let expanded = expand_tilde(root);
+                        log::info!("Pre-creating DashMap directory: {}", expanded);
+                        if let Err(e) = std::fs::create_dir_all(&expanded) {
+                            log::warn!("Failed to create DashMap directory '{}': {}", expanded, e);
                         } else {
-                            log::info!("✅ Created DashMap directory: {}", root);
-                        }
-                    }
-                }
-            }
-            "rocksdb" => {
-                if let Some(datadir) = profile.get("datadir") {
-                    if !datadir.is_empty() {
-                        log::info!("🔧 Pre-creating RocksDB directory: {}", datadir);
-                        if let Err(e) = std::fs::create_dir_all(datadir) {
-                            log::warn!("Failed to create RocksDB directory '{}': {}", datadir, e);
-                        } else {
-                            log::info!("✅ Created RocksDB directory: {}", datadir);
+                            log::info!("Created DashMap directory: {}", expanded);
                         }
                     }
                 }
@@ -241,91 +251,188 @@ pub trait Persistable: Serialize + DeserializeOwned {
         Ok(())
     }
 
-    /// Load from operators with fallback mechanism
+    /// Load from operators with fallback mechanism and cache warm-up
     ///
     /// This function tries to load the object from storage backends in speed order.
     /// If the fastest operator fails, it will try the next fastest, and so on.
-    /// This provides resilience when different storage backends have different content.
+    /// When data is successfully loaded from a fallback (slower) operator,
+    /// it is asynchronously written to the fastest operator for future access.
+    ///
+    /// # Cache Write-back Behavior
+    /// - Non-blocking: Uses tokio::spawn for fire-and-forget
+    /// - Best-effort: Failures logged at debug level, don't affect load
+    /// - Compressed: Objects over 1MB are compressed with zstd
+    /// - Schema evolution: If cached data fails to deserialize, cache is cleared and refetched
     async fn load_from_operator(&self, key: &str, _op: &Operator) -> Result<Self>
     where
         Self: Sized,
     {
-        let (ops, fastest_op) = &self.load_config().await?;
+        let span = debug_span!("load_from_operator", key = %key);
+        async {
+            let (ops, fastest_op) = &self.load_config().await?;
 
-        // First try the fastest operator as before
-        match fastest_op.read(key).await {
-            Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
-                Ok(obj) => {
-                    log::debug!("✅ Loaded '{}' from fastest operator", key);
-                    return Ok(obj);
+            // Helper to check existence and read from an operator with decompression support
+            async fn try_read_from_op<T: DeserializeOwned>(
+                op: &Operator,
+                key: &str,
+                profile_name: Option<&str>,
+            ) -> Option<std::result::Result<T, Error>> {
+                let span = debug_span!("try_read", profile = ?profile_name);
+                async {
+                    // Use stat() first to check existence - this doesn't trigger WARN-level logging
+                    match op.stat(key).await {
+                        Ok(_) => {
+                            // File exists, proceed with read
+                            match op.read(key).await {
+                                Ok(bs) => {
+                                    // Try to decompress if needed
+                                    let data = match maybe_decompress(&bs.to_vec()) {
+                                        Ok(decompressed) => decompressed,
+                                        Err(e) => {
+                                            log::debug!("Decompression failed for '{}', using raw data: {}", key, e);
+                                            bs.to_vec()
+                                        }
+                                    };
+
+                                    match serde_json::from_slice(&data) {
+                                        Ok(obj) => {
+                                            if let Some(name) = profile_name {
+                                                log::debug!("Loaded '{}' from profile '{}'", key, name);
+                                            } else {
+                                                log::debug!("Loaded '{}' from fastest operator (cache hit)", key);
+                                            }
+                                            Some(Ok(obj))
+                                        }
+                                        Err(e) => {
+                                            log::warn!("Failed to deserialize '{}': {}", key, e);
+                                            Some(Err(Error::Json(e)))
+                                        }
+                                    }
+                                },
+                                Err(e) => {
+                                    log::debug!("Failed to read '{}' after stat: {}", key, e);
+                                    Some(Err(e.into()))
+                                }
+                            }
+                        }
+                        Err(e) if e.kind() == opendal::ErrorKind::NotFound => {
+                            // File doesn't exist - this is expected on first run, log at debug
+                            log::debug!("File '{}' not found in storage (cache miss)", key);
+                            None
+                        }
+                        Err(e) => {
+                            log::debug!("Failed to stat '{}': {}", key, e);
+                            Some(Err(e.into()))
+                        }
+                    }
+                }.instrument(span).await
+            }
+
+            // First try the fastest operator
+            let schema_evolution_detected = {
+                let fastest_result = try_read_from_op::<Self>(fastest_op, key, None).await;
+
+                // Process the result - consume it fully before any awaits
+                match fastest_result {
+                    Some(Ok(obj)) => return Ok(obj),
+                    Some(Err(Error::Json(_))) => true,   // Schema evolution detected
+                    Some(Err(_)) => false,              // Other error, try fallback
+                    None => false,                      // Not found, try fallback
                 }
-                Err(e) => {
-                    log::warn!(
-                        "Failed to deserialize '{}' from fastest operator: {}",
-                        key,
-                        e
-                    );
-                }
-            },
-            Err(e) => {
-                log::debug!(
-                    "Failed to read '{}' from fastest operator: {}, trying fallback",
-                    key,
-                    e
+                // fastest_result is dropped here
+            };
+
+            // Handle schema evolution outside the scope to avoid Send issues
+            if schema_evolution_detected {
+                log::info!(
+                    "Schema evolution detected for '{}': clearing cache and refetching",
+                    key
                 );
-            }
-        }
-
-        // If fastest operator failed, try all operators in speed order
-        let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
-        ops_vec.sort_by_key(|&(_, (_, speed))| speed);
-
-        for (profile_name, (op, _speed)) in ops_vec {
-            // Skip if this is the same as the fastest operator we already tried
-            if std::ptr::eq(op as *const Operator, fastest_op as *const Operator) {
-                continue;
+                let delete_span = debug_span!("cache_clear", key = %key);
+                async {
+                    if let Err(e) = fastest_op.delete(key).await {
+                        log::debug!("Failed to delete stale cache entry '{}': {}", key, e);
+                    } else {
+                        log::debug!("Deleted stale cache entry '{}'", key);
+                    }
+                }.instrument(delete_span).await;
             }
 
-            log::debug!(
-                "🔄 Trying to load '{}' from profile '{}'",
-                key,
-                profile_name
-            );
+            // If fastest operator failed or file not found, try all operators in speed order
+            let mut ops_vec: Vec<(&String, &(Operator, u128))> = ops.iter().collect();
+            ops_vec.sort_by_key(|&(_, (_, speed))| speed);
 
-            match op.read(key).await {
-                Ok(bs) => match serde_json::from_slice(&bs.to_vec()) {
-                    Ok(obj) => {
-                        log::info!(
-                            "✅ Successfully loaded '{}' from fallback profile '{}'",
-                            key,
-                            profile_name
-                        );
-                        return Ok(obj);
+            for (profile_name, (op, _speed)) in ops_vec {
+                // Skip if this is the same as the fastest operator we already tried
+                if std::ptr::eq(op as *const Operator, fastest_op as *const Operator) {
+                    continue;
+                }
+
+                log::debug!("Trying to load '{}' from profile '{}'", key, profile_name);
+
+                if let Some(result) = try_read_from_op::<Self>(op, key, Some(profile_name)).await {
+                    match result {
+                        Ok(obj) => {
+                            log::info!(
+                                "Successfully loaded '{}' from fallback profile '{}'",
+                                key,
+                                profile_name
+                            );
+
+                            // Cache write-back: write to fastest operator (non-blocking)
+                            // Only if fastest_op is different from current operator (already checked above)
+                            if let Ok(serialized) = serde_json::to_vec(&obj) {
+                                let fastest = fastest_op.clone();
+                                let k = key.to_string();
+                                let data_len = serialized.len();
+
+                                tokio::spawn(async move {
+                                    let span = debug_span!("cache_writeback", key = %k, size = data_len);
+                                    async {
+                                        // Compress large objects
+                                        let data = maybe_compress(&serialized);
+                                        let compressed = data.len() < serialized.len();
+
+                                        match fastest.write(&k, data).await {
+                                            Ok(_) => {
+                                                if compressed {
+                                                    log::debug!(
+                                                        "Cached '{}' to fastest operator ({} bytes compressed)",
+                                                        k,
+                                                        data_len
+                                                    );
+                                                } else {
+                                                    log::debug!(
+                                                        "Cached '{}' to fastest operator ({} bytes)",
+                                                        k,
+                                                        data_len
+                                                    );
+                                                }
+                                            }
+                                            Err(e) => {
+                                                log::debug!("Cache write-back failed for '{}': {}", k, e);
+                                            }
+                                        }
+                                    }.instrument(span).await
+                                });
+                            }
+
+                            return Ok(obj);
+                        }
+                        Err(Error::Json(_)) => {
+                            // Deserialization error, continue to next
+                        }
+                        Err(_) => {
+                            // Other error, continue to next
+                        }
                     }
-                    Err(e) => {
-                        log::warn!(
-                            "Failed to deserialize '{}' from profile '{}': {}",
-                            key,
-                            profile_name,
-                            e
-                        );
-                    }
-                },
-                Err(e) => {
-                    log::debug!(
-                        "Failed to read '{}' from profile '{}': {}",
-                        key,
-                        profile_name,
-                        e
-                    );
                 }
             }
-        }
 
-        // If all operators failed, return the original error from the fastest operator
-        let bs = fastest_op.read(key).await?;
-        let obj = serde_json::from_slice(&bs.to_vec())?;
-        Ok(obj)
+            // If all operators failed, return NotFound error (no WARN logged)
+            log::debug!("Config file '{}' not found in any storage backend", key);
+            Err(Error::NotFound(key.to_string()))
+        }.instrument(span).await
     }
 
     fn get_key(&self) -> String;

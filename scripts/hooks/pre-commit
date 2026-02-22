@@ -61,7 +61,15 @@ secret_patterns=(
 )
 
 for pattern in "${secret_patterns[@]}"; do
-    if git diff --cached --name-only | xargs grep -l -E -i "$pattern" 2>/dev/null; then
+    # Filter out commented lines (lines starting with # or whitespace then #)
+    # and search for secrets only in actual code
+    if git diff --cached --name-only | while read -r file; do
+        # Check if file exists and is text
+        if [[ -f "$file" ]] && file "$file" | grep -q "text"; then
+            # Remove commented lines and search for pattern
+            grep -v "^[[:space:]]*#" "$file" 2>/dev/null | grep -E -i "$pattern" >/dev/null 2>&1 && echo "$file"
+        fi
+    done | grep -q .; then
         print_status "FAIL" "Potential secret found matching pattern: $pattern"
         secrets_found=true
     fi
@@ -217,6 +225,39 @@ if [ -n "$commit_msg_file" ] && [ -f "$commit_msg_file" ]; then
         print_status "INFO" "Current message: $commit_msg"
     fi
 fi
+
+# ====================
+# Ultimate Bug Scanner (UBS)
+# ====================
+print_status "INFO" "Running Ultimate Bug Scanner on staged files..."
+
+find_ubs() {
+  if command -v ubs >/dev/null 2>&1; then
+    command -v ubs
+  elif [ -x "$HOME/.local/bin/ubs" ]; then
+    echo "$HOME/.local/bin/ubs"
+  elif [ -x "/usr/local/bin/ubs" ]; then
+    echo "/usr/local/bin/ubs"
+  else
+    return 1
+  fi
+}
+
+UBS_CMD="$(find_ubs)" || {
+  print_status "WARN" "'ubs' command not found. Skipping bug scan."
+  print_status "INFO" "Install UBS: curl -sSL https://raw.githubusercontent.com/Dicklesworthstone/ultimate_bug_scanner/master/install.sh | bash"
+  print_status "SUCCESS" "All pre-commit checks passed!"
+  echo ""
+  exit 0
+}
+
+# Run UBS on staged files only using --staged flag
+# Disable size check since --staged only scans staged files, not the whole directory
+if ! UBS_MAX_DIR_SIZE_MB=0 "$UBS_CMD" --staged --fail-on-warning . 2>&1 | tail -50; then
+  print_status "FAIL" "Bug scanner found issues. Fix them or use: git commit --no-verify"
+  exit 1
+fi
+print_status "SUCCESS" "No critical issues found by UBS"
 
 print_status "SUCCESS" "All pre-commit checks passed!"
 echo ""

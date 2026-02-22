@@ -7,10 +7,10 @@ use std::sync::Arc;
 
 use super::LlmClient;
 
-#[cfg(feature = "llm_router")]
-use super::router_config::MergedRouterConfig;
 use super::ChatOptions;
 use super::SummarizeOptions as SummarizationOptions;
+#[cfg(feature = "llm_router")]
+use super::router_config::MergedRouterConfig;
 use crate::Result as ServiceResult;
 use async_trait::async_trait;
 use log::{debug, info};

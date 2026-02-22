@@ -1,8 +1,9 @@
 use std::{path::PathBuf, sync::Arc};
 
 use terraphim_automata::{
+    AutomataPath,
     builder::{Logseq, ThesaurusBuilder},
-    load_thesaurus, AutomataPath,
+    load_thesaurus,
 };
 use terraphim_persistence::Persistable;
 use terraphim_rolegraph::{RoleGraph, RoleGraphSync};
@@ -286,6 +287,8 @@ pub enum ServiceType {
     GrepApp,
     /// Use AI coding assistant session logs (Claude Code, OpenCode, Cursor, Aider, Codex)
     AiAssistant,
+    /// Use Quickwit search engine for log and observability data indexing
+    Quickwit,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched
@@ -933,7 +936,10 @@ impl ConfigState {
                             }
                         }
                     } else {
-                        log::warn!("Role {} is configured for TerraphimGraph but has neither automata_path nor knowledge_graph_local defined.", role_name);
+                        log::warn!(
+                            "Role {} is configured for TerraphimGraph but has neither automata_path nor knowledge_graph_local defined.",
+                            role_name
+                        );
                     }
                 }
             }
@@ -1049,6 +1055,7 @@ mod tests {
     use super::*;
     use std::io::Write;
     use tempfile::tempfile;
+    use terraphim_test_utils::EnvVarGuard;
     use tokio::test;
 
     #[test]
@@ -1355,10 +1362,10 @@ mod tests {
         assert_eq!(result, home.join(".terraphim"));
 
         // Test when env var is set
-        std::env::set_var("TERRAPHIM_TEST_PATH", "/custom/path");
+        let _guard = EnvVarGuard::set("TERRAPHIM_TEST_PATH", "/custom/path");
         let result = expand_path("${TERRAPHIM_TEST_PATH:-${HOME}/.default}");
         assert_eq!(result, PathBuf::from("/custom/path"));
-        std::env::remove_var("TERRAPHIM_TEST_PATH");
+        drop(_guard);
 
         println!("expand_path tests passed!");
         println!("HOME = {}", home_str);

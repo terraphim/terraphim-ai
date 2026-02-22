@@ -3,31 +3,26 @@ api_endpoint="http://localhost:8000/api"
 initialized = "${TERRAPHIM_INITIALIZED:-false}"
 default_data_path = "${TERRAPHIM_DATA_PATH:-~/.terraphim}"
 
-# 3-tier non-locking storage configuration for local development
-# - Memory: Ultra-fast cache for hot data
-# - SQLite: Persistent storage with concurrent access (WAL mode)
-# - DashMap: Development fallback with file persistence
+# Persistent storage configuration for local development
+# SQLite: Persistent storage with excellent concurrency (WAL mode)
+# Using only SQLite to ensure role selections persist across CLI invocations
 
-# Primary - Ultra-fast in-memory cache
-[profiles.memory]
-type = "memory"
-
-# Secondary - Persistent with excellent concurrency (WAL mode)
 [profiles.sqlite]
 type = "sqlite"
-datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
-connection_string = "/tmp/terraphim_sqlite/terraphim.db"
+datadir = "${TERRAPHIM_DATA_PATH:-~/.terraphim}/sqlite"
+connection_string = "${TERRAPHIM_DATA_PATH:-~/.terraphim}/sqlite/terraphim.db"
 table = "terraphim_kv"
 
-# Tertiary - Development fallback with concurrent access
-[profiles.dashmap]
-type = "dashmap"
-root = "/tmp/terraphim_dashmap"  # Directory auto-created
+# DashMap disabled - in-memory storage doesn't persist across process restarts
+# This caused role selections to be lost between CLI invocations
+# [profiles.dashmap]
+# type = "dashmap"
+# root = "/tmp/terraphim_dashmap"
 
-# RocksDB - High-performance embedded database (optional)
-[profiles.rocksdb]
-type = "rocksdb"
-datadir = "/tmp/terraphim_rocksdb"
+# RocksDB disabled - causes locking issues and build complexity
+# [profiles.rocksdb]
+# type = "rocksdb"
+# datadir = "/tmp/terraphim_rocksdb"
 
 # ReDB disabled for local development to avoid database locking issues
 # [profiles.redb]

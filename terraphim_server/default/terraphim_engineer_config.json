@@ -33,10 +33,37 @@
       "llm_system_prompt": "You are an expert Terraphim Engineer specializing in knowledge graphs, semantic search, and AI-powered information retrieval. Focus on understanding context, relationships between concepts, and providing comprehensive technical documentation summaries.",
       "extra": {}
     },
+    "Quickwit Logs": {
+      "shortname": "QuickwitLogs",
+      "name": "Quickwit Logs",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "darkly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "http://localhost:7280",
+          "service": "Quickwit",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {
+            "max_hits": "100",
+            "sort_by": "-timestamp"
+          }
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are an expert in log analysis and observability. Help analyze log data, identify patterns, and troubleshoot issues from Quickwit search results.",
+      "extra": {}
+    },
     "Default": {
       "shortname": "Default",
       "name": "Default",
       "relevance_function": "title-scorer",
+      "terraphim_it": false,
       "theme": "spacelab",
       "kg": null,
       "haystacks": [

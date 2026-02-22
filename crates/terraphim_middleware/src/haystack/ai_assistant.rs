@@ -279,6 +279,10 @@ fn message_to_document(
         ]),
         rank: msg.created_at.map(|t| t.as_millisecond() as u64),
         source_haystack: None, // Will be set by caller
+        doc_type: Default::default(),
+        synonyms: None,
+        route: None,
+        priority: None,
     }
 }
 

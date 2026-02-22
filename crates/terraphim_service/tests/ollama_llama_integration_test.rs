@@ -3,7 +3,7 @@
 use ahash::AHashMap;
 use serial_test::serial;
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
-use terraphim_service::{llm, TerraphimService};
+use terraphim_service::{TerraphimService, llm};
 use terraphim_types::{NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
 
 /// Comprehensive integration test suite for Ollama LLM integration with llama3.2:3b
@@ -11,6 +11,13 @@ use terraphim_types::{NormalizedTermValue, RelevanceFunction, RoleName, SearchQu
 #[tokio::test]
 #[serial]
 async fn ollama_llama_integration_comprehensive() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama integration tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -146,7 +153,10 @@ async fn test_direct_llm_client(base_url: &str) {
     // Additional validation: ensure the summary is not excessively long
     // Even with LLM flexibility, we expect some reasonable length control
     if actual_length > 500 {
-        println!("⚠️  Summary is very long ({} chars) - this may indicate the LLM is not following length instructions", actual_length);
+        println!(
+            "⚠️  Summary is very long ({} chars) - this may indicate the LLM is not following length instructions",
+            actual_length
+        );
     }
 }
 
@@ -393,6 +403,13 @@ async fn test_model_listing(base_url: &str) {
 #[tokio::test]
 #[serial]
 async fn ollama_llama_length_constraint_test() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama integration tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())
@@ -466,6 +483,13 @@ async fn ollama_llama_length_constraint_test() {
 #[tokio::test]
 #[serial]
 async fn ollama_llama_performance_test() {
+    if std::env::var("RUN_OLLAMA_TESTS")
+        .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
+        .unwrap_or(true)
+    {
+        eprintln!("Skipping: set RUN_OLLAMA_TESTS=1 to run Ollama integration tests");
+        return;
+    }
     let base_url = std::env::var("OLLAMA_BASE_URL")
         .ok()
         .filter(|s| !s.trim().is_empty())

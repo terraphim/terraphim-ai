@@ -45,15 +45,42 @@
 ## Testing
 
 - [Testing Overview](./testing/testing-overview.md)
+- [Desktop Testing](./testing/desktop/README.md)
 - [MCP Integration Testing](./testing/mcp-integration-testing.md)
 
 ## Knowledge Graph
 
 - [Knowledge Graph](./kg/knowledge-graph.md)
 - [Knowledge Graph System](./kg/knowledge-graph-system.md)
+- [KG Case Studies](./kg/case-studies/kg-validation-workflows.md)
 - [Bug Reporting Enhancement](./knowledge-graph-bug-reporting-enhancement.md)
 - [Bug Reporting Terminology](./kg/bug-reporting.md)
 - [Issue Tracking Terminology](./kg/issue-tracking.md)
+
+## Dynamic Ontology
+
+- [Dynamic Ontology](./dynamic-ontology.md)
+
+## Domains
+
+- [VM](./domains/vm/README.md)
+- [Security](./domains/security/README.md)
+- [CI/CD](./domains/ci/README.md)
+- [Release](./domains/release/README.md)
+- [Desktop](./domains/desktop/README.md)
+  - [Desktop App](./desktop/README.md)
+
+## Case Studies
+
+- [Case Studies](./case-studies/README.md)
+
+## Artifacts
+
+- [Artifacts](./artifacts/README.md)
+
+## Changelog
+
+- [Changelog](./changelog.md)
 
 ## Deployment
 

@@ -1,7 +1,7 @@
 [package]
 name = "terraphim_automata_py"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
 authors = ["Terraphim Contributors"]
 description = "Python bindings for terraphim_automata - Fast autocomplete and text processing for knowledge graphs"
 documentation = "https://terraphim.ai"
@@ -16,8 +16,8 @@ name = "terraphim_automata"
 crate-type = ["cdylib"]
 
 [dependencies]
-terraphim_automata = { path = "../terraphim_automata", version = "1.0.0" }
-terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+terraphim_automata = { path = "../terraphim_automata", version = "1.0.0", default-features = false }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0", default-features = false }
 
 pyo3 = { version = "0.23", features = ["extension-module", "abi3-py39"] }
 serde_json = "1"
@@ -28,3 +28,5 @@ pyo3 = { version = "0.23", features = ["auto-initialize"] }
 
 [features]
 default = []
+remote-loading = ["terraphim_automata/remote-loading"]
+tokio-runtime = ["terraphim_automata/tokio-runtime"]

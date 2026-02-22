@@ -33,11 +33,12 @@ impl CliService {
         let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
-                    log::info!("Loaded existing embedded configuration");
+                    log::debug!("Loaded existing embedded configuration");
                     config
                 }
-                Err(e) => {
-                    log::info!("Failed to load config: {:?}, using default embedded", e);
+                Err(_) => {
+                    // No saved config found is expected on first run - use default
+                    log::debug!("No saved config found, using default embedded");
                     ConfigBuilder::new_with_id(ConfigId::Embedded)
                         .build_default_embedded()
                         .build()?
@@ -81,6 +82,54 @@ impl CliService {
         config.roles.keys().map(|r| r.to_string()).collect()
     }
 
+    /// List all available roles with their shortnames
+    pub async fn list_roles_with_info(&self) -> Vec<(String, Option<String>)> {
+        let config = self.config_state.config.lock().await;
+        config
+            .roles
+            .iter()
+            .map(|(name, role)| (name.to_string(), role.shortname.clone()))
+            .collect()
+    }
+
+    /// Find a role by name or shortname (case-insensitive)
+    pub async fn find_role_by_name_or_shortname(&self, query: &str) -> Option<RoleName> {
+        let config = self.config_state.config.lock().await;
+        let query_lower = query.to_lowercase();
+
+        // First try exact match on name
+        for (name, _role) in config.roles.iter() {
+            if name.to_string().to_lowercase() == query_lower {
+                return Some(name.clone());
+            }
+        }
+
+        // Then try match on shortname
+        for (name, role) in config.roles.iter() {
+            if let Some(ref shortname) = role.shortname {
+                if shortname.to_lowercase() == query_lower {
+                    return Some(name.clone());
+                }
+            }
+        }
+
+        None
+    }
+
+    /// Update the selected role
+    pub async fn update_selected_role(&self, role_name: RoleName) -> Result<()> {
+        let service = self.service.lock().await;
+        service.update_selected_role(role_name).await?;
+        Ok(())
+    }
+
+    /// Save the current configuration
+    pub async fn save_config(&self) -> Result<()> {
+        let config = self.config_state.config.lock().await;
+        config.save().await?;
+        Ok(())
+    }
+
     /// Search documents with a specific role
     pub async fn search(
         &self,
@@ -108,17 +157,46 @@ impl CliService {
     }
 
     /// Get the role graph top-k concepts for a specific role
+    ///
+    /// Returns the top-k concepts sorted by rank (number of co-occurrences) in descending order.
     pub async fn get_top_concepts(
         &self,
         role_name: &RoleName,
         top_k: usize,
     ) -> Result<Vec<String>> {
-        // For now, return placeholder data since role graph access needs proper implementation
-        // TODO: Implement actual role graph integration
         log::info!("Getting top {} concepts for role {}", top_k, role_name);
-        Ok((0..std::cmp::min(top_k, 10))
-            .map(|i| format!("concept_{}_for_role_{}", i + 1, role_name))
-            .collect())
+
+        // Get the role graph for this role
+        if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
+            let rolegraph = rolegraph_sync.lock().await;
+
+            // Get nodes and sort by rank (descending)
+            let mut nodes: Vec<_> = rolegraph.nodes_map().iter().collect();
+            nodes.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+
+            // Map node IDs to term names and collect top-k
+            let top_concepts: Vec<String> = nodes
+                .into_iter()
+                .take(top_k)
+                .filter_map(|(node_id, _node)| {
+                    rolegraph
+                        .ac_reverse_nterm
+                        .get(node_id)
+                        .map(|term| term.to_string())
+                })
+                .collect();
+
+            log::debug!(
+                "Found {} concepts for role {} (requested {})",
+                top_concepts.len(),
+                role_name,
+                top_k
+            );
+            Ok(top_concepts)
+        } else {
+            log::warn!("Role graph not found for role {}", role_name);
+            Ok(Vec::new())
+        }
     }
 
     /// Find matches in text using thesaurus

@@ -9,7 +9,7 @@ mod tests {
     use super::super::context::{ContextConfig, ContextManager};
     use ahash::AHashMap;
     use terraphim_types::{
-        ChatMessage, ContextItem, ContextType, ConversationId, Document, RoleName,
+        ChatMessage, ContextItem, ContextType, ConversationId, Document, DocumentType, RoleName,
     };
     use tokio::test;
 
@@ -37,6 +37,10 @@ mod tests {
             tags: Some(vec!["test".to_string(), "document".to_string()]),
             rank: Some(1),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 
@@ -53,6 +57,10 @@ mod tests {
                 tags: Some(vec![format!("tag-{}", i), "test".to_string()]),
                 rank: Some(i as u64),
                 source_haystack: None,
+                doc_type: DocumentType::KgEntry,
+                synonyms: None,
+                route: None,
+                priority: None,
             })
             .collect()
     }

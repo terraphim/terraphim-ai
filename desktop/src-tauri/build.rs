@@ -6,7 +6,42 @@ fn main() {
     // Copy configuration files to the build directory
     copy_configs();
 
+    // Ensure dist directory exists for Tauri (required by distDir config)
+    // This allows cargo check to pass without needing yarn build first
+    ensure_dist_dir();
+
     tauri_build::build()
+}
+
+fn ensure_dist_dir() {
+    let manifest_dir = env::var("CARGO_MANIFEST_DIR").unwrap();
+    let dist_dir = Path::new(&manifest_dir).join("../dist");
+
+    if !dist_dir.exists() {
+        println!(
+            "cargo:warning=Creating placeholder dist directory for Tauri: {:?}",
+            dist_dir
+        );
+        if let Err(e) = fs::create_dir_all(&dist_dir) {
+            println!("cargo:warning=Failed to create dist directory: {}", e);
+            return;
+        }
+        // Create minimal index.html placeholder
+        let index_path = dist_dir.join("index.html");
+        if !index_path.exists() {
+            if let Err(e) = fs::write(
+                &index_path,
+                "<!DOCTYPE html><html><head><title>Terraphim</title></head><body>Terraphim Desktop</body></html>",
+            ) {
+                println!(
+                    "cargo:warning=Failed to create placeholder index.html: {}",
+                    e
+                );
+            } else {
+                println!("cargo:warning=Created placeholder index.html for Tauri");
+            }
+        }
+    }
 }
 
 fn copy_configs() {

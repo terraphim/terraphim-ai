@@ -1,0 +1,127 @@
+{
+  "id": "DynamicOntology",
+  "global_shortcut": null,
+  "roles": {
+    "Ontology Orchestrator": {
+      "shortname": "OntoOrch",
+      "name": "Ontology Orchestrator",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [],
+      "llm_provider": "openrouter",
+      "llm_model": "anthropic/claude-3.5-sonnet",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are the Ontology Orchestrator. Your role is to coordinate the Dynamic Ontology pipeline: (1) Route text to Extraction Agent, (2) Pass extracted entities to Normalization Agent, (3) Check coverage with Coverage Agent, (4) Route low-confidence results to Review Agent. Use LeadWithSpecialists workflow pattern.",
+      "extra": {
+        "agent_type": "orchestrator",
+        "specialists": ["extraction", "normalization", "coverage", "review"]
+      }
+    },
+    "Extraction Agent": {
+      "shortname": "Extract",
+      "name": "Extraction Agent",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "openrouter",
+      "llm_model": "anthropic/claude-3.5-haiku",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are the Extraction Agent. Extract schema signals from text: Identify entities (CancerDiagnosis, Tumor, GenomicVariant, Biomarker, Drug) and relationships (HAS_TUMOR, HAS_VARIANT, HAS_BIOMARKER, TREATED_WITH). Return structured JSON with entity_type, raw_value, and confidence.",
+      "extra": {
+        "agent_type": "specialist",
+        "specialty": "extraction"
+      }
+    },
+    "Normalization Agent": {
+      "shortname": "Normalize",
+      "name": "Normalization Agent",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": true,
+      "theme": "lumen",
+      "kg": {
+        "automata_path": null,
+        "knowledge_graph_local": {
+          "input_type": "markdown",
+          "path": "docs/src/kg"
+        },
+        "public": true,
+        "publish": true
+      },
+      "haystacks": [],
+      "llm_provider": "openrouter",
+      "llm_model": "anthropic/claude-3.5-haiku",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are the Normalization Agent. Use graph rank and fuzzy matching to normalize extracted entities: (1) Aho-Corasick exact match first, (2) Fuzzy match (Levenshtein/Jaro-Winkler) for variants, (3) Graph rank for prioritization. Return grounding metadata: normalized_uri, normalized_label, normalized_prov, normalized_score, normalized_method.",
+      "extra": {
+        "agent_type": "specialist",
+        "specialty": "normalization"
+      }
+    },
+    "Coverage Agent": {
+      "shortname": "Coverage",
+      "name": "Coverage Agent",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "openrouter",
+      "llm_model": "anthropic/claude-3.5-haiku",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are the Coverage Agent. Compute coverage governance signal: (1) Count total categories in extracted schema, (2) Count matched categories from ontology catalog, (3) Calculate coverage_ratio = matched/total, (4) If ratio < 0.8, set needs_review = true. Return CoverageSignal with ratio and needs_review.",
+      "extra": {
+        "agent_type": "specialist",
+        "specialty": "coverage",
+        "threshold": 0.8
+      }
+    },
+    "Review Agent": {
+      "shortname": "Review",
+      "name": "Review Agent",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "openrouter",
+      "llm_model": "anthropic/claude-3.5-sonnet",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are the Review Agent. Review low-confidence normalizations: (1) Examine entities where normalized_score < 0.8, (2) Suggest corrections based on domain knowledge, (3) Provide final grounding with confidence rating. Focus on oncology/medical domain accuracy.",
+      "extra": {
+        "agent_type": "specialist",
+        "specialty": "review",
+        "min_confidence": 0.8
+      }
+    },
+    "Gene Normalization Agent": {
+      "shortname": "HGNC",
+      "name": "Gene Normalization Agent",
+      "relevance_function": "title-scorer",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [],
+      "llm_provider": "openrouter",
+      "llm_model": "anthropic/claude-3.5-haiku",
+      "llm_auto_summarize": false,
+      "llm_system_prompt": "You are the Gene Normalization Agent. Specialize in HGNC gene symbol normalization: (1) Exact match against HGNC database first, (2) Fuzzy match for variants, (3) Return HGNC URI, gene symbol, and previous symbols. Handle ambiguous 3-5 character tokens specially.",
+      "extra": {
+        "agent_type": "specialist",
+        "specialty": "gene_normalization",
+        "ontology": "hgnc"
+      }
+    }
+  }
+}

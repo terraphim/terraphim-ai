@@ -1,10 +1,10 @@
-use std::collections::{BinaryHeap, HashMap};
+use std::collections::{BinaryHeap, HashMap, VecDeque};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use chrono::Utc;
 
-use tokio::sync::{mpsc, RwLock};
+use tokio::sync::{RwLock, mpsc};
 use tokio::task::JoinHandle;
 use tokio::time::{sleep, timeout};
 
@@ -12,10 +12,10 @@ use terraphim_persistence::Persistable;
 
 use crate::llm::SummarizeOptions;
 // Rate limiter imports removed - not needed for sequential processing
+use crate::ServiceError;
 use crate::summarization_queue::{
     QueueCommand, QueueConfig, QueueStats, SummarizationTask, TaskId, TaskStatus,
 };
-use crate::ServiceError;
 
 /// A task wrapper for priority queue ordering
 #[derive(Debug)]
@@ -55,18 +55,18 @@ struct WorkerStats {
     total_successful: u64,
     total_failed: u64,
     total_cancelled: u64,
-    processing_times: Vec<Duration>,
+    processing_times: VecDeque<Duration>,
 }
 
 impl WorkerStats {
     fn record_success(&mut self, duration: Duration) {
         self.total_processed += 1;
         self.total_successful += 1;
-        self.processing_times.push(duration);
+        self.processing_times.push_back(duration);
 
         // Keep only last 100 processing times for average calculation
         if self.processing_times.len() > 100 {
-            self.processing_times.remove(0);
+            self.processing_times.pop_front();
         }
     }
 
@@ -97,7 +97,6 @@ pub struct SummarizationWorker {
     task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
     stats: Arc<RwLock<WorkerStats>>,
     is_paused: bool,
-    active_workers: usize,
     worker_handles: Vec<JoinHandle<()>>,
 }
 
@@ -110,7 +109,6 @@ impl SummarizationWorker {
             task_status,
             stats: Arc::new(RwLock::new(WorkerStats::default())),
             is_paused: false,
-            active_workers: 0,
             worker_handles: Vec::new(),
         }
     }
@@ -131,6 +129,7 @@ impl SummarizationWorker {
 
         for worker_id in 0..self.config.max_concurrent_workers {
             let task_receiver = Arc::clone(&task_receiver);
+            let task_sender = task_sender.clone();
             let task_status = Arc::clone(&self.task_status);
             let stats = Arc::clone(&self.stats);
             let retry_delay = self.config.retry_delay;
@@ -140,6 +139,7 @@ impl SummarizationWorker {
                 Self::worker_loop(
                     worker_id,
                     task_receiver,
+                    task_sender,
                     task_status,
                     stats,
                     retry_delay,
@@ -247,10 +247,8 @@ impl SummarizationWorker {
         }
 
         // If not paused, try to send directly to workers
-        if !self.is_paused
-            && self.active_workers < self.config.max_concurrent_workers
-            && task_sender.try_send(task.clone()).is_ok()
-        {
+        // Channel backpressure provides natural concurrency control
+        if !self.is_paused && task_sender.try_send(task.clone()).is_ok() {
             log::debug!("Task {} sent directly to worker", task_id);
             return Ok(());
         }
@@ -337,7 +335,7 @@ impl SummarizationWorker {
                 stats.avg_processing_time().map(|d| d.as_secs())
             },
             is_paused: self.is_paused,
-            active_workers: self.active_workers,
+            active_workers: processing, // Use actual processing count from status map
             rate_limiter_status: std::collections::HashMap::new(), // Rate limiting removed
         }
     }
@@ -390,6 +388,7 @@ impl SummarizationWorker {
     async fn worker_loop(
         worker_id: usize,
         task_receiver: Arc<tokio::sync::Mutex<mpsc::Receiver<SummarizationTask>>>,
+        task_sender: mpsc::Sender<SummarizationTask>,
         task_status: Arc<RwLock<HashMap<TaskId, TaskStatus>>>,
         stats: Arc<RwLock<WorkerStats>>,
         retry_delay: Duration,
@@ -511,8 +510,20 @@ impl SummarizationWorker {
                             },
                         );
 
-                        // TODO: Re-queue the task after delay
-                        // For now, we'll just mark it as failed
+                        // Re-queue the task after delay
+                        let task_sender_clone = task_sender.clone();
+                        tokio::spawn(async move {
+                            sleep(delay).await;
+                            if let Err(e) = task_sender_clone.send(retry_task).await {
+                                log::error!("Failed to re-queue retry task {}: {}", task_id, e);
+                            } else {
+                                log::info!(
+                                    "Task {} re-queued for retry after {:?} delay",
+                                    task_id,
+                                    delay
+                                );
+                            }
+                        });
                     } else {
                         let mut status_map = task_status.write().await;
                         status_map.insert(
@@ -626,7 +637,7 @@ mod tests {
     use super::*;
     use crate::summarization_queue::Priority;
     use terraphim_config::Role;
-    use terraphim_types::Document;
+    use terraphim_types::{Document, DocumentType};
 
     fn create_test_document() -> Document {
         Document {
@@ -640,6 +651,10 @@ mod tests {
             tags: Some(vec![]),
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 

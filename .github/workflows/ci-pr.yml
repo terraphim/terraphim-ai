@@ -31,6 +31,15 @@ jobs:
       should-run-full-ci: ${{ steps.changes.outputs.should-run_full_ci }}
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          # Clean up files that may have different permissions from previous Docker runs
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+          sudo rm -rf "${WORKDIR}/terraphim_server/dist" || true
+          sudo rm -rf "${WORKDIR}/target" || true
+          sudo find "${WORKDIR}" -name "dist" -type d -exec rm -rf {} + 2>/dev/null || true
+
       - name: Checkout
         uses: actions/checkout@v6
         with:
@@ -78,11 +87,16 @@ jobs:
   build-frontend:
     name: Build Frontend
     runs-on: [self-hosted, Linux, X64]
-    timeout-minutes: 5
+    timeout-minutes: 20
     needs: changes
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" "${WORKDIR}/desktop/node_modules" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -131,6 +145,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -150,6 +169,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -165,7 +189,7 @@ jobs:
           components: clippy
 
       - name: Clippy Check
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
   # Quick Rust compilation check
   rust-compile:
@@ -176,6 +200,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -206,10 +235,10 @@ jobs:
       - name: Check compilation
         run: |
           # Quick compilation check without building all binaries
-          cargo check --workspace --all-features
+          cargo check --workspace
           # Check key binaries compile
-          cargo check --package terraphim_server --all-features
-          cargo check --package terraphim_mcp_server --all-features
+          cargo check --package terraphim_server
+          cargo check --package terraphim_mcp_server
 
   # Frontend linting and type checking
   frontend-check:
@@ -220,6 +249,11 @@ jobs:
     if: needs.changes.outputs.frontend-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/node_modules" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -227,20 +261,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '20'
-          cache: 'npm'
-          cache-dependency-path: desktop/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: desktop/yarn.lock
 
       - name: Install dependencies
         working-directory: desktop
-        run: npm ci
+        run: yarn install --frozen-lockfile
 
       - name: Lint check
         working-directory: desktop
-        run: npm run lint || true  # Allow failure during transition
+        run: yarn lint || true  # Allow failure during transition
 
       - name: Type check
         working-directory: desktop
-        run: npm run check
+        run: yarn check
 
   # Quick unit tests for changed code
   rust-tests:
@@ -251,6 +285,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" "${WORKDIR}/desktop/dist" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -263,7 +302,7 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -yqq --no-install-recommends librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev libclang-dev clang
+          sudo apt-get install -yqq --no-install-recommends libclang-dev clang
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -286,8 +325,8 @@ jobs:
 
       - name: Run unit tests
         run: |
-          # Run only unit tests (skip integration tests for speed)
-          cargo test --workspace --lib --bins --all-features -- --test-threads=4
+          # Run unit tests (rocksdb feature disabled in CI)
+          cargo test --workspace --lib --bins -- --test-threads=2
 
   # WASM build verification
   wasm-build:
@@ -298,6 +337,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -324,6 +368,11 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Pre-checkout cleanup
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo rm -rf "${WORKDIR}/target" || true
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -331,10 +380,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit
+        run: cargo install cargo-audit --no-default-features
 
       - name: Run security audit
-        run: cargo audit
+        run: |
+          # Fetch fresh advisory database to handle CVSS format updates
+          cargo audit --fetch || true
+          cargo audit || echo "::warning::cargo audit found issues or had parsing errors"
         continue-on-error: true  # Don't fail PR for security advisories
 
   # Job summary

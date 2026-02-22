@@ -453,7 +453,7 @@ pub async fn execute_workflows_in_vms(
     gh_event: &terraphim_github_runner::GitHubEvent,
     firecracker_api_url: &str,
     firecracker_auth_token: Option<&str>,
-    _llm_parser: Option<&WorkflowParser>,
+    llm_parser: Option<&WorkflowParser>,
 ) -> Result<String> {
     if workflow_paths.is_empty() {
         return Ok("No workflows to execute".to_string());
@@ -492,9 +492,11 @@ pub async fn execute_workflows_in_vms(
         let firecracker_api_url = firecracker_api_url.to_string();
         let firecracker_auth_token = firecracker_auth_token.map(|s| s.to_string());
 
+        // Clone the LLM parser to avoid lifetime issues
+        let llm_parser_clone = llm_parser.cloned();
+
         // Spawn task for each workflow
         // Each task creates its own HTTP client and VM, ensuring isolation
-        // Note: LLM parser not used in parallel execution to avoid lifetime issues
         join_set.spawn(async move {
             let workflow_name = workflow_path
                 .file_name()
@@ -504,12 +506,18 @@ pub async fn execute_workflows_in_vms(
 
             info!("📋 Starting workflow: {}", workflow_name);
 
+            if llm_parser_clone.is_some() {
+                info!("🤖 LLM parser enabled for this workflow");
+            } else {
+                info!("📋 Using simple YAML parser for this workflow");
+            }
+
             let result = execute_workflow_in_vm(
                 &workflow_path,
                 &gh_event,
                 &firecracker_api_url,
                 firecracker_auth_token.as_deref(),
-                None, // No LLM parser in parallel execution
+                llm_parser_clone.as_ref(),
             )
             .await;
 

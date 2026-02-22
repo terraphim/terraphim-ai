@@ -1,10 +1,10 @@
 use ::terraphim_automata::autocomplete::{
-    autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
-    fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
-    AutocompleteConfig, AutocompleteIndex, AutocompleteResult,
+    AutocompleteConfig, AutocompleteIndex, AutocompleteResult, autocomplete_search,
+    build_autocomplete_index, deserialize_autocomplete_index, fuzzy_autocomplete_search,
+    fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
 };
 use ::terraphim_automata::matcher::{
-    extract_paragraphs_from_automata, find_matches, LinkType, Matched,
+    LinkType, Matched, extract_paragraphs_from_automata, find_matches,
 };
 use ::terraphim_automata::{load_thesaurus_from_json, load_thesaurus_from_json_and_replace};
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -347,7 +347,7 @@ fn replace_with_links(text: &str, json_str: &str, link_type: &str) -> PyResult<S
             return Err(PyValueError::new_err(format!(
                 "Invalid link type '{}'. Use 'wiki', 'html', 'markdown', or 'plain'",
                 link_type
-            )))
+            )));
         }
     };
 

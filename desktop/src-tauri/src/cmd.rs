@@ -2432,8 +2432,14 @@ pub async fn add_kg_index_context(
             meta.insert("total_nodes".to_string(), kg_index.total_nodes.to_string());
             meta.insert("total_edges".to_string(), kg_index.total_edges.to_string());
             meta.insert("source".to_string(), kg_index.source.clone());
-            meta.insert("version".to_string(), kg_index.version.clone().unwrap_or_default());
-            meta.insert("last_updated".to_string(), kg_index.last_updated.to_rfc3339());
+            meta.insert(
+                "version".to_string(),
+                kg_index.version.clone().unwrap_or_default(),
+            );
+            meta.insert(
+                "last_updated".to_string(),
+                kg_index.last_updated.to_rfc3339(),
+            );
             meta.insert("content_type".to_string(), "thesaurus_json".to_string());
             meta.insert("kg_index_type".to_string(), "KGIndex".to_string());
             meta

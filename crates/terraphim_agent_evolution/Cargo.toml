@@ -1,7 +1,8 @@
 [package]
 name = "terraphim_agent_evolution"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
+license = "MIT"
 
 [dependencies]
 async-trait = "0.1"

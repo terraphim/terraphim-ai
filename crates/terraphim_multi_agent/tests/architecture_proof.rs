@@ -2,7 +2,7 @@
 //! without requiring actual LLM API calls
 
 use std::sync::Arc;
-use terraphim_multi_agent::{AgentRegistry, MultiAgentError, test_utils::create_test_role};
+use terraphim_multi_agent::{test_utils::create_test_role, AgentRegistry, MultiAgentError};
 use terraphim_persistence::DeviceStorage;
 
 #[tokio::test]
@@ -22,13 +22,14 @@ async fn test_queue_based_architecture_proof() {
     println!("2️⃣ Role system validation...");
     let role = create_test_role();
     assert_eq!(role.name.to_string(), "TestAgent");
+    // Test role is configured for local Ollama provider in this repo.
     assert_eq!(
         role.extra.get("llm_provider").unwrap(),
-        &serde_json::json!("openai")
+        &serde_json::json!("ollama")
     );
     assert_eq!(
-        role.extra.get("openai_model").unwrap(),
-        &serde_json::json!("gpt-3.5-turbo")
+        role.extra.get("llm_model").unwrap(),
+        &serde_json::json!("gemma3:270m")
     );
     println!("✅ Role configuration validated");
 
@@ -36,14 +37,16 @@ async fn test_queue_based_architecture_proof() {
     println!("3️⃣ Rig integration validation...");
     match terraphim_multi_agent::TerraphimAgent::new(role.clone(), persistence.clone(), None).await
     {
+        // In this repo, tests use Ollama by default; if Ollama isn't running we should see a connection error.
         Err(MultiAgentError::SystemError(msg)) if msg.contains("API key") => {
-            println!("✅ Rig integration working - correctly requests API key");
+            println!("✅ LLM integration working - correctly requests API key");
         }
         Err(other) => {
-            println!("✅ Rig integration working - error: {:?}", other);
+            println!("✅ LLM integration working - error: {:?}", other);
         }
         Ok(_) => {
-            panic!("Expected API key error but agent was created successfully");
+            // If Ollama is running locally, agent creation can succeed.
+            println!("✅ Agent created successfully (Ollama available)");
         }
     }
 

@@ -1,0 +1,55 @@
+{
+  "name": "guard_allowlist",
+  "data": {
+    "git checkout -b ": {
+      "id": 1,
+      "nterm": "safe_git_branch_create",
+      "url": "Creating a new branch is safe."
+    },
+    "git checkout --orphan ": {
+      "id": 1,
+      "nterm": "safe_git_branch_create",
+      "url": "Creating an orphan branch is safe."
+    },
+    "git restore --staged": {
+      "id": 2,
+      "nterm": "safe_git_unstage",
+      "url": "Unstaging files is safe; it does not discard working tree changes."
+    },
+    "git clean -n": {
+      "id": 3,
+      "nterm": "safe_git_dry_run",
+      "url": "Dry run only shows what would be removed without deleting anything."
+    },
+    "git clean --dry-run": {
+      "id": 3,
+      "nterm": "safe_git_dry_run",
+      "url": "Dry run only shows what would be removed without deleting anything."
+    },
+    "git push --force-with-lease": {
+      "id": 4,
+      "nterm": "safe_force_push",
+      "url": "Force-with-lease checks that the remote has not been updated before pushing, preventing accidental overwrites."
+    },
+    "rm -rf /tmp/": {
+      "id": 5,
+      "nterm": "safe_tmp_cleanup",
+      "url": "Cleaning temporary directories is safe."
+    },
+    "rm -rf /var/tmp/": {
+      "id": 5,
+      "nterm": "safe_tmp_cleanup",
+      "url": "Cleaning temporary directories is safe."
+    },
+    "rm -fr /tmp/": {
+      "id": 5,
+      "nterm": "safe_tmp_cleanup",
+      "url": "Cleaning temporary directories is safe."
+    },
+    "rm -fr /var/tmp/": {
+      "id": 5,
+      "nterm": "safe_tmp_cleanup",
+      "url": "Cleaning temporary directories is safe."
+    }
+  }
+}

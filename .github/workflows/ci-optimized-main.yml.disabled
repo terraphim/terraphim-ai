@@ -1,0 +1,360 @@
+name: CI Optimized Main Branch
+
+# NOTE: Tag trigger disabled - release-comprehensive.yml handles releases
+on:
+  push:
+    branches: [main, develop]
+    # Disabled tag trigger - release-comprehensive.yml handles releases
+    # tags: ["*.*.*"]
+  workflow_dispatch:
+    inputs:
+      build-release:
+        description: "Build release binaries"
+        required: false
+        default: "false"
+        type: boolean
+      deploy-staging:
+        description: "Deploy to staging environment"
+        required: false
+        default: "false"
+        type: boolean
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+  CARGO_NET_RETRY: 10
+  RUSTUP_MAX_RETRIES: 10
+  REGISTRY: ghcr.io
+  IMAGE_NAME: terraphim/terraphim-ai
+  BUILD_START_TIME: ${{ github.event.head_commit.timestamp }}
+
+jobs:
+  # System resource and environment validation
+  setup:
+    name: Environment Setup and Validation
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-release: ${{ steps.version.outputs.is-release }}
+      cache-key: ${{ steps.cache.outputs.key }}
+      targets: ${{ steps.matrix.outputs.targets }}
+      available-memory: ${{ steps.resources.outputs.memory }}
+      available-disk: ${{ steps.resources.outputs.disk }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: System Resource Check
+        id: resources
+        run: |
+          echo "=== System Resources ===" >> $GITHUB_STEP_SUMMARY
+          MEMORY_GB=$(free -g | awk '/^Mem:/{print $7}')
+          DISK_GB=$(df -BG / | awk 'NR==2{print $4}' | sed 's/G//')
+          DOCKER_IMAGES=$(docker images --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}" | wc -l)
+          DOCKER_STORAGE=$(docker system df --format "{{.Size}}" | head -1)
+
+          echo "Available Memory: ${MEMORY_GB}GB" >> $GITHUB_STEP_SUMMARY
+          echo "Available Disk: ${DISK_GB}GB" >> $GITHUB_STEP_SUMMARY
+          echo "Docker Images Count: $DOCKER_IMAGES" >> $GITHUB_STEP_SUMMARY
+          echo "Docker Storage Used: $DOCKER_STORAGE" >> $GITHUB_STEP_SUMMARY
+
+          echo "memory=${MEMORY_GB}GB" >> $GITHUB_OUTPUT
+          echo "disk=${DISK_GB}GB" >> $GITHUB_OUTPUT
+          echo "docker_storage=$DOCKER_STORAGE" >> $GITHUB_OUTPUT
+
+          # Resource thresholds
+          if [ "$MEMORY_GB" -lt 4 ]; then
+            echo "⚠️ Low memory warning: ${MEMORY_GB}GB available" >> $GITHUB_STEP_SUMMARY
+          fi
+          if [ "$DISK_GB" -lt 20 ]; then
+            echo "⚠️ Low disk space warning: ${DISK_GB}GB available" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Automated Docker Cleanup
+        run: |
+          echo "=== Docker Cleanup ===" >> $GITHUB_STEP_SUMMARY
+
+          # Clean up dangling images and containers
+          DANGLING_IMAGES=$(docker images -f "dangling=true" -q | wc -l)
+          if [ "$DANGLING_IMAGES" -gt 0 ]; then
+            echo "Removing $DANGLING_IMAGES dangling images" >> $GITHUB_STEP_SUMMARY
+            docker rmi $(docker images -f "dangling=true" -q) 2>/dev/null || true
+          fi
+
+          # Clean up stopped containers
+          STOPPED_CONTAINERS=$(docker ps -a -q | wc -l)
+          if [ "$STOPPED_CONTAINERS" -gt 0 ]; then
+            echo "Removing $STOPPED_CONTAINERS stopped containers" >> $GITHUB_STEP_SUMMARY
+            docker rm $(docker ps -a -q) 2>/dev/null || true
+          fi
+
+          # System prune with storage limit
+          BEFORE_SIZE=$(docker system df --format "{{.Size}}" | head -1)
+          docker system prune -f --volumes --filter "until=24h" || true
+          AFTER_SIZE=$(docker system df --format "{{.Size}}" | head -1)
+
+          echo "Storage before cleanup: $BEFORE_SIZE" >> $GITHUB_STEP_SUMMARY
+          echo "Storage after cleanup: $AFTER_SIZE" >> $GITHUB_STEP_SUMMARY
+
+          # Build cache cleanup
+          docker buildx prune -f --keep-storage=10G --filter until=24h || true
+
+      - name: Extract version and release info
+        id: version
+        run: |
+          if [[ $GITHUB_REF == refs/tags/* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/}
+            IS_RELEASE=true
+          elif [[ $GITHUB_REF == refs/heads/main ]]; then
+            VERSION=$(git describe --tags --always --dirty)
+            IS_RELEASE=false
+          else
+            VERSION="latest"
+            IS_RELEASE=false
+          fi
+
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-release=$IS_RELEASE" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION (release: $IS_RELEASE)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate optimized cache key
+        id: cache
+        run: |
+          CACHE_KEY="v3-optimized-${{ runner.os }}-${{ hashFiles('**/Cargo.lock', '**/package-lock.json', '.github/rust-toolchain.toml') }}"
+          echo "key=$CACHE_KEY" >> $GITHUB_OUTPUT
+          echo "Cache key: $CACHE_KEY" >> $GITHUB_STEP_SUMMARY
+
+      - name: Generate build matrix
+        id: matrix
+        run: |
+          if [[ "${{ steps.version.outputs.is-release }}" == "true" ]] || [[ "${{ github.event.inputs.build-release }}" == "true" ]]; then
+            TARGETS='["x86_64-unknown-linux-gnu","aarch64-unknown-linux-gnu","x86_64-unknown-linux-musl"]'
+          else
+            TARGETS='["x86_64-unknown-linux-gnu"]'
+          fi
+          echo "targets=$TARGETS" >> $GITHUB_OUTPUT
+          echo "Build targets: $TARGETS" >> $GITHUB_STEP_SUMMARY
+
+  # Optimized Rust build with comprehensive caching
+  rust-build:
+    name: Rust Build (${{ matrix.target }})
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 30
+    needs: setup
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJson(needs.setup.outputs.targets) }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Build Performance Tracking
+        id: perf
+        run: |
+          BUILD_START=$(date +%s)
+          echo "build_start=$BUILD_START" >> $GITHUB_OUTPUT
+          echo "Build started at: $(date)" >> $GITHUB_STEP_SUMMARY
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+          targets: ${{ matrix.target }}
+
+      - name: Optimized Cargo Cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            /opt/cargo-cache/registry
+            /opt/cargo-cache/git
+            ~/.cargo/registry
+            ~/.cargo/git
+          key: ${{ needs.setup.outputs.cache-key }}-cargo-registry-${{ matrix.target }}
+          restore-keys: |
+            ${{ needs.setup.outputs.cache-key }}-cargo-registry-${{ matrix.target }}-
+            v3-optimized-${{ runner.os }}-cargo-registry-${{ matrix.target }}-
+        env:
+          CARGO_HOME: /opt/cargo-cache
+
+      - name: Target-specific Build Cache
+        uses: actions/cache@v4
+        with:
+          path: target
+          key: ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}
+          restore-keys: |
+            ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}-
+            ${{ needs.setup.outputs.cache-key }}-target-
+
+      - name: Optimized Rust Build
+        run: |
+          # Set build optimizations
+          export CARGO_BUILD_JOBS=$(nproc)
+          export CARGO_PROFILE_RELEASE_LTO=true
+          export CARGO_PROFILE_RELEASE_CODEGEN_UNITS=1
+
+          echo "=== Build Configuration ===" >> $GITHUB_STEP_SUMMARY
+          echo "Target: ${{ matrix.target }}" >> $GITHUB_STEP_SUMMARY
+          echo "Build Jobs: $CARGO_BUILD_JOBS" >> $GITHUB_STEP_SUMMARY
+          echo "LTO Enabled: $CARGO_PROFILE_RELEASE_LTO" >> $GITHUB_STEP_SUMMARY
+
+          # Build workspace with default features (no rocksdb for faster CI)
+          cargo build --release --target ${{ matrix.target }} --workspace
+
+          # Build verification and metrics
+          BINARY_COUNT=$(find target/${{ matrix.target }}/release -name "terraphim*" -type f | wc -l)
+          TOTAL_SIZE=$(du -sh target/${{ matrix.target }}/release/ | cut -f1)
+
+          echo "=== Build Results ===" >> $GITHUB_STEP_SUMMARY
+          echo "Binaries built: $BINARY_COUNT" >> $GITHUB_STEP_SUMMARY
+          echo "Total size: $TOTAL_SIZE" >> $GITHUB_STEP_SUMMARY
+
+          # List binary sizes
+          for binary in target/${{ matrix.target }}/release/terraphim*; do
+            if [[ -f "$binary" ]]; then
+              SIZE=$(du -h "$binary" | cut -f1)
+              echo "$(basename "$binary"): $SIZE" >> $GITHUB_STEP_SUMMARY
+            fi
+          done
+
+      - name: Performance Metrics Collection
+        id: perf-end
+        if: always()
+        run: |
+          BUILD_END=$(date +%s)
+          BUILD_DURATION=$((BUILD_END - ${{ steps.perf.outputs.build_start }}))
+          BUILD_MINUTES=$((BUILD_DURATION / 60))
+
+          echo "=== Performance Metrics ===" >> $GITHUB_STEP_SUMMARY
+          echo "Build duration: ${BUILD_MINUTES}m ${BUILD_DURATION}s" >> $GITHUB_STEP_SUMMARY
+          echo "Build end time: $(date)" >> $GITHUB_STEP_SUMMARY
+
+          # Cache efficiency check
+          CARGO_CACHE_SIZE=$(du -sh /opt/cargo-cache 2>/dev/null || echo "0")
+          echo "Cargo cache size: $CARGO_CACHE_SIZE" >> $GITHUB_STEP_SUMMARY
+
+      - name: Comprehensive Testing
+        run: |
+          echo "=== Running Tests ===" >> $GITHUB_STEP_SUMMARY
+
+          # Run unit and integration tests (no rocksdb for faster CI)
+          cargo test --release --target ${{ matrix.target }} --workspace -- --test-threads=4
+
+          # Run specific critical tests
+          cargo test --release --package terraphim_service --target ${{ matrix.target }}
+          cargo test --release --package terraphim_middleware --target ${{ matrix.target }}
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: rust-binaries-${{ matrix.target }}
+          path: |
+            target/${{ matrix.target }}/release/terraphim_server
+            target/${{ matrix.target }}/release/terraphim_mcp_server
+            target/${{ matrix.target }}/release/terraphim-agent
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+      - name: Create .deb Package (Linux x64)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        run: |
+          if ! command -v cargo-deb &> /dev/null; then
+            cargo install cargo-deb --target ${{ matrix.target }}
+          fi
+
+          cargo deb --target ${{ matrix.target }} --package terraphim_server --no-build
+
+          PACKAGE_SIZE=$(du -h target/${{ matrix.target }}/debian/*.deb | cut -f1)
+          echo "Debian package size: $PACKAGE_SIZE" >> $GITHUB_STEP_SUMMARY
+
+      - name: Upload .deb Artifacts
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        uses: actions/upload-artifact@v4
+        with:
+          name: deb-packages
+          path: target/${{ matrix.target }}/debian/*.deb
+          retention-days: ${{ needs.setup.outputs.is-release == 'true' && '90' || '30' }}
+
+  # Build Summary and Performance Report
+  build-summary:
+    name: CI Performance Summary
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 5
+    needs: [setup, rust-build]
+    if: always()
+
+    steps:
+      - name: Generate Comprehensive Summary
+        run: |
+          echo "# CI/CD Performance Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Build Configuration" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version**: ${{ needs.setup.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Release Build**: ${{ needs.setup.outputs.is-release }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Available Memory**: ${{ needs.setup.outputs.available-memory }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Available Disk**: ${{ needs.setup.outputs.available-disk }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          echo "## Build Results" >> $GITHUB_STEP_SUMMARY
+          echo "| Job | Status | Duration | Notes |" >> $GITHUB_STEP_SUMMARY
+          echo "|-----|--------|----------|-------|" >> $GITHUB_STEP_SUMMARY
+          echo "| Environment Setup | ${{ needs.setup.result }} | - | Resource validation and cleanup |" >> $GITHUB_STEP_SUMMARY
+          echo "| Rust Build | ${{ needs.rust-build.result }} | Varies | Multi-target compilation |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [[ "${{ needs.setup.result }}" == "success" ]] && [[ "${{ needs.rust-build.result }}" == "success" ]]; then
+            echo "## ✅ Build Successful" >> $GITHUB_STEP_SUMMARY
+            echo "- All components built successfully" >> $GITHUB_STEP_SUMMARY
+            echo "- Docker cleanup executed" >> $GITHUB_STEP_SUMMARY
+            echo "- Performance metrics collected" >> $GITHUB_STEP_SUMMARY
+            echo "- Cache optimization active" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "## ❌ Build Failed" >> $GITHUB_STEP_SUMMARY
+            echo "- Check individual job logs for details" >> $GITHUB_STEP_SUMMARY
+            echo "- Consider resource availability" >> $GITHUB_STEP_SUMMARY
+            echo "- Review timeout configurations" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Optimization Status" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Automated Docker cleanup implemented" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Resource monitoring active" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Performance tracking enabled" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Optimized caching strategy" >> $GITHUB_STEP_SUMMARY
+          echo "- ✅ Increased build timeouts (30min)" >> $GITHUB_STEP_SUMMARY
+
+  # Cleanup and Maintenance
+  cleanup:
+    name: Post-Build Cleanup
+    runs-on: [self-hosted, Linux, X64]
+    timeout-minutes: 3
+    needs: [setup, rust-build, build-summary]
+    if: always()
+
+    steps:
+      - name: Final Cleanup and Maintenance
+        run: |
+          echo "=== Post-Build Cleanup ===" >> $GITHUB_STEP_SUMMARY
+
+          # Final system cleanup
+          docker system prune -f --volumes --filter "until=6h" || true
+          docker buildx prune -f --keep-storage=5G --filter "until=6h" || true
+
+          # Report final system state
+          FINAL_STORAGE=$(docker system df --format "{{.Size}}" | head -1)
+          FINAL_IMAGES=$(docker images --format "table {{.Repository}}:{{.Tag}}" | wc -l)
+
+          echo "Final Docker storage: $FINAL_STORAGE" >> $GITHUB_STEP_SUMMARY
+          echo "Final image count: $FINAL_IMAGES" >> $GITHUB_STEP_SUMMARY
+
+          # System resource report
+          FREE_MEMORY=$(free -h | awk '/^Mem:/{print $7}')
+          FREE_DISK=$(df -h / | awk 'NR==2{print $4}')
+
+          echo "Free memory: $FREE_MEMORY" >> $GITHUB_STEP_SUMMARY
+          echo "Free disk: $FREE_DISK" >> $GITHUB_STEP_SUMMARY

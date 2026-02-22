@@ -3,27 +3,33 @@ use std::io;
 use anyhow::Result;
 use clap::{Parser, Subcommand};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{
+        self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode, KeyEvent, KeyModifiers,
+    },
     execute,
-    terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
+    terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
 };
 use ratatui::{
+    Terminal,
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
-    Terminal,
 };
 use tokio::runtime::Runtime;
 
 mod client;
 mod guard_patterns;
+mod onboarding;
 mod service;
 
 // Robot mode and forgiving CLI - always available
 mod forgiving;
 mod robot;
+
+// Learning capture for failed commands
+mod learnings;
 
 #[cfg(feature = "repl")]
 mod repl;
@@ -43,12 +49,13 @@ enum LogicalOperatorCli {
 fn show_usage_info() {
     println!("Terraphim AI Agent v{}", env!("CARGO_PKG_VERSION"));
     println!();
-    println!("Interactive Mode (requires TTY):");
-    println!("  terraphim-agent              # Start REPL or TUI");
-    println!("  terraphim-agent repl         # Explicit REPL mode");
+    println!("Interactive Modes (requires TTY):");
+    println!("  terraphim-agent              # Start fullscreen TUI (requires running server)");
+    println!("  terraphim-agent repl         # Start REPL (offline-capable by default)");
+    println!("  terraphim-agent repl --server # Start REPL in server mode");
     println!();
     println!("Common Commands:");
-    println!("  search <query>               # Search documents");
+    println!("  search <query>               # Search documents (offline-capable by default)");
     println!("  roles list                   # List available roles");
     println!("  config show                  # Show configuration");
     println!("  replace <text>               # Replace terms using thesaurus");
@@ -57,6 +64,38 @@ fn show_usage_info() {
     println!("For more information:");
     println!("  terraphim-agent --help       # Show full help");
     println!("  terraphim-agent help         # Show command-specific help");
+}
+
+fn resolve_tui_server_url(explicit: Option<&str>) -> String {
+    let env_server = std::env::var("TERRAPHIM_SERVER").ok();
+    resolve_tui_server_url_with_env(explicit, env_server.as_deref())
+}
+
+fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&str>) -> String {
+    explicit
+        .map(ToOwned::to_owned)
+        .or_else(|| env_server.map(ToOwned::to_owned))
+        .unwrap_or_else(|| "http://localhost:8000".to_string())
+}
+
+fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Error {
+    anyhow::anyhow!(
+        "Fullscreen TUI requires a running Terraphim server at {}. \
+         Start terraphim_server or use offline mode with `terraphim-agent repl`. \
+         Connection error: {}",
+        url,
+        cause
+    )
+}
+
+fn ensure_tui_server_reachable(
+    runtime: &tokio::runtime::Runtime,
+    api: &ApiClient,
+    url: &str,
+) -> Result<()> {
+    runtime
+        .block_on(api.health())
+        .map_err(|err| tui_server_requirement_error(url, &err))
 }
 
 impl From<LogicalOperatorCli> for LogicalOperator {
@@ -81,6 +120,72 @@ pub enum HookType {
     PrepareCommitMsg,
 }
 
+/// Boundary mode for text replacement
+#[derive(clap::ValueEnum, Debug, Clone, Default)]
+pub enum BoundaryMode {
+    /// Match anywhere (default, current behavior)
+    #[default]
+    None,
+    /// Only match at word boundaries
+    Word,
+}
+
+/// Check if a character is a word boundary character (not alphanumeric).
+fn is_word_boundary_char(c: char) -> bool {
+    !c.is_alphanumeric() && c != '_'
+}
+
+/// Check if a match position is at word boundaries in the text.
+/// Returns true if the character before start (or start of string) and
+/// the character after end (or end of string) are word boundary characters.
+fn is_at_word_boundary(text: &str, start: usize, end: usize) -> bool {
+    // Check character before start
+    let before_ok = if start == 0 {
+        true
+    } else {
+        text[..start]
+            .chars()
+            .last()
+            .map(is_word_boundary_char)
+            .unwrap_or(true)
+    };
+
+    // Check character after end
+    let after_ok = if end >= text.len() {
+        true
+    } else {
+        text[end..]
+            .chars()
+            .next()
+            .map(is_word_boundary_char)
+            .unwrap_or(true)
+    };
+
+    before_ok && after_ok
+}
+
+/// Format a replacement link from a NormalizedTerm and LinkType.
+fn format_replacement_link(
+    term: &terraphim_types::NormalizedTerm,
+    link_type: terraphim_hooks::LinkType,
+) -> String {
+    let display_text = term.display();
+    match link_type {
+        terraphim_hooks::LinkType::WikiLinks => format!("[[{}]]", display_text),
+        terraphim_hooks::LinkType::HTMLLinks => format!(
+            "<a href=\"{}\">{}</a>",
+            term.url.as_deref().unwrap_or_default(),
+            display_text
+        ),
+        terraphim_hooks::LinkType::MarkdownLinks => format!(
+            "[{}]({})",
+            display_text,
+            term.url.as_deref().unwrap_or_default()
+        ),
+        terraphim_hooks::LinkType::PlainText => display_text.to_string(),
+    }
+}
+
 /// Create a transparent style for UI elements
 fn transparent_style() -> Style {
     Style::default().bg(Color::Reset)
@@ -103,6 +208,220 @@ enum ViewMode {
     ResultDetail,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TuiAction {
+    None,
+    Quit,
+    SearchOrOpen,
+    MoveUp,
+    MoveDown,
+    Autocomplete,
+    SwitchRole,
+    SummarizeSelection,
+    SummarizeDetail,
+    Backspace,
+    InsertChar(char),
+    BackToSearch,
+}
+
+#[cfg(test)]
+fn key_event(code: KeyCode, modifiers: KeyModifiers) -> KeyEvent {
+    KeyEvent::new(code, modifiers)
+}
+
+fn map_search_key_event(event: KeyEvent) -> TuiAction {
+    match (event.code, event.modifiers) {
+        (KeyCode::Char('q'), KeyModifiers::CONTROL) => TuiAction::Quit,
+        (KeyCode::Esc, KeyModifiers::NONE) => TuiAction::Quit,
+        (KeyCode::Enter, KeyModifiers::NONE) => TuiAction::SearchOrOpen,
+        (KeyCode::Up, KeyModifiers::NONE) => TuiAction::MoveUp,
+        (KeyCode::Down, KeyModifiers::NONE) => TuiAction::MoveDown,
+        (KeyCode::Tab, KeyModifiers::NONE) => TuiAction::Autocomplete,
+        (KeyCode::Char('r'), KeyModifiers::CONTROL) => TuiAction::SwitchRole,
+        (KeyCode::Char('s'), KeyModifiers::CONTROL) => TuiAction::SummarizeSelection,
+        (KeyCode::Backspace, KeyModifiers::NONE) => TuiAction::Backspace,
+        (KeyCode::Char(c), KeyModifiers::NONE) => TuiAction::InsertChar(c),
+        _ => TuiAction::None,
+    }
+}
+
+fn map_detail_key_event(event: KeyEvent) -> TuiAction {
+    match (event.code, event.modifiers) {
+        (KeyCode::Esc, KeyModifiers::NONE) => TuiAction::BackToSearch,
+        (KeyCode::Char('q'), KeyModifiers::CONTROL) => TuiAction::Quit,
+        (KeyCode::Char('s'), KeyModifiers::CONTROL) => TuiAction::SummarizeDetail,
+        _ => TuiAction::None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn map_search_key_event_allows_plain_letters() {
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('s'), KeyModifiers::NONE)),
+            TuiAction::InsertChar('s')
+        );
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('r'), KeyModifiers::NONE)),
+            TuiAction::InsertChar('r')
+        );
+        // 'q' should also be typeable now
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('q'), KeyModifiers::NONE)),
+            TuiAction::InsertChar('q')
+        );
+    }
+
+    #[test]
+    fn map_search_key_event_ctrl_shortcuts() {
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('s'), KeyModifiers::CONTROL)),
+            TuiAction::SummarizeSelection
+        );
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('r'), KeyModifiers::CONTROL)),
+            TuiAction::SwitchRole
+        );
+        // Ctrl+q quits
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+            TuiAction::Quit
+        );
+        // Esc also quits in search mode
+        assert_eq!(
+            map_search_key_event(key_event(KeyCode::Esc, KeyModifiers::NONE)),
+            TuiAction::Quit
+        );
+    }
+
+    #[test]
+    fn map_detail_key_event_ctrl_s_summarizes() {
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('s'), KeyModifiers::CONTROL)),
+            TuiAction::SummarizeDetail
+        );
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('s'), KeyModifiers::NONE)),
+            TuiAction::None
+        );
+    }
+
+    #[test]
+    fn map_detail_key_event_ctrl_q_quits() {
+        // Ctrl+q quits in detail mode
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('q'), KeyModifiers::CONTROL)),
+            TuiAction::Quit
+        );
+        // Plain 'q' does nothing (no typing in detail mode)
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Char('q'), KeyModifiers::NONE)),
+            TuiAction::None
+        );
+        // Esc goes back to search, not quit
+        assert_eq!(
+            map_detail_key_event(key_event(KeyCode::Esc, KeyModifiers::NONE)),
+            TuiAction::BackToSearch
+        );
+    }
+
+    #[test]
+    fn test_is_word_boundary_char() {
+        // Non-alphanumeric chars are boundaries
+        assert!(is_word_boundary_char(' '));
+        assert!(is_word_boundary_char('\t'));
+        assert!(is_word_boundary_char('\n'));
+        assert!(is_word_boundary_char('.'));
+        assert!(is_word_boundary_char(','));
+        assert!(is_word_boundary_char('('));
+        assert!(is_word_boundary_char(')'));
+        assert!(is_word_boundary_char('"'));
+
+        // Alphanumeric chars are NOT boundaries
+        assert!(!is_word_boundary_char('a'));
+        assert!(!is_word_boundary_char('Z'));
+        assert!(!is_word_boundary_char('0'));
+        assert!(!is_word_boundary_char('9'));
+
+        // Underscore is NOT a boundary (word char in most regex)
+        assert!(!is_word_boundary_char('_'));
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_start_of_string() {
+        // At start of string, "npm" should be at boundary
+        let text = "npm install";
+        assert!(is_at_word_boundary(text, 0, 3)); // "npm" at start
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_end_of_string() {
+        // At end of string, "npm" should be at boundary
+        let text = "install npm";
+        assert!(is_at_word_boundary(text, 8, 11)); // "npm" at end
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_middle_with_spaces() {
+        // In middle with spaces, "npm" should be at boundary
+        let text = "run npm install";
+        assert!(is_at_word_boundary(text, 4, 7)); // "npm" surrounded by spaces
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_not_at_boundary() {
+        // "npm" embedded in "anpmb" should NOT be at boundary
+        let text = "anpmb";
+        assert!(!is_at_word_boundary(text, 1, 4)); // "npm" embedded
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_partial_boundary() {
+        // "npm" at start but not end: "npma"
+        let text = "npma";
+        assert!(!is_at_word_boundary(text, 0, 3)); // "npm" no boundary after
+
+        // "npm" at end but not start: "anpm"
+        let text2 = "anpm";
+        assert!(!is_at_word_boundary(text2, 1, 4)); // "npm" no boundary before
+    }
+
+    #[test]
+    fn test_is_at_word_boundary_with_punctuation() {
+        // Punctuation counts as boundary
+        let text = "(npm)";
+        assert!(is_at_word_boundary(text, 1, 4)); // "npm" between parens
+
+        let text2 = "use npm, please";
+        assert!(is_at_word_boundary(text2, 4, 7)); // "npm" followed by comma
+    }
+
+    #[test]
+    fn resolve_tui_server_url_uses_explicit_then_env_then_default() {
+        let explicit = resolve_tui_server_url_with_env(Some("http://explicit:9000"), None);
+        assert_eq!(explicit, "http://explicit:9000");
+
+        let from_env = resolve_tui_server_url_with_env(None, Some("http://env:7000"));
+        assert_eq!(from_env, "http://env:7000");
+
+        let defaulted = resolve_tui_server_url_with_env(None, None);
+        assert_eq!(defaulted, "http://localhost:8000");
+    }
+
+    #[test]
+    fn tui_server_requirement_error_mentions_repl_fallback() {
+        let cause = anyhow::anyhow!("connect error");
+        let err = tui_server_requirement_error("http://localhost:8000", &cause);
+        let msg = err.to_string();
+        assert!(msg.contains("Fullscreen TUI requires a running Terraphim server"));
+        assert!(msg.contains("terraphim-agent repl"));
+        assert!(msg.contains("http://localhost:8000"));
+    }
+}
+
 #[derive(clap::ValueEnum, Debug, Clone, Default)]
 pub enum OutputFormat {
     /// Human-readable output (default)
@@ -115,7 +434,11 @@ pub enum OutputFormat {
 }
 
 #[derive(Parser, Debug)]
-#[command(name = "terraphim-agent", version, about = "Terraphim TUI interface")]
+#[command(
+    name = "terraphim-agent",
+    version,
+    about = "Terraphim Agent: server-backed fullscreen TUI with offline-capable REPL and CLI commands"
+)]
 struct Cli {
     /// Use server API mode instead of self-contained offline mode
     #[arg(long, default_value_t = false)]
@@ -188,6 +511,9 @@ enum Command {
         /// Output format: plain (default), markdown, wiki, html
         #[arg(long)]
         format: Option<String>,
+        /// Boundary mode: none (match anywhere) or word (only at word boundaries)
+        #[arg(long, default_value = "none")]
+        boundary: BoundaryMode,
         /// Output as JSON with metadata (for hook integration)
         #[arg(long, default_value_t = false)]
         json: bool,
@@ -246,6 +572,9 @@ enum Command {
         /// Output as JSON (always true for hooks, but explicit)
         #[arg(long, default_value_t = true)]
         json: bool,
+        /// Include guard check for destructive commands (git reset --hard, rm -rf, etc.)
+        #[arg(long, default_value_t = false)]
+        with_guard: bool,
     },
     /// Check command against safety guard patterns (blocks destructive git/fs commands)
     Guard {
@@ -257,6 +586,12 @@ enum Command {
         /// Suppress errors and pass through unchanged on failure
         #[arg(long, default_value_t = false)]
         fail_open: bool,
+        /// Path to custom destructive patterns thesaurus JSON file
+        #[arg(long)]
+        guard_thesaurus: Option<String>,
+        /// Path to custom allowlist thesaurus JSON file
+        #[arg(long)]
+        guard_allowlist: Option<String>,
     },
     Interactive,
 
@@ -271,11 +606,91 @@ enum Command {
         server_url: String,
     },
 
+    /// Interactive setup wizard for first-time configuration
+    Setup {
+        /// Apply a specific template directly (skip interactive wizard)
+        #[arg(long)]
+        template: Option<String>,
+        /// Path to use with the template (required for some templates like local-notes)
+        #[arg(long)]
+        path: Option<String>,
+        /// Add a new role to existing configuration (instead of replacing)
+        #[arg(long, default_value_t = false)]
+        add_role: bool,
+        /// List available templates and exit
+        #[arg(long, default_value_t = false)]
+        list_templates: bool,
+    },
+
     /// Check for updates without installing
     CheckUpdate,
 
     /// Update to latest version if available
     Update,
+
+    /// Learning capture for failed commands
+    Learn {
+        #[command(subcommand)]
+        sub: LearnSub,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+enum LearnSub {
+    /// Capture a failed command as a learning
+    Capture {
+        /// The command that failed
+        command: String,
+        /// The error output (stderr)
+        #[arg(long)]
+        error: String,
+        /// The exit code
+        #[arg(long, default_value_t = 1)]
+        exit_code: i32,
+        /// Enable debug output
+        #[arg(long, default_value_t = false)]
+        debug: bool,
+    },
+    /// List recent learnings
+    List {
+        /// Number of recent learnings to show
+        #[arg(long, default_value_t = 10)]
+        recent: usize,
+        /// Show global learnings instead of project
+        #[arg(long, default_value_t = false)]
+        global: bool,
+    },
+    /// Query learnings by pattern
+    Query {
+        /// Search pattern
+        pattern: String,
+        /// Use exact match instead of substring
+        #[arg(long, default_value_t = false)]
+        exact: bool,
+        /// Show global learnings instead of project
+        #[arg(long, default_value_t = false)]
+        global: bool,
+    },
+    /// Add correction to an existing learning
+    Correct {
+        /// Learning ID
+        id: String,
+        /// The correction to add
+        #[arg(long)]
+        correction: String,
+    },
+    /// Process hook input from AI agents (reads JSON from stdin)
+    Hook {
+        /// AI agent format
+        #[arg(long, value_enum, default_value = "claude")]
+        format: learnings::AgentFormat,
+    },
+    /// Install hook for AI agent
+    InstallHook {
+        /// AI agent to install hook for
+        #[arg(value_enum)]
+        agent: learnings::AgentType,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -318,9 +733,8 @@ fn main() -> Result<()> {
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
-                // Create runtime locally to avoid nesting with ui_loop's runtime
-                let rt = Runtime::new()?;
-                rt.block_on(run_tui_offline_mode(cli.transparent))
+                // Run TUI mode - it will create its own runtime
+                run_tui_offline_mode(cli.transparent)
             }
         }
 
@@ -344,20 +758,14 @@ fn main() -> Result<()> {
         }
     }
 }
-async fn run_tui_offline_mode(transparent: bool) -> Result<()> {
-    let service = TuiService::new().await?;
-    run_tui_with_service(service, transparent).await
+fn run_tui_offline_mode(transparent: bool) -> Result<()> {
+    // Fullscreen TUI mode requires a running server.
+    // For offline operation, use `terraphim-agent repl`.
+    run_tui(None, transparent)
 }
 
-fn run_tui_server_mode(_server_url: &str, transparent: bool) -> Result<()> {
-    // TODO: Pass server_url to TUI for API client initialization
-    run_tui(transparent)
-}
-
-async fn run_tui_with_service(_service: TuiService, transparent: bool) -> Result<()> {
-    // TODO: Update interactive TUI to use local service instead of API client
-    // For now, fall back to the existing TUI implementation
-    run_tui(transparent)
+fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
+    run_tui(Some(server_url.to_string()), transparent)
 }
 
 async fn run_offline_command(command: Command) -> Result<()> {
@@ -366,6 +774,8 @@ async fn run_offline_command(command: Command) -> Result<()> {
         command,
         json,
         fail_open,
+        guard_thesaurus,
+        guard_allowlist,
     } = &command
     {
         let input_command = match command {
@@ -378,7 +788,33 @@ async fn run_offline_command(command: Command) -> Result<()> {
             }
         };
 
-        let guard = guard_patterns::CommandGuard::new();
+        let guard = match (guard_thesaurus, guard_allowlist) {
+            (Some(thesaurus_path), Some(allowlist_path)) => {
+                let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json)
+                    .map_err(|e| {
+                        anyhow::anyhow!("Failed to load custom guard thesauruses: {}", e)
+                    })?
+            }
+            (Some(thesaurus_path), None) => {
+                let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                guard_patterns::CommandGuard::from_json(
+                    &destructive_json,
+                    guard_patterns::CommandGuard::default_allowlist_json(),
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to load custom guard thesaurus: {}", e))?
+            }
+            (None, Some(allowlist_path)) => {
+                let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                guard_patterns::CommandGuard::from_json(
+                    guard_patterns::CommandGuard::default_destructive_json(),
+                    &allowlist_json,
+                )
+                .map_err(|e| anyhow::anyhow!("Failed to load custom guard allowlist: {}", e))?
+            }
+            (None, None) => guard_patterns::CommandGuard::new(),
+        };
         let result = guard.check(&input_command);
 
         if *json {
@@ -460,14 +896,35 @@ async fn run_offline_command(command: Command) -> Result<()> {
         Command::Roles { sub } => {
             match sub {
                 RolesSub::List => {
-                    let roles = service.list_roles().await;
-                    println!("{}", roles.join("\n"));
+                    let roles_with_info = service.list_roles_with_info().await;
+                    let selected = service.get_selected_role().await;
+                    for (name, shortname) in roles_with_info {
+                        let marker = if name == selected.to_string() {
+                            "*"
+                        } else {
+                            " "
+                        };
+                        if let Some(short) = shortname {
+                            println!("{} {} ({})", marker, name, short);
+                        } else {
+                            println!("{} {}", marker, name);
+                        }
+                    }
                 }
                 RolesSub::Select { name } => {
-                    let role_name = RoleName::new(&name);
-                    service.update_selected_role(role_name).await?;
+                    // Find role by name or shortname
+                    let role_name = service
+                        .find_role_by_name_or_shortname(&name)
+                        .await
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Role '{}' not found (checked name and shortname)",
+                                name
+                            )
+                        })?;
+                    service.update_selected_role(role_name.clone()).await?;
                     service.save_config().await?;
-                    println!("selected:{}", name);
+                    println!("selected:{}", role_name);
                 }
             }
             Ok(())
@@ -551,6 +1008,7 @@ async fn run_offline_command(command: Command) -> Result<()> {
             text,
             role,
             format,
+            boundary,
             json,
             fail_open,
         } => {
@@ -598,13 +1056,66 @@ async fn run_offline_command(command: Command) -> Result<()> {
                 }
             };
 
-            let replacement_service =
-                terraphim_hooks::ReplacementService::new(thesaurus).with_link_type(link_type);
+            let replacement_service = terraphim_hooks::ReplacementService::new(thesaurus.clone())
+                .with_link_type(link_type);
 
-            let hook_result = if fail_open {
-                replacement_service.replace_fail_open(&input_text)
-            } else {
-                replacement_service.replace(&input_text)?
+            let hook_result = match boundary {
+                BoundaryMode::None => {
+                    // Standard replacement - match anywhere
+                    if fail_open {
+                        replacement_service.replace_fail_open(&input_text)
+                    } else {
+                        replacement_service.replace(&input_text)?
+                    }
+                }
+                BoundaryMode::Word => {
+                    // Word boundary mode - only match at word boundaries
+                    let matches_result = replacement_service.find_matches(&input_text);
+                    match matches_result {
+                        Ok(matches) => {
+                            // Filter matches to only those at word boundaries
+                            let filtered_matches: Vec<_> = matches
+                                .into_iter()
+                                .filter(|m| {
+                                    if let Some((start, end)) = m.pos {
+                                        is_at_word_boundary(&input_text, start, end)
+                                    } else {
+                                        false
+                                    }
+                                })
+                                .collect();
+
+                            if filtered_matches.is_empty() {
+                                terraphim_hooks::HookResult::pass_through(input_text.clone())
+                            } else {
+                                // Apply filtered matches in reverse order to preserve positions
+                                let mut result = input_text.clone();
+                                let mut sorted_matches = filtered_matches;
+                                sorted_matches.sort_by(|a, b| b.pos.cmp(&a.pos)); // Reverse sort by position
+
+                                for m in sorted_matches {
+                                    if let Some((start, end)) = m.pos {
+                                        let replacement =
+                                            format_replacement_link(&m.normalized_term, link_type);
+                                        result.replace_range(start..end, &replacement);
+                                    }
+                                }
+
+                                terraphim_hooks::HookResult::success(input_text.clone(), result)
+                            }
+                        }
+                        Err(e) => {
+                            if fail_open {
+                                terraphim_hooks::HookResult::fail_open(
+                                    input_text.clone(),
+                                    e.to_string(),
+                                )
+                            } else {
+                                return Err(anyhow::anyhow!("Failed to find matches: {}", e));
+                            }
+                        }
+                    }
+                }
             };
 
             if json {
@@ -754,6 +1265,7 @@ async fn run_offline_command(command: Command) -> Result<()> {
             input,
             role,
             json: _,
+            with_guard,
         } => {
             // Read JSON input from argument or stdin
             let input_json = match input {
@@ -791,6 +1303,28 @@ async fn run_offline_command(command: Command) -> Result<()> {
                             .and_then(|v| v.get("command"))
                             .and_then(|v| v.as_str())
                         {
+                            // Guard check if --with-guard flag is set
+                            if with_guard {
+                                let guard = guard_patterns::CommandGuard::new();
+                                let guard_result = guard.check(command);
+
+                                if guard_result.decision == "block" {
+                                    // Output deny response for Claude Code
+                                    let output = serde_json::json!({
+                                        "hookSpecificOutput": {
+                                            "hookEventName": "PreToolUse",
+                                            "permissionDecision": "deny",
+                                            "permissionDecisionReason": format!(
+                                                "BLOCKED: {}",
+                                                guard_result.reason.unwrap_or_default()
+                                            )
+                                        }
+                                    });
+                                    println!("{}", serde_json::to_string(&output)?);
+                                    return Ok(());
+                                }
+                            }
+
                             // Get thesaurus and perform replacement
                             let thesaurus = service.get_thesaurus(&role_name).await?;
                             let replacement_service =
@@ -868,6 +1402,109 @@ async fn run_offline_command(command: Command) -> Result<()> {
             // Handled above before TuiService initialization
             unreachable!("Guard command should be handled before TuiService initialization")
         }
+        Command::Setup {
+            template,
+            path,
+            add_role,
+            list_templates,
+        } => {
+            use onboarding::{
+                SetupMode, SetupResult, apply_template, list_templates as get_templates,
+                run_setup_wizard,
+            };
+
+            // List templates and exit if requested
+            if list_templates {
+                println!("Available templates:\n");
+                for template in get_templates() {
+                    let path_note = if template.requires_path {
+                        " (requires --path)"
+                    } else if template.default_path.is_some() {
+                        &format!(" (default: {})", template.default_path.as_ref().unwrap())
+                    } else {
+                        ""
+                    };
+                    println!("  {} - {}{}", template.id, template.description, path_note);
+                }
+                println!("\nUse --template <id> to apply a template directly.");
+                return Ok(());
+            }
+
+            // Apply template directly if specified
+            if let Some(template_id) = template {
+                println!("Applying template: {}", template_id);
+                match apply_template(&template_id, path.as_deref()) {
+                    Ok(role) => {
+                        // Save the role to config
+                        if add_role {
+                            service.add_role(role.clone()).await?;
+                            println!("Role '{}' added to configuration.", role.name);
+                        } else {
+                            service.set_role(role.clone()).await?;
+                            println!("Configuration set to role '{}'.", role.name);
+                        }
+                        return Ok(());
+                    }
+                    Err(e) => {
+                        eprintln!("Failed to apply template: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+
+            // Run interactive wizard
+            let mode = if add_role {
+                SetupMode::AddRole
+            } else {
+                SetupMode::FirstRun
+            };
+
+            match run_setup_wizard(mode).await {
+                Ok(SetupResult::Template {
+                    template,
+                    custom_path: _,
+                    role,
+                }) => {
+                    if add_role {
+                        service.add_role(role.clone()).await?;
+                        println!(
+                            "\nRole '{}' added from template '{}'.",
+                            role.name, template.id
+                        );
+                    } else {
+                        service.set_role(role.clone()).await?;
+                        println!(
+                            "\nConfiguration set to role '{}' from template '{}'.",
+                            role.name, template.id
+                        );
+                    }
+                }
+                Ok(SetupResult::Custom { role }) => {
+                    if add_role {
+                        service.add_role(role.clone()).await?;
+                        println!("\nCustom role '{}' added to configuration.", role.name);
+                    } else {
+                        service.set_role(role.clone()).await?;
+                        println!("\nConfiguration set to custom role '{}'.", role.name);
+                    }
+                }
+                Ok(SetupResult::Cancelled) => {
+                    println!("\nSetup cancelled.");
+                }
+                Err(onboarding::OnboardingError::NotATty) => {
+                    eprintln!(
+                        "Interactive mode requires a terminal. Use --template for non-interactive setup."
+                    );
+                    std::process::exit(1);
+                }
+                Err(e) => {
+                    eprintln!("Setup failed: {}", e);
+                    std::process::exit(1);
+                }
+            }
+
+            Ok(())
+        }
         Command::CheckUpdate => {
             println!("Checking for terraphim-agent updates...");
             match check_for_updates("terraphim-agent").await {
@@ -891,6 +1528,120 @@ async fn run_offline_command(command: Command) -> Result<()> {
                 Err(e) => {
                     eprintln!("Update failed: {}", e);
                     std::process::exit(1);
+                }
+            }
+        }
+        Command::Learn { sub } => {
+            use learnings::{
+                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+            };
+            let config = LearningCaptureConfig::default();
+
+            match sub {
+                LearnSub::Capture {
+                    command,
+                    error,
+                    exit_code,
+                    debug,
+                } => {
+                    if debug {
+                        eprintln!(
+                            "Capturing learning: command='{}', exit_code={}",
+                            command, exit_code
+                        );
+                    }
+                    match capture_failed_command(&command, &error, exit_code, &config) {
+                        Ok(path) => {
+                            println!("Captured learning: {}", path.display());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            if debug {
+                                eprintln!("Failed to capture learning: {}", e);
+                            }
+                            Err(e.into())
+                        }
+                    }
+                }
+                LearnSub::List { recent, global } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match list_learnings(storage_dir, recent) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings found.");
+                            } else {
+                                println!("Recent learnings:");
+                                for (i, learning) in learnings.iter().enumerate() {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!(
+                                        "  {}. {} {} (exit: {})",
+                                        i + 1,
+                                        source_indicator,
+                                        learning.command,
+                                        learning.exit_code
+                                    );
+                                    if let Some(ref correction) = learning.correction {
+                                        println!("     Correction: {}", correction);
+                                    }
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into()),
+                    }
+                }
+                LearnSub::Query {
+                    pattern,
+                    exact,
+                    global,
+                } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match query_learnings(storage_dir, &pattern, exact) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings matching '{}'.", pattern);
+                            } else {
+                                println!("Learnings matching '{}':", pattern);
+                                for learning in learnings {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!(
+                                        "  {} {} (exit: {})",
+                                        source_indicator, learning.command, learning.exit_code
+                                    );
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into()),
+                    }
+                }
+                LearnSub::Correct { id, correction } => {
+                    // TODO: Implement correction addition
+                    println!("Adding correction to learning {}: {}", id, correction);
+                    println!("(Not yet implemented)");
+                    Ok(())
+                }
+                LearnSub::Hook { format } => learnings::process_hook_input(format)
+                    .await
+                    .map_err(|e| e.into()),
+                LearnSub::InstallHook { agent } => {
+                    learnings::install_hook(agent).await.map_err(|e| e.into())
                 }
             }
         }
@@ -977,13 +1728,46 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             match sub {
                 RolesSub::List => {
                     let cfg = api.get_config().await?;
-                    let keys: Vec<String> =
-                        cfg.config.roles.keys().map(|r| r.to_string()).collect();
-                    println!("{}", keys.join("\n"));
+                    let selected = cfg.config.selected_role.to_string();
+                    for (name, role) in cfg.config.roles.iter() {
+                        let marker = if name.to_string() == selected {
+                            "*"
+                        } else {
+                            " "
+                        };
+                        if let Some(ref short) = role.shortname {
+                            println!("{} {} ({})", marker, name, short);
+                        } else {
+                            println!("{} {}", marker, name);
+                        }
+                    }
                 }
                 RolesSub::Select { name } => {
-                    let _ = api.update_selected_role(&name).await?;
-                    println!("selected:{}", name);
+                    // Try to find role by name or shortname
+                    let cfg = api.get_config().await?;
+                    let query_lower = name.to_lowercase();
+                    let role_name = cfg
+                        .config
+                        .roles
+                        .iter()
+                        .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
+                        .or_else(|| {
+                            cfg.config.roles.iter().find(|(_, role)| {
+                                role.shortname
+                                    .as_ref()
+                                    .map(|s| s.to_lowercase() == query_lower)
+                                    .unwrap_or(false)
+                            })
+                        })
+                        .map(|(n, _)| n.to_string())
+                        .ok_or_else(|| {
+                            anyhow::anyhow!(
+                                "Role '{}' not found (checked name and shortname)",
+                                name
+                            )
+                        })?;
+                    let _ = api.update_selected_role(&role_name).await?;
+                    println!("selected:{}", role_name);
                 }
             }
             Ok(())
@@ -1129,6 +1913,7 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             text,
             role: _,
             format: _,
+            boundary: _,
             json,
             fail_open,
         } => {
@@ -1192,6 +1977,8 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             command,
             json,
             fail_open,
+            guard_thesaurus,
+            guard_allowlist,
         } => {
             // Guard works the same in server mode - no server needed for pattern matching
             let input_command = match command {
@@ -1204,7 +1991,31 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                 }
             };
 
-            let guard = guard_patterns::CommandGuard::new();
+            let guard = match (guard_thesaurus, guard_allowlist) {
+                (Some(thesaurus_path), Some(allowlist_path)) => {
+                    let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                    let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                    guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json)
+                        .map_err(|e| anyhow::anyhow!("{}", e))?
+                }
+                (Some(thesaurus_path), None) => {
+                    let destructive_json = std::fs::read_to_string(thesaurus_path)?;
+                    guard_patterns::CommandGuard::from_json(
+                        &destructive_json,
+                        guard_patterns::CommandGuard::default_allowlist_json(),
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+                }
+                (None, Some(allowlist_path)) => {
+                    let allowlist_json = std::fs::read_to_string(allowlist_path)?;
+                    guard_patterns::CommandGuard::from_json(
+                        guard_patterns::CommandGuard::default_destructive_json(),
+                        &allowlist_json,
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
+                }
+                (None, None) => guard_patterns::CommandGuard::new(),
+            };
             let result = guard.check(&input_command);
 
             if json {
@@ -1220,6 +2031,199 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
 
             Ok(())
         }
+        Command::Setup {
+            template,
+            path,
+            add_role,
+            list_templates,
+        } => {
+            // Setup command - can run in server mode to add roles to running config
+            if list_templates {
+                println!("Available templates:");
+                for t in onboarding::list_templates() {
+                    let path_info = if t.requires_path {
+                        " (requires --path)"
+                    } else if t.default_path.is_some() {
+                        " (optional --path)"
+                    } else {
+                        ""
+                    };
+                    println!("  {} - {}{}", t.id, t.description, path_info);
+                }
+                return Ok(());
+            }
+
+            if let Some(template_id) = template {
+                // Apply template directly
+                let role = onboarding::apply_template(&template_id, path.as_deref())
+                    .map_err(|e| anyhow::anyhow!("{}", e))?;
+
+                println!("Configured role: {}", role.name);
+                println!("To add this role to a running server, restart with the new config.");
+
+                // In server mode, we could potentially add the role via API
+                // For now, just show what was configured
+                if !role.haystacks.is_empty() {
+                    println!("Haystacks:");
+                    for h in &role.haystacks {
+                        println!("  - {} ({:?})", h.location, h.service);
+                    }
+                }
+                if role.kg.is_some() {
+                    println!("Knowledge graph: configured");
+                }
+                if role.llm_enabled {
+                    println!("LLM: enabled");
+                }
+            } else {
+                // Interactive wizard
+                let mode = if add_role {
+                    onboarding::SetupMode::AddRole
+                } else {
+                    onboarding::SetupMode::FirstRun
+                };
+
+                match onboarding::run_setup_wizard(mode).await {
+                    Ok(onboarding::SetupResult::Template {
+                        template,
+                        role,
+                        custom_path,
+                    }) => {
+                        println!("\nApplied template: {}", template.name);
+                        if let Some(ref path) = custom_path {
+                            println!("Custom path: {}", path);
+                        }
+                        println!("Role '{}' configured successfully.", role.name);
+                    }
+                    Ok(onboarding::SetupResult::Custom { role }) => {
+                        println!("\nCustom role '{}' configured successfully.", role.name);
+                    }
+                    Ok(onboarding::SetupResult::Cancelled) => {
+                        println!("\nSetup cancelled.");
+                    }
+                    Err(e) => {
+                        eprintln!("Setup error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            }
+            Ok(())
+        }
+        Command::Learn { sub } => {
+            // Learn command works the same in server mode - no server needed
+            use learnings::{
+                LearningCaptureConfig, capture_failed_command, list_learnings, query_learnings,
+            };
+            let config = LearningCaptureConfig::default();
+
+            match sub {
+                LearnSub::Capture {
+                    command,
+                    error,
+                    exit_code,
+                    debug,
+                } => {
+                    if debug {
+                        eprintln!(
+                            "Capturing learning: command='{}', exit_code={}",
+                            command, exit_code
+                        );
+                    }
+                    match capture_failed_command(&command, &error, exit_code, &config) {
+                        Ok(path) => {
+                            println!("Captured learning: {}", path.display());
+                            Ok(())
+                        }
+                        Err(e) => {
+                            if debug {
+                                eprintln!("Failed to capture learning: {}", e);
+                            }
+                            Err(e.into())
+                        }
+                    }
+                }
+                LearnSub::List { recent, global } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match list_learnings(storage_dir, recent) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings found.");
+                            } else {
+                                println!("Recent learnings:");
+                                for (i, learning) in learnings.iter().enumerate() {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!(
+                                        "  {}. {} {} (exit: {})",
+                                        i + 1,
+                                        source_indicator,
+                                        learning.command,
+                                        learning.exit_code
+                                    );
+                                    if let Some(ref correction) = learning.correction {
+                                        println!("     Correction: {}", correction);
+                                    }
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into()),
+                    }
+                }
+                LearnSub::Query {
+                    pattern,
+                    exact,
+                    global,
+                } => {
+                    let storage_loc = config.storage_location();
+                    let storage_dir = if global {
+                        &config.global_dir
+                    } else {
+                        &storage_loc
+                    };
+                    match query_learnings(storage_dir, &pattern, exact) {
+                        Ok(learnings) => {
+                            if learnings.is_empty() {
+                                println!("No learnings matching '{}'.", pattern);
+                            } else {
+                                println!("Learnings matching '{}':", pattern);
+                                for learning in learnings {
+                                    let source_indicator = match learning.source {
+                                        learnings::LearningSource::Project => "[P]",
+                                        learnings::LearningSource::Global => "[G]",
+                                    };
+                                    println!(
+                                        "  {} {} (exit: {})",
+                                        source_indicator, learning.command, learning.exit_code
+                                    );
+                                }
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into()),
+                    }
+                }
+                LearnSub::Correct { id, correction } => {
+                    // TODO: Implement correction addition
+                    println!("Adding correction to learning {}: {}", id, correction);
+                    println!("(Not yet implemented)");
+                    Ok(())
+                }
+                LearnSub::Hook { format } => learnings::process_hook_input(format)
+                    .await
+                    .map_err(|e| e.into()),
+                LearnSub::InstallHook { agent } => {
+                    learnings::install_hook(agent).await.map_err(|e| e.into())
+                }
+            }
+        }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -1231,7 +2235,7 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
     }
 }
 
-fn run_tui(transparent: bool) -> Result<()> {
+fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
     // Attempt to set up terminal for TUI
     let stdout = io::stdout();
     let backend = CrosstermBackend::new(stdout);
@@ -1266,7 +2270,7 @@ fn run_tui(transparent: bool) -> Result<()> {
                 }
             };
 
-            let res = ui_loop(&mut terminal, transparent);
+            let res = ui_loop(&mut terminal, server_url, transparent);
 
             // Always clean up terminal state
             let _ = disable_raw_mode();
@@ -1292,7 +2296,11 @@ fn run_tui(transparent: bool) -> Result<()> {
     }
 }
 
-fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: bool) -> Result<()> {
+fn ui_loop(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    server_url: Option<String>,
+    transparent: bool,
+) -> Result<()> {
     let mut input = String::new();
     let mut results: Vec<String> = Vec::new();
     let mut detailed_results: Vec<Document> = Vec::new();
@@ -1301,20 +2309,18 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
     let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
     let mut selected_result_index = 0;
     let mut view_mode = ViewMode::Search;
-    let api = ApiClient::new(
-        std::env::var("TERRAPHIM_SERVER").unwrap_or_else(|_| "http://localhost:8000".to_string()),
-    );
+    let effective_url = resolve_tui_server_url(server_url.as_deref());
+    let api = ApiClient::new(effective_url.clone());
 
-    // Use the existing runtime handle instead of creating a new one
-    // This prevents panic from nested runtime creation
-    let handle = tokio::runtime::Handle::try_current()
-        .map_err(|_| anyhow::anyhow!("No tokio runtime context available"))?;
+    // Create a tokio runtime for this TUI session
+    // We need a local runtime because we're in a synchronous function (terminal event loop)
+    let rt = tokio::runtime::Runtime::new()?;
+    ensure_tui_server_reachable(&rt, &api, &effective_url)?;
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
+    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
         current_role = cfg.config.selected_role.to_string();
-        if let Ok(rg) = handle.block_on(async { api.rolegraph(Some(current_role.as_str())).await })
-        {
+        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
             terms = rg.nodes.into_iter().map(|n| n.label).collect();
         }
     }
@@ -1333,7 +2339,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                         ])
                         .split(f.area());
 
-                    let input_title = format!("Search [Role: {}] • Enter: search, Tab: autocomplete, r: switch role, q: quit", current_role);
+                    let input_title = format!(
+                        "Search [Role: {}] • Enter: search, Tab: autocomplete, Ctrl+r: switch role, q: quit",
+                        current_role
+                    );
                     let input_widget = Paragraph::new(Line::from(input.as_str())).block(
                         create_block(&input_title, transparent)
                     );
@@ -1357,8 +2366,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                             item
                         }
                     }).collect();
-                    let list = List::new(items)
-                        .block(create_block("Results • ↑↓: select, Enter: view details, s: summarize", transparent));
+                    let list = List::new(items).block(create_block(
+                        "Results • ↑↓: select, Enter: view details, Ctrl+s: summarize",
+                        transparent,
+                    ));
                     f.render_widget(list, chunks[2]);
 
                     let status_text = format!("Terraphim TUI • {} results • Mode: Search", results.len());
@@ -1386,7 +2397,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
 
                         let content_text = if doc.body.is_empty() { "No content available" } else { &doc.body };
                         let content_widget = Paragraph::new(content_text)
-                            .block(create_block("Content • s: summarize, Esc: back to search", transparent))
+                            .block(create_block(
+                                "Content • Ctrl+s: summarize, Esc: back to search",
+                                transparent,
+                            ))
                             .wrap(ratatui::widgets::Wrap { trim: true });
                         f.render_widget(content_widget, chunks[1]);
 
@@ -1405,14 +2419,14 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
             if let Event::Key(key) = event::read()? {
                 match view_mode {
                     ViewMode::Search => {
-                        match key.code {
-                            KeyCode::Char('q') => break,
-                            KeyCode::Enter => {
+                        match map_search_key_event(key) {
+                            TuiAction::Quit => break,
+                            TuiAction::SearchOrOpen => {
                                 let query = input.trim().to_string();
                                 let api = api.clone();
                                 let role = current_role.clone();
                                 if !query.is_empty() {
-                                    if let Ok((lines, docs)) = handle.block_on(async move {
+                                    if let Ok((lines, docs)) = rt.block_on(async move {
                                         let q = SearchQuery {
                                             search_term: NormalizedTermValue::from(query.as_str()),
                                             search_terms: None,
@@ -1446,21 +2460,21 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     view_mode = ViewMode::ResultDetail;
                                 }
                             }
-                            KeyCode::Up => {
+                            TuiAction::MoveUp => {
                                 selected_result_index = selected_result_index.saturating_sub(1);
                             }
-                            KeyCode::Down => {
+                            TuiAction::MoveDown => {
                                 if selected_result_index + 1 < results.len() {
                                     selected_result_index += 1;
                                 }
                             }
-                            KeyCode::Tab => {
+                            TuiAction::Autocomplete => {
                                 // Real autocomplete from API
                                 let query = input.trim();
                                 if !query.is_empty() {
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_resp) = handle.block_on(async move {
+                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
                                         api.get_autocomplete(&role, query).await
                                     }) {
                                         suggestions = autocomplete_resp
@@ -1472,10 +2486,10 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('r') => {
+                            TuiAction::SwitchRole => {
                                 // Switch role
                                 let api = api.clone();
-                                if let Ok(cfg) = handle.block_on(async { api.get_config().await }) {
+                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
                                     let roles: Vec<String> =
                                         cfg.config.roles.keys().map(|k| k.to_string()).collect();
                                     if !roles.is_empty() {
@@ -1485,7 +2499,7 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                             let next_idx = (current_idx + 1) % roles.len();
                                             current_role = roles[next_idx].clone();
                                             // Update terms for new role
-                                            if let Ok(rg) = handle.block_on(async {
+                                            if let Ok(rg) = rt.block_on(async {
                                                 api.rolegraph(Some(&current_role)).await
                                             }) {
                                                 terms =
@@ -1495,13 +2509,13 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('s') => {
+                            TuiAction::SummarizeSelection => {
                                 // Summarize current selection
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = handle.block_on(async move {
+                                    if let Ok(summary) = rt.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {
@@ -1514,29 +2528,31 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Backspace => {
+                            TuiAction::Backspace => {
                                 input.pop();
                                 update_local_suggestions(&input, &terms, &mut suggestions);
                             }
-                            KeyCode::Char(c) => {
+                            TuiAction::InsertChar(c) => {
                                 input.push(c);
                                 update_local_suggestions(&input, &terms, &mut suggestions);
                             }
-                            _ => {}
+                            TuiAction::None
+                            | TuiAction::BackToSearch
+                            | TuiAction::SummarizeDetail => {}
                         }
                     }
                     ViewMode::ResultDetail => {
-                        match key.code {
-                            KeyCode::Esc => {
+                        match map_detail_key_event(key) {
+                            TuiAction::BackToSearch => {
                                 view_mode = ViewMode::Search;
                             }
-                            KeyCode::Char('s') => {
+                            TuiAction::SummarizeDetail => {
                                 // Summarize current document in detail view
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
                                     let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = handle.block_on(async move {
+                                    if let Ok(summary) = rt.block_on(async move {
                                         api.summarize_document(&doc, Some(&role)).await
                                     }) {
                                         if let Some(summary_text) = summary.summary {
@@ -1558,8 +2574,16 @@ fn ui_loop(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, transparent: b
                                     }
                                 }
                             }
-                            KeyCode::Char('q') => break,
-                            _ => {}
+                            TuiAction::Quit => break,
+                            TuiAction::None
+                            | TuiAction::SearchOrOpen
+                            | TuiAction::MoveUp
+                            | TuiAction::MoveDown
+                            | TuiAction::Autocomplete
+                            | TuiAction::SwitchRole
+                            | TuiAction::SummarizeSelection
+                            | TuiAction::Backspace
+                            | TuiAction::InsertChar(_) => {}
                         }
                     }
                 }

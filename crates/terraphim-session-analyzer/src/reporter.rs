@@ -8,8 +8,8 @@ use indexmap::IndexMap;
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as FmtWrite;
 use tabled::{
-    settings::{object::Columns, Modify, Style, Width},
     Table, Tabled,
+    settings::{Modify, Style, Width, object::Columns},
 };
 
 pub struct Reporter {
@@ -133,7 +133,7 @@ impl Reporter {
         if !table_data.is_empty() {
             let table = Table::new(table_data)
                 .with(Style::modern())
-                .with(Modify::new(Columns::first()).with(Width::wrap(40)))
+                .with(Modify::new(Columns::new(..1)).with(Width::wrap(40)))
                 .to_string();
             println!("{}", table);
         }
@@ -469,8 +469,8 @@ impl Reporter {
 
         let table = Table::new(rows)
             .with(Style::modern())
-            .with(Modify::new(Columns::single(0)).with(Width::wrap(20)))
-            .with(Modify::new(Columns::single(3)).with(Width::wrap(40)))
+            .with(Modify::new(Columns::new(0..1)).with(Width::wrap(20)))
+            .with(Modify::new(Columns::new(3..4)).with(Width::wrap(40)))
             .to_string();
 
         println!("{table}");
@@ -554,8 +554,8 @@ impl Reporter {
 
         let table = Table::new(tool_rows)
             .with(Style::modern())
-            .with(Modify::new(Columns::single(0)).with(Width::wrap(20)))
-            .with(Modify::new(Columns::single(3)).with(Width::wrap(30)))
+            .with(Modify::new(Columns::new(0..1)).with(Width::wrap(20)))
+            .with(Modify::new(Columns::new(3..4)).with(Width::wrap(30)))
             .to_string();
         println!("{}", table);
         println!();

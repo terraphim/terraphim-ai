@@ -2,11 +2,11 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "desktop/src-tauri", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_automata_py", "crates/terraphim_validation"]  # Experimental crates with incomplete API implementations
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_validation", "crates/terraphim_rlm", "crates/terraphim_automata_py"]  # Experimental crates (RLM feature-gated); automata_py is a PyO3 extension module -- build with `maturin develop` instead of cargo
 default-members = ["terraphim_server"]
 
 [workspace.package]
-version = "1.5.0"
+version = "1.8.0"
 edition = "2024"
 
 [workspace.dependencies]
@@ -42,3 +42,18 @@ lto = true
 codegen-units = 1
 opt-level = 3
 panic = "abort"
+
+# CI-optimized profiles for faster builds with less disk usage
+[profile.ci]
+inherits = "dev"
+incremental = false
+codegen-units = 16
+split-debuginfo = "off"
+debug = false
+strip = true
+
+[profile.ci-release]
+inherits = "release"
+lto = "thin"
+codegen-units = 8
+strip = "symbols"

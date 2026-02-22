@@ -3,6 +3,7 @@ use std::sync::Arc;
 use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
+use terraphim_service::llm::{ChatOptions, build_llm_from_role};
 use terraphim_settings::DeviceSettings;
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
@@ -131,17 +132,46 @@ impl TuiService {
     }
 
     /// Get the role graph top-k concepts for a specific role
+    ///
+    /// Returns the top-k concepts sorted by rank (number of co-occurrences) in descending order.
     pub async fn get_role_graph_top_k(
         &self,
         role_name: &RoleName,
         top_k: usize,
     ) -> Result<Vec<String>> {
-        // For now, return placeholder data since role graph access needs proper implementation
-        // TODO: Implement actual role graph integration
         log::info!("Getting top {} concepts for role {}", top_k, role_name);
-        Ok((0..std::cmp::min(top_k, 10))
-            .map(|i| format!("concept_{}_for_role_{}", i + 1, role_name))
-            .collect())
+
+        // Get the role graph for this role
+        if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
+            let rolegraph = rolegraph_sync.lock().await;
+
+            // Get nodes and sort by rank (descending)
+            let mut nodes: Vec<_> = rolegraph.nodes_map().iter().collect();
+            nodes.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+
+            // Map node IDs to term names and collect top-k
+            let top_concepts: Vec<String> = nodes
+                .into_iter()
+                .take(top_k)
+                .filter_map(|(node_id, _node)| {
+                    rolegraph
+                        .ac_reverse_nterm
+                        .get(node_id)
+                        .map(|term| term.to_string())
+                })
+                .collect();
+
+            log::debug!(
+                "Found {} concepts for role {} (requested {})",
+                top_concepts.len(),
+                role_name,
+                top_k
+            );
+            Ok(top_concepts)
+        } else {
+            log::warn!("Role graph not found for role {}", role_name);
+            Ok(Vec::new())
+        }
     }
 
     /// Generate chat response using LLM
@@ -149,32 +179,48 @@ impl TuiService {
         &self,
         role_name: &RoleName,
         prompt: &str,
-        model: Option<String>,
+        _model: Option<String>,
     ) -> Result<String> {
-        // Check if role has LLM configuration
+        // Get the role configuration
         let config = self.config_state.config.lock().await;
-        if let Some(role) = config.roles.get(role_name) {
-            // Check for various LLM providers in the role's extra config
-            if let Some(llm_provider) = role.extra.get("llm_provider") {
-                if let Some(provider_str) = llm_provider.as_str() {
-                    log::info!("Using LLM provider: {}", provider_str);
-                    // Use the service's LLM capabilities
-                    let _service = self.service.lock().await;
-                    // For now, return a placeholder response
-                    // TODO: Implement actual LLM integration when service supports it
-                    return Ok(format!(
-                        "Chat response from {} with model {:?}: {}",
-                        provider_str, model, prompt
-                    ));
-                }
-            }
-        }
+        let role = config
+            .roles
+            .get(role_name)
+            .ok_or_else(|| anyhow::anyhow!("Role '{}' not found in configuration", role_name))?;
 
-        // Fallback response
-        Ok(format!(
-            "No LLM configured for role {}. Prompt was: {}",
-            role_name, prompt
-        ))
+        // Build LLM client from role configuration
+        let llm_client = build_llm_from_role(role).ok_or_else(|| {
+            anyhow::anyhow!(
+                "No LLM configured for role '{}'. Add llm_provider, ollama_model, or llm_model to role's extra config.",
+                role_name
+            )
+        })?;
+
+        log::info!(
+            "Using LLM provider: {} for role: {}",
+            llm_client.name(),
+            role_name
+        );
+
+        // Build chat messages
+        let messages = vec![serde_json::json!({
+            "role": "user",
+            "content": prompt
+        })];
+
+        // Configure chat options
+        let opts = ChatOptions {
+            max_tokens: Some(1024),
+            temperature: Some(0.7),
+        };
+
+        // Call the LLM
+        let response = llm_client
+            .chat_completion(messages, opts)
+            .await
+            .map_err(|e| anyhow::anyhow!("LLM chat error: {}", e))?;
+
+        Ok(response)
     }
 
     /// Extract paragraphs from text using thesaurus

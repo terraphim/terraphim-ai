@@ -48,10 +48,11 @@ else
     exit 1
 fi
 
-# Check if npm is available (we use npm instead of yarn for CI)
-if ! command -v npm &> /dev/null; then
-    echo -e "${RED}❌ npm not found${NC}"
-    exit 1
+# Check if yarn is available (project uses yarn with yarn.lock)
+if ! command -v yarn &> /dev/null; then
+    echo -e "${RED}yarn not found${NC}"
+    echo -e "${YELLOW}  Installing yarn via npm...${NC}"
+    npm install -g yarn
 fi
 
 cd "$DESKTOP_DIR"
@@ -81,26 +82,22 @@ sudo apt-get install -yqq --no-install-recommends \
 
 # Set environment variables (same as CI) - Increased memory for CI
 export NODE_OPTIONS="--max-old-space-size=8192"
-export npm_config_legacy_peer_deps=true
-export npm_config_cache="$HOME/.npm-cache"
 
-echo -e "${BLUE}📦 Installing frontend dependencies...${NC}"
-# Create npm cache directory to speed up installs
-mkdir -p "$npm_config_cache"
+echo -e "${BLUE}Installing frontend dependencies...${NC}"
 
-# Install dependencies with npm instead of yarn for better CI compatibility
-if [[ -f package-lock.json ]]; then
-    echo "Found package-lock.json, installing with npm ci for faster, reliable installs"
-    if timeout 600 npm ci --prefer-offline --no-audit --no-fund; then
-        echo -e "${GREEN}  ✅ Dependencies installed successfully${NC}"
+# Install dependencies with yarn using yarn.lock for reproducible builds
+if [[ -f yarn.lock ]]; then
+    echo "Found yarn.lock, installing with yarn --frozen-lockfile"
+    if timeout 600 yarn install --frozen-lockfile; then
+        echo -e "${GREEN}  Dependencies installed successfully${NC}"
     else
-        echo -e "${YELLOW}  ⚠️  npm ci failed, trying npm install${NC}"
-        if timeout 600 npm install --prefer-offline --no-audit --no-fund --legacy-peer-deps; then
-            echo -e "${GREEN}  ✅ Dependencies installed successfully (fallback)${NC}"
+        echo -e "${YELLOW}  yarn --frozen-lockfile failed, trying yarn install${NC}"
+        if timeout 600 yarn install; then
+            echo -e "${GREEN}  Dependencies installed successfully (fallback)${NC}"
         else
-            echo -e "${RED}  ❌ Failed to install dependencies${NC}"
+            echo -e "${RED}  Failed to install dependencies${NC}"
             echo "Debugging dependency installation..."
-            npm --version
+            yarn --version
             node --version
             echo "Available memory: $(free -h)"
             echo "Disk space: $(df -h .)"
@@ -108,13 +105,13 @@ if [[ -f package-lock.json ]]; then
         fi
     fi
 else
-    echo "No package-lock.json found, installing with npm install"
-    if timeout 900 npm install --prefer-offline --no-audit --no-fund --legacy-peer-deps; then
-        echo -e "${GREEN}  ✅ Dependencies installed successfully${NC}"
+    echo "No yarn.lock found, installing with yarn install"
+    if timeout 900 yarn install; then
+        echo -e "${GREEN}  Dependencies installed successfully${NC}"
     else
-        echo -e "${RED}  ❌ Failed to install dependencies${NC}"
+        echo -e "${RED}  Failed to install dependencies${NC}"
         echo "Debugging dependency installation..."
-        npm --version
+        yarn --version
         node --version
         echo "Available memory: $(free -h)"
         echo "Disk space: $(df -h .)"
@@ -126,50 +123,50 @@ echo -e "${BLUE}🔍 Running frontend linting...${NC}"
 echo "Skipping linting due to known type errors during CI migration"
 # yarn run check  # Currently skipped in CI
 
-echo -e "${BLUE}🧪 Running frontend tests...${NC}"
+echo -e "${BLUE}Running frontend tests...${NC}"
 # Run tests but continue on error (same as CI)
-if timeout 300 npm run test:ci; then
-    echo -e "${GREEN}  ✅ Frontend tests passed${NC}"
+if timeout 300 yarn test:ci; then
+    echo -e "${GREEN}  Frontend tests passed${NC}"
 else
-    echo -e "${YELLOW}  ⚠️  Frontend tests failed or timed out but continuing build${NC}"
+    echo -e "${YELLOW}  Frontend tests failed or timed out but continuing build${NC}"
 fi
 
-echo -e "${BLUE}🏗️  Building frontend...${NC}"
+echo -e "${BLUE}Building frontend...${NC}"
 # Try to build with enhanced error reporting and CI-specific build script
 echo "Starting frontend build process..."
-if timeout 1200 npm run build:ci; then
-    echo -e "${GREEN}  ✅ Frontend build successful${NC}"
+if timeout 1200 yarn build:ci; then
+    echo -e "${GREEN}  Frontend build successful${NC}"
     # Verify build output
     if [[ -f dist/index.html ]]; then
-        echo -e "${GREEN}  ✅ Build output verified${NC}"
+        echo -e "${GREEN}  Build output verified${NC}"
         ls -la dist/
         # Check build size
         BUILD_SIZE=$(du -sh dist | cut -f1)
         echo "Build size: $BUILD_SIZE"
     else
-        echo -e "${YELLOW}  ⚠️  Build completed but dist/index.html not found${NC}"
+        echo -e "${YELLOW}  Build completed but dist/index.html not found${NC}"
         ls -la . 2>/dev/null || echo "Current directory listing failed"
     fi
 else
-    echo -e "${RED}  ❌ Frontend build failed or timed out${NC}"
+    echo -e "${RED}  Frontend build failed or timed out${NC}"
     echo "Debugging build failure..."
     echo "Node version: $(node --version)"
-    echo "NPM version: $(npm --version)"
+    echo "Yarn version: $(yarn --version)"
     echo "Available memory: $(free -h)"
     echo "Disk space: $(df -h .)"
 
       # Try minimal build as fallback
     echo "Attempting minimal build..."
-    if timeout 600 npm run build:minimal; then
-        echo -e "${GREEN}  ✅ Minimal build successful${NC}"
+    if timeout 600 yarn build:minimal; then
+        echo -e "${GREEN}  Minimal build successful${NC}"
     else
-        echo -e "${YELLOW}  ⚠️  Minimal build failed, trying ultra-minimal build...${NC}"
-        if timeout 300 npm run build:ultra-minimal; then
-            echo -e "${GREEN}  ✅ Ultra-minimal build successful${NC}"
+        echo -e "${YELLOW}  Minimal build failed, trying ultra-minimal build...${NC}"
+        if timeout 300 yarn build:ultra-minimal; then
+            echo -e "${GREEN}  Ultra-minimal build successful${NC}"
         else
             # Try to identify specific build errors
             echo "Checking for common build issues..."
-            if npm run build 2>&1 | grep -i "error\|failed\|missing"; then
+            if yarn build 2>&1 | grep -i "error\|failed\|missing"; then
                 echo "Build errors detected above"
             fi
 

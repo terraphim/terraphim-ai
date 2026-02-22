@@ -23,8 +23,76 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
+  verify-versions:
+    name: Verify version consistency
+    runs-on: ubuntu-22.04
+    outputs:
+      version: ${{ steps.extract.outputs.version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Extract version from tag
+        id: extract
+        run: |
+          # Get the tag name
+          TAG="${{ github.ref_name }}"
+          echo "Tag: $TAG"
+
+          # Extract version (strip v prefix and any component prefix)
+          if [[ "$TAG" == *"-v"* ]]; then
+            # Component-specific tag like terraphim_agent-v1.5.2
+            VERSION="${TAG##*-v}"
+          elif [[ "$TAG" == v* ]]; then
+            # Standard version tag like v1.5.2
+            VERSION="${TAG#v}"
+          else
+            echo "::error::Invalid tag format: $TAG (expected v* or component-v*)"
+            exit 1
+          fi
+
+          echo "Extracted version: $VERSION"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Verify Cargo.toml versions match tag
+        env:
+          EXPECTED_VERSION: ${{ steps.extract.outputs.version }}
+        run: |
+          echo "Expected version: $EXPECTED_VERSION"
+
+          # Get workspace version
+          WORKSPACE_VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r '.packages[] | select(.name == "terraphim_server") | .version')
+          echo "Workspace version (from terraphim_server): $WORKSPACE_VERSION"
+
+          # Check key binaries
+          BINARIES=("terraphim_server" "terraphim_agent" "terraphim-cli")
+          FAILED=0
+
+          for pkg in "${BINARIES[@]}"; do
+            PKG_VERSION=$(cargo metadata --no-deps --format-version=1 | jq -r --arg name "$pkg" '.packages[] | select(.name == $name) | .version')
+            echo "Package $pkg version: $PKG_VERSION"
+
+            if [ "$PKG_VERSION" != "$EXPECTED_VERSION" ]; then
+              echo "::error::Version mismatch for $pkg: expected $EXPECTED_VERSION, got $PKG_VERSION"
+              FAILED=1
+            fi
+          done
+
+          if [ $FAILED -eq 1 ]; then
+            echo ""
+            echo "::error::Version verification failed! Update workspace.package.version in Cargo.toml to match the release tag."
+            echo "Run: cargo metadata --no-deps --format-version=1 | jq '.packages[] | {name: .name, version: .version}' to see all versions"
+            exit 1
+          fi
+
+          echo "All versions match expected: $EXPECTED_VERSION"
+
   build-binaries:
     name: Build binaries for ${{ matrix.target }}
+    needs: verify-versions
     strategy:
       fail-fast: false
       matrix:
@@ -119,11 +187,57 @@ jobs:
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
             --target ${{ matrix.target }} -p terraphim-cli --bin terraphim-cli
 
+      - name: Verify binary versions (native builds only)
+        if: matrix.target == 'x86_64-unknown-linux-gnu'
+        shell: bash
+        env:
+          EXPECTED_VERSION: ${{ needs.verify-versions.outputs.version }}
+        run: |
+          echo "Verifying binary --version output matches expected: $EXPECTED_VERSION"
+
+          # Verify terraphim-agent
+          AGENT_VERSION=$(./target/${{ matrix.target }}/release/terraphim-agent --version 2>&1 | head -1)
+          echo "terraphim-agent: $AGENT_VERSION"
+          if [[ "$AGENT_VERSION" != *"$EXPECTED_VERSION"* ]]; then
+            echo "::error::terraphim-agent version mismatch: expected $EXPECTED_VERSION in '$AGENT_VERSION'"
+            exit 1
+          fi
+
+          # Verify terraphim-cli
+          CLI_VERSION=$(./target/${{ matrix.target }}/release/terraphim-cli --version 2>&1 | head -1)
+          echo "terraphim-cli: $CLI_VERSION"
+          if [[ "$CLI_VERSION" != *"$EXPECTED_VERSION"* ]]; then
+            echo "::error::terraphim-cli version mismatch: expected $EXPECTED_VERSION in '$CLI_VERSION'"
+            exit 1
+          fi
+
+          # Verify terraphim_server
+          SERVER_VERSION=$(./target/${{ matrix.target }}/release/terraphim_server --version 2>&1 | head -1)
+          echo "terraphim_server: $SERVER_VERSION"
+          if [[ "$SERVER_VERSION" != *"$EXPECTED_VERSION"* ]]; then
+            echo "::error::terraphim_server version mismatch: expected $EXPECTED_VERSION in '$SERVER_VERSION'"
+            exit 1
+          fi
+
+          echo "All binary versions verified successfully!"
+
       - name: Prepare artifacts (Unix)
         if: matrix.os != 'windows-latest'
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
           mkdir -p artifacts
+          # Create tar.gz archives with version in filename for auto-update compatibility
           # Server binary only exists for non-cross builds
+          if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
+            tar -czf "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.tar.gz" \
+              -C "target/${{ matrix.target }}/release" terraphim_server
+          fi
+          tar -czf "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.tar.gz" \
+            -C "target/${{ matrix.target }}/release" terraphim-agent
+          tar -czf "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.tar.gz" \
+            -C "target/${{ matrix.target }}/release" terraphim-cli
+          # Also copy raw binaries for backward compatibility
           if [ -f "target/${{ matrix.target }}/release/terraphim_server" ]; then
             cp target/${{ matrix.target }}/release/terraphim_server artifacts/terraphim_server-${{ matrix.target }}
           fi
@@ -134,8 +248,20 @@ jobs:
       - name: Prepare artifacts (Windows)
         if: matrix.os == 'windows-latest'
         shell: bash
+        env:
+          VERSION: ${{ needs.verify-versions.outputs.version }}
         run: |
           mkdir -p artifacts
+          # Create zip archives with version in filename for auto-update compatibility
+          if [ -f "target/${{ matrix.target }}/release/terraphim_server.exe" ]; then
+            zip -j "artifacts/terraphim_server-${VERSION}-${{ matrix.target }}.zip" \
+              "target/${{ matrix.target }}/release/terraphim_server.exe"
+          fi
+          zip -j "artifacts/terraphim-agent-${VERSION}-${{ matrix.target }}.zip" \
+            "target/${{ matrix.target }}/release/terraphim-agent.exe"
+          zip -j "artifacts/terraphim-cli-${VERSION}-${{ matrix.target }}.zip" \
+            "target/${{ matrix.target }}/release/terraphim-cli.exe"
+          # Also copy raw binaries for backward compatibility
           cp target/${{ matrix.target }}/release/terraphim_server.exe artifacts/terraphim_server-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-agent.exe artifacts/terraphim-agent-${{ matrix.target }}.exe || true
           cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe || true
@@ -488,9 +614,14 @@ jobs:
           for artifact_dir in binaries-*; do
             if [ -d "$artifact_dir" ]; then
               echo "Processing $artifact_dir..."
-              # Copy all files that look like binaries (no extension or .exe)
+              # Copy archive files (tar.gz, zip) for auto-update compatibility
+              find "$artifact_dir" -type f \( -name "*.tar.gz" -o -name "*.zip" \) | while read file; do
+                echo "  Copying archive: $file"
+                cp "$file" release-assets/
+              done
+              # Copy raw binaries for backward compatibility
               find "$artifact_dir" -type f \( -name "terraphim*" -o -name "*.exe" \) | while read file; do
-                echo "  Copying: $file"
+                echo "  Copying binary: $file"
                 cp "$file" release-assets/
               done
             fi

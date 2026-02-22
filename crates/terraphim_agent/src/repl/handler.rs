@@ -9,6 +9,9 @@ use crate::{client::ApiClient, service::TuiService};
 
 // Import robot module types
 use crate::robot::{ExitCode, SelfDocumentation};
+
+#[cfg(feature = "repl-mcp")]
+use crate::repl::mcp_tools::McpToolsHandler;
 use anyhow::Result;
 use std::io::{self, Write};
 use std::str::FromStr;
@@ -23,14 +26,24 @@ pub struct ReplHandler {
     service: Option<TuiService>,
     api_client: Option<ApiClient>,
     current_role: String,
+    #[cfg(feature = "repl-mcp")]
+    mcp_handler: Option<McpToolsHandler>,
 }
 
 impl ReplHandler {
     pub fn new_offline(service: TuiService) -> Self {
+        #[cfg(feature = "repl-mcp")]
+        let mcp_handler = {
+            let service_arc = std::sync::Arc::new(service.clone());
+            Some(McpToolsHandler::new(service_arc))
+        };
+
         Self {
             service: Some(service),
             api_client: None,
             current_role: "Default".to_string(),
+            #[cfg(feature = "repl-mcp")]
+            mcp_handler,
         }
     }
 
@@ -39,6 +52,8 @@ impl ReplHandler {
             service: None,
             api_client: Some(api_client),
             current_role: "Terraphim Engineer".to_string(),
+            #[cfg(feature = "repl-mcp")]
+            mcp_handler: None,
         }
     }
 
@@ -359,13 +374,9 @@ impl ReplHandler {
             );
 
             if let Some(service) = &self.service {
-                // Offline mode
-                let role_name = if let Some(role) = role {
-                    terraphim_types::RoleName::new(&role)
-                } else {
-                    service.get_selected_role().await
-                };
-
+                // Offline mode - use search_with_role if role specified, otherwise use current role
+                let effective_role = role.unwrap_or_else(|| self.current_role.clone());
+                let role_name = terraphim_types::RoleName::new(&effective_role);
                 let results = service.search_with_role(&query, &role_name, limit).await?;
 
                 if results.is_empty() {
@@ -397,10 +408,11 @@ impl ReplHandler {
                     );
                 }
             } else if let Some(api_client) = &self.api_client {
-                // Server mode
+                // Server mode - use current role if no role specified
                 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
-                let role_name = role.map(|r| RoleName::new(&r));
+                let effective_role = role.unwrap_or_else(|| self.current_role.clone());
+                let role_name = Some(RoleName::new(&effective_role));
                 let search_query = SearchQuery {
                     search_term: NormalizedTermValue::from(query.as_str()),
                     search_terms: None,
@@ -494,39 +506,37 @@ impl ReplHandler {
         match subcommand {
             RoleSubcommand::List => {
                 if let Some(service) = &self.service {
-                    let roles = service.list_roles().await;
+                    let roles_with_info = service.list_roles_with_info().await;
                     println!("{}", "Available roles:".bold());
-                    for role in roles {
-                        let marker = if role == self.current_role {
-                            "▶"
+                    for (role, shortname) in roles_with_info {
+                        let marker = if role == self.current_role { ">" } else { " " };
+                        if let Some(short) = shortname {
+                            println!("  {} {} ({})", marker.green(), role, short.cyan());
                         } else {
-                            " "
-                        };
-                        println!("  {} {}", marker.green(), role);
+                            println!("  {} {}", marker.green(), role);
+                        }
                     }
                 } else if let Some(api_client) = &self.api_client {
                     match api_client.get_config().await {
                         Ok(response) => {
                             println!("{}", "Available roles:".bold());
-                            let roles: Vec<String> = response
-                                .config
-                                .roles
-                                .keys()
-                                .map(|k| k.to_string())
-                                .collect();
-                            for role in roles {
-                                let marker = if role == self.current_role {
-                                    "▶"
+                            for (name, role) in response.config.roles.iter() {
+                                let marker = if name.to_string() == self.current_role {
+                                    ">"
                                 } else {
                                     " "
                                 };
-                                println!("  {} {}", marker.green(), role);
+                                if let Some(ref short) = role.shortname {
+                                    println!("  {} {} ({})", marker.green(), name, short.cyan());
+                                } else {
+                                    println!("  {} {}", marker.green(), name);
+                                }
                             }
                         }
                         Err(e) => {
                             println!(
                                 "{} Failed to get roles: {}",
-                                "❌".bold(),
+                                "X".bold(),
                                 e.to_string().red()
                             );
                         }
@@ -534,19 +544,62 @@ impl ReplHandler {
                 }
             }
             RoleSubcommand::Select { name } => {
-                self.current_role = name.clone();
+                // Try to find role by name or shortname
+                let resolved_name = if let Some(service) = &self.service {
+                    service
+                        .find_role_by_name_or_shortname(&name)
+                        .await
+                        .map(|r| r.to_string())
+                } else if let Some(api_client) = &self.api_client {
+                    // For API mode, fetch config and resolve shortname client-side
+                    match api_client.get_config().await {
+                        Ok(cfg) => {
+                            let query_lower = name.to_lowercase();
+                            cfg.config
+                                .roles
+                                .iter()
+                                .find(|(n, _)| n.to_string().to_lowercase() == query_lower)
+                                .or_else(|| {
+                                    cfg.config.roles.iter().find(|(_, role)| {
+                                        role.shortname
+                                            .as_ref()
+                                            .map(|s| s.to_lowercase() == query_lower)
+                                            .unwrap_or(false)
+                                    })
+                                })
+                                .map(|(n, _)| n.to_string())
+                        }
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                };
+
+                let actual_name = match resolved_name {
+                    Some(n) => n,
+                    None => {
+                        println!(
+                            "{} Role '{}' not found (checked name and shortname)",
+                            "X".bold(),
+                            name.red()
+                        );
+                        return Ok(());
+                    }
+                };
+
+                self.current_role = actual_name.clone();
                 // Update the service's selected role so search uses the new role
                 if let Some(service) = &self.service {
-                    let role_name = terraphim_types::RoleName::new(&name);
+                    let role_name = terraphim_types::RoleName::new(&actual_name);
                     if let Err(e) = service.update_selected_role(role_name).await {
                         println!(
                             "{} Warning: Failed to update service role: {}",
-                            "⚠".yellow().bold(),
+                            "!".yellow().bold(),
                             e.to_string().yellow()
                         );
                     }
                 }
-                println!("{} Switched to role: {}", "✅".bold(), name.green());
+                println!("{} Switched to role: {}", "OK".bold(), actual_name.green());
             }
         }
         Ok(())
@@ -688,7 +741,7 @@ impl ReplHandler {
                 }
             } else if let Some(api_client) = &self.api_client {
                 // Server mode summarization - create a temporary document
-                use terraphim_types::Document;
+                use terraphim_types::{Document, DocumentType};
 
                 let doc = Document {
                     id: "temp-summary".to_string(),
@@ -701,6 +754,10 @@ impl ReplHandler {
                     tags: Some(vec![]),
                     rank: None,
                     source_haystack: None,
+                    doc_type: DocumentType::KgEntry,
+                    synonyms: None,
+                    route: None,
+                    priority: None,
                 };
 
                 match api_client
@@ -740,39 +797,18 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Autocompleting: '{}'", "🔍".bold(), query.cyan());
 
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service.autocomplete(&role_name, &query, limit).await {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.autocomplete_terms(&query, limit).await {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No autocomplete suggestions found", "ℹ".blue().bold());
                         } else {
-                            let mut table = Table::new();
-                            table
-                                .load_preset(UTF8_FULL)
-                                .apply_modifier(UTF8_ROUND_CORNERS)
-                                .set_header(vec![
-                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Score").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                                ]);
-
-                            for result in &results {
-                                table.add_row(vec![
-                                    Cell::new(&result.term),
-                                    Cell::new(format!("{:.2}", result.score)),
-                                    Cell::new(result.url.as_deref().unwrap_or("N/A")),
-                                ]);
+                            for (i, term) in results.iter().enumerate() {
+                                println!("  {}. {}", (i + 1).to_string().yellow(), term);
                             }
-
-                            println!("{}", table);
                             println!(
                                 "{} Found {} suggestion(s)",
                                 "✅".bold(),
@@ -809,45 +845,28 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Extracting paragraphs from text...", "📄".bold());
 
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service
-                    .extract_paragraphs(&role_name, &text, exclude_term)
-                    .await
-                {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.extract_paragraphs(&text, exclude_term).await {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No paragraphs found", "ℹ".blue().bold());
                         } else {
-                            let mut table = Table::new();
-                            table
-                                .load_preset(UTF8_FULL)
-                                .apply_modifier(UTF8_ROUND_CORNERS)
-                                .set_header(vec![
-                                    Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Paragraph")
-                                        .add_attribute(comfy_table::Attribute::Bold),
-                                ]);
-
-                            for (term, paragraph) in &results {
-                                let truncated_paragraph = if paragraph.len() > 100 {
+                            for (i, (term, paragraph)) in results.iter().enumerate() {
+                                let truncated = if paragraph.len() > 100 {
                                     format!("{}...", &paragraph[..97])
                                 } else {
                                     paragraph.clone()
                                 };
-
-                                table
-                                    .add_row(vec![Cell::new(term), Cell::new(truncated_paragraph)]);
+                                println!(
+                                    "  {}. {}: {}",
+                                    (i + 1).to_string().yellow(),
+                                    term.cyan(),
+                                    truncated
+                                );
                             }
-
-                            println!("{}", table);
                             println!(
                                 "{} Found {} paragraph(s)",
                                 "✅".bold(),
@@ -880,40 +899,18 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Finding matches in text...", "🔍".bold());
 
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service.find_matches(&role_name, &text).await {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.find_matches(&text).await {
                     Ok(results) => {
                         if results.is_empty() {
                             println!("{} No matches found", "ℹ".blue().bold());
                         } else {
-                            let mut table = Table::new();
-                            table
-                                .load_preset(UTF8_FULL)
-                                .apply_modifier(UTF8_ROUND_CORNERS)
-                                .set_header(vec![
-                                    Cell::new("Match").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("Start").add_attribute(comfy_table::Attribute::Bold),
-                                    Cell::new("End").add_attribute(comfy_table::Attribute::Bold),
-                                ]);
-
-                            for matched in &results {
-                                let (start, end) = matched.pos.unwrap_or((0, 0));
-                                table.add_row(vec![
-                                    Cell::new(matched.normalized_term.value.as_str()),
-                                    Cell::new(start.to_string()),
-                                    Cell::new(end.to_string()),
-                                ]);
+                            for (i, matched) in results.iter().enumerate() {
+                                println!("  {}. {}", (i + 1).to_string().yellow(), matched);
                             }
-
-                            println!("{}", table);
                             println!(
                                 "{} Found {} match(es)",
                                 "✅".bold(),
@@ -949,18 +946,8 @@ impl ReplHandler {
 
             println!("{} Replacing matches in text...", "🔄".bold());
 
-            let link_type = match format.as_deref() {
-                Some("markdown") => terraphim_automata::LinkType::MarkdownLinks,
-                Some("html") => terraphim_automata::LinkType::HTMLLinks,
-                Some("wiki") => terraphim_automata::LinkType::WikiLinks,
-                Some("plain") => terraphim_automata::LinkType::PlainText,
-                _ => terraphim_automata::LinkType::PlainText, // Default to plain text
-            };
-
-            if let Some(service) = &self.service {
-                let role_name = service.get_selected_role().await;
-
-                match service.replace_matches(&role_name, &text, link_type).await {
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.replace_matches(&text, format).await {
                     Ok(result) => {
                         println!("\n{} {}\n", "📝".bold(), "Result:".bold());
                         println!("{}", result);
@@ -990,51 +977,33 @@ impl ReplHandler {
         #[cfg(feature = "repl")]
         {
             use colored::Colorize;
-            use comfy_table::modifiers::UTF8_ROUND_CORNERS;
-            use comfy_table::presets::UTF8_FULL;
-            use comfy_table::{Cell, Table};
 
             println!("{} Loading thesaurus...", "📚".bold());
 
-            if let Some(service) = &self.service {
-                let role_name = if let Some(role_str) = role {
-                    terraphim_types::RoleName::new(&role_str)
-                } else {
-                    service.get_selected_role().await
-                };
-
-                match service.get_thesaurus(&role_name).await {
-                    Ok(thesaurus) => {
-                        let mut table = Table::new();
-                        table
-                            .load_preset(UTF8_FULL)
-                            .apply_modifier(UTF8_ROUND_CORNERS)
-                            .set_header(vec![
-                                Cell::new("Term").add_attribute(comfy_table::Attribute::Bold),
-                                Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
-                                Cell::new("Normalized").add_attribute(comfy_table::Attribute::Bold),
-                                Cell::new("URL").add_attribute(comfy_table::Attribute::Bold),
-                            ]);
-
+            if let Some(mcp_handler) = &self.mcp_handler {
+                match mcp_handler.get_thesaurus(role).await {
+                    Ok(results) => {
                         let mut count = 0;
-                        for (term, normalized) in (&thesaurus).into_iter().take(20) {
+                        for (term, url) in results.iter().take(20) {
                             // Show first 20 entries
-                            table.add_row(vec![
-                                Cell::new(term.as_str()),
-                                Cell::new(normalized.id.to_string()),
-                                Cell::new(normalized.value.as_str()),
-                                Cell::new(normalized.url.as_deref().unwrap_or("N/A")),
-                            ]);
+                            if url.is_empty() {
+                                println!("  {}. {}", (count + 1).to_string().yellow(), term);
+                            } else {
+                                println!(
+                                    "  {}. {} -> {}",
+                                    (count + 1).to_string().yellow(),
+                                    term,
+                                    url.cyan()
+                                );
+                            }
                             count += 1;
                         }
 
-                        println!("{}", table);
                         println!(
-                            "{} Showing {} of {} thesaurus entries for role '{}'",
+                            "{} Showing {} of {} thesaurus entries",
                             "✅".bold(),
                             count.to_string().green(),
-                            thesaurus.len().to_string().cyan(),
-                            role_name.to_string().yellow()
+                            results.len().to_string().cyan()
                         );
                     }
                     Err(e) => {
@@ -1675,7 +1644,7 @@ impl ReplHandler {
     /// Handle update management commands
     async fn handle_update(&mut self, subcommand: UpdateSubcommand) -> Result<()> {
         use terraphim_update::{
-            check_for_updates_auto, rollback::BackupManager, update_binary, UpdateStatus,
+            UpdateStatus, check_for_updates_auto, rollback::BackupManager, update_binary,
         };
 
         // Get the current binary name and version
@@ -2124,12 +2093,10 @@ impl ReplHandler {
                 let _min = min_shared.unwrap_or(1); // Will be used with enrichment
 
                 // Get the source session
-                let source = svc.get_session(&session_id).await;
-                if source.is_none() {
+                let Some(source) = svc.get_session(&session_id).await else {
                     println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
                     return Ok(());
-                }
-                let source = source.unwrap();
+                };
 
                 // Get keywords from first user message
                 let keywords = source

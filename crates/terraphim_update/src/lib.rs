@@ -12,7 +12,7 @@ pub mod scheduler;
 pub mod signature;
 pub mod state;
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{Context, Result, anyhow};
 use base64::Engine;
 use self_update::cargo_crate_version;
 use self_update::version::bump_is_greater;
@@ -152,15 +152,21 @@ impl TerraphimUpdater {
 
         // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
+            // Normalize binary name for asset lookup (underscores to hyphens)
+            let bin_name_for_asset = bin_name.replace('_', "-");
+
             // Check if update is available
-            match self_update::backends::github::Update::configure()
-                .repo_owner(&repo_owner)
-                .repo_name(&repo_name)
-                .bin_name(&bin_name)
-                .current_version(&current_version)
-                .show_download_progress(show_progress)
-                .build()
-            {
+            let mut builder = self_update::backends::github::Update::configure();
+            builder.repo_owner(&repo_owner);
+            builder.repo_name(&repo_name);
+            builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
+            builder.current_version(&current_version);
+            builder.show_download_progress(show_progress);
+
+            // Set custom install path to preserve underscore naming
+            builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+            match builder.build() {
                 Ok(updater) => {
                     // This will check without updating
                     match updater.get_latest_release() {
@@ -266,17 +272,22 @@ impl TerraphimUpdater {
 
         // Move self_update operations to a blocking task to avoid runtime conflicts
         let result = tokio::task::spawn_blocking(move || {
-            // Build the updater with signature verification enabled
-            let builder_result = self_update::backends::github::Update::configure()
-                .repo_owner(&repo_owner)
-                .repo_name(&repo_name)
-                .bin_name(&bin_name)
-                .current_version(&current_version)
-                .show_download_progress(show_progress)
-                .verifying_keys(vec![key_array]) // Enable signature verification
-                .build();
+            // Normalize binary name for asset lookup (underscores to hyphens)
+            let bin_name_for_asset = bin_name.replace('_', "-");
 
-            match builder_result {
+            // Build the updater with signature verification enabled
+            let mut builder = self_update::backends::github::Update::configure();
+            builder.repo_owner(&repo_owner);
+            builder.repo_name(&repo_name);
+            builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
+            builder.current_version(&current_version);
+            builder.show_download_progress(show_progress);
+            builder.verifying_keys(vec![key_array]); // Enable signature verification
+
+            // Set custom install path to preserve underscore naming
+            builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+            match builder.build() {
                 Ok(updater) => match updater.update() {
                     Ok(status) => match status {
                         self_update::Status::UpToDate(version) => {
@@ -519,12 +530,19 @@ impl TerraphimUpdater {
             repo_owner, repo_name
         );
 
-        let updater = self_update::backends::github::Update::configure()
-            .repo_owner(repo_owner)
-            .repo_name(repo_name)
-            .bin_name(bin_name)
-            .current_version(current_version)
-            .build()?;
+        // Normalize binary name for asset lookup (underscores to hyphens)
+        let bin_name_for_asset = bin_name.replace('_', "-");
+
+        let mut builder = self_update::backends::github::Update::configure();
+        builder.repo_owner(repo_owner);
+        builder.repo_name(repo_name);
+        builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
+        builder.current_version(current_version);
+
+        // Set custom install path to preserve underscore naming
+        builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+        let updater = builder.build()?;
 
         let release = updater.get_latest_release()?;
 
@@ -550,15 +568,33 @@ impl TerraphimUpdater {
         version: &str,
         show_progress: bool,
     ) -> Result<NamedTempFile> {
+        // Normalize binary name (replace underscores with hyphens for GitHub releases)
+        let bin_name_in_asset = bin_name.replace('_', "-");
+
         // Determine current platform
         let target = Self::get_target_triple()?;
-        let extension = if cfg!(windows) { "zip" } else { "tar.gz" };
+
+        // Construct the expected asset name (following self_update conventions)
+        // self_update looks for: {bin_name_in_asset}-{target}
+        let asset_name = format!("{}-{}", bin_name_in_asset, target);
+
+        // Add .exe extension for Windows
+        let asset_name = if cfg!(windows) {
+            format!("{}.exe", asset_name)
+        } else {
+            asset_name
+        };
 
         // Construct download URL
-        let archive_name = format!("{}-{}-{}.{}", bin_name, version, target, extension);
+        // GitHub release tags use "v" prefix (e.g., v1.5.2) but self_update strips it
+        let version_tag = if version.starts_with('v') {
+            version.to_string()
+        } else {
+            format!("v{}", version)
+        };
         let download_url = format!(
             "https://github.com/{}/{}/releases/download/{}/{}",
-            repo_owner, repo_name, version, archive_name
+            repo_owner, repo_name, version_tag, asset_name
         );
 
         info!("Downloading from: {}", download_url);
@@ -570,14 +606,27 @@ impl TerraphimUpdater {
             ..Default::default()
         };
 
-        crate::downloader::download_with_retry(
+        match crate::downloader::download_with_retry(
             &download_url,
             temp_file.path(),
             Some(download_config),
-        )?;
-
-        info!("Downloaded archive to: {:?}", temp_file.path());
-        Ok(temp_file)
+        ) {
+            Ok(_) => {
+                info!("Downloaded archive to: {:?}", temp_file.path());
+                Ok(temp_file)
+            }
+            Err(e) => {
+                // Provide helpful error message with available assets
+                Err(anyhow!(
+                    "Failed to download asset '{}'. Available assets can be listed at: https://github.com/{}/{}/releases/tag/{}. Error: {}",
+                    asset_name,
+                    repo_owner,
+                    repo_name,
+                    version,
+                    e
+                ))
+            }
+        }
     }
 
     /// Get the target triple for the current platform
@@ -611,29 +660,80 @@ impl TerraphimUpdater {
 
         info!("Installing to directory: {:?}", install_dir);
 
-        // Extract and install using self_update's extract functionality
-        // Note: This is a simplified version - we may need platform-specific extraction
-        if cfg!(windows) {
-            // Windows: extract ZIP
-            Self::extract_zip(archive_path, install_dir)?;
+        // Check if the downloaded file is an archive or a raw binary
+        let file_magic = std::fs::File::open(archive_path)?;
+        let first_bytes = Self::read_file_magic(&file_magic)?;
+
+        // Check file magic to determine if it's an archive or raw binary
+        if Self::is_archive(&first_bytes) {
+            info!("Detected archive format, extracting...");
+            // Extract and install using self_update's extract functionality
+            if cfg!(windows) {
+                // Windows: extract ZIP
+                Self::extract_zip(archive_path, install_dir)?;
+            } else {
+                // Unix: extract tar.gz
+                Self::extract_tarball(archive_path, install_dir, bin_name)?;
+            }
         } else {
-            // Unix: extract tar.gz
-            Self::extract_tarball(archive_path, install_dir, bin_name)?;
+            info!("Detected raw binary, copying directly...");
+            // It's a raw binary, just copy it to the install location
+            let normalized_bin_name = bin_name.replace('_', "-");
+            let target_path = install_dir.join(&normalized_bin_name);
+
+            info!("Copying binary to {:?}", target_path);
+            std::fs::copy(archive_path, &target_path)?;
+
+            // Also try the original bin_name in case the release uses underscores
+            if normalized_bin_name != bin_name {
+                let alt_path = install_dir.join(bin_name);
+                if !alt_path.exists() {
+                    std::fs::copy(archive_path, &alt_path)?;
+                    info!("Also copied to {:?}", alt_path);
+                }
+            }
         }
 
         // Make executable on Unix
         #[cfg(unix)]
         {
             use std::os::unix::fs::PermissionsExt;
-            let bin_path = install_dir.join(bin_name);
-            if bin_path.exists() {
-                let mut perms = fs::metadata(&bin_path)?.permissions();
-                perms.set_mode(0o755);
-                fs::set_permissions(&bin_path, perms)?;
+            for name in &[bin_name, &bin_name.replace('_', "-")] {
+                let bin_path = install_dir.join(name);
+                if bin_path.exists() {
+                    let mut perms = fs::metadata(&bin_path)?.permissions();
+                    perms.set_mode(0o755);
+                    fs::set_permissions(&bin_path, perms)?;
+                    info!("Made executable: {:?}", bin_path);
+                }
             }
         }
 
         Ok(())
+    }
+
+    /// Read first few bytes of a file to detect format
+    fn read_file_magic(file: &std::fs::File) -> Result<Vec<u8>> {
+        use std::io::Read;
+        let mut buffer = [0u8; 16];
+        let mut handle = file.try_clone()?;
+        handle.read_exact(&mut buffer)?;
+        Ok(buffer.to_vec())
+    }
+
+    /// Check if bytes indicate an archive format
+    fn is_archive(bytes: &[u8]) -> bool {
+        // ZIP magic number: PK\x03\x04
+        if bytes.starts_with(&[0x50, 0x4B, 0x03, 0x04]) {
+            return true;
+        }
+
+        // gzip magic number: \x1f\x8b
+        if bytes.starts_with(&[0x1F, 0x8B]) {
+            return true;
+        }
+
+        false
     }
 
     /// Extract a ZIP archive to the target directory
@@ -794,38 +894,41 @@ pub async fn check_for_updates_auto(bin_name: &str, current_version: &str) -> Re
     let bin_name = bin_name.to_string();
     let current_version = current_version.to_string();
 
-    let result =
-        tokio::task::spawn_blocking(
-            move || match self_update::backends::github::Update::configure()
-                .repo_owner("terraphim")
-                .repo_name("terraphim-ai")
-                .bin_name(&bin_name)
-                .current_version(&current_version)
-                .build()
-            {
-                Ok(updater) => match updater.get_latest_release() {
-                    Ok(release) => {
-                        let latest_version = release.version.clone();
+    let result = tokio::task::spawn_blocking(move || {
+        // Normalize binary name for asset lookup (underscores to hyphens)
+        let bin_name_for_asset = bin_name.replace('_', "-");
 
-                        match is_newer_version_static(&latest_version, &current_version) {
-                            Ok(true) => {
-                                Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
-                                    current_version,
-                                    latest_version,
-                                })
-                            }
-                            Ok(false) => Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(
-                                current_version,
-                            )),
-                            Err(e) => Err(e),
-                        }
+        let mut builder = self_update::backends::github::Update::configure();
+        builder.repo_owner("terraphim");
+        builder.repo_name("terraphim-ai");
+        builder.bin_name(&bin_name_for_asset); // Use hyphenated name for asset lookup
+        builder.current_version(&current_version);
+
+        // Set custom install path to preserve underscore naming
+        builder.bin_install_path(format!("/usr/local/bin/{}", bin_name));
+
+        match builder.build() {
+            Ok(updater) => match updater.get_latest_release() {
+                Ok(release) => {
+                    let latest_version = release.version.clone();
+
+                    match is_newer_version_static(&latest_version, &current_version) {
+                        Ok(true) => Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::Available {
+                            current_version,
+                            latest_version,
+                        }),
+                        Ok(false) => Ok::<UpdateStatus, anyhow::Error>(UpdateStatus::UpToDate(
+                            current_version,
+                        )),
+                        Err(e) => Err(e),
                     }
-                    Err(e) => Ok(UpdateStatus::Failed(format!("Check failed: {}", e))),
-                },
-                Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
+                }
+                Err(e) => Ok(UpdateStatus::Failed(format!("Check failed: {}", e))),
             },
-        )
-        .await;
+            Err(e) => Ok(UpdateStatus::Failed(format!("Configuration error: {}", e))),
+        }
+    })
+    .await;
 
     match result {
         Ok(update_result) => update_result,
@@ -1248,5 +1351,29 @@ mod tests {
 
         let failed = UpdateStatus::Failed("test error".to_string());
         assert!(failed.to_string().contains("test error"));
+    }
+
+    #[test]
+    fn test_version_prefix_for_github_releases() {
+        // GitHub release tags use "v" prefix but self_update strips it
+        // This test verifies our version tag construction logic
+        let version_without_v = "1.5.2";
+        let version_with_v = "v1.5.2";
+
+        // Version without v should get v prepended
+        let version_tag_1 = if version_without_v.starts_with('v') {
+            version_without_v.to_string()
+        } else {
+            format!("v{}", version_without_v)
+        };
+        assert_eq!(version_tag_1, "v1.5.2");
+
+        // Version with v should remain unchanged
+        let version_tag_2 = if version_with_v.starts_with('v') {
+            version_with_v.to_string()
+        } else {
+            format!("v{}", version_with_v)
+        };
+        assert_eq!(version_tag_2, "v1.5.2");
     }
 }

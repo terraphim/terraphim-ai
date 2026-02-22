@@ -2,7 +2,7 @@ use std::collections::HashSet;
 use std::fs::{self};
 use std::path::Path;
 use terraphim_persistence::Persistable;
-use terraphim_types::{Document, Index};
+use terraphim_types::{Document, DocumentType, Index};
 
 use super::IndexMiddleware;
 use crate::command::ripgrep::{Data, Message, RipgrepCommand};
@@ -125,6 +125,10 @@ impl RipgrepIndexer {
             tags: None,
             rank: None,
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         };
         // Create a meaningful ID from the file path
         let original_id = format!("ripgrep_{}", file_path);
@@ -265,7 +269,9 @@ impl RipgrepIndexer {
 
                     // We got a context for a different document
                     if document_url != *path {
-                        log::warn!("Context for different document. document_url != path: {document_url:?} != {path:?}");
+                        log::warn!(
+                            "Context for different document. document_url != path: {document_url:?} != {path:?}"
+                        );
                         continue;
                     }
 
@@ -313,8 +319,12 @@ impl RipgrepIndexer {
             };
         }
 
-        log::debug!("Index_inner completed: {} documents processed, {} matches found, {} documents in final index",
-                 document_count, match_count, index.len());
+        log::debug!(
+            "Index_inner completed: {} documents processed, {} matches found, {} documents in final index",
+            document_count,
+            match_count,
+            index.len()
+        );
         index
     }
 }

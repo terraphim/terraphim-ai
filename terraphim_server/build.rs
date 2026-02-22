@@ -30,27 +30,34 @@ fn main() -> std::io::Result<()> {
     println!("cargo:rerun-if-changed={}", BROWSER_ROOT);
 
     // Ensure dist directory exists for RustEmbed even if desktop is not built
-    if !dirs.js_dist_tmp.exists() {
-        p!(
-            "Creating dist directory for RustEmbed: {}",
-            dirs.js_dist_tmp.display()
-        );
-        fs::create_dir_all(&dirs.js_dist_tmp)?;
-        // Create minimal placeholder index.html if source doesn't exist
-        let index_path = dirs.js_dist_tmp.join("index.html");
-        if !index_path.exists() && !dirs.js_dist_source.exists() {
-            fs::write(
-                index_path,
-                "<!DOCTYPE html><html><body>Terraphim Server</body></html>",
-            )?;
-            p!("Created placeholder index.html for RustEmbed");
+    // RustEmbed in lib.rs expects ../desktop/dist, so create placeholder there too
+    for dist_dir in [&dirs.js_dist_source, &dirs.js_dist_tmp] {
+        if !dist_dir.exists() {
+            p!(
+                "Creating dist directory for RustEmbed: {}",
+                dist_dir.display()
+            );
+            fs::create_dir_all(dist_dir)?;
+            // Create minimal placeholder index.html
+            let index_path = dist_dir.join("index.html");
+            if !index_path.exists() {
+                fs::write(
+                    &index_path,
+                    "<!DOCTYPE html><html><body>Terraphim Server</body></html>",
+                )?;
+                p!("Created placeholder index.html at {}", index_path.display());
+            }
         }
     }
 
     if should_build(&dirs) {
-        build_js(&dirs);
-        let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
-        dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        let build_succeeded = build_js(&dirs);
+        if build_succeeded && dirs.js_dist_source.exists() {
+            let _ = fs::remove_dir_all(&dirs.js_dist_tmp);
+            dircpy::copy_dir(&dirs.js_dist_source, &dirs.js_dist_tmp)?;
+        } else {
+            p!("JS build did not produce dist folder, using existing or placeholder");
+        }
     } else if dirs.js_dist_tmp.exists() {
         p!("Found {}, skipping copy", dirs.js_dist_tmp.display());
     } else if dirs.js_dist_source.exists() {
@@ -79,7 +86,9 @@ fn main() -> std::io::Result<()> {
 
 fn should_build(dirs: &Dirs) -> bool {
     if !dirs.browser_root.exists() {
-        p!("Could not find browser folder, assuming this is a `cargo publish` run. Skipping JS build.");
+        p!(
+            "Could not find browser folder, assuming this is a `cargo publish` run. Skipping JS build."
+        );
         return false;
     }
 
@@ -133,23 +142,32 @@ fn should_build(dirs: &Dirs) -> bool {
 }
 
 /// Runs JS package manager to install packages and build the JS bundle
-fn build_js(dirs: &Dirs) {
+/// Returns true if build succeeded, false if it failed (graceful fallback)
+fn build_js(dirs: &Dirs) -> bool {
     let pkg_manager = "./scripts/yarn_and_build.sh";
     p!("install js packages...");
     p!("build js assets...");
     let out = std::process::Command::new("/bin/bash")
         .arg(pkg_manager)
         .current_dir(&dirs.browser_root)
-        .output()
-        .expect("Failed to build js bundle");
-    // Check if out contains errors
-    if out.status.success() {
-        p!("js build successful");
-    } else {
-        panic!(
-            "js build failed: {}",
-            String::from_utf8(out.stderr).unwrap()
-        );
+        .output();
+
+    match out {
+        Ok(output) if output.status.success() => {
+            p!("js build successful");
+            true
+        }
+        Ok(output) => {
+            p!(
+                "js build failed (gracefully continuing): {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
+            false
+        }
+        Err(e) => {
+            p!("js build command failed (gracefully continuing): {}", e);
+            false
+        }
     }
 }
 

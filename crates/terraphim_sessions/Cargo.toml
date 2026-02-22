@@ -1,9 +1,15 @@
 [package]
 name = "terraphim_sessions"
-version = "0.1.0"
+version.workspace = true
 edition.workspace = true
-description = "Session management for AI coding assistant history"
-license = "MIT"
+description = "Session management for AI coding assistant history - search across Claude Code, Cursor, Aider sessions"
+license = "Apache-2.0"
+authors = ["Terraphim Contributors"]
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["sessions", "ai", "search", "claude", "cursor"]
+readme = "../../README.md"
 
 [features]
 default = []
@@ -40,12 +46,12 @@ walkdir = "2.4"
 dirs = "5.0"
 
 # Feature-gated: Terraphim Session Analyzer
-terraphim-session-analyzer = { path = "../terraphim-session-analyzer", optional = true }
+terraphim-session-analyzer = { version = "1.6.0", path = "../terraphim-session-analyzer", optional = true }
 
-# Feature-gated: Terraphim enrichment
-terraphim_automata = { path = "../terraphim_automata", optional = true }
-terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
-terraphim_types = { path = "../terraphim_types", optional = true }
+# Feature-gated: Terraphim enrichment (uses published crates.io versions)
+terraphim_automata = { version = ">=1.4.10", path = "../terraphim_automata", optional = true }
+terraphim_rolegraph = { version = ">=1.4.10", path = "../terraphim_rolegraph", optional = true }
+terraphim_types = { version = ">=1.4.10", path = "../terraphim_types", optional = true }
 
 [dev-dependencies]
 tempfile = "3.10"

@@ -37,6 +37,28 @@ enum OutputFormat {
     Text,
 }
 
+/// Replace mode for the replace command
+#[derive(Debug, Clone, clap::ValueEnum, Default)]
+enum ReplaceMode {
+    /// Add links to matched terms (default, current behavior)
+    #[default]
+    Link,
+    /// Replace with synonyms from knowledge graph (matches terraphim-agent)
+    Synonym,
+}
+
+/// Roles subcommands
+#[derive(Subcommand)]
+enum RolesSub {
+    /// List available roles
+    List,
+    /// Select a role by name or shortname
+    Select {
+        /// Role name or shortname to select
+        name: String,
+    },
+}
+
 #[derive(Subcommand)]
 enum Commands {
     /// Search for documents
@@ -56,8 +78,11 @@ enum Commands {
     /// Show configuration
     Config,
 
-    /// List available roles
-    Roles,
+    /// Manage roles
+    Roles {
+        #[command(subcommand)]
+        sub: RolesSub,
+    },
 
     /// Show top concepts from knowledge graph
     Graph {
@@ -70,12 +95,16 @@ enum Commands {
         role: Option<String>,
     },
 
-    /// Replace matched terms with links
+    /// Replace matched terms with links or synonyms
     Replace {
         /// Text to process
         text: String,
 
-        /// Link format: markdown, html, wiki, plain
+        /// Replace mode: link (add links) or synonym (knowledge graph replacement)
+        #[arg(long, default_value = "link")]
+        mode: ReplaceMode,
+
+        /// Link format: markdown, html, wiki, plain (only for --mode link)
         #[arg(long = "link-format", default_value = "markdown")]
         link_format: String,
 
@@ -160,6 +189,18 @@ struct ReplaceResult {
     original: String,
     replaced: String,
     format: String,
+    mode: String,
+}
+
+#[derive(Serialize)]
+struct SynonymReplaceResult {
+    original: String,
+    replaced: String,
+    replacements: usize,
+    changed: bool,
+    mode: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    error: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -201,6 +242,26 @@ struct ErrorResult {
     details: Option<String>,
 }
 
+#[derive(Serialize)]
+struct RolesListResult {
+    roles: Vec<RoleInfo>,
+    selected: String,
+}
+
+#[derive(Serialize)]
+struct RoleInfo {
+    name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    shortname: Option<String>,
+    selected: bool,
+}
+
+#[derive(Serialize)]
+struct RoleSelectResult {
+    selected: String,
+    previous: String,
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse();
@@ -228,13 +289,17 @@ async fn main() -> Result<()> {
             handle_search(&service, query, role, limit).await
         }
         Some(Commands::Config) => handle_config(&service).await,
-        Some(Commands::Roles) => handle_roles(&service).await,
+        Some(Commands::Roles { sub }) => match sub {
+            RolesSub::List => handle_roles_list(&service).await,
+            RolesSub::Select { name } => handle_roles_select(&service, name).await,
+        },
         Some(Commands::Graph { top_k, role }) => handle_graph(&service, top_k, role).await,
         Some(Commands::Replace {
             text,
+            mode,
             link_format,
             role,
-        }) => handle_replace(&service, text, link_format, role).await,
+        }) => handle_replace(&service, text, mode, link_format, role).await,
         Some(Commands::Find { text, role }) => handle_find(&service, text, role).await,
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
         Some(Commands::CheckUpdate) => handle_check_update().await,
@@ -294,6 +359,13 @@ async fn handle_search(
 
     let documents = service.search(&query, &role_name, limit).await?;
 
+    // Apply limit client-side since the service may return more results
+    let documents = if let Some(max) = limit {
+        &documents[..documents.len().min(max)]
+    } else {
+        &documents
+    };
+
     let results: Vec<DocumentResult> = documents
         .iter()
         .map(|doc| DocumentResult {
@@ -327,9 +399,43 @@ async fn handle_config(service: &CliService) -> Result<serde_json::Value> {
     Ok(serde_json::to_value(result)?)
 }
 
-async fn handle_roles(service: &CliService) -> Result<serde_json::Value> {
-    let roles = service.list_roles().await;
-    Ok(serde_json::to_value(roles)?)
+async fn handle_roles_list(service: &CliService) -> Result<serde_json::Value> {
+    let roles_with_info = service.list_roles_with_info().await;
+    let selected_role = service.get_selected_role().await;
+
+    let roles: Vec<RoleInfo> = roles_with_info
+        .into_iter()
+        .map(|(name, shortname)| RoleInfo {
+            selected: name == selected_role.to_string(),
+            name,
+            shortname,
+        })
+        .collect();
+
+    let result = RolesListResult {
+        roles,
+        selected: selected_role.to_string(),
+    };
+    Ok(serde_json::to_value(result)?)
+}
+
+async fn handle_roles_select(service: &CliService, name: String) -> Result<serde_json::Value> {
+    let previous = service.get_selected_role().await.to_string();
+
+    // Find role by name or shortname
+    let role_name = service
+        .find_role_by_name_or_shortname(&name)
+        .await
+        .ok_or_else(|| anyhow::anyhow!("Role '{}' not found (checked name and shortname)", name))?;
+
+    service.update_selected_role(role_name.clone()).await?;
+    service.save_config().await?;
+
+    let result = RoleSelectResult {
+        selected: role_name.to_string(),
+        previous,
+    };
+    Ok(serde_json::to_value(result)?)
 }
 
 async fn handle_graph(
@@ -357,6 +463,7 @@ async fn handle_graph(
 async fn handle_replace(
     service: &CliService,
     text: String,
+    mode: ReplaceMode,
     format: String,
     role: Option<String>,
 ) -> Result<serde_json::Value> {
@@ -366,37 +473,61 @@ async fn handle_replace(
         service.get_selected_role().await
     };
 
-    let link_type = match format.as_str() {
-        "markdown" => terraphim_automata::LinkType::MarkdownLinks,
-        "html" => terraphim_automata::LinkType::HTMLLinks,
-        "wiki" => terraphim_automata::LinkType::WikiLinks,
-        "plain" => {
-            let result = ReplaceResult {
-                original: text.clone(),
-                replaced: text,
-                format: "plain".to_string(),
+    match mode {
+        ReplaceMode::Link => {
+            // Existing link replacement logic
+            let link_type = match format.as_str() {
+                "markdown" => terraphim_automata::LinkType::MarkdownLinks,
+                "html" => terraphim_automata::LinkType::HTMLLinks,
+                "wiki" => terraphim_automata::LinkType::WikiLinks,
+                "plain" => {
+                    let result = ReplaceResult {
+                        original: text.clone(),
+                        replaced: text,
+                        format: "plain".to_string(),
+                        mode: "link".to_string(),
+                    };
+                    return Ok(serde_json::to_value(result)?);
+                }
+                _ => {
+                    anyhow::bail!(
+                        "Unknown format: {}. Use: markdown, html, wiki, or plain",
+                        format
+                    );
+                }
             };
-            return Ok(serde_json::to_value(result)?);
+
+            let replaced = service
+                .replace_matches(&role_name, &text, link_type)
+                .await?;
+
+            let result = ReplaceResult {
+                original: text,
+                replaced,
+                format,
+                mode: "link".to_string(),
+            };
+
+            Ok(serde_json::to_value(result)?)
         }
-        _ => {
-            anyhow::bail!(
-                "Unknown format: {}. Use: markdown, html, wiki, or plain",
-                format
-            );
+        ReplaceMode::Synonym => {
+            // New synonym replacement (matches terraphim-agent)
+            let thesaurus = service.get_thesaurus(&role_name).await?;
+            let replacement_service = terraphim_hooks::ReplacementService::new(thesaurus);
+            let hook_result = replacement_service.replace_fail_open(&text);
+
+            let result = SynonymReplaceResult {
+                original: hook_result.original,
+                replaced: hook_result.result,
+                replacements: hook_result.replacements,
+                changed: hook_result.changed,
+                mode: "synonym".to_string(),
+                error: hook_result.error,
+            };
+
+            Ok(serde_json::to_value(result)?)
         }
-    };
-
-    let replaced = service
-        .replace_matches(&role_name, &text, link_type)
-        .await?;
-
-    let result = ReplaceResult {
-        original: text,
-        replaced,
-        format,
-    };
-
-    Ok(serde_json::to_value(result)?)
+    }
 }
 
 async fn handle_find(

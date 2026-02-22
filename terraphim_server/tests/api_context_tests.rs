@@ -9,13 +9,13 @@ use serial_test::serial;
 use std::{net::SocketAddr, time::Duration};
 use terraphim_config::{Config, ConfigBuilder, Role};
 use terraphim_server::{
-    axum_server, AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
+    AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, CreateConversationRequest, CreateConversationResponse,
-    GetConversationResponse, ListConversationsResponse, Status,
+    GetConversationResponse, ListConversationsResponse, Status, axum_server,
 };
 use terraphim_service::http_client;
 use terraphim_settings::DeviceSettings;
-use terraphim_types::{ContextType, Document, RelevanceFunction};
+use terraphim_types::{ContextType, Document, DocumentType, RelevanceFunction};
 
 /// Sample configuration for testing context management
 fn create_test_config() -> Config {
@@ -108,6 +108,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["rust".to_string(), "programming".to_string()]),
             rank: Some(95),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc-2".to_string(),
@@ -121,6 +125,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["async".to_string(), "tokio".to_string()]),
             rank: Some(87),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
         Document {
             id: "doc-3".to_string(),
@@ -133,6 +141,10 @@ fn create_test_documents() -> Vec<Document> {
             tags: Some(vec!["web".to_string(), "axum".to_string()]),
             rank: Some(72),
             source_haystack: None,
+            doc_type: DocumentType::KgEntry,
+            synonyms: None,
+            route: None,
+            priority: None,
         },
     ]
 }
@@ -1112,9 +1124,11 @@ async fn test_conversation_context_workflow() {
         "I need help with Rust programming"
     );
     assert_eq!(conversation.messages[1].role, "assistant");
-    assert!(conversation.messages[1]
-        .content
-        .contains("async programming"));
+    assert!(
+        conversation.messages[1]
+            .content
+            .contains("async programming")
+    );
 
     // Check global context
     assert_eq!(conversation.global_context.len(), 2);

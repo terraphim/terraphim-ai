@@ -1,9 +1,10 @@
 use anyhow::Result;
 use std::sync::Arc;
-use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
+use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
-use terraphim_settings::DeviceSettings;
+use terraphim_service::llm::{ChatOptions, build_llm_from_role};
+use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
@@ -23,36 +24,59 @@ impl TuiService {
 
         log::info!("Initializing TUI service with embedded configuration");
 
-        // Load device settings
-        let device_settings = DeviceSettings::load_from_env_and_file(None)?;
+        // Load device settings, falling back to embedded defaults when running in sandboxes/tests
+        let device_settings = match DeviceSettings::load_from_env_and_file(None) {
+            Ok(settings) => settings,
+            Err(DeviceSettingsError::IoError(err))
+                if err.kind() == std::io::ErrorKind::NotFound =>
+            {
+                log::warn!(
+                    "Device settings not found ({}); using embedded defaults",
+                    err
+                );
+                DeviceSettings::default_embedded()
+            }
+            Err(err) => {
+                log::error!("Failed to load device settings: {err:?}");
+                return Err(err.into());
+            }
+        };
         log::debug!("Device settings: {:?}", device_settings);
 
         // Try to load existing configuration, fallback to default embedded config
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+        let config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
-                    log::info!("Loaded existing embedded configuration");
+                    log::debug!("Loaded existing embedded configuration");
                     config
                 }
-                Err(e) => {
-                    log::info!("Failed to load config: {:?}, using default embedded", e);
-                    ConfigBuilder::new_with_id(ConfigId::Embedded)
-                        .build_default_embedded()
-                        .build()?
+                Err(_) => {
+                    // No saved config found is expected on first run - use default
+                    log::debug!("No saved config found, using default embedded");
+                    return Self::new_with_embedded_defaults().await;
                 }
             },
             Err(e) => {
                 log::warn!("Failed to build config: {:?}, using default", e);
-                ConfigBuilder::new_with_id(ConfigId::Embedded)
-                    .build_default_embedded()
-                    .build()?
+                return Self::new_with_embedded_defaults().await;
             }
         };
 
-        // Create config state
-        let config_state = ConfigState::new(&mut config).await?;
+        Self::from_config(config).await
+    }
 
-        // Create service
+    /// Initialize service strictly from the embedded default configuration.
+    ///
+    /// This constructor avoids touching host-specific config/state and is used by tests.
+    pub async fn new_with_embedded_defaults() -> Result<Self> {
+        let config = ConfigBuilder::new_with_id(ConfigId::Embedded)
+            .build_default_embedded()
+            .build()?;
+        Self::from_config(config).await
+    }
+
+    async fn from_config(mut config: Config) -> Result<Self> {
+        let config_state = ConfigState::new(&mut config).await?;
         let service = TerraphimService::new(config_state.clone());
 
         Ok(Self {
@@ -82,18 +106,38 @@ impl TuiService {
         Ok(service.update_selected_role(role_name).await?)
     }
 
-    /// List all available roles
-    pub async fn list_roles(&self) -> Vec<String> {
+    /// List all available roles with their shortnames
+    pub async fn list_roles_with_info(&self) -> Vec<(String, Option<String>)> {
         let config = self.config_state.config.lock().await;
-        config.roles.keys().map(|r| r.to_string()).collect()
+        config
+            .roles
+            .iter()
+            .map(|(name, role)| (name.to_string(), role.shortname.clone()))
+            .collect()
     }
 
-    /// Search documents using the current selected role
-    #[allow(dead_code)]
-    pub async fn search(&self, search_term: &str, limit: Option<usize>) -> Result<Vec<Document>> {
-        let selected_role = self.get_selected_role().await;
-        self.search_with_role(search_term, &selected_role, limit)
-            .await
+    /// Find a role by name or shortname (case-insensitive)
+    pub async fn find_role_by_name_or_shortname(&self, query: &str) -> Option<RoleName> {
+        let config = self.config_state.config.lock().await;
+        let query_lower = query.to_lowercase();
+
+        // First try exact match on name
+        for (name, _role) in config.roles.iter() {
+            if name.to_string().to_lowercase() == query_lower {
+                return Some(name.clone());
+            }
+        }
+
+        // Then try match on shortname
+        for (name, role) in config.roles.iter() {
+            if let Some(ref shortname) = role.shortname {
+                if shortname.to_lowercase() == query_lower {
+                    return Some(name.clone());
+                }
+            }
+        }
+
+        None
     }
 
     /// Search documents with a specific role
@@ -129,17 +173,46 @@ impl TuiService {
     }
 
     /// Get the role graph top-k concepts for a specific role
+    ///
+    /// Returns the top-k concepts sorted by rank (number of co-occurrences) in descending order.
     pub async fn get_role_graph_top_k(
         &self,
         role_name: &RoleName,
         top_k: usize,
     ) -> Result<Vec<String>> {
-        // For now, return placeholder data since role graph access needs proper implementation
-        // TODO: Implement actual role graph integration
         log::info!("Getting top {} concepts for role {}", top_k, role_name);
-        Ok((0..std::cmp::min(top_k, 10))
-            .map(|i| format!("concept_{}_for_role_{}", i + 1, role_name))
-            .collect())
+
+        // Get the role graph for this role
+        if let Some(rolegraph_sync) = self.config_state.roles.get(role_name) {
+            let rolegraph = rolegraph_sync.lock().await;
+
+            // Get nodes and sort by rank (descending)
+            let mut nodes: Vec<_> = rolegraph.nodes_map().iter().collect();
+            nodes.sort_by(|a, b| b.1.rank.cmp(&a.1.rank));
+
+            // Map node IDs to term names and collect top-k
+            let top_concepts: Vec<String> = nodes
+                .into_iter()
+                .take(top_k)
+                .filter_map(|(node_id, _node)| {
+                    rolegraph
+                        .ac_reverse_nterm
+                        .get(node_id)
+                        .map(|term| term.to_string())
+                })
+                .collect();
+
+            log::debug!(
+                "Found {} concepts for role {} (requested {})",
+                top_concepts.len(),
+                role_name,
+                top_k
+            );
+            Ok(top_concepts)
+        } else {
+            log::warn!("Role graph not found for role {}", role_name);
+            Ok(Vec::new())
+        }
     }
 
     /// Generate chat response using LLM
@@ -147,32 +220,48 @@ impl TuiService {
         &self,
         role_name: &RoleName,
         prompt: &str,
-        model: Option<String>,
+        _model: Option<String>,
     ) -> Result<String> {
-        // Check if role has LLM configuration
+        // Get the role configuration
         let config = self.config_state.config.lock().await;
-        if let Some(role) = config.roles.get(role_name) {
-            // Check for various LLM providers in the role's extra config
-            if let Some(llm_provider) = role.extra.get("llm_provider") {
-                if let Some(provider_str) = llm_provider.as_str() {
-                    log::info!("Using LLM provider: {}", provider_str);
-                    // Use the service's LLM capabilities
-                    let _service = self.service.lock().await;
-                    // For now, return a placeholder response
-                    // TODO: Implement actual LLM integration when service supports it
-                    return Ok(format!(
-                        "Chat response from {} with model {:?}: {}",
-                        provider_str, model, prompt
-                    ));
-                }
-            }
-        }
+        let role = config
+            .roles
+            .get(role_name)
+            .ok_or_else(|| anyhow::anyhow!("Role '{}' not found in configuration", role_name))?;
 
-        // Fallback response
-        Ok(format!(
-            "No LLM configured for role {}. Prompt was: {}",
-            role_name, prompt
-        ))
+        // Build LLM client from role configuration
+        let llm_client = build_llm_from_role(role).ok_or_else(|| {
+            anyhow::anyhow!(
+                "No LLM configured for role '{}'. Add llm_provider, ollama_model, or llm_model to role's extra config.",
+                role_name
+            )
+        })?;
+
+        log::info!(
+            "Using LLM provider: {} for role: {}",
+            llm_client.name(),
+            role_name
+        );
+
+        // Build chat messages
+        let messages = vec![serde_json::json!({
+            "role": "user",
+            "content": prompt
+        })];
+
+        // Configure chat options
+        let opts = ChatOptions {
+            max_tokens: Some(1024),
+            temperature: Some(0.7),
+        };
+
+        // Call the LLM
+        let response = llm_client
+            .chat_completion(messages, opts)
+            .await
+            .map_err(|e| anyhow::anyhow!("LLM chat error: {}", e))?;
+
+        Ok(response)
     }
 
     /// Extract paragraphs from text using thesaurus
@@ -202,7 +291,7 @@ impl TuiService {
     }
 
     /// Perform autocomplete search using thesaurus for a role
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "repl-mcp"), allow(dead_code))]
     pub async fn autocomplete(
         &self,
         role_name: &RoleName,
@@ -228,7 +317,6 @@ impl TuiService {
     }
 
     /// Find matches in text using thesaurus
-    #[allow(dead_code)]
     pub async fn find_matches(
         &self,
         role_name: &RoleName,
@@ -242,7 +330,7 @@ impl TuiService {
     }
 
     /// Replace matches in text with links using thesaurus
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "repl-mcp"), allow(dead_code))]
     pub async fn replace_matches(
         &self,
         role_name: &RoleName,
@@ -258,7 +346,7 @@ impl TuiService {
     }
 
     /// Summarize content using available AI services
-    #[allow(dead_code)]
+    #[cfg_attr(not(feature = "repl-chat"), allow(dead_code))]
     pub async fn summarize(&self, role_name: &RoleName, content: &str) -> Result<String> {
         // For now, use the chat method with a summarization prompt
         let prompt = format!("Please summarize the following content:\n\n{}", content);
@@ -481,6 +569,41 @@ impl TuiService {
             satisfied,
             missing,
         })
+    }
+
+    /// Add a new role to the configuration
+    ///
+    /// This adds the role to the existing config and saves it.
+    /// If a role with the same name exists, it will be replaced.
+    pub async fn add_role(&self, role: terraphim_config::Role) -> Result<()> {
+        {
+            let mut config = self.config_state.config.lock().await;
+            let role_name = role.name.clone();
+            config.roles.insert(role_name.clone(), role);
+            log::info!("Added role '{}' to configuration", role_name);
+        }
+        self.save_config().await?;
+        Ok(())
+    }
+
+    /// Set the configuration to use a single role
+    ///
+    /// This replaces the current config with a new one containing only this role,
+    /// and sets it as the selected role.
+    pub async fn set_role(&self, role: terraphim_config::Role) -> Result<()> {
+        {
+            let mut config = self.config_state.config.lock().await;
+            let role_name = role.name.clone();
+            config.roles.clear();
+            config.roles.insert(role_name.clone(), role);
+            config.selected_role = role_name.clone();
+            log::info!(
+                "Set configuration to role '{}' (cleared other roles)",
+                role_name
+            );
+        }
+        self.save_config().await?;
+        Ok(())
     }
 }
 

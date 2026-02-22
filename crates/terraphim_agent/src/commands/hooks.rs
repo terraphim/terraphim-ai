@@ -361,7 +361,7 @@ impl CommandHook for BackupHook {
             // Create timestamped backup
             let timestamp = SystemTime::now()
                 .duration_since(UNIX_EPOCH)
-                .unwrap()
+                .expect("system time should be after Unix epoch")
                 .as_secs();
 
             let backup_name = format!("backup_{}_{}.json", context.user, timestamp);

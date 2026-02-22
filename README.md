@@ -48,7 +48,7 @@ cargo install terraphim-cli     # Automation CLI (8 commands)
 - ⚡ Lightweight (15 MB RAM, 13 MB disk)
 - 🚀 Fast (<200ms operations)
 
-**Learn more**: [v1.0.0 Release Notes](RELEASE_NOTES_v1.0.0.md) | [Cross-Platform Guide](CROSS_PLATFORM_STATUS.md)
+**Learn more**: [Quickstart](QUICKSTART.md) | [Changelog](https://docs.terraphim.ai/src/changelog.html) | [Cross-Platform Guide](docs/archive/root/CROSS_PLATFORM_STATUS.md)
 
 You can use it as a local search engine, configured to search for different types of content on StackOverflow, GitHub, and the local filesystem using a predefined folder, which includes your Markdown files.
 
@@ -114,7 +114,12 @@ Terraphim aims to bridge this gap by providing a privacy-first AI assistant that
 
 #### 🦀 Rust CLI/TUI (Most Features)
 ```bash
+# Basic installation
 cargo install terraphim_agent
+
+# Full installation with session search support
+cargo install terraphim_agent --features repl-full
+
 terraphim-agent --help
 ```
 
@@ -182,8 +187,11 @@ pip install terraphim-automata
 
 ### 🦀 Rust CLI/TUI
 ```bash
-# Interactive mode with full features
+# Fullscreen TUI (requires a running server at TERRAPHIM_SERVER or localhost:8000)
 terraphim-agent
+
+# Offline-capable REPL
+terraphim-agent repl
 
 # Search commands
 terraphim-agent search "Rust async programming"
@@ -252,6 +260,32 @@ for result in results:
 fuzzy_results = ta.fuzzy_autocomplete_search(index, "machin", min_distance=0.8)
 print(f"Fuzzy results: {len(fuzzy_results)}")
 ```
+
+### 📊 Quickwit Log Search
+```bash
+# Search application logs with Quickwit integration
+terraphim-agent --config terraphim_server/default/quickwit_engineer_config.json
+
+# In REPL, search for errors
+> /search "level:ERROR"
+
+# Time-based search
+> /search "timestamp:[2024-01-13T10:00:00Z TO *]"
+
+# Multi-field search
+> /search "service:api-server AND (error OR timeout)"
+
+# Auto-discovery mode (searches all indexes)
+terraphim-agent --config terraphim_server/default/quickwit_autodiscovery_config.json
+> /search error
+
+# With authentication (production)
+export QUICKWIT_PASSWORD=$(op read "op://Private/Quickwit/password")
+terraphim-agent --config terraphim_server/default/quickwit_production_config.json
+> /search "database connection failed"
+```
+
+**Complete Example:** See [examples/quickwit-log-search.md](examples/quickwit-log-search.md) for incident investigation walkthrough.
 
 ## 🆕 v1.0.0 Features
 
@@ -349,10 +383,13 @@ $ terraphim-agent update
 
 ```bash
 # Build with all features
-cargo build -p terraphim_tui --features repl-full --release
+cargo build -p terraphim_agent --features repl-full --release
 
-# Launch interactive REPL
+# Launch fullscreen TUI (server-backed)
 ./target/release/terraphim-agent
+
+# Launch REPL (offline-capable by default)
+./target/release/terraphim-agent repl
 
 # Available REPL commands:
 /help           # Show all commands
@@ -364,9 +401,48 @@ cargo build -p terraphim_tui --features repl-full --release
 /vm list        # VM management with sub-2s boot
 /web get URL    # Web operations
 /file search    # Semantic file operations
+
+# Session search commands (requires repl-full feature):
+/sessions sources          # Detect available session sources
+/sessions import           # Import sessions from Claude Code, Cursor, Aider
+/sessions list             # List imported sessions
+/sessions search <query>   # Full-text search across sessions
+/sessions stats            # Show session statistics
+/sessions concepts <term>  # Knowledge graph concept search
+/sessions related <id>     # Find related sessions
+/sessions timeline         # Timeline visualization
+/sessions export           # Export to JSON/Markdown
 ```
 
 For detailed documentation, see [TUI Usage Guide](docs/tui-usage.md) and [Auto-Update System](docs/autoupdate.md).
+
+### Session Search
+
+Search across AI coding assistant history from Claude Code, Cursor, and Aider sessions:
+
+```bash
+# Install with session search support
+cargo install terraphim_agent --features repl-full
+
+# Launch REPL (offline-capable)
+terraphim-agent repl
+
+# In REPL:
+/sessions sources          # Detect available session sources (e.g., 419 Claude Code sessions)
+/sessions import           # Import sessions from all sources
+/sessions list             # List imported sessions with ID, source, title, message count
+/sessions search "rust"    # Full-text search across sessions
+/sessions stats            # Show statistics (total sessions, messages, breakdown by source)
+/sessions concepts "async" # Knowledge graph concept search
+/sessions related <id>     # Find related sessions by shared concepts
+/sessions timeline         # Timeline visualization grouped by day/week/month
+/sessions export           # Export to JSON or Markdown
+```
+
+**Supported Sources:**
+- Claude Code (`~/.claude/projects/`)
+- Cursor IDE sessions
+- Aider git-based conversation logs
 
 ## Terminology
 
@@ -408,6 +484,73 @@ The compactness and mobility of such AI assistant drives the [[Design Decisions]
 [relict]: https://www.goodreads.com/en/book/show/196710046
 
 Terraphim is a trademark registered in the UK, US and internationally (WIPO). All other trademarks mentioned above are the property of their respective owners.
+
+## 🔒 Validation Framework
+
+Terraphim includes a comprehensive validation system that ensures security, quality, and compliance across all AI operations.
+
+### 🛡️ Runtime Validation Hooks
+
+**Two-Stage Security Flow**:
+1. **Guard Stage**: Blocks dangerous operations (e.g., `git commit --no-verify`)
+2. **Replacement Stage**: Enhances commands using knowledge graph intelligence
+
+**Hook Coverage**:
+- **Pre/Post LLM**: Validates AI inputs/outputs for safety and quality
+- **Pre/Post Tool**: Secures code execution in VM environments
+- **Claude Code Integration**: Seamless workflow validation with guard+replacement
+
+**Configuration**: `~/.config/terraphim/runtime-validation.toml`
+```toml
+[hooks]
+enabled = true
+fail_open = true          # Development mode
+
+[guard]
+strict_mode = false        # Balance security vs. productivity
+
+[llm_hooks]
+enabled = true
+require_human_review = false
+
+[tool_hooks]
+enabled = true
+vm_isolation = true
+```
+
+### 📋 Release Validation
+
+Comprehensive release testing and validation system:
+- **Multi-Platform Testing**: Windows, macOS, Linux validation
+- **Security Scanning**: Automated vulnerability assessment
+- **Performance Benchmarking**: CI/CD integrated performance tests
+- **Installation Testing**: Package installation verification
+- **Functional Testing**: End-to-end feature validation
+
+**Usage**:
+```bash
+# Run complete release validation
+terraphim-validation validate --version v1.5.0
+
+# Run specific validation categories
+terraphim-validation validate --categories security,performance
+
+# Generate validation report
+terraphim-validation status --report-format json
+```
+
+**Documentation**: See [Runtime Validation Hooks](.docs/runtime-validation-hooks.md) for detailed implementation guide.
+
+### Development with Validation
+
+During development, hooks operate in fail-open mode to avoid blocking workflows:
+```bash
+# Development configuration
+export TERRAPHIM_RUNTIME_VALIDATION_HOOKS=true
+export TERRAPHIM_FAIL_OPEN=true
+export TERRAPHIM_GUARD_STAGE=true
+export TERRAPHIM_REPLACEMENT_STAGE=true
+```
 
 ## Configuration
 
@@ -501,7 +644,10 @@ chmod +x /tmp/terraphim-agent-x86_64-unknown-linux-gnu
 mv /tmp/terraphim-agent-x86_64-unknown-linux-gnu ~/.cargo/bin/terraphim-agent
 ```
 
-**Note:** The crates.io version (`cargo install terraphim_agent`) is v1.0.0 and missing `hook` and `guard` commands. Use GitHub releases.
+**Note:** For full functionality including `hook`, `guard`, and session search commands, install with features:
+```bash
+cargo install terraphim_agent --features repl-full
+```
 
 **Step 2: Install Claude Code Skills Plugin**
 ```bash

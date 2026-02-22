@@ -257,10 +257,12 @@ confidence = 1.5
 
         let result = load_patterns_from_str(toml);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("invalid confidence"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("invalid confidence")
+        );
     }
 
     #[test]

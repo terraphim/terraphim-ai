@@ -200,4 +200,5 @@ jobs:
 
       - name: Run basic tests
         run: |
+          # rocksdb feature disabled in CI
           cargo test --target ${{ matrix.target }} --workspace --exclude terraphim_agent

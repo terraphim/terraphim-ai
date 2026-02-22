@@ -1,0 +1,35 @@
+{
+  "name": "code-review",
+  "version": "1.0.0",
+  "description": "Perform automated code review on a file or directory",
+  "author": "TinyClaw Examples",
+  "inputs": [
+    {
+      "name": "target_path",
+      "description": "Path to file or directory to review",
+      "required": true,
+      "default": null
+    },
+    {
+      "name": "language",
+      "description": "Programming language (rust, python, javascript, etc.)",
+      "required": false,
+      "default": "auto"
+    }
+  ],
+  "steps": [
+    {
+      "type": "tool",
+      "tool": "filesystem",
+      "args": {
+        "operation": "read_file",
+        "path": "{target_path}"
+      }
+    },
+    {
+      "type": "llm",
+      "prompt": "Review this {language} code from {target_path}. Provide: 1) Code quality assessment 2) Potential bugs or issues 3) Security concerns 4) Performance suggestions 5) Style and best practice recommendations",
+      "use_context": true
+    }
+  ]
+}

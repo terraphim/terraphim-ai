@@ -56,7 +56,7 @@ install:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
@@ -89,7 +89,7 @@ install-native:
   ENV DEBIAN_FRONTEND=noninteractive
   ENV DEBCONF_NONINTERACTIVE_SEEN=true
   RUN apt-get update -qq
-  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev librocksdb-dev libsnappy-dev liblz4-dev libzstd-dev
+  RUN apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config musl-tools musl-dev libclang-dev clang llvm-dev libglib2.0-dev libgtk-3-dev libsoup2.4-dev libwebkit2gtk-4.0-dev libappindicator3-dev
   RUN update-ca-certificates
   # Install Rust from official installer
   RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain 1.88.0
@@ -136,11 +136,6 @@ build-native:
 build-debug-native:
   FROM +source-native
   WORKDIR /code
-  # Remove firecracker from workspace before building
-  RUN rm -rf terraphim_firecracker || true
-  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
-  # Also update default-members to match the remaining members
-  RUN sed -i 's/default-members = \["terraphim_server"\]/default-members = ["terraphim_server"]/' Cargo.toml
   # Optimize build with parallel jobs and optimized settings
   RUN CARGO_BUILD_JOBS=$(nproc) CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo build
   SAVE ARTIFACT /code/target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
@@ -226,6 +221,7 @@ test:
   # COPY --chmod=0755 +build-debug/terraphim_server /code/terraphim_server_debug
   GIT CLONE https://github.com/terraphim/INCOSE-Systems-Engineering-Handbook.git /tmp/system_operator/
   # RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE nohup /code/terraphim_server_debug & sleep 5 && cargo test;
+  # rocksdb feature disabled in CI
   RUN cargo test --workspace
   #DO rust+CARGO --args="test --offline"
 
@@ -235,11 +231,7 @@ fmt:
 
 lint:
   FROM +workspace-debug
-  # Exclude firecracker from workspace for linting
-  RUN rm -rf terraphim_firecracker || true
-  # Temporarily remove firecracker from workspace members list
-  RUN sed -i '/terraphim_firecracker/d' Cargo.toml
-  RUN cargo clippy --workspace --all-targets --all-features --exclude terraphim_firecracker
+  RUN cargo clippy --workspace --all-targets
 
 build-focal:
   FROM ubuntu:20.04

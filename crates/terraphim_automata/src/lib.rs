@@ -108,17 +108,47 @@
 pub use self::builder::{Logseq, ThesaurusBuilder};
 pub mod autocomplete;
 pub mod builder;
+pub mod markdown_directives;
 pub mod matcher;
 pub mod url_protector;
 
+// Medical entity extraction modules (SNOMED CT and UMLS)
+#[cfg(feature = "medical")]
+pub mod medical_artifact;
+#[cfg(feature = "medical")]
+pub mod medical_extractor;
+#[cfg(feature = "medical")]
+pub mod sharded_extractor;
+#[cfg(feature = "medical")]
+pub mod snomed;
+#[cfg(feature = "medical")]
+pub mod umls;
+#[cfg(feature = "medical")]
+pub mod umls_extractor;
+
 pub use autocomplete::{
+    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
     autocomplete_search, build_autocomplete_index, deserialize_autocomplete_index,
     fuzzy_autocomplete_search, fuzzy_autocomplete_search_levenshtein, serialize_autocomplete_index,
-    AutocompleteConfig, AutocompleteIndex, AutocompleteMetadata, AutocompleteResult,
+};
+pub use markdown_directives::{
+    MarkdownDirectiveWarning, MarkdownDirectivesParseResult, parse_markdown_directives_dir,
 };
 pub use matcher::{
-    extract_paragraphs_from_automata, find_matches, replace_matches, LinkType, Matched,
+    LinkType, Matched, extract_paragraphs_from_automata, find_matches, replace_matches,
 };
+
+// Medical entity extraction re-exports
+#[cfg(feature = "medical")]
+pub use medical_extractor::{EntityExtractor, ExtractedEntity};
+#[cfg(feature = "medical")]
+pub use sharded_extractor::ShardedUmlsExtractor;
+#[cfg(feature = "medical")]
+pub use snomed::{SemanticType, SnomedConcept, SnomedMatch};
+#[cfg(feature = "medical")]
+pub use umls::{UmlsConcept, UmlsDataset, UmlsStats};
+#[cfg(feature = "medical")]
+pub use umls_extractor::{UmlsExtractor, UmlsExtractorStats, UmlsMatch};
 
 // Re-export helpers for metadata iteration to support graph-embedding expansions in consumers
 pub mod autocomplete_helpers {
@@ -314,6 +344,7 @@ pub async fn load_thesaurus_from_json_and_replace_async(
 /// Note: Remote loading requires the "remote-loading" feature to be enabled.
 #[cfg(feature = "remote-loading")]
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
+    #[allow(dead_code)]
     async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::builder()
@@ -347,8 +378,21 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
     }
 
     let contents = match automata_path {
-        AutomataPath::Local(path) => fs::read_to_string(path)?,
-        AutomataPath::Remote(url) => read_url(url.clone()).await?,
+        AutomataPath::Local(path) => {
+            // Check if file exists before attempting to read
+            if !std::path::Path::new(path).exists() {
+                return Err(TerraphimAutomataError::InvalidThesaurus(format!(
+                    "Thesaurus file not found: {}",
+                    path.display()
+                )));
+            }
+            fs::read_to_string(path)?
+        }
+        AutomataPath::Remote(_) => {
+            return Err(TerraphimAutomataError::InvalidThesaurus(
+                "Remote loading is not supported. Enable the 'remote-loading' feature.".to_string(),
+            ));
+        }
     };
 
     let thesaurus = serde_json::from_str(&contents)?;
@@ -551,13 +595,19 @@ mod tests {
             load_thesaurus_from_json_and_replace(json_str, content, LinkType::MarkdownLinks)
                 .unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
-        assert_eq!(replaced_str, "I like [project constraints](https://example.com/project-constraints) and [strategy documents](https://example.com/strategy-documents).");
+        assert_eq!(
+            replaced_str,
+            "I like [project constraints](https://example.com/project-constraints) and [strategy documents](https://example.com/strategy-documents)."
+        );
 
         // Test HTMLLinks
         let replaced =
             load_thesaurus_from_json_and_replace(json_str, content, LinkType::HTMLLinks).unwrap();
         let replaced_str = String::from_utf8(replaced).unwrap();
-        assert_eq!(replaced_str, "I like <a href=\"https://example.com/project-constraints\">project constraints</a> and <a href=\"https://example.com/strategy-documents\">strategy documents</a>.");
+        assert_eq!(
+            replaced_str,
+            "I like <a href=\"https://example.com/project-constraints\">project constraints</a> and <a href=\"https://example.com/strategy-documents\">strategy documents</a>."
+        );
 
         // Test WikiLinks
         let replaced =

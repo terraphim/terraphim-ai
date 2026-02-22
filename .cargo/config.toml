@@ -50,9 +50,9 @@ linker = "riscv64-linux-gnu-gcc"
 # Uncomment and customize if you need specific image overrides
 
 # Registry configuration
-[registry]
+[registries.crates-io]
 # Use sparse protocol for faster downloads
-crates-io = { protocol = "sparse" }
+protocol = "sparse"
 
 # Network configuration
 [http]

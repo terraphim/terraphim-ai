@@ -1,7 +1,8 @@
 [package]
 name = "terraphim_github_runner_server"
 version = "0.1.0"
-edition = "2021"
+edition.workspace = true
+license = "MIT"
 
 [dependencies]
 # Web framework
@@ -9,7 +10,7 @@ salvo = { version = "0.74.3" }
 tokio = { version = "1.36", features = ["full"] }
 
 # GitHub integration
-octocrab = "0.42.1"
+octocrab = "0.49.5"
 
 # Serialization
 serde = { version = "1.0", features = ["derive"] }
@@ -56,3 +57,4 @@ openrouter = ["terraphim_service/openrouter"]
 
 [dev-dependencies]
 salvo = { version = "0.74.3", features = ["test"] }
+terraphim_test_utils = { path = "../terraphim_test_utils" }

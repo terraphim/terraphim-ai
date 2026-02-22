@@ -1,12 +1,13 @@
 [package]
 name = "terraphim_atomic_client"
 version = "1.0.0"
-edition = "2021"
+edition.workspace = true
+license = "MIT"
 
 [dependencies]
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-reqwest = { version = "0.12.5", features = ["json", "rustls-tls"], default-features = false, optional = true }
+reqwest = { version = "0.12.28", features = ["json", "rustls-tls"], default-features = false, optional = true }
 web-sys = { version = "0.3.69", features = ["Request", "RequestInit", "RequestMode", "Response", "Headers", "Window"], optional = true }
 hex = "0.4"
 base64 = "0.22.1"
@@ -14,7 +15,7 @@ jiff = { version = "0.2", features = ["serde"] }
 wasm-bindgen = { version = "0.2.92", optional = true }
 wasm-bindgen-futures = { version = "0.4.42", optional = true }
 dotenvy = "0.15.7"
-url = { version = "2.5.4", features = ["serde"] }
+url = { version = "2.5.8", features = ["serde"] }
 ed25519-dalek = { version = "2.2", features = ["rand_core"] }
 thiserror = "2.0.12"
 rand_core = { version = "0.6", features = ["getrandom"] }

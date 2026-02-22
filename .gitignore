@@ -14,6 +14,7 @@ terraphim-grep/
 artifact/
 nohup.out
 .cargo/
+!.cargo/audit.toml
 localsearch/
 # Local Netlify folder
 .netlify/
@@ -51,3 +52,18 @@ keys/
 
 # Working documents
 .docs/
+
+# Claude Code working files
+.claude/plans/
+
+# Auto-updated test settings
+crates/terraphim_settings/test_settings/settings.toml
+# Nightshift plan artifacts (keep out of version control)
+.nightshift-plan
+
+# Build artifacts
+a.out
+
+# Cache
+.cachebro/
+.cachebro/

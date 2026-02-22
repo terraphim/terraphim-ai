@@ -3,7 +3,7 @@
 //! Parses commands with typo tolerance and alias expansion.
 
 use super::aliases::AliasRegistry;
-use super::suggestions::{find_best_match, find_similar_commands, CommandSuggestion};
+use super::suggestions::{CommandSuggestion, find_best_match, find_similar_commands};
 
 /// Result of parsing with the forgiving parser
 #[derive(Debug, Clone)]

@@ -7,7 +7,7 @@
 //! - Progress tracking
 //! - Timeout handling
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use std::io::{self, Write};
 use std::time::{Duration, Instant};
 use tracing::{debug, error, info, warn};
@@ -306,6 +306,18 @@ pub fn download_silent(url: &str, output_path: &std::path::Path) -> Result<()> {
 mod tests {
     use super::*;
     use std::fs;
+    use std::net::ToSocketAddrs;
+
+    fn can_connect(host: &str, port: u16) -> bool {
+        let addr = (host, port)
+            .to_socket_addrs()
+            .ok()
+            .and_then(|mut addrs| addrs.next());
+        let Some(addr) = addr else {
+            return false;
+        };
+        std::net::TcpStream::connect_timeout(&addr, Duration::from_millis(200)).is_ok()
+    }
 
     #[test]
     fn test_download_config_default() {
@@ -384,6 +396,10 @@ mod tests {
 
     #[test]
     fn test_download_silent_local_file() {
+        if !can_connect("httpbin.org", 443) {
+            eprintln!("Skipping network test: cannot reach httpbin.org");
+            return;
+        }
         let temp_dir = tempfile::tempdir().unwrap();
         let output_file = temp_dir.path().join("output.txt");
 
@@ -463,6 +479,10 @@ mod tests {
 
     #[test]
     fn test_download_creates_output_file() {
+        if !can_connect("httpbin.org", 443) {
+            eprintln!("Skipping network test: cannot reach httpbin.org");
+            return;
+        }
         let temp_dir = tempfile::tempdir().unwrap();
         let output_file = temp_dir.path().join("output.txt");
 
@@ -477,6 +497,10 @@ mod tests {
 
     #[test]
     fn test_download_result_success() {
+        if !can_connect("httpbin.org", 443) {
+            eprintln!("Skipping network test: cannot reach httpbin.org");
+            return;
+        }
         let temp_dir = tempfile::tempdir().unwrap();
         let output_file = temp_dir.path().join("output.txt");
 
