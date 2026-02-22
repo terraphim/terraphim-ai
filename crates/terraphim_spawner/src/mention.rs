@@ -8,8 +8,7 @@ use tokio::sync::mpsc;
 
 use terraphim_types::capability::ProcessId;
 
-use crate::output::OutputEvent;
-use crate::{AgentHandle, AgentSpawner, SpawnerError};
+use crate::{AgentSpawner, SpawnerError};
 
 /// Router for @mention messages between agents
 #[derive(Debug)]
@@ -56,7 +55,7 @@ impl MentionRouter {
     }
 
     /// Route mentions to their targets
-    pub async fn route_mentions(&mut self, spawner: &AgentSpawner) -> Result<(), SpawnerError> {
+    pub async fn route_mentions(&mut self, _spawner: &AgentSpawner) -> Result<(), SpawnerError> {
         while let Some(event) = self.mention_receiver.recv().await {
             log::info!(
                 "Routing mention from {} to @{}: {}",

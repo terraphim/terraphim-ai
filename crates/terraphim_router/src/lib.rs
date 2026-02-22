@@ -34,11 +34,14 @@ pub use fallback::{FallbackRouter, FallbackStrategy};
 pub use keyword::KeywordRouter;
 pub use knowledge_graph::KnowledgeGraphRouter;
 pub use metrics::{RouterMetrics, Timer};
+#[cfg(feature = "persistence")]
+pub use registry::PersistedProviderRegistry;
 pub use registry::ProviderRegistry;
-pub use strategy::{CapabilityFirst, CostOptimized, LatencyOptimized, RoundRobin, RoutingStrategy};
+pub use strategy::{
+    CapabilityFirst, CostOptimized, LatencyOptimized, PreferenceFilter, RoundRobin,
+    RoutingStrategy, StrategyRegistry, WeightedStrategy,
+};
 pub use types::{RoutingContext, RoutingDecision, RoutingError, RoutingResult};
 
-use terraphim_types::capability::Provider;
-
 /// Re-export capability types for convenience
-pub use terraphim_types::capability::{Capability, CostLevel, Latency, ProviderType};
+pub use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};

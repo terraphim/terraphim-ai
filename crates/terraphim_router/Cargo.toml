@@ -18,14 +18,27 @@ serde_json = "1.0"
 regex = "1.10"
 thiserror = "1.0"
 anyhow = "1.0"
-log = "0.4"
+tracing = "0.1"
 chrono = { version = "0.4", features = ["serde"] }
 tokio = { version = "1.0", features = ["full"] }
 async-trait = "0.1"
 uuid = { version = "1.0", features = ["v4", "serde"] }
 dirs = "5.0"
 
+# Optional persistence support
+[dependencies.terraphim_persistence]
+path = "../terraphim_persistence"
+optional = true
+
+[features]
+default = []
+persistence = ["dep:terraphim_persistence"]
+
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.8"
+tracing-test = "0.2"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+serial_test = "3.2"
+terraphim_persistence = { path = "../terraphim_persistence" }
 terraphim_spawner = { path = "../terraphim_spawner" }

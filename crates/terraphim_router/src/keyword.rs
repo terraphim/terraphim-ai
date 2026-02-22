@@ -3,7 +3,6 @@
 //! This module provides keyword matching to extract capabilities from text,
 //! enabling intelligent routing based on prompt content.
 
-use regex::Regex;
 use std::collections::HashSet;
 use terraphim_types::capability::Capability;
 
@@ -51,7 +50,7 @@ impl KeywordRouter {
         for mapping in &self.mappings {
             for keyword in &mapping.keywords {
                 if text_lower.contains(&keyword.to_lowercase()) {
-                    caps.insert(mapping.capability.clone());
+                    caps.insert(mapping.capability);
                     matched_keywords.push((keyword.clone(), mapping.priority));
                     break; // Only match once per mapping
                 }

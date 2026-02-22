@@ -8,6 +8,13 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};
 
+#[cfg(feature = "persistence")]
+use async_trait::async_trait;
+#[cfg(feature = "persistence")]
+use serde::{Deserialize, Serialize};
+#[cfg(feature = "persistence")]
+use terraphim_persistence::Persistable;
+
 /// Registry of capability providers loaded from markdown files
 #[derive(Debug, Clone, Default)]
 pub struct ProviderRegistry {
@@ -100,6 +107,7 @@ impl ProviderRegistry {
     /// Load providers from a directory of markdown files
     pub async fn load_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<usize, RoutingError> {
         let dir = dir.as_ref();
+        let _span = tracing::info_span!("router.registry.load", directory = ?dir).entered();
         let mut count = 0;
 
         // Read directory entries
@@ -123,11 +131,19 @@ impl ProviderRegistry {
                             count += 1;
                         }
                         Err(e) => {
-                            log::warn!("Failed to parse provider from {:?}: {}", path, e);
+                            tracing::warn!(
+                                file_path = ?path,
+                                error = %e,
+                                "Failed to parse provider from markdown file"
+                            );
                         }
                     },
                     Err(e) => {
-                        log::warn!("Failed to load markdown from {:?}: {}", path, e);
+                        tracing::warn!(
+                            file_path = ?path,
+                            error = %e,
+                            "Failed to load markdown file"
+                        );
                     }
                 }
             }
@@ -266,10 +282,79 @@ impl ProviderRegistry {
             "security_audit" | "securityaudit" => Some(Capability::SecurityAudit),
             "performance" => Some(Capability::Performance),
             _ => {
-                log::warn!("Unknown capability: {}", s);
+                tracing::warn!(capability_string = s, "Unknown capability string, skipping");
                 None
             }
         }
+    }
+
+    /// Create a registry that auto-loads from DeviceStorage on startup.
+    ///
+    /// If no persisted data is found, starts empty. Use
+    /// [`add_provider_persisted`] and [`remove_provider_persisted`] to
+    /// write-through changes to storage.
+    #[cfg(feature = "persistence")]
+    pub async fn with_persistence(registry_id: &str) -> Result<Self, RoutingError> {
+        let mut persisted = PersistedProviderRegistry::new(registry_id.to_string());
+
+        let providers = match persisted.load().await {
+            Ok(loaded) => {
+                tracing::info!(
+                    registry_id = registry_id,
+                    count = loaded.providers.len(),
+                    "Loaded providers from persistent storage"
+                );
+                loaded.providers
+            }
+            Err(_) => {
+                tracing::debug!(
+                    registry_id = registry_id,
+                    "No persisted providers found, starting empty"
+                );
+                HashMap::new()
+            }
+        };
+
+        Ok(Self {
+            providers,
+            source_path: None,
+        })
+    }
+
+    /// Add a provider and persist the full registry to storage.
+    #[cfg(feature = "persistence")]
+    pub async fn add_provider_persisted(
+        &mut self,
+        provider: Provider,
+        registry_id: &str,
+    ) -> Result<(), RoutingError> {
+        self.providers.insert(provider.id.clone(), provider);
+        self.persist_all(registry_id).await
+    }
+
+    /// Remove a provider and persist the change to storage.
+    #[cfg(feature = "persistence")]
+    pub async fn remove_provider_persisted(
+        &mut self,
+        provider_id: &str,
+        registry_id: &str,
+    ) -> Result<Option<Provider>, RoutingError> {
+        let removed = self.providers.remove(provider_id);
+        self.persist_all(registry_id).await?;
+        Ok(removed)
+    }
+
+    /// Write the full registry state to all storage backends.
+    #[cfg(feature = "persistence")]
+    async fn persist_all(&self, registry_id: &str) -> Result<(), RoutingError> {
+        let persisted = PersistedProviderRegistry {
+            registry_id: registry_id.to_string(),
+            providers: self.providers.clone(),
+        };
+        persisted
+            .save()
+            .await
+            .map_err(|e| RoutingError::RegistryError(format!("Persistence error: {}", e)))
     }
 
     /// Load from default location (~/.terraphim/providers/)
@@ -286,6 +371,50 @@ impl ProviderRegistry {
         }
 
         Ok(registry)
+    }
+}
+
+/// Serializable snapshot of the provider registry for persistence.
+///
+/// Stored as a single JSON document in DeviceStorage. The `registry_id`
+/// is used to derive the storage key.
+#[cfg(feature = "persistence")]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PersistedProviderRegistry {
+    pub registry_id: String,
+    pub providers: HashMap<String, Provider>,
+}
+
+#[cfg(feature = "persistence")]
+#[async_trait]
+impl Persistable for PersistedProviderRegistry {
+    fn new(key: String) -> Self {
+        Self {
+            registry_id: key,
+            providers: HashMap::new(),
+        }
+    }
+
+    async fn save(&self) -> terraphim_persistence::Result<()> {
+        self.save_to_all().await
+    }
+
+    async fn save_to_one(&self, profile_name: &str) -> terraphim_persistence::Result<()> {
+        self.save_to_profile(profile_name).await
+    }
+
+    async fn load(&mut self) -> terraphim_persistence::Result<Self>
+    where
+        Self: Sized,
+    {
+        let op = &self.load_config().await?.1;
+        let key = self.get_key();
+        self.load_from_operator(&key, op).await
+    }
+
+    fn get_key(&self) -> String {
+        let normalized = self.normalize_key(&self.registry_id);
+        format!("provider_registry_{}.json", normalized)
     }
 }
 
@@ -421,5 +550,171 @@ This is a test.
 
         assert_eq!(count, 1);
         assert!(registry.get("test-provider").is_some());
+    }
+
+    // Persistence tests -- use real DeviceStorage with memory backend
+    #[cfg(feature = "persistence")]
+    mod persistence_tests {
+        use super::*;
+        use serial_test::serial;
+        use terraphim_persistence::Persistable;
+
+        async fn init_test_persistence() {
+            terraphim_persistence::DeviceStorage::init_memory_only()
+                .await
+                .expect("Failed to initialize memory-only DeviceStorage");
+        }
+
+        fn test_provider(id: &str) -> Provider {
+            Provider::new(
+                id,
+                format!("Test {}", id),
+                ProviderType::Llm {
+                    model_id: format!("model-{}", id),
+                    api_endpoint: "https://api.example.com".to_string(),
+                },
+                vec![Capability::CodeGeneration, Capability::CodeReview],
+            )
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_persist_and_load_empty_registry() {
+            init_test_persistence().await;
+
+            let persisted = PersistedProviderRegistry {
+                registry_id: "test-empty".to_string(),
+                providers: HashMap::new(),
+            };
+            persisted.save().await.unwrap();
+
+            let mut loaded = PersistedProviderRegistry::new("test-empty".to_string());
+            loaded = loaded.load().await.unwrap();
+
+            assert_eq!(loaded.providers.len(), 0);
+            assert_eq!(loaded.registry_id, "test-empty");
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_persist_and_load_with_providers() {
+            init_test_persistence().await;
+
+            let mut providers = HashMap::new();
+            providers.insert("p1".to_string(), test_provider("p1"));
+            providers.insert("p2".to_string(), test_provider("p2"));
+
+            let persisted = PersistedProviderRegistry {
+                registry_id: "test-with-providers".to_string(),
+                providers,
+            };
+            persisted.save().await.unwrap();
+
+            let mut loaded = PersistedProviderRegistry::new("test-with-providers".to_string());
+            loaded = loaded.load().await.unwrap();
+
+            assert_eq!(loaded.providers.len(), 2);
+            assert!(loaded.providers.contains_key("p1"));
+            assert!(loaded.providers.contains_key("p2"));
+            assert_eq!(loaded.providers["p1"].name, "Test p1");
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_with_persistence_loads_existing() {
+            init_test_persistence().await;
+
+            // Pre-populate storage
+            let mut providers = HashMap::new();
+            providers.insert("existing".to_string(), test_provider("existing"));
+            let persisted = PersistedProviderRegistry {
+                registry_id: "test-load".to_string(),
+                providers,
+            };
+            persisted.save().await.unwrap();
+
+            // Create registry via with_persistence
+            let registry = ProviderRegistry::with_persistence("test-load")
+                .await
+                .unwrap();
+
+            assert_eq!(registry.all().len(), 1);
+            assert!(registry.get("existing").is_some());
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_with_persistence_starts_empty_when_no_data() {
+            init_test_persistence().await;
+
+            let registry = ProviderRegistry::with_persistence("test-nonexistent")
+                .await
+                .unwrap();
+
+            assert_eq!(registry.all().len(), 0);
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_add_provider_persisted_roundtrip() {
+            init_test_persistence().await;
+
+            let mut registry = ProviderRegistry::with_persistence("test-add")
+                .await
+                .unwrap();
+
+            registry
+                .add_provider_persisted(test_provider("new-provider"), "test-add")
+                .await
+                .unwrap();
+
+            assert_eq!(registry.all().len(), 1);
+
+            // Verify it was persisted by loading fresh
+            let registry2 = ProviderRegistry::with_persistence("test-add")
+                .await
+                .unwrap();
+            assert_eq!(registry2.all().len(), 1);
+            assert!(registry2.get("new-provider").is_some());
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_remove_provider_persisted() {
+            init_test_persistence().await;
+
+            let mut registry = ProviderRegistry::with_persistence("test-remove")
+                .await
+                .unwrap();
+
+            registry
+                .add_provider_persisted(test_provider("to-remove"), "test-remove")
+                .await
+                .unwrap();
+            assert_eq!(registry.all().len(), 1);
+
+            let removed = registry
+                .remove_provider_persisted("to-remove", "test-remove")
+                .await
+                .unwrap();
+            assert!(removed.is_some());
+            assert_eq!(registry.all().len(), 0);
+
+            // Verify removal persisted
+            let registry2 = ProviderRegistry::with_persistence("test-remove")
+                .await
+                .unwrap();
+            assert_eq!(registry2.all().len(), 0);
+        }
+
+        #[tokio::test]
+        #[serial]
+        async fn test_backward_compat_non_persisted_still_works() {
+            // Ensure the existing in-memory API is unaffected
+            let mut registry = ProviderRegistry::new();
+            registry.add_provider(test_provider("in-memory"));
+            assert_eq!(registry.all().len(), 1);
+            assert!(registry.get("in-memory").is_some());
+        }
     }
 }
