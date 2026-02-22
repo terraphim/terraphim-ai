@@ -5,6 +5,7 @@ use serde_json::Value;
 
 /// Decision from execution guard evaluation.
 #[derive(Debug)]
+#[allow(dead_code)]
 pub enum GuardDecision {
     /// Safe to execute.
     Allow,
@@ -190,6 +191,7 @@ impl ExecutionGuard {
     }
 
     /// Convert a GuardDecision to a ToolError if it's a Block.
+    #[allow(dead_code)]
     pub fn to_error(&self, tool_name: &str, decision: GuardDecision) -> Result<(), ToolError> {
         match decision {
             GuardDecision::Allow => Ok(()),

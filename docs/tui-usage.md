@@ -1,12 +1,17 @@
 # Terraphim Terminal User Interface (TUI)
 
-Terraphim includes a comprehensive terminal user interface (TUI) that provides both interactive REPL functionality and CLI commands for advanced operations including VM management, web operations, and intelligent file operations with semantic awareness. The TUI is ideal for CI/CD environments, headless servers, development workflows, and integration with terminal-based automation.
+Terraphim includes a terminal interface with three execution modes:
+- Fullscreen TUI (`terraphim-agent`) - server-backed interactive UI
+- REPL (`terraphim-agent repl`) - offline-capable by default
+- CLI subcommands (`terraphim-agent <command>`) - offline-capable by default unless `--server` is used
+
+These modes support VM management, web operations, and intelligent file operations with semantic awareness.
 
 ## Installation
 
 ### Prerequisites
 - Rust toolchain (cargo)
-- Running Terraphim server (local or remote)
+- Running Terraphim server (required for fullscreen TUI and `--server` mode)
 
 ### Building from Source
 
@@ -53,19 +58,27 @@ Set the Terraphim server URL (defaults to `http://localhost:8000`):
 export TERRAPHIM_SERVER=http://localhost:8000
 ```
 
-This environment variable is **required** for the TUI to connect to the server. If not set, the default will be used.
+This environment variable is used by fullscreen TUI and `--server` mode. REPL and CLI subcommands in default mode can run offline.
 
 ## Command Reference
 
-### Interactive REPL Mode
-
-The TUI features a comprehensive REPL (Read-Eval-Print Loop) that provides access to all advanced functionality:
+### Fullscreen TUI Mode (Server-Backed)
 
 ```bash
 terraphim-agent
 ```
 
-In interactive mode, you have access to:
+Use this mode when you want the fullscreen terminal UI and a running Terraphim server.
+
+### REPL Mode (Offline-Capable)
+
+```bash
+terraphim-agent repl
+```
+
+Use `terraphim-agent repl --server --server-url http://localhost:8000` to run REPL in server mode.
+
+In REPL mode, you have access to:
 - **Smart Search**: Type queries and get intelligent suggestions from the rolegraph
 - **VM Management**: Control Firecracker VMs for isolated operations
 - **Web Operations**: Perform web requests through secure VM sandboxing
@@ -359,7 +372,7 @@ Intelligent file operations with semantic understanding and analysis:
 
 | Variable | Required | Default | Description |
 |----------|----------|---------|-------------|
-| `TERRAPHIM_SERVER` | Yes | `http://localhost:8000` | URL of the Terraphim server |
+| `TERRAPHIM_SERVER` | Mode-dependent | `http://localhost:8000` | Server URL used by fullscreen TUI and `--server` mode |
 | `OPENROUTER_KEY` | No | None | OpenRouter API key for chat functionality |
 | `OLLAMA_BASE_URL` | No | `http://127.0.0.1:11434` | Ollama server URL for local models |
 | `VM_STORAGE_PATH` | No | `./vm-storage` | Directory for VM disk images |
@@ -406,7 +419,7 @@ export MCP_AUTH_TOKEN=your-mcp-token
 
 ### Server Requirements
 
-The TUI requires a running Terraphim server with the following endpoints:
+Fullscreen TUI mode and `--server` mode require a running Terraphim server with the following endpoints:
 - `/config` - Configuration management
 - `/config/selected_role` - Role selection
 - `/documents/search` - Document search

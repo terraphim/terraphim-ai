@@ -1,6 +1,9 @@
 # Terraphim TUI
 
-Terraphim includes a comprehensive terminal user interface (TUI) that provides both interactive REPL functionality and CLI commands for advanced operations including VM management, web operations, and intelligent file operations with semantic awareness.
+Terraphim includes a terminal interface with three execution modes:
+- Fullscreen TUI (`terraphim-agent`) - server-backed interactive UI
+- REPL (`terraphim-agent repl`) - offline-capable by default
+- CLI subcommands (`terraphim-agent <command>`) - offline-capable by default unless `--server` is used
 
 ## Installation
 
@@ -34,13 +37,19 @@ export TERRAPHIM_SERVER=http://localhost:8000
 - `repl-sessions` - AI coding session history search (Claude Code, Cursor, Aider)
 - `repl-full` - All features enabled (recommended)
 
-## Interactive REPL Mode
+## Interactive Modes
 
 ```bash
+# Fullscreen TUI (server-backed)
 terraphim-agent
+
+# REPL (offline-capable)
+terraphim-agent repl
 ```
 
-The TUI provides a comprehensive REPL (Read-Eval-Print Loop) with access to all features:
+Use `terraphim-agent repl --server --server-url http://localhost:8000` for server-backed REPL.
+
+REPL mode provides access to all slash commands below:
 
 **Navigation and Help:**
 - `/help` - Show all available commands
@@ -125,6 +134,9 @@ Traditional CLI commands are also supported:
 
 ## Behavior
 
+- `terraphim-agent` (no args) runs fullscreen TUI and requires a reachable server.
+- `terraphim-agent repl` runs REPL offline by default (or server mode with `--server`).
+- CLI subcommands (for example `search`, `config`, `roles`) run offline-capable mode by default.
 - Uses `/config`, `/config/selected_role`, `/documents/search`, and `/rolegraph` endpoints.
 - Chat posts to `/chat` (requires server compiled with openrouter feature and configured role or `OPENROUTER_KEY`).
 - VM operations require Firecracker integration and proper system permissions.

@@ -77,6 +77,12 @@
 //! );
 //! ```
 
+// Medical types module (feature-gated)
+#[cfg(feature = "medical")]
+pub mod medical_types;
+#[cfg(feature = "medical")]
+pub use medical_types::*;
+
 // HGNC Gene Normalization module (feature-gated)
 #[cfg(feature = "hgnc")]
 pub mod hgnc;
@@ -494,6 +500,10 @@ pub struct Edge {
     pub rank: u64,
     /// A hashmap of `document_id` to `rank`
     pub doc_hash: AHashMap<String, u64>,
+    /// Medical edge type (only available with the `medical` feature)
+    #[cfg(feature = "medical")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub edge_type: Option<medical_types::MedicalEdgeType>,
 }
 
 impl Edge {
@@ -504,6 +514,8 @@ impl Edge {
             id,
             rank: 1,
             doc_hash,
+            #[cfg(feature = "medical")]
+            edge_type: None,
         }
     }
 }
@@ -519,6 +531,18 @@ pub struct Node {
     pub rank: u64,
     /// List of connected edges
     pub connected_with: HashSet<u64>,
+    /// Medical node type (only available with the `medical` feature)
+    #[cfg(feature = "medical")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub node_type: Option<medical_types::MedicalNodeType>,
+    /// Human-readable term for this node (only available with the `medical` feature)
+    #[cfg(feature = "medical")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub term: Option<String>,
+    /// SNOMED CT concept identifier (only available with the `medical` feature)
+    #[cfg(feature = "medical")]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snomed_id: Option<u64>,
 }
 
 impl Node {
@@ -530,6 +554,12 @@ impl Node {
             id,
             rank: 1,
             connected_with,
+            #[cfg(feature = "medical")]
+            node_type: None,
+            #[cfg(feature = "medical")]
+            term: None,
+            #[cfg(feature = "medical")]
+            snomed_id: None,
         }
     }
 
