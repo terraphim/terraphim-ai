@@ -37,7 +37,10 @@ pub use metrics::{RouterMetrics, Timer};
 #[cfg(feature = "persistence")]
 pub use registry::PersistedProviderRegistry;
 pub use registry::ProviderRegistry;
-pub use strategy::{CapabilityFirst, CostOptimized, LatencyOptimized, RoundRobin, RoutingStrategy};
+pub use strategy::{
+    CapabilityFirst, CostOptimized, LatencyOptimized, PreferenceFilter, RoundRobin,
+    RoutingStrategy, StrategyRegistry, WeightedStrategy,
+};
 pub use types::{RoutingContext, RoutingDecision, RoutingError, RoutingResult};
 
 /// Re-export capability types for convenience
