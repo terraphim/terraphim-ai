@@ -20,6 +20,8 @@
 //! }
 //! ```
 
+#[cfg(feature = "file-watch")]
+pub mod discovery;
 pub mod engine;
 pub mod fallback;
 pub mod keyword;
@@ -29,6 +31,8 @@ pub mod registry;
 pub mod strategy;
 pub mod types;
 
+#[cfg(feature = "file-watch")]
+pub use discovery::ProviderDirectoryWatcher;
 pub use engine::{Router, RoutingEngine};
 pub use fallback::{FallbackRouter, FallbackStrategy};
 pub use keyword::KeywordRouter;
@@ -36,7 +40,7 @@ pub use knowledge_graph::KnowledgeGraphRouter;
 pub use metrics::{RouterMetrics, Timer};
 #[cfg(feature = "persistence")]
 pub use registry::PersistedProviderRegistry;
-pub use registry::ProviderRegistry;
+pub use registry::{ProviderRegistry, RegistryEvent};
 pub use strategy::{
     CapabilityFirst, CostOptimized, LatencyOptimized, PreferenceFilter, RoundRobin,
     RoutingStrategy, StrategyRegistry, WeightedStrategy,

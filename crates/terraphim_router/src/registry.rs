@@ -7,6 +7,7 @@ use crate::types::RoutingError;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};
+use tokio::sync::broadcast;
 
 #[cfg(feature = "persistence")]
 use async_trait::async_trait;
@@ -15,11 +16,26 @@ use serde::{Deserialize, Serialize};
 #[cfg(feature = "persistence")]
 use terraphim_persistence::Persistable;
 
+/// Events emitted when the provider registry changes.
+#[derive(Debug, Clone)]
+pub enum RegistryEvent {
+    /// A provider was added to the registry.
+    ProviderAdded { provider_id: String },
+    /// A provider was removed from the registry.
+    ProviderRemoved { provider_id: String },
+    /// Providers were reloaded from a directory.
+    ProvidersReloaded { count: usize },
+}
+
 /// Registry of capability providers loaded from markdown files
 #[derive(Debug, Clone, Default)]
 pub struct ProviderRegistry {
     providers: HashMap<String, Provider>,
     source_path: Option<PathBuf>,
+    /// Optional broadcast sender for registry change events.
+    /// Wrapped in Option to avoid requiring Clone on broadcast::Sender
+    /// when using the Default derive.
+    change_sender: Option<broadcast::Sender<RegistryEvent>>,
 }
 
 /// Parsed markdown file with YAML frontmatter
@@ -62,6 +78,7 @@ impl ProviderRegistry {
         Self {
             providers: HashMap::new(),
             source_path: None,
+            change_sender: None,
         }
     }
 
@@ -70,12 +87,32 @@ impl ProviderRegistry {
         Self {
             providers: HashMap::new(),
             source_path: Some(path.into()),
+            change_sender: None,
         }
+    }
+
+    /// Enable change notifications with the given channel capacity.
+    pub fn with_change_notifications(mut self, capacity: usize) -> Self {
+        let (sender, _) = broadcast::channel(capacity);
+        self.change_sender = Some(sender);
+        self
+    }
+
+    /// Subscribe to registry change events.
+    ///
+    /// Returns `None` if change notifications were not enabled
+    /// via [`with_change_notifications`].
+    pub fn subscribe_changes(&self) -> Option<broadcast::Receiver<RegistryEvent>> {
+        self.change_sender.as_ref().map(|s| s.subscribe())
     }
 
     /// Add a provider to the registry
     pub fn add_provider(&mut self, provider: Provider) {
-        self.providers.insert(provider.id.clone(), provider);
+        let id = provider.id.clone();
+        self.providers.insert(id.clone(), provider);
+        if let Some(sender) = &self.change_sender {
+            let _ = sender.send(RegistryEvent::ProviderAdded { provider_id: id });
+        }
     }
 
     /// Get a provider by ID
@@ -90,7 +127,15 @@ impl ProviderRegistry {
 
     /// Remove a provider by ID (in-memory only, not persisted).
     pub fn remove_provider(&mut self, id: &str) -> Option<Provider> {
-        self.providers.remove(id)
+        let removed = self.providers.remove(id);
+        if removed.is_some() {
+            if let Some(sender) = &self.change_sender {
+                let _ = sender.send(RegistryEvent::ProviderRemoved {
+                    provider_id: id.to_string(),
+                });
+            }
+        }
+        removed
     }
 
     /// Get all providers
@@ -117,7 +162,7 @@ impl ProviderRegistry {
     /// Load providers from a directory of markdown files
     pub async fn load_from_dir(&mut self, dir: impl AsRef<Path>) -> Result<usize, RoutingError> {
         let dir = dir.as_ref();
-        let _span = tracing::info_span!("router.registry.load", directory = ?dir).entered();
+        tracing::info!(directory = ?dir, "Loading providers from directory");
         let mut count = 0;
 
         // Read directory entries
@@ -156,6 +201,12 @@ impl ProviderRegistry {
                         );
                     }
                 }
+            }
+        }
+
+        if count > 0 {
+            if let Some(sender) = &self.change_sender {
+                let _ = sender.send(RegistryEvent::ProvidersReloaded { count });
             }
         }
 
@@ -328,6 +379,7 @@ impl ProviderRegistry {
         Ok(Self {
             providers,
             source_path: None,
+            change_sender: None,
         })
     }
 
@@ -560,6 +612,53 @@ This is a test.
 
         assert_eq!(count, 1);
         assert!(registry.get("test-provider").is_some());
+    }
+
+    #[test]
+    fn test_registry_change_notifications() {
+        let mut registry = ProviderRegistry::new().with_change_notifications(16);
+        let mut rx = registry.subscribe_changes().unwrap();
+
+        // Add a provider
+        let provider = Provider::new(
+            "test-llm",
+            "Test LLM",
+            ProviderType::Llm {
+                model_id: "gpt-4".to_string(),
+                api_endpoint: "https://api.openai.com".to_string(),
+            },
+            vec![Capability::CodeGeneration],
+        );
+        registry.add_provider(provider);
+
+        match rx.try_recv() {
+            Ok(RegistryEvent::ProviderAdded { provider_id }) => {
+                assert_eq!(provider_id, "test-llm");
+            }
+            other => panic!("Expected ProviderAdded, got {:?}", other),
+        }
+
+        // Remove the provider
+        let removed = registry.remove_provider("test-llm");
+        assert!(removed.is_some());
+
+        match rx.try_recv() {
+            Ok(RegistryEvent::ProviderRemoved { provider_id }) => {
+                assert_eq!(provider_id, "test-llm");
+            }
+            other => panic!("Expected ProviderRemoved, got {:?}", other),
+        }
+
+        // Remove non-existent -- no event
+        let removed = registry.remove_provider("nonexistent");
+        assert!(removed.is_none());
+        assert!(rx.try_recv().is_err());
+    }
+
+    #[test]
+    fn test_subscribe_changes_none_when_not_enabled() {
+        let registry = ProviderRegistry::new();
+        assert!(registry.subscribe_changes().is_none());
     }
 
     // Persistence tests -- use real DeviceStorage with memory backend
