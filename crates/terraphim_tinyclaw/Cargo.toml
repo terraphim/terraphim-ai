@@ -18,7 +18,7 @@ tokio-util = { version = "0.7", features = ["rt"] }
 # Serialization
 serde = { workspace = true }
 serde_json = { workspace = true }
-toml = "0.8"
+toml = "0.9"
 
 # HTTP client
 reqwest = { workspace = true }
