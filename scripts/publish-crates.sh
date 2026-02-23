@@ -193,11 +193,13 @@ update_versions() {
     if [[ -f "$crate_path" ]]; then
       log_info "Updating $crate to version $VERSION"
 
-      # Update version in Cargo.toml
+      # Update ONLY the [package] version in Cargo.toml (first occurrence).
+      # Using 0,/pattern/ (GNU sed) or 1,/pattern/ (BSD sed) to avoid
+      # corrupting dependency version lines in [dependencies.X] sections.
       if [[ "$OSTYPE" == "darwin"* ]]; then
-        sed -i '' "s/^version = \".*\"/version = \"$VERSION\"/" "$crate_path"
+        sed -i '' '1,/^version = ".*"/s/^version = ".*"/version = "'"$VERSION"'"/' "$crate_path"
       else
-        sed -i "s/^version = \".*\"/version = \"$VERSION\"/" "$crate_path"
+        sed -i '0,/^version = ".*"/s/^version = ".*"/version = "'"$VERSION"'"/' "$crate_path"
       fi
 
       # Update workspace dependencies
