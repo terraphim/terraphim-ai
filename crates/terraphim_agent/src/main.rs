@@ -831,6 +831,42 @@ async fn run_offline_command(command: Command) -> Result<()> {
         return Ok(());
     }
 
+    // CheckUpdate is stateless - handle before TuiService initialization
+    if let Command::CheckUpdate = &command {
+        println!("Checking for terraphim-agent updates...");
+        match check_for_updates("terraphim-agent").await {
+            Ok(status) => {
+                println!("{}", status);
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Failed to check for updates: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    // Update is stateless - handle before TuiService initialization
+    if let Command::Update = &command {
+        println!("Updating terraphim-agent...");
+        match update_binary("terraphim-agent").await {
+            Ok(status) => {
+                println!("{}", status);
+                return Ok(());
+            }
+            Err(e) => {
+                eprintln!("Update failed: {}", e);
+                std::process::exit(1);
+            }
+        }
+    }
+
+    // Learn is stateless - handle before TuiService initialization.
+    // Must be last early-return because it consumes `command` via destructuring.
+    if let Command::Learn { sub } = command {
+        return run_learn_command(sub).await;
+    }
+
     let service = TuiService::new().await?;
 
     match command {
@@ -1506,155 +1542,13 @@ async fn run_offline_command(command: Command) -> Result<()> {
             Ok(())
         }
         Command::CheckUpdate => {
-            println!("Checking for terraphim-agent updates...");
-            match check_for_updates("terraphim-agent").await {
-                Ok(status) => {
-                    println!("{}", status);
-                    Ok(())
-                }
-                Err(e) => {
-                    eprintln!("Failed to check for updates: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            unreachable!("CheckUpdate command should be handled before TuiService initialization")
         }
         Command::Update => {
-            println!("Updating terraphim-agent...");
-            match update_binary("terraphim-agent").await {
-                Ok(status) => {
-                    println!("{}", status);
-                    Ok(())
-                }
-                Err(e) => {
-                    eprintln!("Update failed: {}", e);
-                    std::process::exit(1);
-                }
-            }
+            unreachable!("Update command should be handled before TuiService initialization")
         }
-        Command::Learn { sub } => {
-            use learnings::{
-                LearningCaptureConfig, capture_failed_command, correct_learning, list_learnings,
-                query_learnings,
-            };
-            let config = LearningCaptureConfig::default();
-
-            match sub {
-                LearnSub::Capture {
-                    command,
-                    error,
-                    exit_code,
-                    debug,
-                } => {
-                    if debug {
-                        eprintln!(
-                            "Capturing learning: command='{}', exit_code={}",
-                            command, exit_code
-                        );
-                    }
-                    match capture_failed_command(&command, &error, exit_code, &config) {
-                        Ok(path) => {
-                            println!("Captured learning: {}", path.display());
-                            Ok(())
-                        }
-                        Err(e) => {
-                            if debug {
-                                eprintln!("Failed to capture learning: {}", e);
-                            }
-                            Err(e.into())
-                        }
-                    }
-                }
-                LearnSub::List { recent, global } => {
-                    let storage_loc = config.storage_location();
-                    let storage_dir = if global {
-                        &config.global_dir
-                    } else {
-                        &storage_loc
-                    };
-                    match list_learnings(storage_dir, recent) {
-                        Ok(learnings) => {
-                            if learnings.is_empty() {
-                                println!("No learnings found.");
-                            } else {
-                                println!("Recent learnings:");
-                                for (i, learning) in learnings.iter().enumerate() {
-                                    let source_indicator = match learning.source {
-                                        learnings::LearningSource::Project => "[P]",
-                                        learnings::LearningSource::Global => "[G]",
-                                    };
-                                    println!(
-                                        "  {}. {} {} (exit: {})",
-                                        i + 1,
-                                        source_indicator,
-                                        learning.command,
-                                        learning.exit_code
-                                    );
-                                    if let Some(ref correction) = learning.correction {
-                                        println!("     Correction: {}", correction);
-                                    }
-                                }
-                            }
-                            Ok(())
-                        }
-                        Err(e) => Err(e.into()),
-                    }
-                }
-                LearnSub::Query {
-                    pattern,
-                    exact,
-                    global,
-                } => {
-                    let storage_loc = config.storage_location();
-                    let storage_dir = if global {
-                        &config.global_dir
-                    } else {
-                        &storage_loc
-                    };
-                    match query_learnings(storage_dir, &pattern, exact) {
-                        Ok(learnings) => {
-                            if learnings.is_empty() {
-                                println!("No learnings matching '{}'.", pattern);
-                            } else {
-                                println!("Learnings matching '{}':", pattern);
-                                for learning in learnings {
-                                    let source_indicator = match learning.source {
-                                        learnings::LearningSource::Project => "[P]",
-                                        learnings::LearningSource::Global => "[G]",
-                                    };
-                                    println!(
-                                        "  {} {} (exit: {})",
-                                        source_indicator, learning.command, learning.exit_code
-                                    );
-                                    if let Some(ref correction) = learning.correction {
-                                        println!("     Correction: {}", correction);
-                                    }
-                                }
-                            }
-                            Ok(())
-                        }
-                        Err(e) => Err(e.into()),
-                    }
-                }
-                LearnSub::Correct { id, correction } => {
-                    let storage_loc = config.storage_location();
-                    match correct_learning(&storage_loc, &id, &correction) {
-                        Ok(path) => {
-                            println!("Correction added to learning {}: {}", id, path.display());
-                            Ok(())
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to add correction: {}", e);
-                            Err(e.into())
-                        }
-                    }
-                }
-                LearnSub::Hook { format } => learnings::process_hook_input(format)
-                    .await
-                    .map_err(|e| e.into()),
-                LearnSub::InstallHook { agent } => {
-                    learnings::install_hook(agent).await.map_err(|e| e.into())
-                }
-            }
+        Command::Learn { .. } => {
+            unreachable!("Learn command should be handled before TuiService initialization")
         }
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
@@ -1663,6 +1557,132 @@ async fn run_offline_command(command: Command) -> Result<()> {
         #[cfg(feature = "repl")]
         Command::Repl { .. } => {
             unreachable!("REPL mode should be handled above")
+        }
+    }
+}
+
+async fn run_learn_command(sub: LearnSub) -> Result<()> {
+    use learnings::{
+        LearningCaptureConfig, capture_failed_command, correct_learning, list_learnings,
+        query_learnings,
+    };
+    let config = LearningCaptureConfig::default();
+
+    match sub {
+        LearnSub::Capture {
+            command,
+            error,
+            exit_code,
+            debug,
+        } => {
+            if debug {
+                eprintln!(
+                    "Capturing learning: command='{}', exit_code={}",
+                    command, exit_code
+                );
+            }
+            match capture_failed_command(&command, &error, exit_code, &config) {
+                Ok(path) => {
+                    println!("Captured learning: {}", path.display());
+                    Ok(())
+                }
+                Err(e) => {
+                    if debug {
+                        eprintln!("Failed to capture learning: {}", e);
+                    }
+                    Err(e.into())
+                }
+            }
+        }
+        LearnSub::List { recent, global } => {
+            let storage_loc = config.storage_location();
+            let storage_dir = if global {
+                &config.global_dir
+            } else {
+                &storage_loc
+            };
+            match list_learnings(storage_dir, recent) {
+                Ok(learnings) => {
+                    if learnings.is_empty() {
+                        println!("No learnings found.");
+                    } else {
+                        println!("Recent learnings:");
+                        for (i, learning) in learnings.iter().enumerate() {
+                            let source_indicator = match learning.source {
+                                learnings::LearningSource::Project => "[P]",
+                                learnings::LearningSource::Global => "[G]",
+                            };
+                            println!(
+                                "  {}. {} {} (exit: {})",
+                                i + 1,
+                                source_indicator,
+                                learning.command,
+                                learning.exit_code
+                            );
+                            if let Some(ref correction) = learning.correction {
+                                println!("     Correction: {}", correction);
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
+            }
+        }
+        LearnSub::Query {
+            pattern,
+            exact,
+            global,
+        } => {
+            let storage_loc = config.storage_location();
+            let storage_dir = if global {
+                &config.global_dir
+            } else {
+                &storage_loc
+            };
+            match query_learnings(storage_dir, &pattern, exact) {
+                Ok(learnings) => {
+                    if learnings.is_empty() {
+                        println!("No learnings matching '{}'.", pattern);
+                    } else {
+                        println!("Learnings matching '{}':", pattern);
+                        for learning in learnings {
+                            let source_indicator = match learning.source {
+                                learnings::LearningSource::Project => "[P]",
+                                learnings::LearningSource::Global => "[G]",
+                            };
+                            println!(
+                                "  {} {} (exit: {})",
+                                source_indicator, learning.command, learning.exit_code
+                            );
+                            if let Some(ref correction) = learning.correction {
+                                println!("     Correction: {}", correction);
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
+            }
+        }
+        LearnSub::Correct { id, correction } => {
+            let storage_loc = config.storage_location();
+            match correct_learning(&storage_loc, &id, &correction) {
+                Ok(path) => {
+                    println!("Correction added to learning {}: {}", id, path.display());
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("Failed to add correction: {}", e);
+                    Err(e.into())
+                }
+            }
+        }
+        LearnSub::Hook { format } => learnings::process_hook_input(format)
+            .await
+            .map_err(|e| e.into()),
+        LearnSub::InstallHook { agent } => {
+            learnings::install_hook(agent).await.map_err(|e| e.into())
         }
     }
 }
@@ -2120,132 +2140,7 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
             }
             Ok(())
         }
-        Command::Learn { sub } => {
-            // Learn command works the same in server mode - no server needed
-            use learnings::{
-                LearningCaptureConfig, capture_failed_command, correct_learning, list_learnings,
-                query_learnings,
-            };
-            let config = LearningCaptureConfig::default();
-
-            match sub {
-                LearnSub::Capture {
-                    command,
-                    error,
-                    exit_code,
-                    debug,
-                } => {
-                    if debug {
-                        eprintln!(
-                            "Capturing learning: command='{}', exit_code={}",
-                            command, exit_code
-                        );
-                    }
-                    match capture_failed_command(&command, &error, exit_code, &config) {
-                        Ok(path) => {
-                            println!("Captured learning: {}", path.display());
-                            Ok(())
-                        }
-                        Err(e) => {
-                            if debug {
-                                eprintln!("Failed to capture learning: {}", e);
-                            }
-                            Err(e.into())
-                        }
-                    }
-                }
-                LearnSub::List { recent, global } => {
-                    let storage_loc = config.storage_location();
-                    let storage_dir = if global {
-                        &config.global_dir
-                    } else {
-                        &storage_loc
-                    };
-                    match list_learnings(storage_dir, recent) {
-                        Ok(learnings) => {
-                            if learnings.is_empty() {
-                                println!("No learnings found.");
-                            } else {
-                                println!("Recent learnings:");
-                                for (i, learning) in learnings.iter().enumerate() {
-                                    let source_indicator = match learning.source {
-                                        learnings::LearningSource::Project => "[P]",
-                                        learnings::LearningSource::Global => "[G]",
-                                    };
-                                    println!(
-                                        "  {}. {} {} (exit: {})",
-                                        i + 1,
-                                        source_indicator,
-                                        learning.command,
-                                        learning.exit_code
-                                    );
-                                    if let Some(ref correction) = learning.correction {
-                                        println!("     Correction: {}", correction);
-                                    }
-                                }
-                            }
-                            Ok(())
-                        }
-                        Err(e) => Err(e.into()),
-                    }
-                }
-                LearnSub::Query {
-                    pattern,
-                    exact,
-                    global,
-                } => {
-                    let storage_loc = config.storage_location();
-                    let storage_dir = if global {
-                        &config.global_dir
-                    } else {
-                        &storage_loc
-                    };
-                    match query_learnings(storage_dir, &pattern, exact) {
-                        Ok(learnings) => {
-                            if learnings.is_empty() {
-                                println!("No learnings matching '{}'.", pattern);
-                            } else {
-                                println!("Learnings matching '{}':", pattern);
-                                for learning in learnings {
-                                    let source_indicator = match learning.source {
-                                        learnings::LearningSource::Project => "[P]",
-                                        learnings::LearningSource::Global => "[G]",
-                                    };
-                                    println!(
-                                        "  {} {} (exit: {})",
-                                        source_indicator, learning.command, learning.exit_code
-                                    );
-                                    if let Some(ref correction) = learning.correction {
-                                        println!("     Correction: {}", correction);
-                                    }
-                                }
-                            }
-                            Ok(())
-                        }
-                        Err(e) => Err(e.into()),
-                    }
-                }
-                LearnSub::Correct { id, correction } => {
-                    let storage_loc = config.storage_location();
-                    match correct_learning(&storage_loc, &id, &correction) {
-                        Ok(path) => {
-                            println!("Correction added to learning {}: {}", id, path.display());
-                            Ok(())
-                        }
-                        Err(e) => {
-                            eprintln!("Failed to add correction: {}", e);
-                            Err(e.into())
-                        }
-                    }
-                }
-                LearnSub::Hook { format } => learnings::process_hook_input(format)
-                    .await
-                    .map_err(|e| e.into()),
-                LearnSub::InstallHook { agent } => {
-                    learnings::install_hook(agent).await.map_err(|e| e.into())
-                }
-            }
-        }
+        Command::Learn { sub } => run_learn_command(sub).await,
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }

@@ -514,7 +514,7 @@ impl ConfigBuilder {
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
                 input_type: KnowledgeGraphInputType::Markdown,
-                path: PathBuf::from("docs/src/kg"),
+                path: self.get_default_data_path().join("kg"),
             }),
             public: true,
             publish: true,
