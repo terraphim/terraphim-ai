@@ -1,200 +1,119 @@
-# Handover: 2026-02-21 - PR #543 Pushed and Open
+# Handover: 2026-02-23 - v1.10.0 Release Fully Published
 
-**PR**: https://github.com/terraphim/terraphim-ai/pull/543
+**Branch**: `main` (at `dd2ee59c`)
+**Release**: v1.10.0 -- https://github.com/terraphim/terraphim-ai/releases/tag/v1.10.0
 
 ---
 
-# Previous Session: multi_agent_implementation completion
-
 ## Session Summary
 
-Applied disciplined research + design methodology to audit and complete the
-`terraphim_multi_agent` implementation, validate examples end-to-end, and fix
-all correctness/quality issues identified.
+Fixed the remaining crates.io publish failure for v1.10.0. The publish script's `update_versions` function had an overly broad `sed` pattern that corrupted dependency versions in multi-line `[dependencies.X]` blocks.
 
 ---
 
 ## What Was Done
 
-### Phase 1: Research (disciplined-research skill)
+### 1. Fixed crates.io Publish Script (PR #574, merged)
 
-Audited all relevant files:
+**Problem**: The `update_versions()` function in `scripts/publish-crates.sh` used `sed -i "s/^version = \".*\"/version = \"$VERSION\"/"` which replaced ALL lines starting with `version = "` -- not just the `[package]` version. This changed `notify`'s version from `"6.1"` to `"1.10.0"` in `terraphim_router/Cargo.toml`, causing `cargo publish` to fail with:
+```
+error: failed to select a version for the requirement `notify = "^1.10.0"`
+```
 
-| File | Finding |
-|------|---------|
-| `ontology_agents.rs` | LLM prompt used `"exact|fuzzy|graphrank"` — wrong |
-| `ontology_workflow.rs` | LLM prompt used `"exact|similarity|fuzzy"` — wrong |
-| `prompt_sanitizer.rs` | `UNICODE_SPECIAL_CHARS: Vec<char>` — O(n) lookup per char |
-| `gateway_dispatch.rs` | `get_sent_messages` never called — needed implementation |
-| `kg_normalization.rs` | Hardcoded macOS path `/Users/alex/cto-executive-system/knowledge` |
+**Fix**: Changed the `sed` command to use range addressing (`0,/pattern/` on GNU, `1,/pattern/` on BSD) so only the first occurrence (the `[package]` version line) gets replaced.
 
-### Phase 2: Design (disciplined-design skill)
+**File changed**: `scripts/publish-crates.sh` (lines 196-203)
 
-Four targeted fixes designed (no scope creep):
+### 2. Re-tagged v1.10.0 and Triggered Release
 
-1. Fix `NormalizationMethod` prompt strings — `"graph_rank"` is the correct serde snake_case
-2. Fix `UNICODE_SPECIAL_CHARS` — `Vec<char>` → `HashSet<char>` for O(1) lookup
-3. Implement `get_sent_messages` — refactor `new()` to return `Self` only
-4. Fix `kg_normalization` corpus path — use `docs/src/kg` from this repo
+- Deleted remote tag `v1.10.0`
+- Re-tagged at `dd2ee59c` (includes all three CI fixes)
+- Deleted orphaned draft release
+- Triggered workflow run 22303128846
 
-### Phase 3: Implementation (disciplined-implementation skill)
+### 3. Verified Full Release Success
 
-#### Commit 1: `2c4a5d84`
-`fix(multi-agent): correct NormalizationMethod prompt values and performance`
+All critical jobs in run 22303128846 completed successfully:
 
-- `ontology_agents.rs`: `"exact|fuzzy|graphrank"` → `"exact|fuzzy|graph_rank"`
-- `ontology_workflow.rs`: `"exact|similarity|fuzzy"` → `"exact|fuzzy|graph_rank"`
-- `prompt_sanitizer.rs`: `Vec<char>` → `std::collections::HashSet<char>` with
-  `.iter().copied().collect()` in `lazy_static!`
+| Job | Status | Duration |
+|-----|--------|----------|
+| Verify version consistency | PASS | 23s |
+| Build binaries (all 7 targets) | PASS | 3m36s - 9m54s |
+| Build Debian packages | PASS | 5m0s |
+| Build Tauri desktop (all 3 platforms) | PASS | 9m40s - 17m31s |
+| Create macOS universal binaries | PASS | 35s |
+| Sign and notarize macOS binaries | PASS | 2m48s |
+| Create GitHub release | PASS | 25s |
+| **Publish Rust crates to crates.io** | **PASS** | **8m34s** |
+| Update Homebrew formulas | PASS | 5s |
+| Docker 20.04 | Still running | Self-hosted runner |
+| Docker 22.04 | Still running | Self-hosted runner |
 
-#### Commit 2: `caab0644`
-`refactor(tinyclaw): implement get_sent_messages in gateway_dispatch tests`
+---
 
-- `MockChannel::new()` now returns `Self` (not a tuple)
-- All tests call `mock.get_sent_messages()` before `channel_manager.register(Box::new(mock))`
-- `get_sent_messages` is now genuinely required — no `#[allow(dead_code)]`
-- Fixed pre-existing clippy lint: removed needless `&` on `format!()`
+## PRs Merged This Session (cumulative across both sessions)
 
-#### Commit 3: `7e6cd571`
-`fix(types): use repo docs/src/kg as corpus path in kg_normalization example`
-
-- Replaced hardcoded `/Users/alex/cto-executive-system/knowledge`
-- Uses `concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/src/kg")`
-- Example now loads 59 documents, builds 80-term ontology, runs end-to-end
+| PR | Title | Fix |
+|----|-------|-----|
+| #558 | fix(docker): use pre-built frontend assets | Replaced in-container Node.js build with CI-built assets |
+| #565 | fix(ci): use 7z instead of zip for Windows | Replaced `zip -j` with `7z a -tzip` |
+| #573 | fix(ci): add missing version fields for crates.io | Added `version` to path deps, added new crates to publish list |
+| #574 | fix(ci): scope publish script version sed to package section only | Scoped sed to first `version =` line only |
 
 ---
 
 ## Current State
 
-### Branch: `pr529`
-
 ```
-7e6cd571 fix(types): use repo docs/src/kg as corpus path in kg_normalization example
-caab0644 refactor(tinyclaw): implement get_sent_messages in gateway_dispatch tests
-2c4a5d84 fix(multi-agent): correct NormalizationMethod prompt values and performance
-dd4881be chore(workspace): exclude desktop/src-tauri from cargo workspace
-3a23608e docs: add handover and lessons learned for 2026-02-21 branch recovery
-206959cb fix(multi-agent): add hgnc feature gate and gitignore cachebro
-d1a4bfa9 code_review(tinyclaw): add comprehensive_rust docs
-6a5359d7 fix(tinyclaw): remove token logging from Telegram channel
-b0e96bb9 code_review(tinyclaw): add gateway outbound dispatch tests
-1226699b security(tinyclaw): remove token logging from Telegram and Discord
-  --- (upstream/main base at 541d04fc) ---
+Branch: main
+HEAD:   dd2ee59c fix(ci): scope publish script version sed to package section only (#574)
+Working tree: modified HANDOVER.md, lessons-learned.md (uncommitted)
 ```
-
-10 commits ahead of `upstream/main`.
-
-### Test Status
-
-| Suite | Result |
-|-------|--------|
-| `terraphim_types` (no features) | 25/25 pass |
-| `terraphim_types --features hgnc` | 31/31 pass |
-| `terraphim_multi_agent` | 69/69 pass |
-| `terraphim_multi_agent --features hgnc` | full suite pass |
-| `ontology_integration_test --features hgnc` | 8/8 pass |
-| `dos_prevention_test` | 8/8 pass (stable) |
-| `gateway_dispatch` | 4/4 pass |
-
-### Examples
-
-| Example | Status |
-|---------|--------|
-| `ontology_usage` (no features) | Compiles and runs |
-| `ontology_usage --features hgnc` | Compiles and runs — full HGNC pipeline |
-| `kg_normalization` | Compiles and runs — loads 59 docs from `docs/src/kg` |
-
-### Working Tree
-
-Only noise (cachebro SQLite files, `a.out`), both gitignored/untracked. Clean.
 
 ---
 
-## Current Status (2026-02-21, this session)
+## Blockers and Known Issues
 
-- PR #543 is open: https://github.com/terraphim/terraphim-ai/pull/543
-- Branch: `pr529` pushed to `upstream`
-- All modified crates pass: terraphim_multi_agent (69), terraphim_types (25/31), terraphim_tinyclaw (4)
-- `desktop_mcp_integration` test passes after workspace restoration
-- Pre-existing failures in `terraphim_agent::server_mode_tests` and `mcp_autocomplete_e2e_test` are NOT from our branch
+1. **Docker builds still running**: Both Docker 20.04 and 22.04 builds are pending on self-hosted runners. Not a code problem -- runner availability issue.
 
-### What was done this session
+2. **Tauri desktop bundles not produced**: All three Tauri builds pass, but no `.dmg`, `.AppImage`, `.deb`, `.msi`, or `.nsis` artifacts are uploaded. The Tauri bundle configuration may need updating.
 
-1. **Workspace restored**: `1226699b` incorrectly removed `terraphim_server`, `terraphim_firecracker`, `desktop/src-tauri`, `terraphim_ai_nodejs` from workspace members and changed `default-members`. Fixed in `e494f78b`.
-2. **Merged upstream/pr529**: Remote branch had 11 new commits from previous sessions (tinyclaw features, agent onboarding). Merged cleanly, resolving 5 conflicts:
-   - `.beads/issues.jsonl` → took upstream
-   - `.gitignore` → took upstream
-   - `crates/terraphim_rolegraph/Cargo.toml` → took upstream (adds tempfile)
-   - `crates/terraphim_rolegraph/examples/learning_via_negativa.rs` → took upstream
-   - `crates/terraphim_tinyclaw/src/channels/telegram.rs` → took upstream's new implementation + applied our security fix (remove token logging)
-3. **Pushed and opened PR**: `git push upstream pr529` succeeded, PR opened via `gh pr create`.
-
-### Next Steps
-
-- Await PR review from @terraphim maintainers
-- Address any review comments on PR #543
+3. **Diagnostics warnings** (non-blocking, pre-existing):
+   - `learning_via_negativa.rs`: unused imports, unused variables, dead code
+   - `advanced_routing.rs`: unused import `Latency`
+   - `unified_routing.rs`: unused variable `spawner`
 
 ---
 
-## Key Technical Context
+## Open Issues (Priority Order)
 
-### NormalizationMethod serde mapping
-
-```rust
-#[derive(Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum NormalizationMethod {
-    Exact,     // → "exact"
-    Fuzzy,     // → "fuzzy"
-    GraphRank, // → "graph_rank"  ← not "graphrank", not "similarity"
-}
-```
-
-LLM prompts must use `"exact|fuzzy|graph_rank"`. The previous prompts used
-`"graphrank"` and `"similarity"` — both would deserialize to `None` silently
-since grounding uses `.ok()`.
-
-### MockChannel pattern
-
-```rust
-// Correct pattern after this session's refactor:
-let ch = MockChannel::new("name");
-let msgs = ch.get_sent_messages(); // capture Arc BEFORE moving ch
-channel_manager.register(Box::new(ch)); // ch is moved here
-
-// msgs is still valid — Arc<Mutex<Vec<OutboundMessage>>>
-```
-
-### kg_normalization corpus path
-
-```rust
-// In examples, CARGO_MANIFEST_DIR points to the crate root.
-// docs/src/kg is at ../../docs/src/kg relative to terraphim_types/.
-let corpus_path = concat!(env!("CARGO_MANIFEST_DIR"), "/../../docs/src/kg");
-```
-
-### Remotes
-
-| Remote | URL | Use |
-|--------|-----|-----|
-| `origin` | `terraphim-ai-desktop.git` | Desktop-only fork — do NOT target for this PR |
-| `upstream` | `terraphim-ai.git` | Full monorepo — PR target |
-
-### dcg Safety Hook
-
-Intercepts `git restore`, `git checkout HEAD -- <path>`, `git reset --hard`.
-Workaround: `git show HEAD:<path>` + Write tool to recreate files.
+| Issue | Title | Priority |
+|-------|-------|----------|
+| #544 | Dynamic ontology extraction (parent) | High -- new feature |
+| #545 | CLI extract --schema outputs SchemaSignal | High -- child of #544 |
+| #546 | CLI coverage --schema --threshold --json | High -- child of #544 |
+| #547 | Define ontology schema file format | High -- child of #544 |
+| #548 | CLI extract includes GroundingMetadata | High -- child of #544 |
+| #566 | Cross-compile Windows binaries with cargo-xwin | Medium -- CI optimization |
+| #560 | TinyClaw: agent spawning via terraphim_spawner | Medium |
+| #561 | TinyClaw: Document standalone architecture | Low |
 
 ---
 
-## Files Changed This Session
+## Next Steps (Recommended Priority)
 
-| File | Change |
-|------|--------|
-| `crates/terraphim_multi_agent/src/agents/ontology_agents.rs` | Fix `"graphrank"` → `"graph_rank"` in normalization prompt |
-| `crates/terraphim_multi_agent/src/workflows/ontology_workflow.rs` | Fix `"similarity"` → `"graph_rank"` in normalization prompt |
-| `crates/terraphim_multi_agent/src/prompt_sanitizer.rs` | `Vec<char>` → `HashSet<char>` for unicode char set |
-| `crates/terraphim_tinyclaw/tests/gateway_dispatch.rs` | Refactor `MockChannel::new()` + implement `get_sent_messages` usage |
-| `crates/terraphim_types/examples/kg_normalization.rs` | Fix corpus path to `docs/src/kg` |
-| `HANDOVER.md` | This file |
-| `lessons-learned.md` | New entries appended |
+1. **Monitor Docker builds** -- Check if self-hosted runners complete the Docker 20.04/22.04 builds.
+
+2. **Implement issue #544** -- Design plan is complete and posted. Start with #547 (schema file format), then #545 (extract --schema), #546 (coverage --schema), #548 (grounding metadata).
+
+3. **Fix Tauri bundle packaging** -- Investigate why no desktop bundles (dmg/AppImage/msi) are produced despite successful builds.
+
+4. **Implement issue #566** (cargo-xwin) -- Lower priority, but will save CI costs long-term.
+
+---
+
+## Key Patterns Discovered This Session
+
+- **`sed` first-match-only addressing**: Use `0,/pattern/` (GNU) or `1,/pattern/` (BSD) to replace only the first occurrence. Critical when Cargo.toml files have `version = "..."` in both `[package]` and `[dependencies.X]` sections.
+- **Publish script version corruption**: The `update_versions()` function should never use a global `sed` replacement on `version = "..."` because multi-line dependency blocks have their own version lines.
+- **crates.io publish takes ~8-10 minutes**: 16 crates with 60-second delays between each.
