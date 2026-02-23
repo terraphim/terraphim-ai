@@ -49,6 +49,8 @@ CRATES=(
   "terraphim_automata"
   "terraphim_config"
   "terraphim_rolegraph"
+  "terraphim_router"
+  "terraphim_spawner"
   "terraphim_hooks"
   "terraphim-session-analyzer"
   "haystack_core"

@@ -9,7 +9,7 @@ repository = "https://github.com/terraphim/terraphim-ai"
 
 [dependencies]
 # Terraphim internal crates
-terraphim_types = { path = "../terraphim_types" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 
 # Core dependencies
 serde = { version = "1.0", features = ["derive"] }
@@ -28,6 +28,7 @@ dirs = "5.0"
 # Optional persistence support
 [dependencies.terraphim_persistence]
 path = "../terraphim_persistence"
+version = "1.0.0"
 optional = true
 
 # Optional file-watching support
