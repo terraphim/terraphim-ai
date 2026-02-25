@@ -773,6 +773,16 @@ enum ConfigSub {
     Set { key: String, value: String },
 }
 
+/// Get the session cache file path
+#[cfg(feature = "repl-sessions")]
+fn get_session_cache_path() -> std::path::PathBuf {
+    let cache_dir = dirs::cache_dir()
+        .unwrap_or_else(|| std::path::PathBuf::from("."))
+        .join("terraphim-agent");
+    std::fs::create_dir_all(&cache_dir).ok();
+    cache_dir.join("sessions.json")
+}
+
 #[cfg(feature = "repl-sessions")]
 #[derive(Subcommand, Debug)]
 enum SessionsSub {
@@ -1683,6 +1693,19 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
 
             let service = SessionService::new();
 
+            // Load cached sessions from disk
+            let cache_path = get_session_cache_path();
+            if cache_path.exists() {
+                if let Ok(data) = std::fs::read_to_string(&cache_path) {
+                    if let Ok(cached) =
+                        serde_json::from_str::<Vec<terraphim_sessions::Session>>(&data)
+                    {
+                        service.load_sessions(cached).await;
+                        println!("Loaded sessions from cache.");
+                    }
+                }
+            }
+
             match sub {
                 SessionsSub::Sources => {
                     let sources = service.detect_sources();
@@ -1712,6 +1735,11 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
                     };
                     match service.import_all(&options).await {
                         Ok(sessions) => {
+                            // Save to cache file
+                            let cache_path = get_session_cache_path();
+                            if let Ok(data) = serde_json::to_string_pretty(&sessions) {
+                                let _ = std::fs::write(&cache_path, data);
+                            }
                             println!("Imported {} sessions.", sessions.len());
                             Ok(())
                         }
@@ -1724,6 +1752,15 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
                         ..Default::default()
                     };
                     match service.import_from(&source, &options).await {
+                        Ok(sessions) => {
+                            // Save to cache file
+                            let cache_path = get_session_cache_path();
+                            if let Ok(data) = serde_json::to_string_pretty(&sessions) {
+                                let _ = std::fs::write(&cache_path, data);
+                            }
+                            println!("Imported {} sessions from {}.", sessions.len(), source);
+                            Ok(())
+                        }
                         Ok(sessions) => {
                             println!("Imported {} sessions from {}.", sessions.len(), source);
                             Ok(())
@@ -2457,6 +2494,11 @@ async fn run_server_command(
                         };
                         match service.import_all(&options).await {
                             Ok(sessions) => {
+                                // Save to cache file
+                                let cache_path = get_session_cache_path();
+                                if let Ok(data) = serde_json::to_string_pretty(&sessions) {
+                                    let _ = std::fs::write(&cache_path, data);
+                                }
                                 println!("Imported {} sessions.", sessions.len());
                                 Ok(())
                             }
@@ -2470,6 +2512,11 @@ async fn run_server_command(
                         };
                         match service.import_from(&source, &options).await {
                             Ok(sessions) => {
+                                // Save to cache file
+                                let cache_path = get_session_cache_path();
+                                if let Ok(data) = serde_json::to_string_pretty(&sessions) {
+                                    let _ = std::fs::write(&cache_path, data);
+                                }
                                 println!("Imported {} sessions from {}.", sessions.len(), source);
                                 Ok(())
                             }
