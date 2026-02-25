@@ -1,6 +1,5 @@
 VERSION --try --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
-IMPORT ../desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
 FROM ubuntu:24.04
 
@@ -18,7 +17,6 @@ END
 WORKDIR /code
 
 pipeline:
-  BUILD desktop+build
   BUILD +fmt
   BUILD +lint
   BUILD +test
@@ -44,7 +42,6 @@ install:
 source:
   FROM +install
   COPY --keep-ts --dir . .
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args=fetch --keep-fingerprints=true
   SAVE ARTIFACT dist as LOCAL /dist
 
@@ -67,5 +64,5 @@ lint:
   DO rust+CARGO --args="clippy --no-deps --all-features --all-targets"
 
 save-fe-local:
-  COPY desktop+build/dist ./dist
+  COPY ./dist ./dist
   SAVE ARTIFACT ./dist AS LOCAL ./dist

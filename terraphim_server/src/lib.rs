@@ -155,7 +155,7 @@ static INDEX_HTML: &str = "index.html";
 
 #[cfg(feature = "embedded-assets")]
 #[derive(RustEmbed)]
-#[folder = "../desktop/dist"]
+#[folder = "dist"]
 struct Assets;
 
 #[cfg(not(feature = "embedded-assets"))]

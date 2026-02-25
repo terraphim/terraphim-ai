@@ -28,8 +28,9 @@ NODE_VERSION="20"
 DESKTOP_DIR="$PROJECT_ROOT/desktop"
 
 if [[ ! -d "$DESKTOP_DIR" ]]; then
-    echo -e "${RED}❌ Desktop directory not found: $DESKTOP_DIR${NC}"
-    exit 1
+    echo -e "${YELLOW}⚠️  Desktop directory not found: $DESKTOP_DIR${NC}"
+    echo "Desktop build moved to terraphim-ai-desktop repository; skipping frontend check in this repo."
+    exit 0
 fi
 
 # Check if Node.js is installed and get version

@@ -1,6 +1,5 @@
 VERSION --cache-persist-option --global-cache 0.7
 PROJECT applied-knowledge-systems/terraphim-project
-IMPORT ./desktop AS desktop
 IMPORT github.com/earthly/lib/rust AS rust
 FROM ubuntu:20.04
 
@@ -18,7 +17,6 @@ END
 WORKDIR /code
 
 pipeline:
-  BUILD desktop+build
   BUILD +build-debug-native
   BUILD +fmt
   BUILD +lint
@@ -117,9 +115,7 @@ source-native:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
-  COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
-  COPY --keep-ts desktop+build/dist /code/desktop/dist
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs default crates ./
   RUN mkdir -p .cargo
   # Optimize cargo vendor for faster dependency resolution
   RUN CARGO_NET_RETRY=10 CARGO_NET_TIMEOUT=60 cargo vendor > .cargo/config.toml
@@ -154,8 +150,7 @@ source:
   WORKDIR /code
   CACHE --sharing shared --persist /code/vendor
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
-  COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs default crates ./
   RUN mkdir -p .cargo
   RUN cargo vendor > .cargo/config.toml
   DO rust+CARGO --args=fetch
@@ -164,7 +159,6 @@ cross-build:
   FROM +source
   ARG --required TARGET
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --keep-ts desktop+build/dist /code/terraphim_server/dist
   # Use cargo directly for musl targets, cross for others
   IF [ "$TARGET" = "x86_64-unknown-linux-musl" ]
     RUN --mount=$EARTHLY_RUST_CARGO_HOME_CACHE --mount=$EARTHLY_RUST_TARGET_CACHE \
@@ -210,7 +204,6 @@ build:
 build-debug:
   FROM +source
   DO rust+SET_CACHE_MOUNTS_ENV
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   DO rust+CARGO --args="build" --output="debug/[^/\.]+"
   RUN ./target/debug/terraphim_server --version
   SAVE ARTIFACT ./target/debug/terraphim_server AS LOCAL artifact/bin/terraphim_server_debug
@@ -241,8 +234,7 @@ build-focal:
   RUN DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true TZ=Etc/UTC apt-get install -yqq --no-install-recommends build-essential bison flex ca-certificates openssl libssl-dev bc wget git curl cmake pkg-config
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
-  COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs default crates ./
   RUN curl https://pkgx.sh | sh
   RUN pkgx +openssl cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_focal
@@ -258,15 +250,13 @@ build-jammy:
   # RUN rustup toolchain install stable
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs default crates ./
   IF [ "$CARGO_HOME" = "" ]
     ENV CARGO_HOME="$HOME/.cargo"
   END
   IF ! echo $PATH | grep -E -q "(^|:)$CARGO_HOME/bin($|:)"
     ENV PATH="$PATH:$CARGO_HOME/bin"
   END
-  RUN ./desktop/scripts/yarn_and_build.sh
-  # COPY --keep-ts desktop+build/dist /code/terraphim-server/dist
   RUN cargo build --release
   SAVE ARTIFACT /code/target/release/terraphim_server AS LOCAL artifact/bin/terraphim_server_jammy
 
@@ -320,7 +310,7 @@ docker-aarch64:
 
   WORKDIR /code
   COPY --keep-ts Cargo.toml Cargo.lock ./
-  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs desktop default crates ./
+  COPY --keep-ts --dir terraphim_server terraphim_firecracker terraphim_ai_nodejs default crates ./
 
   ENV CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc \
       CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc \

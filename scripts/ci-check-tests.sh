@@ -68,14 +68,11 @@ fi
 # Set environment variables
 export CARGO_TERM_COLOR="$CARGO_TERM_COLOR"
 
-# Create frontend dist directory if it doesn't exist (for integration tests)
-echo -e "${BLUE}📂 Setting up frontend dist directory...${NC}"
+# Ensure server assets directory exists (desktop moved to separate repository).
+echo -e "${BLUE}📂 Setting up server dist directory...${NC}"
 mkdir -p terraphim_server/dist
-if [[ -d desktop/dist ]]; then
-    echo "Copying frontend dist to terraphim_server..."
-    cp -r desktop/dist/* terraphim_server/dist/ || echo "No frontend files found to copy"
-else
-    echo "No desktop/dist found, creating placeholder"
+if [[ ! -f terraphim_server/dist/index.html ]]; then
+    echo "No terraphim_server/dist/index.html found, creating placeholder"
     echo '<html><body><h1>No Frontend</h1></body></html>' > terraphim_server/dist/index.html
 fi
 
