@@ -163,6 +163,14 @@ impl SessionService {
         cache.clear();
     }
 
+    /// Load sessions into cache (for CLI persistence)
+    pub async fn load_sessions(&self, sessions: Vec<Session>) {
+        let mut cache = self.cache.write().await;
+        for session in sessions {
+            cache.insert(session.id.clone(), session);
+        }
+    }
+
     /// Get summary statistics
     pub async fn statistics(&self) -> SessionStatistics {
         let cache = self.cache.read().await;
