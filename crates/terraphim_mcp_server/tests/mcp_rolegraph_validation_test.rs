@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serial_test::serial;
+use std::path::PathBuf;
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
 };
@@ -13,6 +14,36 @@ use terraphim_automata::AutomataPath;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::DeviceStorage;
 use terraphim_persistence::Persistable;
+
+fn resolve_desktop_binary() -> Result<Option<PathBuf>> {
+    if let Ok(path) = std::env::var("TERRAPHIM_DESKTOP_BINARY") {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Ok(Some(path));
+        }
+        anyhow::bail!(
+            "TERRAPHIM_DESKTOP_BINARY is set but file does not exist: {}",
+            path.display()
+        );
+    }
+
+    let current_dir = std::env::current_dir()?;
+    let project_root = current_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
+    let binary_name = if cfg!(target_os = "windows") {
+        "terraphim-ai-desktop.exe"
+    } else {
+        "terraphim-ai-desktop"
+    };
+    let desktop_binary = project_root.join("target").join("debug").join(binary_name);
+    if desktop_binary.exists() {
+        Ok(Some(desktop_binary))
+    } else {
+        Ok(None)
+    }
+}
 
 /// Create a configuration with the correct "Terraphim Engineer" role
 /// that uses local KG files and builds thesaurus from local markdown files
@@ -274,22 +305,12 @@ async fn test_desktop_cli_mcp_search() -> Result<()> {
 
     println!("🖥️ Testing desktop CLI with MCP server...");
 
-    // Build desktop binary if needed
-    let current_dir = std::env::current_dir()?;
-    let project_root = current_dir.parent().unwrap().parent().unwrap();
-    let desktop_binary = project_root.join("target/debug/terraphim-ai-desktop");
-
-    if !desktop_binary.exists() {
-        println!("Building desktop binary...");
-        let build_status = std::process::Command::new("cargo")
-            .args(["build", "-p", "terraphim-ai-desktop"])
-            .current_dir(project_root)
-            .status()?;
-
-        if !build_status.success() {
-            panic!("Failed to build desktop binary");
-        }
-    }
+    let Some(desktop_binary) = resolve_desktop_binary()? else {
+        eprintln!(
+            "Skipping desktop CLI MCP test: set TERRAPHIM_DESKTOP_BINARY to external terraphim-ai-desktop binary"
+        );
+        return Ok(());
+    };
 
     // Test that desktop binary can run in MCP server mode
     let mut cmd = Command::new(&desktop_binary);

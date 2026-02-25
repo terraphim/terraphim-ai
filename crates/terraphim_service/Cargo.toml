@@ -29,8 +29,6 @@ strsim = "0.11.1"
 regex = "1.11.0"
 tokio = { workspace = true }
 async-trait = { workspace = true }
-futures-util = "0.3"
-async-stream = "0.3"
 uuid = { workspace = true }
 chrono = { workspace = true }
 

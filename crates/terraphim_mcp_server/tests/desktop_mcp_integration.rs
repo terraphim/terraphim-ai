@@ -1,23 +1,42 @@
 use anyhow::Result;
 use rmcp::{ServiceExt, model::CallToolRequestParam, transport::TokioChildProcess};
-use std::process::Stdio;
+use std::{path::PathBuf, process::Stdio};
 use tokio::process::Command;
 
-/// Build and launch the desktop binary in MCP server mode and return a transport for the client.
-async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
-    // Ensure the desktop crate is built
-    let build_status = Command::new("cargo")
-        .arg("build")
-        .arg("--package")
-        .arg("terraphim-ai-desktop")
-        .status()
-        .await?;
+/// Launch desktop binary in MCP server mode and return a transport for the client.
+///
+/// This repo no longer builds desktop; integration is exercised when an external
+/// desktop binary is provided via TERRAPHIM_DESKTOP_BINARY.
+async fn launch_desktop_mcp_server() -> Result<Option<TokioChildProcess>> {
+    let binary_path = resolve_desktop_binary()?;
+    let Some(binary_path) = binary_path else {
+        eprintln!(
+            "Skipping desktop MCP integration test: set TERRAPHIM_DESKTOP_BINARY to external terraphim-ai-desktop binary"
+        );
+        return Ok(None);
+    };
 
-    if !build_status.success() {
-        anyhow::bail!("Failed to build terraphim-ai-desktop");
+    let mut cmd = Command::new(binary_path);
+    cmd.arg("mcp-server")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped());
+
+    Ok(Some(TokioChildProcess::new(cmd)?))
+}
+
+fn resolve_desktop_binary() -> Result<Option<PathBuf>> {
+    if let Ok(path) = std::env::var("TERRAPHIM_DESKTOP_BINARY") {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Ok(Some(path));
+        }
+        anyhow::bail!(
+            "TERRAPHIM_DESKTOP_BINARY is set but file does not exist: {}",
+            path.display()
+        );
     }
 
-    // Locate the compiled binary: same logic as other integration tests
     let crate_dir = std::env::current_dir()?;
     let binary_name = if cfg!(target_os = "windows") {
         "terraphim-ai-desktop.exe"
@@ -33,32 +52,19 @@ async fn launch_desktop_mcp_server() -> Result<TokioChildProcess> {
         Some(crate_dir.join("target").join("debug").join(binary_name)),
     ];
 
-    let binary_path = candidate_paths
-        .into_iter()
-        .flatten()
-        .find(|p| p.exists())
-        .ok_or_else(|| anyhow::anyhow!("Desktop binary not found in expected locations"))?;
-
-    // Spawn the desktop binary with the `mcp-server` subcommand
-    let mut cmd = Command::new(binary_path);
-    cmd.arg("mcp-server")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    Ok(TokioChildProcess::new(cmd)?)
+    Ok(candidate_paths.into_iter().flatten().find(|p| p.exists()))
 }
 
 #[tokio::test]
 async fn test_desktop_mcp_server_basic_search() -> Result<()> {
-    let transport = launch_desktop_mcp_server().await?;
+    let Some(transport) = launch_desktop_mcp_server().await? else {
+        return Ok(());
+    };
     let service = ().serve(transport).await?;
 
-    // Basic sanity: list tools
     let tools = service.list_tools(Default::default()).await?;
     assert!(!tools.tools.is_empty(), "No tools exposed by server");
 
-    // Perform a simple search
     let search_result = service
         .call_tool(CallToolRequestParam {
             name: "search".into(),
@@ -76,7 +82,6 @@ async fn test_desktop_mcp_server_basic_search() -> Result<()> {
         "Search reported error"
     );
 
-    // Terminate server
     service.cancel().await?;
     Ok(())
 }
