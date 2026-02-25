@@ -7,15 +7,10 @@
       <h1 class="title is-2">{{ section.title }}</h1>
       <p class="subtitle is-4">{{ section.description }}</p>
       <figure class="image is-flex is-justify-content-center is-align-items-center" style="margin-bottom: 1.5rem;">
-        <a href="/logo-animation/" title="View animated logo">
-          <iframe
-            src="/logo-animation/"
-            width="320"
-            height="360"
-            style="border: none; border-radius: 8px; overflow: hidden; pointer-events: none;"
-            loading="lazy"
-            aria-label="Animated Terraphim AI logo"
-          ></iframe>
+        <a href="/logo-animation/" title="View full animated logo">
+          <img src="/images/terraphim_logo_animated.svg"
+               alt="Terraphim AI animated logo"
+               style="max-width: 320px; width: 100%; border-radius: 8px;" />
         </a>
       </figure>
       {{ macros:: social_links( social_config=config.extra.social) }}
