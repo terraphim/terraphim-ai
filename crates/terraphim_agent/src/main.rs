@@ -17,6 +17,7 @@ use ratatui::{
     text::Line,
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
+use serde::Serialize;
 use tokio::runtime::Runtime;
 
 mod client;
@@ -433,6 +434,66 @@ pub enum OutputFormat {
     JsonCompact,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommandOutputMode {
+    Human,
+    Json,
+    JsonCompact,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CommandOutputConfig {
+    mode: CommandOutputMode,
+    robot: bool,
+}
+
+impl CommandOutputConfig {
+    fn is_machine_readable(self) -> bool {
+        self.robot || !matches!(self.mode, CommandOutputMode::Human)
+    }
+}
+
+fn resolve_output_config(robot: bool, format: OutputFormat) -> CommandOutputConfig {
+    let mode = match format {
+        OutputFormat::Human => {
+            if robot {
+                CommandOutputMode::Json
+            } else {
+                CommandOutputMode::Human
+            }
+        }
+        OutputFormat::Json => CommandOutputMode::Json,
+        OutputFormat::JsonCompact => CommandOutputMode::JsonCompact,
+    };
+    CommandOutputConfig { mode, robot }
+}
+
+#[derive(Debug, Serialize)]
+struct SearchDocumentOutput {
+    id: String,
+    title: String,
+    url: String,
+    rank: Option<u64>,
+}
+
+#[derive(Debug, Serialize)]
+struct SearchOutput {
+    query: String,
+    role: String,
+    count: usize,
+    results: Vec<SearchDocumentOutput>,
+}
+
+fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result<()> {
+    let out = match mode {
+        CommandOutputMode::Human => serde_json::to_string_pretty(value)?,
+        CommandOutputMode::Json => serde_json::to_string_pretty(value)?,
+        CommandOutputMode::JsonCompact => serde_json::to_string(value)?,
+    };
+    println!("{}", out);
+    Ok(())
+}
+
 #[derive(Parser, Debug)]
 #[command(
     name = "terraphim-agent",
@@ -707,6 +768,7 @@ enum ConfigSub {
 
 fn main() -> Result<()> {
     let cli = Cli::parse();
+    let output = resolve_output_config(cli.robot, cli.format.clone());
 
     // Check for updates on startup (non-blocking, logs warning on failure)
     let rt = Runtime::new()?;
@@ -751,9 +813,9 @@ fn main() -> Result<()> {
         Some(command) => {
             let rt = Runtime::new()?;
             if cli.server {
-                rt.block_on(run_server_command(command, &cli.server_url))
+                rt.block_on(run_server_command(command, &cli.server_url, output))
             } else {
-                rt.block_on(run_offline_command(command))
+                rt.block_on(run_offline_command(command, output))
             }
         }
     }
@@ -768,7 +830,7 @@ fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
     run_tui(Some(server_url.to_string()), transparent)
 }
 
-async fn run_offline_command(command: Command) -> Result<()> {
+async fn run_offline_command(command: Command, output: CommandOutputConfig) -> Result<()> {
     // Handle stateless commands that don't need TuiService first
     if let Command::Guard {
         command,
@@ -885,18 +947,20 @@ async fn run_offline_command(command: Command) -> Result<()> {
 
             let results = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
-                let mut all_terms = vec![query];
+                let mut all_terms = vec![query.clone()];
                 all_terms.extend(additional_terms);
 
                 let op_str = match operator {
                     Some(LogicalOperatorCli::And) => "AND",
                     Some(LogicalOperatorCli::Or) | None => "OR", // Default to OR
                 };
-                println!(
-                    "Multi-term search: {} terms using {} operator",
-                    all_terms.len(),
-                    op_str
-                );
+                if !output.is_machine_readable() {
+                    println!(
+                        "Multi-term search: {} terms using {} operator",
+                        all_terms.len(),
+                        op_str
+                    );
+                }
 
                 let search_query = SearchQuery {
                     search_term: NormalizedTermValue::from(all_terms[0].as_str()),
@@ -924,8 +988,26 @@ async fn run_offline_command(command: Command) -> Result<()> {
                     .await?
             };
 
-            for doc in results.iter() {
-                println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+            if output.is_machine_readable() {
+                let payload = SearchOutput {
+                    query,
+                    role: role_name.to_string(),
+                    count: results.len(),
+                    results: results
+                        .iter()
+                        .map(|doc| SearchDocumentOutput {
+                            id: doc.id.clone(),
+                            title: doc.title.clone(),
+                            url: doc.url.clone(),
+                            rank: doc.rank,
+                        })
+                        .collect(),
+                };
+                print_json_output(&payload, output.mode)?;
+            } else {
+                for doc in results.iter() {
+                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                }
             }
             Ok(())
         }
@@ -1687,7 +1769,11 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
     }
 }
 
-async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
+async fn run_server_command(
+    command: Command,
+    server_url: &str,
+    output: CommandOutputConfig,
+) -> Result<()> {
     let api = ApiClient::new(server_url.to_string());
 
     match command {
@@ -1741,17 +1827,42 @@ async fn run_server_command(command: Command, server_url: &str) -> Result<()> {
                     Some(LogicalOperator::Or) => "OR",
                     None => "OR", // Default
                 };
-                println!(
-                    "Multi-term search: '{}' {} {} additional terms using {} operator",
-                    query,
-                    op_str,
-                    additional_terms.len(),
-                    op_str
-                );
+                if !output.is_machine_readable() {
+                    println!(
+                        "Multi-term search: '{}' {} {} additional terms using {} operator",
+                        query,
+                        op_str,
+                        additional_terms.len(),
+                        op_str
+                    );
+                }
             }
 
-            for doc in res.results.iter() {
-                println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+            if output.is_machine_readable() {
+                let payload = SearchOutput {
+                    query,
+                    role: q
+                        .role
+                        .as_ref()
+                        .map(|r| r.to_string())
+                        .unwrap_or_else(|| "unknown".to_string()),
+                    count: res.results.len(),
+                    results: res
+                        .results
+                        .iter()
+                        .map(|doc| SearchDocumentOutput {
+                            id: doc.id.clone(),
+                            title: doc.title.clone(),
+                            url: doc.url.clone(),
+                            rank: doc.rank,
+                        })
+                        .collect(),
+                };
+                print_json_output(&payload, output.mode)?;
+            } else {
+                for doc in res.results.iter() {
+                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                }
             }
             Ok(())
         }
