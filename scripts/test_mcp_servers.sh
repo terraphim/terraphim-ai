@@ -39,7 +39,8 @@ if [[ -f "./target/debug/terraphim-ai-desktop" ]]; then
         echo "📄 Response: $response"
     fi
 else
-    echo "❌ Desktop binary not found. Run: cargo build -p terraphim-ai-desktop"
+    echo "❌ Desktop binary not found in this repo."
+    echo "   Set TERRAPHIM_DESKTOP_BINARY to a binary built from terraphim-ai-desktop repository."
 fi
 
 echo
@@ -71,7 +72,7 @@ echo "🔍 Claude Desktop Configuration Examples:"
 echo "=========================================="
 echo
 echo "✅ RECOMMENDED: Desktop Binary Method"
-echo "Executable: $PROJECT_ROOT/target/debug/terraphim-ai-desktop"
+echo "Executable: \$TERRAPHIM_DESKTOP_BINARY (from terraphim-ai-desktop repository)"
 echo "Arguments: mcp-server"
 echo
 echo "Alternative: Standalone MCP Server Method"

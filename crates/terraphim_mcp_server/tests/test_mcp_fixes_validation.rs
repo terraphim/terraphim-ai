@@ -1,8 +1,43 @@
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serde_json::json;
+use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
+
+fn resolve_desktop_binary() -> Result<Option<PathBuf>> {
+    if let Ok(path) = std::env::var("TERRAPHIM_DESKTOP_BINARY") {
+        let path = PathBuf::from(path);
+        if path.exists() {
+            return Ok(Some(path));
+        }
+        anyhow::bail!(
+            "TERRAPHIM_DESKTOP_BINARY is set but file does not exist: {}",
+            path.display()
+        );
+    }
+
+    let crate_dir = std::env::current_dir()?;
+    let binary_name = if cfg!(target_os = "windows") {
+        "terraphim-ai-desktop.exe"
+    } else {
+        "terraphim-ai-desktop"
+    };
+
+    let workspace_root = crate_dir
+        .parent()
+        .and_then(|p| p.parent())
+        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
+    let candidate = workspace_root
+        .join("target")
+        .join("debug")
+        .join(binary_name);
+    if candidate.exists() {
+        Ok(Some(candidate))
+    } else {
+        Ok(None)
+    }
+}
 
 /// Test that MCP server properly separates logs from JSON-RPC responses
 #[tokio::test]
@@ -140,31 +175,12 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
 #[tokio::test]
 async fn test_desktop_mcp_integration_fixed() -> Result<()> {
     println!("🖥️ Testing desktop MCP integration");
-
-    // Check if desktop binary exists, build if needed
-    let crate_dir = std::env::current_dir()?;
-    let workspace_root = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-
-    let desktop_binary = workspace_root
-        .join("target")
-        .join("debug")
-        .join("terraphim-ai-desktop");
-
-    if !desktop_binary.exists() {
-        println!("🔨 Building desktop binary...");
-        let build_status = Command::new("cargo")
-            .args(["build", "--package", "terraphim-ai-desktop"])
-            .current_dir(workspace_root)
-            .status()
-            .await?;
-
-        if !build_status.success() {
-            anyhow::bail!("Failed to build desktop binary");
-        }
-    }
+    let Some(desktop_binary) = resolve_desktop_binary()? else {
+        eprintln!(
+            "Skipping desktop MCP integration test: set TERRAPHIM_DESKTOP_BINARY to external terraphim-ai-desktop binary"
+        );
+        return Ok(());
+    };
 
     println!("✅ Desktop binary available at: {:?}", desktop_binary);
 
