@@ -694,6 +694,13 @@ enum Command {
         #[command(subcommand)]
         sub: LearnSub,
     },
+
+    /// Session management for AI coding assistant history
+    #[cfg(feature = "repl-sessions")]
+    Sessions {
+        #[command(subcommand)]
+        sub: SessionsSub,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -764,6 +771,43 @@ enum RolesSub {
 enum ConfigSub {
     Show,
     Set { key: String, value: String },
+}
+
+#[cfg(feature = "repl-sessions")]
+#[derive(Subcommand, Debug)]
+enum SessionsSub {
+    /// Detect available session sources (Claude Code, Cursor, etc.)
+    Sources,
+    /// Import sessions from all available sources
+    Import {
+        /// Limit number of sessions to import
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+    },
+    /// Import sessions from a specific source
+    ImportFrom {
+        /// Source ID (e.g., "claude-code-native")
+        source: String,
+        /// Limit number of sessions to import
+        #[arg(long, default_value_t = 100)]
+        limit: usize,
+    },
+    /// List all cached sessions
+    List {
+        /// Limit number of sessions to show
+        #[arg(long, default_value_t = 20)]
+        limit: usize,
+    },
+    /// Search sessions by query string
+    Search {
+        /// Search query
+        query: String,
+        /// Limit number of results
+        #[arg(long, default_value_t = 10)]
+        limit: usize,
+    },
+    /// Show session statistics
+    Stats,
 }
 
 fn main() -> Result<()> {
@@ -1632,6 +1676,121 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
         Command::Learn { .. } => {
             unreachable!("Learn command should be handled before TuiService initialization")
         }
+
+        #[cfg(feature = "repl-sessions")]
+        Command::Sessions { sub } => {
+            use terraphim_sessions::{SessionService, connector::ImportOptions};
+
+            let service = SessionService::new();
+
+            match sub {
+                SessionsSub::Sources => {
+                    let sources = service.detect_sources();
+                    if sources.is_empty() {
+                        println!("No session sources detected.");
+                    } else {
+                        println!("Available session sources:");
+                        for source in sources {
+                            let status = if source.is_available() {
+                                "available"
+                            } else {
+                                "not found"
+                            };
+                            println!(
+                                "  - {} ({})",
+                                source.name.unwrap_or_else(|| source.id.clone()),
+                                status
+                            );
+                        }
+                    }
+                    Ok(())
+                }
+                SessionsSub::Import { limit } => {
+                    let options = ImportOptions {
+                        limit: Some(limit),
+                        ..Default::default()
+                    };
+                    match service.import_all(&options).await {
+                        Ok(sessions) => {
+                            println!("Imported {} sessions.", sessions.len());
+                            Ok(())
+                        }
+                        Err(e) => Err(anyhow::anyhow!("Import failed: {}", e)),
+                    }
+                }
+                SessionsSub::ImportFrom { source, limit } => {
+                    let options = ImportOptions {
+                        limit: Some(limit),
+                        ..Default::default()
+                    };
+                    match service.import_from(&source, &options).await {
+                        Ok(sessions) => {
+                            println!("Imported {} sessions from {}.", sessions.len(), source);
+                            Ok(())
+                        }
+                        Err(e) => Err(anyhow::anyhow!("Import from {} failed: {}", source, e)),
+                    }
+                }
+                SessionsSub::List { limit } => {
+                    let sessions = service.list_sessions().await;
+                    if sessions.is_empty() {
+                        println!("No sessions in cache. Import first with 'sessions import'.");
+                    } else {
+                        println!("Cached sessions ({} total):", sessions.len());
+                        for session in sessions.iter().take(limit) {
+                            let msg_count = session.message_count();
+                            let title = session.title.as_deref().unwrap_or("(untitled)");
+                            println!("  - {} ({} messages)", title, msg_count);
+                        }
+                        if sessions.len() > limit {
+                            println!("  ... and {} more", sessions.len() - limit);
+                        }
+                    }
+                    Ok(())
+                }
+                SessionsSub::Search { query, limit } => {
+                    let results = service.search(&query).await;
+                    if results.is_empty() {
+                        println!(
+                            "No sessions matching '{}'. Import first with 'sessions import'.",
+                            query
+                        );
+                    } else {
+                        println!("Found {} matching sessions:", results.len());
+                        for session in results.iter().take(limit) {
+                            let title = session.title.as_deref().unwrap_or("(untitled)");
+                            println!("  - {}", title);
+                            // Show preview of matching content
+                            for msg in &session.messages {
+                                let content_lower = msg.content.to_lowercase();
+                                if content_lower.contains(&query.to_lowercase()) {
+                                    let preview: String = msg.content.chars().take(100).collect();
+                                    println!("    > {}", preview);
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                SessionsSub::Stats => {
+                    let stats = service.statistics().await;
+                    println!("Session Statistics:");
+                    println!("  Total sessions: {}", stats.total_sessions);
+                    println!("  Total messages: {}", stats.total_messages);
+                    println!("  User messages: {}", stats.total_user_messages);
+                    println!("  Assistant messages: {}", stats.total_assistant_messages);
+                    if !stats.sessions_by_source.is_empty() {
+                        println!("  By source:");
+                        for (source, count) in stats.sessions_by_source {
+                            println!("    - {}: {}", source, count);
+                        }
+                    }
+                    Ok(())
+                }
+            }
+        }
+
         Command::Interactive => {
             unreachable!("Interactive mode should be handled above")
         }
@@ -2259,6 +2418,124 @@ async fn run_server_command(
         #[cfg(feature = "repl")]
         Command::Repl { .. } => {
             unreachable!("REPL mode should be handled above")
+        }
+
+        #[cfg(feature = "repl-sessions")]
+        Command::Sessions { sub } => {
+            use terraphim_sessions::{SessionService, connector::ImportOptions};
+
+            let rt = Runtime::new()?;
+            rt.block_on(async {
+                let service = SessionService::new();
+
+                match sub {
+                    SessionsSub::Sources => {
+                        let sources = service.detect_sources();
+                        if sources.is_empty() {
+                            println!("No session sources detected.");
+                        } else {
+                            println!("Available session sources:");
+                            for source in sources {
+                                let status = if source.is_available() {
+                                    "available"
+                                } else {
+                                    "not found"
+                                };
+                                println!(
+                                    "  - {} ({})",
+                                    source.name.unwrap_or_else(|| source.id.clone()),
+                                    status
+                                );
+                            }
+                        }
+                        Ok(())
+                    }
+                    SessionsSub::Import { limit } => {
+                        let options = ImportOptions {
+                            limit: Some(limit),
+                            ..Default::default()
+                        };
+                        match service.import_all(&options).await {
+                            Ok(sessions) => {
+                                println!("Imported {} sessions.", sessions.len());
+                                Ok(())
+                            }
+                            Err(e) => Err(anyhow::anyhow!("Import failed: {}", e)),
+                        }
+                    }
+                    SessionsSub::ImportFrom { source, limit } => {
+                        let options = ImportOptions {
+                            limit: Some(limit),
+                            ..Default::default()
+                        };
+                        match service.import_from(&source, &options).await {
+                            Ok(sessions) => {
+                                println!("Imported {} sessions from {}.", sessions.len(), source);
+                                Ok(())
+                            }
+                            Err(e) => Err(anyhow::anyhow!("Import from {} failed: {}", source, e)),
+                        }
+                    }
+                    SessionsSub::List { limit } => {
+                        let sessions = service.list_sessions().await;
+                        if sessions.is_empty() {
+                            println!("No sessions in cache. Import first with 'sessions import'.");
+                        } else {
+                            println!("Cached sessions ({} total):", sessions.len());
+                            for session in sessions.iter().take(limit) {
+                                let msg_count = session.message_count();
+                                let title = session.title.as_deref().unwrap_or("(untitled)");
+                                println!("  - {} ({} messages)", title, msg_count);
+                            }
+                            if sessions.len() > limit {
+                                println!("  ... and {} more", sessions.len() - limit);
+                            }
+                        }
+                        Ok(())
+                    }
+                    SessionsSub::Search { query, limit } => {
+                        let results = service.search(&query).await;
+                        if results.is_empty() {
+                            println!(
+                                "No sessions matching '{}'. Import first with 'sessions import'.",
+                                query
+                            );
+                        } else {
+                            println!("Found {} matching sessions:", results.len());
+                            for session in results.iter().take(limit) {
+                                let title = session.title.as_deref().unwrap_or("(untitled)");
+                                println!("  - {}", title);
+                                // Show preview of matching content
+                                for msg in &session.messages {
+                                    let content_lower = msg.content.to_lowercase();
+                                    if content_lower.contains(&query.to_lowercase()) {
+                                        let preview: String =
+                                            msg.content.chars().take(100).collect();
+                                        println!("    > {}", preview);
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+                    SessionsSub::Stats => {
+                        let stats = service.statistics().await;
+                        println!("Session Statistics:");
+                        println!("  Total sessions: {}", stats.total_sessions);
+                        println!("  Total messages: {}", stats.total_messages);
+                        println!("  User messages: {}", stats.total_user_messages);
+                        println!("  Assistant messages: {}", stats.total_assistant_messages);
+                        if !stats.sessions_by_source.is_empty() {
+                            println!("  By source:");
+                            for (source, count) in stats.sessions_by_source {
+                                println!("    - {}: {}", source, count);
+                            }
+                        }
+                        Ok(())
+                    }
+                }
+            })
         }
     }
 }
