@@ -1905,7 +1905,7 @@ impl TerraphimService {
                 }
             }
             RelevanceFunction::TerraphimGraph => {
-                eprintln!("🧠 TerraphimGraph search initiated for role: {}", role.name);
+                log::debug!("TerraphimGraph search initiated for role: {}", role.name);
                 self.build_thesaurus(search_query).await?;
                 let _thesaurus = self.ensure_thesaurus_loaded(&role.name).await?;
                 let scored_index_docs: Vec<IndexedDocument> = self
@@ -2126,6 +2126,32 @@ impl TerraphimService {
                             documents = updated_documents;
                         }
                     }
+                }
+
+                if documents.is_empty() && !all_haystack_docs.is_empty() {
+                    log::info!(
+                        "TerraphimGraph returned no results for role '{}'; falling back to lexical haystack ranking",
+                        role.name
+                    );
+                    documents = if search_query.is_multi_term_query() {
+                        let filtered_docs = self
+                            .apply_logical_operators_to_documents(
+                                search_query,
+                                all_haystack_docs.clone(),
+                            )
+                            .await?;
+                        let combined_query_string = search_query
+                            .get_all_terms()
+                            .iter()
+                            .map(|t| t.as_str())
+                            .collect::<Vec<_>>()
+                            .join(" ");
+                        let query = Query::new(&combined_query_string);
+                        score::sort_documents(&query, filtered_docs)
+                    } else {
+                        let query = Query::new(&search_query.search_term.to_string());
+                        score::sort_documents(&query, all_haystack_docs.clone())
+                    };
                 }
 
                 // Apply TF-IDF scoring to enhance Terraphim Graph ranking
