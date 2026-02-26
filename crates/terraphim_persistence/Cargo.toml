@@ -30,7 +30,7 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 thiserror = { workspace = true }
 tokio = { workspace = true, features = ["fs", "macros", "rt-multi-thread", "sync"] }
-regex = "1.11.0"
+regex = "1.12.3"
 rusqlite = { version = "0.32", optional = true }
 chrono = { workspace = true }
 zstd = "0.13"
