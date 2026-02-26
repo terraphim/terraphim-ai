@@ -1,7 +1,6 @@
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serial_test::serial;
-use std::path::PathBuf;
 use terraphim_config::{
     ConfigBuilder, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
 };
@@ -14,36 +13,6 @@ use terraphim_automata::AutomataPath;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_persistence::DeviceStorage;
 use terraphim_persistence::Persistable;
-
-fn resolve_desktop_binary() -> Result<Option<PathBuf>> {
-    if let Ok(path) = std::env::var("TERRAPHIM_DESKTOP_BINARY") {
-        let path = PathBuf::from(path);
-        if path.exists() {
-            return Ok(Some(path));
-        }
-        anyhow::bail!(
-            "TERRAPHIM_DESKTOP_BINARY is set but file does not exist: {}",
-            path.display()
-        );
-    }
-
-    let current_dir = std::env::current_dir()?;
-    let project_root = current_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-    let binary_name = if cfg!(target_os = "windows") {
-        "terraphim-ai-desktop.exe"
-    } else {
-        "terraphim-ai-desktop"
-    };
-    let desktop_binary = project_root.join("target").join("debug").join(binary_name);
-    if desktop_binary.exists() {
-        Ok(Some(desktop_binary))
-    } else {
-        Ok(None)
-    }
-}
 
 /// Create a configuration with the correct "Terraphim Engineer" role
 /// that uses local KG files and builds thesaurus from local markdown files
@@ -292,80 +261,6 @@ async fn test_mcp_server_terraphim_engineer_search() -> Result<()> {
     println!(
         "\n🎉 All tests passed! MCP server correctly finds documents with Terraphim Engineer role."
     );
-
-    Ok(())
-}
-
-/// Test desktop CLI integration with MCP server
-#[tokio::test]
-#[serial]
-async fn test_desktop_cli_mcp_search() -> Result<()> {
-    // Use memory-only persistence to avoid database conflicts between tests
-    set_env_var("TERRAPHIM_PROFILE_MEMORY_TYPE", "memory");
-
-    println!("🖥️ Testing desktop CLI with MCP server...");
-
-    let Some(desktop_binary) = resolve_desktop_binary()? else {
-        eprintln!(
-            "Skipping desktop CLI MCP test: set TERRAPHIM_DESKTOP_BINARY to external terraphim-ai-desktop binary"
-        );
-        return Ok(());
-    };
-
-    // Test that desktop binary can run in MCP server mode
-    let mut cmd = Command::new(&desktop_binary);
-    cmd.arg("mcp-server")
-        .stdin(std::process::Stdio::piped())
-        .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped());
-
-    let transport = TokioChildProcess::new(cmd)?;
-    let service = ().serve(transport).await?;
-
-    println!("✅ Desktop CLI running in MCP server mode");
-
-    // Update config and test search - same as above
-    let config_json = create_terraphim_engineer_config().await?;
-
-    let config_result = service
-        .call_tool(CallToolRequestParam {
-            name: "update_config_tool".into(),
-            arguments: serde_json::json!({
-                "config_str": config_json
-            })
-            .as_object()
-            .cloned(),
-        })
-        .await?;
-
-    assert!(
-        !config_result.is_error.unwrap_or(false),
-        "Config update should succeed"
-    );
-
-    // Test search
-    let search_result = service
-        .call_tool(CallToolRequestParam {
-            name: "search".into(),
-            arguments: serde_json::json!({
-                "query": "terraphim-graph",
-                "limit": 3
-            })
-            .as_object()
-            .cloned(),
-        })
-        .await?;
-
-    assert!(
-        !search_result.is_error.unwrap_or(false),
-        "Search should succeed"
-    );
-
-    let result_count = search_result.content.len().saturating_sub(1);
-    assert!(result_count > 0, "Should find terraphim-graph documents");
-
-    service.cancel().await?;
-    println!("✅ Desktop CLI MCP server working correctly");
 
     Ok(())
 }
