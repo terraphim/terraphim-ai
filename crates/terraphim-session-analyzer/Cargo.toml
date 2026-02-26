@@ -47,7 +47,7 @@ thiserror = "1.0"
 jiff = { version = "0.1", features = ["serde"] }
 
 # Data processing
-regex = "1.10"
+regex = "1.12"
 lazy_static = "1.4"
 indexmap = { version = "2.2", features = ["serde"] }
 aho-corasick = "1.1"
