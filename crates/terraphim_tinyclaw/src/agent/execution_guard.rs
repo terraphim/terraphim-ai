@@ -79,6 +79,13 @@ impl ExecutionGuard {
         }
     }
 
+    /// Evaluate a raw shell command string for safety.
+    /// This is used by the skill executor to check shell steps.
+    pub fn evaluate_shell_command(&self, command: &str) -> GuardDecision {
+        let args = serde_json::json!({"command": command});
+        self.evaluate_shell(&args)
+    }
+
     /// Evaluate shell command safety.
     fn evaluate_shell(&self, arguments: &Value) -> GuardDecision {
         let command = match arguments["command"].as_str() {
