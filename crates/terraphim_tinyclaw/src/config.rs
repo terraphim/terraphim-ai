@@ -10,6 +10,8 @@ pub struct Config {
     pub channels: ChannelsConfig,
     #[serde(default)]
     pub tools: ToolsConfig,
+    #[serde(default)]
+    pub commands: MarkdownCommandsConfig,
 }
 
 impl Config {
@@ -347,6 +349,35 @@ pub struct ToolsConfig {
     pub web: Option<WebToolsConfig>,
 }
 
+/// Markdown slash command runtime configuration.
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
+pub struct MarkdownCommandsConfig {
+    /// Enable markdown-defined slash command loading.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Directory containing command markdown files.
+    /// If relative, resolved against `agent.workspace`.
+    /// Defaults to `agent.workspace/commands` when enabled.
+    #[serde(default, alias = "dir")]
+    pub directory: Option<PathBuf>,
+}
+
+impl MarkdownCommandsConfig {
+    /// Resolve the markdown commands directory when command loading is enabled.
+    pub fn commands_dir(&self, workspace: &Path) -> Option<PathBuf> {
+        if !self.enabled {
+            return None;
+        }
+
+        Some(match &self.directory {
+            Some(path) if path.is_absolute() => path.clone(),
+            Some(path) => workspace.join(path),
+            None => workspace.join("commands"),
+        })
+    }
+}
+
 /// Shell tool configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ShellToolConfig {
@@ -540,5 +571,38 @@ base_url = "https://search.example.com"
     fn test_shell_tool_timeout_default() {
         let cfg: ShellToolConfig = toml::from_str("deny_patterns = []").unwrap();
         assert_eq!(cfg.timeout_seconds, 120);
+    }
+
+    #[test]
+    fn test_markdown_commands_config_from_toml() {
+        let toml = r#"
+[agent]
+workspace = "/tmp/tinyclaw"
+
+[llm.proxy]
+base_url = "http://localhost:3456"
+
+[llm.direct]
+provider = "ollama"
+model = "llama3.2"
+
+[commands]
+enabled = true
+directory = "custom-commands"
+"#;
+
+        let config: Config = toml::from_str(toml).unwrap();
+        let resolved = config
+            .commands
+            .commands_dir(&config.agent.workspace)
+            .expect("commands should be enabled");
+
+        assert_eq!(resolved, PathBuf::from("/tmp/tinyclaw/custom-commands"));
+    }
+
+    #[test]
+    fn test_markdown_commands_config_disabled_by_default() {
+        let cfg = MarkdownCommandsConfig::default();
+        assert!(cfg.commands_dir(Path::new("/tmp")).is_none());
     }
 }

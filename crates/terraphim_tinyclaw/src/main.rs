@@ -4,6 +4,7 @@ mod bus;
 #[allow(dead_code)]
 mod channel;
 mod channels;
+mod commands;
 #[allow(dead_code)]
 mod config;
 #[allow(dead_code)]
@@ -20,9 +21,10 @@ use crate::agent::proxy_client::ProxyClientConfig;
 use crate::bus::MessageBus;
 use crate::channel::{Channel, ChannelManager, build_channels_from_config};
 use crate::channels::cli::CliChannel;
+use crate::commands::MarkdownCommandRuntime;
 use crate::config::Config;
 use crate::session::SessionManager;
-use crate::skills::{Skill, SkillExecutor};
+use crate::skills::{Skill, SkillExecutor, parse_markdown_skill};
 use crate::tools::{create_default_registry, create_registry_from_config};
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
@@ -66,9 +68,9 @@ enum Commands {
 
 #[derive(Subcommand, Debug)]
 enum SkillCommands {
-    /// Save a skill from a JSON file.
+    /// Save a skill from a JSON or markdown file.
     Save {
-        /// Path to the skill JSON file
+        /// Path to the skill file (`.json` or markdown with YAML frontmatter)
         path: PathBuf,
     },
     /// Load and display a skill.
@@ -164,6 +166,7 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
 
     // Create tool registry
     let tools = Arc::new(create_registry_from_config(&config.tools));
+    let markdown_commands = load_markdown_commands(&config);
 
     // Create session manager
     let sessions_dir = config.agent.workspace.join("sessions");
@@ -180,7 +183,8 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let router = HybridLlmRouter::new(proxy_config, config.llm.direct.clone());
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
+    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt)
+        .with_markdown_commands(markdown_commands);
 
     // Spawn agent loop in background
     let bus_clone = bus.clone();
@@ -217,6 +221,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
 
     // Create tool registry
     let tools = Arc::new(create_registry_from_config(&config.tools));
+    let markdown_commands = load_markdown_commands(&config);
 
     // Create session manager
     let sessions_dir = config.agent.workspace.join("sessions");
@@ -233,7 +238,8 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let router = HybridLlmRouter::new(proxy_config, config.llm.direct.clone());
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt);
+    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt)
+        .with_markdown_commands(markdown_commands);
 
     // Create channel manager and register enabled channels
     let mut channel_manager = ChannelManager::new();
@@ -288,12 +294,24 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
 
     match command {
         SkillCommands::Save { path } => {
-            let json = tokio::fs::read_to_string(&path)
+            let content = tokio::fs::read_to_string(&path)
                 .await
                 .map_err(|e| anyhow::anyhow!("Failed to read skill file: {}", e))?;
 
-            let skill: Skill = serde_json::from_str(&json)
-                .map_err(|e| anyhow::anyhow!("Invalid skill JSON: {}", e))?;
+            let is_markdown = path
+                .extension()
+                .and_then(|ext| ext.to_str())
+                .map(|ext| matches!(ext, "md" | "markdown"))
+                .unwrap_or(false)
+                || content.trim_start().starts_with("---");
+
+            let skill: Skill = if is_markdown {
+                parse_markdown_skill(&content)
+                    .map_err(|e| anyhow::anyhow!("Invalid markdown skill: {}", e))?
+            } else {
+                serde_json::from_str(&content)
+                    .map_err(|e| anyhow::anyhow!("Invalid skill JSON: {}", e))?
+            };
 
             executor
                 .save_skill(&skill)
@@ -421,4 +439,36 @@ async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
     }
 
     Ok(())
+}
+
+fn load_markdown_commands(config: &Config) -> Arc<MarkdownCommandRuntime> {
+    let Some(commands_dir) = config.commands.commands_dir(&config.agent.workspace) else {
+        return Arc::new(MarkdownCommandRuntime::default());
+    };
+
+    match MarkdownCommandRuntime::load_from_dir(&commands_dir) {
+        Ok(runtime) => {
+            if runtime.is_empty() {
+                log::info!(
+                    "No markdown command entries found in {}",
+                    commands_dir.display()
+                );
+            } else {
+                log::info!(
+                    "Loaded {} markdown command entries from {}",
+                    runtime.len(),
+                    commands_dir.display()
+                );
+            }
+            Arc::new(runtime)
+        }
+        Err(error) => {
+            log::warn!(
+                "Failed to load markdown commands from {}: {}",
+                commands_dir.display(),
+                error
+            );
+            Arc::new(MarkdownCommandRuntime::default())
+        }
+    }
 }

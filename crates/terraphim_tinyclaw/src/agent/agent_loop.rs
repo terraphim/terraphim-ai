@@ -5,6 +5,7 @@ use crate::agent::proxy_client::{
     Message, ProxyClient, ProxyClientConfig, ProxyResponse, ToolDefinition,
 };
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
+use crate::commands::MarkdownCommandRuntime;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::{ToolError, ToolRegistry};
@@ -312,6 +313,7 @@ pub struct ToolCallingLoop {
     router: HybridLlmRouter,
     guard: ExecutionGuard,
     tools: Arc<ToolRegistry>,
+    markdown_commands: Arc<MarkdownCommandRuntime>,
     sessions: Arc<Mutex<SessionManager>>,
     system_prompt: String,
     shutdown: CancellationToken,
@@ -335,10 +337,20 @@ impl ToolCallingLoop {
             router,
             guard: ExecutionGuard::new(),
             tools,
+            markdown_commands: Arc::new(MarkdownCommandRuntime::default()),
             sessions: Arc::new(Mutex::new(sessions)),
             system_prompt,
             shutdown: CancellationToken::new(),
         }
+    }
+
+    /// Attach markdown command runtime for slash command dispatch.
+    pub fn with_markdown_commands(
+        mut self,
+        markdown_commands: Arc<MarkdownCommandRuntime>,
+    ) -> Self {
+        self.markdown_commands = markdown_commands;
+        self
     }
 
     /// Run the agent loop, consuming messages from the bus.
@@ -637,13 +649,31 @@ impl ToolCallingLoop {
                 "Role switching not yet implemented (coming in full implementation)".to_string(),
             ))
         } else if content == "/help" {
-            Some(OutboundMessage::new(
-                &msg.channel,
-                &msg.chat_id,
-                "Available commands:\n/reset - Clear session\n/help - Show this help".to_string(),
-            ))
+            let mut help =
+                "Available commands:\n/reset - Clear session\n/help - Show this help".to_string();
+            let custom_commands = self
+                .markdown_commands
+                .help_lines()
+                .into_iter()
+                .filter(|line| {
+                    let lower = line.to_ascii_lowercase();
+                    !lower.starts_with("/help")
+                        && !lower.starts_with("/reset")
+                        && !lower.starts_with("/role")
+                })
+                .collect::<Vec<_>>();
+            if !custom_commands.is_empty() {
+                help.push_str("\n\nCustom commands:\n");
+                help.push_str(&custom_commands.join("\n"));
+            }
+
+            Some(OutboundMessage::new(&msg.channel, &msg.chat_id, help))
         } else {
-            None
+            self.markdown_commands
+                .dispatch_from_slash_message(content)
+                .map(|markdown_content| {
+                    OutboundMessage::new(&msg.channel, &msg.chat_id, markdown_content)
+                })
         }
     }
 }
@@ -800,6 +830,87 @@ mod tests {
 
         assert!(response.is_some());
         assert!(response.unwrap().content.contains("Available commands"));
+    }
+
+    #[test]
+    fn test_slash_command_dispatches_markdown_command() {
+        let temp_dir = TempDir::new().unwrap();
+        let commands_dir = temp_dir.path().join("commands");
+        std::fs::create_dir_all(&commands_dir).unwrap();
+        std::fs::write(
+            commands_dir.join("greet.md"),
+            r#"---
+name: greet
+usage: /greet <name>
+parameters:
+  - name: name
+    required: true
+---
+Hello {name}
+"#,
+        )
+        .unwrap();
+
+        let markdown_commands =
+            Arc::new(MarkdownCommandRuntime::load_from_dir(&commands_dir).unwrap());
+
+        let sessions = SessionManager::new(temp_dir.path().to_path_buf());
+        let tools = Arc::new(ToolRegistry::new());
+        let router = create_test_router();
+        let loop_config = AgentConfig {
+            max_iterations: 10,
+            ..Default::default()
+        };
+
+        let agent = ToolCallingLoop::new(&loop_config, router, tools, sessions, "Test".to_string())
+            .with_markdown_commands(markdown_commands);
+
+        let msg = InboundMessage::new("cli", "user1", "chat1", "/greet Alice");
+        let response = agent.handle_slash_command(&msg).unwrap();
+
+        assert!(response.content.contains("Hello Alice"));
+        assert!(response.content.contains("Usage: /greet <name>"));
+    }
+
+    #[test]
+    fn test_builtins_take_priority_over_markdown_commands() {
+        let temp_dir = TempDir::new().unwrap();
+        let commands_dir = temp_dir.path().join("commands");
+        std::fs::create_dir_all(&commands_dir).unwrap();
+        std::fs::write(
+            commands_dir.join("help.md"),
+            r#"---
+name: help
+usage: /help
+---
+This custom help should not run.
+"#,
+        )
+        .unwrap();
+
+        let markdown_commands =
+            Arc::new(MarkdownCommandRuntime::load_from_dir(&commands_dir).unwrap());
+
+        let sessions = SessionManager::new(temp_dir.path().to_path_buf());
+        let tools = Arc::new(ToolRegistry::new());
+        let router = create_test_router();
+        let loop_config = AgentConfig {
+            max_iterations: 10,
+            ..Default::default()
+        };
+
+        let agent = ToolCallingLoop::new(&loop_config, router, tools, sessions, "Test".to_string())
+            .with_markdown_commands(markdown_commands);
+
+        let msg = InboundMessage::new("cli", "user1", "chat1", "/help");
+        let response = agent.handle_slash_command(&msg).unwrap();
+
+        assert!(response.content.contains("Available commands"));
+        assert!(
+            !response
+                .content
+                .contains("This custom help should not run.")
+        );
     }
 
     #[tokio::test]
