@@ -131,6 +131,14 @@ impl Session {
         self.updated_at = Utc::now();
     }
 
+    /// Clear all messages and summary.
+    /// This is used by the /reset command to completely reset a session.
+    pub fn clear(&mut self) {
+        self.messages.clear();
+        self.summary = None;
+        self.updated_at = Utc::now();
+    }
+
     /// Get the total message count.
     pub fn message_count(&self) -> usize {
         self.messages.len()
@@ -363,6 +371,29 @@ mod tests {
             session.summary,
             Some("Previous conversation about Rust.".to_string())
         );
+    }
+
+    #[test]
+    fn test_session_clear() {
+        let mut session = Session::new("test:session");
+
+        // Add messages and set summary
+        session.add_message(ChatMessage::user("Hello", "user1"));
+        session.add_message(ChatMessage::assistant("Hi there!"));
+        session.set_summary("Previous conversation.".to_string());
+
+        assert_eq!(session.message_count(), 2);
+        assert!(session.summary.is_some());
+
+        let before_clear = session.updated_at;
+
+        // Clear the session
+        session.clear();
+
+        // Verify all cleared
+        assert_eq!(session.message_count(), 0);
+        assert!(session.summary.is_none());
+        assert!(session.updated_at >= before_clear);
     }
 
     #[test]
