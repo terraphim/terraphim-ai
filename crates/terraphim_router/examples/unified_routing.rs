@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     router.add_provider(agent_provider);
 
     // Create an agent spawner
-    let spawner = AgentSpawner::new()
+    let _spawner = AgentSpawner::new()
         .with_working_dir("/workspace")
         .with_auto_restart(true);
 
