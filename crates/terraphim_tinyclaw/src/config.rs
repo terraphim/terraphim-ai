@@ -347,6 +347,10 @@ pub struct ToolsConfig {
     /// Web tools configuration.
     #[serde(default)]
     pub web: Option<WebToolsConfig>,
+
+    /// Voice transcription tool configuration.
+    #[serde(default)]
+    pub voice: Option<VoiceToolConfig>,
 }
 
 /// Markdown slash command runtime configuration.
@@ -408,6 +412,72 @@ pub struct WebToolsConfig {
 
     /// Optional base URL for web search provider integrations.
     pub base_url: Option<String>,
+}
+
+/// Voice transcription tool configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct VoiceToolConfig {
+    /// Whether the voice tool is enabled.
+    #[serde(default = "default_voice_tool_enabled")]
+    pub enabled: bool,
+
+    /// Voice provider name (e.g. "whisper").
+    #[serde(default = "default_voice_provider")]
+    pub provider: Option<String>,
+
+    /// Model identifier for provider-backed transcription.
+    #[serde(default = "default_voice_model")]
+    pub model: Option<String>,
+
+    /// Optional API key for provider-backed transcription.
+    #[serde(default)]
+    pub api_key: Option<String>,
+
+    /// Base URL for provider-backed transcription APIs.
+    #[serde(default = "default_voice_base_url")]
+    pub base_url: Option<String>,
+
+    /// Request timeout for transcription backend calls in seconds.
+    #[serde(default = "default_voice_timeout")]
+    pub timeout_seconds: u64,
+
+    /// Optional temp directory override for downloaded audio.
+    #[serde(default)]
+    pub temp_dir: Option<PathBuf>,
+}
+
+impl Default for VoiceToolConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_voice_tool_enabled(),
+            provider: default_voice_provider(),
+            model: default_voice_model(),
+            api_key: None,
+            base_url: default_voice_base_url(),
+            timeout_seconds: default_voice_timeout(),
+            temp_dir: None,
+        }
+    }
+}
+
+fn default_voice_tool_enabled() -> bool {
+    true
+}
+
+fn default_voice_provider() -> Option<String> {
+    Some("whisper".to_string())
+}
+
+fn default_voice_model() -> Option<String> {
+    Some("gpt-4o-mini-transcribe".to_string())
+}
+
+fn default_voice_base_url() -> Option<String> {
+    Some("https://api.openai.com/v1".to_string())
+}
+
+fn default_voice_timeout() -> u64 {
+    45
 }
 
 /// Expand environment variables in a string.
@@ -552,6 +622,14 @@ deny_patterns = ["dangerous"]
 search_provider = "searxng"
 fetch_mode = "readability"
 base_url = "https://search.example.com"
+
+[tools.voice]
+enabled = false
+provider = "whisper"
+model = "whisper-1"
+base_url = "https://voice.example.com/v1"
+timeout_seconds = 30
+temp_dir = "/tmp/tinyclaw-voice"
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -565,6 +643,33 @@ base_url = "https://search.example.com"
         assert_eq!(web.fetch_mode.as_deref(), Some("readability"));
         assert_eq!(web.api_key, None);
         assert_eq!(web.base_url.as_deref(), Some("https://search.example.com"));
+
+        let voice = config.tools.voice.unwrap();
+        assert!(!voice.enabled);
+        assert_eq!(voice.provider.as_deref(), Some("whisper"));
+        assert_eq!(voice.model.as_deref(), Some("whisper-1"));
+        assert!(voice.api_key.is_none());
+        assert_eq!(
+            voice.base_url.as_deref(),
+            Some("https://voice.example.com/v1")
+        );
+        assert_eq!(voice.timeout_seconds, 30);
+        assert_eq!(
+            voice.temp_dir.as_deref(),
+            Some(Path::new("/tmp/tinyclaw-voice"))
+        );
+    }
+
+    #[test]
+    fn test_voice_tool_config_defaults_when_section_present() {
+        let voice: VoiceToolConfig = toml::from_str("").unwrap();
+        assert!(voice.enabled);
+        assert_eq!(voice.provider.as_deref(), Some("whisper"));
+        assert_eq!(voice.model.as_deref(), Some("gpt-4o-mini-transcribe"));
+        assert!(voice.api_key.is_none());
+        assert_eq!(voice.base_url.as_deref(), Some("https://api.openai.com/v1"));
+        assert_eq!(voice.timeout_seconds, 45);
+        assert!(voice.temp_dir.is_none());
     }
 
     #[test]

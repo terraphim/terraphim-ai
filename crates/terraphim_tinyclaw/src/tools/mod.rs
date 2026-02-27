@@ -183,6 +183,8 @@ pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
         .unwrap_or("raw")
         .to_string();
 
+    let voice_config = tools_cfg.voice.clone().unwrap_or_default();
+
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(FilesystemTool::new()));
     registry.register(Box::new(EditTool::new()));
@@ -193,7 +195,7 @@ pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
         web_api_key,
     )));
     registry.register(Box::new(WebFetchTool::with_mode(web_fetch_mode)));
-    registry.register(Box::new(VoiceTranscribeTool::new()));
+    registry.register(Box::new(VoiceTranscribeTool::with_config(voice_config)));
     registry
 }
 
@@ -289,6 +291,7 @@ mod tests {
                 api_key: Some("api-key".to_string()),
                 base_url: Some("https://search.example.com".to_string()),
             }),
+            voice: None,
         };
 
         let registry = create_registry_from_config(&config);
@@ -308,6 +311,7 @@ mod tests {
                 deny_patterns: vec![],
             }),
             web: None,
+            voice: None,
         };
         let registry = create_registry_from_config(&config);
 
