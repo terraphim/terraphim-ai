@@ -95,7 +95,7 @@ impl KgNormalizer {
                     let path = entry.path();
                     if path.is_dir() {
                         visit_dir(&path, docs);
-                    } else if path.extension().map_or(false, |e| e == "md") {
+                    } else if path.extension().is_some_and(|e| e == "md") {
                         if let Ok(content) = fs::read_to_string(&path) {
                             let (title, tags, linked_terms) = parse_markdown_frontmatter(&content);
                             let doc = CorpusDocument {
@@ -272,9 +272,9 @@ fn parse_markdown_frontmatter(content: &str) -> (String, Vec<String>, Vec<String
     let mut tags = Vec::new();
     let mut linked_terms = Vec::new();
 
-    if content.starts_with("---") {
-        if let Some(end) = content[3..].find("---") {
-            let frontmatter = &content[3..end + 3];
+    if let Some(stripped) = content.strip_prefix("---") {
+        if let Some(end) = stripped.find("---") {
+            let frontmatter = &stripped[..end];
             for line in frontmatter.lines() {
                 let line = line.trim();
                 if line.starts_with("title:") {
@@ -314,8 +314,8 @@ fn parse_markdown_frontmatter(content: &str) -> (String, Vec<String>, Vec<String
     if title.is_empty() {
         for line in content.lines() {
             let trimmed = line.trim();
-            if trimmed.starts_with("# ") {
-                title = trimmed[2..].to_string();
+            if let Some(stripped) = trimmed.strip_prefix("# ") {
+                title = stripped.to_string();
                 break;
             }
         }
@@ -342,8 +342,8 @@ fn extract_terms_from_content(content: &str) -> Vec<String> {
     // Extract headers
     for line in content.lines() {
         let trimmed = line.trim();
-        if trimmed.starts_with("## ") {
-            let header = trimmed[3..].trim();
+        if let Some(stripped) = trimmed.strip_prefix("## ") {
+            let header = stripped.trim();
             // Split header into potential terms
             for word in header.split(&[',', '-', '/'][..]) {
                 let word = word.trim();
