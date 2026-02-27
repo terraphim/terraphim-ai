@@ -23,7 +23,7 @@ use crate::channels::cli::CliChannel;
 use crate::config::Config;
 use crate::session::SessionManager;
 use crate::skills::{Skill, SkillExecutor};
-use crate::tools::create_default_registry;
+use crate::tools::{create_default_registry, create_registry_from_config};
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -163,7 +163,7 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let bus = Arc::new(MessageBus::new());
 
     // Create tool registry
-    let tools = Arc::new(create_default_registry());
+    let tools = Arc::new(create_registry_from_config(&config.tools));
 
     // Create session manager
     let sessions_dir = config.agent.workspace.join("sessions");
@@ -216,7 +216,7 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let bus = Arc::new(MessageBus::new());
 
     // Create tool registry
-    let tools = Arc::new(create_default_registry());
+    let tools = Arc::new(create_registry_from_config(&config.tools));
 
     // Create session manager
     let sessions_dir = config.agent.workspace.join("sessions");

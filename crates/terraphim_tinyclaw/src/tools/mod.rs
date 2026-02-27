@@ -6,6 +6,7 @@ pub mod shell;
 pub mod voice_transcribe;
 pub mod web;
 
+use crate::config::ToolsConfig;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -149,18 +150,49 @@ impl Default for ToolRegistry {
 
 /// Create a standard tool registry with all default tools.
 pub fn create_default_registry() -> ToolRegistry {
+    create_registry_from_config(&ToolsConfig::default())
+}
+
+/// Create a tool registry using tool-specific config overrides.
+pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::shell::ShellTool;
     use crate::tools::voice_transcribe::VoiceTranscribeTool;
     use crate::tools::web::{WebFetchTool, WebSearchTool};
 
+    let shell_timeout = tools_cfg
+        .shell
+        .as_ref()
+        .map(|cfg| cfg.timeout_seconds)
+        .unwrap_or(120);
+
+    let web_provider = tools_cfg
+        .web
+        .as_ref()
+        .and_then(|cfg| cfg.search_provider.as_deref())
+        .unwrap_or("brave")
+        .to_string();
+    let web_api_key = tools_cfg.web.as_ref().and_then(|cfg| cfg.api_key.clone());
+    let web_base_url = tools_cfg.web.as_ref().and_then(|cfg| cfg.base_url.clone());
+
+    let web_fetch_mode = tools_cfg
+        .web
+        .as_ref()
+        .and_then(|cfg| cfg.fetch_mode.as_deref())
+        .unwrap_or("raw")
+        .to_string();
+
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(FilesystemTool::new()));
     registry.register(Box::new(EditTool::new()));
-    registry.register(Box::new(ShellTool::new()));
-    registry.register(Box::new(WebSearchTool::new()));
-    registry.register(Box::new(WebFetchTool::new()));
+    registry.register(Box::new(ShellTool::with_timeout(shell_timeout)));
+    registry.register(Box::new(WebSearchTool::with_config(
+        web_provider,
+        web_base_url,
+        web_api_key,
+    )));
+    registry.register(Box::new(WebFetchTool::with_mode(web_fetch_mode)));
     registry.register(Box::new(VoiceTranscribeTool::new()));
     registry
 }
@@ -168,6 +200,7 @@ pub fn create_default_registry() -> ToolRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::config::{ShellToolConfig, WebToolsConfig};
 
     struct MockTool;
 
@@ -241,5 +274,52 @@ mod tests {
 
         let result = registry.execute(&call).await;
         assert!(matches!(result, Err(ToolError::NotFound { .. })));
+    }
+
+    #[test]
+    fn test_create_registry_from_config_registers_expected_tools() {
+        let config = ToolsConfig {
+            shell: Some(ShellToolConfig {
+                timeout_seconds: 30,
+                deny_patterns: vec![],
+            }),
+            web: Some(WebToolsConfig {
+                search_provider: Some("searxng".to_string()),
+                fetch_mode: Some("readability".to_string()),
+                api_key: Some("api-key".to_string()),
+                base_url: Some("https://search.example.com".to_string()),
+            }),
+        };
+
+        let registry = create_registry_from_config(&config);
+        assert!(registry.has("filesystem"));
+        assert!(registry.has("edit"));
+        assert!(registry.has("shell"));
+        assert!(registry.has("web_search"));
+        assert!(registry.has("web_fetch"));
+        assert!(registry.has("voice_transcribe"));
+    }
+
+    #[tokio::test]
+    async fn test_create_registry_from_config_applies_shell_timeout() {
+        let config = ToolsConfig {
+            shell: Some(ShellToolConfig {
+                timeout_seconds: 1,
+                deny_patterns: vec![],
+            }),
+            web: None,
+        };
+        let registry = create_registry_from_config(&config);
+
+        let call = ToolCall {
+            id: "call_1".to_string(),
+            name: "shell".to_string(),
+            arguments: serde_json::json!({
+                "command": "sleep 2"
+            }),
+        };
+
+        let result = registry.execute(&call).await;
+        assert!(matches!(result, Err(ToolError::Timeout { seconds: 1, .. })));
     }
 }

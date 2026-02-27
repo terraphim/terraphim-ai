@@ -339,9 +339,11 @@ impl MatrixConfig {
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct ToolsConfig {
     /// Shell tool configuration.
+    #[serde(default)]
     pub shell: Option<ShellToolConfig>,
 
     /// Web tools configuration.
+    #[serde(default)]
     pub web: Option<WebToolsConfig>,
 }
 
@@ -362,13 +364,19 @@ fn default_shell_timeout() -> u64 {
 }
 
 /// Web tools configuration.
-#[derive(Debug, Clone, Deserialize, Serialize)]
+#[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct WebToolsConfig {
     /// Web search provider ("brave", "searxng", "google").
     pub search_provider: Option<String>,
 
     /// Web fetch mode ("readability", "raw").
     pub fetch_mode: Option<String>,
+
+    /// Optional API key for web search provider integrations.
+    pub api_key: Option<String>,
+
+    /// Optional base URL for web search provider integrations.
+    pub base_url: Option<String>,
 }
 
 /// Expand environment variables in a string.
@@ -490,5 +498,47 @@ model = "llama3.2"
             ..Default::default()
         };
         assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_tools_config_from_toml() {
+        let toml = r#"
+[agent]
+workspace = "/tmp/tinyclaw"
+
+[llm.proxy]
+base_url = "http://localhost:3456"
+
+[llm.direct]
+provider = "ollama"
+model = "llama3.2"
+
+[tools.shell]
+timeout_seconds = 42
+deny_patterns = ["dangerous"]
+
+[tools.web]
+search_provider = "searxng"
+fetch_mode = "readability"
+base_url = "https://search.example.com"
+"#;
+
+        let config: Config = toml::from_str(toml).unwrap();
+
+        let shell = config.tools.shell.unwrap();
+        assert_eq!(shell.timeout_seconds, 42);
+        assert_eq!(shell.deny_patterns, vec!["dangerous".to_string()]);
+
+        let web = config.tools.web.unwrap();
+        assert_eq!(web.search_provider.as_deref(), Some("searxng"));
+        assert_eq!(web.fetch_mode.as_deref(), Some("readability"));
+        assert_eq!(web.api_key, None);
+        assert_eq!(web.base_url.as_deref(), Some("https://search.example.com"));
+    }
+
+    #[test]
+    fn test_shell_tool_timeout_default() {
+        let cfg: ShellToolConfig = toml::from_str("deny_patterns = []").unwrap();
+        assert_eq!(cfg.timeout_seconds, 120);
     }
 }
