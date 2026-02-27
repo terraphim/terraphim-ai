@@ -1,5 +1,6 @@
 //! Skill executor for loading and executing skill workflows.
 
+use crate::agent::execution_guard::{ExecutionGuard, GuardDecision};
 #[cfg(test)]
 use crate::skills::types::SkillInput;
 use crate::skills::types::{Skill, SkillResult, SkillStatus, SkillStep, StepResult};
@@ -28,6 +29,8 @@ pub enum SkillError {
     Timeout,
     #[error("Missing required input: {0}")]
     MissingInput(String),
+    #[error("Execution blocked for '{target}': {reason}")]
+    Blocked { target: String, reason: String },
 }
 
 /// Executes skills with progress tracking and cancellation support.
@@ -38,6 +41,8 @@ pub struct SkillExecutor {
     cancelled: Arc<AtomicBool>,
     /// Optional tool registry for executing tool steps
     tool_registry: Option<Arc<ToolRegistry>>,
+    /// Safety guard for shell/tool execution
+    guard: ExecutionGuard,
 }
 
 impl SkillExecutor {
@@ -50,6 +55,7 @@ impl SkillExecutor {
             storage_dir,
             cancelled: Arc::new(AtomicBool::new(false)),
             tool_registry: None,
+            guard: ExecutionGuard::new(),
         })
     }
 
@@ -309,6 +315,24 @@ impl SkillExecutor {
         inputs
     }
 
+    fn enforce_guard(&self, target: &str, arguments: &serde_json::Value) -> Result<(), SkillError> {
+        match self.guard.evaluate(target, arguments) {
+            GuardDecision::Allow => Ok(()),
+            GuardDecision::Warn { reason } => {
+                log::warn!(
+                    "Skill step '{}' executing with guard warning: {}",
+                    target,
+                    reason
+                );
+                Ok(())
+            }
+            GuardDecision::Block { reason } => Err(SkillError::Blocked {
+                target: target.to_string(),
+                reason,
+            }),
+        }
+    }
+
     async fn execute_tool_step(
         &self,
         tool: &str,
@@ -319,6 +343,7 @@ impl SkillExecutor {
         let args_str = serde_json::to_string(args)?;
         let substituted = self.substitute_template(&args_str, inputs)?;
         let substituted_args: serde_json::Value = serde_json::from_str(&substituted)?;
+        self.enforce_guard(tool, &substituted_args)?;
 
         if let Some(ref registry) = self.tool_registry {
             let call = ToolCall {
@@ -397,6 +422,8 @@ impl SkillExecutor {
         inputs: &HashMap<String, String>,
     ) -> Result<String, SkillError> {
         let substituted = self.substitute_template(command, inputs)?;
+        let guard_args = serde_json::json!({ "command": substituted.clone() });
+        self.enforce_guard("shell", &guard_args)?;
 
         let mut cmd = tokio::process::Command::new("sh");
         cmd.arg("-c").arg(&substituted);
@@ -442,6 +469,7 @@ fn step_type_name(step: &SkillStep) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::tools::filesystem::FilesystemTool;
     use std::time::Duration;
     use tempfile::TempDir;
 
@@ -644,6 +672,79 @@ mod tests {
 
         assert_eq!(result.status, SkillStatus::Success);
         assert!(result.output.contains("Hello World"));
+    }
+
+    #[tokio::test]
+    async fn test_execute_skill_shell_step_blocked_by_guard() {
+        let temp_dir = TempDir::new().unwrap();
+        let executor = SkillExecutor::new(temp_dir.path()).unwrap();
+
+        let skill = Skill {
+            name: "blocked-shell-skill".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Blocked shell skill".to_string(),
+            author: None,
+            steps: vec![SkillStep::Shell {
+                command: "rm -rf /".to_string(),
+                working_dir: None,
+            }],
+            inputs: vec![],
+        };
+
+        let result = executor
+            .execute_skill(&skill, HashMap::new(), None)
+            .await
+            .unwrap();
+
+        match result.status {
+            SkillStatus::Failed { step, error } => {
+                assert_eq!(step, 0);
+                assert!(error.contains("Execution blocked"));
+                assert!(error.contains("shell"));
+                assert!(error.contains("dangerous pattern"));
+            }
+            status => panic!("Expected blocked failure, got {:?}", status),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_execute_skill_tool_path_blocked_by_guard() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut registry = ToolRegistry::new();
+        registry.register(Box::new(FilesystemTool::new()));
+        let executor = SkillExecutor::new(temp_dir.path())
+            .unwrap()
+            .with_tool_registry(Arc::new(registry));
+
+        let skill = Skill {
+            name: "blocked-filesystem-skill".to_string(),
+            version: "1.0.0".to_string(),
+            description: "Blocked filesystem tool skill".to_string(),
+            author: None,
+            steps: vec![SkillStep::Tool {
+                tool: "filesystem".to_string(),
+                args: serde_json::json!({
+                    "operation": "read_file",
+                    "path": "../secret.txt"
+                }),
+            }],
+            inputs: vec![],
+        };
+
+        let result = executor
+            .execute_skill(&skill, HashMap::new(), None)
+            .await
+            .unwrap();
+
+        match result.status {
+            SkillStatus::Failed { step, error } => {
+                assert_eq!(step, 0);
+                assert!(error.contains("Execution blocked"));
+                assert!(error.contains("filesystem"));
+                assert!(error.contains("Path traversal not allowed"));
+            }
+            status => panic!("Expected blocked failure, got {:?}", status),
+        }
     }
 
     #[tokio::test]

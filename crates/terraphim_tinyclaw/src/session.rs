@@ -131,6 +131,13 @@ impl Session {
         self.updated_at = Utc::now();
     }
 
+    /// Reset conversational state (messages + summary).
+    pub fn reset(&mut self) {
+        self.messages.clear();
+        self.summary = None;
+        self.updated_at = Utc::now();
+    }
+
     /// Get the total message count.
     pub fn message_count(&self) -> usize {
         self.messages.len()
@@ -274,6 +281,17 @@ impl SessionManager {
         Ok(())
     }
 
+    /// Reset a session and persist the cleared state.
+    pub fn reset_session(&mut self, key: &str) -> anyhow::Result<()> {
+        let snapshot = {
+            let session = self.get_or_create(key);
+            session.reset();
+            session.clone()
+        };
+
+        self.save(&snapshot)
+    }
+
     /// Flush all cached sessions to disk.
     pub fn flush_all(&self) -> anyhow::Result<()> {
         for (key, session) in &self.cache {
@@ -366,6 +384,18 @@ mod tests {
     }
 
     #[test]
+    fn test_session_reset_clears_messages_and_summary() {
+        let mut session = Session::new("test:session");
+        session.add_message(ChatMessage::user("Hello", "user1"));
+        session.set_summary("Old context".to_string());
+
+        session.reset();
+
+        assert_eq!(session.message_count(), 0);
+        assert_eq!(session.summary, None);
+    }
+
+    #[test]
     fn test_session_format_messages() {
         let mut session = Session::new("test:session");
         session.add_message(ChatMessage::user("Hello", "user1"));
@@ -393,5 +423,26 @@ mod tests {
         assert_eq!(sessions.len(), 2);
         assert!(sessions.contains(&"cli:123".to_string()));
         assert!(sessions.contains(&"telegram:456".to_string()));
+    }
+
+    #[test]
+    fn test_session_manager_reset_session_persists() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path().to_path_buf());
+        let key = "cli:chat1";
+
+        {
+            let session = manager.get_or_create(key);
+            session.add_message(ChatMessage::user("hello", "user1"));
+            session.set_summary("previous".to_string());
+            let snapshot = session.clone();
+            manager.save(&snapshot).unwrap();
+        }
+
+        manager.reset_session(key).unwrap();
+
+        let loaded = manager.load(key).unwrap();
+        assert_eq!(loaded.message_count(), 0);
+        assert_eq!(loaded.summary, None);
     }
 }

@@ -283,7 +283,8 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
 
 async fn run_skill_command(command: SkillCommands) -> anyhow::Result<()> {
     let executor = SkillExecutor::with_default_storage()
-        .map_err(|e| anyhow::anyhow!("Failed to initialize skill executor: {}", e))?;
+        .map_err(|e| anyhow::anyhow!("Failed to initialize skill executor: {}", e))?
+        .with_tool_registry(Arc::new(create_default_registry()));
 
     match command {
         SkillCommands::Save { path } => {

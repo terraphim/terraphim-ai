@@ -19,6 +19,8 @@ use tokio_util::sync::CancellationToken;
 pub struct ToolCallingConfig {
     /// Maximum tool-calling iterations per message.
     pub max_iterations: usize,
+    /// Maximum number of session messages before compression.
+    pub max_session_messages: usize,
     /// Number of messages to keep after summarization.
     pub keep_last_messages: usize,
 }
@@ -27,6 +29,7 @@ impl Default for ToolCallingConfig {
     fn default() -> Self {
         Self {
             max_iterations: 20,
+            max_session_messages: 200,
             keep_last_messages: 4,
         }
     }
@@ -326,7 +329,8 @@ impl ToolCallingLoop {
         Self {
             config: ToolCallingConfig {
                 max_iterations: agent_config.max_iterations,
-                ..Default::default()
+                max_session_messages: agent_config.max_session_messages,
+                keep_last_messages: ToolCallingConfig::default().keep_last_messages,
             },
             router,
             guard: ExecutionGuard::new(),
@@ -372,6 +376,23 @@ impl ToolCallingLoop {
         msg: InboundMessage,
         outbound_tx: &tokio::sync::mpsc::Sender<OutboundMessage>,
     ) -> anyhow::Result<()> {
+        // Handle /reset with real state clearing and persistence.
+        if msg.content.trim() == "/reset" {
+            let session_key = msg.session_key();
+            let mut sessions_guard = self.sessions.lock().await;
+            sessions_guard.reset_session(&session_key)?;
+            drop(sessions_guard);
+
+            outbound_tx
+                .send(OutboundMessage::new(
+                    &msg.channel,
+                    &msg.chat_id,
+                    "Session reset. Your next message will start fresh.".to_string(),
+                ))
+                .await?;
+            return Ok(());
+        }
+
         // Check if this is a slash command
         if let Some(response) = self.handle_slash_command(&msg) {
             outbound_tx.send(response).await?;
@@ -399,8 +420,8 @@ impl ToolCallingLoop {
         sessions_guard.save(&session_clone)?;
         drop(sessions_guard);
 
-        // Check if we need compression using configured ratio
-        let needs_compress = message_count > self.config.keep_last_messages * 2;
+        // Check if we need compression using configured session cap.
+        let needs_compress = self.should_compress(message_count);
         if needs_compress {
             // Keep the last N messages, compress the rest
             let keep_count = self.config.keep_last_messages;
@@ -497,6 +518,10 @@ impl ToolCallingLoop {
         outbound_tx.send(outbound).await?;
 
         Ok(())
+    }
+
+    fn should_compress(&self, message_count: usize) -> bool {
+        message_count > self.config.max_session_messages
     }
 
     /// Run the iterative tool-calling loop.
@@ -599,7 +624,7 @@ impl ToolCallingLoop {
         let content = msg.content.trim();
 
         if content == "/reset" {
-            // Reset is handled in process_message by creating new session context
+            // Reset side effects are handled in process_message.
             Some(OutboundMessage::new(
                 &msg.channel,
                 &msg.chat_id,
@@ -701,6 +726,61 @@ mod tests {
         assert!(response.unwrap().content.contains("Session reset"));
     }
 
+    #[tokio::test]
+    async fn test_reset_clears_session_state() {
+        let temp_dir = TempDir::new().unwrap();
+        let sessions = SessionManager::new(temp_dir.path().to_path_buf());
+        let tools = Arc::new(ToolRegistry::new());
+        let router = create_test_router();
+
+        let loop_config = AgentConfig {
+            max_iterations: 10,
+            max_session_messages: 20,
+            ..Default::default()
+        };
+
+        let agent = ToolCallingLoop::new(
+            &loop_config,
+            router,
+            tools,
+            sessions,
+            "Test system prompt".to_string(),
+        );
+
+        let session_key = "cli:chat1";
+        {
+            let mut sessions_guard = agent.sessions.lock().await;
+            let session = sessions_guard.get_or_create(session_key);
+            session.add_message(ChatMessage::user("hello", "user1"));
+            session.set_summary("old summary".to_string());
+            let snapshot = session.clone();
+            sessions_guard.save(&snapshot).unwrap();
+        }
+
+        let (outbound_tx, mut outbound_rx) = tokio::sync::mpsc::channel(1);
+        let reset_msg = InboundMessage::new("cli", "user1", "chat1", "/reset");
+        agent
+            .process_message(reset_msg, &outbound_tx)
+            .await
+            .unwrap();
+
+        let response = outbound_rx.recv().await.unwrap();
+        assert!(response.content.contains("Session reset"));
+
+        {
+            let mut sessions_guard = agent.sessions.lock().await;
+            let session = sessions_guard.get_or_create(session_key);
+            assert_eq!(session.message_count(), 0);
+            assert_eq!(session.summary, None);
+        }
+
+        let persisted = std::fs::read_to_string(temp_dir.path().join("cli_chat1.jsonl")).unwrap();
+        let last_line = persisted.lines().last().unwrap();
+        let snapshot: serde_json::Value = serde_json::from_str(last_line).unwrap();
+        assert_eq!(snapshot["messages"].as_array().unwrap().len(), 0);
+        assert!(snapshot["summary"].is_null());
+    }
+
     #[test]
     fn test_slash_command_help() {
         let temp_dir = TempDir::new().unwrap();
@@ -763,6 +843,29 @@ mod tests {
             summary.contains("2 messages"),
             "Expected extractive summary, got: {}",
             summary
+        );
+    }
+
+    #[test]
+    fn test_compression_trigger_uses_max_session_messages() {
+        let temp_dir = TempDir::new().unwrap();
+        let sessions = SessionManager::new(temp_dir.path().to_path_buf());
+        let tools = Arc::new(ToolRegistry::new());
+        let router = create_test_router();
+
+        let loop_config = AgentConfig {
+            max_iterations: 10,
+            max_session_messages: 6,
+            ..Default::default()
+        };
+
+        let agent = ToolCallingLoop::new(&loop_config, router, tools, sessions, "Test".to_string());
+
+        assert!(!agent.should_compress(6));
+        assert!(agent.should_compress(7));
+        assert_eq!(
+            agent.config.keep_last_messages,
+            ToolCallingConfig::default().keep_last_messages
         );
     }
 
