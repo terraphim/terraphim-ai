@@ -54,11 +54,9 @@ You should get a response.
 ## Common Commands
 
 ```
-/start - Start conversation
 /help - Show help
-/status - Bot status
-/skill list - List skills
-/skill run analyze-repo repo_path=/path/to/repo
+/reset - Clear the current chat session
+/role <name> - Not implemented (returns placeholder message)
 ```
 
 ## Production Deployment
@@ -138,9 +136,22 @@ RUST_LOG=debug terraphim-tinyclaw gateway
 
 1. **Create custom skills**: See `examples/skills/`
 2. **Add system prompt**: Create `SYSTEM.md` file
-3. **Enable other channels**: Discord, Matrix
+3. **Enable other channels**: Discord (Matrix is currently disabled)
 4. **Monitor logs**: `journalctl -u tinyclaw -f`
+5. **Use OpenAI Codex**: See [TINYCLAW_CODEX_QUICKSTART.md](./TINYCLAW_CODEX_QUICKSTART.md) for Codex OAuth setup
 
 ## Full Guide
 
 For detailed setup instructions, see: `docs/telegram-bot-setup-guide.md`
+
+## Codex/LLM Proxy Setup
+
+For advanced LLM routing with OpenAI Codex, Claude, Gemini, or other OAuth providers, see:
+
+**[TINYCLAW_CODEX_QUICKSTART.md](./TINYCLAW_CODEX_QUICKSTART.md)**
+
+This guide covers:
+- Option A: Codex CLI integration (file-based OAuth)
+- Option B: Browser OAuth flow (Claude, Gemini, OpenAI)
+- Docker deployment
+- Configuration reference

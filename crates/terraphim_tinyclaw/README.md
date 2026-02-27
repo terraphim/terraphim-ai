@@ -4,10 +4,11 @@ TinyClaw is a multi-channel AI assistant powered by Terraphim, supporting Telegr
 
 ## Features
 
-- **Multi-Channel Support**: Interact via Telegram, Discord, or CLI
+- **Multi-Channel Support**: Interact via Telegram, Discord, and CLI (Matrix adapter currently disabled)
 - **Tool System**: Extensible tools for filesystem, web, shell, and code operations
 - **Skills System**: Create and execute reusable JSON-defined workflows
 - **Session Management**: Persistent conversation history
+- **Orchestration Tools**: Session relay (`sessions_*`), external agent spawning (`agent_spawn`), and scheduled reminders (`cron`)
 - **Hybrid LLM Router**: Intelligent routing between local (Ollama) and cloud (OpenAI) LLM providers
 - **Security**: Execution guards, allowlists, and safe command execution
 
@@ -111,6 +112,24 @@ allow_from = ["your_telegram_username"]
 [channels.discord]
 token = "${DISCORD_BOT_TOKEN}"
 allow_from = ["your_discord_user_id"]
+
+[spawner]
+enabled = true
+max_concurrent = 3
+default_timeout_secs = 300
+shutdown_grace_secs = 5
+
+[[spawner.agents]]
+name = "codex"
+command = "codex"
+working_directory = "/tmp/tinyclaw"
+capabilities = ["code_generation", "code_review"]
+
+[cron]
+enabled = true
+tick_seconds = 1
+persist_path = "cron/jobs.json"
+max_jobs = 256
 ```
 
 ### Running the Gateway
@@ -244,7 +263,16 @@ terraphim-tinyclaw skill run code-review path=./src focus=security
 | **edit** | Search and replace | `Replace "old" with "new"` |
 | **web_search** | Web search | `Search: rust async tutorial` |
 | **web_fetch** | Fetch web pages | `Fetch: https://example.com` |
-| **voice_transcribe** | Transcribe audio | Coming soon (see #593) |
+| **voice_transcribe** | Transcribe audio | Provider-backed transcription with graceful fallback |
+| **agent_spawn** | Spawn Codex/OpenCode/Claude runners | `agent_type=codex task=\"review this crate\"` |
+| **cron** | Schedule reminders to sessions | `action=add session_key=cli:main ...` |
+
+## Orchestration Constraints
+
+- `agent_spawn` enforces `spawner.max_concurrent`; additional spawns are blocked until capacity is available.
+- `agent_spawn` supports configured `[spawner.agents]` names, plus built-ins (`codex`, `opencode`, `claude-code`, `echo`).
+- `cron add` enforces same-channel targets (`requester_session_key` and `session_key` must share the same channel prefix).
+- `cron` recurring jobs accept `schedule.every_seconds` in the range `1..=604800` and persist to `[cron].persist_path`.
 
 ## Architecture
 
@@ -397,4 +425,32 @@ See [CONTRIBUTING.md](../../CONTRIBUTING.md) for contribution guidelines.
 ## Support
 
 - GitHub Issues: https://github.com/terraphim/terraphim-ai/issues
+
+## Advanced Setup
+
+### OpenAI Codex Integration
+
+For using OpenAI Codex, Claude, or other OAuth-enabled LLM providers, see:
+
+**[docs/TINYCLAW_CODEX_QUICKSTART.md](docs/TINYCLAW_CODEX_QUICKSTART.md)**
+
+This covers:
+- terraphim-llm-proxy setup with Codex OAuth
+- Browser-based OAuth flows
+- Docker deployment
+- Configuration reference
+
+### Architecture
+
+For detailed system architecture, see:
+
+**[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**
+
+This covers:
+- System components and data flow
+- LLM routing strategies
+- OAuth integration
+- Channel adapters
+- Session management
+- Tool system
 - Discussions: https://github.com/terraphim/terraphim-ai/discussions
