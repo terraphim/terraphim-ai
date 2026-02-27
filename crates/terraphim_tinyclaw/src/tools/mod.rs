@@ -2,6 +2,7 @@
 
 pub mod edit;
 pub mod filesystem;
+pub mod session_tools;
 pub mod shell;
 pub mod voice_transcribe;
 pub mod web;
@@ -148,9 +149,12 @@ impl Default for ToolRegistry {
 }
 
 /// Create a standard tool registry with all default tools.
-pub fn create_default_registry() -> ToolRegistry {
+pub fn create_default_registry(
+    sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
+) -> ToolRegistry {
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
+    use crate::tools::session_tools::{SessionHistoryTool, SessionListTool, SessionSendTool};
     use crate::tools::shell::ShellTool;
     use crate::tools::voice_transcribe::VoiceTranscribeTool;
     use crate::tools::web::{WebFetchTool, WebSearchTool};
@@ -162,6 +166,14 @@ pub fn create_default_registry() -> ToolRegistry {
     registry.register(Box::new(WebSearchTool::new()));
     registry.register(Box::new(WebFetchTool::new()));
     registry.register(Box::new(VoiceTranscribeTool::new()));
+
+    // Register session tools if SessionManager is provided
+    if let Some(sessions) = sessions {
+        registry.register(Box::new(SessionListTool::new(sessions.clone())));
+        registry.register(Box::new(SessionHistoryTool::new(sessions.clone())));
+        registry.register(Box::new(SessionSendTool::new(sessions)));
+    }
+
     registry
 }
 

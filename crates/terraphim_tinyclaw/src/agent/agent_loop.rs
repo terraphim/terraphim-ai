@@ -267,7 +267,7 @@ impl ToolCallingLoop {
         agent_config: &AgentConfig,
         router: HybridLlmRouter,
         tools: Arc<ToolRegistry>,
-        sessions: SessionManager,
+        sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
     ) -> Self {
         // Initialize command registry with defaults
@@ -284,7 +284,7 @@ impl ToolCallingLoop {
             router,
             guard: ExecutionGuard::new(),
             tools,
-            sessions: Arc::new(Mutex::new(sessions)),
+            sessions,
             commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
@@ -296,7 +296,7 @@ impl ToolCallingLoop {
         agent_config: &AgentConfig,
         router: HybridLlmRouter,
         tools: Arc<ToolRegistry>,
-        sessions: SessionManager,
+        sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
         commands: CommandRegistry,
     ) -> Self {
@@ -309,7 +309,7 @@ impl ToolCallingLoop {
             router,
             guard: ExecutionGuard::new(),
             tools,
-            sessions: Arc::new(Mutex::new(sessions)),
+            sessions,
             commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
@@ -718,7 +718,7 @@ mod tests {
             &loop_config,
             router,
             tools,
-            sessions,
+            Arc::new(Mutex::new(sessions)),
             "Test system prompt".to_string(),
         );
 
@@ -741,7 +741,7 @@ mod tests {
             ..Default::default()
         };
 
-        let agent = ToolCallingLoop::new(&loop_config, router, tools, sessions, "Test".to_string());
+        let agent = ToolCallingLoop::new(&loop_config, router, tools, Arc::new(Mutex::new(sessions)), "Test".to_string());
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/help");
         let response = agent.handle_slash_command(&msg).await;
