@@ -42,7 +42,7 @@ use terraphim_types::{
 /// When you search for "consensus algorithms", the graph traverses from the
 /// matched node to connected nodes, finding documents that mention related
 /// concepts like "raft", "leader election", etc.
-
+///
 /// Build the initial thesaurus (basic learning concepts)
 fn build_initial_thesaurus() -> Thesaurus {
     let mut thesaurus = Thesaurus::new("Initial Learnings".to_string());
@@ -129,7 +129,7 @@ fn build_enhanced_thesaurus() -> Thesaurus {
 /// PART 2: Sample Learning Documents
 /// ============================================================================
 /// These represent notes captured from technical books, courses, and research.
-
+///
 fn create_learning_documents() -> Vec<Document> {
     vec![
         Document {
@@ -247,7 +247,7 @@ Prevents use-after-free, double-free, and data races."#
 /// ============================================================================
 /// PART 3: Demonstrating Graph Embedding and Indexing
 /// ============================================================================
-
+///
 async fn demonstrate_embedding(
     rolegraph: &mut RoleGraph,
     docs: &[Document],
@@ -292,7 +292,7 @@ async fn demonstrate_embedding(
 /// ============================================================================
 /// This is the key demonstration: how adding domain-specific terms improves
 /// retrieval quality.
-
+///
 async fn compare_rankings(
     initial_graph: &RoleGraph,
     enhanced_graph: &RoleGraph,
@@ -372,7 +372,7 @@ async fn compare_rankings(
 /// PART 5: Connectivity Analysis
 /// ============================================================================
 /// Shows how graph connectivity indicates semantic coherence
-
+///
 fn demonstrate_connectivity(rolegraph: &RoleGraph, queries: &[&str]) {
     println!("\n🕸️  Semantic Connectivity Analysis");
     println!("   (Checks if query terms are connected in the knowledge graph)");

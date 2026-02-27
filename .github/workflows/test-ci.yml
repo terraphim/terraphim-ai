@@ -40,41 +40,6 @@ jobs:
           sudo apt-get install -yqq --no-install-recommends \
             libappindicator3-dev || true
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-
-      - name: Cache frontend dependencies
-        uses: actions/cache@v4
-        with:
-          path: |
-            desktop/node_modules
-            ~/.cache/yarn
-          key: ${{ runner.os }}-frontend-${{ hashFiles('desktop/yarn.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-frontend-
-
-      - name: Cache frontend build
-        uses: actions/cache@v4
-        with:
-          path: desktop/dist
-          key: ${{ runner.os }}-frontend-dist-${{ hashFiles('desktop/src/**', 'desktop/package.json', 'desktop/vite.config.ts') }}
-          restore-keys: |
-            ${{ runner.os }}-frontend-dist-
-
-      - name: Build frontend
-        working-directory: desktop
-        run: |
-          # Skip build if dist already exists from cache
-          if [ -f "dist/index.html" ]; then
-            echo "Frontend dist found in cache, skipping build"
-          else
-            echo "Building frontend..."
-            yarn install --frozen-lockfile
-            yarn build
-          fi
-
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
