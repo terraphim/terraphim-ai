@@ -71,10 +71,7 @@ mod tests {
 mod tests {
     // Stub tests when hgnc feature is not enabled
     #[test]
-    fn test_hgnc_stub() {
-        // HGNC tests require the hgnc feature
-        assert!(true);
-    }
+    fn test_hgnc_stub() {}
 }
 
 #[cfg(test)]
@@ -84,7 +81,7 @@ mod generic_tests {
     /// Test coverage signal calculation
     #[test]
     fn test_coverage_signal_calculation() {
-        let entities = vec![
+        let entities = [
             ExtractedEntity {
                 entity_type: "cancer_diagnosis".to_string(),
                 raw_value: "lung carcinoma".to_string(),
@@ -135,7 +132,7 @@ mod generic_tests {
     /// Test coverage above threshold
     #[test]
     fn test_coverage_above_threshold() {
-        let entities = vec![
+        let entities = [
             ExtractedEntity {
                 entity_type: "cancer_diagnosis".to_string(),
                 raw_value: "lung carcinoma".to_string(),

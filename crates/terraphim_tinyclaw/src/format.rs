@@ -138,20 +138,30 @@ fn replace_bold(text: &str) -> String {
 fn replace_italic(text: &str) -> String {
     let mut result = text.to_string();
     // *text* (but not **)
-    let mut i = 0;
-    while i < result.len() {
-        if result[i..].starts_with('*') && !result[i..].starts_with("**") {
-            if let Some(end) = result[i + 1..].find('*') {
-                if !result[i + 1 + end..].starts_with('*') {
-                    let end = i + 1 + end;
-                    let content = result[i + 1..end].to_string();
-                    result.replace_range(i..end + 1, &format!("<i>{}</i>", content));
-                    i += 7 + content.len();
-                    continue;
-                }
+    let mut search_start = 0;
+    while let Some(start) = result[search_start..].find('*') {
+        let start = search_start + start;
+
+        // Skip bold markers (**)
+        if result[start..].starts_with("**") {
+            search_start = start + 2;
+            continue;
+        }
+
+        // Find closing *
+        if let Some(end) = result[start + 1..].find('*') {
+            let end = start + 1 + end;
+
+            // Make sure it's not the start of a bold marker
+            if !result[end..].starts_with("*") || end == start + 1 {
+                let content = result[start + 1..end].to_string();
+                result.replace_range(start..end + 1, &format!("<i>{}</i>", content));
+                search_start = start + 7 + content.len();
+                continue;
             }
         }
-        i += 1;
+
+        search_start = start + 1;
     }
     result
 }
@@ -172,18 +182,27 @@ fn replace_strikethrough(text: &str) -> String {
 
 fn replace_inline_code(text: &str) -> String {
     let mut result = text.to_string();
-    let mut i = 0;
-    while i < result.len() {
-        if result[i..].starts_with('`') && !result[i..].starts_with("```") {
-            if let Some(end) = result[i + 1..].find('`') {
-                let end = i + 1 + end;
-                let content = result[i + 1..end].to_string();
-                result.replace_range(i..end + 1, &format!("<code>{}</code>", content));
-                i += 13 + content.len();
-                continue;
-            }
+    let mut search_start = 0;
+
+    while let Some(start) = result[search_start..].find('`') {
+        let start = search_start + start;
+
+        // Skip code blocks
+        if result[start..].starts_with("```") {
+            search_start = start + 3;
+            continue;
         }
-        i += 1;
+
+        // Find closing backtick
+        if let Some(end) = result[start + 1..].find('`') {
+            let end = start + 1 + end;
+            let content = result[start + 1..end].to_string();
+            result.replace_range(start..end + 1, &format!("<code>{}</code>", content));
+            // Move past the replacement
+            search_start = start + 13 + content.len();
+        } else {
+            break;
+        }
     }
     result
 }
@@ -209,27 +228,26 @@ fn replace_code_blocks(text: &str) -> String {
 
 fn replace_links(text: &str) -> String {
     let mut result = text.to_string();
-    let mut i = 0;
-    while i < result.len() {
-        if result[i..].starts_with('[') {
-            if let Some(close_bracket) = result[i + 1..].find(']') {
-                let close_bracket = i + 1 + close_bracket;
-                if result[close_bracket + 1..].starts_with('(') {
-                    if let Some(close_paren) = result[close_bracket + 2..].find(')') {
-                        let close_paren = close_bracket + 2 + close_paren;
-                        let link_text = result[i + 1..close_bracket].to_string();
-                        let url = result[close_bracket + 2..close_paren].to_string();
-                        result.replace_range(
-                            i..close_paren + 1,
-                            &format!(r#"<a href="{}">{}</a>"#, url, link_text),
-                        );
-                        i += 15 + url.len() + link_text.len();
-                        continue;
-                    }
+    let mut search_start = 0;
+    while let Some(start) = result[search_start..].find('[') {
+        let start = search_start + start;
+        if let Some(close_bracket) = result[start + 1..].find(']') {
+            let close_bracket = start + 1 + close_bracket;
+            if close_bracket + 1 < result.len() && result[close_bracket + 1..].starts_with('(') {
+                if let Some(close_paren) = result[close_bracket + 2..].find(')') {
+                    let close_paren = close_bracket + 2 + close_paren;
+                    let link_text = result[start + 1..close_bracket].to_string();
+                    let url = result[close_bracket + 2..close_paren].to_string();
+                    result.replace_range(
+                        start..close_paren + 1,
+                        &format!(r#"<a href="{}">{}</a>"#, url, link_text),
+                    );
+                    search_start = start + 15 + url.len() + link_text.len();
+                    continue;
                 }
             }
         }
-        i += 1;
+        search_start = start + 1;
     }
     result
 }

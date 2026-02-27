@@ -10,7 +10,7 @@ use terraphim_router::{
     FallbackRouter, FallbackStrategy, KnowledgeGraphRouter, Router, RouterMetrics, RoutingContext,
     Timer,
 };
-use terraphim_types::capability::{Capability, CostLevel, Latency, Provider, ProviderType};
+use terraphim_types::capability::{Capability, CostLevel, Provider, ProviderType};
 use terraphim_types::{NormalizedTerm, NormalizedTermValue, RoleName, Thesaurus};
 
 #[tokio::main]

@@ -47,7 +47,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     router.add_provider(agent_provider);
 
     // Create an agent spawner
-    let spawner = AgentSpawner::new()
+    let _spawner = AgentSpawner::new()
         .with_working_dir("/workspace")
         .with_auto_restart(true);
 
@@ -127,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_cost(CostLevel::Cheap),
     );
-    let router_cost = router_cost.with_strategy(Box::new(CostOptimized::default()));
+    let router_cost = router_cost.with_strategy(Box::new(CostOptimized));
 
     let decision3 = router_cost.route(task2, &RoutingContext::default())?;
     println!(
