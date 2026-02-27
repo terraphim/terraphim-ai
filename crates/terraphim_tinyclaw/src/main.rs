@@ -164,12 +164,12 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create tool registry
-    let tools = Arc::new(create_default_registry());
-
-    // Create session manager
+    // Create session manager (wrapped in Arc<Mutex> for sharing)
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = SessionManager::new(sessions_dir);
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+
+    // Create tool registry with session manager
+    let tools = Arc::new(create_default_registry(Some(sessions.clone())));
 
     // Create hybrid LLM router
     let proxy_config = ProxyClientConfig {
@@ -217,12 +217,12 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create tool registry
-    let tools = Arc::new(create_default_registry());
-
-    // Create session manager
+    // Create session manager (wrapped in Arc<Mutex> for sharing)
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = SessionManager::new(sessions_dir);
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+
+    // Create tool registry with session manager
+    let tools = Arc::new(create_default_registry(Some(sessions.clone())));
 
     // Create hybrid LLM router
     let proxy_config = ProxyClientConfig {
