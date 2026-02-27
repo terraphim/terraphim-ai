@@ -4,7 +4,7 @@ TinyClaw is a multi-channel AI assistant powered by Terraphim, supporting Telegr
 
 ## Features
 
-- **Multi-Channel Support**: Interact via Telegram, Discord, CLI, or Matrix (via bridge)
+- **Multi-Channel Support**: Interact via Telegram, Discord, or CLI
 - **Tool System**: Extensible tools for filesystem, web, shell, and code operations
 - **Skills System**: Create and execute reusable JSON-defined workflows
 - **Session Management**: Persistent conversation history
@@ -95,7 +95,7 @@ max_iterations = 20
 
 [llm.proxy]
 base_url = "https://api.openai.com/v1"
-api_key = "${OPENAI_API_KEY}"
+api_key = OPENAI_API_KEY_ENV
 model = "gpt-4"
 timeout_ms = 60000
 
@@ -244,7 +244,7 @@ terraphim-tinyclaw skill run code-review path=./src focus=security
 | **edit** | Search and replace | `Replace "old" with "new"` |
 | **web_search** | Web search | `Search: rust async tutorial` |
 | **web_fetch** | Fetch web pages | `Fetch: https://example.com` |
-| **voice_transcribe** | Transcribe audio | Requires `voice` feature |
+| **voice_transcribe** | Transcribe audio | Coming soon (see #593) |
 
 ## Architecture
 
@@ -373,8 +373,8 @@ Response:
   "components": {
     "message_bus": true,
     "session_storage": true,
-    "telegram": true,
-    "discord": true
+    "telegram": {{telegram_enabled}},
+    "discord": {{discord_enabled}}
   }
 }
 ```
