@@ -466,7 +466,10 @@ Say hello to someone.
 
         let step = parse_shell_block(content).unwrap();
         match step {
-            CommandStep::Shell { command, working_dir } => {
+            CommandStep::Shell {
+                command,
+                working_dir,
+            } => {
                 assert!(command.contains("echo"));
                 assert!(command.contains("{name}"));
                 assert_eq!(working_dir, None);
@@ -486,7 +489,10 @@ use_context: true
 
         let step = parse_llm_block(content).unwrap();
         match step {
-            CommandStep::Llm { prompt, use_context } => {
+            CommandStep::Llm {
+                prompt,
+                use_context,
+            } => {
                 assert!(prompt.contains("Analyze this code"));
                 assert!(prompt.contains("{code}"));
                 assert!(use_context);

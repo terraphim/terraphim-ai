@@ -5,6 +5,7 @@ use crate::agent::proxy_client::{
     Message, ProxyClient, ProxyClientConfig, ProxyResponse, ToolDefinition,
 };
 use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
+use crate::commands::CommandRegistry;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
 use crate::tools::{ToolError, ToolRegistry};
@@ -255,6 +256,7 @@ pub struct ToolCallingLoop {
     guard: ExecutionGuard,
     tools: Arc<ToolRegistry>,
     sessions: Arc<Mutex<SessionManager>>,
+    commands: Arc<Mutex<CommandRegistry>>,
     system_prompt: String,
     shutdown: CancellationToken,
 }
@@ -268,6 +270,11 @@ impl ToolCallingLoop {
         sessions: SessionManager,
         system_prompt: String,
     ) -> Self {
+        // Initialize command registry with defaults
+        let mut commands = CommandRegistry::with_defaults();
+        // Load commands from search paths (best effort)
+        let _ = commands.load_all();
+
         Self {
             config: ToolCallingConfig {
                 max_iterations: agent_config.max_iterations,
@@ -278,6 +285,32 @@ impl ToolCallingLoop {
             guard: ExecutionGuard::new(),
             tools,
             sessions: Arc::new(Mutex::new(sessions)),
+            commands: Arc::new(Mutex::new(commands)),
+            system_prompt,
+            shutdown: CancellationToken::new(),
+        }
+    }
+
+    /// Create with a custom command registry.
+    pub fn with_commands(
+        agent_config: &AgentConfig,
+        router: HybridLlmRouter,
+        tools: Arc<ToolRegistry>,
+        sessions: SessionManager,
+        system_prompt: String,
+        commands: CommandRegistry,
+    ) -> Self {
+        Self {
+            config: ToolCallingConfig {
+                max_iterations: agent_config.max_iterations,
+                max_session_messages: agent_config.max_session_messages,
+                ..Default::default()
+            },
+            router,
+            guard: ExecutionGuard::new(),
+            tools,
+            sessions: Arc::new(Mutex::new(sessions)),
+            commands: Arc::new(Mutex::new(commands)),
             system_prompt,
             shutdown: CancellationToken::new(),
         }
@@ -339,7 +372,7 @@ impl ToolCallingLoop {
         }
 
         // Check if this is another slash command
-        if let Some(response) = self.handle_slash_command(&msg) {
+        if let Some(response) = self.handle_slash_command(&msg).await {
             outbound_tx.send(response).await?;
             return Ok(());
         }
@@ -552,24 +585,80 @@ impl ToolCallingLoop {
     }
 
     /// Handle slash commands (except /reset which is handled in process_message).
-    fn handle_slash_command(&self, msg: &InboundMessage) -> Option<OutboundMessage> {
+    async fn handle_slash_command(&self, msg: &InboundMessage) -> Option<OutboundMessage> {
+        use crate::commands::CommandRegistry;
         let content = msg.content.trim();
 
+        // Built-in commands first (faster path)
         if content.starts_with("/role ") {
-            Some(OutboundMessage::new(
+            return Some(OutboundMessage::new(
                 &msg.channel,
                 &msg.chat_id,
                 "Role switching not yet implemented (coming in full implementation)".to_string(),
-            ))
-        } else if content == "/help" {
-            Some(OutboundMessage::new(
-                &msg.channel,
-                &msg.chat_id,
-                "Available commands:\n/reset - Clear session\n/help - Show this help".to_string(),
-            ))
-        } else {
-            None
+            ));
         }
+
+        if content == "/help" {
+            // Get available markdown commands
+            let commands_guard: tokio::sync::MutexGuard<'_, CommandRegistry> =
+                self.commands.lock().await;
+            let mut help_text =
+                "Available commands:\n/reset - Clear session\n/help - Show this help".to_string();
+
+            let commands = commands_guard.list();
+            if !commands.is_empty() {
+                help_text.push_str("\n\nCustom commands:");
+                for cmd in commands {
+                    help_text.push_str(&format!("\n/{} - {}", cmd.name, cmd.description));
+                }
+            }
+            drop(commands_guard);
+
+            return Some(OutboundMessage::new(&msg.channel, &msg.chat_id, help_text));
+        }
+
+        // Check for markdown commands
+        let first_word = content.split_whitespace().next()?;
+        if first_word.starts_with('/') {
+            let cmd_name: &str = &first_word[1..]; // Remove leading /
+            let commands_guard: tokio::sync::MutexGuard<'_, CommandRegistry> =
+                self.commands.lock().await;
+            if let Some(cmd) = commands_guard.get(cmd_name) {
+                // Found a markdown command - return info about it
+                let _args: Vec<&str> = content.split_whitespace().skip(1).collect();
+                let response = format!(
+                    "Command: {}\nDescription: {}\nArguments: {}\n\nTo execute, use: /{} {}",
+                    cmd.name,
+                    cmd.description,
+                    if cmd.arguments.is_empty() {
+                        "None".to_string()
+                    } else {
+                        cmd.arguments
+                            .iter()
+                            .map(|a| {
+                                format!(
+                                    "{} ({})",
+                                    a.name,
+                                    if a.required { "required" } else { "optional" }
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                            .join(", ")
+                    },
+                    cmd.name,
+                    cmd.arguments
+                        .iter()
+                        .filter(|a| a.required)
+                        .map(|a| format!("{}=<value>", a.name))
+                        .collect::<Vec<_>>()
+                        .join(" ")
+                );
+                return Some(OutboundMessage::new(&msg.channel, &msg.chat_id, response));
+            }
+            drop(commands_guard);
+        }
+
+        None
     }
 
     /// Trigger graceful shutdown.
@@ -612,8 +701,8 @@ mod tests {
         );
     }
 
-    #[test]
-    fn test_slash_command_reset_returns_none() {
+    #[tokio::test]
+    async fn test_slash_command_reset_returns_none() {
         // /reset is now handled in process_message, not handle_slash_command
         let temp_dir = TempDir::new().unwrap();
         let sessions = SessionManager::new(temp_dir.path().to_path_buf());
@@ -634,14 +723,14 @@ mod tests {
         );
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/reset");
-        let response = agent.handle_slash_command(&msg);
+        let response = agent.handle_slash_command(&msg).await;
 
         // handle_slash_command returns None for /reset since it's handled in process_message
         assert!(response.is_none());
     }
 
-    #[test]
-    fn test_slash_command_help() {
+    #[tokio::test]
+    async fn test_slash_command_help() {
         let temp_dir = TempDir::new().unwrap();
         let sessions = SessionManager::new(temp_dir.path().to_path_buf());
         let tools = Arc::new(ToolRegistry::new());
@@ -655,7 +744,7 @@ mod tests {
         let agent = ToolCallingLoop::new(&loop_config, router, tools, sessions, "Test".to_string());
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/help");
-        let response = agent.handle_slash_command(&msg);
+        let response = agent.handle_slash_command(&msg).await;
 
         assert!(response.is_some());
         assert!(response.unwrap().content.contains("Available commands"));

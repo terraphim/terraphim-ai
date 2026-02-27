@@ -5,6 +5,8 @@ mod bus;
 mod channel;
 mod channels;
 #[allow(dead_code)]
+mod commands;
+#[allow(dead_code)]
 mod config;
 #[allow(dead_code)]
 mod format;
