@@ -820,7 +820,13 @@ mod tests {
             ..Default::default()
         };
 
-        let agent = ToolCallingLoop::new(&loop_config, router, tools, Arc::new(Mutex::new(sessions)), "Test".to_string());
+        let agent = ToolCallingLoop::new(
+            &loop_config,
+            router,
+            tools,
+            Arc::new(Mutex::new(sessions)),
+            "Test".to_string(),
+        );
 
         let msg = InboundMessage::new("cli", "user1", "chat1", "/help");
         let response = agent.handle_slash_command(&msg).await;
