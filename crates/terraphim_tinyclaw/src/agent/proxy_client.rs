@@ -201,6 +201,8 @@ struct AnthropicRequest {
 /// Response format from Anthropic API.
 #[derive(Deserialize)]
 struct AnthropicResponse {
+    #[serde(rename = "id", default)]
+    _id: Option<String>,
     model: String,
     content: Vec<ContentBlock>,
     stop_reason: String,
@@ -222,7 +224,9 @@ enum ContentBlock {
 
 #[derive(Deserialize)]
 struct AnthropicUsage {
+    #[serde(alias = "prompt_tokens")]
     input_tokens: u32,
+    #[serde(alias = "completion_tokens")]
     output_tokens: u32,
 }
 
@@ -269,7 +273,6 @@ pub struct ToolDefinition {
 
 /// Response from the proxy.
 #[derive(Debug)]
-#[allow(dead_code)]
 pub struct ProxyResponse {
     pub content: Option<String>,
     pub tool_calls: Vec<ToolCall>,
@@ -280,7 +283,6 @@ pub struct ProxyResponse {
 
 /// Token usage information.
 #[derive(Debug, Default)]
-#[allow(dead_code)]
 pub struct TokenUsage {
     pub input_tokens: u32,
     pub output_tokens: u32,
@@ -346,5 +348,31 @@ mod tests {
         let msg = Message::assistant("Hi there");
         assert_eq!(msg.role, "assistant");
         assert_eq!(msg.content, "Hi there");
+    }
+
+    #[test]
+    fn test_anthropic_usage_parses_anthropic_format() {
+        let json = serde_json::json!({
+            "model": "claude-3-sonnet",
+            "content": [{"type": "text", "text": "Hello"}],
+            "stop_reason": "end_turn",
+            "usage": {"input_tokens": 100, "output_tokens": 50}
+        });
+        let response: AnthropicResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(response.usage.input_tokens, 100);
+        assert_eq!(response.usage.output_tokens, 50);
+    }
+
+    #[test]
+    fn test_anthropic_usage_parses_openai_format() {
+        let json = serde_json::json!({
+            "model": "gpt-4",
+            "content": [{"type": "text", "text": "Hello"}],
+            "stop_reason": "end_turn",
+            "usage": {"prompt_tokens": 200, "completion_tokens": 75}
+        });
+        let response: AnthropicResponse = serde_json::from_value(json).unwrap();
+        assert_eq!(response.usage.input_tokens, 200);
+        assert_eq!(response.usage.output_tokens, 75);
     }
 }

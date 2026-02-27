@@ -2070,10 +2070,11 @@ pub struct AgentCommunication {
 // ============================================================================
 
 /// Normalization method used for grounding
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum NormalizationMethod {
     /// Exact match via Aho-Corasick
+    #[default]
     Exact,
     /// Fuzzy match via Levenshtein or Jaro-Winkler
     Fuzzy,
@@ -2081,14 +2082,8 @@ pub enum NormalizationMethod {
     GraphRank,
 }
 
-impl Default for NormalizationMethod {
-    fn default() -> Self {
-        NormalizationMethod::Exact
-    }
-}
-
 /// Grounding metadata for normalized terms (Dynamic Ontology)
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct GroundingMetadata {
     /// Canonical URI from ontology (NCIt, HGNC, etc.)
     pub normalized_uri: Option<String>,
@@ -2117,18 +2112,6 @@ impl GroundingMetadata {
             normalized_prov: Some(prov),
             normalized_score: Some(score),
             normalized_method: Some(method),
-        }
-    }
-}
-
-impl Default for GroundingMetadata {
-    fn default() -> Self {
-        Self {
-            normalized_uri: None,
-            normalized_label: None,
-            normalized_prov: None,
-            normalized_score: None,
-            normalized_method: None,
         }
     }
 }

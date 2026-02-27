@@ -17,12 +17,9 @@ use tokio_util::sync::CancellationToken;
 
 /// Configuration for the tool-calling loop.
 #[derive(Debug, Clone)]
-#[allow(dead_code)]
 pub struct ToolCallingConfig {
     /// Maximum tool-calling iterations per message.
     pub max_iterations: usize,
-    /// Token ratio at which to trigger compression.
-    pub summarize_at_token_ratio: f32,
     /// Number of messages to keep after summarization.
     pub keep_last_messages: usize,
     /// Maximum messages per session before compression.
@@ -33,7 +30,6 @@ impl Default for ToolCallingConfig {
     fn default() -> Self {
         Self {
             max_iterations: 20,
-            summarize_at_token_ratio: 0.75,
             keep_last_messages: 4,
             max_session_messages: 200,
         }
@@ -164,20 +160,14 @@ impl HybridLlmRouter {
         }
     }
 
-    /// Compress context via direct LLM (cheap/local).
-    /// Never goes through proxy - uses Ollama or configured direct LLM.
+    /// Compress context via LLM summarization.
+    /// Tries proxy first (Claude/OpenAI), falls back to direct LLM (Ollama),
+    /// then to extractive summary.
     pub async fn compress(
         &self,
         messages: Vec<ChatMessage>,
         _system: String,
     ) -> anyhow::Result<String> {
-        let base_url = self
-            .direct_config
-            .base_url
-            .clone()
-            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
-        let model = &self.direct_config.model;
-
         // Format conversation for summarization
         let conversation = messages
             .iter()
@@ -185,17 +175,55 @@ impl HybridLlmRouter {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let prompt = format!(
+        let summarization_prompt = format!(
             "Summarize the following conversation concisely, \
              preserving key facts, decisions, and context:\n\n{}",
             conversation
         );
 
+        let summarization_system = "You are a conversation summarizer. \
+             Summarize concisely, preserving key facts, decisions, and context."
+            .to_string();
+
+        log::info!("Context compression - {} messages", messages.len());
+
+        // Tier 1: Try proxy (Claude/OpenAI via terraphim-llm-proxy)
+        if self.proxy.is_available() {
+            let proxy_messages = vec![Message::user(&summarization_prompt)];
+            match self
+                .proxy
+                .chat(proxy_messages, Some(summarization_system.clone()))
+                .await
+            {
+                Ok(response) => {
+                    log::info!(
+                        "Context compressed via proxy (model: {}, tokens: {}/{})",
+                        response.model,
+                        response.usage.input_tokens,
+                        response.usage.output_tokens
+                    );
+                    if let Some(content) = response.content {
+                        return Ok(content);
+                    }
+                }
+                Err(e) => {
+                    log::warn!("Proxy unavailable for compression: {}", e);
+                }
+            }
+        }
+
+        // Tier 2: Try direct LLM (Ollama)
+        let base_url = self
+            .direct_config
+            .base_url
+            .clone()
+            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
+        let model = &self.direct_config.model;
+
         log::info!(
-            "Context compression via {} ({}) - {} messages",
+            "Compression fallback to {} ({})",
             self.direct_config.provider,
             model,
-            messages.len()
         );
 
         let client = reqwest::Client::new();
@@ -203,7 +231,7 @@ impl HybridLlmRouter {
             .post(format!("{}/api/generate", base_url))
             .json(&serde_json::json!({
                 "model": model,
-                "prompt": prompt,
+                "prompt": summarization_prompt,
                 "stream": false
             }))
             .send()
@@ -247,6 +275,36 @@ impl HybridLlmRouter {
             recent.join("\n")
         )
     }
+}
+
+/// Build proxy messages from session messages, optionally prepending a summary.
+///
+/// If a summary exists, it is injected as a user+assistant pair at the start
+/// to maintain the alternating message pattern required by the Anthropic API.
+fn build_proxy_messages(messages: &[ChatMessage], summary: Option<&str>) -> Vec<Message> {
+    let mut proxy_messages: Vec<Message> = Vec::new();
+
+    // Inject summary as context if it exists
+    if let Some(summary) = summary {
+        proxy_messages.push(Message::user(format!(
+            "[Previous conversation summary]: {}",
+            summary
+        )));
+        proxy_messages.push(Message::assistant(
+            "Understood, I have the context from our previous conversation.",
+        ));
+    }
+
+    // Add current messages
+    for m in messages {
+        proxy_messages.push(match m.role {
+            MessageRole::User => Message::user(&m.content),
+            MessageRole::Assistant => Message::assistant(&m.content),
+            _ => Message::user(&m.content),
+        });
+    }
+
+    proxy_messages
 }
 
 /// The main tool-calling agent loop.
@@ -392,23 +450,27 @@ impl ToolCallingLoop {
         };
         session.add_message(user_msg.clone());
 
-        // Store messages for LLM conversion
-        let session_messages: Vec<_> = session.messages.clone();
-        let session_clone = session.clone();
-
         // Save session before releasing lock
+        let session_clone = session.clone();
+        let message_count = session.messages.len();
         sessions_guard.save(&session_clone)?;
         drop(sessions_guard);
 
-        // Check if we need compression using configured max_session_messages
-        let needs_compress = session_messages.len() > self.config.max_session_messages;
+        // Check if we need compression using configured ratio
+        let needs_compress = message_count > self.config.keep_last_messages * 2;
         if needs_compress {
             // Keep the last N messages, compress the rest
             let keep_count = self.config.keep_last_messages;
-            let messages_to_compress: Vec<_> = if session_messages.len() > keep_count {
-                session_messages[..session_messages.len() - keep_count].to_vec()
-            } else {
-                session_messages.clone()
+
+            // Re-acquire lock to read messages for compression
+            let messages_to_compress = {
+                let mut sessions_guard = self.sessions.lock().await;
+                let session = sessions_guard.get_or_create(&session_key);
+                if session.messages.len() > keep_count {
+                    session.messages[..session.messages.len() - keep_count].to_vec()
+                } else {
+                    session.messages.clone()
+                }
             };
 
             let summary = self
@@ -437,15 +499,12 @@ impl ToolCallingLoop {
             drop(sessions_guard);
         }
 
-        // Convert to proxy message format
-        let proxy_messages: Vec<Message> = session_messages
-            .iter()
-            .map(|m| match m.role {
-                MessageRole::User => Message::user(&m.content),
-                MessageRole::Assistant => Message::assistant(&m.content),
-                _ => Message::user(&m.content),
-            })
-            .collect();
+        // Build proxy messages from CURRENT session state (post-compression)
+        let proxy_messages = {
+            let mut sessions_guard = self.sessions.lock().await;
+            let session = sessions_guard.get_or_create(&session_key);
+            build_proxy_messages(&session.messages, session.summary.as_deref())
+        };
 
         // Get tool definitions
         let tool_definitions: Vec<ToolDefinition> = self
@@ -525,6 +584,14 @@ impl ToolCallingLoop {
                         .await;
                 }
             };
+
+            log::debug!(
+                "LLM response (model: {}, reason: {}, tokens: {}/{})",
+                response.model,
+                response.stop_reason,
+                response.usage.input_tokens,
+                response.usage.output_tokens
+            );
 
             // Check if there are tool calls
             if response.tool_calls.is_empty() {
@@ -660,12 +727,6 @@ impl ToolCallingLoop {
 
         None
     }
-
-    /// Trigger graceful shutdown.
-    #[allow(dead_code)]
-    pub fn shutdown(&self) {
-        self.shutdown.cancel();
-    }
 }
 
 #[cfg(test)]
@@ -687,16 +748,34 @@ mod tests {
         assert!(router.tools_available.load(Ordering::SeqCst));
     }
 
+    #[test]
+    fn test_tools_available_no_auto_reset() {
+        let router = create_test_router();
+        // Simulate a tool call failure by setting flag to false
+        router.tools_available.store(false, Ordering::SeqCst);
+        // The getter should NOT auto-reset
+        assert!(!router.tools_available());
+        // Flag should still be false
+        assert!(!router.tools_available.load(Ordering::SeqCst));
+    }
+
     #[tokio::test]
     async fn test_text_only_fallback() {
-        let router = create_test_router();
+        let proxy_config = ProxyClientConfig {
+            base_url: "http://127.0.0.1:1".to_string(),
+            ..Default::default()
+        };
+        let direct_config = DirectLlmConfig {
+            base_url: Some("http://127.0.0.1:1".to_string()),
+            ..Default::default()
+        };
+        let router = HybridLlmRouter::new(proxy_config, direct_config);
         let messages = vec![Message::user("Hello")];
 
         let response = router.text_only(messages, None).await.unwrap();
-        // When both proxy and direct LLM are unavailable, returns unavailable message
         assert!(
-            response.contains("unavailable") || response.contains("Hello"),
-            "Expected unavailable message or echoed input, got: {}",
+            response.contains("unavailable"),
+            "Expected unavailable message when both proxy and direct LLM are unreachable, got: {}",
             response
         );
     }
@@ -748,5 +827,93 @@ mod tests {
 
         assert!(response.is_some());
         assert!(response.unwrap().content.contains("Available commands"));
+    }
+
+    #[tokio::test]
+    async fn test_compress_fallback_to_extractive() {
+        // Both proxy and Ollama unreachable (port 1 is unreachable)
+        let proxy_config = ProxyClientConfig {
+            base_url: "http://127.0.0.1:1".to_string(),
+            ..Default::default()
+        };
+        let direct_config = DirectLlmConfig {
+            base_url: Some("http://127.0.0.1:1".to_string()),
+            ..Default::default()
+        };
+        let router = HybridLlmRouter::new(proxy_config, direct_config);
+
+        let messages = vec![
+            ChatMessage {
+                role: MessageRole::User,
+                content: "Hello there".to_string(),
+                sender_id: None,
+                timestamp: chrono::Utc::now(),
+                metadata: std::collections::HashMap::new(),
+            },
+            ChatMessage {
+                role: MessageRole::Assistant,
+                content: "Hi! How can I help?".to_string(),
+                sender_id: None,
+                timestamp: chrono::Utc::now(),
+                metadata: std::collections::HashMap::new(),
+            },
+        ];
+
+        let result = router.compress(messages, "system".to_string()).await;
+        assert!(
+            result.is_ok(),
+            "compress should never fail, got: {:?}",
+            result
+        );
+        let summary = result.unwrap();
+        assert!(
+            summary.contains("2 messages"),
+            "Expected extractive summary, got: {}",
+            summary
+        );
+    }
+
+    #[test]
+    fn test_build_proxy_messages_with_summary() {
+        let messages = vec![ChatMessage {
+            role: MessageRole::User,
+            content: "What was the decision?".to_string(),
+            sender_id: None,
+            timestamp: chrono::Utc::now(),
+            metadata: HashMap::new(),
+        }];
+
+        let result = build_proxy_messages(&messages, Some("We decided to use Rust."));
+        // Summary user message + assistant ack + 1 user message = 3
+        assert_eq!(result.len(), 3);
+        assert!(result[0].content.contains("We decided to use Rust."));
+        assert_eq!(result[0].role, "user");
+        assert_eq!(result[1].role, "assistant");
+        assert_eq!(result[2].content, "What was the decision?");
+    }
+
+    #[test]
+    fn test_build_proxy_messages_without_summary() {
+        let messages = vec![
+            ChatMessage {
+                role: MessageRole::User,
+                content: "Hello".to_string(),
+                sender_id: None,
+                timestamp: chrono::Utc::now(),
+                metadata: HashMap::new(),
+            },
+            ChatMessage {
+                role: MessageRole::Assistant,
+                content: "Hi!".to_string(),
+                sender_id: None,
+                timestamp: chrono::Utc::now(),
+                metadata: HashMap::new(),
+            },
+        ];
+
+        let result = build_proxy_messages(&messages, None);
+        assert_eq!(result.len(), 2);
+        assert_eq!(result[0].content, "Hello");
+        assert_eq!(result[1].content, "Hi!");
     }
 }

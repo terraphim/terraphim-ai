@@ -134,18 +134,12 @@ jobs:
 
   lint-and-format:
     runs-on: [self-hosted, Linux, X64]
-    needs: [setup, build-base-image, build-frontend]
+    needs: [setup, build-base-image]
     if: needs.setup.outputs.should-build == 'true'
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: desktop/dist
 
       - name: Download Docker image artifact
         uses: actions/download-artifact@v4
@@ -156,10 +150,6 @@ jobs:
       - name: Load Docker image
         run: |
           docker load < terraphim-builder-image.tar.gz
-
-      - name: Verify frontend dist
-        run: |
-          ls -la desktop/dist || echo "No desktop/dist found"
 
       - name: Run format check
         run: |
@@ -187,7 +177,7 @@ jobs:
 
   build-rust:
     runs-on: [self-hosted, Linux, X64]
-    needs: [setup, build-base-image, build-frontend, lint-and-format]
+    needs: [setup, build-base-image, lint-and-format]
     if: needs.setup.outputs.should-build == 'true'
     strategy:
       fail-fast: false
@@ -207,12 +197,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: frontend-dist
-
       - name: Download Docker image artifact
         uses: actions/download-artifact@v4
         with:
@@ -225,10 +209,6 @@ jobs:
 
       - name: Build Rust project
         run: |
-          # Copy frontend dist to desktop/dist (RustEmbed expects ../desktop/dist relative to terraphim_server)
-          mkdir -p desktop/dist
-          cp -r frontend-dist/* desktop/dist/ || echo "No frontend files found"
-
           # Build with Docker
           docker run --rm \
             -v $PWD:/workspace \
@@ -273,7 +253,7 @@ jobs:
 
   test:
     runs-on: [self-hosted, Linux, X64]
-    needs: [setup, build-base-image, build-frontend, build-rust]
+    needs: [setup, build-base-image, build-rust]
     if: needs.setup.outputs.should-build == 'true'
     timeout-minutes: 20
 
@@ -288,12 +268,6 @@ jobs:
 
       - name: Checkout code
         uses: actions/checkout@v6
-
-      - name: Download frontend artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: frontend-dist
-          path: desktop/dist
 
       - name: Download Docker image artifact
         uses: actions/download-artifact@v4
@@ -322,7 +296,7 @@ jobs:
             "
 
   summary:
-    needs: [lint-and-format, build-frontend, build-rust, test]
+    needs: [lint-and-format, build-rust, test]
     if: always()
     runs-on: [self-hosted, Linux, X64]
 

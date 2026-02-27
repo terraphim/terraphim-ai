@@ -72,7 +72,7 @@ fn example_hgnc_normalization() {
 
 fn example_coverage_signal() {
     // Create entities with varying grounding using string-based entity_type
-    let entities = vec![
+    let entities = [
         ExtractedEntity {
             entity_type: "cancer_diagnosis".to_string(),
             raw_value: "non-small cell lung cancer".to_string(),

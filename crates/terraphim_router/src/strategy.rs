@@ -358,7 +358,7 @@ mod tests {
     fn test_cost_optimized() {
         let strategy = CostOptimized;
 
-        let providers = vec![
+        let providers = [
             create_test_provider("expensive", CostLevel::Expensive, Latency::Medium),
             create_test_provider("cheap", CostLevel::Cheap, Latency::Medium),
             create_test_provider("moderate", CostLevel::Moderate, Latency::Medium),
@@ -374,7 +374,7 @@ mod tests {
     fn test_latency_optimized() {
         let strategy = LatencyOptimized;
 
-        let providers = vec![
+        let providers = [
             create_test_provider("slow", CostLevel::Moderate, Latency::Slow),
             create_test_provider("fast", CostLevel::Moderate, Latency::Fast),
             create_test_provider("medium", CostLevel::Moderate, Latency::Medium),
@@ -390,7 +390,7 @@ mod tests {
     fn test_round_robin() {
         let strategy = RoundRobin::new();
 
-        let providers = vec![
+        let providers = [
             create_test_provider("a", CostLevel::Cheap, Latency::Fast),
             create_test_provider("b", CostLevel::Cheap, Latency::Fast),
             create_test_provider("c", CostLevel::Cheap, Latency::Fast),
@@ -422,7 +422,7 @@ mod tests {
             1.0, // Always use A
         );
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
         ];
@@ -443,7 +443,7 @@ mod tests {
             0.0, // Always use B
         );
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
         ];
@@ -464,7 +464,7 @@ mod tests {
             0.5, // 50/50 split
         );
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
         ];
@@ -491,7 +491,7 @@ mod tests {
         let strategy =
             PreferenceFilter::new(Box::new(LatencyOptimized)).with_max_cost(CostLevel::Moderate);
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
             create_test_provider("moderate-medium", CostLevel::Moderate, Latency::Medium),
@@ -509,7 +509,7 @@ mod tests {
         let strategy =
             PreferenceFilter::new(Box::new(CostOptimized)).with_max_latency(Latency::Medium);
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
             create_test_provider("moderate-medium", CostLevel::Moderate, Latency::Medium),
@@ -528,7 +528,7 @@ mod tests {
         let strategy =
             PreferenceFilter::new(Box::new(CostOptimized)).with_max_latency(Latency::Fast);
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-slow", CostLevel::Expensive, Latency::Slow),
         ];
@@ -574,7 +574,7 @@ mod tests {
         let rr1 = registry.get("round_robin").unwrap();
         let rr2 = registry.get("round_robin").unwrap();
 
-        let providers = vec![
+        let providers = [
             create_test_provider("a", CostLevel::Cheap, Latency::Fast),
             create_test_provider("b", CostLevel::Cheap, Latency::Fast),
         ];
@@ -634,7 +634,7 @@ mod proptest_tests {
             p3 in arb_provider("p3"),
         ) {
             let strategy = CostOptimized;
-            let providers = vec![p1.clone(), p2.clone(), p3.clone()];
+            let providers = [p1.clone(), p2.clone(), p3.clone()];
             let candidates: Vec<&Provider> = providers.iter().collect();
 
             if let Some(selected) = strategy.select_provider(candidates) {
@@ -652,7 +652,7 @@ mod proptest_tests {
             p3 in arb_provider("p3"),
         ) {
             let strategy = LatencyOptimized;
-            let providers = vec![p1.clone(), p2.clone(), p3.clone()];
+            let providers = [p1.clone(), p2.clone(), p3.clone()];
             let candidates: Vec<&Provider> = providers.iter().collect();
 
             if let Some(selected) = strategy.select_provider(candidates) {
@@ -668,7 +668,7 @@ mod proptest_tests {
             p2 in arb_provider("rr2"),
         ) {
             let strategy = RoundRobin::new();
-            let providers = vec![p1.clone(), p2.clone()];
+            let providers = [p1.clone(), p2.clone()];
 
             let mut seen = std::collections::HashSet::new();
             for _ in 0..providers.len() {
