@@ -42,9 +42,6 @@ jobs:
         with:
           enable-cache: true
 
-      - name: Install dependencies
-        run: uv pip install --system black ruff mypy
-
       - name: Setup virtual environment
         working-directory: crates/terraphim_automata_py
         run: |
@@ -55,6 +52,7 @@ jobs:
           else
             source .venv/bin/activate
           fi
+          uv pip install black ruff mypy
 
       - name: Fix Black formatting
         working-directory: crates/terraphim_automata_py
@@ -64,16 +62,28 @@ jobs:
           else
             source .venv/bin/activate
           fi
-          uv run black python/
+          black python/
         continue-on-error: false
 
       - name: Lint with Ruff
         working-directory: crates/terraphim_automata_py
-        run: ruff check python/
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          ruff check python/
 
       - name: Type check with mypy
         working-directory: crates/terraphim_automata_py
-        run: mypy python/terraphim_automata/ --ignore-missing-imports
+        run: |
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            source .venv/Scripts/activate
+          else
+            source .venv/bin/activate
+          fi
+          mypy python/terraphim_automata/ --ignore-missing-imports
         continue-on-error: true
 
   test:

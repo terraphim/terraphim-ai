@@ -144,8 +144,8 @@ impl OntologyWorkflow {
     pub async fn execute(&self, text: &str) -> MultiAgentResult<OntologyWorkflowResult> {
         let start_time = std::time::Instant::now();
         let total_tokens = 0u64;
-        let extraction_iterations;
-        let mut normalization_iterations;
+        let extraction_iterations = 1;
+        let mut normalization_iterations = 1;
         let mut review_triggered = false;
 
         // Step 1: Lead agent routes to Extraction Agent
@@ -153,7 +153,6 @@ impl OntologyWorkflow {
 
         // Step 2: Extraction Agent extracts entities and relationships
         let schema_signal = self.extract_entities(text).await?;
-        extraction_iterations = 1;
         log::info!(
             "Extracted {} entities and {} relationships",
             schema_signal.entities.len(),
@@ -164,7 +163,6 @@ impl OntologyWorkflow {
         let mut grounded_entities = self
             .normalize_entities(schema_signal.entities.clone())
             .await?;
-        normalization_iterations = 1;
         log::info!("Normalized {} entities", grounded_entities.len());
 
         // Step 4: Coverage Agent checks ontology coverage
@@ -309,10 +307,8 @@ If no match found, respond with:
   "normalized_prov": null,
   "normalized_score": null,
   "normalized_method": null
-}}"#,
-                ontology_list,
-                entity.raw_value,
-                format!("{:?}", entity.entity_type)
+            }}"#,
+                ontology_list, entity.raw_value, entity.entity_type
             );
 
             let request = LlmRequest::new(vec![
@@ -367,7 +363,7 @@ If no match found, respond with:
     /// Review Agent: Review and improve low coverage
     async fn review_and_improve(
         &self,
-        entities: &mut Vec<ExtractedEntity>,
+        entities: &mut [ExtractedEntity],
         _coverage: &CoverageSignal,
     ) -> MultiAgentResult<Vec<ExtractedEntity>> {
         let mut client = self.llm_client.write().await;
@@ -453,7 +449,7 @@ Respond with ONLY valid JSON array:
             }
         }
 
-        Ok(entities.clone())
+        Ok(entities.to_vec())
     }
 }
 
