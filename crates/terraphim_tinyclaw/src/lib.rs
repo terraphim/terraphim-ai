@@ -13,6 +13,7 @@ pub mod agent;
 pub mod bus;
 pub mod channel;
 pub mod channels;
+pub mod commands;
 pub mod config;
 pub mod format;
 pub mod session;
