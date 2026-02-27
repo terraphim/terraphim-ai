@@ -24,6 +24,8 @@ pub struct ToolCallingConfig {
     pub summarize_at_token_ratio: f32,
     /// Number of messages to keep after summarization.
     pub keep_last_messages: usize,
+    /// Maximum messages per session before compression.
+    pub max_session_messages: usize,
 }
 
 impl Default for ToolCallingConfig {
@@ -32,6 +34,7 @@ impl Default for ToolCallingConfig {
             max_iterations: 20,
             summarize_at_token_ratio: 0.75,
             keep_last_messages: 4,
+            max_session_messages: 200,
         }
     }
 }
@@ -268,6 +271,7 @@ impl ToolCallingLoop {
         Self {
             config: ToolCallingConfig {
                 max_iterations: agent_config.max_iterations,
+                max_session_messages: agent_config.max_session_messages,
                 ..Default::default()
             },
             router,
@@ -363,8 +367,8 @@ impl ToolCallingLoop {
         sessions_guard.save(&session_clone)?;
         drop(sessions_guard);
 
-        // Check if we need compression using configured ratio
-        let needs_compress = session_messages.len() > self.config.keep_last_messages * 2;
+        // Check if we need compression using configured max_session_messages
+        let needs_compress = session_messages.len() > self.config.max_session_messages;
         if needs_compress {
             // Keep the last N messages, compress the rest
             let keep_count = self.config.keep_last_messages;
