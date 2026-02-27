@@ -1,16 +1,23 @@
 //! Tool registry and implementations for TinyClaw agent.
 
+pub mod agent_spawn;
 pub mod edit;
 pub mod filesystem;
+pub mod session_tools;
 pub mod shell;
 pub mod voice_transcribe;
 pub mod web;
 
+use crate::bus::OutboundMessage;
 use crate::config::ToolsConfig;
+use crate::session::SessionManager;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::Arc;
 use thiserror::Error;
+use tokio::sync::{Mutex, mpsc};
 
 /// A tool call request from the LLM.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -155,8 +162,20 @@ pub fn create_default_registry() -> ToolRegistry {
 
 /// Create a tool registry using tool-specific config overrides.
 pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
+    create_registry_from_config_with_runtime(tools_cfg, None, None, None)
+}
+
+/// Create a tool registry with optional runtime context for session-aware tools.
+pub fn create_registry_from_config_with_runtime(
+    tools_cfg: &ToolsConfig,
+    sessions: Option<Arc<Mutex<SessionManager>>>,
+    outbound_tx: Option<mpsc::Sender<OutboundMessage>>,
+    workspace: Option<PathBuf>,
+) -> ToolRegistry {
+    use crate::tools::agent_spawn::AgentSpawnTool;
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
+    use crate::tools::session_tools::{SessionsHistoryTool, SessionsListTool, SessionsSendTool};
     use crate::tools::shell::ShellTool;
     use crate::tools::voice_transcribe::VoiceTranscribeTool;
     use crate::tools::web::{WebFetchTool, WebSearchTool};
@@ -173,7 +192,7 @@ pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
         .and_then(|cfg| cfg.search_provider.as_deref())
         .unwrap_or("brave")
         .to_string();
-    let web_api_key = tools_cfg.web.as_ref().and_then(|cfg| cfg.api_key.clone());
+    let web_auth_token = tools_cfg.web.as_ref().and_then(|cfg| cfg.api_key.clone());
     let web_base_url = tools_cfg.web.as_ref().and_then(|cfg| cfg.base_url.clone());
 
     let web_fetch_mode = tools_cfg
@@ -184,6 +203,8 @@ pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
         .to_string();
 
     let voice_config = tools_cfg.voice.clone().unwrap_or_default();
+    let spawn_workdir =
+        workspace.unwrap_or_else(|| std::env::current_dir().unwrap_or_else(|_| PathBuf::from(".")));
 
     let mut registry = ToolRegistry::new();
     registry.register(Box::new(FilesystemTool::new()));
@@ -192,10 +213,20 @@ pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
     registry.register(Box::new(WebSearchTool::with_config(
         web_provider,
         web_base_url,
-        web_api_key,
+        web_auth_token,
     )));
     registry.register(Box::new(WebFetchTool::with_mode(web_fetch_mode)));
     registry.register(Box::new(VoiceTranscribeTool::with_config(voice_config)));
+    registry.register(Box::new(AgentSpawnTool::new(spawn_workdir)));
+
+    if let Some(sessions) = sessions {
+        registry.register(Box::new(SessionsListTool::new(sessions.clone())));
+        registry.register(Box::new(SessionsHistoryTool::new(sessions.clone())));
+        if let Some(outbound_tx) = outbound_tx {
+            registry.register(Box::new(SessionsSendTool::new(sessions, outbound_tx)));
+        }
+    }
+
     registry
 }
 
@@ -203,6 +234,9 @@ pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
 mod tests {
     use super::*;
     use crate::config::{ShellToolConfig, WebToolsConfig};
+    use crate::session::SessionManager;
+    use tempfile::TempDir;
+    use tokio::sync::mpsc;
 
     struct MockTool;
 
@@ -301,6 +335,7 @@ mod tests {
         assert!(registry.has("web_search"));
         assert!(registry.has("web_fetch"));
         assert!(registry.has("voice_transcribe"));
+        assert!(registry.has("agent_spawn"));
     }
 
     #[tokio::test]
@@ -325,5 +360,25 @@ mod tests {
 
         let result = registry.execute(&call).await;
         assert!(matches!(result, Err(ToolError::Timeout { seconds: 1, .. })));
+    }
+
+    #[tokio::test]
+    async fn test_runtime_registry_registers_session_tools() {
+        let temp_dir = TempDir::new().unwrap();
+        let sessions = Arc::new(Mutex::new(SessionManager::new(
+            temp_dir.path().to_path_buf(),
+        )));
+        let (outbound_tx, _outbound_rx) = mpsc::channel(1);
+
+        let registry = create_registry_from_config_with_runtime(
+            &ToolsConfig::default(),
+            Some(sessions),
+            Some(outbound_tx),
+            Some(temp_dir.path().to_path_buf()),
+        );
+
+        assert!(registry.has("sessions_list"));
+        assert!(registry.has("sessions_history"));
+        assert!(registry.has("sessions_send"));
     }
 }

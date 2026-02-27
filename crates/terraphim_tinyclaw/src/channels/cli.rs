@@ -67,13 +67,6 @@ impl Channel for CliChannel {
                 break;
             }
 
-            if input == "/reset" {
-                println!("Session reset (not yet implemented)");
-                print!("> ");
-                io::stdout().flush()?;
-                continue;
-            }
-
             // Create inbound message
             let msg = InboundMessage::new("cli", "local", "cli", input);
 

@@ -8,7 +8,7 @@ use crate::bus::{InboundMessage, MessageBus, OutboundMessage};
 use crate::commands::MarkdownCommandRuntime;
 use crate::config::{AgentConfig, DirectLlmConfig};
 use crate::session::{ChatMessage, MessageRole, SessionManager};
-use crate::tools::{ToolError, ToolRegistry};
+use crate::tools::{ToolCall, ToolError, ToolRegistry};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -321,11 +321,29 @@ pub struct ToolCallingLoop {
 
 impl ToolCallingLoop {
     /// Create a new tool-calling loop.
+    #[allow(dead_code)]
     pub fn new(
         agent_config: &AgentConfig,
         router: HybridLlmRouter,
         tools: Arc<ToolRegistry>,
         sessions: SessionManager,
+        system_prompt: String,
+    ) -> Self {
+        Self::new_with_shared_sessions(
+            agent_config,
+            router,
+            tools,
+            Arc::new(Mutex::new(sessions)),
+            system_prompt,
+        )
+    }
+
+    /// Create a new tool-calling loop using an externally shared session manager.
+    pub fn new_with_shared_sessions(
+        agent_config: &AgentConfig,
+        router: HybridLlmRouter,
+        tools: Arc<ToolRegistry>,
+        sessions: Arc<Mutex<SessionManager>>,
         system_prompt: String,
     ) -> Self {
         Self {
@@ -338,7 +356,7 @@ impl ToolCallingLoop {
             guard: ExecutionGuard::new(),
             tools,
             markdown_commands: Arc::new(MarkdownCommandRuntime::default()),
-            sessions: Arc::new(Mutex::new(sessions)),
+            sessions,
             system_prompt,
             shutdown: CancellationToken::new(),
         }
@@ -499,7 +517,14 @@ impl ToolCallingLoop {
 
         // Call LLM with tool-calling loop
         let final_response = if self.router.tools_available() && !tool_definitions.is_empty() {
-            self.run_tool_loop(proxy_messages, tool_definitions).await?
+            self.run_tool_loop(
+                proxy_messages,
+                tool_definitions,
+                &session_key,
+                &msg.channel,
+                &msg.chat_id,
+            )
+            .await?
         } else {
             // Fallback to text-only mode
             self.router
@@ -541,6 +566,9 @@ impl ToolCallingLoop {
         &self,
         mut messages: Vec<Message>,
         tools: Vec<ToolDefinition>,
+        requester_session_key: &str,
+        requester_channel: &str,
+        requester_chat_id: &str,
     ) -> anyhow::Result<String> {
         for iteration in 0..self.config.max_iterations {
             log::debug!("Tool-calling iteration {}", iteration + 1);
@@ -581,13 +609,19 @@ impl ToolCallingLoop {
 
             // Execute each tool call
             for tool_call in &response.tool_calls {
+                let tool_call = self.with_session_tool_context(
+                    tool_call,
+                    requester_session_key,
+                    requester_channel,
+                    requester_chat_id,
+                );
                 log::info!("Executing tool: {}", tool_call.name);
 
                 // Check with execution guard
                 let decision = self.guard.evaluate(&tool_call.name, &tool_call.arguments);
 
                 let tool_result = match decision {
-                    GuardDecision::Allow => match self.tools.execute(tool_call).await {
+                    GuardDecision::Allow => match self.tools.execute(&tool_call).await {
                         Ok(result) => result,
                         Err(ToolError::Blocked { reason, .. }) => {
                             format!("Tool blocked: {}", reason)
@@ -605,7 +639,7 @@ impl ToolCallingLoop {
                             tool_call.name,
                             reason
                         );
-                        match self.tools.execute(tool_call).await {
+                        match self.tools.execute(&tool_call).await {
                             Ok(result) => result,
                             Err(e) => format!("Tool execution error: {}", e),
                         }
@@ -674,6 +708,46 @@ impl ToolCallingLoop {
                 .map(|markdown_content| {
                     OutboundMessage::new(&msg.channel, &msg.chat_id, markdown_content)
                 })
+        }
+    }
+
+    fn with_session_tool_context(
+        &self,
+        call: &ToolCall,
+        requester_session_key: &str,
+        requester_channel: &str,
+        requester_chat_id: &str,
+    ) -> ToolCall {
+        if !matches!(
+            call.name.as_str(),
+            "sessions_list" | "sessions_history" | "sessions_send"
+        ) {
+            return call.clone();
+        }
+
+        let mut arguments = match call.arguments.clone() {
+            serde_json::Value::Object(map) => map,
+            other => {
+                let mut map = serde_json::Map::new();
+                map.insert("input".to_string(), other);
+                map
+            }
+        };
+
+        arguments
+            .entry("requester_session_key".to_string())
+            .or_insert_with(|| serde_json::Value::String(requester_session_key.to_string()));
+        arguments
+            .entry("requester_channel".to_string())
+            .or_insert_with(|| serde_json::Value::String(requester_channel.to_string()));
+        arguments
+            .entry("requester_chat_id".to_string())
+            .or_insert_with(|| serde_json::Value::String(requester_chat_id.to_string()));
+
+        ToolCall {
+            id: call.id.clone(),
+            name: call.name.clone(),
+            arguments: serde_json::Value::Object(arguments),
         }
     }
 }
@@ -1022,5 +1096,27 @@ This custom help should not run.
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].content, "Hello");
         assert_eq!(result[1].content, "Hi!");
+    }
+
+    #[test]
+    fn test_session_tool_context_injected() {
+        let temp_dir = TempDir::new().unwrap();
+        let sessions = SessionManager::new(temp_dir.path().to_path_buf());
+        let tools = Arc::new(ToolRegistry::new());
+        let router = create_test_router();
+        let loop_config = AgentConfig::default();
+
+        let agent = ToolCallingLoop::new(&loop_config, router, tools, sessions, "Test".to_string());
+
+        let call = ToolCall {
+            id: "call-1".to_string(),
+            name: "sessions_history".to_string(),
+            arguments: serde_json::json!({"session_key": "cli:target"}),
+        };
+
+        let scoped = agent.with_session_tool_context(&call, "cli:source", "cli", "source");
+        assert_eq!(scoped.arguments["requester_session_key"], "cli:source");
+        assert_eq!(scoped.arguments["requester_channel"], "cli");
+        assert_eq!(scoped.arguments["requester_chat_id"], "source");
     }
 }

@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::{File, OpenOptions};
 use std::io::{BufRead, BufReader, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// A single chat message in a session.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -236,6 +236,16 @@ impl SessionManager {
         serde_json::from_str(&last_line).ok()
     }
 
+    /// Load a session snapshot from disk without touching cache.
+    pub fn load_session(&self, key: &str) -> Option<Session> {
+        self.load(key)
+    }
+
+    /// Get a cloned session snapshot from cache or disk without creating a new session.
+    pub fn get_session_snapshot(&mut self, key: &str) -> Option<Session> {
+        self.cache.get(key).cloned().or_else(|| self.load(key))
+    }
+
     /// Get the file path for a session.
     fn session_file_path(&self, key: &str) -> PathBuf {
         // Sanitize key for filesystem (replace colons with underscores)
@@ -256,15 +266,26 @@ impl SessionManager {
             let path = entry.path();
 
             if path.extension().and_then(|s| s.to_str()) == Some("jsonl") {
-                if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
-                    // Convert back from sanitized format
-                    let key = stem.replace('_', ":");
+                if let Some(key) = Self::read_key_from_jsonl(&path) {
                     keys.push(key);
+                } else if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+                    // Fallback for malformed files: legacy stem mapping.
+                    keys.push(stem.replace('_', ":"));
                 }
             }
         }
 
+        keys.sort();
+        keys.dedup();
         Ok(keys)
+    }
+
+    fn read_key_from_jsonl(path: &Path) -> Option<String> {
+        let file = File::open(path).ok()?;
+        let reader = BufReader::new(file);
+        let last_line = reader.lines().map_while(Result::ok).last()?;
+        let snapshot: Session = serde_json::from_str(&last_line).ok()?;
+        Some(snapshot.key)
     }
 
     /// Delete a session.
@@ -426,6 +447,18 @@ mod tests {
     }
 
     #[test]
+    fn test_session_manager_list_preserves_underscores() {
+        let temp_dir = TempDir::new().unwrap();
+        let manager = SessionManager::new(temp_dir.path().to_path_buf());
+
+        let session = Session::new("discord:thread_123");
+        manager.save(&session).unwrap();
+
+        let sessions = manager.list_sessions().unwrap();
+        assert_eq!(sessions, vec!["discord:thread_123".to_string()]);
+    }
+
+    #[test]
     fn test_session_manager_reset_session_persists() {
         let temp_dir = TempDir::new().unwrap();
         let mut manager = SessionManager::new(temp_dir.path().to_path_buf());
@@ -444,5 +477,14 @@ mod tests {
         let loaded = manager.load(key).unwrap();
         assert_eq!(loaded.message_count(), 0);
         assert_eq!(loaded.summary, None);
+    }
+
+    #[test]
+    fn test_get_session_snapshot_does_not_create_new_session() {
+        let temp_dir = TempDir::new().unwrap();
+        let mut manager = SessionManager::new(temp_dir.path().to_path_buf());
+
+        assert!(manager.get_session_snapshot("cli:missing").is_none());
+        assert!(manager.list_sessions().unwrap().is_empty());
     }
 }

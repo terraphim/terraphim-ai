@@ -25,7 +25,7 @@ use crate::commands::MarkdownCommandRuntime;
 use crate::config::Config;
 use crate::session::SessionManager;
 use crate::skills::{Skill, SkillExecutor, parse_markdown_skill};
-use crate::tools::{create_default_registry, create_registry_from_config};
+use crate::tools::{create_default_registry, create_registry_from_config_with_runtime};
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -164,13 +164,18 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create tool registry
-    let tools = Arc::new(create_registry_from_config(&config.tools));
-    let markdown_commands = load_markdown_commands(&config);
-
     // Create session manager
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = SessionManager::new(sessions_dir);
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+
+    // Create tool registry
+    let tools = Arc::new(create_registry_from_config_with_runtime(
+        &config.tools,
+        Some(sessions.clone()),
+        Some(bus.outbound_sender()),
+        Some(config.agent.workspace.clone()),
+    ));
+    let markdown_commands = load_markdown_commands(&config);
 
     // Create hybrid LLM router
     let proxy_config = ProxyClientConfig {
@@ -183,8 +188,14 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let router = HybridLlmRouter::new(proxy_config, config.llm.direct.clone());
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt)
-        .with_markdown_commands(markdown_commands);
+    let agent = ToolCallingLoop::new_with_shared_sessions(
+        &config.agent,
+        router,
+        tools,
+        sessions,
+        system_prompt,
+    )
+    .with_markdown_commands(markdown_commands);
 
     // Spawn agent loop in background
     let bus_clone = bus.clone();
@@ -194,12 +205,26 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
         }
     });
 
-    // Create and run CLI channel
-    let cli_channel = CliChannel::new();
-    cli_channel.start(bus).await?;
+    // Create and run CLI channel with outbound dispatch.
+    let cli_channel = Arc::new(CliChannel::new());
+    let dispatch_channel = cli_channel.clone();
+    let bus_clone = bus.clone();
+    let dispatch_handle = tokio::spawn(async move {
+        let mut outbound_rx = bus_clone.outbound_rx.lock().await;
+        while let Some(msg) = outbound_rx.recv().await {
+            log::debug!("Dispatching outbound to CLI");
+            if let Err(e) = dispatch_channel.send(msg).await {
+                log::error!("Failed to dispatch outbound message to CLI: {}", e);
+            }
+        }
+    });
 
-    // Shutdown agent when CLI exits
+    let cli_result = cli_channel.start(bus).await;
+
+    // Shutdown background tasks when CLI exits.
     agent_handle.abort();
+    dispatch_handle.abort();
+    cli_result?;
 
     Ok(())
 }
@@ -219,13 +244,18 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     // Create message bus
     let bus = Arc::new(MessageBus::new());
 
-    // Create tool registry
-    let tools = Arc::new(create_registry_from_config(&config.tools));
-    let markdown_commands = load_markdown_commands(&config);
-
     // Create session manager
     let sessions_dir = config.agent.workspace.join("sessions");
-    let sessions = SessionManager::new(sessions_dir);
+    let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
+
+    // Create tool registry
+    let tools = Arc::new(create_registry_from_config_with_runtime(
+        &config.tools,
+        Some(sessions.clone()),
+        Some(bus.outbound_sender()),
+        Some(config.agent.workspace.clone()),
+    ));
+    let markdown_commands = load_markdown_commands(&config);
 
     // Create hybrid LLM router
     let proxy_config = ProxyClientConfig {
@@ -238,8 +268,14 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let router = HybridLlmRouter::new(proxy_config, config.llm.direct.clone());
 
     // Create agent loop
-    let agent = ToolCallingLoop::new(&config.agent, router, tools, sessions, system_prompt)
-        .with_markdown_commands(markdown_commands);
+    let agent = ToolCallingLoop::new_with_shared_sessions(
+        &config.agent,
+        router,
+        tools,
+        sessions,
+        system_prompt,
+    )
+    .with_markdown_commands(markdown_commands);
 
     // Create channel manager and register enabled channels
     let mut channel_manager = ChannelManager::new();
