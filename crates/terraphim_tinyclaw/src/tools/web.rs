@@ -2,44 +2,273 @@ use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use reqwest::Client;
 
+/// Search provider trait for web search implementations.
+#[async_trait]
+pub trait SearchProvider: Send + Sync {
+    /// Search the web and return formatted results.
+    async fn search(&self, query: &str, num_results: usize) -> Result<String, ToolError>;
+    /// Provider name.
+    fn name(&self) -> &str;
+}
+
+/// Exa.ai search provider.
+pub struct ExaProvider {
+    client: Client,
+    api_key: Option<String>,
+}
+
+impl ExaProvider {
+    /// Create a new Exa provider.
+    pub fn new(api_key: Option<String>) -> Self {
+        Self {
+            client: Client::new(),
+            api_key,
+        }
+    }
+}
+
+#[async_trait]
+impl SearchProvider for ExaProvider {
+    fn name(&self) -> &str {
+        "exa"
+    }
+
+    async fn search(&self, query: &str, num_results: usize) -> Result<String, ToolError> {
+        log::info!("Searching via Exa: {}", query);
+
+        let api_key = self
+            .api_key
+            .as_ref()
+            .ok_or_else(|| ToolError::ExecutionFailed {
+                tool: "web_search".to_string(),
+                message: "Exa API key not configured".to_string(),
+            })?;
+
+        let response = self
+            .client
+            .post("https://api.exa.ai/search")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&serde_json::json!({
+                "query": query,
+                "numResults": num_results,
+                "contents": {
+                    "text": true
+                }
+            }))
+            .send()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "web_search".to_string(),
+                message: format!("Exa API request failed: {}", e),
+            })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(ToolError::ExecutionFailed {
+                tool: "web_search".to_string(),
+                message: format!("Exa API error ({}): {}", status, error_text),
+            });
+        }
+
+        let data: serde_json::Value =
+            response
+                .json()
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    tool: "web_search".to_string(),
+                    message: format!("Failed to parse Exa response: {}", e),
+                })?;
+
+        // Format results
+        let mut output = format!("Search results for '{}' via Exa:\n\n", query);
+
+        if let Some(results) = data["results"].as_array() {
+            for (i, result) in results.iter().take(num_results).enumerate() {
+                let title = result["title"].as_str().unwrap_or("No title");
+                let url = result["url"].as_str().unwrap_or("No URL");
+                let text = result["text"].as_str().unwrap_or("");
+
+                output.push_str(&format!(
+                    "{}. {}\n{}
+{}
+\n",
+                    i + 1,
+                    title,
+                    url,
+                    text
+                ));
+            }
+        }
+
+        Ok(output)
+    }
+}
+
+/// Kimi Search provider (Moonshot AI).
+pub struct KimiSearchProvider {
+    client: Client,
+    api_key: Option<String>,
+}
+
+impl KimiSearchProvider {
+    /// Create a new Kimi Search provider.
+    pub fn new(api_key: Option<String>) -> Self {
+        Self {
+            client: Client::new(),
+            api_key,
+        }
+    }
+}
+
+#[async_trait]
+impl SearchProvider for KimiSearchProvider {
+    fn name(&self) -> &str {
+        "kimi_search"
+    }
+
+    async fn search(&self, query: &str, num_results: usize) -> Result<String, ToolError> {
+        log::info!("Searching via Kimi: {}", query);
+
+        let api_key = self
+            .api_key
+            .as_ref()
+            .ok_or_else(|| ToolError::ExecutionFailed {
+                tool: "web_search".to_string(),
+                message: "Kimi API key not configured".to_string(),
+            })?;
+
+        let response = self.client
+            .post("https://api.moonshot.cn/v1/chat/completions")
+            .header("Authorization", format!("Bearer {}", api_key))
+            .json(&serde_json::json!({
+                "model": "moonshot-v1-8k",
+                "messages": [
+                    {
+                        "role": "system",
+                        "content": "You are a search assistant. Use web search to find information and provide concise, accurate results."
+                    },
+                    {
+                        "role": "user",
+                        "content": format!("Search for: {}. Provide {} results.", query, num_results)
+                    }
+                ],
+                "tools": [
+                    {
+                        "type": "builtin_function",
+                        "function": {
+                            "name": "web_search"
+                        }
+                    }
+                ]
+            }))
+            .send()
+            .await
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "web_search".to_string(),
+                message: format!("Kimi API request failed: {}", e),
+            })?;
+
+        let status = response.status();
+        if !status.is_success() {
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_string());
+            return Err(ToolError::ExecutionFailed {
+                tool: "web_search".to_string(),
+                message: format!("Kimi API error ({}): {}", status, error_text),
+            });
+        }
+
+        let data: serde_json::Value =
+            response
+                .json()
+                .await
+                .map_err(|e| ToolError::ExecutionFailed {
+                    tool: "web_search".to_string(),
+                    message: format!("Failed to parse Kimi response: {}", e),
+                })?;
+
+        // Extract search results from the response
+        let mut output = format!("Search results for '{}' via Kimi:\n\n", query);
+
+        if let Some(choices) = data["choices"].as_array() {
+            if let Some(first) = choices.first() {
+                if let Some(content) = first["message"]["content"].as_str() {
+                    output.push_str(content);
+                }
+            }
+        }
+
+        Ok(output)
+    }
+}
+
+/// Placeholder provider for when no API key is configured.
+pub struct PlaceholderProvider;
+
+#[async_trait]
+impl SearchProvider for PlaceholderProvider {
+    fn name(&self) -> &str {
+        "placeholder"
+    }
+
+    async fn search(&self, query: &str, num_results: usize) -> Result<String, ToolError> {
+        Ok(format!(
+            "Search results for '{}' ({} results):\n\n\
+             [Note: Web search integration requires API keys]\n\
+             To enable web search:\n\
+             1. Set up a search provider (exa, kimi_search)\n\
+             2. Set the appropriate environment variable (EXA_API_KEY or KIMI_API_KEY)\n\
+             3. Restart the application",
+            query, num_results
+        ))
+    }
+}
+
 /// Web search tool using search providers.
 pub struct WebSearchTool {
-    provider: String,
+    provider: Box<dyn SearchProvider>,
 }
 
 impl WebSearchTool {
-    /// Create a new web search tool.
+    /// Create a new web search tool with default provider.
     pub fn new() -> Self {
-        Self {
-            provider: "brave".to_string(),
-        }
+        Self::from_env()
     }
 
     /// Create with a specific provider.
-    pub fn with_provider(provider: impl Into<String>) -> Self {
-        Self {
-            provider: provider.into(),
+    pub fn with_provider(provider: Box<dyn SearchProvider>) -> Self {
+        Self { provider }
+    }
+
+    /// Create from environment variables.
+    pub fn from_env() -> Self {
+        // Check for Exa API key
+        if let Ok(api_key) = std::env::var("EXA_API_KEY") {
+            if !api_key.is_empty() {
+                return Self::with_provider(Box::new(ExaProvider::new(Some(api_key))));
+            }
         }
+
+        // Check for Kimi API key
+        if let Ok(api_key) = std::env::var("KIMI_API_KEY") {
+            if !api_key.is_empty() {
+                return Self::with_provider(Box::new(KimiSearchProvider::new(Some(api_key))));
+            }
+        }
+
+        // Fall back to placeholder
+        Self::with_provider(Box::new(PlaceholderProvider))
     }
 
     /// Perform a web search.
     async fn search(&self, query: &str, num_results: usize) -> Result<String, ToolError> {
-        // For now, return a placeholder implementation
-        // In production, this would integrate with Brave, SearXNG, or Google APIs
-        log::info!("Web search for: {} (provider: {})", query, self.provider);
-
-        // Simulated search results
-        let results = format!(
-            "Search results for '{}' ({} results):\n\n\
-             [Note: Web search integration requires API keys]\n\
-             To enable web search:\n\
-             1. Set up a search provider (Brave, SearXNG, or Google)\n\
-             2. Configure API keys in your config file\n\
-             3. Restart the application",
-            query, num_results
-        );
-
-        Ok(results)
+        self.provider.search(query, num_results).await
     }
 }
 
@@ -57,8 +286,8 @@ impl Tool for WebSearchTool {
 
     fn description(&self) -> &str {
         "Search the web for information. \
-         Supports multiple search providers (Brave, SearXNG, Google). \
-         Note: Requires API key configuration."
+         Supports multiple search providers (exa, kimi_search). \
+         Requires EXA_API_KEY or KIMI_API_KEY environment variable."
     }
 
     fn parameters_schema(&self) -> serde_json::Value {
@@ -235,7 +464,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_web_search_placeholder() {
-        let tool = WebSearchTool::new();
+        let tool = WebSearchTool::with_provider(Box::new(PlaceholderProvider));
         let args = serde_json::json!({
             "query": "rust programming language",
             "num_results": 5
@@ -244,5 +473,23 @@ mod tests {
         let result = tool.execute(args).await.unwrap();
         assert!(result.contains("rust programming language"));
         assert!(result.contains("Web search integration requires API keys"));
+    }
+
+    #[test]
+    fn test_exa_provider_name() {
+        let provider = ExaProvider::new(None);
+        assert_eq!(provider.name(), "exa");
+    }
+
+    #[test]
+    fn test_kimi_provider_name() {
+        let provider = KimiSearchProvider::new(None);
+        assert_eq!(provider.name(), "kimi_search");
+    }
+
+    #[test]
+    fn test_placeholder_provider_name() {
+        let provider = PlaceholderProvider;
+        assert_eq!(provider.name(), "placeholder");
     }
 }
