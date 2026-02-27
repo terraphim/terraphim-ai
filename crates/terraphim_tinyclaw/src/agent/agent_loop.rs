@@ -720,7 +720,7 @@ impl ToolCallingLoop {
     ) -> ToolCall {
         if !matches!(
             call.name.as_str(),
-            "sessions_list" | "sessions_history" | "sessions_send"
+            "sessions_list" | "sessions_history" | "sessions_send" | "cron"
         ) {
             return call.clone();
         }

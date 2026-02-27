@@ -25,7 +25,9 @@ use crate::commands::MarkdownCommandRuntime;
 use crate::config::Config;
 use crate::session::SessionManager;
 use crate::skills::{Skill, SkillExecutor, parse_markdown_skill};
-use crate::tools::{create_default_registry, create_registry_from_config_with_runtime};
+use crate::tools::{
+    create_default_registry, create_registry_from_config_with_runtime_and_orchestration,
+};
 use clap::{Parser, Subcommand};
 use std::collections::HashMap;
 use std::path::PathBuf;
@@ -169,8 +171,10 @@ async fn run_agent_mode(config: Config, system_prompt_path: Option<PathBuf>) -> 
     let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
 
     // Create tool registry
-    let tools = Arc::new(create_registry_from_config_with_runtime(
+    let tools = Arc::new(create_registry_from_config_with_runtime_and_orchestration(
         &config.tools,
+        &config.spawner,
+        &config.cron,
         Some(sessions.clone()),
         Some(bus.outbound_sender()),
         Some(config.agent.workspace.clone()),
@@ -249,8 +253,10 @@ async fn run_gateway_mode(config: Config) -> anyhow::Result<()> {
     let sessions = Arc::new(tokio::sync::Mutex::new(SessionManager::new(sessions_dir)));
 
     // Create tool registry
-    let tools = Arc::new(create_registry_from_config_with_runtime(
+    let tools = Arc::new(create_registry_from_config_with_runtime_and_orchestration(
         &config.tools,
+        &config.spawner,
+        &config.cron,
         Some(sessions.clone()),
         Some(bus.outbound_sender()),
         Some(config.agent.workspace.clone()),

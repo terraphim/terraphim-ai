@@ -8984,6 +8984,8 @@ dependencies = [
  "serenity",
  "teloxide",
  "tempfile",
+ "terraphim_spawner",
+ "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",

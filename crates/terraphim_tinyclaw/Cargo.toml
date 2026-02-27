@@ -41,6 +41,10 @@ tracing = "0.1"
 log = { workspace = true }
 env_logger = "0.11"
 
+# Terraphim crates
+terraphim_spawner = { path = "../terraphim_spawner" }
+terraphim_types = { path = "../terraphim_types" }
+
 # Environment
 env_home = "0.1"
 dirs = "5"

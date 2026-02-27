@@ -1,6 +1,7 @@
 //! Tool registry and implementations for TinyClaw agent.
 
 pub mod agent_spawn;
+pub mod cron;
 pub mod edit;
 pub mod filesystem;
 pub mod session_tools;
@@ -9,7 +10,7 @@ pub mod voice_transcribe;
 pub mod web;
 
 use crate::bus::OutboundMessage;
-use crate::config::ToolsConfig;
+use crate::config::{CronConfig, SpawnerConfig, ToolsConfig};
 use crate::session::SessionManager;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
@@ -162,7 +163,14 @@ pub fn create_default_registry() -> ToolRegistry {
 
 /// Create a tool registry using tool-specific config overrides.
 pub fn create_registry_from_config(tools_cfg: &ToolsConfig) -> ToolRegistry {
-    create_registry_from_config_with_runtime(tools_cfg, None, None, None)
+    create_registry_from_config_with_runtime_and_orchestration(
+        tools_cfg,
+        &SpawnerConfig::default(),
+        &CronConfig::default(),
+        None,
+        None,
+        None,
+    )
 }
 
 /// Create a tool registry with optional runtime context for session-aware tools.
@@ -172,7 +180,27 @@ pub fn create_registry_from_config_with_runtime(
     outbound_tx: Option<mpsc::Sender<OutboundMessage>>,
     workspace: Option<PathBuf>,
 ) -> ToolRegistry {
+    create_registry_from_config_with_runtime_and_orchestration(
+        tools_cfg,
+        &SpawnerConfig::default(),
+        &CronConfig::default(),
+        sessions,
+        outbound_tx,
+        workspace,
+    )
+}
+
+/// Create a tool registry with optional runtime context and orchestration config.
+pub fn create_registry_from_config_with_runtime_and_orchestration(
+    tools_cfg: &ToolsConfig,
+    spawner_cfg: &SpawnerConfig,
+    cron_cfg: &CronConfig,
+    sessions: Option<Arc<Mutex<SessionManager>>>,
+    outbound_tx: Option<mpsc::Sender<OutboundMessage>>,
+    workspace: Option<PathBuf>,
+) -> ToolRegistry {
     use crate::tools::agent_spawn::AgentSpawnTool;
+    use crate::tools::cron::CronTool;
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
     use crate::tools::session_tools::{SessionsHistoryTool, SessionsListTool, SessionsSendTool};
@@ -192,7 +220,7 @@ pub fn create_registry_from_config_with_runtime(
         .and_then(|cfg| cfg.search_provider.as_deref())
         .unwrap_or("brave")
         .to_string();
-    let web_auth_token = tools_cfg.web.as_ref().and_then(|cfg| cfg.api_key.clone());
+    let web_search_api_key = tools_cfg.web.as_ref().and_then(|cfg| cfg.api_key.clone());
     let web_base_url = tools_cfg.web.as_ref().and_then(|cfg| cfg.base_url.clone());
 
     let web_fetch_mode = tools_cfg
@@ -213,17 +241,29 @@ pub fn create_registry_from_config_with_runtime(
     registry.register(Box::new(WebSearchTool::with_config(
         web_provider,
         web_base_url,
-        web_auth_token,
+        web_search_api_key,
     )));
     registry.register(Box::new(WebFetchTool::with_mode(web_fetch_mode)));
     registry.register(Box::new(VoiceTranscribeTool::with_config(voice_config)));
-    registry.register(Box::new(AgentSpawnTool::new(spawn_workdir)));
+    registry.register(Box::new(AgentSpawnTool::with_config(
+        spawn_workdir.clone(),
+        spawner_cfg.clone(),
+    )));
 
     if let Some(sessions) = sessions {
         registry.register(Box::new(SessionsListTool::new(sessions.clone())));
         registry.register(Box::new(SessionsHistoryTool::new(sessions.clone())));
         if let Some(outbound_tx) = outbound_tx {
-            registry.register(Box::new(SessionsSendTool::new(sessions, outbound_tx)));
+            registry.register(Box::new(SessionsSendTool::new(
+                sessions.clone(),
+                outbound_tx.clone(),
+            )));
+            registry.register(Box::new(CronTool::new(
+                cron_cfg.clone(),
+                spawn_workdir,
+                sessions,
+                outbound_tx,
+            )));
         }
     }
 
@@ -233,7 +273,7 @@ pub fn create_registry_from_config_with_runtime(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::config::{ShellToolConfig, WebToolsConfig};
+    use crate::config::{CronConfig, ShellToolConfig, SpawnerConfig, WebToolsConfig};
     use crate::session::SessionManager;
     use tempfile::TempDir;
     use tokio::sync::mpsc;
@@ -380,5 +420,28 @@ mod tests {
         assert!(registry.has("sessions_list"));
         assert!(registry.has("sessions_history"));
         assert!(registry.has("sessions_send"));
+    }
+
+    #[tokio::test]
+    async fn test_runtime_registry_registers_cron_when_enabled() {
+        let temp_dir = TempDir::new().unwrap();
+        let sessions = Arc::new(Mutex::new(SessionManager::new(
+            temp_dir.path().join("sessions"),
+        )));
+        let (outbound_tx, _outbound_rx) = mpsc::channel(1);
+
+        let registry = create_registry_from_config_with_runtime_and_orchestration(
+            &ToolsConfig::default(),
+            &SpawnerConfig::default(),
+            &CronConfig {
+                enabled: true,
+                ..Default::default()
+            },
+            Some(sessions),
+            Some(outbound_tx),
+            Some(temp_dir.path().to_path_buf()),
+        );
+
+        assert!(registry.has("cron"));
     }
 }

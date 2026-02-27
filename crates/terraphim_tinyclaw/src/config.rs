@@ -11,6 +11,10 @@ pub struct Config {
     #[serde(default)]
     pub tools: ToolsConfig,
     #[serde(default)]
+    pub spawner: SpawnerConfig,
+    #[serde(default)]
+    pub cron: CronConfig,
+    #[serde(default)]
     pub commands: MarkdownCommandsConfig,
 }
 
@@ -37,6 +41,8 @@ impl Config {
         self.agent.validate()?;
         self.channels.validate()?;
         self.llm.validate()?;
+        self.spawner.validate()?;
+        self.cron.validate()?;
         Ok(())
     }
 
@@ -353,6 +359,168 @@ pub struct ToolsConfig {
     pub voice: Option<VoiceToolConfig>,
 }
 
+/// External agent spawning configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SpawnerConfig {
+    /// Whether `agent_spawn` is enabled.
+    #[serde(default = "default_spawner_enabled")]
+    pub enabled: bool,
+
+    /// Maximum concurrently running spawned agents.
+    #[serde(default = "default_spawner_max_concurrent")]
+    pub max_concurrent: usize,
+
+    /// Default wait timeout for foreground executions.
+    #[serde(default = "default_spawner_timeout")]
+    pub default_timeout_secs: u64,
+
+    /// Grace period used when terminating timed out jobs.
+    #[serde(default = "default_spawner_shutdown_grace")]
+    pub shutdown_grace_secs: u64,
+
+    /// Named agent mappings available to the tool.
+    #[serde(default)]
+    pub agents: Vec<SpawnerAgentEntry>,
+}
+
+impl Default for SpawnerConfig {
+    fn default() -> Self {
+        Self {
+            enabled: default_spawner_enabled(),
+            max_concurrent: default_spawner_max_concurrent(),
+            default_timeout_secs: default_spawner_timeout(),
+            shutdown_grace_secs: default_spawner_shutdown_grace(),
+            agents: Vec::new(),
+        }
+    }
+}
+
+impl SpawnerConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.max_concurrent == 0 {
+            anyhow::bail!("spawner.max_concurrent must be greater than 0");
+        }
+        if self.default_timeout_secs == 0 {
+            anyhow::bail!("spawner.default_timeout_secs must be greater than 0");
+        }
+
+        for entry in &self.agents {
+            if entry.name.trim().is_empty() {
+                anyhow::bail!("spawner.agents[].name cannot be empty");
+            }
+            if entry.command.trim().is_empty() {
+                anyhow::bail!(
+                    "spawner.agents[].command cannot be empty (agent: {})",
+                    entry.name
+                );
+            }
+        }
+
+        Ok(())
+    }
+}
+
+fn default_spawner_enabled() -> bool {
+    true
+}
+
+fn default_spawner_max_concurrent() -> usize {
+    3
+}
+
+fn default_spawner_timeout() -> u64 {
+    300
+}
+
+fn default_spawner_shutdown_grace() -> u64 {
+    5
+}
+
+/// A named external agent runtime mapping.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SpawnerAgentEntry {
+    /// Tool-facing agent type (e.g. `codex`, `opencode`, `claude-code`).
+    pub name: String,
+
+    /// Executable command in PATH (or absolute path).
+    pub command: String,
+
+    /// Optional per-agent working directory override.
+    #[serde(default)]
+    pub working_directory: Option<PathBuf>,
+
+    /// Optional capability names.
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+
+    /// Reserved for compatibility with upstream docs.
+    #[serde(default = "default_health_check_interval")]
+    pub health_check_interval_secs: u64,
+}
+
+fn default_health_check_interval() -> u64 {
+    30
+}
+
+/// Scheduler settings for the `cron` tool.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct CronConfig {
+    /// Whether cron tooling is enabled.
+    #[serde(default)]
+    pub enabled: bool,
+
+    /// Poll interval for due job checks.
+    #[serde(default = "default_cron_tick_seconds")]
+    pub tick_seconds: u64,
+
+    /// Optional path to cron job storage file.
+    #[serde(default)]
+    pub persist_path: Option<PathBuf>,
+
+    /// Maximum number of stored jobs.
+    #[serde(default = "default_cron_max_jobs")]
+    pub max_jobs: usize,
+}
+
+impl Default for CronConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            tick_seconds: default_cron_tick_seconds(),
+            persist_path: None,
+            max_jobs: default_cron_max_jobs(),
+        }
+    }
+}
+
+impl CronConfig {
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.tick_seconds == 0 {
+            anyhow::bail!("cron.tick_seconds must be greater than 0");
+        }
+        if self.max_jobs == 0 {
+            anyhow::bail!("cron.max_jobs must be greater than 0");
+        }
+        Ok(())
+    }
+
+    pub fn jobs_path(&self, workspace: &Path) -> PathBuf {
+        match &self.persist_path {
+            Some(path) if path.is_absolute() => path.clone(),
+            Some(path) => workspace.join(path),
+            None => workspace.join("cron/jobs.json"),
+        }
+    }
+}
+
+fn default_cron_tick_seconds() -> u64 {
+    1
+}
+
+fn default_cron_max_jobs() -> usize {
+    256
+}
+
 /// Markdown slash command runtime configuration.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]
 pub struct MarkdownCommandsConfig {
@@ -630,6 +798,24 @@ model = "whisper-1"
 base_url = "https://voice.example.com/v1"
 timeout_seconds = 30
 temp_dir = "/tmp/tinyclaw-voice"
+
+[spawner]
+enabled = true
+max_concurrent = 5
+default_timeout_secs = 120
+shutdown_grace_secs = 7
+
+[[spawner.agents]]
+name = "codex"
+command = "codex"
+working_directory = "/tmp/tinyclaw"
+capabilities = ["code_generation", "code_review"]
+
+[cron]
+enabled = true
+tick_seconds = 2
+persist_path = "cron/jobs-test.json"
+max_jobs = 99
 "#;
 
         let config: Config = toml::from_str(toml).unwrap();
@@ -657,6 +843,30 @@ temp_dir = "/tmp/tinyclaw-voice"
         assert_eq!(
             voice.temp_dir.as_deref(),
             Some(Path::new("/tmp/tinyclaw-voice"))
+        );
+
+        assert!(config.spawner.enabled);
+        assert_eq!(config.spawner.max_concurrent, 5);
+        assert_eq!(config.spawner.default_timeout_secs, 120);
+        assert_eq!(config.spawner.shutdown_grace_secs, 7);
+        assert_eq!(config.spawner.agents.len(), 1);
+        assert_eq!(config.spawner.agents[0].name, "codex");
+        assert_eq!(config.spawner.agents[0].command, "codex");
+        assert_eq!(
+            config.spawner.agents[0].working_directory.as_deref(),
+            Some(Path::new("/tmp/tinyclaw"))
+        );
+        assert_eq!(
+            config.spawner.agents[0].capabilities,
+            vec!["code_generation".to_string(), "code_review".to_string()]
+        );
+
+        assert!(config.cron.enabled);
+        assert_eq!(config.cron.tick_seconds, 2);
+        assert_eq!(config.cron.max_jobs, 99);
+        assert_eq!(
+            config.cron.persist_path.as_deref(),
+            Some(Path::new("cron/jobs-test.json"))
         );
     }
 
@@ -709,5 +919,17 @@ directory = "custom-commands"
     fn test_markdown_commands_config_disabled_by_default() {
         let cfg = MarkdownCommandsConfig::default();
         assert!(cfg.commands_dir(Path::new("/tmp")).is_none());
+    }
+
+    #[test]
+    fn test_cron_jobs_path_resolution() {
+        let cfg = CronConfig {
+            persist_path: Some(PathBuf::from("cron/jobs.json")),
+            ..Default::default()
+        };
+        assert_eq!(
+            cfg.jobs_path(Path::new("/workspace")),
+            PathBuf::from("/workspace/cron/jobs.json")
+        );
     }
 }
