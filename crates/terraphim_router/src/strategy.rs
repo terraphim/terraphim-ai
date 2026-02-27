@@ -358,7 +358,7 @@ mod tests {
     fn test_cost_optimized() {
         let strategy = CostOptimized;
 
-        let providers = vec![
+        let providers = [
             create_test_provider("expensive", CostLevel::Expensive, Latency::Medium),
             create_test_provider("cheap", CostLevel::Cheap, Latency::Medium),
             create_test_provider("moderate", CostLevel::Moderate, Latency::Medium),
@@ -374,7 +374,7 @@ mod tests {
     fn test_latency_optimized() {
         let strategy = LatencyOptimized;
 
-        let providers = vec![
+        let providers = [
             create_test_provider("slow", CostLevel::Moderate, Latency::Slow),
             create_test_provider("fast", CostLevel::Moderate, Latency::Fast),
             create_test_provider("medium", CostLevel::Moderate, Latency::Medium),
@@ -390,7 +390,7 @@ mod tests {
     fn test_round_robin() {
         let strategy = RoundRobin::new();
 
-        let providers = vec![
+        let providers = [
             create_test_provider("a", CostLevel::Cheap, Latency::Fast),
             create_test_provider("b", CostLevel::Cheap, Latency::Fast),
             create_test_provider("c", CostLevel::Cheap, Latency::Fast),
@@ -422,7 +422,7 @@ mod tests {
             1.0, // Always use A
         );
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
         ];
@@ -443,7 +443,7 @@ mod tests {
             0.0, // Always use B
         );
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
         ];
@@ -464,7 +464,7 @@ mod tests {
             0.5, // 50/50 split
         );
 
-        let providers = vec![
+        let providers = [
             create_test_provider("cheap-slow", CostLevel::Cheap, Latency::Slow),
             create_test_provider("expensive-fast", CostLevel::Expensive, Latency::Fast),
         ];

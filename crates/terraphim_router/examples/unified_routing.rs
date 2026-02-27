@@ -127,7 +127,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         )
         .with_cost(CostLevel::Cheap),
     );
-    let router_cost = router_cost.with_strategy(Box::new(CostOptimized::default()));
+    let router_cost = router_cost.with_strategy(Box::new(CostOptimized));
 
     let decision3 = router_cost.route(task2, &RoutingContext::default())?;
     println!(
