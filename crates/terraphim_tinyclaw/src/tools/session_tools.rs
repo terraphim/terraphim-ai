@@ -27,10 +27,12 @@ impl SessionListTool {
         limit: usize,
     ) -> Result<Vec<SessionInfo>, ToolError> {
         let sessions = self.sessions.lock().await;
-        let keys = sessions.list_sessions().map_err(|e| ToolError::ExecutionFailed {
-            tool: "sessions_list".to_string(),
-            message: format!("Failed to list sessions: {}", e),
-        })?;
+        let keys = sessions
+            .list_sessions()
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "sessions_list".to_string(),
+                message: format!("Failed to list sessions: {}", e),
+            })?;
 
         let mut infos = Vec::new();
         for key in keys {
@@ -107,8 +109,16 @@ impl Tool for SessionListTool {
 
         for info in sessions {
             let summary_indicator = if info.has_summary { "Yes" } else { "No" };
-            let created = info.created_at.split('T').next().unwrap_or(&info.created_at);
-            let updated = info.updated_at.split('T').next().unwrap_or(&info.updated_at);
+            let created = info
+                .created_at
+                .split('T')
+                .next()
+                .unwrap_or(&info.created_at);
+            let updated = info
+                .updated_at
+                .split('T')
+                .next()
+                .unwrap_or(&info.updated_at);
 
             output.push_str(&format!(
                 "| {} | {} | {} | {} | {} |\n",
@@ -141,10 +151,12 @@ impl SessionHistoryTool {
         }
 
         // If not in cache, try loading from disk by listing all sessions
-        let keys = sessions.list_sessions().map_err(|e| ToolError::ExecutionFailed {
-            tool: "sessions_history".to_string(),
-            message: format!("Failed to list sessions: {}", e),
-        })?;
+        let keys = sessions
+            .list_sessions()
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "sessions_history".to_string(),
+                message: format!("Failed to list sessions: {}", e),
+            })?;
 
         if !keys.iter().any(|k| k == session_key) {
             return Err(ToolError::ExecutionFailed {
@@ -155,7 +167,10 @@ impl SessionHistoryTool {
 
         Err(ToolError::ExecutionFailed {
             tool: "sessions_history".to_string(),
-            message: format!("Session '{}' exists but is not currently loaded", session_key),
+            message: format!(
+                "Session '{}' exists but is not currently loaded",
+                session_key
+            ),
         })
     }
 
@@ -235,10 +250,13 @@ impl Tool for SessionHistoryTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> Result<String, ToolError> {
-        let session_key = args["session_key"].as_str().ok_or_else(|| ToolError::InvalidArguments {
-            tool: "sessions_history".to_string(),
-            message: "Missing required parameter 'session_key'".to_string(),
-        })?;
+        let session_key =
+            args["session_key"]
+                .as_str()
+                .ok_or_else(|| ToolError::InvalidArguments {
+                    tool: "sessions_history".to_string(),
+                    message: "Missing required parameter 'session_key'".to_string(),
+                })?;
 
         let limit = args["limit"].as_u64().unwrap_or(20) as usize;
 
@@ -292,15 +310,20 @@ impl Tool for SessionSendTool {
     }
 
     async fn execute(&self, args: serde_json::Value) -> Result<String, ToolError> {
-        let session_key = args["session_key"].as_str().ok_or_else(|| ToolError::InvalidArguments {
-            tool: "sessions_send".to_string(),
-            message: "Missing required parameter 'session_key'".to_string(),
-        })?;
+        let session_key =
+            args["session_key"]
+                .as_str()
+                .ok_or_else(|| ToolError::InvalidArguments {
+                    tool: "sessions_send".to_string(),
+                    message: "Missing required parameter 'session_key'".to_string(),
+                })?;
 
-        let message = args["message"].as_str().ok_or_else(|| ToolError::InvalidArguments {
-            tool: "sessions_send".to_string(),
-            message: "Missing required parameter 'message'".to_string(),
-        })?;
+        let message = args["message"]
+            .as_str()
+            .ok_or_else(|| ToolError::InvalidArguments {
+                tool: "sessions_send".to_string(),
+                message: "Missing required parameter 'message'".to_string(),
+            })?;
 
         let role_str = args["as_role"].as_str().unwrap_or("assistant");
         let role = match role_str {
@@ -337,16 +360,17 @@ impl Tool for SessionSendTool {
 
         // Save the session - acquire a new lock
         let sessions = self.sessions.lock().await;
-        sessions.save(&session_to_save).map_err(|e| ToolError::ExecutionFailed {
-            tool: "sessions_send".to_string(),
-            message: format!("Failed to save session: {}", e),
-        })?;
+        sessions
+            .save(&session_to_save)
+            .map_err(|e| ToolError::ExecutionFailed {
+                tool: "sessions_send".to_string(),
+                message: format!("Failed to save session: {}", e),
+            })?;
         drop(sessions);
 
         Ok(format!(
             "Message sent to session '{}'. Session now has {} messages.",
-            session_key,
-            message_count
+            session_key, message_count
         ))
     }
 }
