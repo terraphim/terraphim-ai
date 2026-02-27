@@ -314,7 +314,27 @@ impl ToolCallingLoop {
         msg: InboundMessage,
         outbound_tx: &tokio::sync::mpsc::Sender<OutboundMessage>,
     ) -> anyhow::Result<()> {
-        // Check if this is a slash command
+        // Handle /reset command specially - it needs to clear the session
+        if msg.content.trim() == "/reset" {
+            let session_key = msg.session_key();
+            let mut sessions_guard = self.sessions.lock().await;
+            // Get session, clear it, then save
+            let session = sessions_guard.get_or_create(&session_key);
+            session.clear();
+            let session_clone = session.clone();
+            sessions_guard.save(&session_clone)?;
+            drop(sessions_guard);
+
+            let response = OutboundMessage::new(
+                &msg.channel,
+                &msg.chat_id,
+                "Session reset. Your next message will start fresh.".to_string(),
+            );
+            outbound_tx.send(response).await?;
+            return Ok(());
+        }
+
+        // Check if this is another slash command
         if let Some(response) = self.handle_slash_command(&msg) {
             outbound_tx.send(response).await?;
             return Ok(());
@@ -527,18 +547,11 @@ impl ToolCallingLoop {
         ))
     }
 
-    /// Handle slash commands.
+    /// Handle slash commands (except /reset which is handled in process_message).
     fn handle_slash_command(&self, msg: &InboundMessage) -> Option<OutboundMessage> {
         let content = msg.content.trim();
 
-        if content == "/reset" {
-            // Reset is handled in process_message by creating new session context
-            Some(OutboundMessage::new(
-                &msg.channel,
-                &msg.chat_id,
-                "Session reset. Your next message will start fresh.".to_string(),
-            ))
-        } else if content.starts_with("/role ") {
+        if content.starts_with("/role ") {
             Some(OutboundMessage::new(
                 &msg.channel,
                 &msg.chat_id,
@@ -596,7 +609,8 @@ mod tests {
     }
 
     #[test]
-    fn test_slash_command_reset() {
+    fn test_slash_command_reset_returns_none() {
+        // /reset is now handled in process_message, not handle_slash_command
         let temp_dir = TempDir::new().unwrap();
         let sessions = SessionManager::new(temp_dir.path().to_path_buf());
         let tools = Arc::new(ToolRegistry::new());
@@ -618,8 +632,8 @@ mod tests {
         let msg = InboundMessage::new("cli", "user1", "chat1", "/reset");
         let response = agent.handle_slash_command(&msg);
 
-        assert!(response.is_some());
-        assert!(response.unwrap().content.contains("Session reset"));
+        // handle_slash_command returns None for /reset since it's handled in process_message
+        assert!(response.is_none());
     }
 
     #[test]
