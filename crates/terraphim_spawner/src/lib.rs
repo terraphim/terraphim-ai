@@ -446,27 +446,23 @@ impl AgentSpawner {
         use nix::sys::resource::{setrlimit, Resource};
 
         if let Some(max_mem) = limits.max_memory_bytes {
-            setrlimit(Resource::RLIMIT_AS, max_mem, max_mem).map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_AS: {}", e))
-            })?;
+            setrlimit(Resource::RLIMIT_AS, max_mem, max_mem)
+                .map_err(|e| std::io::Error::other(format!("RLIMIT_AS: {}", e)))?;
         }
 
         if let Some(max_cpu) = limits.max_cpu_seconds {
-            setrlimit(Resource::RLIMIT_CPU, max_cpu, max_cpu).map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_CPU: {}", e))
-            })?;
+            setrlimit(Resource::RLIMIT_CPU, max_cpu, max_cpu)
+                .map_err(|e| std::io::Error::other(format!("RLIMIT_CPU: {}", e)))?;
         }
 
         if let Some(max_fsize) = limits.max_file_size_bytes {
-            setrlimit(Resource::RLIMIT_FSIZE, max_fsize, max_fsize).map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_FSIZE: {}", e))
-            })?;
+            setrlimit(Resource::RLIMIT_FSIZE, max_fsize, max_fsize)
+                .map_err(|e| std::io::Error::other(format!("RLIMIT_FSIZE: {}", e)))?;
         }
 
         if let Some(max_files) = limits.max_open_files {
-            setrlimit(Resource::RLIMIT_NOFILE, max_files, max_files).map_err(|e| {
-                std::io::Error::new(std::io::ErrorKind::Other, format!("RLIMIT_NOFILE: {}", e))
-            })?;
+            setrlimit(Resource::RLIMIT_NOFILE, max_files, max_files)
+                .map_err(|e| std::io::Error::other(format!("RLIMIT_NOFILE: {}", e)))?;
         }
 
         Ok(())

@@ -182,10 +182,8 @@ If no match found, respond with:
   "normalized_prov": null,
   "normalized_score": null,
   "normalized_method": null
-}}"#,
-                ontology_list,
-                entity.raw_value,
-                format!("{:?}", entity.entity_type)
+            }}"#,
+                ontology_list, entity.raw_value, entity.entity_type
             );
 
             let request = LlmRequest::new(vec![
@@ -276,7 +274,7 @@ impl ReviewAgent {
     /// Review and improve low-confidence normalizations
     pub async fn review(
         &self,
-        entities: &mut Vec<ExtractedEntity>,
+        entities: &mut [ExtractedEntity],
     ) -> MultiAgentResult<Vec<ExtractedEntity>> {
         let client = self.llm_client.write().await;
 
@@ -292,7 +290,7 @@ impl ReviewAgent {
             .collect();
 
         if low_confidence.is_empty() {
-            return Ok(entities.clone());
+            return Ok(entities.to_vec());
         }
 
         let review_prompt = format!(
@@ -373,7 +371,7 @@ Respond with ONLY valid JSON array:
 
         info!("Review complete for {} entities", entities.len());
 
-        Ok(entities.clone())
+        Ok(entities.to_vec())
     }
 }
 

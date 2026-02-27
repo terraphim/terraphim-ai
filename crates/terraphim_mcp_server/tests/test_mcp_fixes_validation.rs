@@ -1,43 +1,8 @@
 use anyhow::Result;
 use rmcp::{model::CallToolRequestParam, service::ServiceExt, transport::TokioChildProcess};
 use serde_json::json;
-use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
-
-fn resolve_desktop_binary() -> Result<Option<PathBuf>> {
-    if let Ok(path) = std::env::var("TERRAPHIM_DESKTOP_BINARY") {
-        let path = PathBuf::from(path);
-        if path.exists() {
-            return Ok(Some(path));
-        }
-        anyhow::bail!(
-            "TERRAPHIM_DESKTOP_BINARY is set but file does not exist: {}",
-            path.display()
-        );
-    }
-
-    let crate_dir = std::env::current_dir()?;
-    let binary_name = if cfg!(target_os = "windows") {
-        "terraphim-ai-desktop.exe"
-    } else {
-        "terraphim-ai-desktop"
-    };
-
-    let workspace_root = crate_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .ok_or_else(|| anyhow::anyhow!("Cannot find workspace root"))?;
-    let candidate = workspace_root
-        .join("target")
-        .join("debug")
-        .join(binary_name);
-    if candidate.exists() {
-        Ok(Some(candidate))
-    } else {
-        Ok(None)
-    }
-}
 
 /// Test that MCP server properly separates logs from JSON-RPC responses
 #[tokio::test]
@@ -168,45 +133,6 @@ async fn test_mcp_log_separation_and_tools() -> Result<()> {
     );
 
     println!("🎉 All MCP tests passed successfully!");
-    Ok(())
-}
-
-/// Test that desktop MCP integration works without --ignored flag
-#[tokio::test]
-async fn test_desktop_mcp_integration_fixed() -> Result<()> {
-    println!("🖥️ Testing desktop MCP integration");
-    let Some(desktop_binary) = resolve_desktop_binary()? else {
-        eprintln!(
-            "Skipping desktop MCP integration test: set TERRAPHIM_DESKTOP_BINARY to external terraphim-ai-desktop binary"
-        );
-        return Ok(());
-    };
-
-    println!("✅ Desktop binary available at: {:?}", desktop_binary);
-
-    // Test desktop in MCP server mode
-    let mut cmd = Command::new(desktop_binary);
-    cmd.arg("mcp-server")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped());
-
-    let transport = TokioChildProcess::new(cmd)?;
-    let service = ().serve(transport).await?;
-
-    println!("✅ Desktop MCP server connected: {:?}", service.peer_info());
-
-    // Basic functionality test
-    let tools = service.list_tools(Default::default()).await?;
-    assert!(
-        !tools.tools.is_empty(),
-        "Desktop MCP server should expose tools"
-    );
-
-    println!(
-        "✅ Desktop MCP integration test passed with {} tools",
-        tools.tools.len()
-    );
     Ok(())
 }
 

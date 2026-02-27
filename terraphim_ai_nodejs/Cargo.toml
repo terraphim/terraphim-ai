@@ -10,8 +10,8 @@ crate-type = ["cdylib"]
 
 [dependencies]
 # Default enable napi4 feature, see https://nodejs.org/api/n-api.html#node-api-version-matrix
-napi = { version = "2.12.2", default-features = false, features = ["napi8", "tokio_rt"] }
-napi-derive = "2.12.2"
+napi = { version = "3.8.3", default-features = false, features = ["napi8", "tokio_rt"] }
+napi-derive = "3.5.2"
 serde_json = { workspace = true }
 terraphim_automata = { path = "../crates/terraphim_automata", default-features = false }
 terraphim_service = { path = "../crates/terraphim_service" }
