@@ -26,6 +26,12 @@ pub trait Channel: Send + Sync {
     fn is_allowed(&self, sender_id: &str) -> bool;
 }
 
+/// Check if a sender is in the allowlist.
+/// Returns true if the list contains `"*"` (wildcard) or the given identifier.
+pub fn is_sender_allowed(allow_from: &[String], identifier: &str) -> bool {
+    allow_from.iter().any(|a| a == "*") || allow_from.contains(&identifier.to_string())
+}
+
 /// Manages multiple channels and dispatches outbound messages.
 pub struct ChannelManager {
     channels: HashMap<String, Box<dyn Channel>>,
