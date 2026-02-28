@@ -8,12 +8,13 @@
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
+use tokio::sync::OnceCell;
 
 /// Tool for transcribing voice messages to text.
 pub struct VoiceTranscribeTool {
     temp_dir: PathBuf,
     #[cfg(feature = "voice")]
-    model_path: Option<PathBuf>,
+    model_path: OnceCell<PathBuf>,
 }
 
 impl VoiceTranscribeTool {
@@ -22,42 +23,43 @@ impl VoiceTranscribeTool {
         Self {
             temp_dir: std::env::temp_dir().join("terraphim_tinyclaw"),
             #[cfg(feature = "voice")]
-            model_path: None,
+            model_path: OnceCell::new(),
         }
     }
 
-    /// Initialize Whisper model (downloads on first use).
+    /// Find and cache the Whisper model path (lazy, called on first use).
     #[cfg(feature = "voice")]
-    pub async fn init_whisper(&mut self) -> anyhow::Result<()> {
-        // Look for model in standard locations
-        let model_paths = [
-            std::env::var("WHISPER_MODEL_PATH").ok(),
-            Some("ggml-base.bin".to_string()),
-            Some(
-                std::env::var("HOME").unwrap_or_default() + "/.local/share/terraphim/ggml-base.bin",
-            ),
-            Some("/usr/share/terraphim/ggml-base.bin".to_string()),
-        ];
+    async fn ensure_model(&self) -> Result<&PathBuf, ToolError> {
+        self.model_path
+            .get_or_try_init(|| async {
+                let model_paths = [
+                    std::env::var("WHISPER_MODEL_PATH").ok(),
+                    Some("ggml-base.bin".to_string()),
+                    Some(
+                        std::env::var("HOME").unwrap_or_default()
+                            + "/.local/share/terraphim/ggml-base.bin",
+                    ),
+                    Some("/usr/share/terraphim/ggml-base.bin".to_string()),
+                ];
 
-        for path in model_paths.iter().flatten() {
-            let path = Path::new(path);
-            if path.exists() {
-                log::info!("Found Whisper model at: {:?}", path);
-                self.model_path = Some(path.to_path_buf());
-                return Ok(());
-            }
-        }
+                for path in model_paths.iter().flatten() {
+                    let path = Path::new(path);
+                    if path.exists() {
+                        log::info!("Found Whisper model at: {:?}", path);
+                        return Ok(path.to_path_buf());
+                    }
+                }
 
-        anyhow::bail!(
-            "Whisper model not found. Download from https://huggingface.co/ggerganov/whisper.cpp \
-             and set WHISPER_MODEL_PATH or place at ~/.local/share/terraphim/ggml-base.bin"
-        )
-    }
-
-    #[cfg(not(feature = "voice"))]
-    pub async fn init_whisper(&mut self) -> anyhow::Result<()> {
-        log::info!("Voice feature not enabled, Whisper initialization skipped");
-        Ok(())
+                Err(ToolError::ExecutionFailed {
+                    tool: "voice_transcribe".to_string(),
+                    message: "Whisper model not found. Download from \
+                        https://huggingface.co/ggerganov/whisper.cpp and set \
+                        WHISPER_MODEL_PATH or place at \
+                        ~/.local/share/terraphim/ggml-base.bin"
+                        .to_string(),
+                })
+            })
+            .await
     }
 
     /// Download audio file from URL.
@@ -320,13 +322,7 @@ impl VoiceTranscribeTool {
     async fn transcribe(&self, audio_path: &Path) -> Result<String, ToolError> {
         use whisper_rs::{FullParams, SamplingStrategy, WhisperContext};
 
-        let model_path = self
-            .model_path
-            .as_ref()
-            .ok_or_else(|| ToolError::ExecutionFailed {
-                tool: "voice_transcribe".to_string(),
-                message: "Whisper model not initialized. Call init_whisper() first.".to_string(),
-            })?;
+        let model_path = self.ensure_model().await?;
 
         // Read WAV file
         let wav_path = audio_path.to_path_buf();
