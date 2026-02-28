@@ -289,9 +289,10 @@ fn build_media_augmented_content(content: &str, media: &[String]) -> String {
     let mut augmented = content.to_string();
     for url in media {
         augmented.push_str(&format!(
-            "\n[User sent a voice/audio message. Audio available at: {}. \
-             Use the voice_transcribe tool to transcribe it, then respond based on the transcription.]",
-            url
+            "\n\nIMPORTANT: The user sent an audio file. The audio is available at this URL: {}\n\
+             You MUST call the voice_transcribe tool with {{\"audio_url\": \"{}\"}} to transcribe it. \
+             Do NOT say you cannot process audio. After transcription, respond based on the text.",
+            url, url
         ));
     }
     augmented
