@@ -277,6 +277,26 @@ impl HybridLlmRouter {
     }
 }
 
+/// Build user message content augmented with media URLs.
+///
+/// When media URLs are present, appends instructions for the LLM to invoke
+/// the voice_transcribe tool. Returns content unchanged when no media is present.
+fn build_media_augmented_content(content: &str, media: &[String]) -> String {
+    if media.is_empty() {
+        return content.to_string();
+    }
+
+    let mut augmented = content.to_string();
+    for url in media {
+        augmented.push_str(&format!(
+            "\n[User sent a voice/audio message. Audio available at: {}. \
+             Use the voice_transcribe tool to transcribe it, then respond based on the transcription.]",
+            url
+        ));
+    }
+    augmented
+}
+
 /// Build proxy messages from session messages, optionally prepending a summary.
 ///
 /// If a summary exists, it is injected as a user+assistant pair at the start
@@ -440,10 +460,10 @@ impl ToolCallingLoop {
         let mut sessions_guard = self.sessions.lock().await;
         let session = sessions_guard.get_or_create(&session_key);
 
-        // Add user message to session
+        // Add user message to session (augmented with media context if present)
         let user_msg = ChatMessage {
             role: MessageRole::User,
-            content: msg.content.clone(),
+            content: build_media_augmented_content(&msg.content, &msg.media),
             sender_id: Some(msg.sender_id.clone()),
             timestamp: chrono::Utc::now(),
             metadata: HashMap::new(),
@@ -921,5 +941,33 @@ mod tests {
         assert_eq!(result.len(), 2);
         assert_eq!(result[0].content, "Hello");
         assert_eq!(result[1].content, "Hi!");
+    }
+
+    #[test]
+    fn test_media_augmented_content_no_media() {
+        let result = build_media_augmented_content("Hello", &[]);
+        assert_eq!(result, "Hello");
+    }
+
+    #[test]
+    fn test_media_augmented_content_with_url() {
+        let media = vec!["https://api.telegram.org/file/bot123/voice.ogg".to_string()];
+        let result = build_media_augmented_content("[Voice message]", &media);
+        assert!(result.contains("[Voice message]"));
+        assert!(result.contains("voice_transcribe"));
+        assert!(result.contains("https://api.telegram.org/file/bot123/voice.ogg"));
+    }
+
+    #[test]
+    fn test_media_augmented_content_multiple_urls() {
+        let media = vec![
+            "https://example.com/a.ogg".to_string(),
+            "https://example.com/b.mp3".to_string(),
+        ];
+        let result = build_media_augmented_content("", &media);
+        assert!(result.contains("a.ogg"));
+        assert!(result.contains("b.mp3"));
+        // Should have two voice_transcribe instructions
+        assert_eq!(result.matches("voice_transcribe").count(), 2);
     }
 }

@@ -52,6 +52,17 @@ impl InboundMessage {
             None
         }
     }
+
+    /// Attach media URLs to the message.
+    pub fn with_media(mut self, media: Vec<String>) -> Self {
+        self.media = media;
+        self
+    }
+
+    /// Check if the message has media attachments.
+    pub fn has_media(&self) -> bool {
+        !self.media.is_empty()
+    }
 }
 
 /// Message to send to a chat channel.
@@ -162,6 +173,22 @@ mod tests {
         assert_eq!(received.channel, "telegram");
         assert_eq!(received.sender_id, "user123");
         assert_eq!(received.content, "Hello");
+    }
+
+    #[test]
+    fn test_inbound_with_media() {
+        let msg = InboundMessage::new("telegram", "user123", "chat456", "[Voice message]")
+            .with_media(vec!["https://example.com/voice.ogg".to_string()]);
+        assert!(msg.has_media());
+        assert_eq!(msg.media.len(), 1);
+        assert_eq!(msg.media[0], "https://example.com/voice.ogg");
+    }
+
+    #[test]
+    fn test_inbound_has_media() {
+        let msg = InboundMessage::new("telegram", "user123", "chat456", "Hello");
+        assert!(!msg.has_media());
+        assert!(msg.media.is_empty());
     }
 
     #[test]
