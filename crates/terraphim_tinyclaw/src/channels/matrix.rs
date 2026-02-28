@@ -76,8 +76,10 @@ impl Channel for MatrixChannel {
                         // Get sender
                         let sender = ev.sender.to_string();
 
-                        // Check whitelist
-                        if !allow_from.contains(&sender) {
+                        // Check whitelist ("*" allows all)
+                        if !allow_from.iter().any(|a| a == "*")
+                            && !allow_from.contains(&sender)
+                        {
                             log::warn!("Unauthorized Matrix message from: {}", sender);
                             return;
                         }
