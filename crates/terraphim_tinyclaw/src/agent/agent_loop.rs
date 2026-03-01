@@ -22,8 +22,6 @@ pub struct ToolCallingConfig {
     pub max_iterations: usize,
     /// Number of messages to keep after summarization.
     pub keep_last_messages: usize,
-    /// Maximum messages per session before compression.
-    pub max_session_messages: usize,
 }
 
 impl Default for ToolCallingConfig {
@@ -31,7 +29,6 @@ impl Default for ToolCallingConfig {
         Self {
             max_iterations: 20,
             keep_last_messages: 4,
-            max_session_messages: 200,
         }
     }
 }
@@ -42,6 +39,8 @@ pub struct HybridLlmRouter {
     proxy: ProxyClient,
     /// Direct LLM configuration for cheap/local tasks.
     direct_config: DirectLlmConfig,
+    /// Reusable HTTP client for direct LLM calls (connection pooling).
+    direct_http: reqwest::Client,
     /// Whether tools are currently available.
     tools_available: AtomicBool,
 }
@@ -50,12 +49,42 @@ impl HybridLlmRouter {
     /// Create a new hybrid router.
     pub fn new(proxy_config: ProxyClientConfig, direct_config: DirectLlmConfig) -> Self {
         let proxy = ProxyClient::new(proxy_config);
+        let direct_http = reqwest::Client::new();
 
         Self {
             proxy,
             direct_config,
+            direct_http,
             tools_available: AtomicBool::new(true),
         }
+    }
+
+    /// Default Ollama base URL.
+    const DEFAULT_OLLAMA_URL: &str = "http://127.0.0.1:11434";
+
+    /// Call the direct LLM (Ollama) with a prompt.
+    /// Returns the response text, or an error if the call fails.
+    async fn ollama_generate(&self, prompt: &str) -> Result<String, reqwest::Error> {
+        let base_url = self
+            .direct_config
+            .base_url
+            .as_deref()
+            .unwrap_or(Self::DEFAULT_OLLAMA_URL);
+
+        let resp = self
+            .direct_http
+            .post(format!("{}/api/generate", base_url))
+            .json(&serde_json::json!({
+                "model": &self.direct_config.model,
+                "prompt": prompt,
+                "stream": false
+            }))
+            .send()
+            .await?;
+
+        resp.json::<serde_json::Value>()
+            .await
+            .map(|body| body["response"].as_str().unwrap_or("").to_string())
     }
 
     /// Check if the proxy is available for tool-calling.
@@ -115,12 +144,6 @@ impl HybridLlmRouter {
         }
 
         // Try direct LLM (Ollama)
-        let base_url = self
-            .direct_config
-            .base_url
-            .clone()
-            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
-
         let last_user_msg = messages
             .iter()
             .rev()
@@ -134,25 +157,8 @@ impl HybridLlmRouter {
             last_user_msg
         };
 
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("{}/api/generate", base_url))
-            .json(&serde_json::json!({
-                "model": &self.direct_config.model,
-                "prompt": prompt,
-                "stream": false
-            }))
-            .send()
-            .await;
-
-        match response {
-            Ok(resp) if resp.status().is_success() => {
-                let body: serde_json::Value = resp.json().await?;
-                Ok(body["response"]
-                    .as_str()
-                    .unwrap_or("I received your message but could not generate a response.")
-                    .to_string())
-            }
+        match self.ollama_generate(&prompt).await {
+            Ok(text) if !text.is_empty() => Ok(text),
             _ => Ok(
                 "Tools and direct LLM are currently unavailable. Please check your configuration."
                     .to_string(),
@@ -213,43 +219,16 @@ impl HybridLlmRouter {
         }
 
         // Tier 2: Try direct LLM (Ollama)
-        let base_url = self
-            .direct_config
-            .base_url
-            .clone()
-            .unwrap_or_else(|| "http://127.0.0.1:11434".to_string());
-        let model = &self.direct_config.model;
-
         log::info!(
             "Compression fallback to {} ({})",
             self.direct_config.provider,
-            model,
+            self.direct_config.model,
         );
 
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("{}/api/generate", base_url))
-            .json(&serde_json::json!({
-                "model": model,
-                "prompt": summarization_prompt,
-                "stream": false
-            }))
-            .send()
-            .await;
-
-        match response {
-            Ok(resp) if resp.status().is_success() => {
-                let body: serde_json::Value = resp.json().await?;
-                Ok(body["response"]
-                    .as_str()
-                    .unwrap_or("[Previous conversation summarized]")
-                    .to_string())
-            }
-            Ok(resp) => {
-                log::warn!(
-                    "Direct LLM returned error ({}), using fallback summary",
-                    resp.status()
-                );
+        match self.ollama_generate(&summarization_prompt).await {
+            Ok(text) if !text.is_empty() => Ok(text),
+            Ok(_) => {
+                log::warn!("Direct LLM returned empty response, using fallback summary");
                 Ok(Self::fallback_summary(&messages))
             }
             Err(e) => {
@@ -289,10 +268,10 @@ fn build_media_augmented_content(content: &str, media: &[String]) -> String {
     let mut augmented = content.to_string();
     for url in media {
         augmented.push_str(&format!(
-            "\n\nIMPORTANT: The user sent an audio file. The audio is available at this URL: {}\n\
-             You MUST call the voice_transcribe tool with {{\"audio_url\": \"{}\"}} to transcribe it. \
+            "\n\nIMPORTANT: The user sent an audio file at URL: {}\n\
+             You MUST call the voice_transcribe tool with this URL as the \"audio_url\" parameter. \
              Do NOT say you cannot process audio. After transcription, respond based on the text.",
-            url, url
+            url
         ));
     }
     augmented
@@ -354,20 +333,14 @@ impl ToolCallingLoop {
         // Load commands from search paths (best effort)
         let _ = commands.load_all();
 
-        Self {
-            config: ToolCallingConfig {
-                max_iterations: agent_config.max_iterations,
-                max_session_messages: agent_config.max_session_messages,
-                ..Default::default()
-            },
+        Self::with_commands(
+            agent_config,
             router,
-            guard: ExecutionGuard::new(),
             tools,
             sessions,
-            commands: Arc::new(Mutex::new(commands)),
             system_prompt,
-            shutdown: CancellationToken::new(),
-        }
+            commands,
+        )
     }
 
     /// Create with a custom command registry.
@@ -382,7 +355,6 @@ impl ToolCallingLoop {
         Self {
             config: ToolCallingConfig {
                 max_iterations: agent_config.max_iterations,
-                max_session_messages: agent_config.max_session_messages,
                 ..Default::default()
             },
             router,
@@ -707,8 +679,7 @@ impl ToolCallingLoop {
 
         // Check for markdown commands
         let first_word = content.split_whitespace().next()?;
-        if first_word.starts_with('/') {
-            let cmd_name: &str = &first_word[1..]; // Remove leading /
+        if let Some(cmd_name) = first_word.strip_prefix('/') {
             let commands_guard: tokio::sync::MutexGuard<'_, CommandRegistry> =
                 self.commands.lock().await;
             if let Some(cmd) = commands_guard.get(cmd_name) {

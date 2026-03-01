@@ -201,8 +201,6 @@ struct AnthropicRequest {
 /// Response format from Anthropic API.
 #[derive(Deserialize)]
 struct AnthropicResponse {
-    #[serde(rename = "id", default)]
-    _id: Option<String>,
     model: String,
     content: Vec<ContentBlock>,
     stop_reason: String,

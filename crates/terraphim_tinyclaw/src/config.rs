@@ -259,8 +259,9 @@ impl TelegramConfig {
     }
 
     /// Check if a sender is allowed.
+    /// Returns true if allow_from contains `"*"` (wildcard) or the given sender_id.
     pub fn is_allowed(&self, sender_id: &str) -> bool {
-        self.allow_from.contains(&sender_id.to_string())
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
     }
 }
 
@@ -290,8 +291,9 @@ impl DiscordConfig {
     }
 
     /// Check if a sender is allowed.
+    /// Returns true if allow_from contains `"*"` (wildcard) or the given sender_id.
     pub fn is_allowed(&self, sender_id: &str) -> bool {
-        self.allow_from.contains(&sender_id.to_string())
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
     }
 }
 
@@ -330,8 +332,9 @@ impl MatrixConfig {
     }
 
     /// Check if a sender is allowed.
+    /// Returns true if allow_from contains `"*"` (wildcard) or the given sender_id.
     pub fn is_allowed(&self, sender_id: &str) -> bool {
-        self.allow_from.contains(&sender_id.to_string())
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
     }
 }
 

@@ -142,9 +142,8 @@ impl Channel for TelegramChannel {
                                 .unwrap_or_default();
 
                             // Check allowlist by user ID or username ("*" allows all)
-                            if !allowed.iter().any(|a| a == "*")
-                                && !allowed.contains(&sender_id)
-                                && !allowed.contains(&username)
+                            if !crate::channel::is_sender_allowed(&allowed, &sender_id)
+                                && !crate::channel::is_sender_allowed(&allowed, &username)
                             {
                                 log::warn!(
                                     "Telegram: rejected message from unauthorized user: {} ({})",
