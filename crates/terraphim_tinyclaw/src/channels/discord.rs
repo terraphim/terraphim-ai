@@ -58,9 +58,8 @@ impl Channel for DiscordChannel {
                     let username = msg.author.name.clone();
 
                     // Check allowlist ("*" allows all)
-                    if !self.allow_from.iter().any(|a| a == "*")
-                        && !self.allow_from.contains(&sender_id)
-                        && !self.allow_from.contains(&username)
+                    if !crate::channel::is_sender_allowed(&self.allow_from, &sender_id)
+                        && !crate::channel::is_sender_allowed(&self.allow_from, &username)
                     {
                         log::warn!(
                             "Discord: rejected message from unauthorized user: {} ({})",

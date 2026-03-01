@@ -8,6 +8,7 @@
 use crate::tools::{Tool, ToolError};
 use async_trait::async_trait;
 use std::path::{Path, PathBuf};
+#[cfg(feature = "voice")]
 use tokio::sync::OnceCell;
 
 /// Tool for transcribing voice messages to text.
@@ -35,10 +36,11 @@ impl VoiceTranscribeTool {
                 let model_paths = [
                     std::env::var("WHISPER_MODEL_PATH").ok(),
                     Some("ggml-base.bin".to_string()),
-                    Some(
-                        std::env::var("HOME").unwrap_or_default()
-                            + "/.local/share/terraphim/ggml-base.bin",
-                    ),
+                    dirs::data_local_dir().map(|d| {
+                        d.join("terraphim/ggml-base.bin")
+                            .to_string_lossy()
+                            .into_owned()
+                    }),
                     Some("/usr/share/terraphim/ggml-base.bin".to_string()),
                 ];
 
