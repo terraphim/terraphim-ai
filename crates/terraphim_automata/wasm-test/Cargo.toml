@@ -26,6 +26,12 @@ web-sys = { version = "0.3", features = ["console"] }
 [dev-dependencies]
 wasm-bindgen-test = "0.3"
 
+[package.metadata.wasm-pack.profile.release]
+# Disable wasm-opt: the version bundled with wasm-pack is too old
+# to handle reference-types / bulk-memory WASM features produced by
+# recent Rust toolchains ("Only 1 table definition allowed in MVP").
+wasm-opt = false
+
 [profile.release]
 # Optimize for small code size
 opt-level = "s"
