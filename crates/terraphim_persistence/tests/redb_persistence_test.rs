@@ -34,6 +34,8 @@ async fn test_redb_configuration() -> Result<(), Box<dyn std::error::Error>> {
         initialized: false,
         default_data_path: temp_path.to_string_lossy().to_string(),
         profiles,
+        role_config: None,
+        default_role: None,
     };
 
     log::info!("Test settings created with ReDB file: {:?}", redb_file);
@@ -114,6 +116,8 @@ async fn test_redb_error_handling() -> Result<(), Box<dyn std::error::Error>> {
         initialized: false,
         default_data_path: "/tmp/test_invalid".to_string(),
         profiles,
+        role_config: None,
+        default_role: None,
     };
 
     // This should fail gracefully (parent directory doesn't exist)
