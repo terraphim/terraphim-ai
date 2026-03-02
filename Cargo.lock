@@ -643,9 +643,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "bytes"
-version = "1.11.0"
+version = "1.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b35204fbdc0b3f4446b89fc1ac2cf84a8a68971995d0bf2e925ec7cd960f9cb3"
+checksum = "1e748733b7cbc798e1434b6ac524f0c1ff2ab456fe201501e6497c8417a4fc33"
 
 [[package]]
 name = "bytesize"
@@ -2838,7 +2838,7 @@ dependencies = [
 
 [[package]]
 name = "grepapp_haystack"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "anyhow",
  "haystack_core",
@@ -2989,7 +2989,7 @@ dependencies = [
 
 [[package]]
 name = "haystack_core"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "terraphim_types",
 ]
@@ -8275,7 +8275,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-cli"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -8337,7 +8337,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-repl"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "anyhow",
  "colored 2.2.0",
@@ -8362,7 +8362,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim-session-analyzer"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "aho-corasick",
  "anyhow",
@@ -8401,7 +8401,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_agent"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -8874,7 +8874,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_middleware"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "ahash 0.8.12",
  "async-trait",
@@ -9049,7 +9049,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_server"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "ahash 0.8.12",
  "anyhow",
@@ -9127,7 +9127,7 @@ dependencies = [
 
 [[package]]
 name = "terraphim_sessions"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -9213,14 +9213,14 @@ dependencies = [
 
 [[package]]
 name = "terraphim_test_utils"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "rustc_version",
 ]
 
 [[package]]
 name = "terraphim_tinyclaw"
-version = "1.10.1"
+version = "1.11.0"
 dependencies = [
  "anyhow",
  "async-trait",
