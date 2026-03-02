@@ -309,8 +309,15 @@ async fn test_server_mode_roles_select() -> Result<()> {
         return Ok(());
     }
 
-    // Select the first available role
-    let role_name = available_roles[0].trim();
+    // Parse role name from list output format: " * Role Name (shortname)" or "   Role Name"
+    // Strip the leading marker (* or space) and trailing (shortname) if present
+    let raw_line = available_roles[0].trim();
+    let without_marker = raw_line.trim_start_matches('*').trim();
+    let role_name = if let Some(paren_pos) = without_marker.rfind(" (") {
+        without_marker[..paren_pos].trim()
+    } else {
+        without_marker
+    };
     println!("Selecting role: {}", role_name);
 
     let (stdout, stderr, code) = run_server_command(&server_url, &["roles", "select", role_name])?;
