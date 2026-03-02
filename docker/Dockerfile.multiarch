@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7
 # Multi-stage, multi-architecture Dockerfile for Terraphim Server
 # Supports Ubuntu 18.04, 20.04, 22.04, and 24.04 with multiple architectures
 
@@ -98,8 +99,12 @@ RUN case "${TARGETARCH}" in \
 WORKDIR /code
 
 # Copy dependency files first for better caching
+# NOTE: Docker COPY with wildcards flattens directory structure, so
+# "COPY crates/*/Cargo.toml crates/" would put all Cargo.toml files into
+# crates/Cargo.toml (overwriting each other). We use --parents to preserve
+# the subdirectory layout that the workspace crates/* glob expects.
 COPY Cargo.toml Cargo.lock ./
-COPY crates/*/Cargo.toml crates/
+COPY --parents crates/*/Cargo.toml ./
 COPY terraphim_server/Cargo.toml terraphim_server/
 
 # Create empty source files to satisfy cargo
