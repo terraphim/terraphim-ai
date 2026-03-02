@@ -76,7 +76,7 @@ voice = ["dep:whisper-rs", "dep:symphonia", "dep:hound"]
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3"
-criterion = { version = "0.5", features = ["async_tokio"] }
+criterion = { version = "0.8", features = ["async_tokio"] }
 
 [[bench]]
 name = "tinyclaw_benchmarks"
