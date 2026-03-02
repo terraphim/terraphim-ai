@@ -199,6 +199,12 @@ jobs:
     needs: setup
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -246,6 +252,12 @@ jobs:
     needs: setup
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -287,6 +299,12 @@ jobs:
     if: needs.setup.outputs.is-release == 'true' || github.event.inputs.deploy-staging == 'true'
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -346,6 +364,12 @@ jobs:
     if: github.ref == 'refs/heads/main' || needs.setup.outputs.is-release == 'true'
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
@@ -397,6 +421,12 @@ jobs:
     if: github.ref == 'refs/heads/main' || needs.setup.outputs.is-release == 'true'
 
     steps:
+      - name: Fix target directory permissions
+        run: |
+          if [ -d "target" ]; then
+            chmod -R u+rw target 2>/dev/null || true
+          fi
+
       - name: Checkout
         uses: actions/checkout@v6
 
