@@ -189,18 +189,18 @@ jobs:
             const sloMatch = report.match(/SLO Compliance: (\d+\.?\d*)%/);
             const sloCompliance = sloMatch ? sloMatch[1] : 'N/A';
 
-          const comment = [
-            "## 🚀 Performance Benchmark Results",
-            "",
-            `**SLO Compliance:** ${sloCompliance}%`,
-            "",
-            "### Key Findings:",
-            report.includes('violations')
-              ? '⚠️ Some performance thresholds were not met'
-              : '✅ All performance requirements satisfied',
-            "",
-            `[View full report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
-          ].join("\\n");
+            const comment = [
+              "## Performance Benchmark Results",
+              "",
+              `**SLO Compliance:** ${sloCompliance}%`,
+              "",
+              "### Key Findings:",
+              report.includes('violations')
+                ? 'Some performance thresholds were not met'
+                : 'All performance requirements satisfied',
+              "",
+              `[View full report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+            ].join("\\n");
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,

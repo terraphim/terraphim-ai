@@ -10,10 +10,10 @@ yanked = "warn"
 
 # Ignore specific advisories
 ignore = [
-    # idna vulnerability via trust-dns-proto (transitive dep from terraphim_rlm)
-    # Will be fixed when migrating from trust-dns to hickory-dns
-    # TODO: Track migration in GitHub issue
-    "RUSTSEC-2024-0421",
+    # RSA Marvin Attack - transitive dep via octocrab -> jsonwebtoken -> rsa
+    # No safe upgrade available yet; RustCrypto team migrating to constant-time impl
+    # TODO: Remove once octocrab updates to rsa with constant-time support
+    "RUSTSEC-2023-0071",
     # atty unaligned read - transitive dep, only affects Windows with custom allocators
     "RUSTSEC-2021-0145",
     # atty unmaintained - used by terraphim_agent, should migrate to std::io::IsTerminal
