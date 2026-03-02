@@ -25,6 +25,8 @@ pub fn create_memory_only_device_settings() -> Result<DeviceSettings> {
         initialized: true,
         default_data_path: "/tmp/terraphim_test".to_string(),
         profiles,
+        role_config: None,
+        default_role: None,
     };
 
     Ok(settings)
@@ -71,6 +73,8 @@ pub fn create_multi_profile_device_settings() -> Result<DeviceSettings> {
         initialized: true,
         default_data_path: "/tmp/terraphim_test".to_string(),
         profiles,
+        role_config: None,
+        default_role: None,
     };
 
     Ok(settings)

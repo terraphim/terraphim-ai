@@ -73,6 +73,14 @@ pub struct DeviceSettings {
     pub default_data_path: String,
     /// configured storage backends available on device
     pub profiles: HashMap<String, HashMap<String, String>>,
+    /// Path to a JSON role configuration file (supports ~, $HOME, ${VAR:-default})
+    /// On first run, roles are loaded from this file and saved to persistence.
+    /// Subsequent runs use persistence (so CLI changes stick). Use `config reload` to re-read.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub role_config: Option<String>,
+    /// Default role name to select on startup (must exist in the role_config file)
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_role: Option<String>,
 }
 
 impl Default for DeviceSettings {
@@ -173,6 +181,8 @@ impl DeviceSettings {
             initialized: true,
             default_data_path: data_dir,
             profiles,
+            role_config: None,
+            default_role: None,
         }
     }
     /// Get the default path for the config file
@@ -300,5 +310,52 @@ mod tests {
         let config_copy =
             DeviceSettings::load_from_env_and_file(Some(test_config_path.clone())).unwrap();
         assert!(config_copy.initialized);
+    }
+
+    #[test]
+    fn test_missing_role_config_defaults_to_none() {
+        let temp_dir = TempDir::new().unwrap();
+        let config =
+            DeviceSettings::load_from_env_and_file(Some(temp_dir.path().to_path_buf())).unwrap();
+        assert!(
+            config.role_config.is_none(),
+            "role_config should default to None when absent from TOML"
+        );
+        assert!(
+            config.default_role.is_none(),
+            "default_role should default to None when absent from TOML"
+        );
+    }
+
+    #[test]
+    fn test_role_config_loaded_from_toml() {
+        let temp_dir = TempDir::new().unwrap();
+        let settings_dir = temp_dir.path();
+        std::fs::create_dir_all(settings_dir).unwrap();
+        let settings_file = settings_dir.join("settings.toml");
+        std::fs::write(
+            &settings_file,
+            r#"
+server_hostname = "127.0.0.1:8000"
+api_endpoint = "http://localhost:8000/api"
+initialized = "false"
+default_data_path = "/tmp/test"
+role_config = "~/.config/terraphim/my_roles.json"
+default_role = "MyRole"
+
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/test_dashmap"
+"#,
+        )
+        .unwrap();
+
+        let config =
+            DeviceSettings::load_from_env_and_file(Some(settings_dir.to_path_buf())).unwrap();
+        assert_eq!(
+            config.role_config.as_deref(),
+            Some("~/.config/terraphim/my_roles.json")
+        );
+        assert_eq!(config.default_role.as_deref(), Some("MyRole"));
     }
 }
