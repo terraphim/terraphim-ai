@@ -422,9 +422,10 @@ async fn test_offline_mode_is_default() -> Result<()> {
 
     // Should initialize embedded service (log messages will show this)
     assert!(
-        stderr.contains("Initializing TUI service with embedded configuration")
+        stderr.contains("Initializing TUI service")
             || stderr.contains("Failed to load config")
-            || stderr.contains("using default embedded"),
+            || stderr.contains("using default embedded")
+            || stderr.contains("using embedded defaults"),
         "Should show embedded initialization: {}",
         stderr
     );

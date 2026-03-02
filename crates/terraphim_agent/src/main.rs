@@ -18,6 +18,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem, Paragraph},
 };
 use serde::Serialize;
+use terraphim_persistence::Persistable;
 use tokio::runtime::Runtime;
 
 mod client;
@@ -516,6 +517,9 @@ struct Cli {
     /// Output format (human, json, json-compact)
     #[arg(long, value_enum, default_value_t = OutputFormat::Human)]
     format: OutputFormat,
+    /// Path to a JSON config file (overrides settings.toml and persistence)
+    #[arg(long)]
+    config: Option<String>,
     #[command(subcommand)]
     command: Option<Command>,
 }
@@ -769,8 +773,14 @@ enum RolesSub {
 
 #[derive(Subcommand, Debug)]
 enum ConfigSub {
+    /// Show current configuration as JSON
     Show,
+    /// Set a configuration value
     Set { key: String, value: String },
+    /// Validate configuration loading (shows what would be loaded and from where)
+    Validate,
+    /// Reload roles from JSON file specified in settings.toml role_config
+    Reload,
 }
 
 /// Get the session cache file path
@@ -869,7 +879,7 @@ fn main() -> Result<()> {
             if cli.server {
                 rt.block_on(run_server_command(command, &cli.server_url, output))
             } else {
-                rt.block_on(run_offline_command(command, output))
+                rt.block_on(run_offline_command(command, output, cli.config))
             }
         }
     }
@@ -884,7 +894,102 @@ fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
     run_tui(Some(server_url.to_string()), transparent)
 }
 
-async fn run_offline_command(command: Command, output: CommandOutputConfig) -> Result<()> {
+/// Stateless config validation -- runs before TuiService initialization.
+/// Shows config sources, paths, and what would be loaded.
+async fn run_config_validate() -> Result<()> {
+    use terraphim_settings::DeviceSettings;
+
+    println!("== Device Settings ==");
+    let ds = match DeviceSettings::load_from_env_and_file(None) {
+        Ok(s) => {
+            let config_path = DeviceSettings::default_config_path();
+            println!("  settings.toml: {}/settings.toml", config_path.display());
+            println!("  server_hostname: {}", s.server_hostname);
+            println!("  api_endpoint: {}", s.api_endpoint);
+            println!("  default_data_path: {}", s.default_data_path);
+            println!("  profiles: {:?}", s.profiles.keys().collect::<Vec<_>>());
+            s
+        }
+        Err(e) => {
+            println!("  FAILED to load: {:?}", e);
+            println!("  Would use embedded defaults");
+            DeviceSettings::default_embedded()
+        }
+    };
+
+    println!();
+    println!("== Role Configuration ==");
+    match &ds.role_config {
+        Some(path) => {
+            let expanded = terraphim_config::expand_path(path);
+            println!("  role_config: {} (expanded: {})", path, expanded.display());
+            if expanded.exists() {
+                match terraphim_config::Config::load_from_json_file(path) {
+                    Ok(config) => {
+                        println!("  Status: OK - loaded {} role(s)", config.roles.len());
+                        for (name, role) in &config.roles {
+                            println!("    - {} (shortname: {:?})", name, role.shortname);
+                        }
+                        println!("  default_role in file: {}", config.default_role);
+                        println!("  selected_role in file: {}", config.selected_role);
+                    }
+                    Err(e) => {
+                        println!("  Status: PARSE ERROR - {:?}", e);
+                    }
+                }
+            } else {
+                println!("  Status: FILE NOT FOUND at {}", expanded.display());
+            }
+        }
+        None => {
+            println!("  role_config: not set (using persistence/embedded defaults)");
+        }
+    }
+
+    if let Some(ref role) = ds.default_role {
+        println!("  default_role override: {}", role);
+    }
+
+    println!();
+    println!("== Persistence ==");
+    match terraphim_config::ConfigBuilder::new_with_id(terraphim_config::ConfigId::Embedded).build()
+    {
+        Ok(mut config) => match config.load().await {
+            Ok(persisted) => {
+                println!(
+                    "  Persisted config found with {} role(s):",
+                    persisted.roles.len()
+                );
+                for (name, role) in &persisted.roles {
+                    println!("    - {} (shortname: {:?})", name, role.shortname);
+                }
+                println!("  selected_role: {}", persisted.selected_role);
+            }
+            Err(_) => {
+                println!("  No persisted config found (first run or empty)");
+            }
+        },
+        Err(e) => {
+            println!("  Failed to check persistence: {:?}", e);
+        }
+    }
+
+    println!();
+    println!("== Summary ==");
+    if ds.role_config.is_some() {
+        println!("  Config source: role_config in settings.toml (bootstrap-then-persistence)");
+    } else {
+        println!("  Config source: persistence layer or embedded defaults");
+    }
+
+    Ok(())
+}
+
+async fn run_offline_command(
+    command: Command,
+    output: CommandOutputConfig,
+    config_path: Option<String>,
+) -> Result<()> {
     // Handle stateless commands that don't need TuiService first
     if let Command::Guard {
         command,
@@ -977,13 +1082,21 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
         }
     }
 
+    // Config validate is stateless - handle before TuiService initialization
+    if let Command::Config {
+        sub: ConfigSub::Validate,
+    } = &command
+    {
+        return run_config_validate().await;
+    }
+
     // Learn is stateless - handle before TuiService initialization.
     // Must be last early-return because it consumes `command` via destructuring.
     if let Command::Learn { sub } = command {
         return run_learn_command(sub).await;
     }
 
-    let service = TuiService::new().await?;
+    let service = TuiService::new(config_path).await?;
 
     match command {
         Command::Search {
@@ -1118,6 +1231,35 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
                         println!("unsupported key: {}", key);
                     }
                 },
+                ConfigSub::Validate => {
+                    // Handled as early-return above; should not reach here
+                    unreachable!("config validate is handled before TuiService init");
+                }
+                ConfigSub::Reload => {
+                    let ds = terraphim_settings::DeviceSettings::load_from_env_and_file(None)
+                        .unwrap_or_else(|_| terraphim_settings::DeviceSettings::default_embedded());
+                    match &ds.role_config {
+                        Some(path) => match service.reload_from_json(path).await {
+                            Ok(count) => {
+                                println!(
+                                    "Reloaded {} role(s) from '{}' and saved to persistence",
+                                    count, path
+                                );
+                            }
+                            Err(e) => {
+                                eprintln!("Failed to reload from '{}': {:?}", path, e);
+                                std::process::exit(1);
+                            }
+                        },
+                        None => {
+                            eprintln!("No role_config set in settings.toml. Nothing to reload.");
+                            eprintln!(
+                                "Add role_config = \"path/to/roles.json\" to your settings.toml"
+                            );
+                            std::process::exit(1);
+                        }
+                    }
+                }
             }
             Ok(())
         }
@@ -1761,10 +1903,6 @@ async fn run_offline_command(command: Command, output: CommandOutputConfig) -> R
                             println!("Imported {} sessions from {}.", sessions.len(), source);
                             Ok(())
                         }
-                        Ok(sessions) => {
-                            println!("Imported {} sessions from {}.", sessions.len(), source);
-                            Ok(())
-                        }
                         Err(e) => Err(anyhow::anyhow!("Import from {} failed: {}", source, e)),
                     }
                 }
@@ -2128,6 +2266,14 @@ async fn run_server_command(
                             println!("unsupported key: {}", key);
                         }
                     }
+                }
+                ConfigSub::Validate => {
+                    println!(
+                        "config validate is only available in offline mode (without --server)"
+                    );
+                }
+                ConfigSub::Reload => {
+                    println!("config reload is only available in offline mode (without --server)");
                 }
             }
             Ok(())

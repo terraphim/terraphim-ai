@@ -644,6 +644,8 @@ mod tests {
             initialized: false,
             default_data_path: temp_path.to_string_lossy().to_string(),
             profiles,
+            role_config: None,
+            default_role: None,
         };
 
         // Test that init_device_storage_with_settings creates directories and operators

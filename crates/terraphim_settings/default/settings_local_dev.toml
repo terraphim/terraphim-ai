@@ -24,3 +24,11 @@ table = "terraphim_kv"
 # type = "redb"
 # datadir = "/tmp/terraphim_redb/local_dev.redb"
 # table = "terraphim"
+
+# Path to a JSON role configuration file (supports ~, $HOME, ${VAR:-default})
+# On first run, roles are loaded from this file and saved to persistence.
+# Subsequent runs use persistence (so CLI changes stick). Use `config reload` to re-read.
+# role_config = "~/.config/terraphim/multi_repo_roles.json"
+
+# Default role to select on first load (must exist in the role_config file)
+# default_role = "LearningCapture"

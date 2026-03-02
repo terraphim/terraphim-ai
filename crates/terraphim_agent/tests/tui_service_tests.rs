@@ -42,7 +42,7 @@ async fn test_tui_service_new_uses_host_settings_path() -> Result<()> {
     let data_path = temp_home.path().join(".terraphim");
     let _data_guard = EnvVarGuard::set("TERRAPHIM_DATA_PATH", &data_path);
 
-    let service = TuiService::new().await?;
+    let service = TuiService::new(None).await?;
 
     let config_dir = DeviceSettings::default_config_path();
     let settings_file = config_dir.join("settings.toml");

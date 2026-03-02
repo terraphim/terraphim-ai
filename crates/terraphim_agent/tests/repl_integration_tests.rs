@@ -175,7 +175,7 @@ async fn test_repl_handler_offline_mode() {
     use terraphim_agent::service::TuiService;
 
     // Create TuiService (may fail if config is missing, which is OK for this test)
-    match TuiService::new().await {
+    match TuiService::new(None).await {
         Ok(service) => {
             let _handler = ReplHandler::new_offline(service);
             // Handler should be created successfully
