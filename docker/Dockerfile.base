@@ -63,40 +63,7 @@ RUN cargo install --version 0.12.2 cargo-edit && \
     cargo install --version 8.4.0 cargo-watch || true
 
 # ============================================
-# Stage 2: Rust Builder with Cache
-# ============================================
-FROM base-builder as rust-builder
-
-# Copy Cargo files for dependency caching
-COPY --chown=terraphim:terraphim Cargo.toml Cargo.lock ./
-COPY --chown=terraphim:terraphim crates/ ./crates/
-COPY --chown=terraphim:terraphim terraphim_server/ ./terraphim_server/
-COPY --chown=terraphim:terraphim desktop/src-tauri/Cargo.toml ./desktop/src-tauri/
-
-# Create dummy main.rs files to pre-cache dependencies
-RUN mkdir -p crates/terraphim_automata/src && \
-    echo "fn main() {}" > crates/terraphim_automata/src/main.rs && \
-    mkdir -p terraphim_server/src && \
-    echo "fn main() {}" > terraphim_server/src/main.rs
-
-# Build dependencies (creates cached layers)
-RUN cargo build --release --bins --workspace && \
-    rm -rf target/release/deps/terraphim* || true
-
-# ============================================
-# Stage 3: WASM Builder
-# ============================================
-FROM base-builder as wasm-builder
-
-# Copy WASM-specific source
-COPY --chown=terraphim:terraphim crates/terraphim_automata/ /app/crates/terraphim_automata/
-
-# Pre-build WASM dependencies
-RUN cd crates/terraphim_automata/wasm-test && \
-    wasm-pack build --dev --target web --out-dir pkg || true
-
-# ============================================
-# Stage 4: Frontend Builder
+# Stage 2: Frontend Builder
 # ============================================
 FROM base-builder as frontend-builder
 
@@ -115,6 +82,43 @@ COPY --chown=terraphim:terraphim desktop/*.config.* ./desktop/
 RUN cd desktop && \
     if [ -f yarn.lock ]; then yarn build; \
     else npm run build; fi
+
+# ============================================
+# Stage 3: Rust Builder with Cache
+# ============================================
+FROM base-builder as rust-builder
+
+# Copy Cargo files for dependency caching
+COPY --chown=terraphim:terraphim Cargo.toml Cargo.lock ./
+COPY --chown=terraphim:terraphim crates/ ./crates/
+COPY --chown=terraphim:terraphim terraphim_server/ ./terraphim_server/
+COPY --chown=terraphim:terraphim desktop/src-tauri/Cargo.toml ./desktop/src-tauri/
+
+# Copy fresh frontend assets into terraphim_server/dist/ BEFORE cargo build
+# so that rust-embed embeds the real web UI, not stale committed assets
+COPY --from=frontend-builder --chown=terraphim:terraphim /app/desktop/dist/ ./terraphim_server/dist/
+
+# Create dummy main.rs files to pre-cache dependencies
+RUN mkdir -p crates/terraphim_automata/src && \
+    echo "fn main() {}" > crates/terraphim_automata/src/main.rs && \
+    mkdir -p terraphim_server/src && \
+    echo "fn main() {}" > terraphim_server/src/main.rs
+
+# Build dependencies (creates cached layers)
+RUN cargo build --release --bins --workspace && \
+    rm -rf target/release/deps/terraphim* || true
+
+# ============================================
+# Stage 4: WASM Builder
+# ============================================
+FROM base-builder as wasm-builder
+
+# Copy WASM-specific source
+COPY --chown=terraphim:terraphim crates/terraphim_automata/ /app/crates/terraphim_automata/
+
+# Pre-build WASM dependencies
+RUN cd crates/terraphim_automata/wasm-test && \
+    wasm-pack build --dev --target web --out-dir pkg || true
 
 # ============================================
 # Stage 5: Final Runtime Image
@@ -139,6 +143,9 @@ WORKDIR /app
 # Copy built artifacts from builder stages
 COPY --from=rust-builder --chown=terraphim:terraphim /app/target/release/terraphim_server /app/bin/
 COPY --from=rust-builder --chown=terraphim:terraphim /app/target/release/terraphim_mcp_server /app/bin/
+
+# Frontend assets are already embedded in the server binary via rust-embed.
+# Also copy to /app/dist/ for any runtime static file serving needs.
 COPY --from=frontend-builder --chown=terraphim:terraphim /app/desktop/dist /app/dist/
 
 # Copy configuration files
