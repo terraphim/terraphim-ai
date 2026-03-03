@@ -1,14 +1,16 @@
 //! Service wrapper for CLI operations
 
 use anyhow::Result;
+use serde::Serialize;
 use std::sync::Arc;
 use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{
-    Document, ExtractedEntity, GroundingMetadata, NormalizationMethod, NormalizedTerm,
-    NormalizedTermValue, OntologySchema, RoleName, SchemaSignal, SearchQuery, Thesaurus,
+    CoverageSignal, Document, ExtractedEntity, GroundingMetadata, NormalizationMethod,
+    NormalizedTerm, NormalizedTermValue, OntologySchema, RoleName, SchemaSignal, SearchQuery,
+    Thesaurus,
 };
 use tokio::sync::Mutex;
 
@@ -420,6 +422,43 @@ impl CliService {
         thesaurus
     }
 
+    /// Calculate coverage of schema categories in text
+    pub fn calculate_coverage(
+        &self,
+        schema: &OntologySchema,
+        text: &str,
+        threshold: f32,
+    ) -> Result<CoverageResult> {
+        let signal = self.extract_with_schema(schema, text)?;
+
+        let all_categories = schema.category_ids();
+        let matched_ids: std::collections::HashSet<String> = signal
+            .entities
+            .iter()
+            .map(|e| e.entity_type.clone())
+            .collect();
+
+        let matched: Vec<String> = all_categories
+            .iter()
+            .filter(|id| matched_ids.contains(*id))
+            .cloned()
+            .collect();
+        let missing: Vec<String> = all_categories
+            .iter()
+            .filter(|id| !matched_ids.contains(*id))
+            .cloned()
+            .collect();
+
+        let coverage = CoverageSignal::compute(&all_categories, matched.len(), threshold);
+
+        Ok(CoverageResult {
+            signal: coverage,
+            matched_categories: matched,
+            missing_categories: missing,
+            schema_name: schema.name.clone(),
+        })
+    }
+
     /// Replace matches in text with links using thesaurus
     pub async fn replace_matches(
         &self,
@@ -434,4 +473,17 @@ impl CliService {
         let result = terraphim_automata::replace_matches(text, thesaurus, link_type)?;
         Ok(String::from_utf8(result).unwrap_or_else(|_| text.to_string()))
     }
+}
+
+/// Result of ontology coverage analysis
+#[derive(Debug, Clone, Serialize)]
+pub struct CoverageResult {
+    /// Coverage signal with ratio and threshold
+    pub signal: CoverageSignal,
+    /// Entity type IDs that were matched in the text
+    pub matched_categories: Vec<String>,
+    /// Entity type IDs that were NOT matched in the text
+    pub missing_categories: Vec<String>,
+    /// Name of the schema used
+    pub schema_name: String,
 }
