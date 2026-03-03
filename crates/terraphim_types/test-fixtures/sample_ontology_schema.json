@@ -1,0 +1,42 @@
+{
+  "name": "Publishing Domain Model",
+  "version": "1.0.0",
+  "entity_types": [
+    {
+      "id": "chapter",
+      "label": "Chapter",
+      "uri_prefix": "https://schema.org/Chapter",
+      "aliases": ["section", "part"],
+      "category": "structure"
+    },
+    {
+      "id": "concept",
+      "label": "Concept",
+      "uri_prefix": "https://schema.org/DefinedTerm",
+      "aliases": ["term", "definition"],
+      "category": "core"
+    },
+    {
+      "id": "knowledge_graph",
+      "label": "Knowledge Graph",
+      "uri_prefix": "kg://knowledge_graph",
+      "aliases": ["KG", "semantic graph", "concept graph"],
+      "category": "core"
+    }
+  ],
+  "relationship_types": [
+    {
+      "id": "references",
+      "label": "References",
+      "source_type": "chapter",
+      "target_type": "concept"
+    }
+  ],
+  "anti_patterns": [
+    {
+      "id": "undefined_term",
+      "description": "Term used without definition",
+      "indicators": ["TBD", "TODO", "undefined"]
+    }
+  ]
+}
