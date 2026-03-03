@@ -73,11 +73,13 @@ async fn terraphim_graph_falls_back_to_lexical_when_graph_returns_empty() {
         llm_router_config: None,
     };
 
-    let mut config = Config::default();
-    config.id = ConfigId::Embedded;
+    let mut config = Config {
+        id: ConfigId::Embedded,
+        default_role: role_name.clone(),
+        selected_role: role_name.clone(),
+        ..Config::default()
+    };
     config.roles.insert(role_name.clone(), role);
-    config.default_role = role_name.clone();
-    config.selected_role = role_name.clone();
 
     let config_state = ConfigState::new(&mut config).await.expect("config state");
     let mut service = TerraphimService::new(config_state);
