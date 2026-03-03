@@ -443,6 +443,212 @@ mod output_format_tests {
 }
 
 #[cfg(test)]
+mod ontology_schema_tests {
+    use std::path::PathBuf;
+    use terraphim_types::OntologySchema;
+
+    fn sample_schema_path() -> PathBuf {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let manifest_path = PathBuf::from(manifest_dir);
+        let workspace_root = manifest_path
+            .parent()
+            .and_then(|p| p.parent())
+            .expect("Cannot find workspace root");
+        workspace_root.join("crates/terraphim_types/test-fixtures/sample_ontology_schema.json")
+    }
+
+    fn load_sample_schema() -> OntologySchema {
+        OntologySchema::load_from_file(sample_schema_path().to_str().unwrap())
+            .expect("Failed to load sample schema")
+    }
+
+    #[test]
+    fn test_build_thesaurus_from_schema() {
+        let schema = load_sample_schema();
+        let entries = schema.to_thesaurus_entries();
+
+        // Build thesaurus the same way CliService does
+        let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
+        for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
+            let nterm_value = terraphim_types::NormalizedTermValue::new(term);
+            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            if let Some(url) = url {
+                nterm = nterm.with_url(url);
+            }
+            thesaurus.insert(nterm_value, nterm);
+        }
+
+        assert!(
+            !thesaurus.is_empty(),
+            "Thesaurus built from schema should not be empty"
+        );
+        // Schema has 3 entity types with labels + aliases = 10 entries total
+        // But thesaurus deduplicates by NormalizedTermValue (lowercased)
+        assert!(
+            thesaurus.len() >= 3,
+            "Thesaurus should have at least 3 entries (one per entity type)"
+        );
+    }
+
+    #[test]
+    fn test_extract_with_schema_finds_entities() {
+        let schema = load_sample_schema();
+
+        // Build thesaurus from schema
+        let entries = schema.to_thesaurus_entries();
+        let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
+        for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
+            let nterm_value = terraphim_types::NormalizedTermValue::new(term);
+            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            if let Some(url) = url {
+                nterm = nterm.with_url(url);
+            }
+            thesaurus.insert(nterm_value, nterm);
+        }
+
+        // Text containing "Chapter" and "Concept" from the schema
+        let text = "This chapter covers the concept of knowledge graphs";
+        let matches = terraphim_automata::find_matches(text, thesaurus, true)
+            .expect("find_matches should succeed");
+
+        assert!(
+            !matches.is_empty(),
+            "Should find matches for schema terms in text"
+        );
+
+        // Check that at least one match has a normalized value
+        let has_chapter = matches
+            .iter()
+            .any(|m| m.normalized_term.value.to_string() == "chapter");
+        let has_concept = matches
+            .iter()
+            .any(|m| m.normalized_term.value.to_string() == "concept");
+        assert!(has_chapter, "Should find 'chapter' in text");
+        assert!(has_concept, "Should find 'concept' in text");
+    }
+
+    #[test]
+    fn test_extract_with_schema_empty_text() {
+        let schema = load_sample_schema();
+
+        let entries = schema.to_thesaurus_entries();
+        let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
+        for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
+            let nterm_value = terraphim_types::NormalizedTermValue::new(term);
+            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            if let Some(url) = url {
+                nterm = nterm.with_url(url);
+            }
+            thesaurus.insert(nterm_value, nterm);
+        }
+
+        let matches = terraphim_automata::find_matches("", thesaurus, true)
+            .expect("find_matches on empty text should succeed");
+        assert!(matches.is_empty(), "Empty text should produce no matches");
+    }
+
+    #[test]
+    fn test_extract_with_schema_no_matches() {
+        let schema = load_sample_schema();
+
+        let entries = schema.to_thesaurus_entries();
+        let mut thesaurus = terraphim_types::Thesaurus::new(schema.name.clone());
+        for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
+            let nterm_value = terraphim_types::NormalizedTermValue::new(term);
+            let mut nterm = terraphim_types::NormalizedTerm::new(idx as u64, nterm_value.clone());
+            if let Some(url) = url {
+                nterm = nterm.with_url(url);
+            }
+            thesaurus.insert(nterm_value, nterm);
+        }
+
+        let text = "completely unrelated text about cooking recipes";
+        let matches = terraphim_automata::find_matches(text, thesaurus, true)
+            .expect("find_matches should succeed");
+        assert!(
+            matches.is_empty(),
+            "Unrelated text should produce no matches"
+        );
+    }
+
+    #[test]
+    fn test_calculate_coverage_all_matched() {
+        let schema = load_sample_schema();
+        let all_categories = schema.category_ids();
+
+        // If all categories are matched
+        let coverage =
+            terraphim_types::CoverageSignal::compute(&all_categories, all_categories.len(), 0.7);
+
+        assert_eq!(coverage.coverage_ratio, 1.0);
+        assert!(
+            !coverage.needs_review,
+            "Full coverage should not need review"
+        );
+        assert_eq!(coverage.total_categories, 3);
+        assert_eq!(coverage.matched_categories, 3);
+    }
+
+    #[test]
+    fn test_calculate_coverage_none_matched() {
+        let schema = load_sample_schema();
+        let all_categories = schema.category_ids();
+
+        let coverage = terraphim_types::CoverageSignal::compute(&all_categories, 0, 0.7);
+
+        assert_eq!(coverage.coverage_ratio, 0.0);
+        assert!(coverage.needs_review, "Zero coverage should need review");
+        assert_eq!(coverage.matched_categories, 0);
+    }
+
+    #[test]
+    fn test_calculate_coverage_partial_below_threshold() {
+        let schema = load_sample_schema();
+        let all_categories = schema.category_ids();
+
+        // 1 out of 3 matched = 0.33, below 0.7 threshold
+        let coverage = terraphim_types::CoverageSignal::compute(&all_categories, 1, 0.7);
+
+        assert!(coverage.coverage_ratio < 0.7);
+        assert!(
+            coverage.needs_review,
+            "Partial coverage below threshold should need review"
+        );
+    }
+
+    #[test]
+    fn test_calculate_coverage_partial_above_threshold() {
+        let schema = load_sample_schema();
+        let all_categories = schema.category_ids();
+
+        // 3 out of 3 = 1.0, above 0.7 threshold
+        let coverage = terraphim_types::CoverageSignal::compute(&all_categories, 3, 0.7);
+
+        assert!(coverage.coverage_ratio >= 0.7);
+        assert!(
+            !coverage.needs_review,
+            "Coverage above threshold should not need review"
+        );
+    }
+
+    #[test]
+    fn test_schema_load_nonexistent_file() {
+        let result = OntologySchema::load_from_file("/nonexistent/path/schema.json");
+        assert!(result.is_err(), "Loading nonexistent file should fail");
+    }
+
+    #[test]
+    fn test_schema_load_invalid_json() {
+        let dir = tempfile::tempdir().expect("Failed to create temp dir");
+        let path = dir.path().join("bad_schema.json");
+        std::fs::write(&path, "not valid json{{{").expect("Failed to write test file");
+
+        let result = OntologySchema::load_from_file(path.to_str().unwrap());
+        assert!(result.is_err(), "Loading invalid JSON should fail");
+    }
+}
+
+#[cfg(test)]
 mod error_handling_tests {
     #[test]
     fn test_error_result_structure() {
