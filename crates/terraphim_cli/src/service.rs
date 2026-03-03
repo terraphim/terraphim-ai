@@ -7,8 +7,8 @@ use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{
-    Document, ExtractedEntity, GroundingMetadata, NormalizationMethod, NormalizedTermValue,
-    RoleName, SearchQuery, Thesaurus,
+    Document, ExtractedEntity, GroundingMetadata, NormalizationMethod, NormalizedTerm,
+    NormalizedTermValue, OntologySchema, RoleName, SchemaSignal, SearchQuery, Thesaurus,
 };
 use tokio::sync::Mutex;
 
@@ -360,6 +360,64 @@ impl CliService {
             .collect();
 
         Ok(entities)
+    }
+
+    /// Extract entities using ontology schema, returning SchemaSignal
+    pub fn extract_with_schema(&self, schema: &OntologySchema, text: &str) -> Result<SchemaSignal> {
+        let thesaurus = Self::build_thesaurus_from_schema(schema);
+        let matches = terraphim_automata::find_matches(text, thesaurus, true)?;
+
+        // Build a lookup from NormalizedTermValue -> entity_type_id
+        let entry_lookup: std::collections::HashMap<String, String> = schema
+            .to_thesaurus_entries()
+            .into_iter()
+            .map(|(id, term, _)| (term.to_lowercase(), id))
+            .collect();
+
+        let entities: Vec<ExtractedEntity> = matches
+            .iter()
+            .map(|m| {
+                let entity_type_id = entry_lookup
+                    .get(&m.normalized_term.value.to_string())
+                    .cloned()
+                    .unwrap_or_else(|| "unknown".to_string());
+                ExtractedEntity {
+                    entity_type: entity_type_id.clone(),
+                    raw_value: m.term.clone(),
+                    normalized_value: Some(m.normalized_term.value.to_string()),
+                    grounding: Some(GroundingMetadata::new(
+                        schema
+                            .uri_for(&entity_type_id)
+                            .unwrap_or_else(|| format!("kg://{}", entity_type_id)),
+                        m.normalized_term.value.to_string(),
+                        schema.name.clone(),
+                        1.0,
+                        NormalizationMethod::Exact,
+                    )),
+                }
+            })
+            .collect();
+
+        Ok(SchemaSignal {
+            entities,
+            relationships: Vec::new(),
+            confidence: if matches.is_empty() { 0.0 } else { 1.0 },
+        })
+    }
+
+    /// Build a Thesaurus from an OntologySchema's entity types and aliases
+    fn build_thesaurus_from_schema(schema: &OntologySchema) -> Thesaurus {
+        let entries = schema.to_thesaurus_entries();
+        let mut thesaurus = Thesaurus::new(schema.name.clone());
+        for (idx, (_id, term, url)) in entries.into_iter().enumerate() {
+            let nterm_value = NormalizedTermValue::new(term);
+            let mut nterm = NormalizedTerm::new(idx as u64, nterm_value.clone());
+            if let Some(url) = url {
+                nterm = nterm.with_url(url);
+            }
+            thesaurus.insert(nterm_value, nterm);
+        }
+        thesaurus
     }
 
     /// Replace matches in text with links using thesaurus
