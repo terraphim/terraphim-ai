@@ -33,7 +33,7 @@ rust-sdk/
 .aider*
 scratchpad/firecracker-rust
 scratchpad/
-terraphim_server/dist/
+# terraphim_server/dist/ is tracked -- contains pre-built frontend for rust-embed
 # Generated build artifacts that shouldn't be committed
 .cargo/config.toml
 crates/terraphim_atomic_client/.aider.*
