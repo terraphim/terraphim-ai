@@ -150,6 +150,10 @@ enum Commands {
         /// Output as JSON with grounding metadata
         #[arg(long)]
         json: bool,
+
+        /// Path to ontology schema JSON file for schema-based extraction
+        #[arg(long)]
+        schema: Option<String>,
     },
 
     /// Generate shell completions
@@ -319,9 +323,12 @@ async fn main() -> Result<()> {
             role,
         }) => handle_replace(&service, text, mode, link_format, role).await,
         Some(Commands::Find { text, role }) => handle_find(&service, text, role).await,
-        Some(Commands::Extract { text, role, json }) => {
-            handle_extract(&service, text, role, json).await
-        }
+        Some(Commands::Extract {
+            text,
+            role,
+            json,
+            schema,
+        }) => handle_extract(&service, text, role, json, schema).await,
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
@@ -587,7 +594,16 @@ async fn handle_extract(
     text: String,
     role: Option<String>,
     json: bool,
+    schema_path: Option<String>,
 ) -> Result<serde_json::Value> {
+    // If --schema is provided, use schema-based extraction
+    if let Some(ref path) = schema_path {
+        let schema = terraphim_types::OntologySchema::load_from_file(path)
+            .map_err(|e| anyhow::anyhow!("Failed to load schema '{}': {}", path, e))?;
+        let signal = service.extract_with_schema(&schema, &text)?;
+        return Ok(serde_json::to_value(&signal)?);
+    }
+
     let role_name = if let Some(role) = role {
         terraphim_types::RoleName::new(&role)
     } else {
