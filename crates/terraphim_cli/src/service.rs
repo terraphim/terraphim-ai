@@ -2,10 +2,10 @@
 
 use anyhow::Result;
 use std::sync::Arc;
-use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
+use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
-use terraphim_settings::DeviceSettings;
+use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
 use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
 use tokio::sync::Mutex;
 
@@ -16,8 +16,15 @@ pub struct CliService {
 }
 
 impl CliService {
-    /// Initialize a new CLI service
-    pub async fn new() -> Result<Self> {
+    /// Initialize a new CLI service.
+    ///
+    /// Config loading priority:
+    /// 1. `config_path` (--config CLI flag) -- always loads from JSON, no persistence
+    /// 2. `role_config` in settings.toml -- bootstrap-then-persistence (first run loads
+    ///    JSON and saves to persistence; subsequent runs use persistence so CLI changes stick)
+    /// 3. Persistence layer (SQLite)
+    /// 4. Embedded defaults (hardcoded roles)
+    pub async fn new(config_path: Option<String>) -> Result<Self> {
         // Initialize logging
         terraphim_service::logging::init_logging(
             terraphim_service::logging::detect_logging_config(),
@@ -25,37 +32,146 @@ impl CliService {
 
         log::info!("Initializing CLI service");
 
-        // Load device settings
-        let device_settings = DeviceSettings::load_from_env_and_file(None)?;
+        // Priority 1: --config CLI flag (always loads from JSON, no persistence check)
+        if let Some(ref path) = config_path {
+            log::info!("Loading config from --config flag: '{}'", path);
+            match Config::load_from_json_file(path) {
+                Ok(config) => {
+                    return Self::from_config(config).await;
+                }
+                Err(e) => {
+                    return Err(anyhow::anyhow!(
+                        "Failed to load config from '{}': {:?}",
+                        path,
+                        e
+                    ));
+                }
+            }
+        }
+
+        // Load device settings, falling back to embedded defaults when running in sandboxes/tests
+        let device_settings = match DeviceSettings::load_from_env_and_file(None) {
+            Ok(settings) => settings,
+            Err(DeviceSettingsError::IoError(err))
+                if err.kind() == std::io::ErrorKind::NotFound =>
+            {
+                log::warn!(
+                    "Device settings not found ({}); using embedded defaults",
+                    err
+                );
+                DeviceSettings::default_embedded()
+            }
+            Err(err) => {
+                log::error!("Failed to load device settings: {err:?}");
+                return Err(err.into());
+            }
+        };
         log::debug!("Device settings: {:?}", device_settings);
 
-        // Try to load existing configuration, fallback to default embedded config
-        let mut config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+        // Priority 2: role_config in settings.toml (bootstrap-then-persistence)
+        if let Some(ref role_config_path) = device_settings.role_config {
+            log::info!("Found role_config in settings.toml: '{}'", role_config_path);
+            return Self::load_with_role_config(role_config_path, &device_settings).await;
+        }
+
+        // Priority 3 & 4: Persistence -> embedded defaults (existing behavior)
+        log::debug!("No role_config specified, using persistence/embedded defaults");
+        let config = match ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
             Ok(mut config) => match config.load().await {
                 Ok(config) => {
-                    log::debug!("Loaded existing embedded configuration");
+                    log::debug!("Loaded existing embedded configuration from persistence");
                     config
                 }
                 Err(_) => {
-                    // No saved config found is expected on first run - use default
                     log::debug!("No saved config found, using default embedded");
-                    ConfigBuilder::new_with_id(ConfigId::Embedded)
-                        .build_default_embedded()
-                        .build()?
+                    return Self::new_with_embedded_defaults().await;
                 }
             },
             Err(e) => {
                 log::warn!("Failed to build config: {:?}, using default", e);
-                ConfigBuilder::new_with_id(ConfigId::Embedded)
-                    .build_default_embedded()
-                    .build()?
+                return Self::new_with_embedded_defaults().await;
             }
         };
 
-        // Create config state
-        let config_state = ConfigState::new(&mut config).await?;
+        Self::from_config(config).await
+    }
 
-        // Create service
+    /// Load config using bootstrap-then-persistence strategy.
+    async fn load_with_role_config(
+        role_config_path: &str,
+        device_settings: &DeviceSettings,
+    ) -> Result<Self> {
+        // Try persistence first (preserves runtime changes like `config set`)
+        if let Ok(mut empty_config) = ConfigBuilder::new_with_id(ConfigId::Embedded).build() {
+            if let Ok(persisted) = empty_config.load().await {
+                if !persisted.roles.is_empty() {
+                    log::info!(
+                        "Loaded {} role(s) from persistence (role_config bootstrap already done)",
+                        persisted.roles.len()
+                    );
+                    return Self::from_config(persisted).await;
+                }
+            }
+        }
+
+        // No persisted config -- bootstrap from JSON file
+        log::info!(
+            "No persisted config found, bootstrapping from role_config: '{}'",
+            role_config_path
+        );
+        match Config::load_from_json_file(role_config_path) {
+            Ok(mut config) => {
+                // Apply default_role override from settings.toml
+                if let Some(ref default_role) = device_settings.default_role {
+                    let role_name = RoleName::new(default_role);
+                    if config.roles.contains_key(&role_name) {
+                        log::info!(
+                            "Setting selected role to '{}' from settings.toml default_role",
+                            default_role
+                        );
+                        config.selected_role = role_name.clone();
+                        config.default_role = role_name;
+                    } else {
+                        log::warn!(
+                            "default_role '{}' not found in role_config; available: {:?}",
+                            default_role,
+                            config
+                                .roles
+                                .keys()
+                                .map(|k| k.to_string())
+                                .collect::<Vec<_>>()
+                        );
+                    }
+                }
+
+                // Save to persistence so subsequent runs use persisted config
+                if let Err(e) = config.save().await {
+                    log::warn!("Failed to save bootstrapped config to persistence: {:?}", e);
+                }
+
+                Self::from_config(config).await
+            }
+            Err(e) => {
+                log::error!(
+                    "Failed to load role_config '{}': {:?}. Falling back to embedded defaults.",
+                    role_config_path,
+                    e
+                );
+                Self::new_with_embedded_defaults().await
+            }
+        }
+    }
+
+    /// Initialize service strictly from the embedded default configuration.
+    async fn new_with_embedded_defaults() -> Result<Self> {
+        let config = ConfigBuilder::new_with_id(ConfigId::Embedded)
+            .build_default_embedded()
+            .build()?;
+        Self::from_config(config).await
+    }
+
+    async fn from_config(mut config: Config) -> Result<Self> {
+        let config_state = ConfigState::new(&mut config).await?;
         let service = TerraphimService::new(config_state.clone());
 
         Ok(Self {
