@@ -30,13 +30,15 @@ fn main() -> std::io::Result<()> {
         );
         fs::write(
             &index_path,
-            "<!DOCTYPE html><html><body>Terraphim Server</body></html>",
+            r#"<!DOCTYPE html>
+<html>
+<body>
+<h1>Terraphim Server</h1>
+<p>Frontend assets not found. Run <code>scripts/build-frontend-for-server.sh</code> to build the web UI.</p>
+</body>
+</html>"#,
         )?;
     }
-
-    static_files::resource_dir(&dist_dir)
-        .build()
-        .unwrap_or_else(|_| panic!("failed to open web assets from {}", dist_dir.display()));
 
     Ok(())
 }
