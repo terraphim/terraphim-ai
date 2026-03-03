@@ -6,7 +6,10 @@ use terraphim_config::{Config, ConfigBuilder, ConfigId, ConfigState};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
 use terraphim_settings::{DeviceSettings, Error as DeviceSettingsError};
-use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery, Thesaurus};
+use terraphim_types::{
+    Document, ExtractedEntity, GroundingMetadata, NormalizationMethod, NormalizedTermValue,
+    RoleName, SearchQuery, Thesaurus,
+};
 use tokio::sync::Mutex;
 
 #[derive(Clone)]
@@ -326,6 +329,37 @@ impl CliService {
 
         // Find matches
         Ok(terraphim_automata::find_matches(text, thesaurus, true)?)
+    }
+
+    /// Extract matches with grounding metadata
+    pub async fn extract_with_grounding(
+        &self,
+        role_name: &RoleName,
+        text: &str,
+    ) -> Result<Vec<ExtractedEntity>> {
+        let thesaurus = self.get_thesaurus(role_name).await?;
+        let matches = terraphim_automata::find_matches(text, thesaurus, true)?;
+
+        let entities: Vec<ExtractedEntity> = matches
+            .iter()
+            .map(|m| ExtractedEntity {
+                entity_type: "term".to_string(),
+                raw_value: m.term.clone(),
+                normalized_value: Some(m.normalized_term.value.to_string()),
+                grounding: Some(GroundingMetadata::new(
+                    m.normalized_term
+                        .url
+                        .clone()
+                        .unwrap_or_else(|| format!("kg://{}", m.normalized_term.value)),
+                    m.normalized_term.value.to_string(),
+                    "terraphim".to_string(),
+                    1.0,
+                    NormalizationMethod::Exact,
+                )),
+            })
+            .collect();
+
+        Ok(entities)
     }
 
     /// Replace matches in text with links using thesaurus

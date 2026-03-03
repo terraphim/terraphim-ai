@@ -138,6 +138,20 @@ enum Commands {
         limit: usize,
     },
 
+    /// Extract entities from text with grounding metadata
+    Extract {
+        /// Text to extract from
+        text: String,
+
+        /// Role to use
+        #[arg(long)]
+        role: Option<String>,
+
+        /// Output as JSON with grounding metadata
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
@@ -305,6 +319,9 @@ async fn main() -> Result<()> {
             role,
         }) => handle_replace(&service, text, mode, link_format, role).await,
         Some(Commands::Find { text, role }) => handle_find(&service, text, role).await,
+        Some(Commands::Extract { text, role, json }) => {
+            handle_extract(&service, text, role, json).await
+        }
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
@@ -563,6 +580,41 @@ async fn handle_find(
     };
 
     Ok(serde_json::to_value(result)?)
+}
+
+async fn handle_extract(
+    service: &CliService,
+    text: String,
+    role: Option<String>,
+    json: bool,
+) -> Result<serde_json::Value> {
+    let role_name = if let Some(role) = role {
+        terraphim_types::RoleName::new(&role)
+    } else {
+        service.get_selected_role().await
+    };
+
+    if json {
+        let entities = service.extract_with_grounding(&role_name, &text).await?;
+        Ok(serde_json::to_value(&entities)?)
+    } else {
+        // Plain text mode: same as find
+        let matches = service.find_matches(&role_name, &text).await?;
+        let match_results: Vec<MatchResult> = matches
+            .iter()
+            .map(|m| MatchResult {
+                term: m.term.clone(),
+                position: m.pos,
+                normalized: m.normalized_term.value.to_string(),
+            })
+            .collect();
+        let result = FindResult {
+            text,
+            matches: match_results,
+            count: matches.len(),
+        };
+        Ok(serde_json::to_value(result)?)
+    }
 }
 
 async fn handle_thesaurus(
