@@ -156,6 +156,24 @@ enum Commands {
         schema: Option<String>,
     },
 
+    /// Check ontology coverage in text
+    Coverage {
+        /// Text to check coverage for
+        text: String,
+
+        /// Path to ontology schema JSON file (required)
+        #[arg(long)]
+        schema: String,
+
+        /// Minimum coverage threshold (0.0 - 1.0)
+        #[arg(long, default_value = "0.7")]
+        threshold: f32,
+
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+
     /// Generate shell completions
     Completions {
         /// Shell to generate completions for
@@ -329,6 +347,32 @@ async fn main() -> Result<()> {
             json,
             schema,
         }) => handle_extract(&service, text, role, json, schema).await,
+        Some(Commands::Coverage {
+            text,
+            schema,
+            threshold,
+            json,
+        }) => {
+            let result = handle_coverage(&service, text, &schema, threshold, json).await;
+            // Coverage uses exit code 1 when below threshold
+            if let Ok(val) = &result {
+                if let Some(true) = val
+                    .get("signal")
+                    .and_then(|s| s.get("needs_review"))
+                    .and_then(|v| v.as_bool())
+                {
+                    let formatted = match cli.format {
+                        OutputFormat::Json => serde_json::to_string(val)?,
+                        OutputFormat::JsonPretty => serde_json::to_string_pretty(val)?,
+                        OutputFormat::Text => format_as_text(val)
+                            .unwrap_or_else(|_| serde_json::to_string(val).unwrap()),
+                    };
+                    println!("{}", formatted);
+                    std::process::exit(1);
+                }
+            }
+            result
+        }
         Some(Commands::Thesaurus { role, limit }) => handle_thesaurus(&service, role, limit).await,
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
@@ -631,6 +675,19 @@ async fn handle_extract(
         };
         Ok(serde_json::to_value(result)?)
     }
+}
+
+async fn handle_coverage(
+    service: &CliService,
+    text: String,
+    schema_path: &str,
+    threshold: f32,
+    _json: bool,
+) -> Result<serde_json::Value> {
+    let schema = terraphim_types::OntologySchema::load_from_file(schema_path)
+        .map_err(|e| anyhow::anyhow!("Failed to load schema '{}': {}", schema_path, e))?;
+    let result = service.calculate_coverage(&schema, &text, threshold)?;
+    Ok(serde_json::to_value(&result)?)
 }
 
 async fn handle_thesaurus(
