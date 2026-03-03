@@ -21,6 +21,10 @@ struct Cli {
     #[command(subcommand)]
     command: Option<Commands>,
 
+    /// Path to role configuration JSON file
+    #[arg(long, global = true)]
+    config: Option<String>,
+
     /// Output format
     #[arg(long, global = true, default_value = "json")]
     format: OutputFormat,
@@ -279,7 +283,7 @@ async fn main() -> Result<()> {
     }
 
     // Initialize service for all other commands
-    let service = CliService::new()
+    let service = CliService::new(cli.config.clone())
         .await
         .context("Failed to initialize service")?;
 
