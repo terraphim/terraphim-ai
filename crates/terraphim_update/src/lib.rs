@@ -20,7 +20,7 @@ use std::fmt;
 use std::fs;
 use std::path::{Path, PathBuf};
 use tempfile::NamedTempFile;
-use tracing::{error, info};
+use tracing::{error, info, warn};
 
 /// Represents the status of an update operation
 #[derive(Debug, Clone)]
@@ -494,9 +494,10 @@ impl TerraphimUpdater {
                 return Ok(UpdateStatus::Failed(error_msg));
             }
             crate::signature::VerificationResult::MissingSignature => {
-                let error_msg = "No signature found in archive - refusing to install".to_string();
-                error!("{}", error_msg);
-                return Ok(UpdateStatus::Failed(error_msg));
+                warn!(
+                    "No signature found in archive - proceeding without verification. \
+                       Archives will be signed in a future release."
+                );
             }
             crate::signature::VerificationResult::Error(msg) => {
                 let error_msg = format!("Verification error: {}", msg);
