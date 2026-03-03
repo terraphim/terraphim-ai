@@ -168,6 +168,12 @@ jobs:
           yarn install --frozen-lockfile
           yarn build
 
+      - name: Copy frontend to server dist for rust-embed
+        if: "!matrix.use_cross"
+        run: |
+          rm -r terraphim_server/dist/assets 2>/dev/null || true
+          cp -a desktop/dist/. terraphim_server/dist/
+
       - name: Build server binary
         if: "!matrix.use_cross"
         shell: bash
@@ -426,6 +432,11 @@ jobs:
         run: |
           yarn install --frozen-lockfile
           yarn build
+
+      - name: Copy frontend to server dist for rust-embed
+        run: |
+          rm -r terraphim_server/dist/assets 2>/dev/null || true
+          cp -a desktop/dist/. terraphim_server/dist/
 
       - name: Build Debian packages
         run: |
