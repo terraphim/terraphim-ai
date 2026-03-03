@@ -2214,6 +2214,119 @@ pub struct SchemaSignal {
     pub confidence: f32,
 }
 
+// ============================================================================
+// Ontology Schema Types - Schema-First Knowledge Graph Definition (#547)
+// ============================================================================
+
+/// Entity type definition in an ontology schema
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OntologyEntityType {
+    /// Unique identifier within the schema (e.g., "chapter", "concept", "author")
+    pub id: String,
+    /// Human-readable label
+    pub label: String,
+    /// Canonical URI prefix for grounding (e.g., "https://schema.org/Chapter")
+    #[serde(default)]
+    pub uri_prefix: Option<String>,
+    /// Alternative names / synonyms for matching
+    #[serde(default)]
+    pub aliases: Vec<String>,
+    /// Category for coverage grouping (e.g., "core", "supporting", "optional")
+    #[serde(default)]
+    pub category: Option<String>,
+}
+
+/// Relationship type definition in an ontology schema
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OntologyRelationshipType {
+    /// Relationship identifier (e.g., "references", "defines")
+    pub id: String,
+    /// Human-readable label
+    pub label: String,
+    /// Source entity type ID
+    pub source_type: String,
+    /// Target entity type ID
+    pub target_type: String,
+}
+
+/// Anti-pattern definition for detection
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OntologyAntiPattern {
+    /// Anti-pattern identifier
+    pub id: String,
+    /// Description of what this anti-pattern represents
+    pub description: String,
+    /// Terms that indicate this anti-pattern
+    pub indicators: Vec<String>,
+}
+
+/// Schema-first ontology definition
+///
+/// Loaded from JSON file, used to build thesaurus for extraction.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct OntologySchema {
+    /// Schema name
+    pub name: String,
+    /// Schema version
+    pub version: String,
+    /// Entity type definitions
+    pub entity_types: Vec<OntologyEntityType>,
+    /// Relationship type definitions
+    #[serde(default)]
+    pub relationship_types: Vec<OntologyRelationshipType>,
+    /// Anti-patterns to detect
+    #[serde(default)]
+    pub anti_patterns: Vec<OntologyAntiPattern>,
+}
+
+impl OntologySchema {
+    /// Load schema from JSON file
+    pub fn load_from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
+        let content = std::fs::read_to_string(path)?;
+        let schema: Self = serde_json::from_str(&content)?;
+        Ok(schema)
+    }
+
+    /// Build thesaurus entries from schema entity types + aliases
+    ///
+    /// Each entity type label and its aliases become thesaurus entries
+    /// with the URI prefix as the URL for grounding.
+    /// Returns tuples of (id, term, url).
+    pub fn to_thesaurus_entries(&self) -> Vec<(String, String, Option<String>)> {
+        let mut entries = Vec::new();
+        for entity_type in &self.entity_types {
+            let url = entity_type
+                .uri_prefix
+                .clone()
+                .unwrap_or_else(|| format!("kg://{}", entity_type.id));
+            // Primary label
+            entries.push((
+                entity_type.id.clone(),
+                entity_type.label.clone(),
+                Some(url.clone()),
+            ));
+            // Aliases
+            for alias in &entity_type.aliases {
+                entries.push((entity_type.id.clone(), alias.clone(), Some(url.clone())));
+            }
+        }
+        entries
+    }
+
+    /// Get all entity type IDs for coverage calculation
+    pub fn category_ids(&self) -> Vec<String> {
+        self.entity_types.iter().map(|e| e.id.clone()).collect()
+    }
+
+    /// Get URI for a matched entity type ID
+    pub fn uri_for(&self, entity_type_id: &str) -> Option<String> {
+        self.entity_types
+            .iter()
+            .find(|e| e.id == entity_type_id)
+            .and_then(|e| e.uri_prefix.clone())
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2558,5 +2671,79 @@ mod tests {
         assert!(doc.synonyms.is_none());
         assert!(doc.route.is_none());
         assert!(doc.priority.is_none());
+    }
+
+    #[test]
+    fn test_ontology_schema_deserialize() {
+        let json = include_str!("../test-fixtures/sample_ontology_schema.json");
+        let schema: OntologySchema = serde_json::from_str(json).unwrap();
+        assert_eq!(schema.name, "Publishing Domain Model");
+        assert_eq!(schema.version, "1.0.0");
+        assert_eq!(schema.entity_types.len(), 3);
+        assert_eq!(schema.relationship_types.len(), 1);
+        assert_eq!(schema.anti_patterns.len(), 1);
+    }
+
+    #[test]
+    fn test_ontology_schema_to_thesaurus_entries() {
+        let json = include_str!("../test-fixtures/sample_ontology_schema.json");
+        let schema: OntologySchema = serde_json::from_str(json).unwrap();
+        let entries = schema.to_thesaurus_entries();
+        // 3 primary labels + 2 + 2 + 3 aliases = 10 entries
+        assert_eq!(entries.len(), 10);
+        // Check that primary labels are present
+        assert!(entries.iter().any(|(_, term, _)| term == "Chapter"));
+        assert!(entries.iter().any(|(_, term, _)| term == "Concept"));
+        assert!(entries.iter().any(|(_, term, _)| term == "Knowledge Graph"));
+        // Check that aliases are present
+        assert!(entries.iter().any(|(_, term, _)| term == "section"));
+        assert!(entries.iter().any(|(_, term, _)| term == "KG"));
+        // Check URIs are populated
+        assert!(entries.iter().all(|(_, _, url)| url.is_some()));
+    }
+
+    #[test]
+    fn test_ontology_schema_category_ids() {
+        let json = include_str!("../test-fixtures/sample_ontology_schema.json");
+        let schema: OntologySchema = serde_json::from_str(json).unwrap();
+        let ids = schema.category_ids();
+        assert_eq!(ids.len(), 3);
+        assert!(ids.contains(&"chapter".to_string()));
+        assert!(ids.contains(&"concept".to_string()));
+        assert!(ids.contains(&"knowledge_graph".to_string()));
+    }
+
+    #[test]
+    fn test_ontology_schema_uri_for() {
+        let json = include_str!("../test-fixtures/sample_ontology_schema.json");
+        let schema: OntologySchema = serde_json::from_str(json).unwrap();
+        assert_eq!(
+            schema.uri_for("chapter"),
+            Some("https://schema.org/Chapter".to_string())
+        );
+        assert_eq!(
+            schema.uri_for("concept"),
+            Some("https://schema.org/DefinedTerm".to_string())
+        );
+        assert_eq!(schema.uri_for("nonexistent"), None);
+    }
+
+    #[test]
+    fn test_ontology_schema_minimal() {
+        // Minimal schema with only required fields
+        let json = r#"{
+            "name": "Minimal",
+            "version": "0.1.0",
+            "entity_types": [
+                {"id": "item", "label": "Item"}
+            ]
+        }"#;
+        let schema: OntologySchema = serde_json::from_str(json).unwrap();
+        assert_eq!(schema.name, "Minimal");
+        assert_eq!(schema.entity_types.len(), 1);
+        assert!(schema.relationship_types.is_empty());
+        assert!(schema.anti_patterns.is_empty());
+        assert!(schema.entity_types[0].aliases.is_empty());
+        assert!(schema.entity_types[0].uri_prefix.is_none());
     }
 }
