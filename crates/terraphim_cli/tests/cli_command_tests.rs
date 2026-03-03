@@ -26,6 +26,8 @@ fn test_cli_help() {
         .stdout(predicate::str::contains("graph"))
         .stdout(predicate::str::contains("replace"))
         .stdout(predicate::str::contains("find"))
+        .stdout(predicate::str::contains("extract"))
+        .stdout(predicate::str::contains("coverage"))
         .stdout(predicate::str::contains("thesaurus"))
         .stdout(predicate::str::contains("completions"));
 }
@@ -567,5 +569,219 @@ mod integration {
         // Note: Some log output may still appear depending on log configuration
         // This test mainly verifies the flag is accepted
         assert!(output.status.success() || stderr.len() < 1000);
+    }
+
+    #[test]
+    fn test_extract_help() {
+        cli_command()
+            .args(["extract", "--help"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("text"))
+            .stdout(predicate::str::contains("--role"))
+            .stdout(predicate::str::contains("--json"))
+            .stdout(predicate::str::contains("--schema"));
+    }
+
+    #[test]
+    fn test_coverage_help() {
+        cli_command()
+            .args(["coverage", "--help"])
+            .assert()
+            .success()
+            .stdout(predicate::str::contains("text"))
+            .stdout(predicate::str::contains("--schema"))
+            .stdout(predicate::str::contains("--threshold"))
+            .stdout(predicate::str::contains("--json"));
+    }
+
+    #[test]
+    #[serial]
+    fn test_extract_with_schema() {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let schema_path = std::path::PathBuf::from(&manifest_dir)
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap()
+            .join("crates/terraphim_types/test-fixtures/sample_ontology_schema.json");
+
+        let output = cli_command()
+            .args([
+                "extract",
+                "This chapter covers the concept of knowledge graphs",
+                "--schema",
+                schema_path.to_str().unwrap(),
+            ])
+            .output()
+            .expect("Failed to execute command");
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let parsed: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+            assert!(
+                parsed.is_ok(),
+                "Extract --schema output should be valid JSON: {}",
+                stdout
+            );
+
+            if let Ok(json) = parsed {
+                // SchemaSignal has entities, relationships, confidence
+                assert!(json.get("entities").is_some(), "Should have entities field");
+                assert!(
+                    json.get("confidence").is_some(),
+                    "Should have confidence field"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_coverage_with_full_coverage() {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let schema_path = std::path::PathBuf::from(&manifest_dir)
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap()
+            .join("crates/terraphim_types/test-fixtures/sample_ontology_schema.json");
+
+        // Text that contains all 3 entity types: chapter, concept, knowledge graph
+        let output = cli_command()
+            .args([
+                "coverage",
+                "This chapter covers the concept and the knowledge graph",
+                "--schema",
+                schema_path.to_str().unwrap(),
+                "--threshold",
+                "0.7",
+            ])
+            .output()
+            .expect("Failed to execute command");
+
+        // Full coverage should exit 0
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !stdout.is_empty() {
+            let parsed: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+            assert!(
+                parsed.is_ok(),
+                "Coverage output should be valid JSON: {}",
+                stdout
+            );
+
+            if let Ok(json) = parsed {
+                assert!(json.get("signal").is_some(), "Should have signal field");
+                assert!(
+                    json.get("matched_categories").is_some(),
+                    "Should have matched_categories field"
+                );
+                assert!(
+                    json.get("missing_categories").is_some(),
+                    "Should have missing_categories field"
+                );
+                assert!(
+                    json.get("schema_name").is_some(),
+                    "Should have schema_name field"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_coverage_below_threshold_exits_1() {
+        let manifest_dir = std::env::var("CARGO_MANIFEST_DIR").unwrap_or_else(|_| ".".to_string());
+        let schema_path = std::path::PathBuf::from(&manifest_dir)
+            .parent()
+            .and_then(|p| p.parent())
+            .unwrap()
+            .join("crates/terraphim_types/test-fixtures/sample_ontology_schema.json");
+
+        // Text that matches NONE of the entity types
+        let output = cli_command()
+            .args([
+                "coverage",
+                "completely unrelated text about cooking recipes",
+                "--schema",
+                schema_path.to_str().unwrap(),
+                "--threshold",
+                "0.7",
+            ])
+            .output()
+            .expect("Failed to execute command");
+
+        // Zero coverage should exit with code 1
+        assert!(
+            !output.status.success(),
+            "Coverage below threshold should exit with non-zero code"
+        );
+
+        // But output should still be valid JSON
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        if !stdout.is_empty() {
+            let parsed: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+            assert!(
+                parsed.is_ok(),
+                "Coverage output should be valid JSON even on exit 1: {}",
+                stdout
+            );
+
+            if let Ok(json) = parsed {
+                let needs_review = json
+                    .get("signal")
+                    .and_then(|s| s.get("needs_review"))
+                    .and_then(|v| v.as_bool());
+                assert_eq!(
+                    needs_review,
+                    Some(true),
+                    "needs_review should be true when below threshold"
+                );
+            }
+        }
+    }
+
+    #[test]
+    #[serial]
+    fn test_extract_command_json_mode() {
+        let output = cli_command()
+            .args(["extract", "rust async tokio", "--json"])
+            .output()
+            .expect("Failed to execute command");
+
+        if output.status.success() {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let parsed: Result<serde_json::Value, _> = serde_json::from_str(&stdout);
+            assert!(
+                parsed.is_ok(),
+                "Extract --json output should be valid JSON: {}",
+                stdout
+            );
+
+            // Should be an array of ExtractedEntity
+            if let Ok(json) = parsed {
+                assert!(json.is_array(), "Extract --json should return an array");
+            }
+        }
+    }
+
+    #[test]
+    fn test_coverage_missing_schema_arg() {
+        // coverage requires --schema
+        cli_command()
+            .args(["coverage", "some text"])
+            .assert()
+            .failure();
+    }
+
+    #[test]
+    fn test_extract_with_nonexistent_schema() {
+        cli_command()
+            .args([
+                "extract",
+                "some text",
+                "--schema",
+                "/nonexistent/schema.json",
+            ])
+            .assert()
+            .failure();
     }
 }

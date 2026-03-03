@@ -323,6 +323,9 @@ async fn main() -> Result<()> {
         .await
         .context("Failed to initialize service")?;
 
+    // Track whether coverage check failed (exit code 1 after output)
+    let mut coverage_below_threshold = false;
+
     // Execute command
     let result = match cli.command {
         Some(Commands::Search { query, role, limit }) => {
@@ -351,24 +354,17 @@ async fn main() -> Result<()> {
             text,
             schema,
             threshold,
-            json,
+            json: _,
         }) => {
-            let result = handle_coverage(&service, text, &schema, threshold, json).await;
-            // Coverage uses exit code 1 when below threshold
+            let result = handle_coverage(&service, text, &schema, threshold).await;
+            // Check if coverage is below threshold for exit code
             if let Ok(val) = &result {
                 if let Some(true) = val
                     .get("signal")
                     .and_then(|s| s.get("needs_review"))
                     .and_then(|v| v.as_bool())
                 {
-                    let formatted = match cli.format {
-                        OutputFormat::Json => serde_json::to_string(val)?,
-                        OutputFormat::JsonPretty => serde_json::to_string_pretty(val)?,
-                        OutputFormat::Text => format_as_text(val)
-                            .unwrap_or_else(|_| serde_json::to_string(val).unwrap()),
-                    };
-                    println!("{}", formatted);
-                    std::process::exit(1);
+                    coverage_below_threshold = true;
                 }
             }
             result
@@ -394,6 +390,9 @@ async fn main() -> Result<()> {
                     .unwrap_or_else(|_| serde_json::to_string(&output).unwrap()),
             };
             println!("{}", formatted);
+            if coverage_below_threshold {
+                std::process::exit(1);
+            }
             Ok(())
         }
         Err(e) => {
@@ -682,7 +681,6 @@ async fn handle_coverage(
     text: String,
     schema_path: &str,
     threshold: f32,
-    _json: bool,
 ) -> Result<serde_json::Value> {
     let schema = terraphim_types::OntologySchema::load_from_file(schema_path)
         .map_err(|e| anyhow::anyhow!("Failed to load schema '{}': {}", schema_path, e))?;
