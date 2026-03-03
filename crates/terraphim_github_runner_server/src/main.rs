@@ -161,15 +161,16 @@ async fn execute_workflows_for_event(
 
 /// Handle incoming webhook requests
 #[handler]
-async fn handle_webhook(req: &mut Request, res: &mut Response) -> Result<(), StatusError> {
-    // Load settings
-    let settings = match Settings::from_env() {
-        Ok(s) => s,
-        Err(e) => {
-            error!("Failed to load settings: {}", e);
-            return Err(StatusError::internal_server_error());
-        }
-    };
+async fn handle_webhook(
+    depot: &mut Depot,
+    req: &mut Request,
+    res: &mut Response,
+) -> Result<(), StatusError> {
+    // Read settings from depot (injected at startup)
+    let settings = depot.obtain::<Settings>().map_err(|_| {
+        error!("Settings not found in depot");
+        StatusError::internal_server_error()
+    })?;
 
     // Verify signature
     let signature = match req
@@ -386,6 +387,23 @@ fn create_llm_client() -> Option<Arc<dyn LlmClient>> {
     client
 }
 
+/// Middleware that injects Settings into the request Depot
+struct SettingsInjector(Settings);
+
+#[async_trait::async_trait]
+impl Handler for SettingsInjector {
+    async fn handle(
+        &self,
+        req: &mut Request,
+        depot: &mut Depot,
+        res: &mut Response,
+        ctrl: &mut FlowCtrl,
+    ) {
+        depot.inject(self.0.clone());
+        ctrl.call_next(req, depot, res).await;
+    }
+}
+
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize logging
@@ -397,8 +415,10 @@ async fn main() -> Result<()> {
     info!("Repository path: {:?}", settings.repository_path);
     info!("Workflow directory: {:?}", settings.workflow_dir);
 
-    // Setup router
-    let router = Router::new().push(Router::with_path("webhook").post(handle_webhook));
+    // Setup router with settings injected into depot
+    let router = Router::new()
+        .hoop(SettingsInjector(settings.clone()))
+        .push(Router::with_path("webhook").post(handle_webhook));
 
     let addr = format!("{}:{}", settings.host, settings.port);
     info!("Terraphim GitHub Runner Server starting on {}", addr);
@@ -413,7 +433,6 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use salvo::test::TestClient;
-    use terraphim_test_utils::EnvVarGuard;
 
     fn create_test_settings() -> Settings {
         use std::path::PathBuf;
@@ -429,9 +448,14 @@ mod tests {
         }
     }
 
+    fn test_router() -> Router {
+        Router::new()
+            .hoop(SettingsInjector(create_test_settings()))
+            .push(Router::with_path("webhook").post(handle_webhook))
+    }
+
     #[tokio::test]
     async fn test_valid_webhook_signature() {
-        let _guard = EnvVarGuard::set("GITHUB_WEBHOOK_SECRET", "test_secret");
         let settings = create_test_settings();
         let payload = r#"{"action":"opened","number":1,"repository":{"full_name":"test/repo"}}"#;
 
@@ -444,8 +468,7 @@ mod tests {
         mac.update(payload.as_bytes());
         let signature = format!("sha256={}", hex::encode(mac.finalize().into_bytes()));
 
-        let service =
-            Service::new(Router::new().push(Router::with_path("webhook").post(handle_webhook)));
+        let service = Service::new(test_router());
         let resp = TestClient::post("http://127.0.0.1:5800/webhook")
             .add_header("content-type", "application/json", false)
             .add_header("x-hub-signature-256", signature, false)
@@ -458,11 +481,9 @@ mod tests {
 
     #[tokio::test]
     async fn test_invalid_webhook_signature() {
-        let _guard = EnvVarGuard::set("GITHUB_WEBHOOK_SECRET", "test_secret");
         let payload = r#"{"action":"opened","number":1,"repository":{"full_name":"test/repo"}}"#;
 
-        let service =
-            Service::new(Router::new().push(Router::with_path("webhook").post(handle_webhook)));
+        let service = Service::new(test_router());
         let resp = TestClient::post("http://127.0.0.1:5800/webhook")
             .add_header("content-type", "application/json", false)
             .add_header("x-hub-signature-256", "sha256=invalid", false)
