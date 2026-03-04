@@ -77,8 +77,8 @@ class GraphStats:
 class LogicalOperator:
     """Logical operator for combining search terms."""
 
-    And: int
-    Or: int
+    And: "LogicalOperator"
+    Or: "LogicalOperator"
 
 class RoleGraph:
     """A knowledge graph for a specific role."""
