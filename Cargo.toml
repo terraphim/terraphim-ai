@@ -2,7 +2,7 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_validation", "crates/terraphim_rlm", "crates/terraphim_automata_py", "desktop/src-tauri"]  # Experimental crates; automata_py needs `maturin develop`; desktop/src-tauri built separately via Tauri CLI
+exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_validation", "crates/terraphim_rlm", "crates/terraphim_automata_py", "crates/terraphim_rolegraph_py", "desktop/src-tauri"]  # Experimental crates; *_py crates need `maturin develop`; desktop/src-tauri built separately via Tauri CLI
 default-members = ["terraphim_server"]
 
 [workspace.package]
