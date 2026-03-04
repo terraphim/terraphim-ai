@@ -477,8 +477,8 @@ mod tests {
         cb.record_failure(); // Opens immediately
         assert_eq!(cb.state(), CircuitState::Open);
 
-        // Wait for cooldown
-        std::thread::sleep(Duration::from_millis(5));
+        // Wait for cooldown (generous margin for CI under load)
+        std::thread::sleep(Duration::from_millis(50));
         assert_eq!(cb.state(), CircuitState::HalfOpen);
         assert!(cb.should_allow());
     }

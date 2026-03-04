@@ -2,7 +2,28 @@
 [workspace]
 resolver = "2"
 members = ["crates/*", "terraphim_server", "terraphim_firecracker", "terraphim_ai_nodejs"]
-exclude = ["crates/terraphim_agent_application", "crates/terraphim_truthforge", "crates/terraphim_validation", "crates/terraphim_rlm", "crates/terraphim_automata_py", "crates/terraphim_rolegraph_py", "desktop/src-tauri"]  # Experimental crates; *_py crates need `maturin develop`; desktop/src-tauri built separately via Tauri CLI
+exclude = [
+    # Experimental crates
+    "crates/terraphim_agent_application",
+    "crates/terraphim_truthforge",
+    "crates/terraphim_validation",
+    "crates/terraphim_rlm",
+    # Python bindings (need `maturin develop`)
+    "crates/terraphim_automata_py",
+    "crates/terraphim_rolegraph_py",
+    # Desktop built separately via Tauri CLI
+    "desktop/src-tauri",
+    # Planned future use, not needed for workspace builds
+    "crates/terraphim_build_args",
+    "crates/terraphim-markdown-parser",
+    # Unused haystack providers (kept for future integration)
+    "crates/haystack_atlassian",
+    "crates/haystack_discourse",
+    "crates/haystack_jmap",
+    "crates/haystack_grepapp",
+    # Superseded by terraphim_agent
+    "crates/terraphim_repl",
+]
 default-members = ["terraphim_server"]
 
 [workspace.package]
