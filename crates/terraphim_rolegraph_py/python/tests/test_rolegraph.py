@@ -121,11 +121,16 @@ class TestGraphQueries:
         assert len(ids) >= 2
 
     def test_is_all_terms_connected_by_path(self, populated_rolegraph):
-        # Terms that co-occur in the same document should be connected
-        result = populated_rolegraph.is_all_terms_connected_by_path(
+        # "machine learning" and "deep learning" co-occur in doc1, so they are connected
+        assert populated_rolegraph.is_all_terms_connected_by_path(
             "machine learning deep learning"
+        ) is True
+        # A term not in the thesaurus produces no nodes, so connectivity is vacuously true;
+        # verify a single known term still returns a bool
+        assert isinstance(
+            populated_rolegraph.is_all_terms_connected_by_path("machine learning"),
+            bool,
         )
-        assert isinstance(result, bool)
 
 
 class TestGraphStats:

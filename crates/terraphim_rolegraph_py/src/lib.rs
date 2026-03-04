@@ -477,13 +477,10 @@ impl PyRoleGraph {
     // -- Dunder methods -----------------------------------------------------
 
     fn __repr__(&self) -> String {
-        let stats = self.inner.get_graph_stats();
         format!(
-            "RoleGraph(role='{}', nodes={}, edges={}, documents={})",
+            "RoleGraph(role='{}', documents={})",
             self.inner.role.original,
-            stats.node_count,
-            stats.edge_count,
-            stats.document_count
+            self.inner.document_count()
         )
     }
 
