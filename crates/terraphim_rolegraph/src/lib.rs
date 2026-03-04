@@ -182,6 +182,15 @@ impl RoleGraph {
 
     /// Create RoleGraph from serializable representation
     pub async fn from_serializable(serializable: SerializableRoleGraph) -> Result<Self> {
+        Self::from_serializable_sync(serializable)
+    }
+
+    /// Create RoleGraph from serializable representation synchronously.
+    ///
+    /// This is identical to [`from_serializable`] but does not require an async runtime.
+    /// The async version exists for API compatibility; the actual construction
+    /// is fully synchronous.
+    pub fn from_serializable_sync(serializable: SerializableRoleGraph) -> Result<Self> {
         let mut role_graph = RoleGraph {
             role: serializable.role,
             nodes: serializable.nodes,
