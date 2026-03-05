@@ -321,4 +321,155 @@ mod tests {
         assert_eq!(connector.source_id(), "claude-code-native");
         assert_eq!(connector.display_name(), "Claude Code (Native)");
     }
+
+    #[test]
+    fn test_parse_timestamp_valid_formats() {
+        assert!(parse_timestamp("2024-01-15T10:30:00Z").is_some());
+        assert!(parse_timestamp("2024-12-31T23:59:59.999Z").is_some());
+    }
+
+    #[test]
+    fn test_parse_timestamp_invalid() {
+        assert!(parse_timestamp("not-a-timestamp").is_none());
+        assert!(parse_timestamp("").is_none());
+    }
+
+    #[test]
+    fn test_parse_user_entry() {
+        let json = r#"{"sessionId":"abc","cwd":"/tmp","timestamp":"2024-01-15T10:30:00Z","message":{"role":"user","content":"hello"}}"#;
+        let entry: LogEntry = serde_json::from_str(json).unwrap();
+        assert_eq!(entry.session_id, Some("abc".to_string()));
+        assert_eq!(entry.cwd, Some("/tmp".to_string()));
+        assert!(matches!(entry.message, EntryMessage::User { .. }));
+    }
+
+    #[test]
+    fn test_parse_assistant_entry_with_text() {
+        let json = r#"{"sessionId":"abc","timestamp":"2024-01-15T10:30:00Z","message":{"role":"assistant","content":[{"type":"text","text":"response here"}]}}"#;
+        let entry: LogEntry = serde_json::from_str(json).unwrap();
+        if let EntryMessage::Assistant { content } = &entry.message {
+            assert_eq!(content.len(), 1);
+            assert!(
+                matches!(&content[0], AssistantContentBlock::Text { text } if text == "response here")
+            );
+        } else {
+            panic!("Expected Assistant message");
+        }
+    }
+
+    #[test]
+    fn test_parse_assistant_entry_with_tool_use() {
+        let json = r#"{"sessionId":"abc","timestamp":"2024-01-15T10:30:00Z","message":{"role":"assistant","content":[{"type":"tool_use","id":"tool1","name":"Read","input":{"path":"/tmp"}}]}}"#;
+        let entry: LogEntry = serde_json::from_str(json).unwrap();
+        if let EntryMessage::Assistant { content } = &entry.message {
+            assert_eq!(content.len(), 1);
+            assert!(
+                matches!(&content[0], AssistantContentBlock::ToolUse { name, .. } if name == "Read")
+            );
+        } else {
+            panic!("Expected Assistant message");
+        }
+    }
+
+    #[test]
+    fn test_parse_tool_result_entry() {
+        let json = r#"{"sessionId":"abc","timestamp":"2024-01-15T10:30:00Z","message":{"role":"tool_result","content":[{"content":"file contents here"}]}}"#;
+        let entry: LogEntry = serde_json::from_str(json).unwrap();
+        if let EntryMessage::ToolResult { content } = &entry.message {
+            assert_eq!(content.len(), 1);
+            assert_eq!(content[0].content, "file contents here");
+        } else {
+            panic!("Expected ToolResult message");
+        }
+    }
+
+    #[test]
+    fn test_parse_entry_missing_optional_fields() {
+        let json =
+            r#"{"timestamp":"2024-01-15T10:30:00Z","message":{"role":"user","content":"hello"}}"#;
+        let entry: LogEntry = serde_json::from_str(json).unwrap();
+        assert!(entry.session_id.is_none());
+        assert!(entry.cwd.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_parse_session_from_jsonl_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("test-session.jsonl");
+        let content = [
+            r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:00Z","message":{"role":"user","content":"How do I use tokio?"}}"#,
+            r#"{"sessionId":"sess1","cwd":"/project","timestamp":"2024-01-15T10:00:05Z","message":{"role":"assistant","content":[{"type":"text","text":"Here is how you use tokio..."}]}}"#,
+        ].join("\n");
+        tokio::fs::write(&file_path, content).await.unwrap();
+
+        let connector = NativeClaudeConnector;
+        let session = connector
+            .parse_session_file(&file_path)
+            .await
+            .unwrap()
+            .unwrap();
+
+        assert_eq!(session.external_id, "sess1");
+        assert_eq!(session.messages.len(), 2);
+        assert_eq!(session.messages[0].role, crate::model::MessageRole::User);
+        assert_eq!(session.messages[0].content, "How do I use tokio?");
+        assert_eq!(
+            session.messages[1].role,
+            crate::model::MessageRole::Assistant
+        );
+        assert!(session.started_at.is_some());
+        assert!(session.ended_at.is_some());
+    }
+
+    #[tokio::test]
+    async fn test_parse_session_empty_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("empty.jsonl");
+        tokio::fs::write(&file_path, "").await.unwrap();
+
+        let connector = NativeClaudeConnector;
+        let result = connector.parse_session_file(&file_path).await.unwrap();
+        assert!(result.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_parse_session_malformed_lines_skipped() {
+        let dir = tempfile::tempdir().unwrap();
+        let file_path = dir.path().join("mixed.jsonl");
+        let content = [
+            "not valid json",
+            r#"{"sessionId":"sess1","timestamp":"2024-01-15T10:00:00Z","message":{"role":"user","content":"hello"}}"#,
+            "also not valid",
+        ].join("\n");
+        tokio::fs::write(&file_path, content).await.unwrap();
+
+        let connector = NativeClaudeConnector;
+        let session = connector
+            .parse_session_file(&file_path)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(session.messages.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_import_with_limit() {
+        let dir = tempfile::tempdir().unwrap();
+        // Create multiple session files
+        for i in 0..5 {
+            let file_path = dir.path().join(format!("session-{}.jsonl", i));
+            let content = format!(
+                r#"{{"sessionId":"sess{}","timestamp":"2024-01-15T10:00:00Z","message":{{"role":"user","content":"msg {}"}}}}"#,
+                i, i
+            );
+            tokio::fs::write(&file_path, content).await.unwrap();
+        }
+
+        let connector = NativeClaudeConnector;
+        let options = ImportOptions::default()
+            .with_path(dir.path().to_path_buf())
+            .with_limit(2);
+        let sessions = connector.import(&options).await.unwrap();
+        assert_eq!(sessions.len(), 2);
+    }
 }
