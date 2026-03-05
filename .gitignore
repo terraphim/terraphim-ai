@@ -44,6 +44,9 @@ website/static/video/
 website/static/images/terraphim_bg.*
 releases/
 
+# Beads task database (local working state)
+.beads/
+
 # Signing keys (NEVER commit private keys)
 keys/
 
@@ -65,5 +68,4 @@ crates/terraphim_settings/test_settings/settings.toml
 a.out
 
 # Cache
-.cachebro/
 .cachebro/
