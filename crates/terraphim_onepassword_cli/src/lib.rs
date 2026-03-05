@@ -311,3 +311,248 @@ impl std::fmt::Display for OnePasswordRef {
         write!(f, "op://{}/{}/{}", self.vault, self.item, self.field)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // --- OnePasswordRef parsing tests ---
+
+    #[test]
+    fn test_parse_valid_reference() {
+        let loader = OnePasswordLoader::new();
+        let parsed = loader
+            .parse_reference("op://my-vault/my-item/my-field")
+            .unwrap();
+        assert_eq!(parsed.vault, "my-vault");
+        assert_eq!(parsed.item, "my-item");
+        assert_eq!(parsed.field, "my-field");
+    }
+
+    #[test]
+    fn test_parse_reference_display_round_trip() {
+        let loader = OnePasswordLoader::new();
+        let reference = "op://vault/item/field";
+        let parsed = loader.parse_reference(reference).unwrap();
+        assert_eq!(parsed.to_string(), reference);
+    }
+
+    #[test]
+    fn test_parse_reference_missing_prefix() {
+        let loader = OnePasswordLoader::new();
+        let result = loader.parse_reference("vault/item/field");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_reference_missing_field() {
+        let loader = OnePasswordLoader::new();
+        let result = loader.parse_reference("op://vault/item");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_reference_extra_components() {
+        let loader = OnePasswordLoader::new();
+        let result = loader.parse_reference("op://vault/item/field/extra");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_reference_empty_components() {
+        let loader = OnePasswordLoader::new();
+        // Regex requires at least one char per component
+        let result = loader.parse_reference("op:////");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_reference_with_special_chars() {
+        let loader = OnePasswordLoader::new();
+        let parsed = loader
+            .parse_reference("op://my-vault_123/my.item/api-key")
+            .unwrap();
+        assert_eq!(parsed.vault, "my-vault_123");
+        assert_eq!(parsed.item, "my.item");
+        assert_eq!(parsed.field, "api-key");
+    }
+
+    #[test]
+    fn test_onepassword_ref_equality() {
+        let ref1 = OnePasswordRef {
+            vault: "v".to_string(),
+            item: "i".to_string(),
+            field: "f".to_string(),
+        };
+        let ref2 = OnePasswordRef {
+            vault: "v".to_string(),
+            item: "i".to_string(),
+            field: "f".to_string(),
+        };
+        assert_eq!(ref1, ref2);
+    }
+
+    #[test]
+    fn test_onepassword_ref_serde_round_trip() {
+        let op_ref = OnePasswordRef {
+            vault: "my-vault".to_string(),
+            item: "my-item".to_string(),
+            field: "password".to_string(),
+        };
+        let json = serde_json::to_string(&op_ref).unwrap();
+        let deserialized: OnePasswordRef = serde_json::from_str(&json).unwrap();
+        assert_eq!(op_ref, deserialized);
+    }
+
+    // --- EnvironmentLoader tests ---
+
+    #[test]
+    fn test_reference_to_env_var_basic() {
+        let loader = EnvironmentLoader::new();
+        let env_var = loader
+            .reference_to_env_var("op://my-vault/my-item/password")
+            .unwrap();
+        assert_eq!(env_var, "MY_VAULT_MY_ITEM_PASSWORD");
+    }
+
+    #[test]
+    fn test_reference_to_env_var_hyphens_replaced() {
+        let loader = EnvironmentLoader::new();
+        let env_var = loader
+            .reference_to_env_var("op://my-vault/my-item/api-key")
+            .unwrap();
+        assert_eq!(env_var, "MY_VAULT_MY_ITEM_API-KEY");
+    }
+
+    #[test]
+    fn test_reference_to_env_var_non_reference_passthrough() {
+        let loader = EnvironmentLoader::new();
+        let result = loader.reference_to_env_var("plain-text").unwrap();
+        assert_eq!(result, "plain-text");
+    }
+
+    #[test]
+    fn test_reference_to_env_var_invalid_format() {
+        let loader = EnvironmentLoader::new();
+        let result = loader.reference_to_env_var("op://vault-only");
+        assert!(result.is_err());
+    }
+
+    // --- OnePasswordLoader constructor tests ---
+
+    #[test]
+    fn test_loader_default_timeout() {
+        let loader = OnePasswordLoader::new();
+        assert_eq!(loader.timeout_seconds, 30);
+    }
+
+    #[test]
+    fn test_loader_default_trait() {
+        let loader = OnePasswordLoader::default();
+        assert_eq!(loader.timeout_seconds, 30);
+    }
+
+    // --- Error display tests ---
+
+    #[test]
+    fn test_error_display_cli_not_found() {
+        let err = OnePasswordError::CliNotFound;
+        let msg = err.to_string();
+        assert!(msg.contains("1Password CLI not found"));
+    }
+
+    #[test]
+    fn test_error_display_not_authenticated() {
+        let err = OnePasswordError::NotAuthenticated;
+        let msg = err.to_string();
+        assert!(msg.contains("Not authenticated"));
+    }
+
+    #[test]
+    fn test_error_display_invalid_reference() {
+        let err = OnePasswordError::InvalidReference {
+            reference: "bad-ref".to_string(),
+        };
+        assert!(err.to_string().contains("bad-ref"));
+    }
+
+    #[test]
+    fn test_error_display_secret_not_found() {
+        let err = OnePasswordError::SecretNotFound {
+            reference: "op://v/i/f".to_string(),
+        };
+        assert!(err.to_string().contains("op://v/i/f"));
+    }
+
+    // --- SecretLoader trait tests for EnvironmentLoader ---
+
+    #[tokio::test]
+    async fn test_env_loader_non_reference_passthrough() {
+        let loader = EnvironmentLoader::new();
+        let result = loader.resolve_secret("not-a-reference").await.unwrap();
+        assert_eq!(result, "not-a-reference");
+    }
+
+    #[tokio::test]
+    async fn test_env_loader_resolve_from_env() {
+        let loader = EnvironmentLoader::new();
+        // Set a test env var
+        // SAFETY: test is single-threaded and env var is unique to this test
+        unsafe {
+            std::env::set_var("TEST_VAULT_TEST_ITEM_API_KEY", "secret123");
+        }
+        let result = loader
+            .resolve_secret("op://test-vault/test-item/api_key")
+            .await
+            .unwrap();
+        assert_eq!(result, "secret123");
+        unsafe {
+            std::env::remove_var("TEST_VAULT_TEST_ITEM_API_KEY");
+        }
+    }
+
+    #[tokio::test]
+    async fn test_env_loader_missing_env_var() {
+        let loader = EnvironmentLoader::new();
+        let result = loader.resolve_secret("op://nonexistent/vault/field").await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_env_loader_is_always_available() {
+        let loader = EnvironmentLoader::new();
+        assert!(loader.is_available().await);
+    }
+
+    #[tokio::test]
+    async fn test_env_loader_process_config_no_references() {
+        let loader = EnvironmentLoader::new();
+        let config = r#"{"key": "plain-value"}"#;
+        let result = loader.process_config(config).await.unwrap();
+        assert_eq!(result, config);
+    }
+
+    #[tokio::test]
+    async fn test_env_loader_process_config_with_reference() {
+        let loader = EnvironmentLoader::new();
+        // SAFETY: test is single-threaded and env var is unique to this test
+        unsafe {
+            std::env::set_var("MYVAULT_MYITEM_TOKEN", "resolved-token");
+        }
+        let config = r#"{"api_token": "op://myvault/myitem/token"}"#;
+        let result = loader.process_config(config).await.unwrap();
+        assert_eq!(result, r#"{"api_token": "resolved-token"}"#);
+        unsafe {
+            std::env::remove_var("MYVAULT_MYITEM_TOKEN");
+        }
+    }
+
+    // --- OnePasswordLoader resolve_secret passthrough ---
+
+    #[tokio::test]
+    async fn test_op_loader_non_reference_passthrough() {
+        let loader = OnePasswordLoader::new();
+        let result = loader.resolve_secret("plain-value").await.unwrap();
+        assert_eq!(result, "plain-value");
+    }
+}
