@@ -28,9 +28,9 @@ async fn test_frontend_engineer_grepapp_integration() {
 
     // Load the Front End Engineer configuration
     let config_path = if current_dir.ends_with("terraphim_server") {
-        PathBuf::from("default/frontend_engineer_config.json")
+        PathBuf::from("../examples/role-configs/frontend_engineer_config.json")
     } else {
-        PathBuf::from("terraphim_server/default/frontend_engineer_config.json")
+        PathBuf::from("examples/role-configs/frontend_engineer_config.json")
     };
 
     if !config_path.exists() {
@@ -251,9 +251,9 @@ async fn test_frontend_engineer_config_structure() {
     let current_dir = std::env::current_dir().unwrap();
 
     let config_path = if current_dir.ends_with("terraphim_server") {
-        PathBuf::from("default/frontend_engineer_config.json")
+        PathBuf::from("../examples/role-configs/frontend_engineer_config.json")
     } else {
-        PathBuf::from("terraphim_server/default/frontend_engineer_config.json")
+        PathBuf::from("examples/role-configs/frontend_engineer_config.json")
     };
 
     if !config_path.exists() {
