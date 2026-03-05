@@ -285,4 +285,190 @@ mod tests {
         assert_eq!(session.user_message_count(), 2);
         assert_eq!(session.assistant_message_count(), 1);
     }
+
+    #[test]
+    fn test_message_role_display() {
+        assert_eq!(MessageRole::User.to_string(), "user");
+        assert_eq!(MessageRole::Assistant.to_string(), "assistant");
+        assert_eq!(MessageRole::System.to_string(), "system");
+        assert_eq!(MessageRole::Tool.to_string(), "tool");
+        assert_eq!(MessageRole::Other.to_string(), "other");
+    }
+
+    #[test]
+    fn test_message_role_from_aliases() {
+        assert_eq!(MessageRole::from("bot"), MessageRole::Assistant);
+        assert_eq!(MessageRole::from("model"), MessageRole::Assistant);
+        assert_eq!(MessageRole::from("tool_result"), MessageRole::Tool);
+    }
+
+    #[test]
+    fn test_content_block_as_text() {
+        let text_block = ContentBlock::Text {
+            text: "hello".to_string(),
+        };
+        assert_eq!(text_block.as_text(), Some("hello"));
+
+        let tool_block = ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: serde_json::Value::Null,
+        };
+        assert_eq!(tool_block.as_text(), None);
+    }
+
+    #[test]
+    fn test_message_has_tool_use() {
+        let mut msg = Message::text(0, MessageRole::Assistant, "text");
+        assert!(!msg.has_tool_use());
+
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Write".to_string(),
+            input: serde_json::Value::Null,
+        });
+        assert!(msg.has_tool_use());
+    }
+
+    #[test]
+    fn test_message_tool_names() {
+        let mut msg = Message::text(0, MessageRole::Assistant, "text");
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: serde_json::Value::Null,
+        });
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "2".to_string(),
+            name: "Write".to_string(),
+            input: serde_json::Value::Null,
+        });
+
+        let names = msg.tool_names();
+        assert_eq!(names, vec!["Read", "Write"]);
+    }
+
+    #[test]
+    fn test_session_tools_used() {
+        let mut msg = Message::text(0, MessageRole::Assistant, "text");
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: serde_json::Value::Null,
+        });
+        let mut msg2 = Message::text(1, MessageRole::Assistant, "text2");
+        msg2.blocks.push(ContentBlock::ToolUse {
+            id: "2".to_string(),
+            name: "Read".to_string(),
+            input: serde_json::Value::Null,
+        });
+        msg2.blocks.push(ContentBlock::ToolUse {
+            id: "3".to_string(),
+            name: "Write".to_string(),
+            input: serde_json::Value::Null,
+        });
+
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![msg, msg2],
+            metadata: SessionMetadata::default(),
+        };
+
+        let tools = session.tools_used();
+        assert_eq!(tools, vec!["Read", "Write"]);
+    }
+
+    #[test]
+    fn test_session_summary_short_message() {
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![Message::text(0, MessageRole::User, "Short question")],
+            metadata: SessionMetadata::default(),
+        };
+        assert_eq!(session.summary(), Some("Short question".to_string()));
+    }
+
+    #[test]
+    fn test_session_summary_long_message_truncated() {
+        let long_text = "a".repeat(200);
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![Message::text(0, MessageRole::User, long_text)],
+            metadata: SessionMetadata::default(),
+        };
+        let summary = session.summary().unwrap();
+        assert!(summary.ends_with("..."));
+        assert!(summary.len() <= 103); // 100 chars + "..."
+    }
+
+    #[test]
+    fn test_session_summary_no_user_messages() {
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![Message::text(0, MessageRole::Assistant, "response")],
+            metadata: SessionMetadata::default(),
+        };
+        assert!(session.summary().is_none());
+    }
+
+    #[test]
+    fn test_session_duration_with_timestamps() {
+        let start: jiff::Timestamp = "2024-01-15T10:00:00Z".parse().unwrap();
+        let end: jiff::Timestamp = "2024-01-15T10:05:00Z".parse().unwrap();
+
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: Some(start),
+            ended_at: Some(end),
+            messages: vec![],
+            metadata: SessionMetadata::default(),
+        };
+
+        let duration = session.duration_ms().unwrap();
+        assert_eq!(duration, 300_000); // 5 minutes in ms
+    }
+
+    #[test]
+    fn test_session_duration_no_timestamps() {
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![],
+            metadata: SessionMetadata::default(),
+        };
+        assert!(session.duration_ms().is_none());
+    }
 }

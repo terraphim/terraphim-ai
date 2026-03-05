@@ -265,4 +265,168 @@ mod tests {
         assert_eq!(stats.total_sessions, 0);
         assert_eq!(stats.total_messages, 0);
     }
+
+    fn make_test_session(id: &str, source: &str, messages: Vec<crate::model::Message>) -> Session {
+        Session {
+            id: id.to_string(),
+            source: source.to_string(),
+            external_id: id.to_string(),
+            title: Some(format!("Session {}", id)),
+            source_path: std::path::PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages,
+            metadata: crate::model::SessionMetadata::default(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_load_and_list_sessions() {
+        let service = SessionService::new();
+        let sessions = vec![
+            make_test_session("s1", "test", vec![]),
+            make_test_session("s2", "test", vec![]),
+        ];
+        service.load_sessions(sessions).await;
+
+        let listed = service.list_sessions().await;
+        assert_eq!(listed.len(), 2);
+        assert_eq!(service.session_count().await, 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_session_by_id() {
+        let service = SessionService::new();
+        let sessions = vec![make_test_session("s1", "test", vec![])];
+        service.load_sessions(sessions).await;
+
+        let found = service.get_session(&"s1".to_string()).await;
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, "s1");
+
+        let not_found = service.get_session(&"nonexistent".to_string()).await;
+        assert!(not_found.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_search_by_title() {
+        let service = SessionService::new();
+        let sessions = vec![
+            make_test_session("s1", "test", vec![]),
+            make_test_session("s2", "test", vec![]),
+        ];
+        service.load_sessions(sessions).await;
+
+        let results = service.search("Session s1").await;
+        assert_eq!(results.len(), 1);
+        assert_eq!(results[0].id, "s1");
+    }
+
+    #[tokio::test]
+    async fn test_search_by_message_content() {
+        use crate::model::{Message, MessageRole};
+        let service = SessionService::new();
+        let sessions = vec![make_test_session(
+            "s1",
+            "test",
+            vec![Message::text(
+                0,
+                MessageRole::User,
+                "How to use Rust async?",
+            )],
+        )];
+        service.load_sessions(sessions).await;
+
+        let results = service.search("rust async").await;
+        assert_eq!(results.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_search_case_insensitive() {
+        let service = SessionService::new();
+        let sessions = vec![make_test_session("s1", "test", vec![])];
+        service.load_sessions(sessions).await;
+
+        let results = service.search("SESSION S1").await;
+        assert_eq!(results.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_search_no_results() {
+        let service = SessionService::new();
+        let sessions = vec![make_test_session("s1", "test", vec![])];
+        service.load_sessions(sessions).await;
+
+        let results = service.search("nonexistent-query").await;
+        assert!(results.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_sessions_by_source() {
+        let service = SessionService::new();
+        let sessions = vec![
+            make_test_session("s1", "claude", vec![]),
+            make_test_session("s2", "cursor", vec![]),
+            make_test_session("s3", "claude", vec![]),
+        ];
+        service.load_sessions(sessions).await;
+
+        let claude_sessions = service.sessions_by_source("claude").await;
+        assert_eq!(claude_sessions.len(), 2);
+
+        let cursor_sessions = service.sessions_by_source("cursor").await;
+        assert_eq!(cursor_sessions.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_clear_cache() {
+        let service = SessionService::new();
+        let sessions = vec![make_test_session("s1", "test", vec![])];
+        service.load_sessions(sessions).await;
+        assert_eq!(service.session_count().await, 1);
+
+        service.clear_cache().await;
+        assert_eq!(service.session_count().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_statistics_with_data() {
+        use crate::model::{Message, MessageRole};
+        let service = SessionService::new();
+        let sessions = vec![
+            make_test_session(
+                "s1",
+                "claude",
+                vec![
+                    Message::text(0, MessageRole::User, "Hello"),
+                    Message::text(1, MessageRole::Assistant, "Hi"),
+                ],
+            ),
+            make_test_session(
+                "s2",
+                "cursor",
+                vec![Message::text(0, MessageRole::User, "Help")],
+            ),
+        ];
+        service.load_sessions(sessions).await;
+
+        let stats = service.statistics().await;
+        assert_eq!(stats.total_sessions, 2);
+        assert_eq!(stats.total_messages, 3);
+        assert_eq!(stats.total_user_messages, 2);
+        assert_eq!(stats.total_assistant_messages, 1);
+        assert_eq!(stats.sessions_by_source.get("claude"), Some(&1));
+        assert_eq!(stats.sessions_by_source.get("cursor"), Some(&1));
+    }
+
+    #[tokio::test]
+    async fn test_load_sessions_deduplicates_by_id() {
+        let service = SessionService::new();
+        let sessions = vec![
+            make_test_session("s1", "test", vec![]),
+            make_test_session("s1", "test", vec![]), // duplicate
+        ];
+        service.load_sessions(sessions).await;
+        assert_eq!(service.session_count().await, 1);
+    }
 }
