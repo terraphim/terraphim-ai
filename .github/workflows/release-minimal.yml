@@ -69,12 +69,6 @@ jobs:
         with:
           key: ${{ matrix.target }}-minimal-release
 
-      - name: Build terraphim-repl
-        run: |
-          ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
-            --target ${{ matrix.target }} \
-            -p terraphim-repl
-
       - name: Build terraphim-cli
         run: |
           ${{ matrix.use_cross && 'cross' || 'cargo' }} build --release \
@@ -85,7 +79,6 @@ jobs:
         if: runner.os != 'Windows'
         run: |
           mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/terraphim-repl artifacts/terraphim-repl-${{ matrix.target }}
           cp target/${{ matrix.target }}/release/terraphim-cli artifacts/terraphim-cli-${{ matrix.target }}
           chmod +x artifacts/*
 
@@ -99,7 +92,6 @@ jobs:
         shell: bash
         run: |
           mkdir -p artifacts
-          cp target/${{ matrix.target }}/release/terraphim-repl.exe artifacts/terraphim-repl-${{ matrix.target }}.exe
           cp target/${{ matrix.target }}/release/terraphim-cli.exe artifacts/terraphim-cli-${{ matrix.target }}.exe
 
           # Generate SHA256 checksums
@@ -168,7 +160,7 @@ jobs:
           ## Installation
 
           \`\`\`bash
-          cargo install terraphim-repl terraphim-cli
+          cargo install terraphim-cli
           \`\`\`
 
           ## Changes
@@ -236,18 +228,9 @@ jobs:
           VERSION=${{ steps.get_version.outputs.version }}
 
           # Calculate SHA256 for binaries
-          REPL_SHA256=$(sha256sum binaries/terraphim-repl-x86_64-unknown-linux-musl | cut -d' ' -f1)
           CLI_SHA256=$(sha256sum binaries/terraphim-cli-x86_64-unknown-linux-musl | cut -d' ' -f1)
 
-          echo "REPL SHA256: $REPL_SHA256"
           echo "CLI SHA256: $CLI_SHA256"
-
-          # Update terraphim-repl formula
-          if [ -f "homebrew-formulas/terraphim-repl.rb" ]; then
-            sed -i "s/version \".*\"/version \"$VERSION\"/" homebrew-formulas/terraphim-repl.rb
-            sed -i "s|download/v.*/terraphim-repl|download/v$VERSION/terraphim-repl|" homebrew-formulas/terraphim-repl.rb
-            sed -i "s/sha256 \".*\"/sha256 \"$REPL_SHA256\"/" homebrew-formulas/terraphim-repl.rb
-          fi
 
           # Update terraphim-cli formula
           if [ -f "homebrew-formulas/terraphim-cli.rb" ]; then
@@ -296,23 +279,6 @@ jobs:
             echo "token_available=true" >> $GITHUB_OUTPUT
           else
             echo "token_available=false" >> $GITHUB_OUTPUT
-          fi
-
-      - name: Publish terraphim-repl
-        if: steps.check_token.outputs.token_available == 'true'
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-        run: |
-          cd crates/terraphim_repl
-
-          # Check if already published
-          CURRENT_VERSION=$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "terraphim-repl") | .version')
-
-          if cargo search terraphim-repl --limit 1 | grep -q "terraphim-repl = \"$CURRENT_VERSION\""; then
-            echo "terraphim-repl v$CURRENT_VERSION already published, skipping"
-          else
-            echo "Publishing terraphim-repl v$CURRENT_VERSION..."
-            cargo publish --no-verify || echo "Publish failed or already exists"
           fi
 
       - name: Publish terraphim-cli
