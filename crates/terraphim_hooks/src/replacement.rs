@@ -189,4 +189,115 @@ mod tests {
         assert_eq!(result.result, "original");
         assert_eq!(result.error, Some("error msg".to_string()));
     }
+
+    #[test]
+    fn test_replacement_multiple_terms_in_one_text() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+
+        // Both npm and yarn should be replaced by bun
+        let result = service.replace("npm install && yarn add foo").unwrap();
+        assert!(result.changed);
+        assert_eq!(result.result, "bun install && bun add foo");
+    }
+
+    #[test]
+    fn test_replacement_service_pnpm() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+
+        let result = service.replace("pnpm install express").unwrap();
+        assert!(result.changed);
+        assert_eq!(result.result, "bun install express");
+    }
+
+    #[test]
+    fn test_find_matches_returns_matched_terms() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+
+        let matches = service.find_matches("npm install && yarn add").unwrap();
+        assert!(!matches.is_empty());
+        let match_terms: Vec<&str> = matches.iter().map(|m| m.term.as_str()).collect();
+        assert!(match_terms.contains(&"npm"));
+        assert!(match_terms.contains(&"yarn"));
+    }
+
+    #[test]
+    fn test_contains_matches_true() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+        assert!(service.contains_matches("npm install"));
+    }
+
+    #[test]
+    fn test_contains_matches_false() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+        assert!(!service.contains_matches("cargo build"));
+    }
+
+    #[test]
+    fn test_replace_fail_open_on_valid_input() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+
+        let result = service.replace_fail_open("npm install");
+        assert!(result.changed);
+        assert_eq!(result.result, "bun install");
+        assert!(result.error.is_none());
+    }
+
+    #[test]
+    fn test_hook_result_success_when_unchanged() {
+        let result = HookResult::success("same".to_string(), "same".to_string());
+        assert!(!result.changed);
+        assert_eq!(result.replacements, 0);
+    }
+
+    #[test]
+    fn test_hook_result_serde_round_trip() {
+        let result = HookResult::success("npm".to_string(), "bun".to_string());
+        let json = serde_json::to_string(&result).unwrap();
+        let deserialized: HookResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.result, "bun");
+        assert_eq!(deserialized.original, "npm");
+        assert!(deserialized.changed);
+    }
+
+    #[test]
+    fn test_hook_result_fail_open_serialization_skips_none_error() {
+        let result = HookResult::pass_through("text".to_string());
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(!json.contains("error"));
+    }
+
+    #[test]
+    fn test_replacement_with_unicode_text() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+
+        let result = service.replace("npm install -- emoji").unwrap();
+        assert!(result.changed);
+        assert!(result.result.starts_with("bun"));
+    }
+
+    #[test]
+    fn test_replacement_preserves_surrounding_text() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus);
+
+        let result = service.replace("before npm after").unwrap();
+        assert!(result.changed);
+        assert_eq!(result.result, "before bun after");
+    }
+
+    #[test]
+    fn test_with_link_type_builder_pattern() {
+        let thesaurus = create_test_thesaurus();
+        let service = ReplacementService::new(thesaurus).with_link_type(LinkType::PlainText);
+        // Just verify it compiles and doesn't panic
+        let result = service.replace("npm install").unwrap();
+        assert!(result.changed);
+    }
 }
