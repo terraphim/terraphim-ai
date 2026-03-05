@@ -28,9 +28,9 @@ async fn test_python_engineer_grepapp_integration() {
 
     // Load the Python Engineer configuration
     let config_path = if current_dir.ends_with("terraphim_server") {
-        PathBuf::from("default/python_engineer_config.json")
+        PathBuf::from("../examples/role-configs/python_engineer_config.json")
     } else {
-        PathBuf::from("terraphim_server/default/python_engineer_config.json")
+        PathBuf::from("examples/role-configs/python_engineer_config.json")
     };
 
     if !config_path.exists() {
@@ -221,9 +221,9 @@ async fn test_python_engineer_config_structure() {
     let current_dir = std::env::current_dir().unwrap();
 
     let config_path = if current_dir.ends_with("terraphim_server") {
-        PathBuf::from("default/python_engineer_config.json")
+        PathBuf::from("../examples/role-configs/python_engineer_config.json")
     } else {
-        PathBuf::from("terraphim_server/default/python_engineer_config.json")
+        PathBuf::from("examples/role-configs/python_engineer_config.json")
     };
 
     if !config_path.exists() {
