@@ -177,7 +177,7 @@ impl JMAPClient {
         let client = reqwest::Client::new();
         let api_url = "https://api.fastmail.com/jmap/session";
 
-        println!("Connecting to: {}", api_url);
+        log::info!("Connecting to JMAP session: {}", api_url);
 
         let session_response = client
             .get(api_url)
@@ -187,9 +187,7 @@ impl JMAPClient {
             .context("Failed to connect to Fastmail")?;
 
         let status = session_response.status();
-        let headers = session_response.headers().clone();
-        println!("Session Response Status: {}", status);
-        println!("Session Headers: {:#?}", headers);
+        log::debug!("JMAP session status: {}", status);
 
         let response_text = session_response.text().await?;
 
@@ -201,12 +199,12 @@ impl JMAPClient {
             ));
         }
 
-        println!("Session Response Body: {}", response_text);
+        log::debug!("JMAP session body length: {} bytes", response_text.len());
 
         let session: Session =
             serde_json::from_str(&response_text).context("Failed to parse session response")?;
 
-        println!("Session API URL: {}", session.api_url);
+        log::info!("JMAP API URL: {}", session.api_url);
 
         Ok(Self {
             session,
@@ -246,7 +244,7 @@ impl JMAPClient {
             )],
         };
 
-        println!("Request JSON: {}", serde_json::to_string_pretty(&request)?);
+        log::debug!("JMAP search request: {}", serde_json::to_string_pretty(&request)?);
 
         let response = self
             .client
@@ -259,12 +257,9 @@ impl JMAPClient {
             .context("Failed to send search request")?;
 
         let status = response.status();
-        let headers = response.headers().clone();
-        println!("Response Status: {}", status);
-        println!("Response Headers: {:#?}", headers);
+        log::debug!("JMAP search response status: {}", status);
 
         let response_text = response.text().await?;
-        println!("Raw response body: {}", response_text);
 
         if !status.is_success() {
             return Err(anyhow::anyhow!(
