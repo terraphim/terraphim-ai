@@ -247,7 +247,11 @@ impl AgentOrchestrator {
         // Skip keyword routing for CLIs that use OAuth and don't support -m
         // (e.g. codex with ChatGPT account). Only apply routed models when the
         // CLI tool is known to accept --model flags with arbitrary model IDs.
-        let supports_model_flag = matches!(def.cli_tool.as_str(), "claude" | "claude-code");
+        let cli_name = std::path::Path::new(&def.cli_tool)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(&def.cli_tool);
+        let supports_model_flag = matches!(cli_name, "claude" | "claude-code");
 
         let model = if let Some(m) = &def.model {
             info!(agent = %def.name, model = %m, "using explicit model");

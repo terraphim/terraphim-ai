@@ -67,13 +67,21 @@ impl AgentConfig {
         self
     }
 
+    /// Extract the binary name from a CLI command (handles full paths).
+    fn cli_name(cli_command: &str) -> &str {
+        std::path::Path::new(cli_command)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or(cli_command)
+    }
+
     /// Infer CLI-specific arguments for non-interactive execution.
     ///
     /// Each CLI tool has its own subcommand/flag for non-interactive mode:
     /// - codex: `exec <prompt>` runs a single task and exits
     /// - claude: `-p <prompt>` prints output without interactive UI
     fn infer_args(cli_command: &str) -> Vec<String> {
-        match cli_command {
+        match Self::cli_name(cli_command) {
             "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
             "claude" | "claude-code" => vec![
                 "-p".to_string(),
@@ -86,7 +94,7 @@ impl AgentConfig {
 
     /// Generate model-specific CLI arguments.
     fn model_args(cli_command: &str, model: &str) -> Vec<String> {
-        match cli_command {
+        match Self::cli_name(cli_command) {
             "codex" => vec!["-m".to_string(), model.to_string()],
             "claude" | "claude-code" => vec!["--model".to_string(), model.to_string()],
             _ => vec![],
@@ -95,7 +103,7 @@ impl AgentConfig {
 
     /// Infer required API keys from CLI command
     fn infer_api_keys(cli_command: &str) -> Vec<String> {
-        match cli_command {
+        match Self::cli_name(cli_command) {
             "claude" | "claude-code" => vec!["ANTHROPIC_API_KEY".to_string()],
             "opencode" | "codex" => vec!["OPENAI_API_KEY".to_string()],
             _ => Vec::new(),
@@ -150,7 +158,16 @@ impl AgentValidator {
     async fn validate_cli(&self) -> Result<(), ValidationError> {
         let cmd = &self.config.cli_command;
 
-        // Check if command exists in PATH
+        // If the command is a full path, check the file directly
+        let path = std::path::Path::new(cmd);
+        if path.is_absolute() {
+            if path.exists() {
+                return Ok(());
+            }
+            return Err(ValidationError::CliNotFound(cmd.clone()));
+        }
+
+        // Otherwise check if command exists in PATH
         let check = tokio::process::Command::new("which")
             .arg(cmd)
             .output()
