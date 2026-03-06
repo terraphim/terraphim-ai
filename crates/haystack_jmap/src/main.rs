@@ -1,6 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
-use jmap_client::JMAPClient;
+use haystack_jmap::JMAPClient;
 
 /// Command line arguments
 #[derive(Parser)]
