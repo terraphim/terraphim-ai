@@ -74,7 +74,7 @@ impl AgentConfig {
     /// - claude: `-p <prompt>` prints output without interactive UI
     fn infer_args(cli_command: &str) -> Vec<String> {
         match cli_command {
-            "codex" => vec!["exec".to_string()],
+            "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
             "claude" | "claude-code" => vec![
                 "-p".to_string(),
                 "--allowedTools".to_string(),
