@@ -105,7 +105,7 @@ impl AgentOrchestrator {
     /// Run the orchestrator (blocks until shutdown signal).
     ///
     /// 1. Spawns all Safety-layer agents immediately
-    /// 2. Enters the select! loop handling schedule events, drift alerts
+    /// 2. Enters the select! loop handling schedule events, drift alerts, and periodic tick
     pub async fn run(&mut self) -> Result<(), OrchestratorError> {
         info!(
             "starting orchestrator with {} agent definitions",
@@ -126,6 +126,9 @@ impl AgentOrchestrator {
             "safety agents spawned, entering reconciliation loop"
         );
 
+        // Reconciliation tick interval
+        let mut tick = tokio::time::interval(Duration::from_secs(self.config.tick_interval_secs));
+
         // Main reconciliation loop
         loop {
             if self.shutdown_requested {
@@ -139,6 +142,9 @@ impl AgentOrchestrator {
                 }
                 alert = self.nightwatch.next_alert() => {
                     self.handle_drift_alert(alert).await;
+                }
+                _ = tick.tick() => {
+                    self.reconcile_tick().await;
                 }
             }
         }
@@ -342,6 +348,203 @@ impl AgentOrchestrator {
         );
 
         Ok(())
+    }
+
+    /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
+    async fn reconcile_tick(&mut self) {
+        // 1. Poll all active agents for exit and handle exits per layer
+        self.poll_agent_exits().await;
+
+        // 2. Restart pending Safety agents (cooldown-aware)
+        self.restart_pending_safety_agents().await;
+
+        // 3. Check cron schedules for Core agents
+        self.check_cron_schedules().await;
+
+        // 4. Drain output events to nightwatch
+        self.drain_output_events();
+
+        // 5. Evaluate nightwatch drift
+        self.nightwatch.evaluate();
+
+        // 6. Update last_tick_time
+        self.last_tick_time = chrono::Utc::now();
+    }
+
+    /// Poll all active agents for exit and handle exits per layer.
+    async fn poll_agent_exits(&mut self) {
+        // Collect exited agents first to avoid borrow conflict
+        let mut exited: Vec<(String, AgentDefinition, std::process::ExitStatus)> = Vec::new();
+        for (name, managed) in &mut self.active_agents {
+            match managed.handle.try_wait() {
+                Ok(Some(status)) => {
+                    exited.push((name.clone(), managed.definition.clone(), status));
+                }
+                Ok(None) => {} // still running
+                Err(e) => {
+                    warn!(agent = %name, error = %e, "try_wait failed");
+                }
+            }
+        }
+
+        // Process exits
+        for (name, def, status) in exited {
+            self.active_agents.remove(&name);
+            self.handle_agent_exit(&name, &def, status);
+        }
+    }
+
+    /// Handle an agent exit based on its layer.
+    fn handle_agent_exit(
+        &mut self,
+        name: &str,
+        def: &AgentDefinition,
+        status: std::process::ExitStatus,
+    ) {
+        match def.layer {
+            AgentLayer::Safety => {
+                let count = self.restart_counts.entry(name.to_string()).or_insert(0);
+                *count += 1;
+                self.restart_cooldowns
+                    .insert(name.to_string(), Instant::now());
+                if *count <= self.config.max_restart_count {
+                    info!(
+                        agent = %name,
+                        exit_status = %status,
+                        restart_count = *count,
+                        cooldown_secs = self.config.restart_cooldown_secs,
+                        "safety agent exited, will restart after cooldown"
+                    );
+                } else {
+                    error!(
+                        agent = %name,
+                        exit_status = %status,
+                        restart_count = *count,
+                        max = self.config.max_restart_count,
+                        "safety agent exceeded max restarts, not restarting"
+                    );
+                }
+            }
+            AgentLayer::Core => {
+                info!(agent = %name, exit_status = %status, "core agent completed");
+            }
+            AgentLayer::Growth => {
+                info!(agent = %name, exit_status = %status, "growth agent completed");
+            }
+        }
+    }
+
+    /// Restart Safety agents that have exited and passed their cooldown.
+    async fn restart_pending_safety_agents(&mut self) {
+        let cooldown = Duration::from_secs(self.config.restart_cooldown_secs);
+        let max_restarts = self.config.max_restart_count;
+
+        // Find Safety agents that need restarting
+        let to_restart: Vec<AgentDefinition> = self
+            .config
+            .agents
+            .iter()
+            .filter(|def| {
+                // Must be Safety layer
+                if def.layer != AgentLayer::Safety {
+                    return false;
+                }
+                // Must not be currently active
+                if self.active_agents.contains_key(&def.name) {
+                    return false;
+                }
+                // Must have a restart cooldown entry (meaning it exited)
+                let last_exit = match self.restart_cooldowns.get(&def.name) {
+                    Some(t) => t,
+                    None => return false,
+                };
+                // Must have passed the cooldown
+                if last_exit.elapsed() < cooldown {
+                    return false;
+                }
+                // Must be under max restart count
+                let count = self.restart_counts.get(&def.name).copied().unwrap_or(0);
+                count <= max_restarts
+            })
+            .cloned()
+            .collect();
+
+        for def in to_restart {
+            info!(
+                agent = %def.name,
+                restart_count = self.restart_counts.get(&def.name).copied().unwrap_or(0),
+                "restarting safety agent after cooldown"
+            );
+            if let Err(e) = self.spawn_agent(&def).await {
+                error!(agent = %def.name, error = %e, "failed to restart safety agent");
+            }
+        }
+    }
+
+    /// Check cron schedules and spawn due Core agents.
+    async fn check_cron_schedules(&mut self) {
+        let now = chrono::Utc::now();
+        let scheduled = self.scheduler.scheduled_agents();
+
+        // Collect agents that should fire
+        let to_spawn: Vec<AgentDefinition> = scheduled
+            .into_iter()
+            .filter(|(def, _schedule)| {
+                // Skip if already active
+                !self.active_agents.contains_key(&def.name)
+            })
+            .filter(|(_def, schedule)| {
+                // Check if a fire time exists between last_tick and now
+                schedule
+                    .after(&self.last_tick_time)
+                    .take_while(|t| *t <= now)
+                    .next()
+                    .is_some()
+            })
+            .map(|(def, _)| def.clone())
+            .collect();
+
+        for def in to_spawn {
+            info!(agent = %def.name, "cron schedule fired");
+            if let Err(e) = self.spawn_agent(&def).await {
+                error!(agent = %def.name, error = %e, "cron spawn failed");
+            }
+        }
+
+        // Also check compound review schedule
+        if let Some(compound_sched) = self.scheduler.compound_review_schedule() {
+            let should_fire = compound_sched
+                .after(&self.last_tick_time)
+                .take_while(|t| *t <= now)
+                .next()
+                .is_some();
+            if should_fire {
+                self.handle_schedule_event(ScheduleEvent::CompoundReview)
+                    .await;
+            }
+        }
+    }
+
+    /// Drain broadcast output events from all active agents into nightwatch.
+    fn drain_output_events(&mut self) {
+        // Collect events first to avoid borrow conflict (active_agents + nightwatch)
+        let mut events: Vec<(String, OutputEvent)> = Vec::new();
+        for (name, managed) in &mut self.active_agents {
+            loop {
+                match managed.output_rx.try_recv() {
+                    Ok(event) => events.push((name.clone(), event)),
+                    Err(broadcast::error::TryRecvError::Empty) => break,
+                    Err(broadcast::error::TryRecvError::Lagged(n)) => {
+                        warn!(agent = %name, skipped = n, "output events lagged");
+                        break;
+                    }
+                    Err(broadcast::error::TryRecvError::Closed) => break,
+                }
+            }
+        }
+        for (name, event) in &events {
+            self.nightwatch.observe(name, event);
+        }
     }
 
     /// Handle a schedule event from the TimeScheduler.
@@ -557,5 +760,197 @@ task = "test"
         assert_eq!(status.name, "test");
         assert!(status.running);
         assert_eq!(status.drift_score, Some(0.05));
+    }
+
+    /// Helper: create a config with a single Safety echo agent and short cooldown.
+    fn test_config_fast_lifecycle() -> OrchestratorConfig {
+        OrchestratorConfig {
+            working_dir: std::path::PathBuf::from("/tmp"),
+            nightwatch: NightwatchConfig::default(),
+            compound_review: CompoundReviewConfig {
+                schedule: "0 2 * * *".to_string(),
+                max_duration_secs: 60,
+                repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+                create_prs: false,
+            },
+            agents: vec![AgentDefinition {
+                name: "echo-safety".to_string(),
+                layer: AgentLayer::Safety,
+                cli_tool: "echo".to_string(),
+                task: "safety watch".to_string(),
+                model: None,
+                schedule: None,
+                capabilities: vec![],
+                max_memory_bytes: None,
+            }],
+            restart_cooldown_secs: 0, // instant restart for testing
+            max_restart_count: 3,
+            tick_interval_secs: 1,
+        }
+    }
+
+    #[tokio::test]
+    async fn test_reconcile_detects_agent_exit() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn the echo agent (exits immediately)
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("echo-safety"));
+
+        // Give echo time to exit
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Poll for exits
+        orch.poll_agent_exits().await;
+
+        // Agent should be removed from active_agents
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "exited agent should be removed from active_agents"
+        );
+
+        // Restart count should be recorded
+        assert_eq!(
+            orch.restart_counts.get("echo-safety").copied(),
+            Some(1),
+            "restart count should be incremented"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_safety_agent_restarts_after_cooldown() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn and let it exit
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("echo-safety"));
+
+        // Restart pending (cooldown is 0, so immediate)
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "safety agent should be restarted after cooldown"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_core_agent_no_auto_restart() {
+        let mut config = test_config_fast_lifecycle();
+        config.agents = vec![AgentDefinition {
+            name: "echo-core".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "echo".to_string(),
+            task: "core task".to_string(),
+            model: None,
+            schedule: Some("0 3 * * *".to_string()),
+            capabilities: vec![],
+            max_memory_bytes: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn core agent and let it exit
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("echo-core"));
+
+        // Restart pending should NOT restart a Core agent
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            !orch.active_agents.contains_key("echo-core"),
+            "core agent should not auto-restart"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_max_restart_count_respected() {
+        let mut config = test_config_fast_lifecycle();
+        config.max_restart_count = 2;
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+
+        // Cycle through max_restart_count + 1 exits
+        for i in 0..3 {
+            orch.spawn_agent(&def).await.unwrap();
+            tokio::time::sleep(Duration::from_millis(100)).await;
+            orch.poll_agent_exits().await;
+            assert!(
+                !orch.active_agents.contains_key("echo-safety"),
+                "agent should have exited on cycle {}",
+                i
+            );
+        }
+
+        // After 3 exits, restart count = 3, max = 2
+        // restart_pending should NOT restart (count > max)
+        orch.restart_pending_safety_agents().await;
+        assert!(
+            !orch.active_agents.contains_key("echo-safety"),
+            "agent should not restart after exceeding max_restart_count"
+        );
+        assert_eq!(orch.restart_counts.get("echo-safety").copied(), Some(3));
+    }
+
+    #[tokio::test]
+    async fn test_output_events_fed_to_nightwatch() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn echo agent (writes "safety watch" to stdout)
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+
+        // Give the output capture time to process
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Drain events
+        orch.drain_output_events();
+
+        // Nightwatch should have observations for the agent
+        let drift = orch.nightwatch.drift_score("echo-safety");
+        assert!(
+            drift.is_some(),
+            "nightwatch should have drift data after draining output events"
+        );
+        let drift = drift.unwrap();
+        assert!(
+            drift.metrics.sample_count > 0,
+            "nightwatch should have at least one sample from drained output"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_reconcile_tick_full_cycle() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Spawn echo agent
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+
+        // Give echo time to exit and produce output
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Run a full reconciliation tick
+        orch.reconcile_tick().await;
+
+        // After tick: echo exited, so it was detected and marked for restart.
+        // With 0 cooldown, it should have been restarted in the same tick.
+        assert!(
+            orch.active_agents.contains_key("echo-safety"),
+            "safety agent should be restarted by reconcile_tick"
+        );
+        assert_eq!(
+            orch.restart_counts.get("echo-safety").copied(),
+            Some(1),
+            "restart count should be 1 after first exit+restart cycle"
+        );
     }
 }
