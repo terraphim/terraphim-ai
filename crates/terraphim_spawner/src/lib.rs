@@ -340,10 +340,36 @@ impl AgentSpawner {
         self.max_restarts
     }
 
+    /// Spawn an agent from a provider configuration with an optional model.
+    pub async fn spawn_with_model(
+        &self,
+        provider: &Provider,
+        task: &str,
+        model: Option<&str>,
+    ) -> Result<AgentHandle, SpawnerError> {
+        let config = AgentConfig::from_provider(provider)?;
+        let config = match model {
+            Some(m) => config.with_model(m),
+            None => config,
+        };
+        self.spawn_config(provider, &config, task).await
+    }
+
     /// Spawn an agent from a provider configuration
     pub async fn spawn(
         &self,
         provider: &Provider,
+        task: &str,
+    ) -> Result<AgentHandle, SpawnerError> {
+        let config = AgentConfig::from_provider(provider)?;
+        self.spawn_config(provider, &config, task).await
+    }
+
+    /// Internal spawn implementation shared by spawn() and spawn_with_model().
+    async fn spawn_config(
+        &self,
+        provider: &Provider,
+        config: &AgentConfig,
         task: &str,
     ) -> Result<AgentHandle, SpawnerError> {
         let _span = tracing::info_span!(
@@ -353,9 +379,7 @@ impl AgentSpawner {
         )
         .entered();
 
-        // Validate the provider
-        let config = AgentConfig::from_provider(provider)?;
-        let validator = AgentValidator::new(&config);
+        let validator = AgentValidator::new(config);
         validator.validate().await?;
 
         // Spawn the agent process

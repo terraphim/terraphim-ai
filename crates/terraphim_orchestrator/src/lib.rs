@@ -238,8 +238,42 @@ impl AgentOrchestrator {
     }
 
     /// Spawn an agent from its definition.
+    ///
+    /// Model selection: if the agent has an explicit `model` field, use it.
+    /// Otherwise, route the task prompt through the RoutingEngine to select
+    /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
-        info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, "spawning agent");
+        // Select model via keyword routing or explicit config
+        let model = if let Some(m) = &def.model {
+            info!(agent = %def.name, model = %m, "using explicit model");
+            Some(m.clone())
+        } else {
+            // Route the task prompt to find the best model
+            let context = terraphim_router::RoutingContext::default();
+            match self.router.route(&def.task, &context) {
+                Ok(decision) => {
+                    if let terraphim_types::capability::ProviderType::Llm { model_id, .. } =
+                        &decision.provider.provider_type
+                    {
+                        info!(
+                            agent = %def.name,
+                            model = %model_id,
+                            confidence = decision.confidence,
+                            "model selected via keyword routing"
+                        );
+                        Some(model_id.clone())
+                    } else {
+                        None
+                    }
+                }
+                Err(_) => {
+                    info!(agent = %def.name, "no model matched via routing, using CLI default");
+                    None
+                }
+            }
+        };
+
+        info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
 
         // Build a Provider from the agent definition for the spawner
         let provider = terraphim_types::capability::Provider {
@@ -258,7 +292,7 @@ impl AgentOrchestrator {
 
         let handle = self
             .spawner
-            .spawn(&provider, &def.task)
+            .spawn_with_model(&provider, &def.task, model.as_deref())
             .await
             .map_err(|e| OrchestratorError::SpawnFailed {
                 agent: def.name.clone(),
@@ -398,6 +432,7 @@ mod tests {
                     layer: AgentLayer::Safety,
                     cli_tool: "echo".to_string(),
                     task: "safety watch".to_string(),
+                    model: None,
                     schedule: None,
                     capabilities: vec!["security".to_string()],
                     max_memory_bytes: None,
@@ -407,6 +442,7 @@ mod tests {
                     layer: AgentLayer::Core,
                     cli_tool: "echo".to_string(),
                     task: "sync upstream".to_string(),
+                    model: None,
                     schedule: Some("0 3 * * *".to_string()),
                     capabilities: vec!["sync".to_string()],
                     max_memory_bytes: None,

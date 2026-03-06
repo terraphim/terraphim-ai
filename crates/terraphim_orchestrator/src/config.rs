@@ -28,6 +28,8 @@ pub struct AgentDefinition {
     pub task: String,
     /// Cron schedule (None = always running for Safety, or on-demand for Growth).
     pub schedule: Option<String>,
+    /// Model to use with the CLI tool (e.g., "o3" for codex, "sonnet" for claude).
+    pub model: Option<String>,
     /// Capabilities this agent provides.
     #[serde(default)]
     pub capabilities: Vec<String>,
