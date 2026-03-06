@@ -50,13 +50,46 @@ impl AgentConfig {
             } => Ok(Self {
                 agent_id: agent_id.clone(),
                 cli_command: cli_command.clone(),
-                args: Vec::new(),
+                args: Self::infer_args(cli_command),
                 working_dir: Some(working_dir.clone()),
                 env_vars: HashMap::new(),
                 required_api_keys: Self::infer_api_keys(cli_command),
                 resource_limits: ResourceLimits::default(),
             }),
             ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
+        }
+    }
+
+    /// Set the model for this agent, adding appropriate CLI flags.
+    pub fn with_model(mut self, model: &str) -> Self {
+        let model_args = Self::model_args(&self.cli_command, model);
+        self.args.extend(model_args);
+        self
+    }
+
+    /// Infer CLI-specific arguments for non-interactive execution.
+    ///
+    /// Each CLI tool has its own subcommand/flag for non-interactive mode:
+    /// - codex: `exec <prompt>` runs a single task and exits
+    /// - claude: `-p <prompt>` prints output without interactive UI
+    fn infer_args(cli_command: &str) -> Vec<String> {
+        match cli_command {
+            "codex" => vec!["exec".to_string()],
+            "claude" | "claude-code" => vec![
+                "-p".to_string(),
+                "--allowedTools".to_string(),
+                "Bash,Read,Write,Edit,Glob,Grep".to_string(),
+            ],
+            _ => Vec::new(),
+        }
+    }
+
+    /// Generate model-specific CLI arguments.
+    fn model_args(cli_command: &str, model: &str) -> Vec<String> {
+        match cli_command {
+            "codex" => vec!["-m".to_string(), model.to_string()],
+            "claude" | "claude-code" => vec!["--model".to_string(), model.to_string()],
+            _ => vec![],
         }
     }
 

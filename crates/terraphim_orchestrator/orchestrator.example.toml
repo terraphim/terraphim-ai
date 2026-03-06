@@ -25,6 +25,7 @@ name = "security-sentinel"
 layer = "Safety"
 cli_tool = "codex"
 task = "Continuously scan for CVEs and security vulnerabilities in dependencies. Run cargo audit and report findings."
+# model = "o3"                    # Optional: explicit model override. Omit to use keyword routing.
 capabilities = ["security", "vulnerability-scanning"]
 max_memory_bytes = 2147483648   # 2GB
 
