@@ -267,4 +267,16 @@ task = "t"
         assert!(config.agents[0].max_memory_bytes.is_none());
         assert!(config.agents[0].schedule.is_none());
     }
+
+    #[test]
+    fn test_example_config_parses() {
+        let example_path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
+        let config = OrchestratorConfig::from_file(&example_path).unwrap();
+        assert_eq!(config.agents.len(), 3);
+        assert_eq!(config.agents[0].layer, AgentLayer::Safety);
+        assert_eq!(config.agents[1].layer, AgentLayer::Core);
+        assert_eq!(config.agents[2].layer, AgentLayer::Growth);
+        assert!(config.agents[1].schedule.is_some());
+    }
 }
