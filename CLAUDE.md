@@ -208,7 +208,7 @@ Throughout all user interactions, maintain three key files:
 ### Consolidated Agent Instructions
 
 For comprehensive project knowledge, patterns, and best practices, refer to:
-- **agents_instructions.json**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
+- **`.docs/agents_instructions.json`**: Machine-readable consolidated instructions combining all knowledge from memories, lessons learned, and scratchpad
   - Contains project context, status, and active features
   - Critical lessons on deployment patterns, UI development, security, Rust development, and TruthForge
   - Complete architecture overview with all crates and components
@@ -584,34 +584,34 @@ See `TESTING_SCRIPTS_README.md` for full documentation.
 Quick start testing scripts:
 ```bash
 # Interactive testing menu
-./quick-start-autocomplete.sh
+./scripts/quick-start-autocomplete.sh
 
 # Start full testing environment
-./start-autocomplete-test.sh
+./scripts/start-autocomplete-test.sh
 
 # Start only MCP server
-./start-autocomplete-test.sh --mcp-only --port 8001
+./scripts/start-autocomplete-test.sh --mcp-only --port 8001
 
 # Stop all services
-./stop-autocomplete-test.sh
+./scripts/stop-autocomplete-test.sh
 
 # Check service status
-./stop-autocomplete-test.sh --status
+./scripts/stop-autocomplete-test.sh --status
 ```
 
 Testing scenarios:
 ```bash
 # Full testing environment
-./quick-start-autocomplete.sh full
+./scripts/quick-start-autocomplete.sh full
 
 # Development environment (MCP + Desktop, no tests)
-./quick-start-autocomplete.sh dev
+./scripts/quick-start-autocomplete.sh dev
 
 # Run tests only
-./quick-start-autocomplete.sh test
+./scripts/quick-start-autocomplete.sh test
 
 # MCP server only
-./quick-start-autocomplete.sh mcp
+./scripts/quick-start-autocomplete.sh mcp
 ```
 
 ## Configuration System
@@ -842,7 +842,7 @@ Default server runs on dynamically assigned port. Check logs for actual port or 
 
 ## Recent Implementations and Features
 
-> **Note**: This section captures recent significant features. For historical context, refer to `memories.md`, `lessons-learned.md`, and `agents_instructions.json`.
+> **Note**: This section captures recent significant features. For historical context, refer to `memories.md`, `lessons-learned.md`, and `.docs/agents_instructions.json`.
 
 ### CI/CD Infrastructure (2025-01-31)
 - **Hybrid GitHub Actions**: Complete migration from Earthly to GitHub Actions + Docker Buildx
