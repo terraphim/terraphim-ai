@@ -1,0 +1,27 @@
+{
+  "roles": {
+    "Email Monitor": {
+      "shortname": "email_monitor",
+      "name": "Email Monitor",
+      "relevance_function": "TitleScorer",
+      "theme": "cosmo",
+      "haystacks": [
+        {
+          "location": "https://api.fastmail.com/jmap/session",
+          "service": "Jmap",
+          "read_only": true,
+          "extra_parameters": {
+            "limit": "50"
+          }
+        }
+      ],
+      "kg": {
+        "automata_url": "https://system-operator.s3.eu-west-2.amazonaws.com/term_to_id.json",
+        "input_type": "Url"
+      },
+      "extra": {}
+    }
+  },
+  "default_role": "Email Monitor",
+  "selected_role": "Email Monitor"
+}
