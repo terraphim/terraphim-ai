@@ -289,6 +289,8 @@ pub enum ServiceType {
     AiAssistant,
     /// Use Quickwit search engine for log and observability data indexing
     Quickwit,
+    /// Use JMAP protocol for email search (RFC 8620/8621)
+    Jmap,
 }
 
 /// A haystack is a collection of documents that can be indexed and searched

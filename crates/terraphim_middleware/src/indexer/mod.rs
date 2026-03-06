@@ -10,8 +10,8 @@ use crate::haystack::AiAssistantHaystackIndexer;
 #[cfg(feature = "grepapp")]
 use crate::haystack::GrepAppHaystackIndexer;
 use crate::haystack::{
-    ClickUpHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer, QueryRsHaystackIndexer,
-    QuickwitHaystackIndexer,
+    ClickUpHaystackIndexer, JmapHaystackIndexer, McpHaystackIndexer, PerplexityHaystackIndexer,
+    QueryRsHaystackIndexer, QuickwitHaystackIndexer,
 };
 pub use ripgrep::RipgrepIndexer;
 
@@ -130,6 +130,11 @@ pub async fn search_haystacks(
                 // Search using Quickwit search engine for log and observability data
                 let quickwit = QuickwitHaystackIndexer::default();
                 quickwit.index(needle, haystack).await?
+            }
+            ServiceType::Jmap => {
+                // Search emails via JMAP protocol
+                let jmap = JmapHaystackIndexer;
+                jmap.index(needle, haystack).await?
             }
         };
 
