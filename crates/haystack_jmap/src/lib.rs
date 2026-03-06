@@ -243,7 +243,10 @@ impl JMAPClient {
             )],
         };
 
-        log::debug!("JMAP search request: {}", serde_json::to_string_pretty(&request)?);
+        log::debug!(
+            "JMAP search request: {}",
+            serde_json::to_string_pretty(&request)?
+        );
 
         let response = self
             .client
@@ -421,7 +424,9 @@ impl HaystackProvider for JMAPClient {
     type Error = anyhow::Error;
 
     async fn search(&self, query: &SearchQuery) -> Result<Vec<Document>, Self::Error> {
-        let emails = self.search_emails(&query.search_term.to_string(), 50).await?;
+        let emails = self
+            .search_emails(&query.search_term.to_string(), 50)
+            .await?;
         Ok(emails.iter().map(email_to_document).collect())
     }
 }
@@ -503,10 +508,7 @@ mod tests {
         assert_eq!(email.subject, Some("Meeting Tomorrow".to_string()));
         assert_eq!(email.from.as_ref().unwrap()[0].email, "alice@test.com");
         assert_eq!(email.body_values.get("1").unwrap().value, "See you at 3pm");
-        assert_eq!(
-            email.received_at,
-            Some("2025-03-01T14:00:00Z".to_string())
-        );
+        assert_eq!(email.received_at, Some("2025-03-01T14:00:00Z".to_string()));
     }
 
     #[test]

@@ -19,15 +19,17 @@ async fn main() -> Result<()> {
 
     let command_line_args = CommandLineArgs::parse();
 
-    let access_token = std::env::var("JMAP_ACCESS_TOKEN")
-        .or_else(|_| std::env::var("FASTMAIL_API_TOKEN"))?;
+    let access_token =
+        std::env::var("JMAP_ACCESS_TOKEN").or_else(|_| std::env::var("FASTMAIL_API_TOKEN"))?;
 
     let session_url = std::env::var("JMAP_SESSION_URL")
         .unwrap_or_else(|_| "https://api.fastmail.com/jmap/session".to_string());
 
     let jmap_client = JMAPClient::new(access_token, &session_url).await?;
 
-    let matching_emails = jmap_client.search_emails(&command_line_args.query, 50).await?;
+    let matching_emails = jmap_client
+        .search_emails(&command_line_args.query, 50)
+        .await?;
 
     match command_line_args.output_format.as_str() {
         "json" => {

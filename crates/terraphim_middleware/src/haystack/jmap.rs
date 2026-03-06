@@ -25,9 +25,7 @@ impl IndexMiddleware for JmapHaystackIndexer {
                         None
                     }
                 })
-                .unwrap_or_else(|| {
-                    "https://api.fastmail.com/jmap/session".to_string()
-                });
+                .unwrap_or_else(|| "https://api.fastmail.com/jmap/session".to_string());
 
             let access_token = std::env::var("JMAP_ACCESS_TOKEN")
                 .ok()
@@ -44,14 +42,14 @@ impl IndexMiddleware for JmapHaystackIndexer {
                 .and_then(|s| s.parse().ok())
                 .unwrap_or(50);
 
-            let jmap_client =
-                match haystack_jmap::JMAPClient::new(access_token, &session_url).await {
-                    Ok(c) => c,
-                    Err(e) => {
-                        log::error!("Failed to create JMAP client: {}", e);
-                        return Ok(Index::default());
-                    }
-                };
+            let jmap_client = match haystack_jmap::JMAPClient::new(access_token, &session_url).await
+            {
+                Ok(c) => c,
+                Err(e) => {
+                    log::error!("Failed to create JMAP client: {}", e);
+                    return Ok(Index::default());
+                }
+            };
 
             let emails = match jmap_client.search_emails(&query, limit).await {
                 Ok(e) => e,
