@@ -621,6 +621,7 @@ impl AgentOrchestrator {
                     "CRITICAL: pausing agent and escalating to human"
                 );
                 self.stop_agent(&alert.agent_name).await;
+                self.nightwatch.reset(&alert.agent_name);
             }
         }
     }
