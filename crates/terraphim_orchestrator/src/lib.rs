@@ -1,8 +1,10 @@
+pub mod compound;
 pub mod config;
 pub mod error;
 pub mod nightwatch;
 pub mod scheduler;
 
+pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, NightwatchConfig, OrchestratorConfig,
 };
