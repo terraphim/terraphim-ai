@@ -15,26 +15,25 @@ struct CommandLineArgs {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    // Parse the command line arguments
+    env_logger::init();
+
     let command_line_args = CommandLineArgs::parse();
 
-    // Get the FASTMAIL_API_TOKEN from environment variables
-    let fastmail_api_token = std::env::var("FASTMAIL_API_TOKEN")?;
+    let access_token = std::env::var("JMAP_ACCESS_TOKEN")
+        .or_else(|_| std::env::var("FASTMAIL_API_TOKEN"))?;
 
-    // Create a new JMAP client
-    let jmap_client = JMAPClient::new(fastmail_api_token).await?;
+    let session_url = std::env::var("JMAP_SESSION_URL")
+        .unwrap_or_else(|_| "https://api.fastmail.com/jmap/session".to_string());
 
-    // Search for emails using the provided query
-    let matching_emails = jmap_client.search_emails(&command_line_args.query).await?;
+    let jmap_client = JMAPClient::new(access_token, &session_url).await?;
 
-    // Print the matching emails in the requested output format
+    let matching_emails = jmap_client.search_emails(&command_line_args.query, 50).await?;
+
     match command_line_args.output_format.as_str() {
         "json" => {
-            // Print emails in JSON format
             println!("{}", serde_json::to_string_pretty(&matching_emails)?);
         }
         _ => {
-            // Print emails in markdown format
             for email in matching_emails {
                 println!("## Email: {}", email.subject.unwrap_or_default());
 
