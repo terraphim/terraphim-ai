@@ -1,0 +1,48 @@
+# orchestrator.example.toml -- AI Dark Factory Agent Fleet
+#
+# Copy to orchestrator.toml and adjust paths for your environment.
+# This configures 3 agents (one per layer) for initial deployment.
+
+working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
+
+[nightwatch]
+eval_interval_secs = 300        # 5 minutes
+minor_threshold = 0.10          # 10-20% drift = Minor (log warning)
+moderate_threshold = 0.20       # 20-40% drift = Moderate (reload config)
+severe_threshold = 0.40         # 40-70% drift = Severe (restart agent)
+critical_threshold = 0.70       # >70% drift = Critical (pause + escalate)
+
+[compound_review]
+schedule = "0 2 * * *"          # 2 AM daily
+max_duration_secs = 1800        # 30 minutes
+repo_path = "/Users/alex/projects/terraphim/terraphim-ai"
+create_prs = false              # Dry run for first 2 weeks
+
+# --- Safety Layer (always running) ---
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "codex"
+task = "Continuously scan for CVEs and security vulnerabilities in dependencies. Run cargo audit and report findings."
+capabilities = ["security", "vulnerability-scanning"]
+max_memory_bytes = 2147483648   # 2GB
+
+# --- Core Layer (scheduled) ---
+
+[[agents]]
+name = "upstream-synchronizer"
+layer = "Core"
+cli_tool = "codex"
+task = "Sync with upstream repositories. Check for new releases of key dependencies."
+schedule = "0 3 * * *"          # 3 AM daily
+capabilities = ["sync", "dependency-management"]
+
+# --- Growth Layer (on-demand) ---
+
+[[agents]]
+name = "code-reviewer"
+layer = "Growth"
+cli_tool = "claude"
+task = "Review the latest PR for code quality, security issues, and adherence to project conventions."
+capabilities = ["code-review", "architecture"]
