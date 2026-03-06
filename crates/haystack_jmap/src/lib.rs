@@ -172,19 +172,18 @@ struct ResponseResult {
 }
 
 impl JMAPClient {
-    /// Creates a new `JMAPClient` with the given access token.
-    pub async fn new(access_token: String) -> Result<Self> {
+    /// Creates a new `JMAPClient` with the given access token and session URL.
+    pub async fn new(access_token: String, session_url: &str) -> Result<Self> {
         let client = reqwest::Client::new();
-        let api_url = "https://api.fastmail.com/jmap/session";
 
-        log::info!("Connecting to JMAP session: {}", api_url);
+        log::info!("Connecting to JMAP session: {}", session_url);
 
         let session_response = client
-            .get(api_url)
+            .get(session_url)
             .header("Authorization", format!("Bearer {}", &access_token))
             .send()
             .await
-            .context("Failed to connect to Fastmail")?;
+            .context("Failed to connect to JMAP server")?;
 
         let status = session_response.status();
         log::debug!("JMAP session status: {}", status);
@@ -213,14 +212,13 @@ impl JMAPClient {
         })
     }
 
-    /// Searches for emails matching the given query.
-    pub async fn search_emails(&self, query: &str) -> Result<Vec<Email>> {
+    /// Searches for emails matching the given query with configurable result limit.
+    pub async fn search_emails(&self, query: &str, limit: u32) -> Result<Vec<Email>> {
         let account_id = self
             .session
             .primary_accounts
-            .values()
-            .next()
-            .context("No primary account found")?;
+            .get("urn:ietf:params:jmap:mail")
+            .context("No mail account found in primaryAccounts")?;
 
         let mut method_params = HashMap::new();
         method_params.insert("accountId".to_string(), serde_json::json!(account_id));
@@ -230,7 +228,7 @@ impl JMAPClient {
                 "text": query
             }),
         );
-        method_params.insert("limit".to_string(), serde_json::json!(10));
+        method_params.insert("limit".to_string(), serde_json::json!(limit));
 
         let request = JMAPRequest {
             using: vec![
@@ -289,9 +287,8 @@ impl JMAPClient {
         let account_id = self
             .session
             .primary_accounts
-            .values()
-            .next()
-            .context("No primary account found")?;
+            .get("urn:ietf:params:jmap:mail")
+            .context("No mail account found in primaryAccounts")?;
 
         let mut method_params = HashMap::new();
         method_params.insert("accountId".to_string(), serde_json::json!(account_id));
@@ -362,8 +359,7 @@ impl HaystackProvider for JMAPClient {
     type Error = anyhow::Error;
 
     async fn search(&self, query: &SearchQuery) -> Result<Vec<Document>, Self::Error> {
-        // TODO: Implement actual search logic
-        let emails = self.search_emails(&query.search_term.to_string()).await?;
+        let emails = self.search_emails(&query.search_term.to_string(), 50).await?;
         let documents: Vec<Document> = emails
             .into_iter()
             .map(|email| Document {
