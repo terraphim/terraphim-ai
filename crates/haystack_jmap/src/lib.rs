@@ -355,25 +355,72 @@ impl JMAPClient {
     }
 }
 
+/// Converts an Email into a Document with enriched metadata.
+pub fn email_to_document(email: &Email) -> Document {
+    let sender = email
+        .from
+        .as_ref()
+        .and_then(|addrs| addrs.first())
+        .map(|a| a.email.clone())
+        .unwrap_or_default();
+
+    let recipient = email
+        .to
+        .as_ref()
+        .and_then(|addrs| addrs.first())
+        .map(|a| a.email.clone())
+        .unwrap_or_default();
+
+    let description = Some(format!("From: {} To: {}", sender, recipient));
+
+    let body_text = email
+        .body_values
+        .values()
+        .next()
+        .map(|bv| bv.value.clone())
+        .unwrap_or_default();
+
+    let stub = if body_text.is_empty() {
+        None
+    } else {
+        Some(body_text.chars().take(200).collect::<String>())
+    };
+
+    let mut tags = vec!["email".to_string()];
+    if !sender.is_empty() {
+        tags.push(format!("sender:{}", sender));
+    }
+    if let Some(ref date) = email.received_at {
+        if let Some(date_part) = date.split('T').next() {
+            tags.push(date_part.to_string());
+        }
+    }
+
+    let url = format!("jmap:///email/{}", email.id);
+
+    Document {
+        id: email.id.clone(),
+        title: email.subject.clone().unwrap_or_default(),
+        body: body_text,
+        url,
+        description,
+        stub,
+        tags: Some(tags),
+        summarization: None,
+        rank: None,
+        source_haystack: None,
+        doc_type: terraphim_types::DocumentType::KgEntry,
+        synonyms: None,
+        route: None,
+        priority: None,
+    }
+}
+
 impl HaystackProvider for JMAPClient {
     type Error = anyhow::Error;
 
     async fn search(&self, query: &SearchQuery) -> Result<Vec<Document>, Self::Error> {
         let emails = self.search_emails(&query.search_term.to_string(), 50).await?;
-        let documents: Vec<Document> = emails
-            .into_iter()
-            .map(|email| Document {
-                id: email.id,
-                title: email.subject.unwrap_or_default(),
-                body: email
-                    .body_values
-                    .values()
-                    .next()
-                    .map(|bv| bv.value.clone())
-                    .unwrap_or_default(),
-                ..Default::default()
-            })
-            .collect();
-        Ok(documents)
+        Ok(emails.iter().map(email_to_document).collect())
     }
 }
