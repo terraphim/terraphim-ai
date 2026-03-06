@@ -13,6 +13,15 @@ pub struct OrchestratorConfig {
     pub compound_review: CompoundReviewConfig,
     /// Agent definitions.
     pub agents: Vec<AgentDefinition>,
+    /// Seconds to wait before restarting a Safety agent after it exits.
+    #[serde(default = "default_restart_cooldown")]
+    pub restart_cooldown_secs: u64,
+    /// Maximum number of restarts per Safety agent before giving up.
+    #[serde(default = "default_max_restart_count")]
+    pub max_restart_count: u32,
+    /// Reconciliation tick interval in seconds.
+    #[serde(default = "default_tick_interval")]
+    pub tick_interval_secs: u64,
 }
 
 /// Definition of a single agent in the fleet.
@@ -113,6 +122,18 @@ pub struct CompoundReviewConfig {
 
 fn default_max_duration() -> u64 {
     1800
+}
+
+fn default_restart_cooldown() -> u64 {
+    60
+}
+
+fn default_max_restart_count() -> u32 {
+    10
+}
+
+fn default_tick_interval() -> u64 {
+    30
 }
 
 impl OrchestratorConfig {
@@ -268,6 +289,55 @@ task = "t"
         assert!(config.agents[0].capabilities.is_empty());
         assert!(config.agents[0].max_memory_bytes.is_none());
         assert!(config.agents[0].schedule.is_none());
+    }
+
+    #[test]
+    fn test_config_restart_defaults() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.restart_cooldown_secs, 60);
+        assert_eq!(config.max_restart_count, 10);
+        assert_eq!(config.tick_interval_secs, 30);
+    }
+
+    #[test]
+    fn test_config_restart_custom() {
+        let toml_str = r#"
+working_dir = "/tmp"
+restart_cooldown_secs = 120
+max_restart_count = 5
+tick_interval_secs = 15
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.restart_cooldown_secs, 120);
+        assert_eq!(config.max_restart_count, 5);
+        assert_eq!(config.tick_interval_secs, 15);
     }
 
     #[test]
