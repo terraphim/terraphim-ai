@@ -137,6 +137,7 @@ mod tests {
             layer,
             cli_tool: "codex".to_string(),
             task: "test task".to_string(),
+            model: None,
             schedule: schedule.map(String::from),
             capabilities: vec![],
             max_memory_bytes: None,
