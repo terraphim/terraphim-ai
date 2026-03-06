@@ -1,0 +1,554 @@
+use std::collections::HashMap;
+
+use terraphim_spawner::health::HealthStatus;
+use terraphim_spawner::output::OutputEvent;
+use tokio::sync::mpsc;
+
+use crate::config::NightwatchConfig;
+
+/// Behavioral drift metrics for a single agent.
+#[derive(Debug, Clone, Default)]
+pub struct DriftMetrics {
+    /// Errors / total output lines.
+    pub error_rate: f64,
+    /// Non-error commands / total commands.
+    pub command_success_rate: f64,
+    /// Process health from HealthStatus observations.
+    pub health_score: f64,
+    /// Number of samples in the evaluation window.
+    pub sample_count: u64,
+}
+
+/// Drift score combining all metrics into a single 0.0-1.0 value.
+#[derive(Debug, Clone)]
+pub struct DriftScore {
+    pub agent_name: String,
+    pub score: f64,
+    pub metrics: DriftMetrics,
+    pub level: CorrectionLevel,
+}
+
+/// Correction level based on drift severity.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CorrectionLevel {
+    /// No drift detected.
+    Normal,
+    /// 10-20% drift: log warning, refresh context.
+    Minor,
+    /// 20-40% drift: reload config.
+    Moderate,
+    /// 40-70% drift: restart agent.
+    Severe,
+    /// >70% drift: pause agent, escalate to human.
+    Critical,
+}
+
+/// Alert emitted by NightwatchMonitor when drift exceeds threshold.
+#[derive(Debug, Clone)]
+pub struct DriftAlert {
+    pub agent_name: String,
+    pub drift_score: DriftScore,
+    pub recommended_action: CorrectionAction,
+}
+
+/// Action the orchestrator should take in response to drift.
+#[derive(Debug, Clone)]
+pub enum CorrectionAction {
+    /// Log and continue.
+    LogWarning(String),
+    /// Restart the agent.
+    RestartAgent,
+    /// Pause agent and notify human.
+    PauseAndEscalate(String),
+}
+
+/// Per-agent metric accumulator for the evaluation window.
+#[derive(Debug, Default)]
+struct AgentMetricAccumulator {
+    total_lines: u64,
+    error_lines: u64,
+    health_checks: u64,
+    healthy_checks: u64,
+}
+
+impl AgentMetricAccumulator {
+    fn drift_metrics(&self) -> DriftMetrics {
+        if self.total_lines == 0 && self.health_checks == 0 {
+            return DriftMetrics::default();
+        }
+
+        let error_rate = if self.total_lines > 0 {
+            self.error_lines as f64 / self.total_lines as f64
+        } else {
+            0.0
+        };
+
+        let command_success_rate = if self.total_lines > 0 {
+            1.0 - error_rate
+        } else {
+            1.0
+        };
+
+        let health_score = if self.health_checks > 0 {
+            self.healthy_checks as f64 / self.health_checks as f64
+        } else {
+            1.0
+        };
+
+        DriftMetrics {
+            error_rate,
+            command_success_rate,
+            health_score,
+            sample_count: self.total_lines + self.health_checks,
+        }
+    }
+
+    fn reset(&mut self) {
+        self.total_lines = 0;
+        self.error_lines = 0;
+        self.health_checks = 0;
+        self.healthy_checks = 0;
+    }
+}
+
+/// Monitors agent behavior and detects drift.
+pub struct NightwatchMonitor {
+    config: NightwatchConfig,
+    agent_metrics: HashMap<String, AgentMetricAccumulator>,
+    alert_tx: mpsc::Sender<DriftAlert>,
+    alert_rx: mpsc::Receiver<DriftAlert>,
+}
+
+impl NightwatchMonitor {
+    /// Create a new monitor with the given configuration.
+    pub fn new(config: NightwatchConfig) -> Self {
+        let (alert_tx, alert_rx) = mpsc::channel(64);
+        Self {
+            config,
+            agent_metrics: HashMap::new(),
+            alert_tx,
+            alert_rx,
+        }
+    }
+
+    /// Feed an output event from an agent into the monitor.
+    pub fn observe(&mut self, agent_name: &str, event: &OutputEvent) {
+        let acc = self
+            .agent_metrics
+            .entry(agent_name.to_string())
+            .or_default();
+
+        match event {
+            OutputEvent::Stdout { .. } => {
+                acc.total_lines += 1;
+            }
+            OutputEvent::Stderr { .. } => {
+                acc.total_lines += 1;
+                acc.error_lines += 1;
+            }
+            OutputEvent::Mention { .. } => {
+                acc.total_lines += 1;
+            }
+            OutputEvent::Completed { .. } => {}
+        }
+    }
+
+    /// Feed a health status update into the monitor.
+    pub fn observe_health(&mut self, agent_name: &str, status: HealthStatus) {
+        let acc = self
+            .agent_metrics
+            .entry(agent_name.to_string())
+            .or_default();
+        acc.health_checks += 1;
+        if status == HealthStatus::Healthy {
+            acc.healthy_checks += 1;
+        }
+    }
+
+    /// Get the next drift alert (async, used in select!).
+    pub async fn next_alert(&mut self) -> DriftAlert {
+        self.alert_rx
+            .recv()
+            .await
+            .expect("alert channel should never close while monitor exists")
+    }
+
+    /// Evaluate drift for all agents and emit alerts for any that exceed thresholds.
+    pub fn evaluate(&mut self) {
+        let mut alerts = Vec::new();
+        for (name, acc) in &self.agent_metrics {
+            let metrics = acc.drift_metrics();
+            let score = Self::calculate_drift(&metrics);
+            let level = self.classify_drift(score);
+            if level > CorrectionLevel::Normal {
+                let action = Self::recommended_action(level, name);
+                alerts.push(DriftAlert {
+                    agent_name: name.clone(),
+                    drift_score: DriftScore {
+                        agent_name: name.clone(),
+                        score,
+                        metrics,
+                        level,
+                    },
+                    recommended_action: action,
+                });
+            }
+        }
+        for alert in alerts {
+            let _ = self.alert_tx.try_send(alert);
+        }
+    }
+
+    /// Get current drift score for an agent (synchronous query).
+    pub fn drift_score(&self, agent_name: &str) -> Option<DriftScore> {
+        self.agent_metrics.get(agent_name).map(|acc| {
+            let metrics = acc.drift_metrics();
+            let score = Self::calculate_drift(&metrics);
+            let level = self.classify_drift(score);
+            DriftScore {
+                agent_name: agent_name.to_string(),
+                score,
+                metrics,
+                level,
+            }
+        })
+    }
+
+    /// Get all current drift scores.
+    pub fn all_drift_scores(&self) -> Vec<DriftScore> {
+        self.agent_metrics
+            .iter()
+            .map(|(name, acc)| {
+                let metrics = acc.drift_metrics();
+                let score = Self::calculate_drift(&metrics);
+                let level = self.classify_drift(score);
+                DriftScore {
+                    agent_name: name.clone(),
+                    score,
+                    metrics,
+                    level,
+                }
+            })
+            .collect()
+    }
+
+    /// Reset metrics for an agent (after restart).
+    pub fn reset(&mut self, agent_name: &str) {
+        if let Some(acc) = self.agent_metrics.get_mut(agent_name) {
+            acc.reset();
+        }
+    }
+
+    /// Calculate drift as weighted average of metric deviations.
+    /// Returns 0.0 when no samples have been collected.
+    fn calculate_drift(metrics: &DriftMetrics) -> f64 {
+        if metrics.sample_count == 0 {
+            return 0.0;
+        }
+
+        let error_weight = 0.4;
+        let success_weight = 0.3;
+        let health_weight = 0.3;
+
+        let error_drift = metrics.error_rate;
+        let success_drift = 1.0 - metrics.command_success_rate;
+        let health_drift = 1.0 - metrics.health_score;
+
+        error_weight * error_drift + success_weight * success_drift + health_weight * health_drift
+    }
+
+    /// Classify a drift score into a correction level.
+    fn classify_drift(&self, score: f64) -> CorrectionLevel {
+        if score >= self.config.critical_threshold {
+            CorrectionLevel::Critical
+        } else if score >= self.config.severe_threshold {
+            CorrectionLevel::Severe
+        } else if score >= self.config.moderate_threshold {
+            CorrectionLevel::Moderate
+        } else if score >= self.config.minor_threshold {
+            CorrectionLevel::Minor
+        } else {
+            CorrectionLevel::Normal
+        }
+    }
+
+    /// Map correction level to recommended action.
+    fn recommended_action(level: CorrectionLevel, agent_name: &str) -> CorrectionAction {
+        match level {
+            CorrectionLevel::Normal => CorrectionAction::LogWarning("no action needed".to_string()),
+            CorrectionLevel::Minor => {
+                CorrectionAction::LogWarning(format!("minor drift detected for {}", agent_name))
+            }
+            CorrectionLevel::Moderate => CorrectionAction::RestartAgent,
+            CorrectionLevel::Severe => CorrectionAction::RestartAgent,
+            CorrectionLevel::Critical => CorrectionAction::PauseAndEscalate(format!(
+                "critical drift for {}, human intervention required",
+                agent_name
+            )),
+        }
+    }
+}
+
+/// Tracks API rate limits per agent per provider.
+#[derive(Debug, Clone, Default)]
+pub struct RateLimitTracker {
+    /// Calls made per (agent_name, provider_id) in current window.
+    pub calls: HashMap<(String, String), RateLimitWindow>,
+}
+
+/// Sliding window for rate limit tracking.
+#[derive(Debug, Clone)]
+pub struct RateLimitWindow {
+    /// Calls in current hour.
+    pub calls_this_hour: u32,
+    /// Provider-reported limit (from HTTP headers, if available).
+    pub hourly_limit: Option<u32>,
+    /// Window start.
+    pub window_start: chrono::DateTime<chrono::Utc>,
+}
+
+impl RateLimitTracker {
+    /// Record an API call for an agent+provider pair.
+    pub fn record_call(&mut self, agent_name: &str, provider_id: &str) {
+        let key = (agent_name.to_string(), provider_id.to_string());
+        let window = self.calls.entry(key).or_insert_with(|| RateLimitWindow {
+            calls_this_hour: 0,
+            hourly_limit: None,
+            window_start: chrono::Utc::now(),
+        });
+
+        // Reset window if more than 1 hour has passed
+        let elapsed = chrono::Utc::now() - window.window_start;
+        if elapsed.num_seconds() >= 3600 {
+            window.calls_this_hour = 0;
+            window.window_start = chrono::Utc::now();
+        }
+
+        window.calls_this_hour += 1;
+    }
+
+    /// Check if an agent can make more calls to a provider.
+    pub fn can_call(&self, agent_name: &str, provider_id: &str) -> bool {
+        let key = (agent_name.to_string(), provider_id.to_string());
+        match self.calls.get(&key) {
+            Some(window) => match window.hourly_limit {
+                Some(limit) => window.calls_this_hour < limit,
+                None => true,
+            },
+            None => true,
+        }
+    }
+
+    /// Update limit from provider response headers.
+    pub fn update_limit(&mut self, agent_name: &str, provider_id: &str, limit: u32) {
+        let key = (agent_name.to_string(), provider_id.to_string());
+        if let Some(window) = self.calls.get_mut(&key) {
+            window.hourly_limit = Some(limit);
+        }
+    }
+
+    /// Get remaining calls for an agent+provider.
+    pub fn remaining(&self, agent_name: &str, provider_id: &str) -> Option<u32> {
+        let key = (agent_name.to_string(), provider_id.to_string());
+        self.calls.get(&key).and_then(|window| {
+            window
+                .hourly_limit
+                .map(|limit| limit.saturating_sub(window.calls_this_hour))
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use terraphim_types::capability::ProcessId;
+
+    fn make_stdout(line: &str) -> OutputEvent {
+        OutputEvent::Stdout {
+            process_id: ProcessId::new(),
+            line: line.to_string(),
+        }
+    }
+
+    fn make_stderr(line: &str) -> OutputEvent {
+        OutputEvent::Stderr {
+            process_id: ProcessId::new(),
+            line: line.to_string(),
+        }
+    }
+
+    #[test]
+    fn test_drift_metrics_zero() {
+        let monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        assert!(monitor.drift_score("nonexistent").is_none());
+    }
+
+    #[test]
+    fn test_drift_metrics_normal() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        // All stdout, no errors
+        for _ in 0..100 {
+            monitor.observe("agent-a", &make_stdout("ok"));
+        }
+        monitor.observe_health("agent-a", HealthStatus::Healthy);
+
+        let ds = monitor.drift_score("agent-a").unwrap();
+        assert_eq!(ds.level, CorrectionLevel::Normal);
+        assert!(ds.score < 0.10);
+    }
+
+    #[test]
+    fn test_drift_metrics_minor() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        // ~15% error rate -> minor drift
+        for _ in 0..85 {
+            monitor.observe("agent-b", &make_stdout("ok"));
+        }
+        for _ in 0..15 {
+            monitor.observe("agent-b", &make_stderr("error"));
+        }
+        monitor.observe_health("agent-b", HealthStatus::Healthy);
+
+        let ds = monitor.drift_score("agent-b").unwrap();
+        // error_rate=0.15, success=0.85, health=1.0
+        // drift = 0.4*0.15 + 0.3*0.15 + 0.3*0.0 = 0.105
+        assert_eq!(ds.level, CorrectionLevel::Minor);
+    }
+
+    #[test]
+    fn test_drift_metrics_moderate() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        // ~30% error rate -> moderate drift
+        for _ in 0..70 {
+            monitor.observe("agent-c", &make_stdout("ok"));
+        }
+        for _ in 0..30 {
+            monitor.observe("agent-c", &make_stderr("error"));
+        }
+        monitor.observe_health("agent-c", HealthStatus::Healthy);
+
+        let ds = monitor.drift_score("agent-c").unwrap();
+        // error_rate=0.30, success=0.70, health=1.0
+        // drift = 0.4*0.30 + 0.3*0.30 + 0.3*0.0 = 0.21
+        assert_eq!(ds.level, CorrectionLevel::Moderate);
+    }
+
+    #[test]
+    fn test_drift_metrics_severe() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        // ~60% error rate + degraded health
+        for _ in 0..40 {
+            monitor.observe("agent-d", &make_stdout("ok"));
+        }
+        for _ in 0..60 {
+            monitor.observe("agent-d", &make_stderr("error"));
+        }
+        for _ in 0..5 {
+            monitor.observe_health("agent-d", HealthStatus::Healthy);
+        }
+        for _ in 0..5 {
+            monitor.observe_health("agent-d", HealthStatus::Degraded);
+        }
+
+        let ds = monitor.drift_score("agent-d").unwrap();
+        // error_rate=0.60, success=0.40, health=0.50
+        // drift = 0.4*0.60 + 0.3*0.60 + 0.3*0.50 = 0.24+0.18+0.15 = 0.57
+        assert_eq!(ds.level, CorrectionLevel::Severe);
+    }
+
+    #[test]
+    fn test_drift_metrics_critical() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        // ~90% error rate + mostly unhealthy
+        for _ in 0..10 {
+            monitor.observe("agent-e", &make_stdout("ok"));
+        }
+        for _ in 0..90 {
+            monitor.observe("agent-e", &make_stderr("error"));
+        }
+        for _ in 0..8 {
+            monitor.observe_health("agent-e", HealthStatus::Unhealthy);
+        }
+        for _ in 0..2 {
+            monitor.observe_health("agent-e", HealthStatus::Healthy);
+        }
+
+        let ds = monitor.drift_score("agent-e").unwrap();
+        // error_rate=0.90, health=0.20
+        // drift = 0.4*0.90 + 0.3*0.90 + 0.3*0.80 = 0.36+0.27+0.24 = 0.87
+        assert_eq!(ds.level, CorrectionLevel::Critical);
+    }
+
+    #[test]
+    fn test_drift_reset() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        for _ in 0..50 {
+            monitor.observe("agent-f", &make_stderr("error"));
+        }
+        let ds = monitor.drift_score("agent-f").unwrap();
+        assert!(ds.score > 0.5);
+
+        monitor.reset("agent-f");
+        let ds = monitor.drift_score("agent-f").unwrap();
+        assert!(ds.score < f64::EPSILON);
+        assert_eq!(ds.metrics.sample_count, 0);
+    }
+
+    #[test]
+    fn test_correction_level_ordering() {
+        assert!(CorrectionLevel::Normal < CorrectionLevel::Minor);
+        assert!(CorrectionLevel::Minor < CorrectionLevel::Moderate);
+        assert!(CorrectionLevel::Moderate < CorrectionLevel::Severe);
+        assert!(CorrectionLevel::Severe < CorrectionLevel::Critical);
+    }
+
+    #[test]
+    fn test_rate_limit_tracker_basic() {
+        let mut tracker = RateLimitTracker::default();
+
+        assert!(tracker.can_call("agent-a", "openai"));
+        assert!(tracker.remaining("agent-a", "openai").is_none());
+
+        tracker.record_call("agent-a", "openai");
+        tracker.update_limit("agent-a", "openai", 100);
+
+        assert!(tracker.can_call("agent-a", "openai"));
+        assert_eq!(tracker.remaining("agent-a", "openai"), Some(99));
+    }
+
+    #[test]
+    fn test_rate_limit_tracker_exhausted() {
+        let mut tracker = RateLimitTracker::default();
+
+        tracker.record_call("agent-b", "anthropic");
+        tracker.update_limit("agent-b", "anthropic", 2);
+        tracker.record_call("agent-b", "anthropic");
+
+        assert!(!tracker.can_call("agent-b", "anthropic"));
+        assert_eq!(tracker.remaining("agent-b", "anthropic"), Some(0));
+    }
+
+    #[test]
+    fn test_evaluate_emits_alerts() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+
+        // Create agent with high error rate
+        for _ in 0..90 {
+            monitor.observe("bad-agent", &make_stderr("error"));
+        }
+        for _ in 0..10 {
+            monitor.observe("bad-agent", &make_stdout("ok"));
+        }
+
+        monitor.evaluate();
+
+        // Should have an alert in the channel
+        match monitor.alert_rx.try_recv() {
+            Ok(alert) => {
+                assert_eq!(alert.agent_name, "bad-agent");
+                assert!(alert.drift_score.level >= CorrectionLevel::Moderate);
+            }
+            Err(_) => panic!("expected alert from evaluate"),
+        }
+    }
+}
