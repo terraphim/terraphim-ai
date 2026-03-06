@@ -53,8 +53,7 @@ keys/
 # CodeBuff compiled JavaScript files
 .codebuff/agents/.agents/*.js
 
-# Working documents
-.docs/
+# Working documents (tracked for project documentation)
 
 # Claude Code working files
 .claude/plans/
