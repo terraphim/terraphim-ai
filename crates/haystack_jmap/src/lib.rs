@@ -121,6 +121,7 @@ pub struct BodyPart {
 }
 
 /// A client for interacting with a JMAP server.
+#[derive(Debug)]
 pub struct JMAPClient {
     /// The JMAP session associated with the client.
     session: Session,
@@ -422,5 +423,302 @@ impl HaystackProvider for JMAPClient {
     async fn search(&self, query: &SearchQuery) -> Result<Vec<Document>, Self::Error> {
         let emails = self.search_emails(&query.search_term.to_string(), 50).await?;
         Ok(emails.iter().map(email_to_document).collect())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn sample_session_json() -> &'static str {
+        r#"{
+            "primaryAccounts": {
+                "urn:ietf:params:jmap:mail": "acc-001",
+                "urn:ietf:params:jmap:contacts": "acc-001"
+            },
+            "apiUrl": "https://jmap.example.com/api/",
+            "capabilities": {},
+            "downloadUrl": "https://jmap.example.com/download/",
+            "uploadUrl": "https://jmap.example.com/upload/",
+            "state": "abc123",
+            "username": "user@example.com"
+        }"#
+    }
+
+    fn sample_email() -> Email {
+        let mut body_values = HashMap::new();
+        body_values.insert(
+            "1".to_string(),
+            BodyValue {
+                value: "Hello, this is the email body content.".to_string(),
+                is_truncated: Some(false),
+            },
+        );
+        Email {
+            id: "email-001".to_string(),
+            subject: Some("Test Subject".to_string()),
+            from: Some(vec![EmailAddress {
+                name: Some("Alice".to_string()),
+                email: "alice@example.com".to_string(),
+            }]),
+            to: Some(vec![EmailAddress {
+                name: Some("Bob".to_string()),
+                email: "bob@example.com".to_string(),
+            }]),
+            body_values,
+            text_body: vec![BodyPart {
+                part_id: "1".to_string(),
+                type_: Some("text/plain".to_string()),
+            }],
+            received_at: Some("2025-01-15T10:30:00Z".to_string()),
+        }
+    }
+
+    #[test]
+    fn test_session_deserialization() {
+        let session: Session = serde_json::from_str(sample_session_json()).unwrap();
+        assert_eq!(session.api_url, "https://jmap.example.com/api/");
+        assert_eq!(session.username, "user@example.com");
+        assert_eq!(
+            session.primary_accounts.get("urn:ietf:params:jmap:mail"),
+            Some(&"acc-001".to_string())
+        );
+    }
+
+    #[test]
+    fn test_email_deserialization() {
+        let json = r#"{
+            "id": "e-123",
+            "subject": "Meeting Tomorrow",
+            "from": [{"name": "Alice", "email": "alice@test.com"}],
+            "to": [{"name": "Bob", "email": "bob@test.com"}],
+            "bodyValues": {
+                "1": {"value": "See you at 3pm", "isTruncated": false}
+            },
+            "textBody": [{"partId": "1"}],
+            "receivedAt": "2025-03-01T14:00:00Z"
+        }"#;
+        let email: Email = serde_json::from_str(json).unwrap();
+        assert_eq!(email.id, "e-123");
+        assert_eq!(email.subject, Some("Meeting Tomorrow".to_string()));
+        assert_eq!(email.from.as_ref().unwrap()[0].email, "alice@test.com");
+        assert_eq!(email.body_values.get("1").unwrap().value, "See you at 3pm");
+        assert_eq!(
+            email.received_at,
+            Some("2025-03-01T14:00:00Z".to_string())
+        );
+    }
+
+    #[test]
+    fn test_email_to_document_mapping() {
+        let email = sample_email();
+        let doc = email_to_document(&email);
+
+        assert_eq!(doc.id, "email-001");
+        assert_eq!(doc.title, "Test Subject");
+        assert_eq!(doc.url, "jmap:///email/email-001");
+        assert_eq!(
+            doc.description,
+            Some("From: alice@example.com To: bob@example.com".to_string())
+        );
+        assert_eq!(doc.body, "Hello, this is the email body content.");
+        assert_eq!(
+            doc.stub,
+            Some("Hello, this is the email body content.".to_string())
+        );
+
+        let tags = doc.tags.unwrap();
+        assert!(tags.contains(&"email".to_string()));
+        assert!(tags.contains(&"sender:alice@example.com".to_string()));
+        assert!(tags.contains(&"2025-01-15".to_string()));
+    }
+
+    #[test]
+    fn test_email_to_document_empty_fields() {
+        let email = Email {
+            id: "empty-001".to_string(),
+            subject: None,
+            from: None,
+            to: None,
+            body_values: HashMap::new(),
+            text_body: vec![],
+            received_at: None,
+        };
+        let doc = email_to_document(&email);
+
+        assert_eq!(doc.id, "empty-001");
+        assert_eq!(doc.title, "");
+        assert_eq!(doc.description, Some("From:  To: ".to_string()));
+        assert_eq!(doc.body, "");
+        assert!(doc.stub.is_none());
+
+        let tags = doc.tags.unwrap();
+        assert_eq!(tags, vec!["email".to_string()]);
+    }
+
+    #[test]
+    fn test_email_to_document_stub_truncation() {
+        let long_body = "A".repeat(500);
+        let mut body_values = HashMap::new();
+        body_values.insert(
+            "1".to_string(),
+            BodyValue {
+                value: long_body,
+                is_truncated: None,
+            },
+        );
+        let email = Email {
+            id: "long-001".to_string(),
+            subject: Some("Long Email".to_string()),
+            from: None,
+            to: None,
+            body_values,
+            text_body: vec![],
+            received_at: None,
+        };
+        let doc = email_to_document(&email);
+
+        let stub = doc.stub.unwrap();
+        assert_eq!(stub.len(), 200);
+        assert_eq!(stub, "A".repeat(200));
+    }
+
+    #[tokio::test]
+    async fn test_wiremock_full_search_flow() {
+        use wiremock::matchers::{body_string_contains, header, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        let session_json = serde_json::json!({
+            "primaryAccounts": {
+                "urn:ietf:params:jmap:mail": "acc-001"
+            },
+            "apiUrl": format!("{}/api", mock_server.uri()),
+            "capabilities": {},
+            "downloadUrl": format!("{}/download/", mock_server.uri()),
+            "uploadUrl": format!("{}/upload/", mock_server.uri()),
+            "state": "s1",
+            "username": "test@example.com"
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/session"))
+            .and(header("Authorization", "Bearer test-token"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&session_json))
+            .mount(&mock_server)
+            .await;
+
+        let query_response = serde_json::json!({
+            "methodResponses": [
+                ["Email/query", {"ids": ["e-1"], "total": 1}, "s1"]
+            ],
+            "sessionState": "s1"
+        });
+        Mock::given(method("POST"))
+            .and(path("/api"))
+            .and(body_string_contains("Email/query"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&query_response))
+            .mount(&mock_server)
+            .await;
+
+        let get_response = serde_json::json!({
+            "methodResponses": [
+                ["Email/get", {
+                    "list": [{
+                        "id": "e-1",
+                        "subject": "Test Email",
+                        "from": [{"name": "Sender", "email": "sender@test.com"}],
+                        "to": [{"name": "Receiver", "email": "receiver@test.com"}],
+                        "bodyValues": {"1": {"value": "Body content here"}},
+                        "textBody": [{"partId": "1"}],
+                        "receivedAt": "2025-06-01T12:00:00Z"
+                    }]
+                }, "s2"]
+            ],
+            "sessionState": "s1"
+        });
+        Mock::given(method("POST"))
+            .and(path("/api"))
+            .and(body_string_contains("Email/get"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&get_response))
+            .mount(&mock_server)
+            .await;
+
+        let session_url = format!("{}/session", mock_server.uri());
+        let client = JMAPClient::new("test-token".to_string(), &session_url)
+            .await
+            .unwrap();
+
+        let emails = client.search_emails("test", 10).await.unwrap();
+        assert_eq!(emails.len(), 1);
+        assert_eq!(emails[0].id, "e-1");
+        assert_eq!(emails[0].subject, Some("Test Email".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_wiremock_auth_failure() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/session"))
+            .respond_with(ResponseTemplate::new(401).set_body_string("Unauthorized"))
+            .mount(&mock_server)
+            .await;
+
+        let session_url = format!("{}/session", mock_server.uri());
+        let result = JMAPClient::new("bad-token".to_string(), &session_url).await;
+
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(err.contains("authenticate"), "Error was: {}", err);
+    }
+
+    #[tokio::test]
+    async fn test_wiremock_empty_search_results() {
+        use wiremock::matchers::{body_string_contains, method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        let session_json = serde_json::json!({
+            "primaryAccounts": {"urn:ietf:params:jmap:mail": "acc-001"},
+            "apiUrl": format!("{}/api", mock_server.uri()),
+            "capabilities": {},
+            "downloadUrl": "",
+            "uploadUrl": "",
+            "state": "s1",
+            "username": "test@example.com"
+        });
+
+        Mock::given(method("GET"))
+            .and(path("/session"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&session_json))
+            .mount(&mock_server)
+            .await;
+
+        let query_response = serde_json::json!({
+            "methodResponses": [
+                ["Email/query", {"ids": [], "total": 0}, "s1"]
+            ],
+            "sessionState": "s1"
+        });
+        Mock::given(method("POST"))
+            .and(path("/api"))
+            .and(body_string_contains("Email/query"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(&query_response))
+            .mount(&mock_server)
+            .await;
+
+        let session_url = format!("{}/session", mock_server.uri());
+        let client = JMAPClient::new("token".to_string(), &session_url)
+            .await
+            .unwrap();
+
+        let emails = client.search_emails("nothing", 10).await.unwrap();
+        assert!(emails.is_empty());
     }
 }
