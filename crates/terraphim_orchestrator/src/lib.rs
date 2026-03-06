@@ -243,11 +243,16 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
-        // Select model via keyword routing or explicit config
+        // Select model via keyword routing or explicit config.
+        // Skip keyword routing for CLIs that use OAuth and don't support -m
+        // (e.g. codex with ChatGPT account). Only apply routed models when the
+        // CLI tool is known to accept --model flags with arbitrary model IDs.
+        let supports_model_flag = matches!(def.cli_tool.as_str(), "claude" | "claude-code");
+
         let model = if let Some(m) = &def.model {
             info!(agent = %def.name, model = %m, "using explicit model");
             Some(m.clone())
-        } else {
+        } else if supports_model_flag {
             // Route the task prompt to find the best model
             let context = terraphim_router::RoutingContext::default();
             match self.router.route(&def.task, &context) {
@@ -271,6 +276,9 @@ impl AgentOrchestrator {
                     None
                 }
             }
+        } else {
+            info!(agent = %def.name, cli = %def.cli_tool, "skipping model routing (CLI uses OAuth/default)");
+            None
         };
 
         info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
