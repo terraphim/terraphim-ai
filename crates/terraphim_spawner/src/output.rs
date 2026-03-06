@@ -42,7 +42,7 @@ impl OutputCapture {
     pub fn new(
         process_id: ProcessId,
         stdout: BufReader<ChildStdout>,
-        _stderr: BufReader<ChildStderr>,
+        stderr: BufReader<ChildStderr>,
     ) -> Self {
         let (event_sender, _event_receiver) = mpsc::channel(100);
         let (broadcast_sender, _) = broadcast::channel(256);
@@ -54,8 +54,9 @@ impl OutputCapture {
             broadcast_sender,
         };
 
-        // Start capturing stdout
+        // Start capturing stdout and stderr
         capture.capture_stdout(stdout);
+        capture.capture_stderr(stderr);
 
         capture
     }
@@ -116,6 +117,38 @@ impl OutputCapture {
                     }
                     Err(e) => {
                         tracing::error!(process_id = %process_id, error = %e, "Error reading stdout");
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    /// Start capturing stderr
+    fn capture_stderr(&self, mut stderr: BufReader<ChildStderr>) {
+        let process_id = self.process_id;
+        let event_sender = self.event_sender.clone();
+        let broadcast_sender = self.broadcast_sender.clone();
+
+        tokio::spawn(async move {
+            let mut line = String::new();
+
+            loop {
+                line.clear();
+                match stderr.read_line(&mut line).await {
+                    Ok(0) => break, // EOF
+                    Ok(_) => {
+                        let line = line.trim().to_string();
+                        if line.is_empty() {
+                            continue;
+                        }
+
+                        let stderr_event = OutputEvent::Stderr { process_id, line };
+                        let _ = event_sender.send(stderr_event.clone()).await;
+                        let _ = broadcast_sender.send(stderr_event);
+                    }
+                    Err(e) => {
+                        tracing::error!(process_id = %process_id, error = %e, "Error reading stderr");
                         break;
                     }
                 }
