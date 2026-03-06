@@ -1,9 +1,9 @@
 #[cfg(feature = "ai-assistant")]
 pub mod ai_assistant;
 pub mod clickup;
-pub mod jmap;
 #[cfg(feature = "grepapp")]
 pub mod grep_app;
+pub mod jmap;
 pub mod mcp;
 pub mod perplexity;
 pub mod query_rs;
@@ -11,9 +11,9 @@ pub mod quickwit;
 #[cfg(feature = "ai-assistant")]
 pub use ai_assistant::AiAssistantHaystackIndexer;
 pub use clickup::ClickUpHaystackIndexer;
-pub use jmap::JmapHaystackIndexer;
 #[cfg(feature = "grepapp")]
 pub use grep_app::GrepAppHaystackIndexer;
+pub use jmap::JmapHaystackIndexer;
 pub use mcp::McpHaystackIndexer;
 pub use perplexity::PerplexityHaystackIndexer;
 pub use query_rs::QueryRsHaystackIndexer;
