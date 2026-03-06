@@ -69,3 +69,12 @@ a.out
 
 # Cache
 .cachebro/
+.ruff_cache/
+
+# Stale logs and test results
+*.log
+test-results/
+benchmark-results/
+
+# Release tarballs
+*.tar.gz
