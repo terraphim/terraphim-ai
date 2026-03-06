@@ -23,7 +23,9 @@ use std::time::{Duration, Instant};
 
 use terraphim_router::RoutingEngine;
 use terraphim_spawner::health::HealthStatus;
+use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner};
+use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
 /// Status of a single agent in the fleet.
@@ -46,6 +48,8 @@ struct ManagedAgent {
     handle: AgentHandle,
     started_at: Instant,
     restart_count: u32,
+    /// Broadcast receiver for draining output events to nightwatch.
+    output_rx: broadcast::Receiver<OutputEvent>,
 }
 
 /// The main orchestrator that runs the dark factory.
@@ -59,6 +63,12 @@ pub struct AgentOrchestrator {
     active_agents: HashMap<String, ManagedAgent>,
     rate_limiter: RateLimitTracker,
     shutdown_requested: bool,
+    /// Total restart count per agent (persists across agent lifecycle).
+    restart_counts: HashMap<String, u32>,
+    /// Last exit time per agent (for cooldown enforcement).
+    restart_cooldowns: HashMap<String, Instant>,
+    /// Timestamp of the last reconciliation tick (for cron comparison).
+    last_tick_time: chrono::DateTime<chrono::Utc>,
 }
 
 impl AgentOrchestrator {
@@ -80,6 +90,9 @@ impl AgentOrchestrator {
             active_agents: HashMap::new(),
             rate_limiter: RateLimitTracker::default(),
             shutdown_requested: false,
+            restart_counts: HashMap::new(),
+            restart_cooldowns: HashMap::new(),
+            last_tick_time: chrono::Utc::now(),
         })
     }
 
@@ -311,13 +324,20 @@ impl AgentOrchestrator {
                 reason: e.to_string(),
             })?;
 
+        // Subscribe to the output broadcast for nightwatch drain
+        let output_rx = handle.subscribe_output();
+
+        // Get the restart count from the orchestrator-level counter
+        let restart_count = self.restart_counts.get(&def.name).copied().unwrap_or(0);
+
         self.active_agents.insert(
             def.name.clone(),
             ManagedAgent {
                 definition: def.clone(),
                 handle,
                 started_at: Instant::now(),
-                restart_count: 0,
+                restart_count,
+                output_rx,
             },
         );
 
