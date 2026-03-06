@@ -142,9 +142,18 @@ impl NightwatchMonitor {
             OutputEvent::Stdout { .. } => {
                 acc.total_lines += 1;
             }
-            OutputEvent::Stderr { .. } => {
+            OutputEvent::Stderr { line, .. } => {
                 acc.total_lines += 1;
-                acc.error_lines += 1;
+                // Only count as error if line contains error-like keywords.
+                // Many CLIs (codex/bun) write normal output to stderr.
+                let lower = line.to_lowercase();
+                if lower.contains("error")
+                    || lower.contains("panic")
+                    || lower.contains("fatal")
+                    || lower.contains("failed")
+                {
+                    acc.error_lines += 1;
+                }
             }
             OutputEvent::Mention { .. } => {
                 acc.total_lines += 1;
@@ -492,6 +501,37 @@ mod tests {
         let ds = monitor.drift_score("agent-f").unwrap();
         assert!(ds.score < f64::EPSILON);
         assert_eq!(ds.metrics.sample_count, 0);
+    }
+
+    #[test]
+    fn test_stderr_without_error_keywords_not_counted() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        // Stderr lines without error keywords (like bun/codex init output)
+        for _ in 0..100 {
+            monitor.observe("agent-bun", &make_stderr("bun install v1.2.3"));
+        }
+        monitor.observe_health("agent-bun", HealthStatus::Healthy);
+
+        let ds = monitor.drift_score("agent-bun").unwrap();
+        // All 100 lines are stderr but none contain error keywords
+        assert_eq!(ds.metrics.error_rate, 0.0);
+        assert_eq!(ds.level, CorrectionLevel::Normal);
+    }
+
+    #[test]
+    fn test_stderr_with_error_keywords_counted() {
+        let mut monitor = NightwatchMonitor::new(NightwatchConfig::default());
+        for _ in 0..50 {
+            monitor.observe("agent-err", &make_stdout("ok"));
+        }
+        for _ in 0..50 {
+            monitor.observe("agent-err", &make_stderr("fatal: connection refused"));
+        }
+        monitor.observe_health("agent-err", HealthStatus::Healthy);
+
+        let ds = monitor.drift_score("agent-err").unwrap();
+        assert_eq!(ds.metrics.error_rate, 0.5);
+        assert!(ds.level >= CorrectionLevel::Moderate);
     }
 
     #[test]
