@@ -101,11 +101,13 @@ impl AgentConfig {
         }
     }
 
-    /// Infer required API keys from CLI command
+    /// Infer required API keys from CLI command.
+    ///
+    /// Note: codex uses OAuth (ChatGPT login) and does not require OPENAI_API_KEY.
     fn infer_api_keys(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             "claude" | "claude-code" => vec!["ANTHROPIC_API_KEY".to_string()],
-            "opencode" | "codex" => vec!["OPENAI_API_KEY".to_string()],
+            "opencode" => vec!["OPENAI_API_KEY".to_string()],
             _ => Vec::new(),
         }
     }
