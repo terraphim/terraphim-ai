@@ -47,6 +47,9 @@ releases/
 # Beads task database (local working state)
 .beads/
 
+# Nested crates directories (build artifacts)
+crates/**/crates/
+
 # Signing keys (NEVER commit private keys)
 keys/
 
