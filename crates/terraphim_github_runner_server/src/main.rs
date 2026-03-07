@@ -423,7 +423,7 @@ async fn main() -> Result<()> {
     let addr = format!("{}:{}", settings.host, settings.port);
     info!("Terraphim GitHub Runner Server starting on {}", addr);
 
-    let acceptor = TcpListener::new(&addr).bind().await;
+    let acceptor = TcpListener::new(addr).bind().await;
     Server::new(acceptor).serve(router).await;
 
     Ok(())
