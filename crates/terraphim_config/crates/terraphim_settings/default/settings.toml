@@ -1,0 +1,34 @@
+server_hostname = "127.0.0.1:8000"
+api_endpoint="http://localhost:8000/api"
+initialized = "${TERRAPHIM_INITIALIZED:-false}"
+default_data_path = "${TERRAPHIM_DATA_PATH:-~/.terraphim}"
+
+# 2-tier non-locking storage configuration for local development
+# - DashMap: Fast concurrent in-memory storage with fallback
+# - SQLite: Persistent storage with concurrent access (WAL mode)
+
+# Primary - Fast concurrent in-memory storage
+[profiles.dashmap]
+type = "dashmap"
+root = "/tmp/terraphim_dashmap"  # Directory auto-created
+
+# Secondary - Persistent with excellent concurrency (WAL mode)
+[profiles.sqlite]
+type = "sqlite"
+datadir = "/tmp/terraphim_sqlite"  # Directory auto-created
+connection_string = "/tmp/terraphim_sqlite/terraphim.db"
+table = "terraphim_kv"
+
+# ReDB disabled for local development to avoid database locking issues
+# [profiles.redb]
+# type = "redb"
+# datadir = "/tmp/terraphim_redb/local_dev.redb"
+# table = "terraphim"
+
+# Path to a JSON role configuration file (supports ~, $HOME, ${VAR:-default})
+# On first run, roles are loaded from this file and saved to persistence.
+# Subsequent runs use persistence (so CLI changes stick). Use `config reload` to re-read.
+# role_config = "~/.config/terraphim/multi_repo_roles.json"
+
+# Default role to select on first load (must exist in the role_config file)
+# default_role = "LearningCapture"
