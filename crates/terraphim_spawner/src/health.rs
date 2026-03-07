@@ -469,16 +469,17 @@ mod tests {
     fn test_circuit_breaker_half_open_after_cooldown() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            cooldown: Duration::from_millis(1), // Very short cooldown for testing
+            cooldown: Duration::from_millis(100), // Long enough to not race
             success_threshold: 1,
         };
         let mut cb = CircuitBreaker::new(config);
 
         cb.record_failure(); // Opens immediately
+        // State should be Open immediately after failure (cooldown hasn't expired)
         assert_eq!(cb.state(), CircuitState::Open);
 
-        // Wait for cooldown (generous margin for CI under load)
-        std::thread::sleep(Duration::from_millis(50));
+        // Wait for cooldown to expire (generous margin for CI under load)
+        std::thread::sleep(Duration::from_millis(150));
         assert_eq!(cb.state(), CircuitState::HalfOpen);
         assert!(cb.should_allow());
     }
@@ -487,13 +488,13 @@ mod tests {
     fn test_circuit_breaker_half_open_success_closes() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            cooldown: Duration::from_millis(1),
+            cooldown: Duration::from_millis(100),
             success_threshold: 1,
         };
         let mut cb = CircuitBreaker::new(config);
 
         cb.record_failure(); // -> Open
-        std::thread::sleep(Duration::from_millis(5)); // -> HalfOpen
+        std::thread::sleep(Duration::from_millis(150)); // -> HalfOpen
         assert_eq!(cb.state(), CircuitState::HalfOpen);
 
         cb.record_success(); // -> Closed
@@ -504,13 +505,13 @@ mod tests {
     fn test_circuit_breaker_half_open_failure_reopens() {
         let config = CircuitBreakerConfig {
             failure_threshold: 1,
-            cooldown: Duration::from_millis(1),
+            cooldown: Duration::from_millis(100),
             success_threshold: 1,
         };
         let mut cb = CircuitBreaker::new(config);
 
         cb.record_failure(); // -> Open
-        std::thread::sleep(Duration::from_millis(5)); // -> HalfOpen
+        std::thread::sleep(Duration::from_millis(150)); // -> HalfOpen
 
         cb.record_failure(); // Probe failed -> Open again
         assert_eq!(cb.state(), CircuitState::Open);
