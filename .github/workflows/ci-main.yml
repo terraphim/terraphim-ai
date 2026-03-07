@@ -117,6 +117,21 @@ jobs:
           name: frontend-dist
           path: terraphim_server/dist/
 
+      - name: Verify fresh UI assets and invalidate cache if needed
+        run: |
+          echo "Frontend assets downloaded to terraphim_server/dist/"
+          ls -la terraphim_server/dist/
+          
+          # Generate hash of frontend assets to detect changes
+          FRONTEND_HASH=$(find terraphim_server/dist -type f -exec sha256sum {} \; | sha256sum | cut -d' ' -f1)
+          echo "Frontend assets hash: $FRONTEND_HASH"
+          echo "frontend-hash=$FRONTEND_HASH" >> $GITHUB_ENV
+          
+          # Force rebuild of terraphim_server by touching build.rs
+          # This ensures rust_embed picks up fresh assets
+          touch terraphim_server/build.rs
+          echo "Forced rebuild of terraphim_server by touching build.rs"
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -142,10 +157,16 @@ jobs:
         uses: actions/cache@v4
         with:
           path: target
-          key: ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}
+          key: ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}-${{ env.frontend-hash }}
           restore-keys: |
             ${{ needs.setup.outputs.cache-key }}-target-${{ matrix.target }}-
             ${{ needs.setup.outputs.cache-key }}-target-
+
+      - name: Clean terraphim_server for fresh UI embedding
+        run: |
+          # Clean the terraphim_server crate to force rebuild with fresh UI
+          cargo clean -p terraphim_server --target ${{ matrix.target }}
+          echo "Cleaned terraphim_server to ensure fresh UI embedding"
 
       - name: Build release binaries
         run: |
@@ -161,6 +182,20 @@ jobs:
               echo "$(basename "$binary"): $(du -h "$binary" | cut -f1)"
             fi
           done
+
+      - name: Verify UI is embedded in server binary
+        run: |
+          # Check if the terraphim_server binary contains UI assets
+          # by searching for a known string from index.html
+          if strings target/${{ matrix.target }}/release/terraphim_server | grep -q "Terraphim Server"; then
+            echo "✓ UI assets are embedded in terraphim_server binary"
+          else
+            echo "✗ Warning: Could not verify UI embedding in terraphim_server binary"
+          fi
+          
+          # Show the size of embedded assets (approximate)
+          BINARY_SIZE=$(stat -f%z target/${{ matrix.target }}/release/terraphim_server 2>/dev/null || stat -c%s target/${{ matrix.target }}/release/terraphim_server)
+          echo "Server binary size: $BINARY_SIZE bytes"
 
       - name: Run tests
         run: |
