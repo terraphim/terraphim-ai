@@ -1,7 +1,14 @@
-name: Publish Tauri with Auto-Update
+# DEPRECATED: This workflow has been moved to terraphim-ai-desktop repository
+# The Tauri desktop app is now built and published from the separate terraphim-ai-desktop repo
+# See: https://github.com/terraphim/terraphim-ai-desktop
+#
+# This file is kept for reference but should not be used.
+# Use the release-comprehensive.yml workflow which triggers the desktop build remotely.
 
-# NOTE: Tag trigger disabled - release-comprehensive.yml handles Tauri builds
-# Use workflow_dispatch for manual Tauri builds
+name: Publish Tauri with Auto-Update (DEPRECATED - Moved to terraphim-ai-desktop)
+
+# NOTE: This workflow is deprecated. Tauri builds are now handled in terraphim-ai-desktop.
+# The release-comprehensive.yml workflow triggers the desktop release remotely.
 on:
   # Disabled tag trigger - release-comprehensive.yml handles Tauri builds
   # push:

@@ -1,4 +1,11 @@
-name: Tauri Build
+# DEPRECATED: This workflow has been moved to terraphim-ai-desktop repository
+# The Tauri desktop app is now built in the separate terraphim-ai-desktop repo
+# See: https://github.com/terraphim/terraphim-ai-desktop
+#
+# This file is kept for reference but should not be used.
+# Use the release-comprehensive.yml workflow which triggers the desktop build remotely.
+
+name: Tauri Build (DEPRECATED - Moved to terraphim-ai-desktop)
 
 on:
   workflow_call:
