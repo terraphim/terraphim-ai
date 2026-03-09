@@ -475,7 +475,7 @@ mod tests {
         let mut cb = CircuitBreaker::new(config);
 
         cb.record_failure(); // Opens immediately
-        // State should be Open immediately after failure (cooldown hasn't expired)
+                             // State should be Open immediately after failure (cooldown hasn't expired)
         assert_eq!(cb.state(), CircuitState::Open);
 
         // Wait for cooldown to expire (generous margin for CI under load)
