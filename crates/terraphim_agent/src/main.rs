@@ -526,6 +526,7 @@ struct Cli {
 
 #[derive(Subcommand, Debug)]
 enum Command {
+    /// Search documents using the knowledge graph
     Search {
         /// Primary search query
         query: String,
@@ -540,20 +541,24 @@ enum Command {
         #[arg(long, default_value_t = 10)]
         limit: usize,
     },
+    /// Manage roles (list, select)
     Roles {
         #[command(subcommand)]
         sub: RolesSub,
     },
+    /// Manage configuration (show, set, validate, reload)
     Config {
         #[command(subcommand)]
         sub: ConfigSub,
     },
+    /// Display the knowledge graph for a role
     Graph {
         #[arg(long)]
         role: Option<String>,
         #[arg(long, default_value_t = 50)]
         top_k: usize,
     },
+    /// Chat with the AI using a specific role
     Chat {
         #[arg(long)]
         role: Option<String>,
@@ -561,6 +566,7 @@ enum Command {
         #[arg(long)]
         model: Option<String>,
     },
+    /// Extract paragraphs matching knowledge graph terms from text
     Extract {
         text: String,
         #[arg(long)]
@@ -568,6 +574,7 @@ enum Command {
         #[arg(long, default_value_t = false)]
         exclude_term: bool,
     },
+    /// Replace terms in text using the knowledge graph thesaurus
     Replace {
         /// Text to replace (reads from stdin if not provided)
         text: Option<String>,
@@ -658,6 +665,7 @@ enum Command {
         #[arg(long)]
         guard_allowlist: Option<String>,
     },
+    /// Start fullscreen interactive TUI mode (requires running server)
     Interactive,
 
     /// Start REPL (Read-Eval-Print-Loop) interface
