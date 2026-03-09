@@ -115,6 +115,15 @@ pub fn build_channels_from_config(
         }
     }
 
+    #[cfg(feature = "slack")]
+    {
+        use crate::channels::slack::SlackChannel;
+
+        if let Some(ref cfg) = config.slack {
+            channels.push(Box::new(SlackChannel::new(cfg.clone())));
+        }
+    }
+
     // Note: matrix channel disabled due to sqlite dependency conflict
     // Re-enable when matrix-sdk updates to compatible rusqlite version
     // #[cfg(feature = "matrix")]
