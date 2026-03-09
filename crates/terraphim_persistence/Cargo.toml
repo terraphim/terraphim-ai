@@ -23,7 +23,7 @@ tracing-subscriber = { version = "0.3", features = [
 async-once-cell = "0.5.3"
 async-trait = { workspace = true }
 log = { workspace = true }
-opendal = { version = "0.54", default-features = false, features = [
+opendal = { version = "0.55", default-features = false, features = [
     "services-memory",  # Always needed
 ] }
 serde = { workspace = true }

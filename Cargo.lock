@@ -4821,22 +4821,22 @@ checksum = "c08d65885ee38876c4f86fa503fb49d7b507c2b62552df7c70b2fce627e06381"
 
 [[package]]
 name = "opendal"
-version = "0.54.1"
+version = "0.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "42afda58fa2cf50914402d132cc1caacff116a85d10c72ab2082bb7c50021754"
+checksum = "d075ab8a203a6ab4bc1bce0a4b9fe486a72bf8b939037f4b78d95386384bc80a"
 dependencies = [
  "anyhow",
  "backon",
  "base64 0.22.1",
  "bb8",
  "bytes",
- "chrono",
  "crc32c",
  "dashmap 6.1.0",
  "futures",
  "getrandom 0.2.17",
  "http 1.4.0",
  "http-body 1.0.1",
+ "jiff 0.2.23",
  "log",
  "md-5",
  "ouroboros",
@@ -4852,6 +4852,7 @@ dependencies = [
  "sled",
  "sqlx",
  "tokio",
+ "url",
  "uuid",
 ]
 

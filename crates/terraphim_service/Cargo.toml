@@ -21,7 +21,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.0.0" }
 
 ahash = { version = "0.8.8", features = ["serde"] }
 thiserror = { workspace = true }
-opendal = { version = "0.54" }
+opendal = { version = "0.55" }
 serde_json = { workspace = true }
 serde = { workspace = true }
 log = { workspace = true }
