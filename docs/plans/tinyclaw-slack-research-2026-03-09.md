@@ -286,6 +286,8 @@ No nanoclaw-specific code or documentation exists in `~/cto-executive-system/`. 
 | Slack App creation + token provisioning | Get bot token + app token for testing | 30 min |
 | Review SLB bot-loop prevention | Ensure TinyClaw handles Slack retry/dedup correctly | 30 min |
 | NanoClaw outgoing queue pattern | Evaluate if TinyClaw needs pre-connect message buffering | 30 min |
+| twin-slack WebSocket feasibility | Prototype tokio-tungstenite WS server simulating Socket Mode envelope format | 2-3 hours |
+| slack-morphism api_base_url override | Verify slack-morphism allows custom API base URL for twin routing | 1 hour |
 
 ### NanoClaw Evaluation (github.com/qwibitai/nanoclaw)
 
@@ -396,7 +398,7 @@ TinyClaw: Same limitation. No typing indicator for bots in Slack API.
 | Error handling | try/catch with console.error | `Result<T, anyhow::Error>` propagation | TinyClaw -- Rust error handling is stronger |
 | Bot detection | `auth.test()` + `bot_id` field check | Same pattern via slack-morphism | Adopt NanoClaw pattern |
 | Message chunking | Manual split at 4000 chars | Reuse existing `chunk_message()` helper | TinyClaw -- helper already exists |
-| Testing | vitest with full mocks | Real integration tests (no mocks policy) | TinyClaw -- more reliable but needs tokens |
+| Testing | vitest with full mocks | Digital twin (twin-slack) + real integration tests | TinyClaw -- digital twin for CI, real tokens for live tests |
 | Graceful null factory | `registerChannel()` returns null if no creds | Feature gate excludes at compile time | TinyClaw -- zero-cost when disabled |
 
 #### NanoClaw Evaluation Summary
@@ -425,6 +427,139 @@ Defer to Phase 2:
 - Thread reply support
 - Reaction-based status indicators
 
+### Testing Strategy: Digital Twin for Slack (twin-slack)
+
+#### Problem
+
+TinyClaw's "never use mocks in tests" policy creates a testing challenge for Slack:
+- Real Slack tokens needed for integration tests
+- CI cannot hold live Slack credentials safely
+- NanoClaw uses vitest mocks -- not an option for us
+- Existing Telegram/Discord adapters have no CI tests (only live tests gated by env vars)
+
+#### Solution: twin-slack in zestic-ai/digital-twins (PRIVATE)
+
+The [digital-twins](https://github.com/zestic-ai/digital-twins) platform (private, `zestic-ai` org) provides stateful API twins for SaaS services. A new `twin-slack` crate will simulate the Slack API endpoints used by TinyClaw's Socket Mode adapter.
+
+**Why digital twin, not mocks:**
+- Real HTTP server with real request/response cycles (no mock objects)
+- Stateful: `auth.test` returns a bot user ID, `chat.postMessage` stores messages, `users.info` resolves users
+- Deterministic: TestClock for time control, no network flakiness
+- Reusable: SLB Rust migration will also need Slack API twins
+- Consistent: follows the established twin-core patterns (DashMapStore, EventBus, webhook delivery)
+
+#### twin-slack Scope (Minimum for TinyClaw)
+
+| Slack API Endpoint | Purpose | twin-slack Behavior |
+|-------------------|---------|---------------------|
+| `auth.test` | Bot self-identification | Returns configured bot_user_id, team_id |
+| `chat.postMessage` | Send messages | Stores message in DashMapStore, returns ts |
+| `users.info` | User name resolution | Returns configurable user profiles |
+| `conversations.list` | Channel metadata sync | Returns configurable channel list |
+| Socket Mode WebSocket | Event delivery | Simulates `message` and `app_mention` events |
+
+**Socket Mode simulation** is the key technical challenge. Options:
+1. **WebSocket server**: twin-slack runs a WS endpoint that sends JSON event envelopes, accepts ack frames. TinyClaw's slack-morphism client connects to `ws://localhost:{port}` instead of `wss://wss-primary.slack.com`.
+2. **HTTP polling fallback**: If WebSocket simulation is too complex for MVP, twin-slack can expose an HTTP endpoint where tests push events and pull acks. Less realistic but simpler.
+
+Recommended: Option 1 (WebSocket). The `tokio-tungstenite` crate makes this straightforward and matches slack-morphism's actual connection model.
+
+#### Boundary: Open Source vs Private
+
+```
+terraphim-ai (PUBLIC, open source)
+  crates/terraphim_tinyclaw/
+    src/channels/slack.rs          -- Slack adapter (public)
+    src/channels/slack_test.rs     -- Unit tests: config, formatting, allowlist (public)
+    tests/slack_integration.rs     -- Integration test scaffold (public)
+                                      Uses env vars: SLACK_TEST_URL, SLACK_BOT_TOKEN, SLACK_APP_TOKEN
+                                      #[ignore] by default -- runs only when env vars set
+
+zestic-ai/digital-twins (PRIVATE, internal)
+  crates/twin-slack/               -- Slack API digital twin (private)
+    src/lib.rs                     -- axum router, DashMapStore for messages/users
+    src/socket_mode.rs             -- WebSocket event simulation
+    src/auth.rs                    -- auth.test endpoint
+    src/chat.rs                    -- chat.postMessage endpoint
+    src/users.rs                   -- users.info endpoint
+    tests/                         -- twin-slack unit tests
+  specs/slack/                     -- Slack API spec subset (private)
+
+zestic-ai/tinyclaw-test-harness (PRIVATE, internal) -- OR in digital-twins/tests/
+  tests/tinyclaw_slack_e2e.rs      -- End-to-end: spawn twin-slack, configure TinyClaw,
+                                      send simulated event, verify InboundMessage on bus
+```
+
+**Key principle**: The open source `terraphim_tinyclaw` crate has NO dependency on `twin-slack`. The integration test in the public repo uses generic env vars (`SLACK_TEST_URL`) that can point to either:
+- twin-slack in CI (private infrastructure)
+- Real Slack API in live testing
+
+#### Test Layering
+
+| Layer | Location | Runs in CI | Needs Tokens | Uses Twin |
+|-------|----------|-----------|--------------|-----------|
+| **Unit tests** | `terraphim_tinyclaw` (public) | Yes | No | No |
+| Config validation | `slack_test.rs` | Yes | No | No |
+| mrkdwn formatting | `slack_test.rs` | Yes | No | No |
+| Allowlist logic | `slack_test.rs` | Yes | No | No |
+| Message chunking | `slack_test.rs` | Yes | No | No |
+| Bot ID filtering | `slack_test.rs` | Yes | No | No |
+| **Integration tests** | `terraphim_tinyclaw` (public) | `#[ignore]` | Via env var | Optional |
+| Connect + auth.test | `slack_integration.rs` | When configured | Yes | Yes (or real) |
+| Send + receive message | `slack_integration.rs` | When configured | Yes | Yes (or real) |
+| **E2E tests** | `digital-twins` (private) | Yes (private CI) | No (twin) | Yes |
+| Full message round-trip | `tinyclaw_slack_e2e.rs` | Yes | No | Yes |
+| Bot loop prevention | `tinyclaw_slack_e2e.rs` | Yes | No | Yes |
+| Reconnection behavior | `tinyclaw_slack_e2e.rs` | Yes | No | Yes |
+
+#### Integration Pattern in terraphim_tinyclaw (Public)
+
+```rust
+// tests/slack_integration.rs (public repo)
+// Runs against either twin-slack or real Slack API
+
+#[tokio::test]
+#[ignore] // Only runs when SLACK_TEST_URL is set
+async fn test_slack_channel_connect_and_receive() {
+    let test_url = std::env::var("SLACK_TEST_URL")
+        .expect("Set SLACK_TEST_URL to twin-slack or real Slack");
+    let bot_token = std::env::var("SLACK_BOT_TOKEN")
+        .expect("Set SLACK_BOT_TOKEN");
+    let app_token = std::env::var("SLACK_APP_TOKEN")
+        .expect("Set SLACK_APP_TOKEN");
+
+    // Config points to test_url instead of api.slack.com
+    let config = SlackConfig {
+        bot_token,
+        app_token,
+        api_base_url: Some(test_url), // Override for testing
+        allow_from: vec!["U_TEST_USER".into()],
+    };
+    // ... test connect, send event, verify InboundMessage
+}
+```
+
+**Note**: `SlackConfig.api_base_url` is an optional field (defaults to `https://slack.com/api`).
+This URL override is the ONLY testing seam exposed in the public code. It follows the same pattern
+used by Stripe SDKs (custom base URL) and is a legitimate configuration option, not a test-only hack.
+
+#### twin-slack Implementation Sequence
+
+1. **Phase 1 (with TinyClaw MVP)**: `auth.test` + `chat.postMessage` + `users.info` HTTP endpoints only. No WebSocket yet. TinyClaw unit tests cover logic; HTTP twin covers API contract.
+2. **Phase 2**: WebSocket Socket Mode simulation. Full connect/disconnect/event delivery cycle. E2E tests in private repo.
+3. **Phase 3**: SDK validation tests (point official `@slack/web-api` Node SDK at twin-slack, verify responses parse correctly). Reusable by SLB Rust migration.
+
+#### Effort Estimate
+
+| Component | Effort | Location |
+|-----------|--------|----------|
+| twin-slack HTTP endpoints (auth, chat, users) | 4-6 hours | digital-twins (private) |
+| twin-slack Socket Mode WebSocket | 6-8 hours | digital-twins (private) |
+| Slack API spec subset | 2 hours | digital-twins (private) |
+| TinyClaw `api_base_url` config field | 30 min | terraphim-ai (public) |
+| TinyClaw integration test scaffold | 1-2 hours | terraphim-ai (public) |
+| E2E test harness | 2-3 hours | digital-twins (private) |
+
 ## Recommendations
 
 ### Proceed/No-Proceed
@@ -443,8 +578,9 @@ Defer to Phase 2:
 8. **@mention stripping**: Remove `<@BOT_ID>` from incoming text (from NanoClaw)
 9. **User name cache**: `HashMap<String, String>` behind `RwLock` for display names (from NanoClaw)
 10. **Message dedup**: Track event IDs to handle Slack retries (from SLB)
-11. Unit tests (config validation, formatting, allowlist, bot detection)
-12. Integration test scaffold (feature-gated, requires tokens)
+11. `api_base_url: Option<String>` in SlackConfig for twin/test URL override
+12. Unit tests (config validation, formatting, allowlist, bot detection) -- run in CI, no tokens
+13. Integration test scaffold (`#[ignore]`, runs against twin-slack or real Slack via env vars)
 
 ### Phase 2 (Future)
 
@@ -462,15 +598,21 @@ Defer to Phase 2:
 - Socket Mode avoids public endpoint exposure
 - Allowlist security matches existing pattern
 - Use `tokio::spawn` for message processing to meet 2-3s ack deadline
+- **Digital twin (twin-slack)** in private repo for deterministic CI testing without Slack tokens
+- **No mock objects**: twin-slack is a real HTTP server, compliant with "never use mocks" policy
+- **No private leakage**: public repo uses `api_base_url` override (same pattern as Stripe SDK), no import/dependency on twin-slack
 
 ## Next Steps
 
 If approved:
 1. Branch from `main` (NOT current dependabot branch)
 2. Create GitHub issue for Slack adapter implementation
-3. Proceed to Phase 2 (Design) -- detailed implementation plan
-4. Implement following the Channel trait pattern
-5. Test with real Slack workspace
+3. Create GitHub issue for twin-slack in `zestic-ai/digital-twins` (private)
+4. Proceed to Phase 2 (Design) -- detailed implementation plan
+5. Implement TinyClaw Slack adapter with `api_base_url` testing seam
+6. Implement twin-slack HTTP endpoints (auth.test, chat.postMessage, users.info) in digital-twins
+7. Wire CI: private CI job spawns twin-slack, runs TinyClaw integration tests
+8. Test with real Slack workspace (live validation)
 
 ## Appendix
 
@@ -548,3 +690,5 @@ allow_from = ["U01234567", "username"]
 - [Slack-Linear Bridge (production TS)](~/Projects/zestic/slack-linear-bridge/)
 - [Slack-Linear Bridge (Rust migration)](~/Projects/zestic-ai/slack-linear-bridge-rust/)
 - [SLB ADR Suite](~/cto-executive-system/projects/slack-linear-bridge/adr/)
+- [Digital Twins Platform](https://github.com/zestic-ai/digital-twins) (PRIVATE -- zestic-ai org)
+- [Digital Twins Knowledge](~/cto-executive-system/knowledge-garden/components/digital-twins.md)
