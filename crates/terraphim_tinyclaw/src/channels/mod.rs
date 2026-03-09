@@ -6,6 +6,9 @@ pub mod telegram;
 #[cfg(feature = "discord")]
 pub mod discord;
 
+#[cfg(feature = "slack")]
+pub mod slack;
+
 // Note: matrix module disabled due to sqlite dependency conflict
 // Re-enable when matrix-sdk updates to compatible rusqlite version
 // #[cfg(feature = "matrix")]
