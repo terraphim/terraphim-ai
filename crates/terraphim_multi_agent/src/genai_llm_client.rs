@@ -7,6 +7,7 @@
 use crate::{LlmRequest, LlmResponse, MessageRole, MultiAgentError, MultiAgentResult, TokenUsage};
 use chrono::Utc;
 use genai::chat::{ChatMessage, ChatOptions, ChatRequest};
+use genai::resolver::Endpoint;
 use genai::Client;
 use std::env;
 use uuid::Uuid;
@@ -211,59 +212,56 @@ impl GenAiLlmClient {
 
     /// Create client from provider configuration with custom base URL
     ///
-    /// This method properly handles custom base URLs, particularly for the z.ai proxy.
-    /// It sets appropriate environment variables before creating the genai client.
+    /// Uses genai's `ServiceTargetResolver` to override the endpoint at request time,
+    /// since rust-genai hardcodes adapter default endpoints (e.g. localhost:11434 for Ollama).
     pub fn from_config_with_url(
         provider: &str,
         model: Option<String>,
         base_url: Option<String>,
     ) -> MultiAgentResult<Self> {
-        // Handle z.ai proxy configuration for Anthropic
-        if provider.to_lowercase() == "anthropic" {
-            if let Some(ref url) = base_url {
-                if url.contains("z.ai") {
-                    // Set environment variables for z.ai proxy
-                    unsafe {
-                        env::set_var("ANTHROPIC_API_BASE", url);
-                    }
-
-                    // Use ANTHROPIC_AUTH_TOKEN if available, otherwise look for ANTHROPIC_API_KEY
-                    let api_key = env::var("ANTHROPIC_AUTH_TOKEN")
-                        .or_else(|_| env::var("ANTHROPIC_API_KEY"))
-                        .unwrap_or_default();
-
-                    if !api_key.is_empty() {
-                        unsafe {
-                            env::set_var("ANTHROPIC_API_KEY", &api_key);
-                        }
-                    }
-
-                    log::info!("🔗 Configured Anthropic client with z.ai proxy: {}", url);
-                }
+        let provider_config = match provider.to_lowercase().as_str() {
+            "ollama" => ProviderConfig::ollama(model),
+            "openai" => ProviderConfig::openai(model),
+            "anthropic" => ProviderConfig::anthropic(model),
+            "openrouter" => ProviderConfig::openrouter(model),
+            _ => {
+                log::warn!("Unknown provider '{}', defaulting to Ollama", provider);
+                ProviderConfig::ollama(model)
             }
-        }
+        };
 
-        // Handle OpenRouter with custom URL
-        if provider.to_lowercase() == "openrouter" {
-            if let Some(ref url) = base_url {
-                unsafe {
-                    env::set_var("OPENROUTER_API_BASE", url);
-                }
-                log::info!("🔗 Configured OpenRouter client with custom URL: {}", url);
-            }
-        }
+        let client = if let Some(ref url) = base_url {
+            // Ensure URL ends with /v1/ for OpenAI-compatible endpoints
+            let endpoint_url = if url.ends_with("/v1/") {
+                url.clone()
+            } else if url.ends_with("/v1") {
+                format!("{}/", url)
+            } else {
+                format!("{}/v1/", url.trim_end_matches('/'))
+            };
+            log::info!(
+                "Configured {} client with custom endpoint: {}",
+                provider,
+                endpoint_url
+            );
+            let url_for_resolver = endpoint_url;
+            Client::builder()
+                .with_service_target_resolver_fn(
+                    move |mut st: genai::ServiceTarget| -> genai::resolver::Result<genai::ServiceTarget> {
+                        st.endpoint = Endpoint::from_owned(url_for_resolver.clone());
+                        Ok(st)
+                    },
+                )
+                .build()
+        } else {
+            Client::default()
+        };
 
-        // Handle Ollama with custom URL
-        if provider.to_lowercase() == "ollama" {
-            if let Some(ref url) = base_url {
-                unsafe {
-                    env::set_var("OLLAMA_BASE_URL", url);
-                }
-                log::info!("🔗 Configured Ollama client with custom URL: {}", url);
-            }
-        }
-
-        Self::from_config(provider, model)
+        Ok(Self {
+            client,
+            provider: provider.to_string(),
+            model: provider_config.model,
+        })
     }
 
     /// Create client with automatic z.ai proxy detection

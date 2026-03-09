@@ -230,21 +230,13 @@ impl TerraphimAgent {
         let cost_tracker = Arc::new(RwLock::new(CostTracker::new()));
 
         // Initialize LLM client using role configuration
-        let provider = role_config
-            .extra
-            .get("llm_provider")
-            .and_then(|v| v.as_str())
-            .unwrap_or("ollama");
-        let model = role_config
-            .extra
-            .get("llm_model")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
-        let base_url = role_config
-            .extra
-            .get("llm_base_url")
-            .and_then(|v| v.as_str())
-            .map(|s| s.to_string());
+        // Uses get_extra_str to handle both flat and nested extra paths
+        let provider = Self::get_extra_str(&role_config.extra, "llm_provider").unwrap_or("ollama");
+        let model = Self::get_extra_str(&role_config.extra, "llm_model")
+            .map(|s| s.to_string())
+            .or_else(|| role_config.llm_model.clone());
+        let base_url =
+            Self::get_extra_str(&role_config.extra, "llm_base_url").map(|s| s.to_string());
 
         log::debug!(
             "🤖 TerraphimAgent::new - LLM config: provider={}, model={:?}, base_url={:?}",
@@ -917,6 +909,21 @@ impl TerraphimAgent {
         let thesaurus = Thesaurus::new("default".to_string());
         build_autocomplete_index(thesaurus, Some(AutocompleteConfig::default()))
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
+    }
+
+    /// Get a string value from extra, checking both flat and nested paths.
+    /// Due to `#[serde(flatten)]` on `Role.extra`, config JSON with `"extra": {"key": "val"}`
+    /// results in `extra["extra"]["key"]` rather than `extra["key"]`.
+    fn get_extra_str<'a>(
+        extra: &'a ahash::AHashMap<String, serde_json::Value>,
+        key: &str,
+    ) -> Option<&'a str> {
+        extra.get(key).and_then(|v| v.as_str()).or_else(|| {
+            extra
+                .get("extra")
+                .and_then(|v| v.get(key))
+                .and_then(|v| v.as_str())
+        })
     }
 
     fn extract_individual_goals(role_config: &Role) -> Vec<String> {

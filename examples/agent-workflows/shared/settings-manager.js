@@ -9,7 +9,7 @@ class TerraphimSettingsManager {
     this.defaultSettings = {
       serverUrl: window.location.protocol === 'file:' ? 'http://127.0.0.1:8000' : 'http://localhost:8000',
       wsUrl: window.location.protocol === 'file:' ? 'ws://127.0.0.1:8000/ws' : 'ws://localhost:8000/ws',
-      apiTimeout: 30000,
+      apiTimeout: 300000,
       maxRetries: 3,
       retryDelay: 1000,
       selectedRole: 'Technical Writer',
