@@ -48,6 +48,71 @@ pub fn markdown_to_discord(text: &str) -> String {
     text.to_string()
 }
 
+/// Convert markdown to Slack mrkdwn format.
+///
+/// Slack mrkdwn differences from standard markdown:
+/// - Bold: `*text*` (not `**text**`)
+/// - Italic: `_text_` (same)
+/// - Strikethrough: `~text~` (not `~~text~~`)
+/// - Code: `` `code` `` (same)
+/// - Code block: ` ```code``` ` (same)
+/// - Links: `<url|text>` (not `[text](url)`)
+pub fn markdown_to_slack_mrkdwn(text: &str) -> String {
+    let mut result = text.to_string();
+
+    // Bold: **text** -> *text*
+    // Must happen before strikethrough to avoid ambiguity
+    while let Some(start) = result.find("**") {
+        if let Some(end) = result[start + 2..].find("**") {
+            let end = start + 2 + end;
+            let content = result[start + 2..end].to_string();
+            result.replace_range(start..end + 2, &format!("*{}*", content));
+        } else {
+            break;
+        }
+    }
+
+    // Strikethrough: ~~text~~ -> ~text~
+    while let Some(start) = result.find("~~") {
+        if let Some(end) = result[start + 2..].find("~~") {
+            let end = start + 2 + end;
+            let content = result[start + 2..end].to_string();
+            result.replace_range(start..end + 2, &format!("~{}~", content));
+        } else {
+            break;
+        }
+    }
+
+    // Links: [text](url) -> <url|text>
+    result = replace_links_to_slack(&result);
+
+    result
+}
+
+fn replace_links_to_slack(text: &str) -> String {
+    let mut result = text.to_string();
+    let mut search_start = 0;
+    while let Some(start) = result[search_start..].find('[') {
+        let start = search_start + start;
+        if let Some(close_bracket) = result[start + 1..].find(']') {
+            let close_bracket = start + 1 + close_bracket;
+            if close_bracket + 1 < result.len() && result[close_bracket + 1..].starts_with('(') {
+                if let Some(close_paren) = result[close_bracket + 2..].find(')') {
+                    let close_paren = close_bracket + 2 + close_paren;
+                    let link_text = result[start + 1..close_bracket].to_string();
+                    let url = result[close_bracket + 2..close_paren].to_string();
+                    let replacement = format!("<{}|{}>", url, link_text);
+                    result.replace_range(start..close_paren + 1, &replacement);
+                    search_start = start + replacement.len();
+                    continue;
+                }
+            }
+        }
+        search_start = start + 1;
+    }
+    result
+}
+
 /// Split text into chunks respecting platform limits.
 ///
 /// - Telegram: 4096 chars per message
@@ -312,5 +377,49 @@ mod tests {
         let result = markdown_to_discord(input);
         // Discord supports markdown natively, so pass through
         assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_bold() {
+        let input = "This is **bold** text";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert_eq!(result, "This is *bold* text");
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_strikethrough() {
+        let input = "This is ~~deleted~~ text";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert_eq!(result, "This is ~deleted~ text");
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_link() {
+        let input = "Visit [Example](https://example.com) here";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert_eq!(result, "Visit <https://example.com|Example> here");
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_code() {
+        let input = "Use `code` and ```block```";
+        let result = markdown_to_slack_mrkdwn(input);
+        // Backticks pass through unchanged for Slack
+        assert_eq!(result, input);
+    }
+
+    #[test]
+    fn test_chunk_message_slack() {
+        // Build text with paragraph breaks so the chunker can split
+        let paragraph = "a ".repeat(500);
+        let text = (0..20)
+            .map(|_| paragraph.as_str())
+            .collect::<Vec<_>>()
+            .join("\n\n");
+        let chunks = chunk_message(&text, 4000);
+        assert!(chunks.len() > 1);
+        for chunk in &chunks {
+            assert!(chunk.len() <= 4000);
+        }
     }
 }
