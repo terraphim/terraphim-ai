@@ -409,6 +409,70 @@ mod tests {
     }
 
     #[test]
+    fn test_markdown_to_slack_mrkdwn_italic_preserved() {
+        assert_eq!(markdown_to_slack_mrkdwn("_italic_"), "_italic_");
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_inline_code_preserved() {
+        assert_eq!(
+            markdown_to_slack_mrkdwn("use `cargo build`"),
+            "use `cargo build`"
+        );
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_mixed_formatting() {
+        let input = "hi _there_ **boss** `code`";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert_eq!(result, "hi _there_ *boss* `code`");
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_slack_mentions_preserved() {
+        let input = "hi <@U123> see <https://example.com|docs>";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert!(
+            result.contains("<@U123>"),
+            "User mention was corrupted: {}",
+            result
+        );
+        assert!(
+            result.contains("<https://example.com|docs>"),
+            "Slack link was corrupted: {}",
+            result
+        );
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_bare_url_not_duplicated() {
+        let input = "see https://example.com for details";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert_eq!(result, "see https://example.com for details");
+    }
+
+    #[test]
+    fn test_markdown_to_slack_mrkdwn_complex_message() {
+        let input = "**Important:** Check the _docs_ at [link](https://example.com)";
+        let result = markdown_to_slack_mrkdwn(input);
+        assert!(
+            result.contains("*Important:*"),
+            "Bold not converted: {}",
+            result
+        );
+        assert!(
+            result.contains("_docs_"),
+            "Italic not preserved: {}",
+            result
+        );
+        assert!(
+            result.contains("<https://example.com|link>"),
+            "Link not converted: {}",
+            result
+        );
+    }
+
+    #[test]
     fn test_chunk_message_slack() {
         // Build text with paragraph breaks so the chunker can split
         let paragraph = "a ".repeat(500);

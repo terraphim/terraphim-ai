@@ -322,10 +322,10 @@ pub struct SlackConfig {
 impl SlackConfig {
     /// Validate the Slack configuration.
     pub fn validate(&self) -> anyhow::Result<()> {
-        if self.bot_token.is_empty() {
+        if self.bot_token.trim().is_empty() {
             anyhow::bail!("slack.bot_token cannot be empty");
         }
-        if self.app_token.is_empty() {
+        if self.app_token.trim().is_empty() {
             anyhow::bail!("slack.app_token cannot be empty");
         }
         if self.allow_from.is_empty() {
@@ -606,5 +606,42 @@ model = "llama3.2"
         };
         assert!(cfg.is_allowed("U111"));
         assert!(cfg.is_allowed("anyone"));
+    }
+
+    #[test]
+    fn test_slack_config_validate_rejects_whitespace_only_tokens() {
+        let cfg = SlackConfig {
+            bot_token: "   ".to_string(),
+            app_token: "xapp-test".to_string(),
+            allow_from: vec!["U111".to_string()],
+        };
+        assert!(
+            cfg.validate().is_err(),
+            "Whitespace-only bot_token should be rejected"
+        );
+
+        let cfg2 = SlackConfig {
+            bot_token: "xoxb-test".to_string(),
+            app_token: "  \t  ".to_string(),
+            allow_from: vec!["U111".to_string()],
+        };
+        assert!(
+            cfg2.validate().is_err(),
+            "Whitespace-only app_token should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_slack_config_is_allowed_case_sensitivity() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-test".to_string(),
+            app_token: "xapp-test".to_string(),
+            allow_from: vec!["U12345".to_string()],
+        };
+        assert!(cfg.is_allowed("U12345"), "Exact match should pass");
+        assert!(
+            !cfg.is_allowed("u12345"),
+            "Lowercase variant should be rejected"
+        );
     }
 }
