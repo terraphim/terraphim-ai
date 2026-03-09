@@ -206,6 +206,9 @@ pub struct ChannelsConfig {
 
     #[cfg(feature = "discord")]
     pub discord: Option<DiscordConfig>,
+
+    #[cfg(feature = "slack")]
+    pub slack: Option<SlackConfig>,
     // Note: matrix config disabled due to sqlite dependency conflict
     // #[cfg(feature = "matrix")]
     // pub matrix: Option<MatrixConfig>,
@@ -220,6 +223,11 @@ impl ChannelsConfig {
 
         #[cfg(feature = "discord")]
         if let Some(ref cfg) = self.discord {
+            cfg.validate()?;
+        }
+
+        #[cfg(feature = "slack")]
+        if let Some(ref cfg) = self.slack {
             cfg.validate()?;
         }
 
@@ -284,6 +292,45 @@ impl DiscordConfig {
         if self.allow_from.is_empty() {
             anyhow::bail!(
                 "discord.allow_from cannot be empty - \
+                 at least one user must be authorized for security"
+            );
+        }
+        Ok(())
+    }
+
+    /// Check if a sender is allowed.
+    /// Returns true if allow_from contains `"*"` (wildcard) or the given sender_id.
+    pub fn is_allowed(&self, sender_id: &str) -> bool {
+        crate::channel::is_sender_allowed(&self.allow_from, sender_id)
+    }
+}
+
+/// Slack channel configuration.
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct SlackConfig {
+    /// Bot token (xoxb-...) from Slack App settings.
+    pub bot_token: String,
+
+    /// App-level token (xapp-...) for Socket Mode connections.
+    pub app_token: String,
+
+    /// List of allowed sender IDs (Slack user IDs like "U01234567").
+    /// Must be non-empty for security.
+    pub allow_from: Vec<String>,
+}
+
+impl SlackConfig {
+    /// Validate the Slack configuration.
+    pub fn validate(&self) -> anyhow::Result<()> {
+        if self.bot_token.is_empty() {
+            anyhow::bail!("slack.bot_token cannot be empty");
+        }
+        if self.app_token.is_empty() {
+            anyhow::bail!("slack.app_token cannot be empty");
+        }
+        if self.allow_from.is_empty() {
+            anyhow::bail!(
+                "slack.allow_from cannot be empty - \
                  at least one user must be authorized for security"
             );
         }
@@ -493,5 +540,71 @@ model = "llama3.2"
             ..Default::default()
         };
         assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_slack_config_validate_valid() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-test-token".to_string(),
+            app_token: "xapp-test-token".to_string(),
+            allow_from: vec!["U01234567".to_string()],
+        };
+        assert!(cfg.validate().is_ok());
+    }
+
+    #[test]
+    fn test_slack_config_validate_empty_bot_token() {
+        let cfg = SlackConfig {
+            bot_token: String::new(),
+            app_token: "xapp-test-token".to_string(),
+            allow_from: vec!["U01234567".to_string()],
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.to_string().contains("bot_token"));
+    }
+
+    #[test]
+    fn test_slack_config_validate_empty_app_token() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-test-token".to_string(),
+            app_token: String::new(),
+            allow_from: vec!["U01234567".to_string()],
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.to_string().contains("app_token"));
+    }
+
+    #[test]
+    fn test_slack_config_validate_empty_allow_from() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-test-token".to_string(),
+            app_token: "xapp-test-token".to_string(),
+            allow_from: vec![],
+        };
+        let err = cfg.validate().unwrap_err();
+        assert!(err.to_string().contains("allow_from"));
+    }
+
+    #[test]
+    fn test_slack_config_is_allowed() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-test".to_string(),
+            app_token: "xapp-test".to_string(),
+            allow_from: vec!["U111".to_string(), "U222".to_string()],
+        };
+        assert!(cfg.is_allowed("U111"));
+        assert!(cfg.is_allowed("U222"));
+        assert!(!cfg.is_allowed("U333"));
+    }
+
+    #[test]
+    fn test_slack_config_is_allowed_wildcard() {
+        let cfg = SlackConfig {
+            bot_token: "xoxb-test".to_string(),
+            app_token: "xapp-test".to_string(),
+            allow_from: vec!["*".to_string()],
+        };
+        assert!(cfg.is_allowed("U111"));
+        assert!(cfg.is_allowed("anyone"));
     }
 }
