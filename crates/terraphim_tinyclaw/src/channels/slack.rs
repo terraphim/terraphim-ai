@@ -314,7 +314,7 @@ fn strip_bot_mention(text: &str, bot_user_id: &str) -> String {
 
 /// Check if a message event is from the bot itself.
 fn is_own_message(event_user: &str, event_bot_id: Option<&str>, bot_user_id: &str) -> bool {
-    event_user == bot_user_id || event_bot_id.is_some()
+    event_user == bot_user_id || event_bot_id.is_some_and(|id| !id.is_empty())
 }
 
 /// Check if an event has already been processed (dedup).
@@ -461,5 +461,76 @@ mod tests {
                 .insert("is_from_me".to_string(), "true".to_string());
         }
         assert_eq!(inbound.metadata.get("is_from_me").unwrap(), "true");
+    }
+
+    #[test]
+    fn test_strip_bot_mention_with_surrounding_whitespace() {
+        let result = strip_bot_mention("  <@UBOT123>  hello  ", "UBOT123");
+        assert_eq!(result, "hello");
+    }
+
+    #[test]
+    fn test_strip_bot_mention_mention_only() {
+        let result = strip_bot_mention("<@UBOT123>", "UBOT123");
+        assert_eq!(result, "");
+    }
+
+    #[test]
+    fn test_is_own_message_empty_bot_id() {
+        // An empty string bot_id (Some("")) should NOT trigger is_own_message.
+        // Slack may set bot_id to "" for certain app integrations.
+        assert!(
+            !is_own_message("UOTHER", Some(""), "UBOT123"),
+            "Empty bot_id should not be treated as own message"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_outgoing_queue_multiple_messages() {
+        let config = SlackConfig {
+            bot_token: "xoxb-test".to_string(),
+            app_token: "xapp-test".to_string(),
+            allow_from: vec!["U111".to_string()],
+        };
+        let channel = SlackChannel::new(config);
+
+        {
+            let mut queue = channel.outgoing_queue.lock().await;
+            queue.push(QueuedMessage {
+                chat_id: "C_FIRST".to_string(),
+                content: "first message".to_string(),
+            });
+            queue.push(QueuedMessage {
+                chat_id: "C_SECOND".to_string(),
+                content: "second message".to_string(),
+            });
+            queue.push(QueuedMessage {
+                chat_id: "C_THIRD".to_string(),
+                content: "third message".to_string(),
+            });
+        }
+
+        let drained = channel.drain_queued_messages().await;
+        assert_eq!(drained.len(), 3, "All three messages should be drained");
+
+        // Verify FIFO order
+        assert_eq!(drained[0].chat_id, "C_FIRST");
+        assert_eq!(drained[0].content, "first message");
+        assert_eq!(drained[0].channel, "slack");
+
+        assert_eq!(drained[1].chat_id, "C_SECOND");
+        assert_eq!(drained[1].content, "second message");
+        assert_eq!(drained[1].channel, "slack");
+
+        assert_eq!(drained[2].chat_id, "C_THIRD");
+        assert_eq!(drained[2].content, "third message");
+        assert_eq!(drained[2].channel, "slack");
+
+        // Queue must be empty after drain
+        let drained_again = channel.drain_queued_messages().await;
+        assert!(
+            drained_again.is_empty(),
+            "Queue should be empty after drain"
+        );
     }
 }
