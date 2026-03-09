@@ -37,8 +37,10 @@ twin-compatible implementation using plain reqwest in the private test harness.
 8. Markdown-to-Slack-mrkdwn formatting
 9. Message chunking at 4000 chars
 10. Feature flag and Cargo.toml changes
-11. Unit tests (all logic, no network, public CI)
-12. Integration test scaffold (#[ignore], env-var-gated)
+11. Outgoing message queue with retry-on-failure (from NanoClaw cross-check)
+12. `is_from_me` metadata on InboundMessage for bot message tracking (from NanoClaw cross-check)
+13. Unit tests (all logic, no network, public CI)
+14. Integration test scaffold (#[ignore], env-var-gated)
 
 **Out of Scope:**
 - Thread reply support
@@ -48,7 +50,6 @@ twin-compatible implementation using plain reqwest in the private test harness.
 - File/media upload
 - Multi-workspace support
 - Channel access policies
-- Outgoing message queue (pre-connect buffering)
 - Channel metadata sync
 
 **Avoid At All Cost** (5/25 analysis):
@@ -113,17 +114,28 @@ twin-compatible implementation using plain reqwest in the private test harness.
 ### Data Flow
 
 ```
+INBOUND:
 [Slack workspace] --(Socket Mode WS)--> [slack-morphism listener]
-    --> [event handler: filter bot, dedup, strip mention, resolve name]
+    --> [event handler: dedup, check allowlist]
+    --> [is_own_message? -> set is_from_me=true in metadata, still forward]
+    --> [strip @mention, resolve user name]
     --> [InboundMessage::new("slack", sender_id, chat_id, cleaned_text)]
     --> [MessageBus.inbound_tx]
 
+OUTBOUND:
 [MessageBus.outbound_rx] --> [ChannelManager.send()]
     --> [SlackChannel.send(OutboundMessage)]
     --> [markdown_to_slack_mrkdwn()]
     --> [chunk_message(4000)]
-    --> [slack-morphism chat.postMessage per chunk]
+    --> [chat.postMessage per chunk]
+        --> success: done
+        --> failure: push to outgoing_queue, log warning
     --> [Slack workspace]
+
+OUTGOING QUEUE (resilience):
+[on reconnect / periodic flush]
+    --> [drain outgoing_queue]
+    --> [chat.postMessage per queued item]
 ```
 
 ### Key Design Decisions
@@ -134,6 +146,8 @@ twin-compatible implementation using plain reqwest in the private test harness.
 | Socket Mode (not HTTP Events) | TinyClaw is a local binary, no public endpoint | HTTP Events API requires public URL, TLS, webhook verification |
 | In-memory user name cache | Simple, sufficient for single-user bot | Database cache (over-engineering), no cache (API rate limit risk) |
 | HashSet for event dedup | Simple, bounded by session lifetime | LRU cache (premature), database (over-engineering) |
+| Outgoing queue + retry | NanoClaw pattern: queue on disconnect AND on send failure. ~20 LOC, prevents message loss | Error propagation only (loses messages on transient failures) |
+| `is_from_me` metadata | NanoClaw passes bot messages through marked `is_from_me: true` for conversation tracking | Filter out bot messages entirely (loses conversation context) |
 | Feature gate `slack` | Zero cost when disabled, follows existing pattern | Always-on (bloats binary), runtime config only (still compiles dep) |
 | No `api_base_url` override | slack-morphism hardcodes `SLACK_API_URI_STR` | Forking slack-morphism (maintenance burden), monkey-patching (fragile) |
 | Testing via digital twin at HTTP level | Complies with "no mocks" policy, reusable by SLB | Mocks (prohibited), real Slack only (no CI), forking slack-morphism |
@@ -147,6 +161,7 @@ twin-compatible implementation using plain reqwest in the private test harness.
 | Thread reply support | Flat messages work for personal assistant | Complicates OutboundMessage, needs thread_ts tracking |
 | Slack interactive components | Bot only sends/receives text | Massive API surface (buttons, modals, views) |
 | Custom hyper connector for URL rewrite | Complex, fragile, depends on slack-morphism internals | Breaks on library updates, hard to debug |
+| Filter out all bot messages | Simpler but loses conversation context | Agent cannot track what it said previously |
 
 ### Simplicity Check
 
@@ -282,7 +297,42 @@ async fn resolve_user_name(
 ) -> String;
 
 /// Check if an event has already been processed (dedup).
-fn is_duplicate_event(event_id: &str, seen: &RwLock<HashSet<String>>) -> bool;
+fn is_duplicate_event(event_id: &str, seen: &mut HashSet<String>) -> bool;
+```
+
+### Outgoing Queue (in slack.rs)
+
+```rust
+/// Queued outbound message for retry on reconnect or send failure.
+struct QueuedMessage {
+    chat_id: String,
+    content: String,
+}
+
+/// The outgoing queue lives inside SlackChannel:
+pub struct SlackChannel {
+    config: SlackConfig,
+    running: Arc<AtomicBool>,
+    outgoing_queue: Arc<Mutex<Vec<QueuedMessage>>>,
+}
+
+/// In send(): on chat.postMessage failure, push to queue instead of returning error.
+/// On reconnect (in start()): flush queue before processing new events.
+/// NanoClaw pattern: ~20 LOC total.
+```
+
+### is_from_me Metadata (in event handler)
+
+```rust
+// In the Socket Mode event handler, bot messages are NOT filtered out.
+// Instead, they are forwarded to the bus with metadata:
+let mut inbound = InboundMessage::new("slack", &sender_id, &chat_id, &text);
+if is_own_message(&sender_id, event_bot_id, &bot_user_id) {
+    inbound.metadata.insert("is_from_me".to_string(), "true".to_string());
+    inbound.metadata.insert("is_bot_message".to_string(), "true".to_string());
+}
+// The agent/session layer can use these flags for conversation history tracking.
+// Non-allowed senders are still rejected by the allowlist check.
 ```
 
 ## Test Strategy
@@ -305,6 +355,8 @@ fn is_duplicate_event(event_id: &str, seen: &RwLock<HashSet<String>>) -> bool;
 | `test_is_own_message_by_bot_id` | `slack.rs` | Detects own message by bot_id field |
 | `test_is_own_message_other_user` | `slack.rs` | Allows other users' messages |
 | `test_is_duplicate_event` | `slack.rs` | First occurrence passes, second blocked |
+| `test_outgoing_queue_on_disconnect` | `slack.rs` | Messages queued when not connected |
+| `test_is_from_me_metadata` | `slack.rs` | Bot messages carry `is_from_me=true` metadata |
 | `test_markdown_to_slack_mrkdwn_bold` | `format.rs` | `**bold**` -> `*bold*` |
 | `test_markdown_to_slack_mrkdwn_strikethrough` | `format.rs` | `~~text~~` -> `~text~` |
 | `test_markdown_to_slack_mrkdwn_link` | `format.rs` | `[text](url)` -> `<url\|text>` |
@@ -460,10 +512,10 @@ pub mod slack;
 ### Step 4: SlackChannel Implementation
 
 **Files:** `crates/terraphim_tinyclaw/src/channels/slack.rs`
-**Description:** Core adapter -- Socket Mode listener, event handler, send method
-**Tests:** 8 unit tests for helper functions (strip_mention, is_own_message, dedup)
+**Description:** Core adapter -- Socket Mode listener, event handler with is_from_me tracking, send with outgoing queue + retry-on-failure
+**Tests:** 10 unit tests for helper functions (strip_mention, is_own_message, dedup, outgoing_queue, is_from_me)
 **Dependencies:** Steps 1, 2, 3
-**Estimated:** 4-5 hours
+**Estimated:** 5-6 hours
 
 ```rust
 //! Slack channel adapter using slack-morphism Socket Mode.
@@ -475,11 +527,17 @@ use async_trait::async_trait;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use tokio::sync::RwLock;
+use tokio::sync::{Mutex, RwLock};
+
+struct QueuedMessage {
+    chat_id: String,
+    content: String,
+}
 
 pub struct SlackChannel {
     config: SlackConfig,
     running: Arc<AtomicBool>,
+    outgoing_queue: Arc<Mutex<Vec<QueuedMessage>>>,
 }
 
 impl SlackChannel {
@@ -487,6 +545,7 @@ impl SlackChannel {
         Self {
             config,
             running: Arc::new(AtomicBool::new(false)),
+            outgoing_queue: Arc::new(Mutex::new(Vec::new())),
         }
     }
 }
@@ -519,6 +578,7 @@ impl Channel for SlackChannel {
             let allow_from = self.config.allow_from.clone();
             let inbound_tx = bus.inbound_sender();
             let running = self.running.clone();
+            let outgoing_queue = self.outgoing_queue.clone();
 
             // Shared state for dedup and user name cache
             let seen_events: Arc<RwLock<HashSet<String>>> =
@@ -540,8 +600,14 @@ impl Channel for SlackChannel {
                         let token_clone = token.clone();
 
                         async move {
-                            // Extract message event, filter, forward to bus
-                            // (implementation in Step 4)
+                            // Extract message event from push envelope
+                            // 1. Dedup by event ID
+                            // 2. Check allowlist (reject unauthorized senders)
+                            // 3. Check is_own_message -> set is_from_me metadata (don't filter out)
+                            // 4. Strip @mention from text
+                            // 5. Resolve user name from cache
+                            // 6. Build InboundMessage with metadata
+                            // 7. Send to bus
                             Ok(())
                         }
                     });
@@ -591,9 +657,16 @@ impl Channel for SlackChannel {
             for chunk in chunks {
                 let req = SlackApiChatPostMessageRequest::new(
                     channel_id.clone(),
-                    SlackMessageContent::new().with_text(chunk),
+                    SlackMessageContent::new().with_text(chunk.clone()),
                 );
-                session.chat_post_message(&req).await?;
+                // Retry-on-failure: queue instead of propagating error (NanoClaw pattern)
+                if let Err(e) = session.chat_post_message(&req).await {
+                    log::warn!("Slack send failed, queuing for retry: {}", e);
+                    self.outgoing_queue.lock().await.push(QueuedMessage {
+                        chat_id: msg.chat_id.clone(),
+                        content: chunk,
+                    });
+                }
             }
             Ok(())
         }
@@ -627,6 +700,31 @@ fn is_own_message(event_user: &str, event_bot_id: Option<&str>, bot_user_id: &st
 
 fn is_duplicate_event(event_id: &str, seen: &mut HashSet<String>) -> bool {
     !seen.insert(event_id.to_string())
+}
+
+/// Flush the outgoing queue. Called after Socket Mode reconnect.
+async fn flush_outgoing_queue(
+    queue: &Mutex<Vec<QueuedMessage>>,
+    client: &SlackHyperClient,
+    token: &SlackApiToken,
+) {
+    let mut q = queue.lock().await;
+    let items: Vec<_> = q.drain(..).collect();
+    drop(q);
+    for item in items {
+        let session = client.open_session(token);
+        let channel_id: SlackChannelId = item.chat_id.into();
+        let req = SlackApiChatPostMessageRequest::new(
+            channel_id,
+            SlackMessageContent::new().with_text(item.content.clone()),
+        );
+        if let Err(e) = session.chat_post_message(&req).await {
+            log::error!("Failed to flush queued message: {}", e);
+            // Re-queue on failure
+            queue.lock().await.push(item);
+            break; // Stop flushing, will retry next time
+        }
+    }
 }
 ```
 
