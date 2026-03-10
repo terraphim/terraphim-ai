@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Prompt Chaining - Interactive Coding Environment</title>
     <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .coding-environment {
             display: grid;
@@ -200,7 +201,7 @@
         <div class="coding-environment">
             <!-- Input Panel -->
             <div class="input-panel">
-                <h3>📝 Project Definition</h3>
+                <h3><i class="fas fa-edit"></i> Project Definition</h3>
 
                 <div class="form-group">
                     <label class="form-label" for="project-description">Describe your project:</label>
@@ -232,7 +233,7 @@
                     ></textarea>
                 </div>
 
-                <h3>🤖 Agent Configuration</h3>
+                <h3><i class="fas fa-robot"></i> Agent Configuration</h3>
                 <div class="form-group">
                     <label class="form-label" for="role-selector">Select Agent Role:</label>
                     <select id="role-selector" class="form-input" data-testid="role-selector"></select>
@@ -256,7 +257,7 @@
 
             <!-- Output Panel -->
             <div class="output-panel" data-testid="output-panel">
-                <h3>🚀 Development Output</h3>
+                <h3><i class="fas fa-rocket"></i> Development Output</h3>
                 <div id="chain-output" data-testid="output">
                     <p class="text-muted">Start the development process to see step-by-step outputs here.</p>
                 </div>
@@ -265,12 +266,13 @@
 
         <!-- Metrics -->
         <div id="metrics-container" style="display: none;">
-            <h3>📊 Execution Metrics</h3>
+            <h3><i class="fas fa-chart-bar"></i> Execution Metrics</h3>
             <!-- Metrics will be populated here -->
         </div>
     </main>
 
     <!-- Scripts -->
+    <script src="../shared/workflow-types.js?v=2025092102"></script>
     <script src="../shared/websocket-client.js?v=2025092102"></script>
     <script src="../shared/api-client.js?v=2025092102"></script>
     <script src="../shared/server-discovery.js?v=2025092102"></script>
