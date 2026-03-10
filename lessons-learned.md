@@ -4,6 +4,106 @@ This document captures insights, gotchas, and lessons learned during development
 
 ---
 
+## 2026-03-10: Agent Workflows E2E Implementation Session
+
+### Frontend/Backend Integration with WebSocket
+
+**Lesson**: WebSocket endpoint paths must match between client and server exactly. A trailing slash mismatch or path difference will cause silent connection failures.
+
+**Discovery**: Initially thought the endpoint was `/ws/workflows` based on design docs, but the server actually uses `/ws`. The `websocket-client.js` was already correctly configured to use `/ws`.
+
+**Pattern**: Always verify the actual server endpoint by checking:
+1. Server route definitions (Salvo/Axum router setup)
+2. Working curl/WebSocket test commands
+3. Browser DevTools Network tab for actual connection attempts
+
+---
+
+### FontAwesome Icon Migration from Emoji
+
+**Lesson**: When replacing emoji with FontAwesome icons, use CSS classes consistently and include the CDN link in all HTML files.
+
+**Discovery**: Some examples had inconsistent icon references between JavaScript-generated content and static HTML.
+
+**Pattern for Migration**:
+```javascript
+// Before (emoji)
+icon: '🎯'
+
+// After (FontAwesome)
+iconClass: 'fas fa-bullseye'
+```
+
+**CSS Classes Used**:
+- Workflow patterns: `fa-link`, `fa-route`, `fa-code-branch`, `fa-network-wired`, `fa-sync-alt`
+- Status indicators: `fa-clock`, `fa-spinner fa-spin`, `fa-check-circle`, `fa-times-circle`, `fa-exclamation-triangle`
+- UI elements: `fa-bolt`, `fa-bullseye`, `fa-robot`, `fa-brain`, `fa-puzzle-piece`, `fa-chart-line`, `fa-cogs`, `fa-search`
+
+**Best Practice**: Include FontAwesome CDN in all HTML `<head>` sections:
+```html
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+```
+
+---
+
+### Git Rebase with Cargo.lock Conflicts
+
+**Lesson**: When rebasing Rust projects with Cargo.lock conflicts, prefer `--theirs` (upstream version) to avoid manual resolution of hundreds of dependency changes.
+
+**Discovery**: During push to upstream/main, had to resolve Cargo.lock conflicts from 48 upstream commits.
+
+**Resolution Command**:
+```bash
+git checkout --theirs Cargo.lock && git add Cargo.lock && git rebase --continue
+```
+
+**Best Practice**: For lock files, always accept the upstream version and let cargo regenerate if needed: `cargo update` after rebase.
+
+---
+
+### Role Configuration Consistency
+
+**Lesson**: Frontend examples must reference roles that exist in the server's default configuration.
+
+**Discovery**: `1-prompt-chaining/app.js` and `5-evaluator-optimizer/app.js` reference `BusinessAnalyst` and `QAEngineer` roles that don't exist in `terraphim_engineer_config.json`.
+
+**Error Pattern**:
+```
+Role error: Role not found: BusinessAnalyst
+```
+
+**Fix**: Add missing roles to server config or update examples to use available roles like "Terraphim Engineer".
+
+---
+
+### Vanilla JavaScript Module Pattern
+
+**Lesson**: For vanilla JS projects without bundlers, use global objects and script tag ordering for module-like organization.
+
+**Pattern**:
+```javascript
+// workflow-types.js - defines global WorkflowTypes object
+window.WorkflowTypes = { WorkflowPatterns, WorkflowStatus, ... };
+
+// api-client.js - uses WorkflowTypes from global scope
+class ApiClient {
+  async executeRouting(params) {
+    // uses WorkflowTypes.WorkflowPatterns.ROUTING internally
+  }
+}
+window.ApiClient = ApiClient;
+```
+
+**Script Loading Order in HTML**:
+```html
+<script src="../shared/workflow-types.js"></script>
+<script src="../shared/api-client.js"></script>
+<script src="../shared/websocket-client.js"></script>
+<script src="app.js"></script>
+```
+
+---
+
 ## 2026-01-20: Role Selection and RocksDB Session
 
 ### Package Name Convention (Hyphen vs Underscore)
