@@ -1,5 +1,6 @@
+#![allow(unused_imports)]
+#[cfg(feature = "repl")]
 use std::str::FromStr;
-
 #[cfg(feature = "repl")]
 use terraphim_agent::repl::web_operations::*;
 

@@ -4,7 +4,8 @@
 //! since LLM calls dominate the performance profile. These benchmarks are
 //! provided for future optimization work.
 
-use criterion::{Criterion, black_box, criterion_group, criterion_main};
+use criterion::{Criterion, criterion_group, criterion_main};
+use std::hint::black_box;
 
 /// Benchmark session operations
 fn bench_session_operations(c: &mut Criterion) {
