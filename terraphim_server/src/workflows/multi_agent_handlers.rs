@@ -62,32 +62,6 @@ impl MultiAgentWorkflowExecutor {
         })
     }
 
-    /// Get a string value from Role.extra, checking both flat and nested paths.
-    ///
-    /// Due to `#[serde(flatten)]` on `Role.extra`, config JSON with `"extra": {"key": "val"}`
-    /// results in `extra["extra"]["key"]` rather than `extra["key"]`.
-    fn get_role_extra_str<'a>(
-        extra: &'a AHashMap<String, serde_json::Value>,
-        key: &str,
-    ) -> Option<&'a str> {
-        extra.get(key).and_then(|v| v.as_str()).or_else(|| {
-            extra
-                .get("extra")
-                .and_then(|v| v.get(key))
-                .and_then(|v| v.as_str())
-        })
-    }
-
-    /// Get an f64 value from Role.extra, checking both flat and nested paths.
-    fn get_role_extra_f64(extra: &AHashMap<String, serde_json::Value>, key: &str) -> Option<f64> {
-        extra.get(key).and_then(|v| v.as_f64()).or_else(|| {
-            extra
-                .get("extra")
-                .and_then(|v| v.get(key))
-                .and_then(|v| v.as_f64())
-        })
-    }
-
     /// Resolve LLM configuration from multiple sources with priority order:
     ///
     /// 1. Request-level config (highest priority)
@@ -128,31 +102,45 @@ impl MultiAgentWorkflowExecutor {
                 // Check if there's a global LLM config section
                 let default_role_name = "Default".into();
                 if let Some(default_role) = config.roles.get(&default_role_name) {
-                    if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_provider") {
-                        resolved.llm_provider = Some(s.to_string());
+                    if let Some(provider) = default_role.extra.get("llm_provider") {
+                        if let Some(provider_str) = provider.as_str() {
+                            resolved.llm_provider = Some(provider_str.to_string());
+                        }
                     }
-                    if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_model") {
-                        resolved.llm_model = Some(s.to_string());
+                    if let Some(model) = default_role.extra.get("llm_model") {
+                        if let Some(model_str) = model.as_str() {
+                            resolved.llm_model = Some(model_str.to_string());
+                        }
                     }
-                    if let Some(s) = Self::get_role_extra_str(&default_role.extra, "llm_base_url") {
-                        resolved.llm_base_url = Some(s.to_string());
+                    if let Some(base_url) = default_role.extra.get("llm_base_url") {
+                        if let Some(base_url_str) = base_url.as_str() {
+                            resolved.llm_base_url = Some(base_url_str.to_string());
+                        }
                     }
                 }
 
                 // Check role-specific config
                 let role_name_key = role_name.into();
                 if let Some(role) = config.roles.get(&role_name_key) {
-                    if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_provider") {
-                        resolved.llm_provider = Some(s.to_string());
+                    if let Some(provider) = role.extra.get("llm_provider") {
+                        if let Some(provider_str) = provider.as_str() {
+                            resolved.llm_provider = Some(provider_str.to_string());
+                        }
                     }
-                    if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_model") {
-                        resolved.llm_model = Some(s.to_string());
+                    if let Some(model) = role.extra.get("llm_model") {
+                        if let Some(model_str) = model.as_str() {
+                            resolved.llm_model = Some(model_str.to_string());
+                        }
                     }
-                    if let Some(s) = Self::get_role_extra_str(&role.extra, "llm_base_url") {
-                        resolved.llm_base_url = Some(s.to_string());
+                    if let Some(base_url) = role.extra.get("llm_base_url") {
+                        if let Some(base_url_str) = base_url.as_str() {
+                            resolved.llm_base_url = Some(base_url_str.to_string());
+                        }
                     }
-                    if let Some(v) = Self::get_role_extra_f64(&role.extra, "llm_temperature") {
-                        resolved.llm_temperature = Some(v);
+                    if let Some(temp) = role.extra.get("llm_temperature") {
+                        if let Some(temp_val) = temp.as_f64() {
+                            resolved.llm_temperature = Some(temp_val);
+                        }
                     }
                 }
             }
