@@ -18,14 +18,12 @@ impl IndexMiddleware for JmapHaystackIndexer {
         async move {
             let session_url = std::env::var("JMAP_SESSION_URL")
                 .ok()
-                .or_else(|| {
-                    if !location.is_empty() {
-                        Some(location)
-                    } else {
-                        None
-                    }
+                .or(if !location.is_empty() {
+                    Some(location)
+                } else {
+                    None
                 })
-                .unwrap_or_else(|| "https://api.fastmail.com/jmap/session".to_string());
+                .unwrap_or("https://api.fastmail.com/jmap/session".to_string());
 
             let access_token = std::env::var("JMAP_ACCESS_TOKEN")
                 .ok()

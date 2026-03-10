@@ -284,7 +284,7 @@ mod tests {
 
     #[test]
     fn test_cli_parsing() {
-        let cli = Cli::try_parse_from(&[
+        let cli = Cli::try_parse_from([
             "terraphim-validation",
             "validate",
             "1.0.0",

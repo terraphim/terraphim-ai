@@ -142,7 +142,8 @@ pub use api::{
     AddContextRequest, AddContextResponse, AddMessageRequest, AddMessageResponse,
     AddSearchContextRequest, ConfigResponse, CreateConversationRequest, CreateConversationResponse,
     CreateDocumentResponse, DeleteContextResponse, GetConversationResponse, ListConversationsQuery,
-    ListConversationsResponse, SearchResponse, UpdateContextRequest, UpdateContextResponse,
+    ListConversationsResponse, RoleGraphResponseDto, SearchResponse, ThesaurusResponse,
+    UpdateContextRequest, UpdateContextResponse,
 };
 use api::{
     create_document, find_documents_by_kg_term, get_rolegraph, health, search_documents,

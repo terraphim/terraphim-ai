@@ -35,9 +35,6 @@ jobs:
     name: Performance Benchmarks
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    outputs:
-      slo-compliance: ${{ steps.check-gates.outputs.slo-compliance }}
-      performance-gates-passed: ${{ steps.check-gates.outputs.performance-gates-passed }}
 
     steps:
     - name: Checkout code
@@ -143,7 +140,6 @@ jobs:
         fi
 
     - name: Check performance gates
-      id: check-gates
       run: |
         # Check if benchmark results meet performance requirements
         if [ -f "benchmark-results/*/benchmark_results.json" ]; then
@@ -193,18 +189,18 @@ jobs:
             const sloMatch = report.match(/SLO Compliance: (\d+\.?\d*)%/);
             const sloCompliance = sloMatch ? sloMatch[1] : 'N/A';
 
-            const comment = [
-              "## Performance Benchmark Results",
-              "",
-              `**SLO Compliance:** ${sloCompliance}%`,
-              "",
-              "### Key Findings:",
-              report.includes('violations')
-                ? 'Some performance thresholds were not met'
-                : 'All performance requirements satisfied',
-              "",
-              `[View full report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
-            ].join("\\n");
+          const comment = [
+            "## 🚀 Performance Benchmark Results",
+            "",
+            `**SLO Compliance:** ${sloCompliance}%`,
+            "",
+            "### Key Findings:",
+            report.includes('violations')
+              ? '⚠️ Some performance thresholds were not met'
+              : '✅ All performance requirements satisfied',
+            "",
+            `[View full report](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})`,
+          ].join("\\n");
 
             github.rest.issues.createComment({
               issue_number: context.issue.number,
@@ -263,6 +259,9 @@ jobs:
         git config --global user.email 'github-actions[bot]@users.noreply.github.com'
 
         git add benchmark-results/baseline.json
-        git commit -m "chore: update performance baseline [run ${{ github.run_id }}]" || echo "No changes to commit"
+        git commit -m "chore: update performance baseline
+
+Auto-updated from CI run: ${{ github.run_id }}
+SLO Compliance: ${{ needs.performance-benchmarks.outputs.slo-compliance }}%" || echo "No changes to commit"
 
         git push origin main

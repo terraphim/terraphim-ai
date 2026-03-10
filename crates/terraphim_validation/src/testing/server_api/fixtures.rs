@@ -24,6 +24,10 @@ impl TestFixtures {
             tags: Some(vec!["test".to_string(), "api".to_string()]),
             rank: Some(1),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::Document,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 
@@ -48,6 +52,10 @@ impl TestFixtures {
             tags: Some(vec!["large".to_string(), "test".to_string()]),
             rank: Some(1),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::Document,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 
@@ -107,6 +115,10 @@ impl TestFixtures {
                 tags: Some(vec!["test".to_string(), format!("doc{}", i)]),
                 rank: Some(1),
                 source_haystack: None,
+                doc_type: terraphim_types::DocumentType::Document,
+                synonyms: None,
+                route: None,
+                priority: None,
             })
             .collect()
     }
@@ -125,6 +137,10 @@ impl TestFixtures {
             tags: Some(vec!["malicious".to_string(), "test".to_string()]),
             rank: Some(1),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::Document,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 
@@ -141,6 +157,10 @@ impl TestFixtures {
             tags: Some(vec!["special".to_string(), "test".to_string()]),
             rank: Some(1),
             source_haystack: None,
+            doc_type: terraphim_types::DocumentType::Document,
+            synonyms: None,
+            route: None,
+            priority: None,
         }
     }
 }

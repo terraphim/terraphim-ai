@@ -67,7 +67,9 @@ impl MultiAgentWorkflowExecutor {
     /// 2. Role-level config from server config
     /// 3. Global defaults
     /// 4. Hardcoded fallback (lowest priority)
+    ///
     /// Get a string value from Role.extra, checking both flat and nested paths.
+    ///
     /// Due to `#[serde(flatten)]` on `Role.extra`, config JSON with `"extra": {"key": "val"}`
     /// results in `extra["extra"]["key"]` rather than `extra["key"]`.
     fn get_role_extra_str<'a>(
@@ -92,6 +94,12 @@ impl MultiAgentWorkflowExecutor {
         })
     }
 
+    /// Resolve LLM configuration from multiple sources with priority order:
+    ///
+    /// 1. Request-level config (highest priority)
+    /// 2. Role-level config from server config
+    /// 3. Global defaults
+    /// 4. Hardcoded fallback (lowest priority)
     fn resolve_llm_config(&self, request_config: Option<&LlmConfig>, role_name: &str) -> LlmConfig {
         let mut resolved = LlmConfig::default();
 

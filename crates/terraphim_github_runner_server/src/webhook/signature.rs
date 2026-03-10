@@ -32,7 +32,7 @@ pub fn verify_signature(secret: &str, signature: &str, body: &[u8]) -> Result<bo
     let result = mac.finalize().into_bytes();
 
     // Constant-time comparison of bytes (no hex encoding needed)
-    Ok(result.as_slice().ct_eq(&expected).into())
+    Ok(result[..].ct_eq(&expected).into())
 }
 
 #[cfg(test)]
