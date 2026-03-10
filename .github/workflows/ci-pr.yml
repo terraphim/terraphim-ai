@@ -224,6 +224,9 @@ jobs:
         with:
           components: clippy
 
+      - name: Clean target for fresh build
+        run: cargo clean
+
       - name: Clippy Check
         run: cargo clippy --workspace --all-targets -- -D warnings
 
