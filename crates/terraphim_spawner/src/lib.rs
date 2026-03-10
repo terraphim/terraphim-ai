@@ -384,7 +384,7 @@ impl AgentSpawner {
 
         // Spawn the agent process
         let process_id = ProcessId::new();
-        let mut child = self.spawn_process(&config, task).await?;
+        let mut child = self.spawn_process(config, task).await?;
 
         // Set up health checking
         let health_checker = HealthChecker::new(process_id, Duration::from_secs(30));

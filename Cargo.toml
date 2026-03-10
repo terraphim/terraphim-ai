@@ -6,7 +6,7 @@ exclude = [
     # Experimental crates
     "crates/terraphim_agent_application",
     "crates/terraphim_truthforge",
-    "crates/terraphim_validation",
+    "crates/terraphim_automata_py",
     "crates/terraphim_rlm",
     # Python bindings (need `maturin develop`)
     "crates/terraphim_automata_py",
