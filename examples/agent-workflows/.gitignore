@@ -1,0 +1,13 @@
+# Dependencies
+node_modules/
+
+# Test artifacts
+test-screenshots/
+test-results.json
+test-report.html
+
+# Bun lockfile
+bun.lockb
+
+# Playwright
+playwright-report/
