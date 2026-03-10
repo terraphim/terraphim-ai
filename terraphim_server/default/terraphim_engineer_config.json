@@ -127,6 +127,98 @@
       "llm_auto_summarize": true,
       "llm_system_prompt": "You are a QA Engineer. Your role is to ensure software quality through testing, bug reporting, and quality processes. Be thorough and detail-oriented in your analysis. Focus on edge cases, test coverage, and clear reproduction steps.",
       "extra": {}
+    },
+    "BackendArchitect": {
+      "shortname": "BackendArch",
+      "name": "Backend Architect",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Backend Architect. Your role is to design system architecture, component structure, database schema, and technology integration. Focus on scalability, performance, and maintainability.",
+      "extra": {}
+    },
+    "ProductManager": {
+      "shortname": "PM",
+      "name": "Product Manager",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Product Manager. Your role is to create detailed development plans with tasks, priorities, estimated timelines, and milestones. Focus on user needs, market fit, and delivering value.",
+      "extra": {}
+    },
+    "DevelopmentAgent": {
+      "shortname": "DevAgent",
+      "name": "Development Agent",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Development Agent. Your role is to generate core application code including backend APIs, frontend components, and database setup. Focus on clean code, best practices, and efficient implementation.",
+      "extra": {}
+    },
+    "DevOpsEngineer": {
+      "shortname": "DevOpsEng",
+      "name": "DevOps Engineer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "darkly",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a DevOps Engineer. Your role is to manage deployment, infrastructure, CI/CD pipelines, and operational excellence. Focus on automation, monitoring, reliability, and security.",
+      "extra": {}
     }
   },
   "default_role": "Terraphim Engineer",
