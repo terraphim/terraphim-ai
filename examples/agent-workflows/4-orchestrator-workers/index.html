@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Orchestrator-Workers - Data Science Pipeline</title>
     <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .pipeline-environment {
             display: grid;
@@ -359,7 +360,7 @@
 <body>
     <header class="header">
         <div class="container">
-            <h1>🕸️ AI Orchestrator-Workers</h1>
+            <h1><i class="fas fa-project-diagram"></i> AI Orchestrator-Workers</h1>
             <p>Data Science Pipeline - Hierarchical task decomposition with knowledge graph enrichment</p>
         </div>
     </header>
@@ -383,7 +384,7 @@
         <div class="pipeline-environment">
             <!-- Orchestrator Panel -->
             <div class="orchestrator-panel">
-                <h3>🎯 Research Orchestrator</h3>
+                <h3><i class="fas fa-bullseye"></i> Research Orchestrator</h3>
 
                 <!-- Research Input -->
                 <div class="research-input">
@@ -413,7 +414,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-robot"></i> Agent Configuration</h3>
                     <div class="form-group">
                         <label class="form-label" for="role-selector">Select Orchestrator Role:</label>
                         <select id="role-selector" class="form-input" data-testid="role-selector"></select>
@@ -431,7 +432,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🚀 Actions</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-rocket"></i> Actions</h3>
                     <div class="controls">
                         <button id="start-pipeline" class="btn primary">Start Pipeline</button>
                         <button id="pause-pipeline" class="btn" disabled>Pause</button>
@@ -447,7 +448,7 @@
                 <!-- Initial State -->
                 <div id="initial-state" class="text-center" style="padding: 3rem;">
                     <div style="color: var(--text-muted);">
-                        <h4>🧪 Ready for Data Science Research</h4>
+                        <h4><i class="fas fa-flask"></i> Ready for Data Science Research</h4>
                         <p>Configure your research query and data sources, then watch as the orchestrator intelligently assigns specialized workers to different pipeline stages.</p>
                         <p style="font-size: 0.875rem; margin-top: 1rem;">The system will analyze scientific papers, extract insights, and build a knowledge graph of relationships.</p>
                     </div>
@@ -461,7 +462,7 @@
                 <!-- Knowledge Graph -->
                 <div id="knowledge-graph" class="knowledge-graph" style="display: none;">
                     <div class="graph-header">
-                        <span style="font-size: 2rem;">🧠</span>
+                        <span style="font-size: 2rem;"><i class="fas fa-brain"></i></span>
                         <div>
                             <div class="graph-title">Knowledge Graph Enrichment</div>
                             <div style="color: var(--text-muted); font-size: 0.875rem;">Semantic relationships and concept mapping</div>
@@ -470,7 +471,7 @@
 
                     <div class="graph-visualization" id="graph-visualization">
                         <div style="color: var(--text-muted);">
-                            <h4>🔗 Concept Relationships</h4>
+                            <h4><i class="fas fa-link"></i> Concept Relationships</h4>
                             <p>Knowledge graph will be populated during pipeline execution</p>
                         </div>
                     </div>
@@ -482,7 +483,7 @@
         <div id="results-section" style="display: none; margin-top: 2rem;">
             <div class="workflow-container">
                 <div class="workflow-header">
-                    <h3>📊 Pipeline Results & Analytics</h3>
+                    <h3><i class="fas fa-chart-bar"></i> Pipeline Results & Analytics</h3>
                 </div>
                 <div id="results-content"></div>
             </div>
@@ -490,11 +491,13 @@
     </main>
 
     <!-- Scripts -->
+    <script src="../shared/workflow-types.js"></script>
     <script src="../shared/api-client.js"></script>
     <script src="../shared/server-discovery.js"></script>
     <script src="../shared/settings-manager.js"></script>
     <script src="../shared/settings-ui.js"></script>
     <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/websocket-client.js"></script>
     <script src="../shared/workflow-visualizer.js"></script>
     <script src="../shared/connection-status.js"></script>
     <script src="../shared/agent-config-manager.js"></script>
