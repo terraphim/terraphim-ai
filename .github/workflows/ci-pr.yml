@@ -31,6 +31,14 @@ jobs:
       should-run-full-ci: ${{ steps.should_run.outputs.should_run_full_ci }}
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          # Fix permissions on workspace directory for self-hosted runners
+          # Files created by Docker/containers may have different ownership
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           # Clean up files that may have different permissions from previous Docker runs
@@ -92,6 +100,12 @@ jobs:
     if: needs.changes.outputs.frontend-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -145,6 +159,12 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -169,6 +189,12 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -194,6 +220,12 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -237,6 +269,12 @@ jobs:
     if: needs.changes.outputs.frontend-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -273,6 +311,12 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true' && needs.rust-compile.result == 'success'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -319,6 +363,12 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -350,6 +400,12 @@ jobs:
     if: needs.changes.outputs.rust-changed == 'true'
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Pre-checkout cleanup
         run: |
           WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
@@ -380,6 +436,12 @@ jobs:
     if: always()
 
     steps:
+      - name: Fix workspace permissions
+        run: |
+          WORKDIR="${GITHUB_WORKSPACE:-$PWD}"
+          sudo chown -R $(id -u):$(id -g) "${WORKDIR}" 2>/dev/null || true
+          sudo chmod -R u+rw "${WORKDIR}" 2>/dev/null || true
+
       - name: Summary
         run: |
           echo "## PR Validation Summary" >> $GITHUB_STEP_SUMMARY
