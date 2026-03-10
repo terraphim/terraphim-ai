@@ -62,7 +62,34 @@ impl MultiAgentWorkflowExecutor {
         })
     }
 
+    /// Get a string value from Role.extra, checking both flat and nested paths.
+    ///
+    /// Due to `#[serde(flatten)]` on `Role.extra`, config JSON with `"extra": {"key": "val"}`
+    /// results in `extra["extra"]["key"]` rather than `extra["key"]`.
+    fn get_role_extra_str<'a>(
+        extra: &'a AHashMap<String, serde_json::Value>,
+        key: &str,
+    ) -> Option<&'a str> {
+        extra.get(key).and_then(|v| v.as_str()).or_else(|| {
+            extra
+                .get("extra")
+                .and_then(|v| v.get(key))
+                .and_then(|v| v.as_str())
+        })
+    }
+
+    /// Get an f64 value from Role.extra, checking both flat and nested paths.
+    fn get_role_extra_f64(extra: &AHashMap<String, serde_json::Value>, key: &str) -> Option<f64> {
+        extra.get(key).and_then(|v| v.as_f64()).or_else(|| {
+            extra
+                .get("extra")
+                .and_then(|v| v.get(key))
+                .and_then(|v| v.as_f64())
+        })
+    }
+
     /// Resolve LLM configuration from multiple sources with priority order:
+    ///
     /// 1. Request-level config (highest priority)
     /// 2. Role-level config from server config
     /// 3. Global defaults
