@@ -19,37 +19,43 @@ class OrchestratorWorkersDemo {
       {
         id: 'arxiv',
         name: 'arXiv',
-        icon: '📚',
+        icon: 'fa-book',
+        iconClass: 'fas fa-book',
         description: 'Research papers and preprints'
       },
       {
         id: 'pubmed',
         name: 'PubMed',
-        icon: '🔬',
+        icon: 'fa-microscope',
+        iconClass: 'fas fa-microscope',
         description: 'Medical and life sciences'
       },
       {
         id: 'semantic_scholar',
         name: 'Semantic Scholar',
-        icon: '🎓',
+        icon: 'fa-graduation-cap',
+        iconClass: 'fas fa-graduation-cap',
         description: 'AI-powered research database'
       },
       {
         id: 'google_scholar',
         name: 'Google Scholar',
-        icon: '🔍',
+        icon: 'fa-search',
+        iconClass: 'fas fa-search',
         description: 'Academic search engine'
       },
       {
         id: 'research_gate',
         name: 'ResearchGate',
-        icon: '👨‍🔬',
+        icon: 'fa-user-graduate',
+        iconClass: 'fas fa-user-graduate',
         description: 'Scientific publications network'
       },
       {
         id: 'ieee',
         name: 'IEEE Xplore',
-        icon: '⚡',
+        icon: 'fa-bolt',
+        iconClass: 'fas fa-bolt',
         description: 'Engineering and technology'
       }
     ];
@@ -59,42 +65,48 @@ class OrchestratorWorkersDemo {
       {
         id: 'data_collector',
         name: 'Data Collector',
-        icon: '📥',
+        icon: 'fa-download',
+        iconClass: 'fas fa-download',
         specialty: 'Paper retrieval and initial filtering',
         status: 'idle'
       },
       {
         id: 'content_analyzer',
         name: 'Content Analyzer',
-        icon: '🔍',
+        icon: 'fa-search',
+        iconClass: 'fas fa-search',
         specialty: 'Abstract and content analysis',
         status: 'idle'
       },
       {
         id: 'methodology_expert',
         name: 'Methodology Expert',
-        icon: '🧪',
+        icon: 'fa-flask',
+        iconClass: 'fas fa-flask',
         specialty: 'Research methods and validation',
         status: 'idle'
       },
       {
         id: 'knowledge_mapper',
         name: 'Knowledge Mapper',
-        icon: '🗺️',
+        icon: 'fa-map',
+        iconClass: 'fas fa-map',
         specialty: 'Concept extraction and relationships',
         status: 'idle'
       },
       {
         id: 'synthesis_specialist',
         name: 'Synthesis Specialist',
-        icon: '🧩',
+        icon: 'fa-puzzle-piece',
+        iconClass: 'fas fa-puzzle-piece',
         specialty: 'Result aggregation and insights',
         status: 'idle'
       },
       {
         id: 'graph_builder',
         name: 'Graph Builder',
-        icon: '🕸️',
+        icon: 'fa-project-diagram',
+        iconClass: 'fas fa-project-diagram',
         specialty: 'Knowledge graph construction',
         status: 'idle'
       }
@@ -105,7 +117,8 @@ class OrchestratorWorkersDemo {
       {
         id: 'data_ingestion',
         title: 'Data Ingestion & Collection',
-        icon: '📥',
+        icon: 'fa-download',
+        iconClass: 'fas fa-download',
         description: 'Collect research papers and documents from selected data sources based on the research query.',
         workers: ['data_collector'],
         duration: 3000
@@ -113,7 +126,8 @@ class OrchestratorWorkersDemo {
       {
         id: 'content_analysis',
         title: 'Content Analysis & Processing',
-        icon: '🔍',
+        icon: 'fa-search',
+        iconClass: 'fas fa-search',
         description: 'Analyze paper abstracts, extract key concepts, and identify relevant methodologies.',
         workers: ['content_analyzer', 'methodology_expert'],
         duration: 4000
@@ -121,7 +135,8 @@ class OrchestratorWorkersDemo {
       {
         id: 'knowledge_extraction',
         title: 'Knowledge Extraction & Mapping',
-        icon: '🗺️',
+        icon: 'fa-map',
+        iconClass: 'fas fa-map',
         description: 'Extract concepts, relationships, and build semantic mappings from processed content.',
         workers: ['knowledge_mapper'],
         duration: 3500
@@ -129,7 +144,8 @@ class OrchestratorWorkersDemo {
       {
         id: 'graph_construction',
         title: 'Knowledge Graph Construction',
-        icon: '🕸️',
+        icon: 'fa-project-diagram',
+        iconClass: 'fas fa-project-diagram',
         description: 'Build comprehensive knowledge graph with nodes, edges, and semantic relationships.',
         workers: ['graph_builder'],
         duration: 4500
@@ -137,7 +153,8 @@ class OrchestratorWorkersDemo {
       {
         id: 'synthesis_insights',
         title: 'Synthesis & Insights Generation',
-        icon: '🧩',
+        icon: 'fa-puzzle-piece',
+        iconClass: 'fas fa-puzzle-piece',
         description: 'Aggregate findings, generate insights, and produce comprehensive research summary.',
         workers: ['synthesis_specialist'],
         duration: 3000
@@ -281,7 +298,7 @@ class OrchestratorWorkersDemo {
     const container = document.getElementById('source-grid');
     container.innerHTML = this.dataSources.map(source => `
       <div class="source-card ${this.selectedSources.has(source.id) ? 'selected' : ''}" data-source-id="${source.id}">
-        <span class="source-icon">${source.icon}</span>
+        <span class="source-icon"><i class="${source.iconClass}"></i></span>
         <div class="source-details">
           <div class="source-name">${source.name}</div>
           <div class="source-description">${source.description}</div>
@@ -295,7 +312,7 @@ class OrchestratorWorkersDemo {
     container.innerHTML = this.workers.map(worker => `
       <div class="worker-card" id="worker-${worker.id}">
         <div class="worker-header">
-          <span class="worker-icon">${worker.icon}</span>
+          <span class="worker-icon"><i class="${worker.iconClass}"></i></span>
           <div class="worker-name">${worker.name}</div>
         </div>
         <div class="worker-status" id="status-${worker.id}">Idle</div>
@@ -312,7 +329,7 @@ class OrchestratorWorkersDemo {
       <div class="pipeline-stage" id="stage-${stage.id}">
         <div class="stage-header">
           <div class="stage-title">
-            <span class="stage-icon">${stage.icon}</span>
+            <span class="stage-icon"><i class="${stage.iconClass}"></i></span>
             ${stage.title}
           </div>
           <div class="stage-status pending" id="stage-status-${stage.id}">Pending</div>
@@ -324,7 +341,7 @@ class OrchestratorWorkersDemo {
               const worker = this.workers.find(w => w.id === workerId);
               return `
                 <div class="assigned-worker">
-                  <div class="worker-task">${worker.icon} ${worker.name}</div>
+                  <div class="worker-task"><i class="${worker.iconClass}"></i> ${worker.name}</div>
                   <div class="worker-role">${worker.specialty}</div>
                 </div>
               `;
@@ -403,43 +420,170 @@ class OrchestratorWorkersDemo {
     this.visualizer.updateStepStatus('orchestrate', 'active');
     this.visualizer.updateProgress(10, 'Analyzing research query and planning tasks...');
 
-    await this.delay(2000);
+    // Prepare agent state
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
 
-    // Task orchestration phase
-    await this.orchestrateTasks();
+    try {
+      // Call real orchestration API
+      const result = await this.apiClient.executeOrchestration({
+        prompt: query,
+        role: agentState.selectedRole || 'OrchestratorAgent',
+        overall_role: 'data_science_pipeline_coordinator',
+        steps: this.pipelineStages.map(stage => ({
+          id: stage.id,
+          title: stage.title,
+          workers: stage.workers
+        })),
+        llm_config: {
+          provider: 'ollama',
+          model: 'gemma3:270m',
+          ...getDefaultLlmConfig()
+        }
+      });
 
-    this.visualizer.updateStepStatus('orchestrate', 'completed');
-    this.visualizer.updateStepStatus('execute', 'active');
-    this.visualizer.updateProgress(20, 'Executing pipeline stages with specialized workers...');
+      console.log('Orchestration API result:', result);
 
-    // Execute pipeline stages sequentially
-    for (let i = 0; i < this.pipelineStages.length; i++) {
-      this.currentStage = i;
-      await this.executePipelineStage(this.pipelineStages[i]);
+      // Subscribe to WebSocket updates if workflow_id is available
+      let wsUnsubscribe = null;
+      if (result.workflow_id && this.apiClient.wsClient) {
+        wsUnsubscribe = this.apiClient.subscribeToWorkflow(result.workflow_id, (message) => {
+          this.handleWorkflowMessage(message);
+        });
+      }
 
-      const progress = 20 + (i + 1) * (60 / this.pipelineStages.length);
-      this.visualizer.updateProgress(progress, `Completed ${this.pipelineStages[i].title}`);
+      await this.delay(2000);
+
+      // Task orchestration phase
+      await this.orchestrateTasks();
+
+      this.visualizer.updateStepStatus('orchestrate', 'completed');
+      this.visualizer.updateStepStatus('execute', 'active');
+      this.visualizer.updateProgress(20, 'Executing pipeline stages with specialized workers...');
+
+      // Execute pipeline stages sequentially
+      for (let i = 0; i < this.pipelineStages.length; i++) {
+        this.currentStage = i;
+        await this.executePipelineStage(this.pipelineStages[i]);
+
+        const progress = 20 + (i + 1) * (60 / this.pipelineStages.length);
+        this.visualizer.updateProgress(progress, `Completed ${this.pipelineStages[i].title}`);
+      }
+
+      this.visualizer.updateStepStatus('execute', 'completed');
+      this.visualizer.updateStepStatus('aggregate', 'active');
+      this.visualizer.updateProgress(85, 'Aggregating results and building knowledge graph...');
+
+      // Final aggregation and knowledge graph construction
+      await this.aggregateResults();
+
+      this.visualizer.updateStepStatus('aggregate', 'completed');
+      this.visualizer.updateProgress(100, 'Pipeline completed successfully!');
+
+      // Unsubscribe from WebSocket
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+      }
+
+      // Update final status
+      document.getElementById('workflow-status').textContent = 'Completed';
+      document.getElementById('workflow-status').className = 'workflow-status completed';
+
+      this.isRunning = false;
+      this.updateControlsState();
+
+      // Show results and knowledge graph
+      this.displayResults();
+
+    } catch (error) {
+      console.error('Orchestration failed:', error);
+      document.getElementById('workflow-status').textContent = 'Error';
+      document.getElementById('workflow-status').className = 'workflow-status error';
+      alert(`Orchestration failed: ${error.message}`);
+      this.isRunning = false;
+      this.updateControlsState();
     }
+  }
 
-    this.visualizer.updateStepStatus('execute', 'completed');
-    this.visualizer.updateStepStatus('aggregate', 'active');
-    this.visualizer.updateProgress(85, 'Aggregating results and building knowledge graph...');
+  /**
+   * Handle WebSocket messages for workflow updates
+   */
+  handleWorkflowMessage(message) {
+    console.log('WebSocket message received:', message);
 
-    // Final aggregation and knowledge graph construction
-    await this.aggregateResults();
+    switch (message.type) {
+      case 'progress':
+        // Update progress based on worker or stage progress
+        if (message.data && message.data.stage_id) {
+          const progress = message.data.progress || 0;
+          const workerProgress = document.getElementById(`progress-${message.data.stage_id}`);
+          if (workerProgress) {
+            workerProgress.style.width = `${progress}%`;
+          }
+        }
+        break;
 
-    this.visualizer.updateStepStatus('aggregate', 'completed');
-    this.visualizer.updateProgress(100, 'Pipeline completed successfully!');
+      case 'status':
+        // Update stage or worker status
+        if (message.data) {
+          const { stage_id, worker_id, status } = message.data;
+          if (stage_id && status) {
+            const statusElement = document.getElementById(`stage-status-${stage_id}`);
+            if (statusElement) {
+              statusElement.textContent = status.charAt(0).toUpperCase() + status.slice(1);
+              statusElement.className = `stage-status ${status}`;
+            }
+          }
+          if (worker_id && status) {
+            this.updateWorkerStatus(worker_id, status, status.charAt(0).toUpperCase() + status.slice(1));
+          }
+        }
+        break;
 
-    // Update final status
-    document.getElementById('workflow-status').textContent = 'Completed';
-    document.getElementById('workflow-status').className = 'workflow-status completed';
+      case 'stage_complete':
+        // Mark stage as completed
+        if (message.data && message.data.stage_id) {
+          const statusElement = document.getElementById(`stage-status-${message.data.stage_id}`);
+          if (statusElement) {
+            statusElement.textContent = 'Completed';
+            statusElement.className = 'stage-status completed';
+          }
+          // Complete workers assigned to this stage
+          const stage = this.pipelineStages.find(s => s.id === message.data.stage_id);
+          if (stage) {
+            stage.workers.forEach(workerId => {
+              this.updateWorkerStatus(workerId, 'completed', 'Completed');
+              this.updateWorkerProgress(workerId, 100);
+            });
+          }
+        }
+        break;
 
-    this.isRunning = false;
-    this.updateControlsState();
+      case 'result':
+        // Handle stage results
+        if (message.data && message.data.stage_id) {
+          this.displayStageResults(message.data.stage_id, {
+            summary: message.data.summary || 'Stage completed',
+            details: message.data.details || ''
+          });
+        }
+        break;
 
-    // Show results and knowledge graph
-    this.displayResults();
+      case 'error':
+        // Handle errors
+        console.error('Workflow error:', message.data);
+        if (message.data && message.data.message) {
+          alert(`Workflow error: ${message.data.message}`);
+        }
+        break;
+
+      case 'complete':
+        // Workflow completed
+        console.log('Workflow completed:', message.data);
+        break;
+
+      default:
+        console.log('Unknown message type:', message.type);
+    }
   }
 
   async orchestrateTasks() {
