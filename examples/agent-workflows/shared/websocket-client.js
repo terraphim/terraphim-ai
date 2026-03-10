@@ -233,7 +233,7 @@ class TerraphimWebSocketClient {
     );
 
     if (newInterval !== this.heartbeatInterval) {
-      console.log(`📈 Adaptive timeout: Increasing heartbeat interval from ${this.heartbeatInterval}ms to ${newInterval}ms`);
+      console.log(`[WebSocket] Adaptive timeout: Increasing heartbeat interval from ${this.heartbeatInterval}ms to ${newInterval}ms`);
       this.heartbeatInterval = newInterval;
 
       // Restart heartbeat with new interval
@@ -371,14 +371,18 @@ class TerraphimWebSocketClient {
 
     // Return unsubscribe function
     return () => {
-      const subscribers = this.subscribers.get(eventType);
-      if (subscribers) {
-        subscribers.delete(callback);
-        if (subscribers.size === 0) {
-          this.subscribers.delete(eventType);
-        }
-      }
+      this.unsubscribe(eventType, callback);
     };
+  }
+
+  unsubscribe(eventType, callback) {
+    const subscribers = this.subscribers.get(eventType);
+    if (subscribers) {
+      subscribers.delete(callback);
+      if (subscribers.size === 0) {
+        this.subscribers.delete(eventType);
+      }
+    }
   }
 
   emit(eventType, data) {
@@ -426,7 +430,7 @@ class TerraphimWebSocketClient {
 
   resetHeartbeatInterval() {
     if (this.heartbeatInterval !== this.baseHeartbeatInterval) {
-      console.log(`🔄 Resetting heartbeat interval from ${this.heartbeatInterval}ms to ${this.baseHeartbeatInterval}ms`);
+      console.log(`[WebSocket] Resetting heartbeat interval from ${this.heartbeatInterval}ms to ${this.baseHeartbeatInterval}ms`);
       this.heartbeatInterval = this.baseHeartbeatInterval;
     }
   }
