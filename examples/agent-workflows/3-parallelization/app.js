@@ -440,112 +440,126 @@ class ParallelizationAnalysisDemo {
   }
 
   generatePerspectiveAnalysis(perspective, topic, result) {
-    // Generate mock analysis based on perspective characteristics
-    const analyses = {
-      analytical: (topic) => ({
-        title: 'Data-Driven Analysis',
-        keyPoints: [
-          'Market research indicates significant growth potential',
-          'Statistical trends show 40% year-over-year increases',
-          'Quantitative models predict positive ROI within 18 months',
-          'Benchmark analysis reveals competitive advantages'
-        ],
-        insights: 'Evidence-based evaluation shows strong fundamentals with measurable success metrics.',
-        recommendations: [
-          'Implement robust analytics tracking',
-          'Establish KPI baselines and monitoring',
-          'Conduct A/B testing for optimization'
-        ],
-        confidence: 0.85
-      }),
+    // Extract real LLM content from the API response
+    const perspectiveId = perspective.id;
 
-      creative: (topic) => ({
-        title: 'Innovative Exploration',
-        keyPoints: [
-          'Blue ocean opportunities in emerging markets',
-          'Disruptive potential through novel approaches',
-          'Cross-industry inspiration from unexpected sources',
-          'Future-forward thinking beyond current paradigms'
-        ],
-        insights: 'Innovative approaches could revolutionize the traditional landscape and create new value propositions.',
-        recommendations: [
-          'Prototype unconventional solutions',
-          'Explore adjacent market opportunities',
-          'Foster innovation through experimentation'
-        ],
-        confidence: 0.78
-      }),
+    // Find matching task from parallel_tasks array
+    let taskResult = null;
+    if (result && result.result && Array.isArray(result.result.parallel_tasks)) {
+      taskResult = result.result.parallel_tasks.find(t => t.perspective === perspectiveId);
+      // Fallback: match by index if perspective field doesn't match
+      if (!taskResult) {
+        taskResult = result.result.parallel_tasks[0];
+      }
+    }
 
-      practical: (topic) => ({
-        title: 'Implementation Focus',
-        keyPoints: [
-          'Clear roadmap with achievable milestones',
-          'Resource requirements are manageable',
-          'Technical feasibility confirmed by experts',
-          'Operational processes can scale effectively'
-        ],
-        insights: 'Practical implementation is feasible with proper planning and resource allocation.',
-        recommendations: [
-          'Develop phased rollout strategy',
-          'Allocate adequate resources and timeline',
-          'Establish clear success criteria'
-        ],
-        confidence: 0.92
-      }),
+    const llmText = taskResult ? taskResult.result : (result && result.result && result.result.aggregated_result) || '';
 
-      critical: (topic) => ({
-        title: 'Risk Assessment',
-        keyPoints: [
-          'Market volatility poses significant challenges',
-          'Regulatory compliance requires careful attention',
-          'Competitive responses could erode advantages',
-          'Technical dependencies create vulnerability'
-        ],
-        insights: 'Several critical risks must be mitigated before proceeding with full implementation.',
-        recommendations: [
-          'Develop comprehensive risk mitigation plan',
-          'Establish contingency strategies',
-          'Monitor regulatory changes closely'
-        ],
-        confidence: 0.88
-      }),
+    if (!llmText) {
+      // Fallback if no LLM result available
+      return {
+        title: `${perspective.name} Analysis`,
+        keyPoints: ['No analysis content received from server'],
+        insights: 'The API call completed but returned no content for this perspective.',
+        recommendations: ['Try again or check server logs'],
+        confidence: 0
+      };
+    }
 
-      strategic: (topic) => ({
-        title: 'Long-term Strategy',
-        keyPoints: [
-          'Aligns with 5-year organizational vision',
-          'Creates sustainable competitive moats',
-          'Positions for future market expansion',
-          'Builds platform for additional opportunities'
-        ],
-        insights: 'Strategic positioning provides long-term value creation and competitive advantage.',
-        recommendations: [
-          'Integrate with broader strategic initiatives',
-          'Build capabilities for future expansion',
-          'Establish strategic partnerships'
-        ],
-        confidence: 0.89
-      }),
+    // Parse the LLM markdown into structured analysis
+    return this.parseLlmResponse(perspective, llmText);
+  }
 
-      user_centered: (topic) => ({
-        title: 'Human Impact Analysis',
-        keyPoints: [
-          'Significant positive impact on user experience',
-          'Accessibility considerations well-addressed',
-          'Stakeholder feedback overwhelmingly positive',
-          'Social impact creates meaningful value'
-        ],
-        insights: 'Human-centered approach ensures widespread adoption and positive societal impact.',
-        recommendations: [
-          'Prioritize user feedback in development',
-          'Ensure accessibility across all features',
-          'Measure and optimize user satisfaction'
-        ],
-        confidence: 0.91
-      })
+  parseLlmResponse(perspective, text) {
+    // Extract sections from LLM markdown response
+    const lines = text.split('\n').filter(l => l.trim());
+
+    // Extract title from first heading or first bold line
+    let title = `${perspective.name} Analysis`;
+    for (const line of lines) {
+      const headingMatch = line.match(/^\*\*(.+?)\*\*$/) || line.match(/^#+\s+(.+)/);
+      if (headingMatch) {
+        title = headingMatch[1].replace(/\*\*/g, '');
+        break;
+      }
+    }
+
+    // Extract bullet points as key points (first 6)
+    const keyPoints = [];
+    for (const line of lines) {
+      const bulletMatch = line.match(/^\s*[-*]\s+\*\*(.+?)\*\*[:\s]*(.*)/);
+      if (bulletMatch) {
+        keyPoints.push(bulletMatch[1] + (bulletMatch[2] ? ': ' + bulletMatch[2] : ''));
+      } else {
+        const simpleBullet = line.match(/^\s*[-*]\s+(.+)/);
+        if (simpleBullet && keyPoints.length < 6) {
+          keyPoints.push(simpleBullet[1].replace(/\*\*/g, ''));
+        }
+      }
+      if (keyPoints.length >= 6) break;
+    }
+
+    // If no bullet points found, extract first few sentences
+    if (keyPoints.length === 0) {
+      const sentences = text.replace(/\*\*/g, '').replace(/#+\s+/g, '').split(/[.!?]+/).filter(s => s.trim().length > 20);
+      for (let i = 0; i < Math.min(4, sentences.length); i++) {
+        keyPoints.push(sentences[i].trim());
+      }
+    }
+
+    // Extract insights from conclusion or findings sections
+    let insights = '';
+    const conclusionMatch = text.match(/\*\*Conclusion\*\*\s*\n+([\s\S]*?)(?=\n\*\*|$)/i);
+    const findingsMatch = text.match(/\*\*Findings\*\*\s*\n+([\s\S]*?)(?=\n\*\*|$)/i);
+    if (conclusionMatch) {
+      insights = conclusionMatch[1].replace(/\*\*/g, '').replace(/\n/g, ' ').trim().slice(0, 300);
+    } else if (findingsMatch) {
+      insights = findingsMatch[1].replace(/\*\*/g, '').replace(/\n/g, ' ').trim().slice(0, 300);
+    } else {
+      // Use a middle paragraph as insights
+      const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 50 && !p.startsWith('#') && !p.startsWith('*'));
+      if (paragraphs.length > 1) {
+        insights = paragraphs[Math.floor(paragraphs.length / 2)].replace(/\*\*/g, '').trim().slice(0, 300);
+      } else if (paragraphs.length === 1) {
+        insights = paragraphs[0].replace(/\*\*/g, '').trim().slice(0, 300);
+      }
+    }
+
+    // Extract recommendations
+    const recommendations = [];
+    const recMatch = text.match(/\*\*Recommendation[s]?\*\*\s*\n+([\s\S]*?)(?=\n\*\*|$)/i);
+    if (recMatch) {
+      const recLines = recMatch[1].split('\n');
+      for (const line of recLines) {
+        const bullet = line.match(/^\s*[-*\d.]+\s+\*\*(.+?)\*\*[:\s]*(.*)/);
+        if (bullet) {
+          recommendations.push(bullet[1] + (bullet[2] ? ': ' + bullet[2] : ''));
+        } else {
+          const simpleBullet = line.match(/^\s*[-*\d.]+\s+(.+)/);
+          if (simpleBullet) {
+            recommendations.push(simpleBullet[1].replace(/\*\*/g, ''));
+          }
+        }
+        if (recommendations.length >= 4) break;
+      }
+    }
+
+    // Fallback recommendations from key points if none found
+    if (recommendations.length === 0 && keyPoints.length > 2) {
+      recommendations.push(...keyPoints.slice(-2));
+    }
+
+    // Estimate confidence based on content richness
+    const wordCount = text.split(/\s+/).length;
+    const confidence = Math.min(0.95, 0.5 + (wordCount / 2000) * 0.45);
+
+    return {
+      title,
+      keyPoints: keyPoints.length > 0 ? keyPoints : ['Analysis completed'],
+      insights: insights || 'Analysis completed successfully. See key points for details.',
+      recommendations: recommendations.length > 0 ? recommendations : ['Review the full analysis for detailed recommendations'],
+      confidence
     };
-
-    return (analyses[perspective.id] && analyses[perspective.id](topic)) || analyses.analytical(topic);
   }
 
   displayPerspectiveResult(perspectiveId, analysis) {
@@ -605,28 +619,61 @@ class ParallelizationAnalysisDemo {
   }
 
   generateAggregatedInsights() {
-    return [
-      {
-        title: 'Convergent Findings',
-        content: 'All perspectives agree on the fundamental viability and positive potential of the analyzed topic.',
-        type: 'consensus'
-      },
-      {
-        title: 'Divergent Views',
-        content: 'Risk assessment varies significantly between perspectives, with critical analysis highlighting more concerns than creative exploration.',
+    // Build aggregated insights from actual analysis results
+    const results = Array.from(this.analysisResults.values());
+    const analyses = results.map(r => r.analysis).filter(Boolean);
+
+    if (analyses.length === 0) {
+      return [{ title: 'No Results', content: 'No perspective analyses were completed.', type: 'info' }];
+    }
+
+    // Collect all key points across perspectives
+    const allKeyPoints = analyses.flatMap(a => a.keyPoints || []);
+    const allRecommendations = analyses.flatMap(a => a.recommendations || []);
+    const perspectiveNames = results.map(r => {
+      const p = this.perspectives[r.perspectiveId];
+      return p ? p.name : r.perspectiveId;
+    });
+
+    const insights = [];
+
+    // Summarize key findings from all perspectives
+    insights.push({
+      title: 'Key Findings Across Perspectives',
+      content: `${analyses.length} perspectives analyzed (${perspectiveNames.join(', ')}). ` +
+        `Identified ${allKeyPoints.length} key points: ${allKeyPoints.slice(0, 3).join('; ')}${allKeyPoints.length > 3 ? '...' : ''}.`,
+      type: 'consensus'
+    });
+
+    // Insights summary
+    const insightTexts = analyses.map(a => a.insights).filter(Boolean);
+    if (insightTexts.length > 0) {
+      insights.push({
+        title: 'Perspective Insights',
+        content: insightTexts.map((t, i) => `${perspectiveNames[i]}: ${t.slice(0, 150)}`).join(' | '),
         type: 'divergence'
-      },
-      {
-        title: 'Implementation Priority',
-        content: 'Practical and strategic perspectives suggest a phased approach with clear milestones and risk mitigation.',
+      });
+    }
+
+    // Recommendations synthesis
+    if (allRecommendations.length > 0) {
+      insights.push({
+        title: 'Combined Recommendations',
+        content: allRecommendations.slice(0, 5).join('. ') + '.',
         type: 'synthesis'
-      },
-      {
-        title: 'Success Factors',
-        content: 'User-centered design, data-driven decisions, and innovative thinking emerge as key success drivers.',
-        type: 'synthesis'
-      }
-    ];
+      });
+    }
+
+    // Confidence summary
+    const avgConfidence = analyses.reduce((sum, a) => sum + (a.confidence || 0), 0) / analyses.length;
+    insights.push({
+      title: 'Confidence Assessment',
+      content: `Average confidence across perspectives: ${Math.round(avgConfidence * 100)}%. ` +
+        analyses.map((a, i) => `${perspectiveNames[i]}: ${Math.round((a.confidence || 0) * 100)}%`).join(', ') + '.',
+      type: 'synthesis'
+    });
+
+    return insights;
   }
 
   displayAggregatedInsights(insights) {
