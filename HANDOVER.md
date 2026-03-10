@@ -1,7 +1,7 @@
 # Handover: 2026-03-10 - Agent Workflows E2E Implementation Complete
 
 **Branch**: main
-**Upstream**: 09a3d61b (4 commits ahead of previous)
+**Upstream**: ab685db4 (6 commits ahead of previous)
 **Previous Handover**: 2026-03-03 - Phase A+B Implementation Complete
 
 ---
@@ -50,11 +50,14 @@
   - `POST /workflows/prompt_chain` - Working (with valid role)
   - `POST /workflows/optimization` - Working (with valid role)
 
-**Blocked/Issues:**
-- Role configuration errors for `BusinessAnalyst` and `QAEngineer` roles
-  - These roles are referenced in prompt-chain and optimize workflows but not defined in server config
-  - Using "Terraphim Engineer" role works correctly
-  - **Fix needed**: Add missing roles to `terraphim_server/default/terraphim_engineer_config.json`
+**Fixed:**
+- All missing roles added to `terraphim_server/default/terraphim_engineer_config.json`:
+  - `BusinessAnalyst` - requirements analysis
+  - `QAEngineer` - quality assurance and testing
+  - `BackendArchitect` - system architecture design
+  - `ProductManager` - development planning
+  - `DevelopmentAgent` - code implementation
+  - `DevOpsEngineer` - deployment and operations
 
 ---
 
@@ -68,12 +71,14 @@ git branch --show-current
 
 ### Recent Commits
 ```bash
-git log -5 --oneline
+git log -7 --oneline
+ab685db4 feat(config): add workflow agent roles to default config
+f222f764 feat(config): add BusinessAnalyst and QAEngineer roles to default config
+05c82d81 docs: update handover and lessons learned for agent workflows
 09a3d61b chore(build): update Cargo.toml and Cargo.lock
 573c099d feat(agent-workflows): update examples 2-5 for real API integration
 440d5902 feat(agent-workflows): update prompt chaining example for real API integration
 c05452f5 feat(agent-workflows): Day 1 foundation - workflow types, API client, WebSocket
-c639d2be docs(cli): add missing doc comments to CLI commands for help text
 ```
 
 ### Modified Files (Committed)
@@ -91,8 +96,11 @@ examples/agent-workflows/4-orchestrator-workers/app.js   (updated)
 examples/agent-workflows/4-orchestrator-workers/index.html (updated)
 examples/agent-workflows/5-evaluator-optimizer/app.js    (updated)
 examples/agent-workflows/5-evaluator-optimizer/index.html (updated)
+terraphim_server/default/terraphim_engineer_config.json  (updated - added 6 new roles)
 Cargo.toml                                               (updated)
 Cargo.lock                                               (updated)
+HANDOVER.md                                              (updated)
+lessons-learned.md                                       (updated)
 ```
 
 ### Untracked Files (Design/Research Docs)
@@ -107,38 +115,23 @@ Cargo.lock                                               (updated)
 
 ## 3. Next Steps
 
-### Priority 1: Fix Missing Role Configuration
-- **File**: `terraphim_server/default/terraphim_engineer_config.json`
-- **Action**: Add `BusinessAnalyst` and `QAEngineer` role definitions
-- **Impact**: Required for prompt-chain and evaluator-optimizer examples to work with their default configurations
+### Priority 1: Verification Testing (Completed)
+- ✅ All 5 workflow endpoints tested successfully with new roles:
+  - `POST /workflows/prompt-chain` with BusinessAnalyst - Working
+  - `POST /workflows/route` with BusinessAnalyst - Working
+  - `POST /workflows/parallel` with QAEngineer - Working
+  - `POST /workflows/orchestrate` with DevelopmentAgent - Working
+  - `POST /workflows/optimize` with BusinessAnalyst - Working
 
-### Priority 2: Verification Testing
-- Run full test suite: `cargo test --workspace --exclude terraphim_agent`
-- Test all 5 workflow examples end-to-end with server running
+### Priority 2: Run Full Test Suite
+- Run: `cargo test --workspace --exclude terraphim_agent`
+- Test examples in browser with server running
 - Verify WebSocket message handling under load
 
 ### Priority 3: Documentation
 - Create `RUNNING_E2E.md` with instructions for running the complete demo
 - Document the workflow API contract for future reference
 - Update example READMEs with real API integration details
-
-### Recommended Approach for Role Fix
-```json
-{
-  "name": "BusinessAnalyst",
-  "relevance_function": "TerraphimGraph",
-  "theme": "business-theme",
-  "system_prompt": "You are a Business Analyst. Your role is to analyze requirements, document processes, and bridge business and technical teams. Provide clear, structured analysis.",
-  "haystacks": []
-},
-{
-  "name": "QAEngineer",
-  "relevance_function": "BM25",
-  "theme": "qa-theme",
-  "system_prompt": "You are a QA Engineer. Your role is to ensure software quality through testing, bug reporting, and quality processes. Be thorough and detail-oriented.",
-  "haystacks": []
-}
-```
 
 ---
 
