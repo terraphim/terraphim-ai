@@ -497,6 +497,7 @@ class PromptChainingDemo {
 
   async executePromptChain(input) {
     const startTime = Date.now();
+    let wsUnsubscribe = null;
 
     try {
       // Prepare step configurations for backend
@@ -522,6 +523,13 @@ class PromptChainingDemo {
       });
 
       console.log('Prompt chain result:', result);
+
+      // Subscribe to WebSocket updates for this workflow
+      if (result.workflow_id && this.apiClient.wsClient) {
+        wsUnsubscribe = this.apiClient.subscribeToWorkflow(result.workflow_id, (message) => {
+          this.handleWorkflowMessage(message);
+        });
+      }
 
       // Process results and update UI step by step
       if (result.result && result.result.steps) {
@@ -564,6 +572,11 @@ class PromptChainingDemo {
       this.pauseButton.disabled = true;
       this.resetButton.disabled = false;
 
+      // Cleanup WebSocket subscription
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+      }
+
       // Show metrics
       const executionSummary = result.result?.execution_summary || {};
       this.showMetrics({
@@ -580,10 +593,79 @@ class PromptChainingDemo {
       this.updateStatus('error');
       this.showError(error.message);
 
+      // Cleanup WebSocket subscription on error
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+      }
+
       this.startButton.disabled = false;
       this.pauseButton.disabled = true;
       this.resetButton.disabled = false;
       throw error;
+    }
+  }
+
+  /**
+   * Handle WebSocket messages for workflow updates
+   * @param {Object} message - WebSocket message
+   */
+  handleWorkflowMessage(message) {
+    console.log('Workflow WebSocket message:', message);
+
+    switch (message.type) {
+      case 'progress':
+        // Update progress visualization
+        if (message.data && message.data.current_step) {
+          const step = this.steps.find(s => s.id === message.data.current_step);
+          if (step) {
+            this.visualizer.updateStepStatus(step.id, 'active');
+            this.highlightCurrentStep(step.id);
+          }
+        }
+        if (message.data && message.data.progress) {
+          this.visualizer.updateProgress(
+            message.data.progress,
+            message.data.message || 'Processing...'
+          );
+        }
+        break;
+
+      case 'status':
+        // Handle status updates
+        if (message.status === 'running') {
+          this.updateStatus('running');
+        } else if (message.status === 'completed') {
+          this.updateStatus('success');
+        } else if (message.status === 'failed') {
+          this.updateStatus('error');
+        }
+        break;
+
+      case 'step_complete':
+        // Handle step completion
+        if (message.data && message.data.step_id) {
+          const step = this.steps.find(s => s.id === message.data.step_id);
+          if (step && message.data.output) {
+            this.addStepOutput(step, {
+              output: message.data.output,
+              duration: message.data.duration || 2000,
+              metadata: message.data
+            });
+            this.visualizer.updateStepStatus(step.id, 'completed', {
+              duration: message.data.duration || 2000
+            });
+          }
+        }
+        break;
+
+      case 'error':
+        // Handle error messages
+        console.error('Workflow error from WebSocket:', message.data);
+        this.showError(message.data?.error || 'Workflow execution failed');
+        break;
+
+      default:
+        console.log('Unhandled WebSocket message type:', message.type);
     }
   }
 
