@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Evaluator-Optimizer - Content Generation Studio</title>
     <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .studio-environment {
             display: grid;
@@ -386,7 +387,7 @@
 <body>
     <header class="header">
         <div class="container">
-            <h1>🔄 AI Evaluator-Optimizer</h1>
+            <h1><i class="fas fa-sync-alt"></i> AI Evaluator-Optimizer</h1>
             <p>Content Generation Studio - Iterative improvement through quality evaluation and optimization</p>
         </div>
     </header>
@@ -424,7 +425,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-robot"></i> Agent Configuration</h3>
                     <div class="form-group">
                         <label class="form-label" for="role-selector">Select Agent Role:</label>
                         <select id="role-selector" class="form-input" data-testid="role-selector"></select>
@@ -442,7 +443,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🚀 Actions</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-rocket"></i> Actions</h3>
                     <div class="controls">
                     <button id="generate-btn" class="btn primary">Generate Content</button>
                     <button id="optimize-btn" class="btn" disabled>Start Optimization</button>
@@ -464,7 +465,7 @@
                     <!-- Initial State -->
                     <div id="initial-state" class="text-center" style="padding: 3rem;">
                         <div style="color: var(--text-muted);">
-                            <h4>🚀 Ready to Generate & Optimize</h4>
+                            <h4><i class="fas fa-rocket"></i> Ready to Generate & Optimize</h4>
                             <p>Enter your content brief and configure quality criteria, then watch as the AI iteratively improves the content through evaluation and optimization cycles.</p>
                             <p style="font-size: 0.875rem; margin-top: 1rem;">The system will generate, evaluate, and refine content until quality thresholds are met.</p>
                         </div>
@@ -474,7 +475,7 @@
                 <!-- Optimization Chart -->
                 <div id="optimization-chart" class="optimization-chart" style="display: none;">
                     <div class="chart-header">
-                        <span style="font-size: 2rem;">📈</span>
+                        <span style="font-size: 2rem;"><i class="fas fa-chart-line"></i></span>
                         <div>
                             <div class="chart-title">Quality Improvement Over Iterations</div>
                             <div style="color: var(--text-muted); font-size: 0.875rem;">Tracking quality scores across optimization cycles</div>
@@ -491,7 +492,7 @@
 
             <!-- Optimization Panel -->
             <div class="optimization-panel">
-                <h3>⚙️ Optimization Settings</h3>
+                <h3><i class="fas fa-cogs"></i> Optimization Settings</h3>
 
                 <!-- Quality Criteria -->
                 <div class="quality-criteria">
@@ -531,7 +532,7 @@
 
                 <!-- Best Version Info -->
                 <div class="best-version" style="margin-top: 2rem; padding: 1rem; background: #d1fae5; border-radius: var(--radius-md); display: none;" id="best-version-info">
-                    <h4 style="color: #065f46; margin-bottom: 0.5rem;">🏆 Best Version</h4>
+                    <h4 style="color: #065f46; margin-bottom: 0.5rem;"><i class="fas fa-trophy"></i> Best Version</h4>
                     <div style="font-size: 0.875rem; color: #065f46;">
                         <div>Iteration: <span id="best-iteration" style="font-weight: 600;">-</span></div>
                         <div>Quality Score: <span id="best-score" style="font-weight: 600;">-</span></div>
@@ -544,7 +545,7 @@
         <div id="results-section" style="display: none; margin-top: 2rem;">
             <div class="workflow-container">
                 <div class="workflow-header">
-                    <h3>📊 Optimization Results & Analytics</h3>
+                    <h3><i class="fas fa-chart-bar"></i> Optimization Results & Analytics</h3>
                 </div>
                 <div id="results-content"></div>
             </div>
@@ -552,11 +553,13 @@
     </main>
 
     <!-- Scripts -->
+    <script src="../shared/workflow-types.js"></script>
     <script src="../shared/api-client.js"></script>
     <script src="../shared/server-discovery.js"></script>
     <script src="../shared/settings-manager.js"></script>
     <script src="../shared/settings-ui.js"></script>
     <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/websocket-client.js"></script>
     <script src="../shared/workflow-visualizer.js"></script>
     <script src="../shared/connection-status.js"></script>
     <script src="../shared/agent-config-manager.js"></script>

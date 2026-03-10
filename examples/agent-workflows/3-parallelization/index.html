@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Parallelization - Multi-perspective Analysis</title>
     <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .analysis-environment {
             display: grid;
@@ -251,7 +252,7 @@
 <body>
     <header class="header">
         <div class="container">
-            <h1>⚡ AI Parallelization</h1>
+            <h1><i class="fas fa-bolt"></i> AI Parallelization</h1>
             <p>Multi-perspective Analysis - Analyze complex topics from multiple viewpoints simultaneously</p>
         </div>
     </header>
@@ -275,7 +276,7 @@
         <div class="analysis-environment">
             <!-- Control Panel -->
             <div class="control-panel">
-                <h3>🎯 Analysis Configuration</h3>
+                <h3><i class="fas fa-bullseye"></i> Analysis Configuration</h3>
 
                 <!-- Topic Input -->
                 <div class="form-group">
@@ -304,7 +305,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-robot"></i> Agent Configuration</h3>
                     <div class="form-group">
                         <label class="form-label" for="role-selector">Select Agent Role:</label>
                         <select id="role-selector" class="form-input" data-testid="role-selector"></select>
@@ -355,7 +356,7 @@
                 <!-- Initial State -->
                 <div id="initial-state" class="text-center" style="padding: 3rem;">
                     <div style="color: var(--text-muted);">
-                        <h4>🧠 Ready for Parallel Analysis</h4>
+                        <h4><i class="fas fa-brain"></i> Ready for Parallel Analysis</h4>
                         <p>Configure your analysis topic and perspectives, then click "Start Analysis" to see multiple AI agents analyze the topic simultaneously from different viewpoints.</p>
                         <p style="font-size: 0.875rem; margin-top: 1rem;">Each perspective runs in parallel, providing comprehensive coverage of the topic.</p>
                     </div>
@@ -369,7 +370,7 @@
                 <!-- Aggregated Insights -->
                 <div id="aggregated-insights" class="aggregated-insights" style="display: none;">
                     <div class="insights-header">
-                        <span style="font-size: 2rem;">🧩</span>
+                        <span style="font-size: 2rem;"><i class="fas fa-puzzle-piece"></i></span>
                         <div>
                             <div class="insights-title">Aggregated Insights</div>
                             <div style="color: var(--text-muted); font-size: 0.875rem;">Synthesized findings from all perspectives</div>
@@ -394,7 +395,7 @@
         <div id="metrics-section" style="display: none; margin-top: 2rem;">
             <div class="workflow-container">
                 <div class="workflow-header">
-                    <h3>📊 Execution Metrics</h3>
+                    <h3><i class="fas fa-chart-bar"></i> Execution Metrics</h3>
                 </div>
                 <div id="metrics-content"></div>
             </div>
@@ -402,11 +403,13 @@
     </main>
 
     <!-- Scripts -->
+    <script src="../shared/workflow-types.js"></script>
     <script src="../shared/api-client.js"></script>
     <script src="../shared/server-discovery.js"></script>
     <script src="../shared/settings-manager.js"></script>
     <script src="../shared/settings-ui.js"></script>
     <script src="../shared/settings-integration.js"></script>
+    <script src="../shared/websocket-client.js"></script>
     <script src="../shared/workflow-visualizer.js"></script>
     <script src="../shared/connection-status.js"></script>
     <script src="../shared/agent-config-manager.js"></script>

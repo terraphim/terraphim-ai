@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Routing - Smart Prototyping Environment</title>
     <link rel="stylesheet" href="../shared/styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .prototyping-environment {
             display: grid;
@@ -66,7 +67,7 @@
         }
 
         .model-option.recommended::after {
-            content: "✨ AI Recommended";
+            content: "AI Recommended";
             position: absolute;
             top: -8px;
             right: 8px;
@@ -238,7 +239,7 @@
 <body>
     <header class="header">
         <div class="container">
-            <h1>🧠 AI Routing</h1>
+            <h1><i class="fas fa-brain"></i> AI Routing</h1>
             <p>Smart Prototyping Environment - Intelligent model selection based on task complexity</p>
         </div>
     </header>
@@ -262,7 +263,7 @@
         <div class="prototyping-environment">
             <!-- Sidebar -->
             <div class="sidebar">
-                <h3>🎯 Smart AI Router</h3>
+                <h3><i class="fas fa-bullseye"></i> Smart AI Router</h3>
 
                 <!-- Model Selection Display -->
                 <div class="model-selector">
@@ -281,23 +282,23 @@
                     <h4>Prototype Templates</h4>
                     <div class="template-grid">
                         <div class="template-card" data-template="landing-page">
-                            <div class="template-title">🏠 Landing Page</div>
+                            <div class="template-title"><i class="fas fa-home"></i> Landing Page</div>
                             <div class="template-description">Marketing site with hero section</div>
                         </div>
                         <div class="template-card" data-template="dashboard">
-                            <div class="template-title">📊 Dashboard</div>
+                            <div class="template-title"><i class="fas fa-chart-bar"></i> Dashboard</div>
                             <div class="template-description">Analytics with charts and metrics</div>
                         </div>
                         <div class="template-card" data-template="ecommerce">
-                            <div class="template-title">🛒 E-commerce</div>
+                            <div class="template-title"><i class="fas fa-shopping-cart"></i> E-commerce</div>
                             <div class="template-description">Product catalog with cart</div>
                         </div>
                         <div class="template-card" data-template="saas-app">
-                            <div class="template-title">⚡ SaaS App</div>
+                            <div class="template-title"><i class="fas fa-bolt"></i> SaaS App</div>
                             <div class="template-description">Feature-rich application</div>
                         </div>
                         <div class="template-card" data-template="portfolio">
-                            <div class="template-title">🎨 Portfolio</div>
+                            <div class="template-title"><i class="fas fa-palette"></i> Portfolio</div>
                             <div class="template-description">Creative showcase site</div>
                         </div>
                     </div>
@@ -326,7 +327,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🤖 Agent Configuration</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-robot"></i> Agent Configuration</h3>
                     <div class="form-group">
                         <label class="form-label" for="role-selector">Select Agent Role:</label>
                         <select id="role-selector" class="form-input" data-testid="role-selector"></select>
@@ -344,7 +345,7 @@
                 </div>
 
                 <div class="sidebar-section">
-                    <h3 class="sidebar-title">🚀 Actions</h3>
+                    <h3 class="sidebar-title"><i class="fas fa-rocket"></i> Actions</h3>
                     <div class="controls">
                         <button id="sidebar-analyze-btn" class="btn">Analyze Task</button>
                         <button id="sidebar-generate-btn" class="btn primary" data-testid="execute-routing" disabled>Generate Prototype</button>
@@ -381,7 +382,7 @@
                 <!-- Preview Area -->
                 <div class="prototype-preview" id="prototype-preview">
                     <div style="color: var(--text-muted);">
-                        <h4>🚀 Ready to Prototype</h4>
+                        <h4><i class="fas fa-rocket"></i> Ready to Prototype</h4>
                         <p>Describe your idea above and click "Analyze Task" to see the AI routing in action.</p>
                         <p style="font-size: 0.875rem; margin-top: 1rem;">The system will analyze complexity and route to the optimal model automatically.</p>
                     </div>
@@ -404,6 +405,8 @@
     </main>
 
     <!-- Scripts -->
+    <script src="../shared/workflow-types.js"></script>
+    <script src="../shared/websocket-client.js"></script>
     <script src="../shared/api-client.js"></script>
     <script src="../shared/server-discovery.js"></script>
     <script src="../shared/settings-manager.js"></script>
