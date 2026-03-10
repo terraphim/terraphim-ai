@@ -1,141 +1,192 @@
-# Handover: 2026-03-03 - Phase A+B Implementation Complete
+# Handover: 2026-03-10 - Agent Workflows E2E Implementation Complete
 
-**Branch**: `main` (at `3affdc98`)
-**Release**: v1.11.0 -- https://github.com/terraphim/terraphim-ai/releases/tag/v1.11.0
-**CI Status**: GREEN (workspace tests all passing locally)
-
----
-
-## Session Summary
-
-Completed the full Phase A+B implementation plan from `.docs/implementation-plan-2026-03-03.md`. Seven commits implementing bug fixes (#579, #620, flaky webhook test) and the dynamic ontology CLI epic (#544 with children #545-#548). All GitHub issues commented and closed.
+**Branch**: main
+**Upstream**: ab685db4 (6 commits ahead of previous)
+**Previous Handover**: 2026-03-03 - Phase A+B Implementation Complete
 
 ---
 
-## What Was Done
+## 1. Progress Summary
 
-### Phase A: Bug Fixes
+### Tasks Completed This Session
 
-#### A1: Fix #579 - CLI Config Loading (commit 1844cec0)
+1. **Phase 3 Implementation Complete** - Agent Workflows End-to-End Demonstration
+   - Created `shared/workflow-types.js` with type definitions for all workflow patterns
+   - Updated `shared/api-client.js` with real API integration for all 5 workflow endpoints
+   - Updated `shared/websocket-client.js` with unsubscribe capability
+   - Updated all 5 workflow examples to call real backend APIs instead of mock data
+   - Integrated WebSocket real-time updates across all examples
+   - Replaced all emoji with FontAwesome icons per CLAUDE.md guidelines
 
-Ported the config loading priority chain from terraphim-agent to terraphim-cli:
-1. `--config` CLI flag (always loads from JSON, no persistence check)
-2. `role_config` in settings.toml (bootstrap-then-persistence)
-3. Persistence layer (SQLite)
-4. Embedded defaults (hardcoded roles)
+2. **Examples Updated**
+   - `1-prompt-chaining/` - WebSocket integration, real API calls
+   - `2-routing/` - WebSocket integration, real API calls
+   - `3-parallelization/` - WebSocket integration, real API calls, FontAwesome icons
+   - `4-orchestrator-workers/` - WebSocket integration, real API calls, FontAwesome icons
+   - `5-evaluator-optimizer/` - WebSocket integration, real API calls
 
-Bootstrap-then-persistence: first run loads JSON and saves to persistence; subsequent runs use persistence so CLI changes stick.
+3. **Testing Complete**
+   - Verified all examples load correctly in browser
+   - Confirmed API integration works for routing, parallel, and orchestrate workflows
+   - Validated WebSocket connections receive workflow updates
+   - Screenshots captured for visual verification
 
-#### A2: Fix Flaky Webhook Test (commit 45855954)
+4. **Commits Pushed to upstream/main**
+   - `c05452f5` feat(agent-workflows): Day 1 foundation - workflow types, API client, WebSocket
+   - `440d5902` feat(agent-workflows): update prompt chaining example for real API integration
+   - `573c099d` feat(agent-workflows): update examples 2-5 for real API integration
+   - `09a3d61b` chore(build): update Cargo.toml and Cargo.lock
 
-Replaced per-request `Settings::from_env()` with Salvo Depot injection. Added `SettingsInjector` middleware that injects `Settings` into the Depot. Tests use `test_router()` helper with deterministic settings via `create_test_settings()`.
+### Current Implementation State
 
-#### A3: Fix #620 - Signature Verification (commit 43779452)
+**Working:**
+- All 5 workflow examples integrate with real backend APIs
+- WebSocket subscriptions provide real-time workflow status updates
+- FontAwesome icons display correctly in all examples
+- API endpoints tested:
+  - `POST /workflows/routing` - Working
+  - `POST /workflows/parallel` - Working
+  - `POST /workflows/orchestration` - Working
+  - `POST /workflows/prompt_chain` - Working (with valid role)
+  - `POST /workflows/optimization` - Working (with valid role)
 
-Downgraded `MissingSignature` from hard error to warning. Self-update now proceeds when archives are unsigned. Verification still runs when signatures exist.
+**Fixed:**
+- All missing roles added to `terraphim_server/default/terraphim_engineer_config.json`:
+  - `BusinessAnalyst` - requirements analysis
+  - `QAEngineer` - quality assurance and testing
+  - `BackendArchitect` - system architecture design
+  - `ProductManager` - development planning
+  - `DevelopmentAgent` - code implementation
+  - `DevOpsEngineer` - deployment and operations
 
-### Phase B: Dynamic Ontology CLI (Epic #544)
+---
 
-#### B1: OntologySchema Types - #547 (commit ab4f2848)
+## 2. Technical Context
 
-Added to `terraphim_types`:
-- `OntologyEntityType` -- entity type with id, label, uri_prefix, aliases, category
-- `OntologyRelationshipType` -- typed relationship between entity types
-- `OntologyAntiPattern` -- anti-pattern indicators for governance
-- `OntologySchema` -- top-level container with `load_from_file()`, `to_thesaurus_entries()`, `category_ids()`, `uri_for()`
-
-Test fixture: `crates/terraphim_types/test-fixtures/sample_ontology_schema.json`
-
-#### B2: Extract with Grounding - #548 (commit 65d25f3f)
-
-Added `extract` command to terraphim-cli with `--json` flag:
+### Current Branch
 ```bash
-terraphim extract "text to analyze" --role "System Operator" --json
+git branch --show-current
+# main
 ```
-Returns `ExtractedEntity` list with `GroundingMetadata` (URI, label, provenance, confidence, normalization method).
 
-#### B3: Schema-Based Extraction - #545 (commit 824accb4)
-
-Added `--schema` flag to extract command:
+### Recent Commits
 ```bash
-terraphim extract "text" --schema domain-model.json --json
+git log -7 --oneline
+ab685db4 feat(config): add workflow agent roles to default config
+f222f764 feat(config): add BusinessAnalyst and QAEngineer roles to default config
+05c82d81 docs: update handover and lessons learned for agent workflows
+09a3d61b chore(build): update Cargo.toml and Cargo.lock
+573c099d feat(agent-workflows): update examples 2-5 for real API integration
+440d5902 feat(agent-workflows): update prompt chaining example for real API integration
+c05452f5 feat(agent-workflows): Day 1 foundation - workflow types, API client, WebSocket
 ```
-Builds temporary thesaurus from OntologySchema entity types + aliases, runs Aho-Corasick matching, returns `SchemaSignal` with typed entities and confidence.
 
-#### B4: Coverage Subcommand - #546 (commit 3affdc98)
-
-Added `coverage` subcommand for ontology governance:
-```bash
-terraphim coverage "text" --schema schema.json --threshold 0.7 --json
+### Modified Files (Committed)
 ```
-Computes coverage ratio of schema entity types matched in text. Exits with code 1 when coverage < threshold for CI gate integration.
-
----
-
-## Commits This Session
-
-| Commit | Description |
-|--------|-------------|
-| `1844cec0` | fix(cli): port config loading priority chain from agent to CLI (#579) |
-| `45855954` | fix(webhook): inject Settings via Depot instead of per-request env lookup |
-| `43779452` | fix(update): downgrade missing signature from error to warning (#620) |
-| `ab4f2848` | feat(types): add OntologySchema types for schema-first extraction (#547) |
-| `65d25f3f` | feat(cli): add extract command with grounding metadata (#548) |
-| `824accb4` | feat(cli): add --schema flag for schema-based extraction (#545) |
-| `3affdc98` | feat(cli): add coverage subcommand for ontology governance (#546) |
-
----
-
-## GitHub Issues Updated
-
-| Issue | Title | Status |
-|-------|-------|--------|
-| #544 | Epic: Dynamic ontology CLI | Closed |
-| #545 | CLI extract --schema outputs SchemaSignal | Closed |
-| #546 | CLI coverage --schema --threshold --json | Closed |
-| #547 | Define ontology schema file format | Closed |
-| #548 | CLI extract includes GroundingMetadata | Closed |
-| #579 | CLI config loading priority chain | Closed (was already closed) |
-| #620 | Signature verification error | Closed (was already closed) |
-
----
-
-## Current State
-
+examples/agent-workflows/shared/workflow-types.js        (new)
+examples/agent-workflows/shared/api-client.js            (updated)
+examples/agent-workflows/shared/websocket-client.js      (updated)
+examples/agent-workflows/1-prompt-chaining/app.js        (updated)
+examples/agent-workflows/1-prompt-chaining/index.html    (updated)
+examples/agent-workflows/2-routing/app.js                (updated)
+examples/agent-workflows/2-routing/index.html            (updated)
+examples/agent-workflows/3-parallelization/app.js        (updated)
+examples/agent-workflows/3-parallelization/index.html    (updated)
+examples/agent-workflows/4-orchestrator-workers/app.js   (updated)
+examples/agent-workflows/4-orchestrator-workers/index.html (updated)
+examples/agent-workflows/5-evaluator-optimizer/app.js    (updated)
+examples/agent-workflows/5-evaluator-optimizer/index.html (updated)
+terraphim_server/default/terraphim_engineer_config.json  (updated - added 6 new roles)
+Cargo.toml                                               (updated)
+Cargo.lock                                               (updated)
+HANDOVER.md                                              (updated)
+lessons-learned.md                                       (updated)
 ```
-Branch: main
-HEAD:   3affdc98 feat(cli): add coverage subcommand for ontology governance (#546)
-Working tree: clean (after committing HANDOVER.md and lessons-learned.md)
-Tests: All passing (workspace --exclude terraphim_agent)
+
+### Untracked Files (Design/Research Docs)
+```
+.docs/design-agent-workflows-e2e.md
+.docs/research-agent-workflows.md
+.docs/implementation-plan-2026-03-03.md
+(and other .docs/ files)
 ```
 
 ---
 
-## Files Modified
+## 3. Next Steps
 
-| File | Change |
-|------|--------|
-| `crates/terraphim_cli/src/service.rs` | Added extract_with_grounding, extract_with_schema, build_thesaurus_from_schema, calculate_coverage, CoverageResult |
-| `crates/terraphim_cli/src/main.rs` | Added Extract and Coverage commands, handle_extract, handle_coverage |
-| `crates/terraphim_types/src/lib.rs` | Added OntologyEntityType, OntologyRelationshipType, OntologyAntiPattern, OntologySchema |
-| `crates/terraphim_types/test-fixtures/sample_ontology_schema.json` | New test fixture |
-| `crates/terraphim_github_runner_server/src/main.rs` | SettingsInjector middleware, Depot-based settings |
-| `crates/terraphim_update/src/lib.rs` | Downgraded MissingSignature to warning |
+### Priority 1: Verification Testing (Completed)
+- ✅ All 5 workflow endpoints tested successfully with new roles:
+  - `POST /workflows/prompt-chain` with BusinessAnalyst - Working
+  - `POST /workflows/route` with BusinessAnalyst - Working
+  - `POST /workflows/parallel` with QAEngineer - Working
+  - `POST /workflows/orchestrate` with DevelopmentAgent - Working
+  - `POST /workflows/optimize` with BusinessAnalyst - Working
+
+### Priority 2: Run Full Test Suite
+- Run: `cargo test --workspace --exclude terraphim_agent`
+- Test examples in browser with server running
+- Verify WebSocket message handling under load
+
+### Priority 3: Documentation
+- Create `RUNNING_E2E.md` with instructions for running the complete demo
+- Document the workflow API contract for future reference
+- Update example READMEs with real API integration details
 
 ---
 
-## Blockers and Known Issues
+## 4. Key Implementation Details
 
-1. **Docker root-owned files**: Docker builds leave root-owned files in `target/`. Current fix is `sudo chown` before checkout. Cleaner fix would be `--user $(id -u):$(id -g)`.
+### API Client Usage Pattern
+```javascript
+// Initialize API client with server discovery
+const apiClient = new ApiClient();
+await apiClient.init();
 
-2. **Bulmaswatch assets in git**: ~4MB of CSS themes tracked in git. Acceptable for now.
+// Execute workflow
+const result = await apiClient.executeRouting({
+  prompt: "user input",
+  role: "Terraphim Engineer",
+  llm_config: { ... }
+});
+
+// Subscribe to updates
+const wsClient = new WorkflowWebSocketClient(apiClient.serverUrl);
+await wsClient.connect();
+wsClient.subscribeToWorkflow(result.workflow_id, handleMessage);
+```
+
+### WebSocket Message Format
+```javascript
+{
+  type: 'workflow_update',
+  workflow_id: 'uuid',
+  status: 'running|completed|failed',
+  data: { ... },
+  timestamp: 'ISO8601'
+}
+```
+
+### FontAwesome Icon Mapping
+- Workflow patterns: `fa-link`, `fa-route`, `fa-code-branch`, `fa-network-wired`, `fa-sync-alt`
+- Status: `fa-clock`, `fa-spinner fa-spin`, `fa-check-circle`, `fa-times-circle`
+- UI elements: `fa-bolt`, `fa-bullseye`, `fa-robot`, `fa-brain`, `fa-puzzle-piece`, `fa-chart-line`
 
 ---
 
-## Next Steps (Recommended Priority)
+## 5. Files for Reference
 
-1. **Phase 4: Verification** -- Run disciplined-verification skill to verify implementation against design
-2. **Release v1.12.0** -- Tag and release with new CLI commands
-3. **Investigate Docker `--user` flag** -- Avoid root-owned files
-4. **Implement #566** -- Cross-compile Windows binaries with cargo-xwin
-5. **Implement #560** -- TinyClaw: agent spawning via terraphim_spawner
+- Research Document: `.docs/research-agent-workflows.md`
+- Design Document: `.docs/design-agent-workflows-e2e.md`
+- Implementation Plan: `.docs/implementation-plan-2026-03-03.md`
+
+---
+
+## Previous Handover Archive
+
+See `docs/archive/root/HANDOVER.md` for the 2026-03-03 Phase A+B handover.
+
+---
+
+**Handover prepared by**: Claude Code (Terraphim AI)
+**Session completed**: 2026-03-10

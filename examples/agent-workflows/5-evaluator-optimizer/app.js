@@ -322,14 +322,49 @@ class EvaluatorOptimizerDemo {
     this.visualizer.updateStepStatus('generate', 'active');
     this.visualizer.updateProgress(20, 'Generating initial content...');
 
+    // Prepare agent state
+    const agentState = this.agentConfigManager ? this.agentConfigManager.getState() : {};
+
     try {
-      // Generate initial content
-      const initialContent = await this.generateContent(prompt, null);
+      // Call real optimization API for initial generation
+      const result = await this.apiClient.executeOptimization({
+        prompt: prompt,
+        role: agentState.selectedRole || 'TechnicalWriter',
+        overall_role: this.terraphimConfig.overallRole,
+        steps: this.qualityCriteria.filter(c => c.enabled).map(c => ({
+          id: c.id,
+          name: c.name,
+          weight: c.weight
+        })),
+        llm_config: {
+          provider: 'ollama',
+          model: 'gemma3:270m',
+          max_iterations: this.maxIterations,
+          quality_threshold: this.qualityThreshold,
+          ...getDefaultLlmConfig()
+        }
+      });
+
+      console.log('Optimization API result:', result);
+
+      // Subscribe to WebSocket updates if workflow_id is available
+      let wsUnsubscribe = null;
+      if (result.workflow_id && this.apiClient.wsClient) {
+        wsUnsubscribe = this.apiClient.subscribeToWorkflow(result.workflow_id, (message) => {
+          this.handleWorkflowMessage(message);
+        });
+      }
+
       this.currentIteration = 1;
 
       this.visualizer.updateStepStatus('generate', 'completed');
       this.visualizer.updateStepStatus('evaluate', 'active');
       this.visualizer.updateProgress(50, 'Evaluating content quality...');
+
+      // Get initial content from API result or fall back to generation
+      const initialContent = (result.result && result.result.initial_content) ||
+        (result.result && result.result.content) ||
+        await this.generateContent(prompt, null);
 
       // Evaluate initial content
       const qualityScores = await this.evaluateContent(initialContent, prompt);
@@ -350,6 +385,11 @@ class EvaluatorOptimizerDemo {
       this.visualizer.updateStepStatus('evaluate', 'completed');
       this.visualizer.updateProgress(100, 'Initial content generated and evaluated!');
 
+      // Unsubscribe from WebSocket after initial generation
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+      }
+
       // Update UI
       this.renderContentVersion(version);
       this.renderIterationHistory();
@@ -365,6 +405,74 @@ class EvaluatorOptimizerDemo {
       console.error('Generation failed:', error);
       document.getElementById('workflow-status').textContent = 'Error';
       document.getElementById('workflow-status').className = 'workflow-status error';
+      alert(`Generation failed: ${error.message}`);
+    }
+  }
+
+  /**
+   * Handle WebSocket messages for workflow updates
+   */
+  handleWorkflowMessage(message) {
+    console.log('WebSocket message received:', message);
+
+    switch (message.type) {
+      case 'progress':
+        // Update progress
+        if (message.data && message.data.progress) {
+          this.visualizer.updateProgress(message.data.progress, message.data.message || 'Processing...');
+        }
+        break;
+
+      case 'status':
+        // Update workflow status
+        if (message.data && message.data.status) {
+          document.getElementById('workflow-status').textContent = message.data.status;
+          document.getElementById('workflow-status').className = `workflow-status ${message.data.status.toLowerCase()}`;
+        }
+        break;
+
+      case 'iteration':
+        // Handle iteration updates
+        if (message.data) {
+          this.currentIteration = message.data.iteration || this.currentIteration;
+          if (message.data.quality_scores) {
+            this.qualityHistory.push(message.data.quality_scores.overall);
+          }
+        }
+        break;
+
+      case 'result':
+        // Handle iteration results
+        if (message.data && message.data.version) {
+          const version = message.data.version;
+          this.contentVersions.push(version);
+          if (version.qualityScores && version.qualityScores.overall > this.bestVersion.qualityScores.overall) {
+            this.bestVersion = version;
+            this.updateBestVersionInfo();
+          }
+          this.renderContentVersion(version);
+          this.renderIterationHistory();
+          this.renderCurrentMetrics();
+        }
+        break;
+
+      case 'error':
+        // Handle errors
+        console.error('Workflow error:', message.data);
+        if (message.data && message.data.message) {
+          alert(`Workflow error: ${message.data.message}`);
+        }
+        break;
+
+      case 'complete':
+        // Workflow completed
+        console.log('Workflow completed:', message.data);
+        this.visualizer.updateStepStatus('optimize', 'completed');
+        this.visualizer.updateProgress(100, 'Optimization completed!');
+        break;
+
+      default:
+        console.log('Unknown message type:', message.type);
     }
   }
 

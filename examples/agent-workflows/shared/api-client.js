@@ -106,7 +106,7 @@ class TerraphimApiClient {
   // Debug mode methods
   setDebugMode(enabled) {
     this.debugMode = Boolean(enabled);
-    console.log(`🐛 API Client Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
+    console.log(`[DEBUG] API Client Debug Mode: ${this.debugMode ? 'ON' : 'OFF'}`);
   }
 
   onDebugLog(callback) {
@@ -160,8 +160,8 @@ class TerraphimApiClient {
     };
 
     // Console logging with sanitization
-    const icon = type === 'request' ? '→' : '←';
-    console.group(`🐛 ${icon} LLM ${type.toUpperCase()}`);
+    const icon = type === 'request' ? '->' : '<-';
+    console.group(`[DEBUG] ${icon} LLM ${type.toUpperCase()}`);
     console.log('Timestamp:', debugEntry.timestamp);
 
     if (type === 'request') {
@@ -368,7 +368,7 @@ class TerraphimApiClient {
       ...(input.steps && { steps: input.steps })  // Include step configurations
     };
 
-    return this.request('/workflows/prompt-chain', {
+    return this.request('/workflows/prompt_chain', {
       method: 'POST',
       body: JSON.stringify(request),
     });
@@ -1044,6 +1044,81 @@ class TerraphimApiClient {
     };
   }
 
+  /**
+   * Subscribe to workflow status updates via WebSocket
+   * @param {string} workflowId - Workflow ID to subscribe to
+   * @param {Function} callback - Callback function for status updates
+   * @returns {Function} Unsubscribe function
+   */
+  subscribeToWorkflow(workflowId, callback) {
+    if (!this.wsClient) {
+      console.warn('[API Client] WebSocket not available for workflow subscription');
+      return () => {};
+    }
+
+    const handler = (data) => {
+      if (data.workflow_id === workflowId || data.sessionId === workflowId) {
+        callback(data);
+      }
+    };
+
+    // Subscribe to all workflow-related events
+    this.wsClient.subscribe('workflow_status', handler);
+    this.wsClient.subscribe('workflow_progress', handler);
+    this.wsClient.subscribe('workflow_completed', handler);
+    this.wsClient.subscribe('workflow_error', handler);
+
+    // Return unsubscribe function
+    return () => {
+      this.wsClient.unsubscribe('workflow_status', handler);
+      this.wsClient.unsubscribe('workflow_progress', handler);
+      this.wsClient.unsubscribe('workflow_completed', handler);
+      this.wsClient.unsubscribe('workflow_error', handler);
+    };
+  }
+
+  /**
+   * Cancel a running workflow
+   * @param {string} workflowId - Workflow ID to cancel
+   * @returns {Promise<Object>} Cancellation result
+   */
+  async cancelWorkflow(workflowId) {
+    return this.request(`/workflows/${workflowId}/cancel`, {
+      method: 'POST',
+    });
+  }
+
+  /**
+   * List active workflow sessions
+   * @returns {Promise<Array>} List of workflow sessions
+   */
+  async listWorkflowSessions() {
+    return this.request('/workflows/sessions');
+  }
+
+  /**
+   * Check backend health and capabilities
+   * @returns {Promise<Object>} Health status including workflow support
+   */
+  async checkBackendHealth() {
+    try {
+      const response = await this.request('/health');
+      return {
+        healthy: true,
+        workflowsSupported: true,
+        websocketSupported: !!this.wsClient,
+        ...response
+      };
+    } catch (error) {
+      return {
+        healthy: false,
+        workflowsSupported: false,
+        websocketSupported: false,
+        error: error.message
+      };
+    }
+  }
+
   // Agent configuration helper methods
   getDefaultRoleForWorkflow(workflowType) {
     const workflowRoleMap = {
@@ -1130,11 +1205,11 @@ class TerraphimApiClient {
   // Helper methods for workflow execution
   getWorkflowEndpoint(workflowType) {
     const endpointMap = {
-      'prompt-chain': 'prompt-chain',
-      'routing': 'route',
+      'prompt-chain': 'prompt_chain',
+      'routing': 'routing',
       'parallel': 'parallel',
-      'orchestration': 'orchestrate',
-      'optimization': 'optimize'
+      'orchestration': 'orchestration',
+      'optimization': 'optimization'
     };
     return endpointMap[workflowType] || workflowType;
   }

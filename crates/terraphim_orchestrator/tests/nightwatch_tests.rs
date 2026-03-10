@@ -13,14 +13,14 @@ fn test_nightwatch_accumulates_from_output() {
     // Feed a mix of stdout and stderr events
     for i in 0..80 {
         let event = OutputEvent::Stdout {
-            process_id: pid.clone(),
+            process_id: pid,
             line: format!("output line {}", i),
         };
         monitor.observe("test-agent", &event);
     }
     for i in 0..20 {
         let event = OutputEvent::Stderr {
-            process_id: pid.clone(),
+            process_id: pid,
             line: format!("error line {}", i),
         };
         monitor.observe("test-agent", &event);
@@ -62,7 +62,7 @@ fn test_nightwatch_multi_agent_independent_tracking() {
         monitor.observe(
             "agent-a",
             &OutputEvent::Stderr {
-                process_id: pid.clone(),
+                process_id: pid,
                 line: "error".to_string(),
             },
         );
@@ -71,7 +71,7 @@ fn test_nightwatch_multi_agent_independent_tracking() {
         monitor.observe(
             "agent-a",
             &OutputEvent::Stdout {
-                process_id: pid.clone(),
+                process_id: pid,
                 line: "ok".to_string(),
             },
         );
@@ -82,7 +82,7 @@ fn test_nightwatch_multi_agent_independent_tracking() {
         monitor.observe(
             "agent-b",
             &OutputEvent::Stdout {
-                process_id: pid.clone(),
+                process_id: pid,
                 line: "ok".to_string(),
             },
         );
@@ -91,7 +91,7 @@ fn test_nightwatch_multi_agent_independent_tracking() {
         monitor.observe(
             "agent-b",
             &OutputEvent::Stderr {
-                process_id: pid.clone(),
+                process_id: pid,
                 line: "warning".to_string(),
             },
         );
@@ -126,7 +126,7 @@ fn test_nightwatch_reset_isolated_to_agent() {
             monitor.observe(
                 agent,
                 &OutputEvent::Stderr {
-                    process_id: pid.clone(),
+                    process_id: pid,
                     line: "error".to_string(),
                 },
             );

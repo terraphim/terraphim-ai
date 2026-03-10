@@ -513,20 +513,26 @@ class RoutingPrototypingDemo {
       ? this.settingsIntegration.enhanceWorkflowInput(input)
       : input;
 
+    let wsUnsubscribe = null;
+
     try {
-      // FORCE HTTP ONLY - bypass any WebSocket caching issues
-      const result = await this.apiClient.request('/workflows/route', {
-        method: 'POST',
-        body: JSON.stringify({
-          prompt: enhancedInput.prompt,
-          role: enhancedInput.role || enhancedInput.input?.role,
-          overall_role: enhancedInput.overall_role || enhancedInput.input?.overall_role || 'engineering_agent',
-          ...(enhancedInput.config && { config: enhancedInput.config }),
-          ...(enhancedInput.llm_config && { llm_config: enhancedInput.llm_config })
-        })
+      // Use the API client executeRouting method
+      const result = await this.apiClient.executeRouting({
+        prompt: enhancedInput.prompt,
+        role: enhancedInput.role || enhancedInput.input?.role,
+        overall_role: enhancedInput.overall_role || enhancedInput.input?.overall_role || 'engineering_agent',
+        ...(enhancedInput.config && { config: enhancedInput.config }),
+        ...(enhancedInput.llm_config && { llm_config: enhancedInput.llm_config })
       });
 
       console.log('Routing HTTP result:', result);
+
+      // Subscribe to WebSocket updates for this workflow
+      if (result.workflow_id && this.apiClient.wsClient) {
+        wsUnsubscribe = this.apiClient.subscribeToWorkflow(result.workflow_id, (message) => {
+          this.handleWorkflowMessage(message, pipeline);
+        });
+      }
 
       this.generationResult = result;
       this.renderPrototypeResult(result);
@@ -540,6 +546,56 @@ class RoutingPrototypingDemo {
       pipeline.updateStepStatus('generate', 'error');
     } finally {
       this.setGenerateButtonState(false);
+      // Cleanup WebSocket subscription
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+      }
+    }
+  }
+
+  /**
+   * Handle WebSocket messages for workflow updates
+   * @param {Object} message - WebSocket message
+   * @param {Object} pipeline - Workflow visualizer pipeline
+   */
+  handleWorkflowMessage(message, pipeline) {
+    console.log('Routing workflow WebSocket message:', message);
+
+    switch (message.type) {
+      case 'progress':
+        // Update progress
+        if (message.data && message.data.progress) {
+          this.visualizer.updateProgress(
+            message.data.progress,
+            message.data.message || 'Routing task...'
+          );
+        }
+        break;
+
+      case 'status':
+        // Handle status updates
+        if (message.status === 'completed') {
+          pipeline.updateStepStatus('generate', 'completed');
+        } else if (message.status === 'failed') {
+          pipeline.updateStepStatus('generate', 'error');
+        }
+        break;
+
+      case 'routing_decision':
+        // Handle routing decision updates
+        if (message.data && message.data.selected_model) {
+          console.log('Routing decision:', message.data.selected_model);
+          // Update UI to show selected model
+          this.selectModel(message.data.selected_model);
+        }
+        break;
+
+      case 'error':
+        console.error('Routing workflow error from WebSocket:', message.data);
+        break;
+
+      default:
+        console.log('Unhandled WebSocket message type:', message.type);
     }
   }
 

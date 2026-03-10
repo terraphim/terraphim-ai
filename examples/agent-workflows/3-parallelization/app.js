@@ -19,7 +19,8 @@ class ParallelizationAnalysisDemo {
       analytical: {
         id: 'analytical',
         name: 'Analytical Perspective',
-        icon: '🔍',
+        icon: 'fa-search',
+        iconClass: 'fas fa-search',
         description: 'Data-driven analysis with facts, statistics, and logical reasoning',
         color: '#3b82f6',
         strengths: ['Objective analysis', 'Data interpretation', 'Logical reasoning'],
@@ -28,7 +29,8 @@ class ParallelizationAnalysisDemo {
       creative: {
         id: 'creative',
         name: 'Creative Perspective',
-        icon: '🎨',
+        icon: 'fa-palette',
+        iconClass: 'fas fa-palette',
         description: 'Innovative thinking with alternative solutions and possibilities',
         color: '#8b5cf6',
         strengths: ['Innovation', 'Alternative solutions', 'Out-of-box thinking'],
@@ -37,7 +39,8 @@ class ParallelizationAnalysisDemo {
       practical: {
         id: 'practical',
         name: 'Practical Perspective',
-        icon: '🛠️',
+        icon: 'fa-tools',
+        iconClass: 'fas fa-tools',
         description: 'Real-world implementation focus with actionable insights',
         color: '#10b981',
         strengths: ['Implementation', 'Real-world applicability', 'Action-oriented'],
@@ -46,7 +49,8 @@ class ParallelizationAnalysisDemo {
       critical: {
         id: 'critical',
         name: 'Critical Perspective',
-        icon: '⚠️',
+        icon: 'fa-exclamation-triangle',
+        iconClass: 'fas fa-exclamation-triangle',
         description: 'Challenge assumptions, identify risks, and find potential issues',
         color: '#f59e0b',
         strengths: ['Risk assessment', 'Assumption challenging', 'Problem identification'],
@@ -55,7 +59,8 @@ class ParallelizationAnalysisDemo {
       strategic: {
         id: 'strategic',
         name: 'Strategic Perspective',
-        icon: '🎯',
+        icon: 'fa-bullseye',
+        iconClass: 'fas fa-bullseye',
         description: 'Long-term planning with big-picture thinking and future focus',
         color: '#ef4444',
         strengths: ['Long-term planning', 'Big-picture view', 'Future-focused'],
@@ -64,7 +69,8 @@ class ParallelizationAnalysisDemo {
       user_centered: {
         id: 'user_centered',
         name: 'User-Centered Perspective',
-        icon: '👥',
+        icon: 'fa-users',
+        iconClass: 'fas fa-users',
         description: 'Human impact focus with user experience and stakeholder needs',
         color: '#06b6d4',
         strengths: ['User experience', 'Human impact', 'Stakeholder needs'],
@@ -377,6 +383,8 @@ class ParallelizationAnalysisDemo {
       this.visualizer.updateParallelTask(perspectiveId, progress);
     }, 100);
 
+    let wsUnsubscribe = null;
+
     try {
       // Enhanced agent configuration for parallel processing
       const agentConfig = this.apiClient.createAgentWorkflowConfig('parallel', {
@@ -400,20 +408,24 @@ class ParallelizationAnalysisDemo {
         }
       });
 
-      // Execute real parallelization workflow with enhanced agent configuration
-      // FORCE HTTP ONLY - bypass any WebSocket caching issues
-      const result = await this.apiClient.request('/workflows/parallel', {
-        method: 'POST',
-        body: JSON.stringify({
-          prompt: topic,
-          role: agentConfig.role || agentConfig.input?.role,
-          overall_role: agentConfig.overall_role || agentConfig.input?.overall_role || 'engineering_agent',
-          ...(agentConfig.config && { config: agentConfig.config }),
-          ...(agentConfig.llm_config && { llm_config: agentConfig.llm_config })
-        })
+      // Execute real parallelization workflow using API client method
+      const result = await this.apiClient.executeParallel({
+        prompt: topic,
+        role: agentConfig.role || agentConfig.input?.role,
+        overall_role: agentConfig.overall_role || agentConfig.input?.overall_role || 'engineering_agent',
+        perspectives: Array.from(this.selectedPerspectives),
+        ...(agentConfig.config && { config: agentConfig.config }),
+        ...(agentConfig.llm_config && { llm_config: agentConfig.llm_config })
       });
 
       console.log('Parallel HTTP result:', result);
+
+      // Subscribe to WebSocket updates for this workflow
+      if (result.workflow_id && this.apiClient.wsClient) {
+        wsUnsubscribe = this.apiClient.subscribeToWorkflow(result.workflow_id, (message) => {
+          this.handleWorkflowMessage(message, perspectiveId);
+        });
+      }
 
       clearInterval(progressInterval);
       this.visualizer.updateParallelTask(perspectiveId, 100);
@@ -436,6 +448,44 @@ class ParallelizationAnalysisDemo {
       clearInterval(progressInterval);
       this.updatePerspectiveStatus(perspectiveId, 'error', 'Error');
       throw error;
+    } finally {
+      // Cleanup WebSocket subscription
+      if (wsUnsubscribe) {
+        wsUnsubscribe();
+      }
+    }
+  }
+
+  /**
+   * Handle WebSocket messages for workflow updates
+   * @param {Object} message - WebSocket message
+   * @param {string} perspectiveId - Current perspective ID
+   */
+  handleWorkflowMessage(message, perspectiveId) {
+    console.log('Parallel workflow WebSocket message:', message);
+
+    switch (message.type) {
+      case 'progress':
+        // Update progress for the specific perspective
+        if (message.data && message.data.progress) {
+          this.visualizer.updateParallelTask(perspectiveId, message.data.progress);
+        }
+        break;
+
+      case 'perspective_complete':
+        // Handle perspective completion
+        if (message.data && message.data.perspective_id === perspectiveId) {
+          this.visualizer.updateParallelTask(perspectiveId, 100);
+          this.updatePerspectiveStatus(perspectiveId, 'completed', 'Completed');
+        }
+        break;
+
+      case 'error':
+        console.error('Parallel workflow error from WebSocket:', message.data);
+        break;
+
+      default:
+        console.log('Unhandled WebSocket message type:', message.type);
     }
   }
 
@@ -572,7 +622,7 @@ class ParallelizationAnalysisDemo {
     resultElement.innerHTML = `
       <div class="result-header">
         <div class="result-title">
-          <span style="color: ${perspective.color};">${perspective.icon}</span>
+          <span style="color: ${perspective.color};"><i class="${perspective.iconClass}"></i></span>
           ${perspective.name}
         </div>
         <div class="result-meta">
