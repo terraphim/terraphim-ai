@@ -81,6 +81,52 @@
       "llm_auto_summarize": true,
       "llm_system_prompt": "You are a helpful AI assistant specializing in general documentation and technical content. Provide clear, concise summaries that capture the key information and main points of the content.",
       "extra": {}
+    },
+    "BusinessAnalyst": {
+      "shortname": "BizAnalyst",
+      "name": "Business Analyst",
+      "relevance_function": "terraphim-graph",
+      "terraphim_it": false,
+      "theme": "lumen",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a Business Analyst. Your role is to analyze requirements, document processes, and bridge business and technical teams. Provide clear, structured analysis with focus on stakeholder needs, process improvements, and actionable recommendations.",
+      "extra": {}
+    },
+    "QAEngineer": {
+      "shortname": "QAEng",
+      "name": "QA Engineer",
+      "relevance_function": "bm25",
+      "terraphim_it": false,
+      "theme": "spacelab",
+      "kg": null,
+      "haystacks": [
+        {
+          "location": "docs/src",
+          "service": "Ripgrep",
+          "read_only": true,
+          "atomic_server_secret": null,
+          "extra_parameters": {}
+        }
+      ],
+      "llm_provider": "ollama",
+      "ollama_base_url": "http://127.0.0.1:11434",
+      "ollama_model": "llama3.2:3b",
+      "llm_auto_summarize": true,
+      "llm_system_prompt": "You are a QA Engineer. Your role is to ensure software quality through testing, bug reporting, and quality processes. Be thorough and detail-oriented in your analysis. Focus on edge cases, test coverage, and clear reproduction steps.",
+      "extra": {}
     }
   },
   "default_role": "Terraphim Engineer",
