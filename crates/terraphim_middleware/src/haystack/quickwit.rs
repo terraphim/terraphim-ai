@@ -1,5 +1,5 @@
-use crate::Result;
 use crate::indexer::IndexMiddleware;
+use crate::Result;
 use reqwest::Client;
 use serde::Deserialize;
 use std::time::Duration;
