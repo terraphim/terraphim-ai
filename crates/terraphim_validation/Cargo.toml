@@ -68,7 +68,7 @@ term_size = "0.3"
 # Docker and container support
 bollard = { version = "0.18", optional = true }
 ahash = "0.8.12"
-axum-test = "18.4.1"
+axum-test = "19.1.1"
 
 # Platform-specific dependencies
 [target.'cfg(unix)'.dependencies]
