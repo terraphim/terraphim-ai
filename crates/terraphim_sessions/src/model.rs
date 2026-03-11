@@ -237,6 +237,49 @@ impl Session {
                 }
             })
     }
+
+    /// Extract all file accesses from the session
+    ///
+    /// Parses tool invocations to identify files that were read or written.
+    /// Returns a vector of FileAccess records with timestamps from the
+    /// corresponding messages.
+    pub fn extract_file_accesses(&self) -> Vec<FileAccess> {
+        let mut accesses = Vec::new();
+
+        for msg in &self.messages {
+            for block in &msg.blocks {
+                if let ContentBlock::ToolUse { name, input, .. } = block {
+                    // Determine operation type based on tool name
+                    let operation = match name.as_str() {
+                        "Read" | "Glob" | "Grep" => FileOperation::Read,
+                        "Edit" | "Write" | "MultiEdit" | "NotebookEdit" => FileOperation::Write,
+                        _ => continue, // Skip tools that don't access files
+                    };
+
+                    // Extract file path based on tool type
+                    let path = match name.as_str() {
+                        "Read" | "Edit" | "Write" | "MultiEdit" => {
+                            input.get("file_path").and_then(|v| v.as_str())
+                        }
+                        "NotebookEdit" => input.get("notebook_path").and_then(|v| v.as_str()),
+                        "Glob" | "Grep" => input.get("path").and_then(|v| v.as_str()),
+                        _ => None,
+                    };
+
+                    if let Some(path) = path {
+                        accesses.push(FileAccess {
+                            path: path.to_string(),
+                            operation,
+                            timestamp: msg.created_at,
+                            tool_name: name.clone(),
+                        });
+                    }
+                }
+            }
+        }
+
+        accesses
+    }
 }
 
 #[cfg(test)]
@@ -470,6 +513,143 @@ mod tests {
             metadata: SessionMetadata::default(),
         };
         assert!(session.duration_ms().is_none());
+    }
+
+    #[test]
+    fn test_session_extract_file_accesses_read_tools() {
+        use serde_json::json;
+
+        let mut msg = Message::text(0, MessageRole::Assistant, "reading files");
+        msg.created_at = Some("2024-01-15T10:00:00Z".parse().unwrap());
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: json!({"file_path": "/path/to/file.rs"}),
+        });
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "2".to_string(),
+            name: "Glob".to_string(),
+            input: json!({"path": "/src/**/*.rs"}),
+        });
+
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![msg],
+            metadata: SessionMetadata::default(),
+        };
+
+        let accesses = session.extract_file_accesses();
+        assert_eq!(accesses.len(), 2);
+        assert_eq!(accesses[0].path, "/path/to/file.rs");
+        assert_eq!(accesses[0].operation, FileOperation::Read);
+        assert_eq!(accesses[0].tool_name, "Read");
+        assert_eq!(accesses[1].path, "/src/**/*.rs");
+        assert_eq!(accesses[1].operation, FileOperation::Read);
+        assert_eq!(accesses[1].tool_name, "Glob");
+    }
+
+    #[test]
+    fn test_session_extract_file_accesses_write_tools() {
+        use serde_json::json;
+
+        let mut msg = Message::text(0, MessageRole::Assistant, "writing files");
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Edit".to_string(),
+            input: json!({"file_path": "/path/to/file.rs"}),
+        });
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "2".to_string(),
+            name: "Write".to_string(),
+            input: json!({"file_path": "/path/to/output.txt"}),
+        });
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "3".to_string(),
+            name: "MultiEdit".to_string(),
+            input: json!({"file_path": "/path/to/multi.rs"}),
+        });
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "4".to_string(),
+            name: "NotebookEdit".to_string(),
+            input: json!({"notebook_path": "/path/to/notebook.ipynb"}),
+        });
+
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![msg],
+            metadata: SessionMetadata::default(),
+        };
+
+        let accesses = session.extract_file_accesses();
+        assert_eq!(accesses.len(), 4);
+        assert_eq!(accesses[0].operation, FileOperation::Write);
+        assert_eq!(accesses[1].operation, FileOperation::Write);
+        assert_eq!(accesses[2].operation, FileOperation::Write);
+        assert_eq!(accesses[3].operation, FileOperation::Write);
+        assert_eq!(accesses[3].path, "/path/to/notebook.ipynb");
+    }
+
+    #[test]
+    fn test_session_extract_file_accesses_skips_unknown_tools() {
+        use serde_json::json;
+
+        let mut msg = Message::text(0, MessageRole::Assistant, "using tools");
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: json!({"file_path": "/path/to/file.rs"}),
+        });
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "2".to_string(),
+            name: "UnknownTool".to_string(),
+            input: json!({"file_path": "/path/to/other.rs"}),
+        });
+
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![msg],
+            metadata: SessionMetadata::default(),
+        };
+
+        let accesses = session.extract_file_accesses();
+        assert_eq!(accesses.len(), 1);
+        assert_eq!(accesses[0].tool_name, "Read");
+    }
+
+    #[test]
+    fn test_session_extract_file_accesses_empty_session() {
+        let session = Session {
+            id: "test".to_string(),
+            source: "test".to_string(),
+            external_id: "test".to_string(),
+            title: None,
+            source_path: PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![],
+            metadata: SessionMetadata::default(),
+        };
+
+        let accesses = session.extract_file_accesses();
+        assert!(accesses.is_empty());
     }
 }
 
