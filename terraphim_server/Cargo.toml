@@ -43,7 +43,7 @@ walkdir = "2.4"
 chrono = { workspace = true }
 uuid = { workspace = true }
 futures-util = "0.3"
-rand = "0.9"
+rand = "0.10"
 
 [features]
 # Minimal default - core server with SQLite for persistence
