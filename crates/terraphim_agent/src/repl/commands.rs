@@ -191,6 +191,10 @@ pub enum SessionsSubcommand {
     },
     /// Enrich sessions with concepts (Phase 3)
     Enrich { session_id: Option<String> },
+    /// List files accessed by a session
+    Files { session_id: String, json: bool },
+    /// Find sessions by file path
+    ByFile { file_path: String, json: bool },
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -1320,8 +1324,28 @@ impl FromStr for ReplCommand {
                             subcommand: SessionsSubcommand::Enrich { session_id },
                         })
                     }
+                    "files" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Sessions files requires a session ID"));
+                        }
+                        let session_id = parts[2].to_string();
+                        let json = parts.iter().any(|&p| p == "--json");
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::Files { session_id, json },
+                        })
+                    }
+                    "by-file" => {
+                        if parts.len() < 3 {
+                            return Err(anyhow!("Sessions by-file requires a file path"));
+                        }
+                        let file_path = parts[2].to_string();
+                        let json = parts.iter().any(|&p| p == "--json");
+                        Ok(ReplCommand::Sessions {
+                            subcommand: SessionsSubcommand::ByFile { file_path, json },
+                        })
+                    }
                     _ => Err(anyhow!(
-                        "Unknown sessions subcommand: {}. Use: sources, import, list, search, stats, show, concepts, related, timeline, export, enrich",
+                        "Unknown sessions subcommand: {}. Use: sources, import, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file",
                         parts[1]
                     )),
                 }
@@ -1478,7 +1502,7 @@ impl ReplCommand {
 
             #[cfg(feature = "repl-sessions")]
             "sessions" => Some(
-                "/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, concepts, related, timeline, export, enrich)",
+                "/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file)",
             ),
 
             _ => None,
