@@ -149,8 +149,13 @@ impl Default for ToolRegistry {
 }
 
 /// Create a standard tool registry with all default tools.
+///
+/// # Arguments
+/// * `sessions` - Optional session manager for session-aware tools
+/// * `web_tools_config` - Optional web tools configuration
 pub fn create_default_registry(
     sessions: Option<std::sync::Arc<tokio::sync::Mutex<crate::session::SessionManager>>>,
+    web_tools_config: Option<&crate::config::WebToolsConfig>,
 ) -> ToolRegistry {
     use crate::tools::edit::EditTool;
     use crate::tools::filesystem::FilesystemTool;
@@ -163,8 +168,8 @@ pub fn create_default_registry(
     registry.register(Box::new(FilesystemTool::new()));
     registry.register(Box::new(EditTool::new()));
     registry.register(Box::new(ShellTool::new()));
-    registry.register(Box::new(WebSearchTool::new()));
-    registry.register(Box::new(WebFetchTool::new()));
+    registry.register(Box::new(WebSearchTool::from_config(web_tools_config)));
+    registry.register(Box::new(WebFetchTool::from_config(web_tools_config)));
     registry.register(Box::new(VoiceTranscribeTool::new()));
 
     // Register session tools if SessionManager is provided
