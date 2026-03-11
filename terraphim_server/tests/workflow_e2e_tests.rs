@@ -17,7 +17,7 @@ async fn test_prompt_chain_workflow() {
     }
     // Build the test router
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Test prompt chaining workflow
     let response = server
@@ -63,7 +63,7 @@ async fn test_routing_workflow() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Test routing workflow for different complexity levels
     let test_cases = vec![
@@ -117,7 +117,7 @@ async fn test_parallel_workflow() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let response = server
         .post("/workflows/parallel")
@@ -169,7 +169,7 @@ async fn test_orchestration_workflow() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let response = server
         .post("/workflows/orchestrate")
@@ -223,7 +223,7 @@ async fn test_optimization_workflow() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let response = server
         .post("/workflows/optimize")
@@ -281,7 +281,7 @@ async fn test_workflow_status_endpoint() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // First create a workflow
     let create_response = server
@@ -315,7 +315,7 @@ async fn test_workflow_trace_endpoint() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // First create a workflow
     let create_response = server
@@ -353,7 +353,7 @@ async fn test_list_workflows_endpoint() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Create multiple workflows
     for i in 0..3 {
@@ -382,7 +382,7 @@ async fn test_workflow_with_custom_config() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let response = server
         .post("/workflows/parallel")
@@ -415,7 +415,7 @@ async fn test_workflow_error_handling() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Test with empty prompt
     let response = server
@@ -439,7 +439,7 @@ async fn test_concurrent_workflows() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Launch multiple workflows sequentially (testing concurrent server handling)
     let mut responses = Vec::new();
