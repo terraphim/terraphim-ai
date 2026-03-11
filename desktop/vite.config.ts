@@ -63,8 +63,6 @@ export default defineConfig({
           'vendor-charts': ['d3'],
           'vendor-atomic': ['@tomic/lib'],
           'vendor-utils': ['comlink-fetch', 'svelte-routing', 'tinro', 'svelte-markdown'],
-          // Large components
-          'novel-editor': ['@paralect/novel-svelte']
         }
       }
     },
