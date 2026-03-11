@@ -1,5 +1,5 @@
 // shim that re-exports Svelte runtime plus mount/unmount helpers expected by some
-// third-party packages (e.g. @paralect/novel-svelte).
+// third-party packages.
 //
 // It proxies every export from the real 'svelte' entry, then adds two helpers:
 //   mount(Component, options)  – instantiates the component and returns it.
