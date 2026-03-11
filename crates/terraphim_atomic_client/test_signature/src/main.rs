@@ -2,6 +2,7 @@ use base64::{engine::general_purpose::STANDARD, Engine};
 use ed25519_dalek::{Keypair, Signer};
 use serde_json::{json, Value};
 use std::env;
+use std::io::IsTerminal;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -16,7 +17,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "update" => update_resource(&args)?,
         "delete" => delete_resource(&args)?,
         _ => {
-            if !atty::is(atty::Stream::Stdout) {
+            if !std::io::stdout().is_terminal() {
                 // If output is redirected, don't print error message
                 return Ok(());
             }
@@ -52,7 +53,7 @@ fn create_resource(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let server_url = std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
 
     // Check if output is redirected
-    let is_redirected = !atty::is(atty::Stream::Stdout);
+    let is_redirected = !std::io::stdout().is_terminal();
 
     // Parse the agent secret
     let secret_bytes = STANDARD.decode(&secret_base64)?;
@@ -162,7 +163,7 @@ fn update_resource(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let server_url = std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
 
     // Check if output is redirected
-    let is_redirected = !atty::is(atty::Stream::Stdout);
+    let is_redirected = !std::io::stdout().is_terminal();
 
     // Parse the agent secret
     let secret_bytes = STANDARD.decode(&secret_base64)?;
@@ -255,7 +256,7 @@ fn delete_resource(args: &[String]) -> Result<(), Box<dyn std::error::Error>> {
     let server_url = std::env::var("ATOMIC_SERVER_URL").unwrap_or_else(|_| "http://localhost:9883".to_string());
 
     // Check if output is redirected
-    let is_redirected = !atty::is(atty::Stream::Stdout);
+    let is_redirected = !std::io::stdout().is_terminal();
 
     // Parse the agent secret
     let secret_bytes = STANDARD.decode(&secret_base64)?;
