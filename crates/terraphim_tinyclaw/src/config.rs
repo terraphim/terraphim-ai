@@ -414,10 +414,15 @@ fn default_shell_timeout() -> u64 {
 /// Web tools configuration.
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct WebToolsConfig {
-    /// Web search provider ("brave", "searxng", "google").
+    /// Web search provider ("exa", "kimi_search").
+    ///
+    /// If not specified, falls back to environment variables
+    /// (EXA_API_KEY or KIMI_API_KEY).
     pub search_provider: Option<String>,
 
-    /// Web fetch mode ("readability", "raw").
+    /// Web fetch mode ("raw", "readability").
+    ///
+    /// Defaults to "raw" if not specified.
     pub fetch_mode: Option<String>,
 }
 
