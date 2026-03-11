@@ -472,3 +472,79 @@ mod tests {
         assert!(session.duration_ms().is_none());
     }
 }
+
+/// File access operation type
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum FileOperation {
+    Read,
+    Write,
+}
+
+impl std::fmt::Display for FileOperation {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Read => write!(f, "read"),
+            Self::Write => write!(f, "write"),
+        }
+    }
+}
+
+/// Record of a file access in a session
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct FileAccess {
+    /// File path (as recorded in tool input)
+    pub path: String,
+    /// Type of file operation
+    pub operation: FileOperation,
+    /// Timestamp of the access (from message)
+    pub timestamp: Option<jiff::Timestamp>,
+    /// Name of the tool that accessed the file
+    pub tool_name: String,
+}
+
+#[cfg(test)]
+mod file_access_tests {
+    use super::*;
+
+    #[test]
+    fn test_file_operation_display() {
+        assert_eq!(FileOperation::Read.to_string(), "read");
+        assert_eq!(FileOperation::Write.to_string(), "write");
+    }
+
+    #[test]
+    fn test_file_access_creation() {
+        let access = FileAccess {
+            path: "/path/to/file.rs".to_string(),
+            operation: FileOperation::Read,
+            timestamp: None,
+            tool_name: "Read".to_string(),
+        };
+        assert_eq!(access.path, "/path/to/file.rs");
+        assert_eq!(access.operation, FileOperation::Read);
+        assert_eq!(access.tool_name, "Read");
+    }
+
+    #[test]
+    fn test_file_access_serialization() {
+        let access = FileAccess {
+            path: "/path/to/file.rs".to_string(),
+            operation: FileOperation::Write,
+            timestamp: None,
+            tool_name: "Edit".to_string(),
+        };
+        let json = serde_json::to_string(&access).unwrap();
+        assert!(json.contains("/path/to/file.rs"));
+        // Serde serializes enum as "Write" (variant name)
+        assert!(
+            json.contains("Write"),
+            "JSON should contain 'Write', got: {}",
+            json
+        );
+        assert!(json.contains("Edit"));
+
+        let deserialized: FileAccess = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.path, access.path);
+        assert_eq!(deserialized.operation, access.operation);
+    }
+}
