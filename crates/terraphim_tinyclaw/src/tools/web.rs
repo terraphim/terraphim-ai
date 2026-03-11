@@ -248,6 +248,39 @@ impl WebSearchTool {
 
     /// Create from environment variables.
     pub fn from_env() -> Self {
+        Self::from_env_inner()
+    }
+
+    /// Create from configuration.
+    ///
+    /// If config specifies a search provider, uses it.
+    /// Otherwise falls back to environment variables (same as `new()`).
+    ///
+    /// # Arguments
+    /// * `config` - Optional web tools configuration
+    ///
+    /// # Supported Providers
+    /// - "exa" - Exa search API
+    /// - "kimi_search" - Kimi search API
+    pub fn from_config(config: Option<&crate::config::WebToolsConfig>) -> Self {
+        match config {
+            Some(cfg) => match cfg.search_provider.as_deref() {
+                Some("exa") => {
+                    let api_key = std::env::var("EXA_API_KEY").ok().filter(|k| !k.is_empty());
+                    Self::with_provider(Box::new(ExaProvider::new(api_key)))
+                }
+                Some("kimi_search") => {
+                    let api_key = std::env::var("KIMI_API_KEY").ok().filter(|k| !k.is_empty());
+                    Self::with_provider(Box::new(KimiSearchProvider::new(api_key)))
+                }
+                Some(_) | None => Self::from_env_inner(),
+            },
+            None => Self::from_env_inner(),
+        }
+    }
+
+    /// Internal helper to create from environment variables.
+    fn from_env_inner() -> Self {
         // Check for Exa API key
         if let Ok(api_key) = std::env::var("EXA_API_KEY") {
             if !api_key.is_empty() {
