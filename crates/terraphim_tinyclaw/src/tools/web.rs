@@ -246,6 +246,12 @@ impl WebSearchTool {
         Self { provider }
     }
 
+    /// Get the provider name.
+    #[cfg(test)]
+    fn provider_name(&self) -> &str {
+        self.provider.name()
+    }
+
     /// Create from environment variables.
     pub fn from_env() -> Self {
         Self::from_env_inner()
@@ -546,5 +552,93 @@ mod tests {
     fn test_placeholder_provider_name() {
         let provider = PlaceholderProvider;
         assert_eq!(provider.name(), "placeholder");
+    }
+
+    #[test]
+    fn test_web_search_from_config_exa() {
+        let config = crate::config::WebToolsConfig {
+            search_provider: Some("exa".to_string()),
+            fetch_mode: None,
+        };
+
+        let tool = WebSearchTool::from_config(Some(&config));
+        // The provider name should reflect the configured provider
+        assert_eq!(tool.provider_name(), "exa");
+    }
+
+    #[test]
+    fn test_web_search_from_config_kimi() {
+        let config = crate::config::WebToolsConfig {
+            search_provider: Some("kimi_search".to_string()),
+            fetch_mode: None,
+        };
+
+        let tool = WebSearchTool::from_config(Some(&config));
+        assert_eq!(tool.provider_name(), "kimi_search");
+    }
+
+    #[test]
+    fn test_web_search_from_config_fallback() {
+        // When config is None, should fall back to env-based selection
+        // or placeholder if no env vars are set
+        let tool = WebSearchTool::from_config(None);
+        // Provider name should be one of the valid options
+        let name = tool.provider_name();
+        assert!(name == "exa" || name == "kimi_search" || name == "placeholder");
+    }
+
+    #[test]
+    fn test_web_search_from_config_unknown_provider() {
+        // Unknown provider should fall back to env-based selection
+        let config = crate::config::WebToolsConfig {
+            search_provider: Some("unknown_provider".to_string()),
+            fetch_mode: None,
+        };
+
+        let tool = WebSearchTool::from_config(Some(&config));
+        // Should fall back to env-based or placeholder
+        let name = tool.provider_name();
+        assert!(name == "exa" || name == "kimi_search" || name == "placeholder");
+    }
+
+    #[test]
+    fn test_web_fetch_from_config_raw() {
+        let config = crate::config::WebToolsConfig {
+            search_provider: None,
+            fetch_mode: Some("raw".to_string()),
+        };
+
+        let tool = WebFetchTool::from_config(Some(&config));
+        assert_eq!(tool.mode, "raw");
+    }
+
+    #[test]
+    fn test_web_fetch_from_config_readability() {
+        let config = crate::config::WebToolsConfig {
+            search_provider: None,
+            fetch_mode: Some("readability".to_string()),
+        };
+
+        let tool = WebFetchTool::from_config(Some(&config));
+        assert_eq!(tool.mode, "readability");
+    }
+
+    #[test]
+    fn test_web_fetch_from_config_fallback() {
+        // When config is None, should default to "raw"
+        let tool = WebFetchTool::from_config(None);
+        assert_eq!(tool.mode, "raw");
+    }
+
+    #[test]
+    fn test_web_fetch_from_config_none_mode() {
+        // When config has None for fetch_mode, should default to "raw"
+        let config = crate::config::WebToolsConfig {
+            search_provider: Some("exa".to_string()),
+            fetch_mode: None,
+        };
+
+        let tool = WebFetchTool::from_config(Some(&config));
+        assert_eq!(tool.mode, "raw");
     }
 }
