@@ -164,7 +164,7 @@ version = "1.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "40c48f72fd53cd289104fc64099abca73db4166ad86ea0b4341abe65af83dadc"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -175,7 +175,7 @@ checksum = "291e6a250ff86cd4a820112fb8898808a366d8f9f58ce16d1f538353ad55747d"
 dependencies = [
  "anstyle",
  "once_cell_polyfill",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -1148,7 +1148,7 @@ version = "3.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "faf9468729b8cbcea668e36183cb69d317348c2e08e994829fb56ebfdfbaac34"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -2143,7 +2143,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.2",
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -2388,19 +2388,6 @@ checksum = "c7f84e12ccf0a7ddc17a6c41c93326024c42920d7ee630d04950e6926645c0fe"
 
 [[package]]
 name = "env_logger"
-version = "0.10.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cd405aab171cb85d6735e5c8d9db038c17d3ca007a4d2c25f337935c3d90580"
-dependencies = [
- "humantime",
- "is-terminal",
- "log",
- "regex",
- "termcolor",
-]
-
-[[package]]
-name = "env_logger"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b2daee4ea451f429a58296525ddf28b45a3b64f1acf6587e2067437bb11e218d"
@@ -2465,7 +2452,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -3285,7 +3272,7 @@ version = "1.0.0"
 dependencies = [
  "anyhow",
  "clap",
- "env_logger 0.11.9",
+ "env_logger",
  "haystack_core",
  "log",
  "reqwest 0.12.28",
@@ -3496,12 +3483,6 @@ name = "httpdate"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "df3b46402a9d5adb4c86a0cf463f42e19994e3ee891101b1841f30a545cb49a9"
-
-[[package]]
-name = "humantime"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "135b12329e5e3ce057a9f972339ea52bc954fe1e9358ef27f95e89716fbc5424"
 
 [[package]]
 name = "hyper"
@@ -3988,17 +3969,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "is-terminal"
-version = "0.4.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3640c1c38b8e4e43584d8df18be5fc6b0aa314ce6ebf51b53313d4306cca8e46"
-dependencies = [
- "hermit-abi 0.5.2",
- "libc",
- "windows-sys 0.61.2",
-]
-
-[[package]]
 name = "is_terminal_polyfill"
 version = "1.70.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4072,7 +4042,7 @@ dependencies = [
  "portable-atomic",
  "portable-atomic-util",
  "serde_core",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -4940,7 +4910,7 @@ version = "0.50.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7957b9740744892f114936ab4a57b3f487491bbeafaf8083688b16841a4240e5"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.59.0",
 ]
 
 [[package]]
@@ -7106,7 +7076,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys 0.12.1",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -7212,7 +7182,7 @@ dependencies = [
  "security-framework 3.7.0",
  "security-framework-sys",
  "webpki-root-certs",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -8314,7 +8284,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "3a766e1110788c36f4fa1c2b71b387a7815aa65f88ce0229841826633d93723e"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -9020,7 +8990,7 @@ dependencies = [
  "getrandom 0.4.2",
  "once_cell",
  "rustix 1.1.4",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -9042,15 +9012,6 @@ checksum = "1e4129646ca0ed8f45d09b929036bafad5377103edd06e50bf574b353d2b08d9"
 dependencies = [
  "libc",
  "winapi",
-]
-
-[[package]]
-name = "termcolor"
-version = "1.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "06794f8f6c5c898b3275aebefa6b8a1cb24cd2c6c79397ab15774837a0bc5755"
-dependencies = [
- "winapi-util",
 ]
 
 [[package]]
@@ -9158,7 +9119,7 @@ dependencies = [
  "clap",
  "config 0.15.19",
  "dashmap 6.1.0",
- "env_logger 0.10.2",
+ "env_logger",
  "fastrand",
  "futures",
  "log",
@@ -9292,7 +9253,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "log",
  "serde",
@@ -9316,7 +9277,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "indexmap 2.13.0",
  "log",
@@ -9342,7 +9303,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "log",
  "serde",
@@ -9446,7 +9407,7 @@ dependencies = [
  "async-once-cell",
  "async-trait",
  "dirs 6.0.0",
- "env_logger 0.11.9",
+ "env_logger",
  "log",
  "opendal",
  "regex",
@@ -9480,7 +9441,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "dashmap 6.1.0",
- "env_logger 0.11.9",
+ "env_logger",
  "log",
  "reqwest 0.12.28",
  "serde",
@@ -9532,7 +9493,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "indexmap 2.13.0",
  "log",
@@ -9591,7 +9552,7 @@ version = "0.1.0"
 dependencies = [
  "aho-corasick",
  "clap",
- "env_logger 0.11.9",
+ "env_logger",
  "log",
  "regex",
  "serde",
@@ -9612,7 +9573,7 @@ dependencies = [
  "ahash 0.8.12",
  "async-trait",
  "chrono",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "indexmap 2.13.0",
  "log",
@@ -9640,7 +9601,7 @@ dependencies = [
  "axum 0.8.8",
  "base64 0.21.7",
  "clap",
- "env_logger 0.11.9",
+ "env_logger",
  "regex",
  "rmcp",
  "serde_json",
@@ -9670,7 +9631,7 @@ dependencies = [
  "async-trait",
  "cached",
  "dotenvy",
- "env_logger 0.11.9",
+ "env_logger",
  "futures",
  "haystack_jmap",
  "home",
@@ -9867,7 +9828,7 @@ dependencies = [
  "axum-test",
  "chrono",
  "clap",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "log",
  "mime_guess",
@@ -9907,7 +9868,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "chrono",
- "env_logger 0.11.9",
+ "env_logger",
  "log",
  "once_cell",
  "opendal",
@@ -10003,7 +9964,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "criterion",
- "env_logger 0.11.9",
+ "env_logger",
  "futures-util",
  "indexmap 2.13.0",
  "log",
@@ -10038,7 +9999,7 @@ dependencies = [
  "criterion",
  "dirs 5.0.1",
  "env_home",
- "env_logger 0.11.9",
+ "env_logger",
  "hound",
  "log",
  "parking_lot 0.12.5",
@@ -10124,7 +10085,7 @@ dependencies = [
  "clap",
  "config 0.14.1",
  "dirs 5.0.1",
- "env_logger 0.10.2",
+ "env_logger",
  "gethostname",
  "hex",
  "image",
@@ -10175,7 +10136,7 @@ version = "0.2.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "37d53ac171c92a39e4769491c4b4dde7022c60042254b5fc044ae409d34a24d4"
 dependencies = [
- "env_logger 0.11.9",
+ "env_logger",
  "test-log-macros",
  "tracing-subscriber",
 ]
@@ -11542,7 +11503,7 @@ version = "0.1.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c2a7b1c03c876122aa43f3020e6c3c3ee5c05081c9a00739faf7503aeba10d22"
 dependencies = [
- "windows-sys 0.61.2",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
