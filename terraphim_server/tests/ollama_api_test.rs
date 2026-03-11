@@ -22,7 +22,7 @@ async fn test_chat_endpoint_with_ollama() {
     let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
 
-    let server = TestServer::new(app).expect("Failed to create test server");
+    let server = TestServer::new(app);
 
     // Test chat request
     let payload = json!({
@@ -51,7 +51,7 @@ async fn test_chat_endpoint_invalid_role() {
     let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
 
-    let server = TestServer::new(app).expect("Failed to create test server");
+    let server = TestServer::new(app);
 
     let payload = json!({
         "role": "NonExistentRole",
@@ -75,7 +75,7 @@ async fn test_chat_endpoint_empty_messages() {
     let _config_path = "terraphim_server/default/terraphim_engineer_config.json";
     let app = terraphim_server::build_router_for_tests().await;
 
-    let server = TestServer::new(app).expect("Failed to create test server");
+    let server = TestServer::new(app);
 
     let payload = json!({
         "role": "Engineer",
