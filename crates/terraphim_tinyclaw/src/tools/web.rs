@@ -378,6 +378,28 @@ impl WebFetchTool {
         }
     }
 
+    /// Create from configuration.
+    ///
+    /// If config specifies a fetch mode, uses it.
+    /// Otherwise defaults to "raw".
+    ///
+    /// # Arguments
+    /// * `config` - Optional web tools configuration
+    ///
+    /// # Supported Modes
+    /// - "raw" - Fetch raw HTML
+    /// - "readability" - Extract readable content
+    pub fn from_config(config: Option<&crate::config::WebToolsConfig>) -> Self {
+        let mode = config
+            .and_then(|c| c.fetch_mode.clone())
+            .unwrap_or_else(|| "raw".to_string());
+
+        Self {
+            client: Client::new(),
+            mode,
+        }
+    }
+
     /// Fetch content from a URL.
     async fn fetch(&self, url: &str) -> Result<String, ToolError> {
         log::info!("Fetching URL: {} (mode: {})", url, self.mode);
