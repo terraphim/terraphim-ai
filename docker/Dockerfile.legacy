@@ -1,5 +1,5 @@
 # Simple Dockerfile for Terraphim Server
-FROM ubuntu:22.04
+FROM ubuntu:24.04
 
 ARG RUST_VERSION=1.87.0
 
