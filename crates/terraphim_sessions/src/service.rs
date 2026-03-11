@@ -4,7 +4,7 @@
 //! from multiple AI coding assistants.
 
 use crate::connector::{ConnectorRegistry, ConnectorStatus, ImportOptions};
-use crate::model::{Session, SessionId};
+use crate::model::{FileAccess, Session, SessionId};
 use anyhow::Result;
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -195,6 +195,37 @@ impl SessionService {
             total_assistant_messages,
             sessions_by_source: sources,
         }
+    }
+
+    /// Extract file accesses from a specific session
+    ///
+    /// Returns all file read/write operations found in the session's
+    /// tool invocations.
+    pub async fn extract_files(&self, session_id: &SessionId) -> Option<Vec<FileAccess>> {
+        let cache = self.cache.read().await;
+        cache
+            .get(session_id)
+            .map(|session| session.extract_file_accesses())
+    }
+
+    /// Find sessions that accessed a specific file path
+    ///
+    /// Performs substring matching on file paths. Returns sessions
+    /// where any file access matches the given path pattern.
+    pub async fn sessions_by_file(&self, file_path: &str) -> Vec<Session> {
+        let cache = self.cache.read().await;
+        let path_lower = file_path.to_lowercase();
+
+        cache
+            .values()
+            .filter(|session| {
+                let accesses = session.extract_file_accesses();
+                accesses
+                    .iter()
+                    .any(|access| access.path.to_lowercase().contains(&path_lower))
+            })
+            .cloned()
+            .collect()
     }
 }
 
@@ -428,5 +459,110 @@ mod tests {
         ];
         service.load_sessions(sessions).await;
         assert_eq!(service.session_count().await, 1);
+    }
+
+    #[tokio::test]
+    async fn test_extract_files_from_session() {
+        use crate::model::{ContentBlock, Message, MessageRole};
+        use serde_json::json;
+
+        let service = SessionService::new();
+
+        let mut msg = Message::text(0, MessageRole::Assistant, "reading files");
+        msg.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: json!({"file_path": "/path/to/file.rs"}),
+        });
+
+        let session = Session {
+            id: "s1".to_string(),
+            source: "test".to_string(),
+            external_id: "s1".to_string(),
+            title: Some("Test Session".to_string()),
+            source_path: std::path::PathBuf::from("."),
+            started_at: None,
+            ended_at: None,
+            messages: vec![msg],
+            metadata: crate::model::SessionMetadata::default(),
+        };
+
+        service.load_sessions(vec![session]).await;
+
+        let files = service.extract_files(&"s1".to_string()).await;
+        assert!(files.is_some());
+        let files = files.unwrap();
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].path, "/path/to/file.rs");
+    }
+
+    #[tokio::test]
+    async fn test_extract_files_not_found() {
+        let service = SessionService::new();
+        let files = service.extract_files(&"nonexistent".to_string()).await;
+        assert!(files.is_none());
+    }
+
+    #[tokio::test]
+    async fn test_sessions_by_file() {
+        use crate::model::{ContentBlock, Message, MessageRole};
+        use serde_json::json;
+
+        let service = SessionService::new();
+
+        // Session with file access
+        let mut msg1 = Message::text(0, MessageRole::Assistant, "reading files");
+        msg1.blocks.push(ContentBlock::ToolUse {
+            id: "1".to_string(),
+            name: "Read".to_string(),
+            input: json!({"file_path": "/src/main.rs"}),
+        });
+
+        // Session without file access
+        let msg2 = Message::text(0, MessageRole::Assistant, "hello");
+
+        let sessions = vec![
+            Session {
+                id: "s1".to_string(),
+                source: "test".to_string(),
+                external_id: "s1".to_string(),
+                title: Some("Session 1".to_string()),
+                source_path: std::path::PathBuf::from("."),
+                started_at: None,
+                ended_at: None,
+                messages: vec![msg1],
+                metadata: crate::model::SessionMetadata::default(),
+            },
+            Session {
+                id: "s2".to_string(),
+                source: "test".to_string(),
+                external_id: "s2".to_string(),
+                title: Some("Session 2".to_string()),
+                source_path: std::path::PathBuf::from("."),
+                started_at: None,
+                ended_at: None,
+                messages: vec![msg2],
+                metadata: crate::model::SessionMetadata::default(),
+            },
+        ];
+
+        service.load_sessions(sessions).await;
+
+        // Find sessions that touched /src/main.rs
+        let matching = service.sessions_by_file("/src/main.rs").await;
+        assert_eq!(matching.len(), 1);
+        assert_eq!(matching[0].id, "s1");
+
+        // Substring match
+        let matching = service.sessions_by_file("main.rs").await;
+        assert_eq!(matching.len(), 1);
+
+        // Case insensitive
+        let matching = service.sessions_by_file("MAIN.RS").await;
+        assert_eq!(matching.len(), 1);
+
+        // No match
+        let matching = service.sessions_by_file("nonexistent").await;
+        assert!(matching.is_empty());
     }
 }
