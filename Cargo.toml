@@ -19,7 +19,6 @@ exclude = [
     # Unused haystack providers (kept for future integration)
     "crates/haystack_atlassian",
     "crates/haystack_discourse",
-    "crates/haystack_grepapp",
     # Superseded by terraphim_agent
     "crates/terraphim_repl",
 ]

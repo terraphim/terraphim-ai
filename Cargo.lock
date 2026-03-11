@@ -3063,6 +3063,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "grepapp_haystack"
+version = "1.13.0"
+dependencies = [
+ "anyhow",
+ "haystack_core",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "terraphim_types",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "url",
+ "wiremock",
+]
+
+[[package]]
 name = "group"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9611,6 +9628,7 @@ dependencies = [
  "dotenvy",
  "env_logger",
  "futures",
+ "grepapp_haystack",
  "haystack_jmap",
  "home",
  "html2md",

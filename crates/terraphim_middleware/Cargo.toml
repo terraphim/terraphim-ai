@@ -21,8 +21,7 @@ terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }
 haystack_jmap = { path = "../haystack_jmap", version = "1.0.0" }
 # NOTE: Atomic Data Server commented out for crates.io publishing (not published yet)
 # terraphim_atomic_client = { path = "../terraphim_atomic_client", version = "1.0.0", features = ["native"], optional = true }
-# NOTE: grepapp_haystack commented out for crates.io publishing (not published yet)
-# grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
+grepapp_haystack = { path = "../haystack_grepapp", version = "1.0.0", optional = true }
 terraphim-session-analyzer = { path = "../terraphim-session-analyzer", version = "1.0.0", features = ["connectors"], optional = true }
 jiff = { version = "0.1", optional = true }
 home = { version = "0.5", optional = true }
@@ -61,12 +60,11 @@ tempfile = "3.23"
 
 [features]
 default = []
-# NOTE: atomic and grepapp features disabled for crates.io publishing (dependencies not published yet)
-# Placeholder features - when dependencies are published, change to:
+# NOTE: atomic feature disabled for crates.io publishing (dependency not published yet)
+# Placeholder feature - when dependency is published, change to:
 # atomic = ["dep:terraphim_atomic_client"]
-# grepapp = ["dep:grepapp_haystack"]
 atomic = []
-grepapp = []
+grepapp = ["dep:grepapp_haystack"]
 # Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
 ai-assistant = ["terraphim-session-analyzer", "jiff", "home"]
 # Enable openrouter integration
