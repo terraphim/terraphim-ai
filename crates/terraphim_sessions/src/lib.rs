@@ -39,7 +39,9 @@ pub mod enrichment;
 
 // Re-exports for convenience
 pub use connector::{ConnectorRegistry, ConnectorStatus, ImportOptions, SessionConnector};
-pub use model::{ContentBlock, Message, MessageRole, Session, SessionMetadata};
+pub use model::{
+    ContentBlock, FileAccess, FileOperation, Message, MessageRole, Session, SessionMetadata,
+};
 pub use service::SessionService;
 
 #[cfg(feature = "enrichment")]

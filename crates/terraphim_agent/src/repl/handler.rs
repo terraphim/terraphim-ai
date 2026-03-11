@@ -1761,11 +1761,12 @@ impl ReplHandler {
     #[cfg(feature = "repl-sessions")]
     async fn handle_sessions(&mut self, subcommand: SessionsSubcommand) -> Result<()> {
         use colored::Colorize;
+        use comfy_table::Color;
         use comfy_table::modifiers::UTF8_ROUND_CORNERS;
         use comfy_table::presets::UTF8_FULL;
         use comfy_table::{Cell, Table};
         use terraphim_sessions::{
-            ConnectorStatus, ImportOptions, MessageRole, Session, SessionService,
+            ConnectorStatus, FileAccess, ImportOptions, MessageRole, Session, SessionService,
         };
 
         // Get or create session service
@@ -2356,6 +2357,109 @@ impl ReplHandler {
                         "  Total messages to process: {}",
                         total_messages.to_string().green()
                     );
+                }
+            }
+
+            SessionsSubcommand::Files { session_id, json } => {
+                if let Some(files) = svc.extract_files(&session_id).await {
+                    if files.is_empty() {
+                        println!(
+                            "{} No files found in session {}",
+                            "ℹ".blue(),
+                            session_id.cyan()
+                        );
+                    } else if json {
+                        match serde_json::to_string_pretty(&files) {
+                            Ok(output) => println!("{}", output),
+                            Err(e) => println!("{} Failed to serialize: {}", "✗".red().bold(), e),
+                        }
+                    } else {
+                        println!("\n{} Files in session {}:", "📁".bold(), session_id.cyan());
+                        println!();
+
+                        let mut table = Table::new();
+                        table
+                            .load_preset(UTF8_FULL)
+                            .apply_modifier(UTF8_ROUND_CORNERS)
+                            .set_header(vec![
+                                Cell::new("Path").add_attribute(comfy_table::Attribute::Bold),
+                                Cell::new("Operation").add_attribute(comfy_table::Attribute::Bold),
+                                Cell::new("Tool").add_attribute(comfy_table::Attribute::Bold),
+                            ]);
+
+                        for FileAccess {
+                            path,
+                            operation,
+                            tool_name,
+                            ..
+                        } in files
+                        {
+                            let op_cell = match operation {
+                                terraphim_sessions::FileOperation::Read => {
+                                    Cell::new("read").fg(Color::Green)
+                                }
+                                terraphim_sessions::FileOperation::Write => {
+                                    Cell::new("write").fg(Color::Yellow)
+                                }
+                            };
+                            table.add_row(vec![
+                                Cell::new(path),
+                                op_cell,
+                                Cell::new(tool_name).fg(Color::Cyan),
+                            ]);
+                        }
+                        println!("{}", table);
+                    }
+                } else {
+                    println!("{} Session '{}' not found", "⚠".yellow().bold(), session_id);
+                }
+            }
+
+            SessionsSubcommand::ByFile { file_path, json } => {
+                let sessions = svc.sessions_by_file(&file_path).await;
+                if sessions.is_empty() {
+                    println!(
+                        "{} No sessions found that touched '{}'",
+                        "ℹ".blue(),
+                        file_path.cyan()
+                    );
+                } else if json {
+                    match serde_json::to_string_pretty(&sessions) {
+                        Ok(output) => println!("{}", output),
+                        Err(e) => println!("{} Failed to serialize: {}", "✗".red().bold(), e),
+                    }
+                } else {
+                    println!(
+                        "\n{} Sessions that touched '{}':",
+                        "📂".bold(),
+                        file_path.cyan()
+                    );
+                    println!();
+
+                    let mut table = Table::new();
+                    table
+                        .load_preset(UTF8_FULL)
+                        .apply_modifier(UTF8_ROUND_CORNERS)
+                        .set_header(vec![
+                            Cell::new("ID").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Source").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Title").add_attribute(comfy_table::Attribute::Bold),
+                            Cell::new("Messages").add_attribute(comfy_table::Attribute::Bold),
+                        ]);
+
+                    for session in sessions {
+                        let title = session
+                            .title
+                            .clone()
+                            .unwrap_or_else(|| "(no title)".to_string());
+                        table.add_row(vec![
+                            Cell::new(&session.id).fg(Color::Cyan),
+                            Cell::new(&session.source).fg(Color::Magenta),
+                            Cell::new(title),
+                            Cell::new(session.message_count().to_string()),
+                        ]);
+                    }
+                    println!("{}", table);
                 }
             }
         }
