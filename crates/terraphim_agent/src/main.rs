@@ -853,13 +853,13 @@ fn main() -> Result<()> {
     match cli.command {
         Some(Command::Interactive) | None => {
             // Check if we're in a TTY for interactive mode (both stdout and stdin required)
-            use atty::Stream;
-            if !atty::is(Stream::Stdout) {
+            use std::io::IsTerminal;
+            if !std::io::stdout().is_terminal() {
                 show_usage_info();
                 std::process::exit(0);
             }
 
-            if !atty::is(Stream::Stdin) {
+            if !std::io::stdin().is_terminal() {
                 show_usage_info();
                 std::process::exit(0);
             }
