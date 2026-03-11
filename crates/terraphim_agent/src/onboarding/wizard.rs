@@ -160,7 +160,8 @@ pub async fn run_setup_wizard(mode: SetupMode) -> Result<SetupResult, Onboarding
     // Check if we're running in a TTY
     #[cfg(feature = "repl-interactive")]
     {
-        if !atty::is(atty::Stream::Stdin) {
+        use std::io::IsTerminal;
+        if !std::io::stdin().is_terminal() {
             return Err(OnboardingError::NotATty);
         }
     }

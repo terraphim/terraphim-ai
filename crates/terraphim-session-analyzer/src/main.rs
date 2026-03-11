@@ -10,6 +10,7 @@ use models::SessionAnalysis;
 use anyhow::{Context, Result};
 use clap::{Parser, Subcommand, ValueEnum};
 use colored::*;
+use std::io::IsTerminal;
 use std::path::PathBuf;
 use tracing::{info, warn};
 
@@ -198,7 +199,7 @@ fn main() -> Result<()> {
         .init();
 
     // Disable colors if requested or if not in terminal
-    if cli.no_color || !atty::is(atty::Stream::Stdout) {
+    if cli.no_color || !std::io::stdout().is_terminal() {
         colored::control::set_override(false);
     }
 
@@ -1193,31 +1194,6 @@ fn extract_tool_invocations_from_session(
     }
 
     Ok(invocations)
-}
-
-// Check if running in terminal
-#[cfg(unix)]
-mod atty {
-    pub enum Stream {
-        Stdout,
-    }
-
-    pub fn is(stream: Stream) -> bool {
-        match stream {
-            Stream::Stdout => unsafe { libc::isatty(libc::STDOUT_FILENO) != 0 },
-        }
-    }
-}
-
-#[cfg(not(unix))]
-mod atty {
-    pub enum Stream {
-        Stdout,
-    }
-
-    pub fn is(_stream: Stream) -> bool {
-        true // Assume terminal on non-Unix systems
-    }
 }
 
 #[cfg(test)]
