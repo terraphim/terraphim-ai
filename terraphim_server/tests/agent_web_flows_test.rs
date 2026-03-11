@@ -14,7 +14,7 @@ async fn test_prompt_chain_web_flow() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Simulate web frontend submitting a complex prompt chain request
     let web_request = json!({
@@ -69,7 +69,7 @@ async fn test_routing_web_flow_with_complexity_analysis() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Test different complexity levels that web interface would send
     let test_cases = vec![
@@ -134,7 +134,7 @@ async fn test_parallel_web_flow_with_perspectives() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let web_request = json!({
         "prompt": "Analyze the business impact of implementing AI-powered customer service chatbots",
@@ -198,7 +198,7 @@ async fn test_orchestration_web_flow_with_workers() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let web_request = json!({
         "prompt": "Build a machine learning pipeline for predicting customer churn",
@@ -266,7 +266,7 @@ async fn test_optimization_web_flow_with_iterations() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     let web_request = json!({
         "prompt": "Write compelling marketing copy for a new eco-friendly water bottle",
@@ -347,7 +347,7 @@ async fn test_web_error_handling_and_validation() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Test invalid request format
     let response = server
@@ -381,7 +381,7 @@ async fn test_web_workflow_status_monitoring() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Create a workflow first
     let create_response = server
@@ -436,7 +436,7 @@ async fn test_web_workflow_listing_and_management() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Create multiple workflows for web management interface
     let workflow_types = vec![
@@ -479,7 +479,7 @@ async fn test_web_agent_role_integration() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Test that web interface can specify custom roles and configurations
     let custom_role_request = json!({
@@ -521,7 +521,7 @@ async fn test_web_concurrent_workflow_handling() {
         return;
     }
     let router = build_router_for_tests().await;
-    let server = TestServer::new(router).unwrap();
+    let server = TestServer::new(router);
 
     // Simulate concurrent web requests (common in web applications)
     let concurrent_requests = vec![

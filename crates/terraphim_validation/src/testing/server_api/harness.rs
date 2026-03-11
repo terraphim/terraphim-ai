@@ -19,7 +19,7 @@ impl ServerHarness {
     pub async fn start_with_config(_config_state: ConfigState) -> Self {
         // Build router using the same function as tests
         let router = terraphim_server::build_router_for_tests().await;
-        let server = AxumTestServer::new(router).unwrap();
+        let server = AxumTestServer::new(router);
         let base_url = "http://localhost:8080".to_string();
 
         Self { server, base_url }
@@ -44,7 +44,7 @@ impl TestServer {
     pub async fn new() -> Result<Self, Box<dyn std::error::Error>> {
         // Build router with test configuration
         let router = terraphim_server::build_router_for_tests().await;
-        let server = AxumTestServer::new(router)?;
+        let server = AxumTestServer::new(router);
         let base_url = "http://localhost:8080".to_string();
 
         Ok(Self { server, base_url })
