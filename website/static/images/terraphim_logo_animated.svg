@@ -1,0 +1,196 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-250 -250 500 500" width="500" height="500">
+  <defs>
+    <!-- Orange-to-gold gradient matching Terraphim brand -->
+    <linearGradient id="tg-orange-gold" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#E8801C" />
+      <stop offset="100%" stop-color="#F5C518" />
+    </linearGradient>
+    <linearGradient id="tg-gold-fade" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#F5C518" stop-opacity="0.6" />
+      <stop offset="100%" stop-color="#E8801C" stop-opacity="0.3" />
+    </linearGradient>
+    <radialGradient id="tg-center-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#F5C518" stop-opacity="0.15" />
+      <stop offset="100%" stop-color="#E8801C" stop-opacity="0" />
+    </radialGradient>
+    <filter id="tg-glow">
+      <feGaussianBlur stdDeviation="2" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+    <filter id="tg-soft-glow">
+      <feGaussianBlur stdDeviation="4" result="blur" />
+      <feMerge>
+        <feMergeNode in="blur" />
+        <feMergeNode in="SourceGraphic" />
+      </feMerge>
+    </filter>
+  </defs>
+
+  <style>
+    @keyframes tg-rotate-slow {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes tg-rotate-reverse {
+      from { transform: rotate(360deg); }
+      to { transform: rotate(0deg); }
+    }
+    @keyframes tg-pulse {
+      0%, 100% { opacity: 0.6; }
+      50% { opacity: 1; }
+    }
+    @keyframes tg-breathe {
+      0%, 100% { transform: scale(1); }
+      50% { transform: scale(1.03); }
+    }
+    @keyframes tg-glow-pulse {
+      0%, 100% { opacity: 0.3; }
+      50% { opacity: 0.7; }
+    }
+    @keyframes tg-t-pulse {
+      0%, 100% { opacity: 0.5; }
+      50% { opacity: 0.9; }
+    }
+
+    .tg-grid { animation: tg-rotate-slow 120s linear infinite; }
+    .tg-stellation-inner { animation: tg-rotate-slow 80s linear infinite; }
+    .tg-stellation-mid { animation: tg-rotate-reverse 100s linear infinite; }
+    .tg-stellation-outer { animation: tg-rotate-slow 60s linear infinite; }
+    .tg-triangle-frame { animation: tg-breathe 8s ease-in-out infinite; }
+    .tg-triangle-glow { animation: tg-glow-pulse 5s ease-in-out infinite; }
+    .tg-t-mark { animation: tg-t-pulse 6s ease-in-out infinite; }
+    .tg-center-pulse { animation: tg-pulse 4s ease-in-out infinite; }
+  </style>
+
+  <!-- Background -->
+  <rect x="-250" y="-250" width="500" height="500" fill="#0F0C0A" />
+
+  <!-- Center glow -->
+  <circle cx="0" cy="0" r="200" fill="url(#tg-center-glow)" class="tg-center-pulse" />
+
+  <!-- Radial grid lines -->
+  <g class="tg-grid" opacity="0.08" stroke="#C8782A" stroke-width="0.5">
+    <line x1="-230" y1="0" x2="230" y2="0" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(15)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(30)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(45)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(60)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(75)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(90)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(105)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(120)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(135)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(150)" />
+    <line x1="-230" y1="0" x2="230" y2="0" transform="rotate(165)" />
+  </g>
+
+  <!-- Concentric circles -->
+  <g class="tg-grid" opacity="0.05" stroke="#F5C518" stroke-width="0.3" fill="none">
+    <circle cx="0" cy="0" r="20" />
+    <circle cx="0" cy="0" r="40" />
+    <circle cx="0" cy="0" r="60" />
+    <circle cx="0" cy="0" r="80" />
+    <circle cx="0" cy="0" r="100" />
+    <circle cx="0" cy="0" r="120" />
+    <circle cx="0" cy="0" r="140" />
+    <circle cx="0" cy="0" r="160" />
+    <circle cx="0" cy="0" r="180" />
+    <circle cx="0" cy="0" r="200" />
+    <circle cx="0" cy="0" r="220" />
+  </g>
+
+  <!-- Inner stellated polygon layer (6-pointed, tight) -->
+  <g class="tg-stellation-inner" opacity="0.35" filter="url(#tg-glow)">
+    <polygon points="0,-50 43.3,25 -43.3,25" fill="none" stroke="#E8801C" stroke-width="0.8" />
+    <polygon points="0,50 43.3,-25 -43.3,-25" fill="none" stroke="#E8801C" stroke-width="0.8" />
+    <!-- Connecting lines to center -->
+    <line x1="0" y1="-50" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.5" />
+    <line x1="43.3" y1="25" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.5" />
+    <line x1="-43.3" y1="25" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.5" />
+    <line x1="0" y1="50" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.5" />
+    <line x1="43.3" y1="-25" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.5" />
+    <line x1="-43.3" y1="-25" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.5" />
+    <!-- Fill triangles -->
+    <polygon points="0,-50 43.3,25 -43.3,25" fill="#E8801C" opacity="0.06" />
+    <polygon points="0,50 43.3,-25 -43.3,-25" fill="#E8801C" opacity="0.06" />
+  </g>
+
+  <!-- Middle stellated polygon layer (8-pointed) -->
+  <g class="tg-stellation-mid" opacity="0.25" filter="url(#tg-glow)">
+    <!-- Square 1 -->
+    <polygon points="0,-90 90,0 0,90 -90,0" fill="none" stroke="#E8801C" stroke-width="0.6" />
+    <!-- Square 2 (rotated 45deg) -->
+    <polygon points="63.6,-63.6 63.6,63.6 -63.6,63.6 -63.6,-63.6" fill="none" stroke="#F5C518" stroke-width="0.6" />
+    <!-- Radial lines -->
+    <line x1="0" y1="-90" x2="0" y2="0" stroke="#E8801C" stroke-width="0.3" opacity="0.4" />
+    <line x1="90" y1="0" x2="0" y2="0" stroke="#E8801C" stroke-width="0.3" opacity="0.4" />
+    <line x1="0" y1="90" x2="0" y2="0" stroke="#E8801C" stroke-width="0.3" opacity="0.4" />
+    <line x1="-90" y1="0" x2="0" y2="0" stroke="#E8801C" stroke-width="0.3" opacity="0.4" />
+    <line x1="63.6" y1="-63.6" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.4" />
+    <line x1="63.6" y1="63.6" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.4" />
+    <line x1="-63.6" y1="63.6" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.4" />
+    <line x1="-63.6" y1="-63.6" x2="0" y2="0" stroke="#F5C518" stroke-width="0.3" opacity="0.4" />
+    <!-- Fill -->
+    <polygon points="0,-90 90,0 0,90 -90,0" fill="#E8801C" opacity="0.03" />
+    <polygon points="63.6,-63.6 63.6,63.6 -63.6,63.6 -63.6,-63.6" fill="#F5C518" opacity="0.03" />
+  </g>
+
+  <!-- Outer stellated polygon layer (12-pointed, wide) -->
+  <g class="tg-stellation-outer" opacity="0.15">
+    <!-- Triangle 1 -->
+    <polygon points="0,-160 138.6,80 -138.6,80" fill="none" stroke="#E8801C" stroke-width="0.5" />
+    <!-- Triangle 2 -->
+    <polygon points="0,160 138.6,-80 -138.6,-80" fill="none" stroke="#E8801C" stroke-width="0.5" />
+    <!-- Triangle 3 -->
+    <polygon points="160,0 -80,138.6 -80,-138.6" fill="none" stroke="#F5C518" stroke-width="0.5" />
+    <!-- Triangle 4 -->
+    <polygon points="-160,0 80,138.6 80,-138.6" fill="none" stroke="#F5C518" stroke-width="0.5" />
+    <!-- Extended radial lines -->
+    <line x1="0" y1="-160" x2="0" y2="-60" stroke="#E8801C" stroke-width="0.3" opacity="0.3" />
+    <line x1="138.6" y1="80" x2="52" y2="30" stroke="#E8801C" stroke-width="0.3" opacity="0.3" />
+    <line x1="-138.6" y1="80" x2="-52" y2="30" stroke="#E8801C" stroke-width="0.3" opacity="0.3" />
+    <line x1="0" y1="160" x2="0" y2="60" stroke="#E8801C" stroke-width="0.3" opacity="0.3" />
+    <line x1="138.6" y1="-80" x2="52" y2="-30" stroke="#F5C518" stroke-width="0.3" opacity="0.3" />
+    <line x1="-138.6" y1="-80" x2="-52" y2="-30" stroke="#F5C518" stroke-width="0.3" opacity="0.3" />
+    <!-- Fills -->
+    <polygon points="0,-160 138.6,80 -138.6,80" fill="#E8801C" opacity="0.02" />
+    <polygon points="0,160 138.6,-80 -138.6,-80" fill="#E8801C" opacity="0.02" />
+  </g>
+
+  <!-- Inverted triangle frame - Terraphim symbol -->
+  <g class="tg-triangle-frame">
+    <!-- Outer glow triangle -->
+    <g class="tg-triangle-glow" filter="url(#tg-soft-glow)">
+      <polygon points="-125,-95 125,-95 0,120"
+               fill="none" stroke="#F5C518" stroke-width="0.5" opacity="0.4" />
+    </g>
+
+    <!-- Main triangle - bold orange -->
+    <polygon points="-115,-88 115,-88 0,112"
+             fill="none" stroke="url(#tg-orange-gold)" stroke-width="2.5"
+             filter="url(#tg-glow)" />
+
+    <!-- Inner triangle - thinner gold -->
+    <polygon points="-100,-78 100,-78 0,98"
+             fill="none" stroke="#F5C518" stroke-width="0.8" opacity="0.5" />
+  </g>
+
+  <!-- T letterform at center -->
+  <g class="tg-t-mark" filter="url(#tg-glow)">
+    <!-- T horizontal bar -->
+    <line x1="-35" y1="-18" x2="35" y2="-18"
+          stroke="#F5C518" stroke-width="2.5" stroke-linecap="round" />
+    <!-- T vertical stem -->
+    <line x1="0" y1="-18" x2="0" y2="28"
+          stroke="#F5C518" stroke-width="2.5" stroke-linecap="round" />
+  </g>
+
+  <!-- Outer border -->
+  <rect x="-245" y="-245" width="490" height="490" rx="2"
+        fill="none" stroke="#C8782A" stroke-width="0.5" opacity="0.15" />
+  <rect x="-240" y="-240" width="480" height="480" rx="2"
+        fill="none" stroke="#C8782A" stroke-width="0.3" opacity="0.1" />
+</svg>

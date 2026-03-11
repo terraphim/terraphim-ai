@@ -6,11 +6,13 @@
     <div class="has-text-centered">
       <h1 class="title is-2">{{ section.title }}</h1>
       <p class="subtitle is-4">{{ section.description }}</p>
-      {% if config.extra.author.avatar %}
-      <figure class="image is-flex is-justify-content-center is-align-items-center">
-        <img src="{{ config.extra.author.avatar }}" style="max-width: 192px" />
+      <figure class="image is-flex is-justify-content-center is-align-items-center" style="margin-bottom: 1.5rem;">
+        <a href="/logo-animation/" title="View full animated logo">
+          <img src="/images/terraphim_logo_animated.svg"
+               alt="Terraphim AI animated logo"
+               style="max-width: 320px; width: 100%; border-radius: 8px;" />
+        </a>
       </figure>
-      {% endif %}
       {{ macros:: social_links( social_config=config.extra.social) }}
     </div>
     <div class="content">
