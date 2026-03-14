@@ -137,11 +137,7 @@ You are working on issue {{ issue.identifier }}: {{ issue.title }}.
         assert!(!def.config.is_empty());
 
         let tracker = def.config.get("tracker").unwrap().as_mapping().unwrap();
-        let kind = tracker
-            .get("kind")
-            .unwrap()
-            .as_str()
-            .unwrap();
+        let kind = tracker.get("kind").unwrap().as_str().unwrap();
         assert_eq!(kind, "linear");
 
         assert!(def.prompt_template.contains("{{ issue.identifier }}"));

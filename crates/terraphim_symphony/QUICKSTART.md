@@ -194,6 +194,23 @@ Shell scripts executed at workspace lifecycle points. All run with `sh -lc` in t
 | `hooks.before_remove` | Before workspace deletion | Logged and ignored |
 | `hooks.timeout_ms` | -- | Default: `60000` (60s). Hook execution timeout |
 
+**Hook environment variables**: All hooks receive these environment variables for the current issue:
+
+| Variable | Example | Description |
+|----------|---------|-------------|
+| `SYMPHONY_ISSUE_ID` | `42` | Tracker-internal issue ID |
+| `SYMPHONY_ISSUE_IDENTIFIER` | `owner/repo#7` | Human-readable issue key |
+| `SYMPHONY_ISSUE_NUMBER` | `7` | Issue number (extracted from identifier) |
+| `SYMPHONY_ISSUE_TITLE` | `Implement parser` | Issue title |
+
+Use these in hooks to create per-issue branches and meaningful commit messages:
+
+```yaml
+hooks:
+  before_run: 'BRANCH="symphony/issue-${SYMPHONY_ISSUE_NUMBER}" && git checkout "$BRANCH" 2>/dev/null || git checkout -b "$BRANCH" origin/main'
+  after_run: 'BRANCH="symphony/issue-${SYMPHONY_ISSUE_NUMBER}" && git add -A && git commit -m "symphony: ${SYMPHONY_ISSUE_IDENTIFIER}" || true && git push -u origin "$BRANCH" || true'
+```
+
 ### Agent
 
 | Setting | Default | Description |
@@ -350,7 +367,11 @@ WORKFLOW.md is watched for changes (via `file-watch` feature, enabled by default
 
 **Git clone fails in after_create hook** -- Plain HTTPS URLs prompt for credentials in non-interactive shell contexts. Use token-embedded URLs: `git clone https://user:${TOKEN}@host/org/repo.git .`
 
-**Liquid templates appearing literally in hooks** -- Hook scripts are plain shell commands run via `sh -lc`. They are NOT Liquid-rendered. Do not use `{{ }}` template syntax in hook values. Only the prompt body (below the YAML front matter) supports Liquid.
+**Liquid templates appearing literally in hooks** -- Hook scripts are plain shell commands run via `sh -lc`. They are NOT Liquid-rendered. Do not use `{{ }}` template syntax in hook values. Only the prompt body (below the YAML front matter) supports Liquid. Use `$SYMPHONY_ISSUE_NUMBER` and other `SYMPHONY_*` environment variables instead.
+
+**Merge conflicts between agent workspaces** -- If multiple agents push to the same branch, use per-issue branches via `$SYMPHONY_ISSUE_NUMBER` in your `before_run` and `after_run` hooks. See the hook environment variables section above.
+
+**Dependency enforcement not working with Gitea** -- Symphony fetches dependencies from the Gitea API (`/api/v1/repos/.../issues/{n}/dependencies`) and uses them to block dispatch. Ensure dependencies are created via the Gitea web UI or API. Issues in "Todo" state with non-terminal blockers will not be dispatched until their blockers are closed.
 
 ---
 
@@ -407,8 +428,8 @@ workspace:
 
 hooks:
   after_create: "git clone https://terraphim:${GITEA_TOKEN}@git.terraphim.cloud/terraphim/pagerank-viewer.git ."
-  before_run: "git fetch origin && git checkout main && git pull"
-  after_run: "git add -A && git commit -m 'symphony: auto-commit' && git push || true"
+  before_run: 'git fetch origin && BRANCH="symphony/issue-${SYMPHONY_ISSUE_NUMBER}" && (git checkout "$BRANCH" 2>/dev/null && git pull origin "$BRANCH" || git checkout -b "$BRANCH" origin/main) || true'
+  after_run: 'BRANCH="symphony/issue-${SYMPHONY_ISSUE_NUMBER}" && git add -A && git commit -m "symphony: ${SYMPHONY_ISSUE_IDENTIFIER} - ${SYMPHONY_ISSUE_TITLE}" || true && git push -u origin "$BRANCH" || true'
   timeout_ms: 120000
 
 codex:

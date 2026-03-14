@@ -8,12 +8,12 @@ use std::path::PathBuf;
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
+use terraphim_symphony::SymphonyError;
 use terraphim_symphony::config::ServiceConfig;
 use terraphim_symphony::orchestrator::SymphonyOrchestrator;
 use terraphim_symphony::tracker::gitea::GiteaTracker;
 use terraphim_symphony::tracker::linear::LinearTracker;
 use terraphim_symphony::workspace::WorkspaceManager;
-use terraphim_symphony::SymphonyError;
 
 /// Symphony orchestration service.
 ///
@@ -51,23 +51,20 @@ async fn main() -> anyhow::Result<()> {
     config.validate_for_dispatch()?;
 
     // Build the tracker client
-    let tracker: Box<dyn terraphim_symphony::IssueTracker> =
-        match config.tracker_kind().as_deref() {
-            Some("linear") => Box::new(LinearTracker::from_config(&config)?),
-            Some("gitea") => Box::new(GiteaTracker::from_config(&config)?),
-            Some(kind) => {
-                return Err(SymphonyError::UnsupportedTrackerKind {
-                    kind: kind.into(),
-                }
-                .into());
+    let tracker: Box<dyn terraphim_symphony::IssueTracker> = match config.tracker_kind().as_deref()
+    {
+        Some("linear") => Box::new(LinearTracker::from_config(&config)?),
+        Some("gitea") => Box::new(GiteaTracker::from_config(&config)?),
+        Some(kind) => {
+            return Err(SymphonyError::UnsupportedTrackerKind { kind: kind.into() }.into());
+        }
+        None => {
+            return Err(SymphonyError::ValidationFailed {
+                checks: vec!["tracker.kind is required".into()],
             }
-            None => {
-                return Err(SymphonyError::ValidationFailed {
-                    checks: vec!["tracker.kind is required".into()],
-                }
-                .into());
-            }
-        };
+            .into());
+        }
+    };
 
     // Build the workspace manager
     let workspace_mgr = WorkspaceManager::new(&config)?;

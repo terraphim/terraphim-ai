@@ -3,14 +3,14 @@
 //! Fetches issues from a Gitea instance using the REST API, normalising
 //! them to the common [`Issue`](super::Issue) model.
 
-use super::{Issue, IssueTracker};
+use super::{BlockerRef, Issue, IssueTracker};
 use crate::config::ServiceConfig;
 use crate::error::{Result, SymphonyError};
 use async_trait::async_trait;
 use chrono::{DateTime, Utc};
 use reqwest::Client;
 use serde::Deserialize;
-use tracing::debug;
+use tracing::{debug, warn};
 
 /// Gitea REST API client.
 pub struct GiteaTracker {
@@ -21,6 +21,34 @@ pub struct GiteaTracker {
     repo: String,
     active_states: Vec<String>,
     terminal_states: Vec<String>,
+    use_robot_api: bool,
+}
+
+// --- Gitea Robot API response types ---
+
+/// A single issue from the Robot `/ready` endpoint.
+#[derive(Debug, Deserialize)]
+#[allow(dead_code)]
+struct RobotReadyIssue {
+    id: i64,
+    index: i64,
+    title: String,
+    page_rank: f64,
+    priority: i32,
+    is_blocked: bool,
+    blocker_count: i32,
+}
+
+/// Response from `GET /api/v1/robot/ready`.
+#[derive(Debug, Deserialize)]
+struct RobotReadyResponse {
+    #[allow(dead_code)]
+    repo_id: i64,
+    #[allow(dead_code)]
+    repo_name: String,
+    #[allow(dead_code)]
+    total_count: i32,
+    ready_issues: Vec<RobotReadyIssue>,
 }
 
 /// Gitea API issue response.
@@ -50,11 +78,7 @@ impl GiteaTracker {
     pub fn from_config(config: &ServiceConfig) -> Result<Self> {
         let token = config
             .tracker_api_key()
-            .or_else(|| {
-                std::env::var("GITEA_TOKEN")
-                    .ok()
-                    .filter(|v| !v.is_empty())
-            })
+            .or_else(|| std::env::var("GITEA_TOKEN").ok().filter(|v| !v.is_empty()))
             .ok_or_else(|| SymphonyError::AuthenticationMissing {
                 service: "gitea".into(),
             })?;
@@ -66,12 +90,11 @@ impl GiteaTracker {
                     checks: vec!["tracker.owner is required for gitea".into()],
                 })?;
 
-        let repo =
-            config
-                .tracker_gitea_repo()
-                .ok_or_else(|| SymphonyError::ValidationFailed {
-                    checks: vec!["tracker.repo is required for gitea".into()],
-                })?;
+        let repo = config
+            .tracker_gitea_repo()
+            .ok_or_else(|| SymphonyError::ValidationFailed {
+                checks: vec!["tracker.repo is required for gitea".into()],
+            })?;
 
         let base_url = config.tracker_endpoint();
 
@@ -83,6 +106,7 @@ impl GiteaTracker {
             repo,
             active_states: config.active_states(),
             terminal_states: config.terminal_states(),
+            use_robot_api: config.tracker_use_robot_api(),
         })
     }
 
@@ -132,6 +156,7 @@ impl GiteaTracker {
             url: gitea.html_url.clone(),
             labels,
             blocked_by: vec![], // Gitea dependencies fetched separately if needed
+            pagerank_score: None, // Populated from Robot API if available
             created_at,
             updated_at,
         }
@@ -181,9 +206,7 @@ impl GiteaTracker {
     /// Extract priority from labels (e.g. "priority/p1-high" -> 1).
     fn extract_priority(&self, labels: &[String]) -> Option<i32> {
         for label in labels {
-            let cleaned = label
-                .strip_prefix("priority/")
-                .unwrap_or(label);
+            let cleaned = label.strip_prefix("priority/").unwrap_or(label);
 
             // Match patterns like "p1", "p2", "p1-high"
             if let Some(rest) = cleaned.strip_prefix("p") {
@@ -195,6 +218,142 @@ impl GiteaTracker {
             }
         }
         None
+    }
+
+    /// Fetch dependencies (blockers) for a specific issue from the Gitea API.
+    ///
+    /// Calls `GET /api/v1/repos/{owner}/{repo}/issues/{number}/dependencies`
+    /// and returns a list of `BlockerRef` entries representing issues that
+    /// block the given issue.
+    async fn fetch_dependencies(&self, issue_number: u64) -> Result<Vec<BlockerRef>> {
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}/dependencies",
+            self.base_url.trim_end_matches('/'),
+            self.owner,
+            self.repo,
+            issue_number
+        );
+
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("token {}", self.token))
+            .send()
+            .await
+            .map_err(|e| SymphonyError::Tracker {
+                kind: "gitea".into(),
+                message: format!("dependency fetch failed for issue #{issue_number}: {e}"),
+            })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            // Non-fatal: log warning and return empty deps rather than failing
+            // the entire poll tick. The issue will be dispatched without
+            // dependency enforcement, which is the previous behaviour.
+            let text = resp.text().await.unwrap_or_default();
+            warn!(
+                issue_number,
+                status = %status,
+                "failed to fetch dependencies, proceeding without: {text}"
+            );
+            return Ok(vec![]);
+        }
+
+        let deps: Vec<GiteaIssue> = resp.json().await.map_err(|e| SymphonyError::Tracker {
+            kind: "gitea".into(),
+            message: format!("dependency parse error for issue #{issue_number}: {e}"),
+        })?;
+
+        let blockers: Vec<BlockerRef> = deps
+            .iter()
+            .map(|dep| {
+                let dep_identifier = format!("{}/{}#{}", self.owner, self.repo, dep.number);
+                let dep_labels: Vec<String> = dep
+                    .labels
+                    .as_ref()
+                    .map(|ls| ls.iter().map(|l| l.name.to_lowercase()).collect())
+                    .unwrap_or_default();
+                let dep_state = self.derive_state(&dep_labels, &dep.state);
+
+                BlockerRef {
+                    id: Some(dep.id.to_string()),
+                    identifier: Some(dep_identifier),
+                    state: Some(dep_state),
+                }
+            })
+            .collect();
+
+        debug!(
+            issue_number,
+            blocker_count = blockers.len(),
+            "fetched dependencies from Gitea"
+        );
+        Ok(blockers)
+    }
+
+    /// Fetch PageRank scores from the Gitea Robot `/ready` endpoint.
+    ///
+    /// Returns the full response including `page_rank` per issue. On failure
+    /// returns an error; callers should degrade gracefully.
+    async fn fetch_ready_issues(&self) -> Result<RobotReadyResponse> {
+        let url = format!(
+            "{}/api/v1/robot/ready?owner={}&repo={}",
+            self.base_url.trim_end_matches('/'),
+            self.owner,
+            self.repo
+        );
+
+        let resp = self
+            .client
+            .get(&url)
+            .header("Authorization", format!("token {}", self.token))
+            .send()
+            .await
+            .map_err(|e| SymphonyError::Tracker {
+                kind: "gitea-robot".into(),
+                message: format!("Robot API /ready request failed: {e}"),
+            })?;
+
+        let status = resp.status();
+        if !status.is_success() {
+            let text = resp.text().await.unwrap_or_default();
+            return Err(SymphonyError::Tracker {
+                kind: "gitea-robot".into(),
+                message: format!("Robot API /ready HTTP {status}: {text}"),
+            });
+        }
+
+        resp.json().await.map_err(|e| SymphonyError::Tracker {
+            kind: "gitea-robot".into(),
+            message: format!("Robot API /ready parse error: {e}"),
+        })
+    }
+
+    /// Merge PageRank scores from the Robot API into already-fetched issues.
+    ///
+    /// Matches by Gitea internal ID. Issues not found in the Robot response
+    /// keep `pagerank_score = None`.
+    fn merge_pagerank_scores(issues: &mut [Issue], ready: &RobotReadyResponse) {
+        use std::collections::HashMap;
+        let scores: HashMap<String, f64> = ready
+            .ready_issues
+            .iter()
+            .map(|ri| (ri.id.to_string(), ri.page_rank))
+            .collect();
+
+        let mut merged = 0usize;
+        for issue in issues.iter_mut() {
+            if let Some(&score) = scores.get(&issue.id) {
+                issue.pagerank_score = Some(score);
+                merged += 1;
+            }
+        }
+        debug!(
+            total = issues.len(),
+            merged,
+            robot_count = ready.ready_issues.len(),
+            "merged PageRank scores from Robot API"
+        );
     }
 }
 
@@ -251,7 +410,7 @@ impl IssueTracker for GiteaTracker {
                     .iter()
                     .any(|s| s.eq_ignore_ascii_case(&issue.state));
                 if is_active {
-                    all_issues.push(issue);
+                    all_issues.push((gi.number, issue));
                 }
             }
 
@@ -262,8 +421,38 @@ impl IssueTracker for GiteaTracker {
             page += 1;
         }
 
-        debug!(count = all_issues.len(), "fetched issues from Gitea");
-        Ok(all_issues)
+        // Fetch dependencies for each issue (one API call per issue).
+        // This is acceptable for small-to-medium projects. For large
+        // projects, consider batch dependency fetching.
+        let mut result = Vec::with_capacity(all_issues.len());
+        for (number, mut issue) in all_issues {
+            match self.fetch_dependencies(number).await {
+                Ok(deps) => issue.blocked_by = deps,
+                Err(e) => {
+                    warn!(
+                        issue_number = number,
+                        "dependency fetch failed, proceeding without: {e}"
+                    );
+                    // Leave blocked_by as empty vec (previous behaviour)
+                }
+            }
+            result.push(issue);
+        }
+
+        // Merge PageRank scores from Robot API (single call, graceful fallback)
+        if self.use_robot_api {
+            match self.fetch_ready_issues().await {
+                Ok(ready) => {
+                    Self::merge_pagerank_scores(&mut result, &ready);
+                }
+                Err(e) => {
+                    debug!("Robot API unavailable, continuing without PageRank: {e}");
+                }
+            }
+        }
+
+        debug!(count = result.len(), "fetched issues from Gitea");
+        Ok(result)
     }
 
     async fn fetch_issue_states_by_ids(&self, ids: &[String]) -> Result<Vec<Issue>> {
@@ -293,11 +482,9 @@ impl IssueTracker for GiteaTracker {
         }
 
         // Determine if we need open, closed, or both
-        let need_open = states.iter().any(|s| {
-            self.active_states
-                .iter()
-                .any(|a| a.eq_ignore_ascii_case(s))
-        });
+        let need_open = states
+            .iter()
+            .any(|s| self.active_states.iter().any(|a| a.eq_ignore_ascii_case(s)));
         let need_closed = states.iter().any(|s| {
             self.terminal_states
                 .iter()
@@ -354,9 +541,7 @@ impl IssueTracker for GiteaTracker {
 
                 for gi in &issues {
                     let issue = self.normalise_issue(gi);
-                    let matches = states
-                        .iter()
-                        .any(|s| s.eq_ignore_ascii_case(&issue.state));
+                    let matches = states.iter().any(|s| s.eq_ignore_ascii_case(&issue.state));
                     if matches {
                         all_issues.push(issue);
                     }
@@ -390,6 +575,7 @@ mod tests {
             repo: "testrepo".into(),
             active_states: vec!["Todo".into(), "In Progress".into()],
             terminal_states: vec!["Done".into(), "Closed".into()],
+            use_robot_api: true,
         }
     }
 
@@ -444,10 +630,7 @@ mod tests {
     fn derive_state_from_label() {
         let tracker = make_tracker();
         let labels = vec!["status/in progress".into(), "bug".into()];
-        assert_eq!(
-            tracker.derive_state(&labels, "open"),
-            "In Progress"
-        );
+        assert_eq!(tracker.derive_state(&labels, "open"), "In Progress");
     }
 
     #[test]
@@ -479,5 +662,180 @@ mod tests {
             tracker.issues_url(),
             "https://git.example.com/api/v1/repos/testowner/testrepo/issues"
         );
+    }
+
+    #[test]
+    fn normalise_issue_blocked_by_starts_empty() {
+        let tracker = make_tracker();
+        let gi = GiteaIssue {
+            id: 1,
+            number: 1,
+            title: "Test".into(),
+            body: None,
+            state: "open".into(),
+            html_url: None,
+            created_at: None,
+            updated_at: None,
+            labels: None,
+            ref_field: None,
+        };
+        let issue = tracker.normalise_issue(&gi);
+        // blocked_by is initially empty; fetch_dependencies() populates it
+        assert!(issue.blocked_by.is_empty());
+    }
+
+    #[test]
+    fn dependency_url_format() {
+        let tracker = make_tracker();
+        let url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}/dependencies",
+            tracker.base_url.trim_end_matches('/'),
+            tracker.owner,
+            tracker.repo,
+            42
+        );
+        assert_eq!(
+            url,
+            "https://git.example.com/api/v1/repos/testowner/testrepo/issues/42/dependencies"
+        );
+    }
+
+    #[test]
+    fn robot_ready_url_format() {
+        let tracker = make_tracker();
+        let url = format!(
+            "{}/api/v1/robot/ready?owner={}&repo={}",
+            tracker.base_url.trim_end_matches('/'),
+            tracker.owner,
+            tracker.repo
+        );
+        assert_eq!(
+            url,
+            "https://git.example.com/api/v1/robot/ready?owner=testowner&repo=testrepo"
+        );
+    }
+
+    #[test]
+    fn robot_ready_response_deserialisation() {
+        let json = r#"{
+            "repo_id": 1,
+            "repo_name": "testrepo",
+            "total_count": 2,
+            "ready_issues": [
+                {
+                    "id": 42,
+                    "index": 7,
+                    "title": "Fix something",
+                    "page_rank": 2.847,
+                    "priority": 10,
+                    "is_blocked": false,
+                    "blocker_count": 0
+                },
+                {
+                    "id": 99,
+                    "index": 3,
+                    "title": "Blocked issue",
+                    "page_rank": 0.15,
+                    "priority": 5,
+                    "is_blocked": true,
+                    "blocker_count": 2
+                }
+            ]
+        }"#;
+
+        let resp: RobotReadyResponse = serde_json::from_str(json).unwrap();
+        assert_eq!(resp.total_count, 2);
+        assert_eq!(resp.ready_issues.len(), 2);
+        assert_eq!(resp.ready_issues[0].id, 42);
+        assert!((resp.ready_issues[0].page_rank - 2.847).abs() < 0.001);
+        assert!(!resp.ready_issues[0].is_blocked);
+        assert!(resp.ready_issues[1].is_blocked);
+        assert_eq!(resp.ready_issues[1].blocker_count, 2);
+    }
+
+    #[test]
+    fn merge_pagerank_scores_into_issues() {
+        let mut issues = vec![
+            Issue {
+                id: "42".into(),
+                identifier: "testowner/testrepo#7".into(),
+                title: "Issue 7".into(),
+                description: None,
+                priority: Some(2),
+                state: "Todo".into(),
+                branch_name: None,
+                url: None,
+                labels: vec![],
+                blocked_by: vec![],
+                pagerank_score: None,
+                created_at: None,
+                updated_at: None,
+            },
+            Issue {
+                id: "99".into(),
+                identifier: "testowner/testrepo#3".into(),
+                title: "Issue 3".into(),
+                description: None,
+                priority: Some(1),
+                state: "Todo".into(),
+                branch_name: None,
+                url: None,
+                labels: vec![],
+                blocked_by: vec![],
+                pagerank_score: None,
+                created_at: None,
+                updated_at: None,
+            },
+            Issue {
+                id: "200".into(),
+                identifier: "testowner/testrepo#10".into(),
+                title: "Issue 10".into(),
+                description: None,
+                priority: None,
+                state: "In Progress".into(),
+                branch_name: None,
+                url: None,
+                labels: vec![],
+                blocked_by: vec![],
+                pagerank_score: None,
+                created_at: None,
+                updated_at: None,
+            },
+        ];
+
+        let ready = RobotReadyResponse {
+            repo_id: 1,
+            repo_name: "testrepo".into(),
+            total_count: 2,
+            ready_issues: vec![
+                RobotReadyIssue {
+                    id: 42,
+                    index: 7,
+                    title: "Issue 7".into(),
+                    page_rank: 2.847,
+                    priority: 10,
+                    is_blocked: false,
+                    blocker_count: 0,
+                },
+                RobotReadyIssue {
+                    id: 99,
+                    index: 3,
+                    title: "Issue 3".into(),
+                    page_rank: 0.15,
+                    priority: 5,
+                    is_blocked: false,
+                    blocker_count: 0,
+                },
+            ],
+        };
+
+        GiteaTracker::merge_pagerank_scores(&mut issues, &ready);
+
+        // Issue 42 should get PageRank 2.847
+        assert!((issues[0].pagerank_score.unwrap() - 2.847).abs() < 0.001);
+        // Issue 99 should get PageRank 0.15
+        assert!((issues[1].pagerank_score.unwrap() - 0.15).abs() < 0.001);
+        // Issue 200 not in Robot response, stays None
+        assert!(issues[2].pagerank_score.is_none());
     }
 }

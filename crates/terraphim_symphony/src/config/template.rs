@@ -19,11 +19,7 @@ const DEFAULT_PROMPT: &str = "You are working on an issue from the configured tr
 /// # Errors
 /// Returns `TemplateParseError` if the template syntax is invalid, or
 /// `TemplateRenderError` if a referenced variable or filter is unknown.
-pub fn render_prompt(
-    template_str: &str,
-    issue: &Issue,
-    attempt: Option<u32>,
-) -> Result<String> {
+pub fn render_prompt(template_str: &str, issue: &Issue, attempt: Option<u32>) -> Result<String> {
     let source = if template_str.trim().is_empty() {
         DEFAULT_PROMPT
     } else {
@@ -171,6 +167,7 @@ mod tests {
             url: Some("https://tracker.example.com/MT-42".into()),
             labels: vec!["bug".into(), "urgent".into()],
             blocked_by: vec![],
+            pagerank_score: None,
             created_at: Some(Utc::now()),
             updated_at: Some(Utc::now()),
         }
