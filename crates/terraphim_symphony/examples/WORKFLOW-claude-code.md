@@ -19,10 +19,10 @@ workspace:
   root: ~/symphony_workspaces
 
 hooks:
-  after_create: "git clone https://git.terraphim.cloud/terraphim/pagerank-viewer.git ."
+  after_create: "git clone https://terraphim:${GITEA_TOKEN}@git.terraphim.cloud/terraphim/pagerank-viewer.git ."
   before_run: "git fetch origin && git checkout main && git pull"
-  after_run: "git add -A && git commit -m 'symphony: auto-commit for {{ issue.identifier }}' || true"
-  timeout_ms: 60000
+  after_run: "git add -A && git commit -m 'symphony: auto-commit for {{ issue.identifier }}' && git push || true"
+  timeout_ms: 120000
 
 codex:
   turn_timeout_ms: 3600000
