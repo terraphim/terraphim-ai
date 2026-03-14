@@ -12,6 +12,7 @@ pub use state::{OrchestratorRuntimeState, StateSnapshot};
 use crate::config::template::render_prompt;
 use crate::config::ServiceConfig;
 use crate::error::Result;
+use crate::runner::claude_code::ClaudeCodeSession;
 use crate::runner::protocol::AgentEvent;
 use crate::runner::session::{CodexSession, WorkerOutcome};
 use crate::runner::TokenCounts;
@@ -245,6 +246,8 @@ impl SymphonyOrchestrator {
         // tracker checks in the worker and let the orchestrator handle it
         // via retry continuation.
 
+        let runner_kind = self.config.runner_kind();
+
         let worker_handle = tokio::spawn(async move {
             let per_issue_event_tx = event_tx.clone();
             let issue_id_for_events = issue_id_clone.clone();
@@ -265,75 +268,88 @@ impl SymphonyOrchestrator {
                 }
             });
 
-            // Start session
-            let session = match CodexSession::start(
-                &workspace_path,
-                &config,
-                session_event_tx.clone(),
-            )
-            .await
-            {
-                Ok(s) => s,
-                Err(e) => {
-                    forward_handle.abort();
-                    let outcome = WorkerOutcome::Failed {
-                        reason: e.to_string(),
-                        turn_count: 0,
-                        tokens: TokenCounts::default(),
-                    };
-                    let _ = exit_tx
-                        .send(WorkerExit {
-                            issue_id: issue_id_for_events,
-                            identifier: identifier_clone,
-                            outcome: WorkerOutcome::Failed {
-                                reason: e.to_string(),
-                                turn_count: 0,
-                                tokens: TokenCounts::default(),
-                            },
-                            started_at,
-                        })
-                        .await;
-                    return outcome;
-                }
-            };
-
-            // For this initial implementation, run a single turn.
-            // Multi-turn with tracker state checks will be added when
-            // we have a way to share the tracker reference.
-            let turn_timeout = Duration::from_millis(config.codex_turn_timeout_ms());
-            let mut session = session;
-
-            // Use the full prompt for the single turn approach
-            let outcome = match tokio::time::timeout(
-                turn_timeout,
-                session.run_turn_simple(&prompt_clone, &issue_clone, &session_event_tx),
-            )
-            .await
-            {
-                Ok(Ok(turn_id)) => {
-                    debug!(turn_id, "single turn completed");
-                    session.stop().await;
-                    WorkerOutcome::Normal {
-                        turn_count: 1,
-                        tokens: session.accumulated_tokens(),
+            let outcome = match runner_kind.as_str() {
+                "claude-code" => {
+                    // Claude Code runner: single-shot `claude -p` invocation
+                    match ClaudeCodeSession::start(
+                        &workspace_path,
+                        &config,
+                        &prompt_clone,
+                        session_event_tx.clone(),
+                    )
+                    .await
+                    {
+                        Ok(session) => {
+                            let turn_timeout =
+                                Duration::from_millis(config.codex_turn_timeout_ms());
+                            session.run_to_completion(&session_event_tx, turn_timeout).await
+                        }
+                        Err(e) => WorkerOutcome::Failed {
+                            reason: e.to_string(),
+                            turn_count: 0,
+                            tokens: TokenCounts::default(),
+                        },
                     }
                 }
-                Ok(Err(e)) => {
-                    let tokens = session.accumulated_tokens();
-                    session.stop().await;
-                    WorkerOutcome::Failed {
-                        reason: e.to_string(),
-                        turn_count: 1,
-                        tokens,
-                    }
-                }
-                Err(_) => {
-                    let tokens = session.accumulated_tokens();
-                    session.stop().await;
-                    WorkerOutcome::Failed {
-                        reason: format!("turn timeout after {}ms", config.codex_turn_timeout_ms()),
-                        turn_count: 1,
-                        tokens,
+                _ => {
+                    // Codex runner: JSON-RPC handshake + single turn
+                    match CodexSession::start(
+                        &workspace_path,
+                        &config,
+                        session_event_tx.clone(),
+                    )
+                    .await
+                    {
+                        Ok(mut session) => {
+                            let turn_timeout =
+                                Duration::from_millis(config.codex_turn_timeout_ms());
+
+                            match tokio::time::timeout(
+                                turn_timeout,
+                                session.run_turn_simple(
+                                    &prompt_clone,
+                                    &issue_clone,
+                                    &session_event_tx,
+                                ),
+                            )
+                            .await
+                            {
+                                Ok(Ok(turn_id)) => {
+                                    debug!(turn_id, "single turn completed");
+                                    session.stop().await;
+                                    WorkerOutcome::Normal {
+                                        turn_count: 1,
+                                        tokens: session.accumulated_tokens(),
+                                    }
+                                }
+                                Ok(Err(e)) => {
+                                    let tokens = session.accumulated_tokens();
+                                    session.stop().await;
+                                    WorkerOutcome::Failed {
+                                        reason: e.to_string(),
+                                        turn_count: 1,
+                                        tokens,
+                                    }
+                                }
+                                Err(_) => {
+                                    let tokens = session.accumulated_tokens();
+                                    session.stop().await;
+                                    WorkerOutcome::Failed {
+                                        reason: format!(
+                                            "turn timeout after {}ms",
+                                            config.codex_turn_timeout_ms()
+                                        ),
+                                        turn_count: 1,
+                                        tokens,
+                                    }
+                                }
+                            }
+                        }
+                        Err(e) => WorkerOutcome::Failed {
+                            reason: e.to_string(),
+                            turn_count: 0,
+                            tokens: TokenCounts::default(),
+                        },
                     }
                 }
             };

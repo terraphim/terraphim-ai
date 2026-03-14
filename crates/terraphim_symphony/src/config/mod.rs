@@ -187,6 +187,22 @@ impl ServiceConfig {
         map
     }
 
+    // --- Runner ---
+
+    /// Runner kind: `"codex"` (default) or `"claude-code"`.
+    ///
+    /// Determines which agent session type to use for dispatching issues.
+    pub fn runner_kind(&self) -> String {
+        self.get_str(&["agent", "runner"])
+            .unwrap_or_else(|| "codex".into())
+    }
+
+    /// Additional CLI flags for the Claude Code runner (e.g.
+    /// `"--dangerously-skip-permissions --max-turns 10"`).
+    pub fn claude_flags(&self) -> Option<String> {
+        self.get_str(&["agent", "claude_flags"])
+    }
+
     // --- Codex ---
 
     /// Coding-agent command to execute.
@@ -289,8 +305,18 @@ impl ServiceConfig {
             None => {} // Already caught above
         }
 
-        if self.codex_command().is_empty() {
-            checks.push("codex.command must not be empty".into());
+        match self.runner_kind().as_str() {
+            "codex" => {
+                if self.codex_command().is_empty() {
+                    checks.push("codex.command must not be empty".into());
+                }
+            }
+            "claude-code" => {
+                // No codex.command needed; claude CLI is invoked directly.
+            }
+            other => {
+                checks.push(format!("unsupported agent.runner: {other}"));
+            }
         }
 
         if checks.is_empty() {
@@ -547,6 +573,57 @@ mod tests {
     fn stall_timeout_default() {
         let cfg = config_from_yaml("tracker:\n  kind: linear");
         assert_eq!(cfg.codex_stall_timeout_ms(), 300_000);
+    }
+
+    #[test]
+    fn default_runner_kind() {
+        let cfg = config_from_yaml("tracker:\n  kind: gitea");
+        assert_eq!(cfg.runner_kind(), "codex");
+    }
+
+    #[test]
+    fn custom_runner_kind() {
+        let cfg = config_from_yaml("agent:\n  runner: claude-code");
+        assert_eq!(cfg.runner_kind(), "claude-code");
+    }
+
+    #[test]
+    fn claude_flags_none_by_default() {
+        let cfg = config_from_yaml("tracker:\n  kind: gitea");
+        assert!(cfg.claude_flags().is_none());
+    }
+
+    #[test]
+    fn claude_flags_present() {
+        let cfg = config_from_yaml(
+            "agent:\n  claude_flags: \"--dangerously-skip-permissions --max-turns 10\"",
+        );
+        assert_eq!(
+            cfg.claude_flags().unwrap(),
+            "--dangerously-skip-permissions --max-turns 10"
+        );
+    }
+
+    #[test]
+    fn validation_claude_code_runner_no_codex_command_needed() {
+        let cfg = config_from_yaml(
+            "tracker:\n  kind: gitea\n  api_key: test\n  owner: o\n  repo: r\nagent:\n  runner: claude-code",
+        );
+        assert!(cfg.validate_for_dispatch().is_ok());
+    }
+
+    #[test]
+    fn validation_unsupported_runner() {
+        let cfg = config_from_yaml(
+            "tracker:\n  kind: gitea\n  api_key: test\n  owner: o\n  repo: r\nagent:\n  runner: unknown-runner",
+        );
+        let err = cfg.validate_for_dispatch().unwrap_err();
+        match err {
+            SymphonyError::ValidationFailed { checks } => {
+                assert!(checks.iter().any(|c| c.contains("unsupported agent.runner")));
+            }
+            _ => panic!("expected ValidationFailed"),
+        }
     }
 
     #[test]
