@@ -14,6 +14,7 @@ agent:
   max_concurrent_agents: 2
   max_turns: 10
   claude_flags: "--dangerously-skip-permissions --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+  settings: ~/.claude/symphony-settings.json
 
 workspace:
   root: ~/symphony_workspaces

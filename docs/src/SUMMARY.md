@@ -27,6 +27,11 @@
 - [MCP Integration](./mcp-integration.md)
 - [Claude Code Skills](./claude-code-skills.md)
 
+## Symphony
+
+- [Symphony Orchestrator](./symphony/README.md)
+- [AI Agent Workflows](./ai_agents_workflows.md)
+
 ## Automata
 
 - [Paragraph Extraction](./automata-paragraph-extraction.md)
@@ -73,6 +78,7 @@
 ## Case Studies
 
 - [Case Studies](./case-studies/README.md)
+- [Symphony PageRank Viewer](./case-studies/symphony-pagerank-viewer.md)
 
 ## Artifacts
 
