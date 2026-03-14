@@ -69,7 +69,10 @@ async fn get_state(State(state): State<Arc<Mutex<ApiState>>>) -> impl IntoRespon
 async fn post_refresh(State(state): State<Arc<Mutex<ApiState>>>) -> impl IntoResponse {
     let locked = state.lock().await;
     locked.refresh_notify.notify_one();
-    (StatusCode::ACCEPTED, Json(serde_json::json!({"status": "refresh_queued"})))
+    (
+        StatusCode::ACCEPTED,
+        Json(serde_json::json!({"status": "refresh_queued"})),
+    )
 }
 
 /// GET /api/v1/:issue_identifier - issue-specific debug details.
@@ -95,7 +98,11 @@ async fn get_issue(
         .iter()
         .find(|r| r.issue_identifier == identifier)
     {
-        return (StatusCode::OK, Json(serde_json::to_value(retrying).unwrap())).into_response();
+        return (
+            StatusCode::OK,
+            Json(serde_json::to_value(retrying).unwrap()),
+        )
+            .into_response();
     }
 
     let err = ApiError {
@@ -104,7 +111,11 @@ async fn get_issue(
             message: format!("issue {identifier} not found in running or retry state"),
         },
     };
-    (StatusCode::NOT_FOUND, Json(serde_json::to_value(err).unwrap())).into_response()
+    (
+        StatusCode::NOT_FOUND,
+        Json(serde_json::to_value(err).unwrap()),
+    )
+        .into_response()
 }
 
 /// GET / - human-readable dashboard.

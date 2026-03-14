@@ -235,10 +235,7 @@ impl ClaudeCodeSession {
     }
 
     /// Process NDJSON events until the stdout channel closes.
-    async fn process_events(
-        &mut self,
-        event_tx: &mpsc::Sender<AgentEvent>,
-    ) -> Result<()> {
+    async fn process_events(&mut self, event_tx: &mpsc::Sender<AgentEvent>) -> Result<()> {
         while let Some(event) = self.stdout_rx.recv().await {
             self.handle_event(&event, event_tx).await;
         }
@@ -246,11 +243,7 @@ impl ClaudeCodeSession {
     }
 
     /// Map a single Claude Code event to an `AgentEvent` and update internal state.
-    async fn handle_event(
-        &mut self,
-        event: &ClaudeCodeEvent,
-        event_tx: &mpsc::Sender<AgentEvent>,
-    ) {
+    async fn handle_event(&mut self, event: &ClaudeCodeEvent, event_tx: &mpsc::Sender<AgentEvent>) {
         match event.event_type.as_str() {
             "system" => {
                 // System init events may carry session_id
@@ -351,10 +344,7 @@ impl ClaudeCodeSession {
             }
 
             "error" => {
-                let msg = event
-                    .content
-                    .as_deref()
-                    .unwrap_or("unknown error");
+                let msg = event.content.as_deref().unwrap_or("unknown error");
                 warn!(error = msg, "claude code error event");
                 let _ = event_tx
                     .send(AgentEvent::TurnFailed {
@@ -528,7 +518,12 @@ mod tests {
 
     #[test]
     fn shell_escape_no_special_chars() {
-        let parts = vec!["claude".into(), "-p".into(), "--max-turns".into(), "10".into()];
+        let parts = vec![
+            "claude".into(),
+            "-p".into(),
+            "--max-turns".into(),
+            "10".into(),
+        ];
         let escaped = shell_escape_command(&parts);
         assert_eq!(escaped, "claude -p --max-turns 10");
     }

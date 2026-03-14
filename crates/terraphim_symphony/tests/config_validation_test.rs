@@ -3,9 +3,9 @@
 //! Verifies that `validate_for_dispatch` correctly identifies
 //! invalid configuration before the orchestrator attempts dispatch.
 
-use terraphim_symphony::config::workflow::WorkflowDefinition;
-use terraphim_symphony::config::ServiceConfig;
 use terraphim_symphony::SymphonyError;
+use terraphim_symphony::config::ServiceConfig;
+use terraphim_symphony::config::workflow::WorkflowDefinition;
 
 fn config_from_yaml(yaml: &str) -> ServiceConfig {
     let content = format!("---\n{yaml}\n---\nPrompt body.");
@@ -15,9 +15,8 @@ fn config_from_yaml(yaml: &str) -> ServiceConfig {
 
 #[test]
 fn valid_linear_config() {
-    let cfg = config_from_yaml(
-        "tracker:\n  kind: linear\n  api_key: test-key\n  project_slug: my-proj",
-    );
+    let cfg =
+        config_from_yaml("tracker:\n  kind: linear\n  api_key: test-key\n  project_slug: my-proj");
     assert!(cfg.validate_for_dispatch().is_ok());
 }
 
@@ -75,7 +74,11 @@ fn linear_missing_api_key() {
     let err = cfg.validate_for_dispatch().unwrap_err();
     match err {
         SymphonyError::ValidationFailed { checks } => {
-            assert!(checks.iter().any(|c| c.contains("api_key") || c.contains("LINEAR_API_KEY")));
+            assert!(
+                checks
+                    .iter()
+                    .any(|c| c.contains("api_key") || c.contains("LINEAR_API_KEY"))
+            );
         }
         _ => panic!("expected ValidationFailed"),
     }
@@ -127,7 +130,10 @@ fn multiple_validation_failures() {
     match err {
         SymphonyError::ValidationFailed { checks } => {
             // Should have at least 2 errors: missing kind and empty command
-            assert!(checks.len() >= 2, "expected multiple checks, got: {checks:?}");
+            assert!(
+                checks.len() >= 2,
+                "expected multiple checks, got: {checks:?}"
+            );
         }
         _ => panic!("expected ValidationFailed"),
     }

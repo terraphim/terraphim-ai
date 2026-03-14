@@ -20,9 +20,9 @@ workspace:
   root: ~/symphony_workspaces
 
 hooks:
-  after_create: "git clone https://terraphim:${GITEA_TOKEN}@git.terraphim.cloud/terraphim/tlaplus-ts.git ."
-  before_run: "git fetch origin && git checkout main && git pull"
-  after_run: "git add -A && git commit -m 'symphony: auto-commit' && git push || true"
+  after_create: "git clone https://terraphim:${GITEA_TOKEN}@git.terraphim.cloud/terraphim/tlaplus-ts.git . && cat > CLAUDE.md << 'CLAUDEEOF'\n# CLAUDE.md - Agent Instructions\n\n## Commit Discipline\n- Make atomic commits with descriptive messages referencing the issue\n- Format: feat(module): description (Refs #N)\n- Run tests before committing: npx vitest run\n- Run build before committing: npm run build\n- Run lint before committing: npm run lint\n\n## Testing\n- Never use mocks in tests\n- Write comprehensive tests using vitest\n- Ensure all existing tests still pass\n\n## Code Standards\n- TypeScript strict mode\n- ESM modules\n- Use British English in documentation\nCLAUDEEOF"
+  before_run: "git fetch origin && BRANCH=\"symphony/issue-${SYMPHONY_ISSUE_NUMBER}\" && (git checkout \"$BRANCH\" 2>/dev/null && git pull origin \"$BRANCH\" || git checkout -b \"$BRANCH\" origin/main) || true"
+  after_run: "BRANCH=\"symphony/issue-${SYMPHONY_ISSUE_NUMBER}\" && git add -A && git commit -m \"symphony: ${SYMPHONY_ISSUE_IDENTIFIER} - ${SYMPHONY_ISSUE_TITLE}\" || true && git push -u origin \"$BRANCH\" || true"
   timeout_ms: 120000
 
 codex:

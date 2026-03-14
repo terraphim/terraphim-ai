@@ -3,8 +3,8 @@
 //! Tests parsing of the sample fixture and various edge cases
 //! to exercise the full config pipeline end-to-end.
 
-use terraphim_symphony::config::workflow::WorkflowDefinition;
 use terraphim_symphony::config::ServiceConfig;
+use terraphim_symphony::config::workflow::WorkflowDefinition;
 
 #[test]
 fn parse_fixture_workflow() {
@@ -52,7 +52,10 @@ fn fixture_config_typed_values() {
     assert_eq!(config.hooks_timeout_ms(), 30_000);
 
     assert_eq!(config.active_states(), vec!["Todo", "In Progress"]);
-    assert_eq!(config.terminal_states(), vec!["Done", "Closed", "Cancelled"]);
+    assert_eq!(
+        config.terminal_states(),
+        vec!["Done", "Closed", "Cancelled"]
+    );
 
     assert!(config.hooks_after_create().is_some());
     assert!(config.hooks_before_run().is_some());

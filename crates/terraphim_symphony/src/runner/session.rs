@@ -186,9 +186,7 @@ impl CodexSession {
         // First turn uses the full rendered prompt.
         // If this is a retry attempt, prepend retry context.
         let mut current_prompt = if let Some(n) = attempt {
-            format!(
-                "[Retry attempt {n}] {prompt}"
-            )
+            format!("[Retry attempt {n}] {prompt}")
         } else {
             prompt.to_string()
         };
@@ -275,7 +273,9 @@ impl CodexSession {
             current_prompt = format!(
                 "Continue working on issue {}. This is turn {} of {}. \
                  Review what was accomplished in the previous turn and continue.",
-                issue.identifier, turn_count + 1, max_turns
+                issue.identifier,
+                turn_count + 1,
+                max_turns
             );
         }
 
@@ -308,10 +308,13 @@ impl CodexSession {
         event_tx: &mpsc::Sender<AgentEvent>,
         timeout: Duration,
     ) -> Result<String> {
-        let thread_id = self.thread_id.clone().ok_or_else(|| SymphonyError::AgentProtocol {
-            method: "turn/start".into(),
-            message: "no thread_id available".into(),
-        })?;
+        let thread_id = self
+            .thread_id
+            .clone()
+            .ok_or_else(|| SymphonyError::AgentProtocol {
+                method: "turn/start".into(),
+                message: "no thread_id available".into(),
+            })?;
 
         let mut turn_params = serde_json::json!({
             "threadId": thread_id,
@@ -351,10 +354,7 @@ impl CodexSession {
     }
 
     /// Process messages from the agent until a turn-ending event.
-    async fn process_turn_messages(
-        &mut self,
-        event_tx: &mpsc::Sender<AgentEvent>,
-    ) -> Result<()> {
+    async fn process_turn_messages(&mut self, event_tx: &mpsc::Sender<AgentEvent>) -> Result<()> {
         loop {
             let msg = self
                 .message_rx
@@ -422,8 +422,7 @@ impl CodexSession {
     ) -> Result<()> {
         match req.method.as_str() {
             // Auto-approve command execution and file changes
-            "item/commandExecution/requestApproval"
-            | "item/fileChange/requestApproval" => {
+            "item/commandExecution/requestApproval" | "item/fileChange/requestApproval" => {
                 let _ = event_tx
                     .send(AgentEvent::ApprovalAutoApproved {
                         approval_type: req.method.clone(),
@@ -493,9 +492,12 @@ impl CodexSession {
 
             // Track deltas relative to last reported totals
             if total > self.last_reported_tokens.total_tokens {
-                self.tokens.input_tokens += input.saturating_sub(self.last_reported_tokens.input_tokens);
-                self.tokens.output_tokens += output.saturating_sub(self.last_reported_tokens.output_tokens);
-                self.tokens.total_tokens += total.saturating_sub(self.last_reported_tokens.total_tokens);
+                self.tokens.input_tokens +=
+                    input.saturating_sub(self.last_reported_tokens.input_tokens);
+                self.tokens.output_tokens +=
+                    output.saturating_sub(self.last_reported_tokens.output_tokens);
+                self.tokens.total_tokens +=
+                    total.saturating_sub(self.last_reported_tokens.total_tokens);
 
                 self.last_reported_tokens = TokenCounts {
                     input_tokens: input,
@@ -530,10 +532,11 @@ impl CodexSession {
             "params": params,
         });
 
-        let mut line = serde_json::to_string(&request).map_err(|e| SymphonyError::AgentProtocol {
-            method: method.into(),
-            message: format!("serialisation error: {e}"),
-        })?;
+        let mut line =
+            serde_json::to_string(&request).map_err(|e| SymphonyError::AgentProtocol {
+                method: method.into(),
+                message: format!("serialisation error: {e}"),
+            })?;
         line.push('\n');
 
         self.stdin
@@ -543,10 +546,13 @@ impl CodexSession {
                 method: method.into(),
                 message: format!("write error: {e}"),
             })?;
-        self.stdin.flush().await.map_err(|e| SymphonyError::AgentProtocol {
-            method: method.into(),
-            message: format!("flush error: {e}"),
-        })?;
+        self.stdin
+            .flush()
+            .await
+            .map_err(|e| SymphonyError::AgentProtocol {
+                method: method.into(),
+                message: format!("flush error: {e}"),
+            })?;
 
         // Wait for response with matching ID
         let result = tokio::time::timeout(timeout, self.wait_for_response(id)).await;
@@ -600,11 +606,7 @@ impl CodexSession {
     }
 
     /// Send a JSON-RPC notification (no response expected).
-    async fn send_notification(
-        &mut self,
-        method: &str,
-        params: serde_json::Value,
-    ) -> Result<()> {
+    async fn send_notification(&mut self, method: &str, params: serde_json::Value) -> Result<()> {
         let notification = serde_json::json!({
             "method": method,
             "params": params,
@@ -624,10 +626,13 @@ impl CodexSession {
                 method: method.into(),
                 message: format!("write error: {e}"),
             })?;
-        self.stdin.flush().await.map_err(|e| SymphonyError::AgentProtocol {
-            method: method.into(),
-            message: format!("flush error: {e}"),
-        })?;
+        self.stdin
+            .flush()
+            .await
+            .map_err(|e| SymphonyError::AgentProtocol {
+                method: method.into(),
+                message: format!("flush error: {e}"),
+            })?;
 
         Ok(())
     }
@@ -657,10 +662,13 @@ impl CodexSession {
                 method: "response".into(),
                 message: format!("write error: {e}"),
             })?;
-        self.stdin.flush().await.map_err(|e| SymphonyError::AgentProtocol {
-            method: "response".into(),
-            message: format!("flush error: {e}"),
-        })?;
+        self.stdin
+            .flush()
+            .await
+            .map_err(|e| SymphonyError::AgentProtocol {
+                method: "response".into(),
+                message: format!("flush error: {e}"),
+            })?;
 
         Ok(())
     }

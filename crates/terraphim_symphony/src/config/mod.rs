@@ -54,20 +54,25 @@ impl ServiceConfig {
 
     /// Tracker API endpoint URL.
     pub fn tracker_endpoint(&self) -> String {
-        self.get_str(&["tracker", "endpoint"])
-            .unwrap_or_else(|| match self.tracker_kind().as_deref() {
+        self.get_str(&["tracker", "endpoint"]).unwrap_or_else(|| {
+            match self.tracker_kind().as_deref() {
                 Some("linear") => "https://api.linear.app/graphql".into(),
                 Some("gitea") => std::env::var("GITEA_URL")
                     .unwrap_or_else(|_| "https://git.terraphim.cloud".into()),
                 _ => String::new(),
-            })
+            }
+        })
     }
 
     /// Tracker API key, with `$VAR` resolution.
     pub fn tracker_api_key(&self) -> Option<String> {
         let raw = self.get_str(&["tracker", "api_key"])?;
         let resolved = resolve_env_var(&raw);
-        if resolved.is_empty() { None } else { Some(resolved) }
+        if resolved.is_empty() {
+            None
+        } else {
+            Some(resolved)
+        }
     }
 
     /// Tracker project slug (required for Linear).
@@ -83,6 +88,12 @@ impl ServiceConfig {
     /// Gitea repo (for gitea tracker kind).
     pub fn tracker_gitea_repo(&self) -> Option<String> {
         self.get_str(&["tracker", "repo"])
+    }
+
+    /// Whether to use the Gitea Robot API for PageRank-aware dispatch.
+    /// Defaults to `true` when tracker kind is "gitea".
+    pub fn tracker_use_robot_api(&self) -> bool {
+        self.get_bool(&["tracker", "use_robot_api"]).unwrap_or(true)
     }
 
     /// Active issue states (issues eligible for dispatch).
@@ -281,8 +292,7 @@ impl ServiceConfig {
                         .is_none()
                 {
                     checks.push(
-                        "tracker.api_key or LINEAR_API_KEY environment variable is required"
-                            .into(),
+                        "tracker.api_key or LINEAR_API_KEY environment variable is required".into(),
                     );
                 }
                 if self.tracker_project_slug().is_none() {
@@ -297,8 +307,7 @@ impl ServiceConfig {
                         .is_none()
                 {
                     checks.push(
-                        "tracker.api_key or GITEA_TOKEN environment variable is required"
-                            .into(),
+                        "tracker.api_key or GITEA_TOKEN environment variable is required".into(),
                     );
                 }
                 if self.tracker_gitea_owner().is_none() {
@@ -353,18 +362,20 @@ impl ServiceConfig {
 
     fn get_u64(&self, path: &[&str]) -> Option<u64> {
         let val = self.get_value(path)?;
-        val.as_u64().or_else(|| {
-            val.as_str()
-                .and_then(|s| s.parse::<u64>().ok())
-        })
+        val.as_u64()
+            .or_else(|| val.as_str().and_then(|s| s.parse::<u64>().ok()))
     }
 
     fn get_i64(&self, path: &[&str]) -> Option<i64> {
         let val = self.get_value(path)?;
-        val.as_i64().or_else(|| {
-            val.as_str()
-                .and_then(|s| s.parse::<i64>().ok())
-        })
+        val.as_i64()
+            .or_else(|| val.as_str().and_then(|s| s.parse::<i64>().ok()))
+    }
+
+    fn get_bool(&self, path: &[&str]) -> Option<bool> {
+        let val = self.get_value(path)?;
+        val.as_bool()
+            .or_else(|| val.as_str().and_then(|s| s.parse::<bool>().ok()))
     }
 
     fn get_str_list(&self, path: &[&str]) -> Option<Vec<String>> {
@@ -451,9 +462,7 @@ mod tests {
 
     #[test]
     fn custom_active_states() {
-        let cfg = config_from_yaml(
-            "tracker:\n  active_states:\n    - Backlog\n    - Started",
-        );
+        let cfg = config_from_yaml("tracker:\n  active_states:\n    - Backlog\n    - Started");
         assert_eq!(cfg.active_states(), vec!["Backlog", "Started"]);
     }
 
@@ -533,9 +542,8 @@ mod tests {
 
     #[test]
     fn per_state_concurrency_ignores_invalid() {
-        let cfg = config_from_yaml(
-            "agent:\n  max_concurrent_agents_by_state:\n    Todo: 0\n    Bad: -1",
-        );
+        let cfg =
+            config_from_yaml("agent:\n  max_concurrent_agents_by_state:\n    Todo: 0\n    Bad: -1");
         let map = cfg.max_concurrent_agents_by_state();
         assert!(map.is_empty());
     }
@@ -554,9 +562,7 @@ mod tests {
 
     #[test]
     fn validation_linear_missing_project_slug() {
-        let cfg = config_from_yaml(
-            "tracker:\n  kind: linear\n  api_key: test-key",
-        );
+        let cfg = config_from_yaml("tracker:\n  kind: linear\n  api_key: test-key");
         let err = cfg.validate_for_dispatch().unwrap_err();
         match err {
             SymphonyError::ValidationFailed { checks } => {
@@ -621,9 +627,7 @@ mod tests {
 
     #[test]
     fn claude_settings_file_path() {
-        let cfg = config_from_yaml(
-            "agent:\n  settings: /home/alex/.claude/symphony-settings.json",
-        );
+        let cfg = config_from_yaml("agent:\n  settings: /home/alex/.claude/symphony-settings.json");
         assert_eq!(
             cfg.claude_settings().unwrap(),
             "/home/alex/.claude/symphony-settings.json"
@@ -632,9 +636,7 @@ mod tests {
 
     #[test]
     fn claude_settings_tilde_path() {
-        let cfg = config_from_yaml(
-            "agent:\n  settings: ~/.claude/symphony-settings.json",
-        );
+        let cfg = config_from_yaml("agent:\n  settings: ~/.claude/symphony-settings.json");
         assert_eq!(
             cfg.claude_settings().unwrap(),
             "~/.claude/symphony-settings.json"
@@ -657,7 +659,11 @@ mod tests {
         let err = cfg.validate_for_dispatch().unwrap_err();
         match err {
             SymphonyError::ValidationFailed { checks } => {
-                assert!(checks.iter().any(|c| c.contains("unsupported agent.runner")));
+                assert!(
+                    checks
+                        .iter()
+                        .any(|c| c.contains("unsupported agent.runner"))
+                );
             }
             _ => panic!("expected ValidationFailed"),
         }

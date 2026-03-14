@@ -4,8 +4,8 @@
 //! All scheduling decisions (dispatch, retry, reconciliation) are
 //! serialised through this state.
 
-use crate::runner::protocol::TokenCounts;
 use crate::runner::TokenTotals;
+use crate::runner::protocol::TokenCounts;
 use crate::tracker::Issue;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};

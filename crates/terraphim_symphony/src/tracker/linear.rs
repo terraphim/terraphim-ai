@@ -34,11 +34,12 @@ impl LinearTracker {
                 service: "linear".into(),
             })?;
 
-        let project_slug = config.tracker_project_slug().ok_or_else(|| {
-            SymphonyError::ValidationFailed {
-                checks: vec!["tracker.project_slug is required for linear".into()],
-            }
-        })?;
+        let project_slug =
+            config
+                .tracker_project_slug()
+                .ok_or_else(|| SymphonyError::ValidationFailed {
+                    checks: vec!["tracker.project_slug is required for linear".into()],
+                })?;
 
         Ok(Self {
             client: Client::new(),
@@ -82,11 +83,10 @@ impl LinearTracker {
             });
         }
 
-        let json: serde_json::Value =
-            resp.json().await.map_err(|e| SymphonyError::Tracker {
-                kind: "linear".into(),
-                message: format!("response parse error: {e}"),
-            })?;
+        let json: serde_json::Value = resp.json().await.map_err(|e| SymphonyError::Tracker {
+            kind: "linear".into(),
+            message: format!("response parse error: {e}"),
+        })?;
 
         // Check for GraphQL errors
         if let Some(errors) = json.get("errors") {
@@ -128,7 +128,10 @@ impl LinearTracker {
             .get("description")
             .and_then(|d| d.as_str())
             .map(String::from);
-        let priority = node.get("priority").and_then(|p| p.as_i64()).map(|p| p as i32);
+        let priority = node
+            .get("priority")
+            .and_then(|p| p.as_i64())
+            .map(|p| p as i32);
         let state = node
             .pointer("/state/name")
             .and_then(|s| s.as_str())
@@ -200,6 +203,7 @@ impl LinearTracker {
             url,
             labels,
             blocked_by,
+            pagerank_score: None,
             created_at,
             updated_at,
         })
@@ -439,10 +443,7 @@ mod tests {
         assert_eq!(issue.priority, Some(2));
         assert_eq!(issue.labels, vec!["bug", "p1"]); // lowercase
         assert_eq!(issue.blocked_by.len(), 1);
-        assert_eq!(
-            issue.blocked_by[0].identifier.as_deref(),
-            Some("PRJ-10")
-        );
+        assert_eq!(issue.blocked_by[0].identifier.as_deref(), Some("PRJ-10"));
         assert_eq!(issue.blocked_by[0].state.as_deref(), Some("Done"));
         assert!(issue.created_at.is_some());
     }

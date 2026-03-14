@@ -9,18 +9,19 @@ pub mod state;
 
 pub use state::{OrchestratorRuntimeState, StateSnapshot};
 
-use crate::config::template::render_prompt;
 use crate::config::ServiceConfig;
+use crate::config::template::render_prompt;
 use crate::error::Result;
+use crate::runner::TokenCounts;
 use crate::runner::claude_code::ClaudeCodeSession;
 use crate::runner::protocol::AgentEvent;
 use crate::runner::session::{CodexSession, WorkerOutcome};
-use crate::runner::TokenCounts;
 use crate::tracker::IssueTracker;
 use crate::workspace::WorkspaceManager;
 
 use chrono::Utc;
 use state::{LiveSession, RetryEntry, RunningEntry};
+use std::collections::HashMap;
 use std::time::Duration;
 use tokio::sync::mpsc;
 use tracing::{debug, error, info, warn};
@@ -31,6 +32,8 @@ struct WorkerExit {
     identifier: String,
     outcome: WorkerOutcome,
     started_at: chrono::DateTime<Utc>,
+    /// Issue environment variables for after_run hooks.
+    issue_env: HashMap<String, String>,
 }
 
 /// The main Symphony orchestrator.
@@ -174,12 +177,28 @@ impl SymphonyOrchestrator {
         }
     }
 
+    /// Build environment variables for hook processes from an issue.
+    ///
+    /// Provides `SYMPHONY_ISSUE_ID`, `SYMPHONY_ISSUE_IDENTIFIER`,
+    /// `SYMPHONY_ISSUE_NUMBER`, and `SYMPHONY_ISSUE_TITLE` so that hooks
+    /// can create per-issue branches, write meaningful commit messages, etc.
+    fn build_issue_env(issue: &crate::tracker::Issue) -> HashMap<String, String> {
+        let mut env = HashMap::new();
+        env.insert("SYMPHONY_ISSUE_ID".into(), issue.id.clone());
+        env.insert("SYMPHONY_ISSUE_IDENTIFIER".into(), issue.identifier.clone());
+        env.insert("SYMPHONY_ISSUE_TITLE".into(), issue.title.clone());
+        // Extract issue number from identifier (e.g. "owner/repo#7" -> "7")
+        let number = issue
+            .identifier
+            .rsplit_once('#')
+            .map(|(_, n)| n.to_string())
+            .unwrap_or_default();
+        env.insert("SYMPHONY_ISSUE_NUMBER".into(), number);
+        env
+    }
+
     /// Dispatch an issue: create workspace, build prompt, spawn worker.
-    async fn dispatch_issue(
-        &mut self,
-        issue: crate::tracker::Issue,
-        attempt: Option<u32>,
-    ) {
+    async fn dispatch_issue(&mut self, issue: crate::tracker::Issue, attempt: Option<u32>) {
         let issue_id = issue.id.clone();
         let identifier = issue.identifier.clone();
 
@@ -197,33 +216,60 @@ impl SymphonyOrchestrator {
             entry.timer_handle.abort();
         }
 
+        // Build issue environment variables for hooks
+        let issue_env = Self::build_issue_env(&issue);
+
         // Prepare workspace
-        let workspace = match self.workspace_mgr.prepare(&identifier).await {
+        let workspace = match self.workspace_mgr.prepare(&identifier, &issue_env).await {
             Ok(ws) => ws,
             Err(e) => {
-                error!(issue_identifier = identifier, "workspace preparation failed: {e}");
-                self.schedule_retry(&issue_id, &identifier, attempt.unwrap_or(0) + 1, Some(e.to_string()), false);
+                error!(
+                    issue_identifier = identifier,
+                    "workspace preparation failed: {e}"
+                );
+                self.schedule_retry(
+                    &issue_id,
+                    &identifier,
+                    attempt.unwrap_or(0) + 1,
+                    Some(e.to_string()),
+                    false,
+                );
                 return;
             }
         };
 
         // Run before_run hook
-        if let Err(e) = self.workspace_mgr.run_before_run_hook(&workspace).await {
+        if let Err(e) = self
+            .workspace_mgr
+            .run_before_run_hook(&workspace, &issue_env)
+            .await
+        {
             error!(issue_identifier = identifier, "before_run hook failed: {e}");
-            self.schedule_retry(&issue_id, &identifier, attempt.unwrap_or(0) + 1, Some(e.to_string()), false);
+            self.schedule_retry(
+                &issue_id,
+                &identifier,
+                attempt.unwrap_or(0) + 1,
+                Some(e.to_string()),
+                false,
+            );
             return;
         }
 
         // Build prompt
-        let prompt = match render_prompt(
-            self.config.prompt_template(),
-            &issue,
-            attempt,
-        ) {
+        let prompt = match render_prompt(self.config.prompt_template(), &issue, attempt) {
             Ok(p) => p,
             Err(e) => {
-                error!(issue_identifier = identifier, "prompt rendering failed: {e}");
-                self.schedule_retry(&issue_id, &identifier, attempt.unwrap_or(0) + 1, Some(e.to_string()), false);
+                error!(
+                    issue_identifier = identifier,
+                    "prompt rendering failed: {e}"
+                );
+                self.schedule_retry(
+                    &issue_id,
+                    &identifier,
+                    attempt.unwrap_or(0) + 1,
+                    Some(e.to_string()),
+                    false,
+                );
                 return;
             }
         };
@@ -238,6 +284,7 @@ impl SymphonyOrchestrator {
         let started_at = Utc::now();
         let issue_id_clone = issue_id.clone();
         let identifier_clone = identifier.clone();
+        let issue_env_clone = issue_env.clone();
 
         // We need the tracker for multi-turn state checks.
         // Since we can't clone Box<dyn IssueTracker>, we create a channel-based
@@ -282,7 +329,9 @@ impl SymphonyOrchestrator {
                         Ok(session) => {
                             let turn_timeout =
                                 Duration::from_millis(config.codex_turn_timeout_ms());
-                            session.run_to_completion(&session_event_tx, turn_timeout).await
+                            session
+                                .run_to_completion(&session_event_tx, turn_timeout)
+                                .await
                         }
                         Err(e) => WorkerOutcome::Failed {
                             reason: e.to_string(),
@@ -293,12 +342,8 @@ impl SymphonyOrchestrator {
                 }
                 _ => {
                     // Codex runner: JSON-RPC handshake + single turn
-                    match CodexSession::start(
-                        &workspace_path,
-                        &config,
-                        session_event_tx.clone(),
-                    )
-                    .await
+                    match CodexSession::start(&workspace_path, &config, session_event_tx.clone())
+                        .await
                     {
                         Ok(mut session) => {
                             let turn_timeout =
@@ -375,6 +420,7 @@ impl SymphonyOrchestrator {
                         },
                     },
                     started_at,
+                    issue_env: issue_env_clone,
                 })
                 .await;
 
@@ -399,10 +445,7 @@ impl SymphonyOrchestrator {
         let issue_id = &exit.issue_id;
 
         // Calculate runtime from the exit's started_at timestamp
-        let elapsed = (Utc::now() - exit.started_at)
-            .num_milliseconds()
-            .max(0) as f64
-            / 1000.0;
+        let elapsed = (Utc::now() - exit.started_at).num_milliseconds().max(0) as f64 / 1000.0;
         self.state.add_runtime_seconds(elapsed);
 
         // Remove from running
@@ -417,7 +460,9 @@ impl SymphonyOrchestrator {
                 workspace_key: ws_key,
                 created_now: false,
             };
-            self.workspace_mgr.run_after_run_hook(&ws_info).await;
+            self.workspace_mgr
+                .run_after_run_hook(&ws_info, &exit.issue_env)
+                .await;
         }
 
         match &exit.outcome {
@@ -432,13 +477,7 @@ impl SymphonyOrchestrator {
                 self.state.completed.insert(exit.issue_id.clone());
 
                 // Schedule continuation retry
-                self.schedule_retry(
-                    &exit.issue_id,
-                    &exit.identifier,
-                    1,
-                    None,
-                    true,
-                );
+                self.schedule_retry(&exit.issue_id, &exit.identifier, 1, None, true);
             }
             WorkerOutcome::Failed {
                 reason,
@@ -597,11 +636,8 @@ impl SymphonyOrchestrator {
             old.timer_handle.abort();
         }
 
-        let delay_ms = state::retry_delay_ms(
-            attempt,
-            self.config.max_retry_backoff_ms(),
-            is_continuation,
-        );
+        let delay_ms =
+            state::retry_delay_ms(attempt, self.config.max_retry_backoff_ms(), is_continuation);
         let due_at = tokio::time::Instant::now() + Duration::from_millis(delay_ms);
 
         let issue_id_owned = issue_id.to_string();
@@ -613,11 +649,7 @@ impl SymphonyOrchestrator {
 
         debug!(
             issue_id,
-            identifier,
-            attempt,
-            delay_ms,
-            is_continuation,
-            "scheduled retry"
+            identifier, attempt, delay_ms, is_continuation, "scheduled retry"
         );
 
         self.state.retry_attempts.insert(
@@ -688,11 +720,7 @@ impl SymphonyOrchestrator {
                         entry.worker_handle.abort();
                         self.state.claimed.remove(&issue.id);
                         // Cleanup workspace
-                        if let Err(e) = self
-                            .workspace_mgr
-                            .cleanup(&entry.issue.identifier)
-                            .await
-                        {
+                        if let Err(e) = self.workspace_mgr.cleanup(&entry.issue.identifier).await {
                             warn!(
                                 issue_identifier = entry.issue.identifier,
                                 "workspace cleanup failed: {e}"
@@ -734,10 +762,7 @@ impl SymphonyOrchestrator {
                 let identifiers: Vec<String> =
                     issues.iter().map(|i| i.identifier.clone()).collect();
                 if !identifiers.is_empty() {
-                    info!(
-                        count = identifiers.len(),
-                        "cleaning up terminal workspaces"
-                    );
+                    info!(count = identifiers.len(), "cleaning up terminal workspaces");
                     self.workspace_mgr
                         .cleanup_terminal_workspaces(&identifiers)
                         .await;

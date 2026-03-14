@@ -70,7 +70,7 @@ crates/terraphim_settings/test_settings/settings.toml
 a.out
 
 # Cache
-.cachebro/
+.cached-context/
 .ruff_cache/
 
 # Stale logs and test results

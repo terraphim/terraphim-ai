@@ -14,13 +14,13 @@
 //! Requires GITEA_TOKEN environment variable to be set.
 //! Run with: cargo test --test gitea_integration_test -- --ignored --nocapture
 
+use terraphim_symphony::config::ServiceConfig;
 use terraphim_symphony::config::template::render_prompt;
 use terraphim_symphony::config::workflow::WorkflowDefinition;
-use terraphim_symphony::config::ServiceConfig;
 use terraphim_symphony::orchestrator::dispatch;
 use terraphim_symphony::orchestrator::state::OrchestratorRuntimeState;
-use terraphim_symphony::tracker::gitea::GiteaTracker;
 use terraphim_symphony::tracker::IssueTracker;
+use terraphim_symphony::tracker::gitea::GiteaTracker;
 use terraphim_symphony::workspace::WorkspaceManager;
 
 use std::collections::HashMap;
@@ -95,10 +95,7 @@ fn step_1_parse_and_validate_gitea_config() {
     assert_eq!(config.tracker_kind().as_deref(), Some("gitea"));
     assert_eq!(config.tracker_gitea_owner().as_deref(), Some("terraphim"));
     assert_eq!(config.tracker_gitea_repo().as_deref(), Some("agent-tasks"));
-    assert_eq!(
-        config.tracker_endpoint(),
-        "https://git.terraphim.cloud"
-    );
+    assert_eq!(config.tracker_endpoint(), "https://git.terraphim.cloud");
     assert_eq!(config.max_concurrent_agents(), 3);
     assert_eq!(config.max_turns(), 5);
     assert_eq!(config.poll_interval_ms(), 30_000);
@@ -140,27 +137,15 @@ async fn step_2_gitea_tracker_fetch_issues() {
         );
 
         // Verify normalisation
-        assert!(
-            !issue.id.is_empty(),
-            "Issue ID must not be empty"
-        );
-        assert!(
-            !issue.identifier.is_empty(),
-            "Identifier must not be empty"
-        );
+        assert!(!issue.id.is_empty(), "Issue ID must not be empty");
+        assert!(!issue.identifier.is_empty(), "Identifier must not be empty");
         assert!(
             issue.identifier.contains("terraphim/agent-tasks#"),
             "Identifier should follow owner/repo#N format, got: {}",
             issue.identifier
         );
-        assert!(
-            !issue.title.is_empty(),
-            "Title must not be empty"
-        );
-        assert!(
-            !issue.state.is_empty(),
-            "State must not be empty"
-        );
+        assert!(!issue.title.is_empty(), "Title must not be empty");
+        assert!(!issue.state.is_empty(), "State must not be empty");
         assert!(issue.is_dispatchable(), "Issue should be dispatchable");
     }
 
@@ -171,7 +156,10 @@ async fn step_2_gitea_tracker_fetch_issues() {
         issues.len()
     );
 
-    println!("[PASS] Step 2: Fetched and normalised {} issues", issues.len());
+    println!(
+        "[PASS] Step 2: Fetched and normalised {} issues",
+        issues.len()
+    );
 }
 
 #[tokio::test]
@@ -182,7 +170,10 @@ async fn step_3_dispatch_sorting_and_eligibility() {
 
     let tracker = GiteaTracker::from_config(&config).unwrap();
     let mut issues = tracker.fetch_candidate_issues().await.unwrap();
-    assert!(!issues.is_empty(), "Need at least one issue for dispatch test");
+    assert!(
+        !issues.is_empty(),
+        "Need at least one issue for dispatch test"
+    );
 
     println!("Before sort:");
     for i in &issues {
@@ -218,10 +209,7 @@ async fn step_3_dispatch_sorting_and_eligibility() {
             &terminal_states,
             &per_state_limits,
         );
-        println!(
-            "  {} eligible={}",
-            issue.identifier, eligible
-        );
+        println!("  {} eligible={}", issue.identifier, eligible);
         if eligible {
             eligible_count += 1;
         }
@@ -232,7 +220,11 @@ async fn step_3_dispatch_sorting_and_eligibility() {
         "At least one issue should be eligible for dispatch"
     );
 
-    println!("[PASS] Step 3: Sorted {} issues, {} eligible", issues.len(), eligible_count);
+    println!(
+        "[PASS] Step 3: Sorted {} issues, {} eligible",
+        issues.len(),
+        eligible_count
+    );
 }
 
 #[tokio::test]
@@ -250,9 +242,16 @@ async fn step_4_workspace_and_prompt_rendering() {
 
     // Create workspace
     let ws_mgr = WorkspaceManager::new(&config).unwrap();
-    let ws_info = ws_mgr.prepare(&issue.identifier).await.unwrap();
+    let ws_info = ws_mgr
+        .prepare(&issue.identifier, &std::collections::HashMap::new())
+        .await
+        .unwrap();
 
-    println!("Workspace created: {} (new={})", ws_info.path.display(), ws_info.created_now);
+    println!(
+        "Workspace created: {} (new={})",
+        ws_info.path.display(),
+        ws_info.created_now
+    );
     assert!(ws_info.path.exists(), "Workspace directory must exist");
 
     // Render prompt template (first attempt)
@@ -287,7 +286,10 @@ async fn step_4_workspace_and_prompt_rendering() {
 
     // Cleanup
     ws_mgr.cleanup(&issue.identifier).await.unwrap();
-    assert!(!ws_info.path.exists(), "Workspace should be removed after cleanup");
+    assert!(
+        !ws_info.path.exists(),
+        "Workspace should be removed after cleanup"
+    );
 
     println!("[PASS] Step 4: Workspace created, prompt rendered, workspace cleaned up");
 }
@@ -309,13 +311,14 @@ Prompt."#;
     let config = ServiceConfig::from_workflow(workflow);
 
     // Create runtime state and snapshot
-    let state = OrchestratorRuntimeState::new(
-        config.poll_interval_ms(),
-        config.max_concurrent_agents(),
-    );
+    let state =
+        OrchestratorRuntimeState::new(config.poll_interval_ms(), config.max_concurrent_agents());
 
     let snapshot = state.snapshot();
-    println!("Snapshot: {}", serde_json::to_string_pretty(&snapshot).unwrap());
+    println!(
+        "Snapshot: {}",
+        serde_json::to_string_pretty(&snapshot).unwrap()
+    );
 
     assert_eq!(snapshot.counts.running, 0);
     assert_eq!(snapshot.counts.retrying, 0);
@@ -336,7 +339,9 @@ async fn full_end_to_end_chain() {
     // -- 1. Parse and validate config --
     let tmp = tempfile::TempDir::new().unwrap();
     let config = gitea_config(tmp.path());
-    config.validate_for_dispatch().expect("Config must validate");
+    config
+        .validate_for_dispatch()
+        .expect("Config must validate");
     println!("[1/7] Config parsed and validated");
 
     // -- 2. Create tracker --
@@ -344,7 +349,10 @@ async fn full_end_to_end_chain() {
     println!("[2/7] GiteaTracker created");
 
     // -- 3. Fetch issues --
-    let issues = tracker.fetch_candidate_issues().await.expect("Must fetch issues");
+    let issues = tracker
+        .fetch_candidate_issues()
+        .await
+        .expect("Must fetch issues");
     println!("[3/7] Fetched {} candidate issues", issues.len());
     assert!(!issues.is_empty(), "Must have at least one issue");
 
@@ -387,7 +395,10 @@ async fn full_end_to_end_chain() {
     // -- 6. Prepare workspace and render prompt --
     let first = eligible[0];
     let ws_mgr = WorkspaceManager::new(&config).unwrap();
-    let ws = ws_mgr.prepare(&first.identifier).await.unwrap();
+    let ws = ws_mgr
+        .prepare(&first.identifier, &std::collections::HashMap::new())
+        .await
+        .unwrap();
     println!(
         "[6/7] Workspace prepared for {}: {} (new={})",
         first.identifier,

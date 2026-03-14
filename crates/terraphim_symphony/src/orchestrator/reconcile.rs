@@ -35,11 +35,7 @@ pub fn check_stall(
     let elapsed_ms = (Utc::now() - reference_time).num_milliseconds();
 
     if elapsed_ms > stall_timeout_ms {
-        debug!(
-            elapsed_ms,
-            stall_timeout_ms,
-            "session stall detected"
-        );
+        debug!(elapsed_ms, stall_timeout_ms, "session stall detected");
         Some(ReconcileAction::StallDetected)
     } else {
         None
@@ -79,10 +75,7 @@ pub fn determine_action(
 }
 
 /// Collect stalled issue IDs from the runtime state.
-pub fn find_stalled_issues(
-    state: &OrchestratorRuntimeState,
-    stall_timeout_ms: i64,
-) -> Vec<String> {
+pub fn find_stalled_issues(state: &OrchestratorRuntimeState, stall_timeout_ms: i64) -> Vec<String> {
     if stall_timeout_ms <= 0 {
         return vec![];
     }

@@ -36,6 +36,8 @@ pub struct Issue {
     pub labels: Vec<String>,
     /// Issues that block this one.
     pub blocked_by: Vec<BlockerRef>,
+    /// PageRank score from dependency graph analysis. Higher = more downstream impact.
+    pub pagerank_score: Option<f64>,
     /// Creation timestamp.
     pub created_at: Option<DateTime<Utc>>,
     /// Last update timestamp.
@@ -113,6 +115,7 @@ mod tests {
             url: Some("https://example.com/MT-42".into()),
             labels: vec!["bug".into(), "p1".into()],
             blocked_by: vec![],
+            pagerank_score: None,
             created_at: Some(Utc::now()),
             updated_at: Some(Utc::now()),
         }

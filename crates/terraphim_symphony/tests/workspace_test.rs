@@ -2,8 +2,9 @@
 //!
 //! Uses tempfile for isolated test directories.
 
-use terraphim_symphony::config::workflow::WorkflowDefinition;
+use std::collections::HashMap;
 use terraphim_symphony::config::ServiceConfig;
+use terraphim_symphony::config::workflow::WorkflowDefinition;
 use terraphim_symphony::workspace::WorkspaceManager;
 
 fn make_config(tmp_path: &std::path::Path, extra_yaml: &str) -> ServiceConfig {
@@ -15,20 +16,25 @@ fn make_config(tmp_path: &std::path::Path, extra_yaml: &str) -> ServiceConfig {
     ServiceConfig::from_workflow(workflow)
 }
 
+fn empty_env() -> HashMap<String, String> {
+    HashMap::new()
+}
+
 #[tokio::test]
 async fn workspace_lifecycle() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
     // Create workspace
-    let info = mgr.prepare("PROJ-1").await.unwrap();
+    let info = mgr.prepare("PROJ-1", &env).await.unwrap();
     assert!(info.created_now);
     assert!(info.path.exists());
     assert_eq!(info.workspace_key, "PROJ-1");
 
     // Reuse workspace
-    let info2 = mgr.prepare("PROJ-1").await.unwrap();
+    let info2 = mgr.prepare("PROJ-1", &env).await.unwrap();
     assert!(!info2.created_now);
     assert_eq!(info.path, info2.path);
 
@@ -42,14 +48,15 @@ async fn workspace_key_sanitisation() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
     // Special characters get sanitised
-    let info = mgr.prepare("owner/repo#42").await.unwrap();
+    let info = mgr.prepare("owner/repo#42", &env).await.unwrap();
     assert_eq!(info.workspace_key, "owner_repo_42");
     assert!(info.path.exists());
 
     // Spaces get sanitised
-    let info2 = mgr.prepare("MT 99").await.unwrap();
+    let info2 = mgr.prepare("MT 99", &env).await.unwrap();
     assert_eq!(info2.workspace_key, "MT_99");
     assert!(info2.path.exists());
 }
@@ -59,11 +66,12 @@ async fn workspace_multiple_issues() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
     // Create multiple workspaces
-    let ws1 = mgr.prepare("ISSUE-1").await.unwrap();
-    let ws2 = mgr.prepare("ISSUE-2").await.unwrap();
-    let ws3 = mgr.prepare("ISSUE-3").await.unwrap();
+    let ws1 = mgr.prepare("ISSUE-1", &env).await.unwrap();
+    let ws2 = mgr.prepare("ISSUE-2", &env).await.unwrap();
+    let ws3 = mgr.prepare("ISSUE-3", &env).await.unwrap();
 
     assert!(ws1.path.exists());
     assert!(ws2.path.exists());
@@ -93,11 +101,12 @@ async fn cleanup_terminal_workspaces() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
     // Create several workspaces
-    mgr.prepare("T-1").await.unwrap();
-    mgr.prepare("T-2").await.unwrap();
-    mgr.prepare("T-3").await.unwrap();
+    mgr.prepare("T-1", &env).await.unwrap();
+    mgr.prepare("T-2", &env).await.unwrap();
+    mgr.prepare("T-3", &env).await.unwrap();
 
     // Cleanup terminal ones
     let terminal = vec!["T-1".to_string(), "T-3".to_string()];
@@ -113,13 +122,14 @@ async fn hook_after_create() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "hooks:\n  after_create: \"touch marker.txt\"");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
-    let info = mgr.prepare("HOOK-TEST").await.unwrap();
+    let info = mgr.prepare("HOOK-TEST", &env).await.unwrap();
     assert!(info.created_now);
     assert!(info.path.join("marker.txt").exists());
 
     // Second prepare should not re-run hook
-    let info2 = mgr.prepare("HOOK-TEST").await.unwrap();
+    let info2 = mgr.prepare("HOOK-TEST", &env).await.unwrap();
     assert!(!info2.created_now);
 }
 
@@ -131,9 +141,10 @@ async fn hook_before_run() {
         "hooks:\n  before_run: \"echo running >> log.txt\"",
     );
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
-    let info = mgr.prepare("BR-1").await.unwrap();
-    mgr.run_before_run_hook(&info).await.unwrap();
+    let info = mgr.prepare("BR-1", &env).await.unwrap();
+    mgr.run_before_run_hook(&info, &env).await.unwrap();
     assert!(info.path.join("log.txt").exists());
 }
 
@@ -142,8 +153,9 @@ async fn hook_after_create_failure_cleans_up() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "hooks:\n  after_create: \"exit 1\"");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
-    let result = mgr.prepare("FAIL-1").await;
+    let result = mgr.prepare("FAIL-1", &env).await;
     assert!(result.is_err());
     // Workspace directory should have been cleaned up
     assert!(!tmp.path().join("FAIL-1").exists());
@@ -154,9 +166,10 @@ async fn hook_before_run_failure_is_propagated() {
     let tmp = tempfile::TempDir::new().unwrap();
     let cfg = make_config(tmp.path(), "hooks:\n  before_run: \"exit 1\"");
     let mgr = WorkspaceManager::new(&cfg).unwrap();
+    let env = empty_env();
 
-    let info = mgr.prepare("BRF-1").await.unwrap();
-    let result = mgr.run_before_run_hook(&info).await;
+    let info = mgr.prepare("BRF-1", &env).await.unwrap();
+    let result = mgr.run_before_run_hook(&info, &env).await;
     assert!(result.is_err());
     // Workspace directory should still exist
     assert!(info.path.exists());

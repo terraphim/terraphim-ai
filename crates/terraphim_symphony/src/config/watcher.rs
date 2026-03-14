@@ -26,11 +26,11 @@ impl WorkflowWatcher {
     ///
     /// Returns a watcher that must be kept alive and a receiver for change notifications.
     pub fn start(workflow_path: &Path) -> crate::Result<Self> {
-        let canonical = workflow_path
-            .canonicalize()
-            .map_err(|e| crate::SymphonyError::MissingWorkflowFile {
+        let canonical = workflow_path.canonicalize().map_err(|e| {
+            crate::SymphonyError::MissingWorkflowFile {
                 path: format!("{}: {e}", workflow_path.display()),
-            })?;
+            }
+        })?;
 
         let (tx, rx) = mpsc::channel(16);
         let watched_path = canonical.clone();
@@ -38,17 +38,12 @@ impl WorkflowWatcher {
         let mut watcher = notify::recommended_watcher(move |res: notify::Result<Event>| {
             match res {
                 Ok(event) => {
-                    let dominated = matches!(
-                        event.kind,
-                        EventKind::Modify(_) | EventKind::Create(_)
-                    );
+                    let dominated =
+                        matches!(event.kind, EventKind::Modify(_) | EventKind::Create(_));
                     if dominated {
                         // Check if the event is for our file
                         let relevant = event.paths.iter().any(|p| {
-                            p.canonicalize()
-                                .ok()
-                                .as_deref()
-                                == Some(watched_path.as_path())
+                            p.canonicalize().ok().as_deref() == Some(watched_path.as_path())
                         });
                         if relevant {
                             debug!("workflow file changed");
@@ -63,20 +58,23 @@ impl WorkflowWatcher {
                 }
             }
         })
-        .map_err(|e| crate::SymphonyError::Io(std::io::Error::other(
-            format!("failed to create file watcher: {e}"),
-        )))?;
+        .map_err(|e| {
+            crate::SymphonyError::Io(std::io::Error::other(format!(
+                "failed to create file watcher: {e}"
+            )))
+        })?;
 
         // Watch the parent directory (notify often misses direct file watches)
-        let watch_dir = canonical
-            .parent()
-            .unwrap_or_else(|| Path::new("."));
+        let watch_dir = canonical.parent().unwrap_or_else(|| Path::new("."));
 
         watcher
             .watch(watch_dir, RecursiveMode::NonRecursive)
-            .map_err(|e| crate::SymphonyError::Io(std::io::Error::other(
-                format!("failed to watch {}: {e}", watch_dir.display()),
-            )))?;
+            .map_err(|e| {
+                crate::SymphonyError::Io(std::io::Error::other(format!(
+                    "failed to watch {}: {e}",
+                    watch_dir.display()
+                )))
+            })?;
 
         info!(path = %canonical.display(), "watching workflow file for changes");
 

@@ -124,27 +124,15 @@ pub enum AgentEvent {
         pid: Option<u32>,
     },
     /// A turn completed successfully.
-    TurnCompleted {
-        turn_id: String,
-        turn_count: u32,
-    },
+    TurnCompleted { turn_id: String, turn_count: u32 },
     /// A turn failed.
-    TurnFailed {
-        turn_id: String,
-        reason: String,
-    },
+    TurnFailed { turn_id: String, reason: String },
     /// An approval was auto-approved.
-    ApprovalAutoApproved {
-        approval_type: String,
-    },
+    ApprovalAutoApproved { approval_type: String },
     /// An unsupported tool call was rejected.
-    UnsupportedToolCall {
-        tool_name: String,
-    },
+    UnsupportedToolCall { tool_name: String },
     /// A general notification from the agent.
-    Notification {
-        message: String,
-    },
+    Notification { message: String },
     /// Token usage update.
     TokenUsage {
         input_tokens: u64,
@@ -152,9 +140,7 @@ pub enum AgentEvent {
         total_tokens: u64,
     },
     /// Startup failed.
-    StartupFailed {
-        reason: String,
-    },
+    StartupFailed { reason: String },
 }
 
 /// Token usage counters.

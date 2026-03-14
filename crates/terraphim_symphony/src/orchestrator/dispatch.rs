@@ -68,15 +68,23 @@ pub fn is_dispatch_eligible(
 /// Sort issues for dispatch priority.
 ///
 /// Sort order (stable):
-/// 1. Priority ascending (lower = higher priority; None sorts last)
-/// 2. Created at oldest first
-/// 3. Identifier lexicographic tiebreaker
+/// 1. PageRank descending (higher score = more downstream impact; None sorts last)
+/// 2. Priority ascending (lower = higher priority; None sorts last)
+/// 3. Created at oldest first
+/// 4. Identifier lexicographic tiebreaker
 pub fn sort_for_dispatch(issues: &mut [Issue]) {
     issues.sort_by(|a, b| {
-        // Priority: Some(n) before None, lower n first
-        let pa = a.priority.unwrap_or(i32::MAX);
-        let pb = b.priority.unwrap_or(i32::MAX);
-        pa.cmp(&pb)
+        // PageRank: higher score first (more downstream impact)
+        let pra = a.pagerank_score.unwrap_or(0.0);
+        let prb = b.pagerank_score.unwrap_or(0.0);
+        prb.partial_cmp(&pra)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                // Priority: Some(n) before None, lower n first
+                let pa = a.priority.unwrap_or(i32::MAX);
+                let pb = b.priority.unwrap_or(i32::MAX);
+                pa.cmp(&pb)
+            })
             .then_with(|| {
                 // Created at: oldest first
                 let ca = a.created_at.unwrap_or_default();
@@ -108,6 +116,7 @@ mod tests {
             url: None,
             labels: vec![],
             blocked_by: vec![],
+            pagerank_score: None,
             created_at: Some(Utc::now()),
             updated_at: None,
         }
@@ -291,5 +300,50 @@ mod tests {
         sort_for_dispatch(&mut issues);
         assert_eq!(issues[0].identifier, "MT-A");
         assert_eq!(issues[1].identifier, "MT-B");
+    }
+
+    #[test]
+    fn sort_by_pagerank() {
+        let mut issues = vec![
+            {
+                let mut i = make_issue("1", "MT-1", "Todo", Some(1));
+                i.pagerank_score = Some(0.5);
+                i
+            },
+            {
+                let mut i = make_issue("2", "MT-2", "Todo", Some(1));
+                i.pagerank_score = Some(2.847);
+                i
+            },
+            {
+                let mut i = make_issue("3", "MT-3", "Todo", Some(1));
+                i.pagerank_score = None; // No PageRank sorts last
+                i
+            },
+        ];
+        sort_for_dispatch(&mut issues);
+        assert_eq!(issues[0].identifier, "MT-2"); // highest PageRank
+        assert_eq!(issues[1].identifier, "MT-1"); // second highest
+        assert_eq!(issues[2].identifier, "MT-3"); // None (0.0)
+    }
+
+    #[test]
+    fn sort_pagerank_tiebreak_priority() {
+        let mut issues = vec![
+            {
+                let mut i = make_issue("1", "MT-1", "Todo", Some(3));
+                i.pagerank_score = Some(1.0);
+                i
+            },
+            {
+                let mut i = make_issue("2", "MT-2", "Todo", Some(1));
+                i.pagerank_score = Some(1.0);
+                i
+            },
+        ];
+        sort_for_dispatch(&mut issues);
+        // Same PageRank, so priority wins (lower = higher priority)
+        assert_eq!(issues[0].identifier, "MT-2"); // priority 1
+        assert_eq!(issues[1].identifier, "MT-1"); // priority 3
     }
 }
