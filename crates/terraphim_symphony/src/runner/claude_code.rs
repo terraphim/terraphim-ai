@@ -127,6 +127,12 @@ impl ClaudeCodeSession {
             }
         }
 
+        // Append settings file/JSON if configured (enables hooks parity with interactive mode)
+        if let Some(settings) = config.claude_settings() {
+            cmd_parts.push("--settings".to_string());
+            cmd_parts.push(settings);
+        }
+
         let command_str = shell_escape_command(&cmd_parts);
         info!(command = %command_str, cwd = %cwd.display(), "launching claude code session");
 
