@@ -3,8 +3,10 @@
 //! Wraps the Codex app-server session lifecycle and provides an
 //! orchestrator-facing API with event channels.
 
+pub mod claude_code;
 pub mod protocol;
 pub mod session;
 
+pub use claude_code::ClaudeCodeSession;
 pub use protocol::{AgentEvent, TokenCounts, TokenTotals};
 pub use session::{CodexSession, WorkerOutcome};

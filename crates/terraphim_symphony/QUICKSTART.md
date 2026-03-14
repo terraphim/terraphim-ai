@@ -198,10 +198,12 @@ Shell scripts executed at workspace lifecycle points. All run with `sh -lc` in t
 
 | Setting | Default | Description |
 |---------|---------|-------------|
+| `agent.runner` | `"codex"` | Runner kind: `"codex"` (JSON-RPC app-server) or `"claude-code"` (Claude Code CLI) |
 | `agent.max_concurrent_agents` | `10` | Maximum parallel agent sessions |
 | `agent.max_turns` | `20` | Maximum turns per agent session |
 | `agent.max_retry_backoff_ms` | `300000` (5 min) | Cap for exponential retry backoff |
 | `agent.max_concurrent_agents_by_state` | -- | Per-state concurrency limits (map of state -> limit) |
+| `agent.claude_flags` | -- | Additional CLI flags for Claude Code runner (e.g. `"--dangerously-skip-permissions"`) |
 
 ### Codex (Agent Process)
 
@@ -211,6 +213,23 @@ Shell scripts executed at workspace lifecycle points. All run with `sh -lc` in t
 | `codex.turn_timeout_ms` | `3600000` (1 hour) | Maximum time for a single turn |
 | `codex.read_timeout_ms` | `5000` (5s) | Timeout for handshake responses |
 | `codex.stall_timeout_ms` | `300000` (5 min) | Kill session after this long with no activity. Set to `-1` to disable |
+
+### Claude Code Runner
+
+When `agent.runner` is set to `"claude-code"`, Symphony uses `claude -p` (Claude Code CLI) instead of the Codex JSON-RPC app-server. This is a single-shot invocation per issue -- no handshake, no approval flow, no multi-turn continuation.
+
+**Requirements**: `claude` CLI must be on PATH. Install via `npm install -g @anthropic-ai/claude-code`.
+
+**Example** (see `examples/WORKFLOW-claude-code.md`):
+```yaml
+agent:
+  runner: claude-code
+  max_concurrent_agents: 2
+  max_turns: 10
+  claude_flags: "--dangerously-skip-permissions --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+```
+
+The session spawns `claude -p "<prompt>" --output-format stream-json --max-turns N <flags>` and parses the NDJSON event stream. Token usage, turn counts, and errors are extracted from the stream and reported to the orchestrator.
 
 ### Server (Optional)
 
