@@ -75,6 +75,11 @@
 - [Desktop](./domains/desktop/README.md)
   - [Desktop App](./desktop/README.md)
 
+## Research
+
+- [TLA+ TypeScript Bindings Research](./research/tlaplus-typescript-bindings.md)
+- [TLA+ TypeScript Bindings Design](./research/tlaplus-typescript-design.md)
+
 ## Case Studies
 
 - [Case Studies](./case-studies/README.md)
