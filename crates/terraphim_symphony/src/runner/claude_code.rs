@@ -112,6 +112,7 @@ impl ClaudeCodeSession {
             prompt.to_string(),
             "--output-format".to_string(),
             "stream-json".to_string(),
+            "--verbose".to_string(),
         ];
 
         // Append max-turns from config
