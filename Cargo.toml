@@ -21,6 +21,8 @@ exclude = [
     "crates/haystack_discourse",
     # Superseded by terraphim_agent
     "crates/terraphim_repl",
+    # Symphony orchestrator (build separately: cd crates/terraphim_symphony && cargo build)
+    "crates/terraphim_symphony",
 ]
 default-members = ["terraphim_server"]
 
