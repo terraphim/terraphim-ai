@@ -1329,7 +1329,7 @@ impl FromStr for ReplCommand {
                             return Err(anyhow!("Sessions files requires a session ID"));
                         }
                         let session_id = parts[2].to_string();
-                        let json = parts.iter().any(|&p| p == "--json");
+                        let json = parts.contains(&"--json");
                         Ok(ReplCommand::Sessions {
                             subcommand: SessionsSubcommand::Files { session_id, json },
                         })
@@ -1339,7 +1339,7 @@ impl FromStr for ReplCommand {
                             return Err(anyhow!("Sessions by-file requires a file path"));
                         }
                         let file_path = parts[2].to_string();
-                        let json = parts.iter().any(|&p| p == "--json");
+                        let json = parts.contains(&"--json");
                         Ok(ReplCommand::Sessions {
                             subcommand: SessionsSubcommand::ByFile { file_path, json },
                         })

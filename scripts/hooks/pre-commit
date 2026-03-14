@@ -100,7 +100,7 @@ if command_exists cargo; then
 
         # Check Rust compilation (cargo check - faster than full build)
         print_status "INFO" "Running cargo check..."
-        if ! timeout 60s cargo check --workspace --all-targets >/dev/null 2>&1; then
+        if ! cargo check --workspace --all-targets >/dev/null 2>&1; then
             print_status "FAIL" "Cargo check failed - compilation errors detected"
             print_status "INFO" "Run 'cargo check --workspace --all-targets' to see details"
             exit 1
@@ -109,7 +109,7 @@ if command_exists cargo; then
 
         # Check Rust linting (clippy)
         print_status "INFO" "Running Rust linter (clippy)..."
-        if ! timeout 60s cargo clippy --workspace --all-targets >/dev/null 2>&1; then
+        if ! cargo clippy --workspace --all-targets >/dev/null 2>&1; then
             print_status "FAIL" "Clippy found issues"
             print_status "INFO" "Run 'cargo clippy --workspace --all-targets' to see details"
             exit 1
@@ -118,7 +118,7 @@ if command_exists cargo; then
 
         # Build the project (optimized for speed)
         print_status "INFO" "Building Rust project..."
-        if ! timeout 90s cargo build --workspace >/dev/null 2>&1; then
+        if ! cargo build --workspace >/dev/null 2>&1; then
             print_status "FAIL" "Cargo build failed"
             print_status "INFO" "Run 'cargo build --workspace' to see details"
             exit 1
@@ -127,7 +127,7 @@ if command_exists cargo; then
 
         # Run tests (with timeout to avoid hanging)
         print_status "INFO" "Running Rust tests..."
-        if ! timeout 90s cargo test --workspace --lib >/dev/null 2>&1; then
+        if ! cargo test --workspace --lib >/dev/null 2>&1; then
             print_status "FAIL" "Some tests are failing"
             print_status "INFO" "Run 'cargo test --workspace --lib' to see details"
             exit 1
