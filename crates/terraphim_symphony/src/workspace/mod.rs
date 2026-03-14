@@ -5,6 +5,7 @@
 
 use crate::config::ServiceConfig;
 use crate::error::{Result, SymphonyError};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use tokio::process::Command;
@@ -55,7 +56,15 @@ impl WorkspaceManager {
     ///
     /// Creates the directory if it does not exist, runs the `after_create` hook
     /// for new workspaces, and returns workspace info.
-    pub async fn prepare(&self, identifier: &str) -> Result<WorkspaceInfo> {
+    ///
+    /// `issue_env` contains `SYMPHONY_*` environment variables that are
+    /// injected into hook processes so hooks can use `$SYMPHONY_ISSUE_NUMBER`
+    /// for branch names and commit messages.
+    pub async fn prepare(
+        &self,
+        identifier: &str,
+        issue_env: &HashMap<String, String>,
+    ) -> Result<WorkspaceInfo> {
         let key = sanitise_workspace_key(identifier);
         let path = self.root.join(&key);
 
@@ -76,7 +85,10 @@ impl WorkspaceManager {
 
             // Run after_create hook
             if let Some(script) = self.config.hooks_after_create() {
-                if let Err(e) = self.run_hook("after_create", &script, &path).await {
+                if let Err(e) = self
+                    .run_hook("after_create", &script, &path, issue_env)
+                    .await
+                {
                     // after_create failure is fatal: remove the directory
                     warn!(
                         issue_identifier = identifier,
@@ -102,17 +114,29 @@ impl WorkspaceManager {
     }
 
     /// Run the `before_run` hook. Failure aborts the current attempt.
-    pub async fn run_before_run_hook(&self, workspace: &WorkspaceInfo) -> Result<()> {
+    pub async fn run_before_run_hook(
+        &self,
+        workspace: &WorkspaceInfo,
+        issue_env: &HashMap<String, String>,
+    ) -> Result<()> {
         if let Some(script) = self.config.hooks_before_run() {
-            self.run_hook("before_run", &script, &workspace.path).await?;
+            self.run_hook("before_run", &script, &workspace.path, issue_env)
+                .await?;
         }
         Ok(())
     }
 
     /// Run the `after_run` hook. Failure is logged and ignored.
-    pub async fn run_after_run_hook(&self, workspace: &WorkspaceInfo) {
+    pub async fn run_after_run_hook(
+        &self,
+        workspace: &WorkspaceInfo,
+        issue_env: &HashMap<String, String>,
+    ) {
         if let Some(script) = self.config.hooks_after_run() {
-            if let Err(e) = self.run_hook("after_run", &script, &workspace.path).await {
+            if let Err(e) = self
+                .run_hook("after_run", &script, &workspace.path, issue_env)
+                .await
+            {
                 warn!(
                     workspace_key = workspace.workspace_key,
                     "after_run hook failed (ignored): {e}"
@@ -132,7 +156,10 @@ impl WorkspaceManager {
 
         // Run before_remove hook (failure logged, ignored)
         if let Some(script) = self.config.hooks_before_remove() {
-            if let Err(e) = self.run_hook("before_remove", &script, &path).await {
+            if let Err(e) = self
+                .run_hook("before_remove", &script, &path, &HashMap::new())
+                .await
+            {
                 warn!(
                     issue_identifier = identifier,
                     "before_remove hook failed (ignored): {e}"
@@ -185,21 +212,34 @@ impl WorkspaceManager {
     }
 
     /// Execute a hook shell script in the workspace directory.
-    async fn run_hook(&self, hook_name: &str, script: &str, cwd: &Path) -> Result<()> {
+    ///
+    /// Optional `env_vars` are injected as environment variables into the
+    /// hook process, allowing hooks to use `$SYMPHONY_ISSUE_NUMBER` etc.
+    async fn run_hook(
+        &self,
+        hook_name: &str,
+        script: &str,
+        cwd: &Path,
+        env_vars: &HashMap<String, String>,
+    ) -> Result<()> {
         let timeout_ms = self.config.hooks_timeout_ms();
         debug!(hook = hook_name, cwd = %cwd.display(), "running hook");
 
-        let child = Command::new("sh")
-            .arg("-lc")
+        let mut cmd = Command::new("sh");
+        cmd.arg("-lc")
             .arg(script)
             .current_dir(cwd)
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .spawn()
-            .map_err(|e| SymphonyError::HookFailed {
-                hook: hook_name.into(),
-                reason: format!("failed to spawn: {e}"),
-            })?;
+            .stderr(std::process::Stdio::piped());
+
+        for (key, val) in env_vars {
+            cmd.env(key, val);
+        }
+
+        let child = cmd.spawn().map_err(|e| SymphonyError::HookFailed {
+            hook: hook_name.into(),
+            reason: format!("failed to spawn: {e}"),
+        })?;
 
         let result =
             tokio::time::timeout(Duration::from_millis(timeout_ms), child.wait_with_output()).await;
@@ -298,19 +338,19 @@ mod tests {
             "---\nworkspace:\n  root: \"{}\"\ntracker:\n  kind: linear\n---\nPrompt.",
             tmp.path().display()
         );
-        let workflow =
-            crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
         let cfg = crate::config::ServiceConfig::from_workflow(workflow);
         let mgr = WorkspaceManager::new(&cfg).unwrap();
+        let env = HashMap::new();
 
         // First call creates
-        let info = mgr.prepare("MT-42").await.unwrap();
+        let info = mgr.prepare("MT-42", &env).await.unwrap();
         assert!(info.created_now);
         assert!(info.path.exists());
         assert_eq!(info.workspace_key, "MT-42");
 
         // Second call reuses
-        let info2 = mgr.prepare("MT-42").await.unwrap();
+        let info2 = mgr.prepare("MT-42", &env).await.unwrap();
         assert!(!info2.created_now);
         assert_eq!(info.path, info2.path);
     }
@@ -322,12 +362,12 @@ mod tests {
             "---\nworkspace:\n  root: \"{}\"\ntracker:\n  kind: linear\n---\nPrompt.",
             tmp.path().display()
         );
-        let workflow =
-            crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
         let cfg = crate::config::ServiceConfig::from_workflow(workflow);
         let mgr = WorkspaceManager::new(&cfg).unwrap();
+        let env = HashMap::new();
 
-        mgr.prepare("MT-99").await.unwrap();
+        mgr.prepare("MT-99", &env).await.unwrap();
         assert!(tmp.path().join("MT-99").exists());
 
         mgr.cleanup("MT-99").await.unwrap();
@@ -341,8 +381,7 @@ mod tests {
             "---\nworkspace:\n  root: \"{}\"\ntracker:\n  kind: linear\n---\nPrompt.",
             tmp.path().display()
         );
-        let workflow =
-            crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
         let cfg = crate::config::ServiceConfig::from_workflow(workflow);
         let mgr = WorkspaceManager::new(&cfg).unwrap();
 
@@ -357,12 +396,12 @@ mod tests {
             "---\nworkspace:\n  root: \"{}\"\nhooks:\n  after_create: \"touch created.txt\"\ntracker:\n  kind: linear\n---\nPrompt.",
             tmp.path().display()
         );
-        let workflow =
-            crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
         let cfg = crate::config::ServiceConfig::from_workflow(workflow);
         let mgr = WorkspaceManager::new(&cfg).unwrap();
+        let env = HashMap::new();
 
-        let info = mgr.prepare("HOOK-1").await.unwrap();
+        let info = mgr.prepare("HOOK-1", &env).await.unwrap();
         assert!(info.path.join("created.txt").exists());
     }
 
@@ -373,15 +412,33 @@ mod tests {
             "---\nworkspace:\n  root: \"{}\"\nhooks:\n  after_create: \"exit 1\"\ntracker:\n  kind: linear\n---\nPrompt.",
             tmp.path().display()
         );
-        let workflow =
-            crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
         let cfg = crate::config::ServiceConfig::from_workflow(workflow);
         let mgr = WorkspaceManager::new(&cfg).unwrap();
+        let env = HashMap::new();
 
-        let result = mgr.prepare("HOOK-FAIL").await;
+        let result = mgr.prepare("HOOK-FAIL", &env).await;
         assert!(result.is_err());
         // Directory should be cleaned up
         assert!(!tmp.path().join("HOOK-FAIL").exists());
+    }
+
+    #[tokio::test]
+    async fn hook_receives_env_vars() {
+        let tmp = tempfile::TempDir::new().unwrap();
+        let yaml = format!(
+            "---\nworkspace:\n  root: \"{}\"\nhooks:\n  after_create: \"echo $SYMPHONY_ISSUE_NUMBER > issue_num.txt\"\ntracker:\n  kind: linear\n---\nPrompt.",
+            tmp.path().display()
+        );
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let cfg = crate::config::ServiceConfig::from_workflow(workflow);
+        let mgr = WorkspaceManager::new(&cfg).unwrap();
+        let mut env = HashMap::new();
+        env.insert("SYMPHONY_ISSUE_NUMBER".into(), "42".into());
+
+        let info = mgr.prepare("ENV-TEST", &env).await.unwrap();
+        let content = std::fs::read_to_string(info.path.join("issue_num.txt")).unwrap();
+        assert_eq!(content.trim(), "42");
     }
 
     #[test]
@@ -391,8 +448,7 @@ mod tests {
             "---\nworkspace:\n  root: \"{}\"\ntracker:\n  kind: linear\n---\nPrompt.",
             tmp.path().display()
         );
-        let workflow =
-            crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
+        let workflow = crate::config::workflow::WorkflowDefinition::parse(&yaml).unwrap();
         let cfg = crate::config::ServiceConfig::from_workflow(workflow);
         let mgr = WorkspaceManager::new(&cfg).unwrap();
 

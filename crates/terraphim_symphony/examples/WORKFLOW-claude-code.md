@@ -21,8 +21,8 @@ workspace:
 
 hooks:
   after_create: "git clone https://terraphim:${GITEA_TOKEN}@git.terraphim.cloud/terraphim/pagerank-viewer.git ."
-  before_run: "git fetch origin && git checkout main && git pull"
-  after_run: "git add -A && git commit -m 'symphony: auto-commit' && git push || true"
+  before_run: "git fetch origin && BRANCH=\"symphony/issue-${SYMPHONY_ISSUE_NUMBER}\" && (git checkout \"$BRANCH\" 2>/dev/null && git pull origin \"$BRANCH\" || git checkout -b \"$BRANCH\" origin/main) || true"
+  after_run: "BRANCH=\"symphony/issue-${SYMPHONY_ISSUE_NUMBER}\" && git add -A && git commit -m \"symphony: ${SYMPHONY_ISSUE_IDENTIFIER} - ${SYMPHONY_ISSUE_TITLE}\" || true && git push -u origin \"$BRANCH\" || true"
   timeout_ms: 120000
 
 codex:
