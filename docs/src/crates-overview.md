@@ -166,6 +166,29 @@ Terraphim is built as a modular Rust project with multiple crates, each serving 
 
 **Dependencies**: terraphim_automata, terraphim_types, serde
 
+## Orchestration
+
+### terraphim_symphony
+**Purpose**: Autonomous agent orchestrator that watches issue trackers and dispatches coding agents
+**Key Features**:
+- Polls Gitea and Linear issue trackers for open issues
+- Dispatches coding agents (Claude Code CLI or Codex app-server) per issue
+- Isolated workspace directories with lifecycle hooks
+- WORKFLOW.md single-file configuration with Liquid prompt templates
+- Exponential backoff retry with configurable cap
+- Stall detection and automatic session termination
+- HTTP dashboard for real-time monitoring (feature-gated)
+- Hot reload of configuration without restart
+- Priority-based dispatch with per-state concurrency limits
+
+**Runners**:
+- `CodexSession` -- JSON-RPC over stdio with handshake, multi-turn, and approval flows
+- `ClaudeCodeSession` -- Single-shot `claude -p` invocation with NDJSON event stream parsing
+
+**Dependencies**: tokio, serde, liquid, reqwest, tracing
+
+**Note**: Excluded from the main workspace; build from `crates/terraphim_symphony/` directory.
+
 ## Build & Configuration
 
 ### terraphim_build_args

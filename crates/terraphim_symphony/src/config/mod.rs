@@ -203,6 +203,15 @@ impl ServiceConfig {
         self.get_str(&["agent", "claude_flags"])
     }
 
+    /// Path to a Claude Code settings JSON file or inline JSON string.
+    ///
+    /// Passed as `--settings <value>` to `claude -p`. Use this to configure
+    /// hooks (PreToolUse, PostToolUse), permissions, MCP servers, and other
+    /// Claude Code settings that should apply to agent sessions.
+    pub fn claude_settings(&self) -> Option<String> {
+        self.get_str(&["agent", "settings"])
+    }
+
     // --- Codex ---
 
     /// Coding-agent command to execute.
@@ -601,6 +610,34 @@ mod tests {
         assert_eq!(
             cfg.claude_flags().unwrap(),
             "--dangerously-skip-permissions --max-turns 10"
+        );
+    }
+
+    #[test]
+    fn claude_settings_none_by_default() {
+        let cfg = config_from_yaml("tracker:\n  kind: gitea");
+        assert!(cfg.claude_settings().is_none());
+    }
+
+    #[test]
+    fn claude_settings_file_path() {
+        let cfg = config_from_yaml(
+            "agent:\n  settings: /home/alex/.claude/symphony-settings.json",
+        );
+        assert_eq!(
+            cfg.claude_settings().unwrap(),
+            "/home/alex/.claude/symphony-settings.json"
+        );
+    }
+
+    #[test]
+    fn claude_settings_tilde_path() {
+        let cfg = config_from_yaml(
+            "agent:\n  settings: ~/.claude/symphony-settings.json",
+        );
+        assert_eq!(
+            cfg.claude_settings().unwrap(),
+            "~/.claude/symphony-settings.json"
         );
     }
 

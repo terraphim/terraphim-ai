@@ -6,7 +6,7 @@ Symphony is a daemon that watches your issue tracker, picks up work automaticall
 
 ```
   Issue Tracker           Symphony                  Coding Agent
-  (Gitea/Linear)          Orchestrator              (codex app-server)
+  (Gitea/Linear)          Orchestrator              (Claude Code / Codex)
   +-----------+      +------------------+      +------------------+
   | Todo      | ---> | Poll & Dispatch  | ---> | Workspace: MT-1  |
   | In Prog   |      | Retry & Backoff  |      | Workspace: MT-2  |
@@ -204,6 +204,7 @@ Shell scripts executed at workspace lifecycle points. All run with `sh -lc` in t
 | `agent.max_retry_backoff_ms` | `300000` (5 min) | Cap for exponential retry backoff |
 | `agent.max_concurrent_agents_by_state` | -- | Per-state concurrency limits (map of state -> limit) |
 | `agent.claude_flags` | -- | Additional CLI flags for Claude Code runner (e.g. `"--dangerously-skip-permissions"`) |
+| `agent.settings` | -- | Path to Claude Code settings JSON file or inline JSON string. Passed as `--settings` to `claude -p`. Use to configure hooks, permissions, and MCP servers for agent sessions |
 
 ### Codex (Agent Process)
 
@@ -227,9 +228,12 @@ agent:
   max_concurrent_agents: 2
   max_turns: 10
   claude_flags: "--dangerously-skip-permissions --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+  settings: ~/.claude/symphony-settings.json
 ```
 
-The session spawns `claude -p "<prompt>" --output-format stream-json --max-turns N <flags>` and parses the NDJSON event stream. Token usage, turn counts, and errors are extracted from the stream and reported to the orchestrator.
+The session spawns `claude -p "<prompt>" --output-format stream-json --max-turns N <flags> --settings <file>` and parses the NDJSON event stream. Token usage, turn counts, and errors are extracted from the stream and reported to the orchestrator.
+
+**Hooks Parity**: To ensure `claude -p` sessions have the same PreToolUse and PostToolUse hooks as interactive `claude` sessions, point `agent.settings` at a JSON file containing your hooks configuration. See `examples/symphony-settings.json` for a template that includes git safety guard and learning capture hooks.
 
 ### Server (Optional)
 
@@ -341,3 +345,148 @@ WORKFLOW.md is watched for changes (via `file-watch` feature, enabled by default
 **Too many retries** -- Check the dashboard or logs. Increase `agent.max_retry_backoff_ms` to space out retries, or fix the underlying issue causing failures.
 
 **Stall detection killing sessions** -- Increase `codex.stall_timeout_ms` or set it to `-1` to disable. Some long-running agent operations may not emit events frequently.
+
+**Claude Code sessions exit with code 1** -- If using `agent.runner: claude-code` and sessions exit immediately, ensure the `--verbose` flag is included. Claude Code CLI requires `--verbose` when using `--output-format stream-json` with `-p` mode. Symphony adds this flag automatically, but if you are testing manually, include it: `claude -p "prompt" --output-format stream-json --verbose`.
+
+**Git clone fails in after_create hook** -- Plain HTTPS URLs prompt for credentials in non-interactive shell contexts. Use token-embedded URLs: `git clone https://user:${TOKEN}@host/org/repo.git .`
+
+**Liquid templates appearing literally in hooks** -- Hook scripts are plain shell commands run via `sh -lc`. They are NOT Liquid-rendered. Do not use `{{ }}` template syntax in hook values. Only the prompt body (below the YAML front matter) supports Liquid.
+
+---
+
+## End-to-End Journey: Building the PageRank Viewer
+
+This section documents a real production deployment where Symphony orchestrated Claude Code agents to build a complete web application from scratch.
+
+### Goal
+
+Build a browser-based graph viewer that visualises Gitea issue dependencies with PageRank scores, consuming the Gitea Robot API. The application needed force-directed graph visualisation, multiple layout modes, graph metrics computation, in-browser SQLite storage, and a dark-themed UI.
+
+### Step 1: Create the Target Repository
+
+```bash
+export GITEA_TOKEN=$(op read "op://TerraphimPlatform/gitea-test-token/credential")
+tea repos create --name pagerank-viewer --description "Gitea PageRank dependency graph viewer"
+```
+
+### Step 2: Create Issues
+
+Six issues were created in the `pagerank-viewer` repository, each targeting specific files:
+
+```bash
+tea issues create --title "Create Gitea Robot API client (api.js)" \
+  --body "Implement GiteaRobotClient class with methods for /robot/graph, /robot/triage, /robot/ready endpoints..."
+
+tea issues create --title "Create graph metrics computation library (metrics.js)" \
+  --body "Implement betweenness centrality, HITS, eigenvector centrality, critical path, cascade impact..."
+
+# ... and so on for graph.js, store.js, index.html+styles.css, WASM integration
+```
+
+Each issue was designed to produce files that do not overlap with other issues, preventing merge conflicts when multiple agents push to the same branch.
+
+### Step 3: Configure WORKFLOW.md
+
+```yaml
+---
+tracker:
+  kind: gitea
+  endpoint: https://git.terraphim.cloud
+  api_key: $GITEA_TOKEN
+  owner: terraphim
+  repo: pagerank-viewer
+
+agent:
+  runner: claude-code
+  max_concurrent_agents: 2
+  max_turns: 10
+  claude_flags: "--dangerously-skip-permissions --allowedTools Bash,Read,Write,Edit,Glob,Grep"
+
+workspace:
+  root: ~/symphony_workspaces
+
+hooks:
+  after_create: "git clone https://terraphim:${GITEA_TOKEN}@git.terraphim.cloud/terraphim/pagerank-viewer.git ."
+  before_run: "git fetch origin && git checkout main && git pull"
+  after_run: "git add -A && git commit -m 'symphony: auto-commit' && git push || true"
+  timeout_ms: 120000
+
+codex:
+  turn_timeout_ms: 3600000
+  stall_timeout_ms: 600000
+---
+```
+
+Key configuration choices:
+- **Token-embedded clone URL**: Avoids credential prompts in non-interactive shell
+- **`max_concurrent_agents: 2`**: Two agents run in parallel per batch
+- **`timeout_ms: 120000`**: 2-minute timeout for hooks (git clone can be slow)
+- **`stall_timeout_ms: 600000`**: 10-minute stall timeout (Claude Code turns can take several minutes)
+
+### Step 4: Build and Run Symphony
+
+```bash
+cd crates/terraphim_symphony
+cargo build --release --bin symphony
+./target/release/symphony examples/WORKFLOW-claude-code.md
+```
+
+Symphony immediately began polling the Gitea repository, found the six open issues, and dispatched the first two agents.
+
+### Step 5: Monitor Progress
+
+```bash
+# Watch Symphony logs
+tail -f /tmp/symphony.log
+
+# Check dashboard (if built with --features api)
+curl http://localhost:8080/api/v1/state | jq .
+```
+
+Symphony logged each phase: workspace creation, hook execution, agent spawning, turn progress, and completion.
+
+### Step 6: Verify and Close Issues
+
+After each batch completed, the generated code was verified and issues were closed:
+
+```bash
+# Verify generated files
+ls ~/symphony_workspaces/terraphim_pagerank-viewer_1/
+
+# Close completed issues
+tea issues close 1
+tea issues close 2
+tea issues close 3
+```
+
+Closing issues prevents re-dispatch on the next poll tick and triggers workspace cleanup.
+
+### Results
+
+| Metric | Value |
+|--------|-------|
+| Issues implemented | 6 |
+| Files generated | 9 |
+| Total lines of code | ~3,000 |
+| Agent turns per issue | ~11 |
+| Concurrent agents | 2 |
+| Batches | 3 |
+
+The generated files included:
+- `api.js` -- Gitea Robot API client with token management and CORS proxy support
+- `metrics.js` -- Brandes betweenness, HITS, eigenvector centrality, critical path analysis
+- `graph.js` -- Force-Graph WebGL wrapper with force-directed, DAG, and radial layouts
+- `store.js` -- SQL.js WASM SQLite for snapshots and historical comparison
+- `index.html` -- SPA shell with FontAwesome icons and layout switcher
+- `styles.css` -- Dark theme matching the Symphony dashboard palette
+- `app.js` -- Main application glue
+
+### Lessons Learned
+
+1. **Token-embedded URLs**: Non-interactive environments cannot prompt for credentials. Use `https://user:${TOKEN}@host/...`.
+2. **`--verbose` is mandatory**: Claude Code CLI requires `--verbose` with `--output-format stream-json` in `-p` mode.
+3. **Hooks are plain shell**: Do not use Liquid `{{ }}` syntax in hook values. Only the prompt body is template-rendered.
+4. **Design issues for disjoint files**: Multiple agents pushing to the same branch cause merge conflicts. Each issue should touch different files.
+5. **Close issues promptly**: Open issues matching `active_states` are re-dispatched every 30 seconds.
+
+For the full case study, see [Symphony PageRank Viewer Case Study](../../docs/src/case-studies/symphony-pagerank-viewer.md).
