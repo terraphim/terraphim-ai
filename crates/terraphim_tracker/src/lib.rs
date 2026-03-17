@@ -4,9 +4,11 @@
 //! implementations normalise to.
 
 pub mod gitea;
+pub mod linear;
 pub mod pagerank;
 
 pub use gitea::GiteaTracker;
+pub use linear::{LinearConfig, LinearTracker};
 pub use pagerank::{PagerankClient, PagerankScore};
 
 use async_trait::async_trait;
@@ -76,6 +78,9 @@ pub enum TrackerError {
 
     #[error("API error: {message}")]
     Api { message: String },
+
+    #[error("GraphQL error: {message}")]
+    GraphQLError { message: String },
 
     #[error("Authentication missing for {service}")]
     AuthenticationMissing { service: String },
