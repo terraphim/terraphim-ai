@@ -150,9 +150,28 @@ Commit the artefact: `git add .docs/ && git commit -m "docs: validation for {{ i
 - Use British English in documentation
 - Never use mocks in tests
 
+## Phase Budgeting
+
+For complex issues (merge/reconciliation, large refactors), agents may exhaust their
+turn budget during phases 1-3. When creating issues, consider splitting into:
+
+- **Implementation issue**: Phases 1-3 (research, design, implementation)
+- **Verification issue**: Phase 4 only, depends on implementation issue
+- **Validation issue**: Phase 5 only, depends on verification issue
+
+For verification-only issues (title contains "verify" or "verification"):
+- Skip phases 1-3
+- Read existing `.docs/research-issue-*.md` and `.docs/design-issue-*.md` artefacts
+- Proceed directly to Phase 4: Verification
+
+For validation-only issues (title contains "validate" or "validation"):
+- Skip phases 1-4
+- Read existing artefacts from prior phases
+- Proceed directly to Phase 5: Validation
+
 ## CRITICAL Instructions
 
-1. Follow all 5 V-model phases in order. Do NOT skip phases.
+1. Follow all applicable V-model phases in order. Do NOT skip phases unless this is a verification-only or validation-only issue.
 2. Examine ALL existing code in this workspace. Build on what is there.
 3. Produce artefacts for each phase and commit them to the branch.
 4. Ensure all quality gates pass before finishing.
