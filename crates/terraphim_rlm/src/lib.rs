@@ -70,6 +70,7 @@ pub mod logger;
 // Knowledge graph validation (Phase 5)
 #[cfg(feature = "kg-validation")]
 pub mod validator;
+pub mod validation;
 
 // MCP tools (Phase 6)
 #[cfg(feature = "mcp")]

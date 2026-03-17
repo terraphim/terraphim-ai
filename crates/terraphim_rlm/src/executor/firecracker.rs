@@ -447,8 +447,13 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
     ) -> Result<SnapshotId, Self::Error> {
         log::info!("Creating snapshot '{}' for session {}", name, session_id);
 
-        // Check snapshot limit for this session
-        let count = *self.snapshot_counts.read().get(session_id).unwrap_or(&0);
+        // Validate snapshot name for security (path traversal prevention)
+        crate::validation::validate_snapshot_name(name)?;
+
+        // Check snapshot limit for this session - use write lock for atomic check-and-increment
+        // to prevent race condition where multiple concurrent snapshots could exceed the limit
+        let mut snapshot_counts = self.snapshot_counts.write();
+        let count = *snapshot_counts.get(session_id).unwrap_or(&0);
         if count >= self.config.max_snapshots_per_session {
             return Err(RlmError::MaxSnapshotsReached {
                 max: self.config.max_snapshots_per_session,
@@ -498,8 +503,10 @@ impl super::ExecutionEnvironment for FirecrackerExecutor {
             }
         };
 
-        // Update tracking
-        *self.snapshot_counts.write().entry(*session_id).or_insert(0) += 1;
+        // Update tracking - use the existing write lock for atomic increment
+        *snapshot_counts.entry(*session_id).or_insert(0) += 1;
+        // Release the write lock by dropping it explicitly before await boundary
+        drop(snapshot_counts);
 
         let result = SnapshotId::new(name, *session_id);
 

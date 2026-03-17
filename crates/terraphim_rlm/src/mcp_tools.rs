@@ -328,6 +328,14 @@ impl RlmMcpService {
             .and_then(|v| v.as_str())
             .ok_or_else(|| ErrorData::invalid_params("Missing 'code' parameter", None))?;
 
+        // Validate code size to prevent DoS via memory exhaustion
+        if let Err(e) = crate::validation::validate_code_input(code) {
+            return Err(ErrorData::invalid_params(
+                format!("Code validation failed: {}", e),
+                None,
+            ));
+        }
+
         let session_id = self.resolve_session_id(&args).await?;
         // timeout_ms is available for future use when execution context supports it
         let _timeout_ms = args.get("timeout_ms").and_then(|v| v.as_u64());
@@ -370,6 +378,14 @@ impl RlmMcpService {
             .get("command")
             .and_then(|v| v.as_str())
             .ok_or_else(|| ErrorData::invalid_params("Missing 'command' parameter", None))?;
+
+        // Validate command size to prevent DoS via memory exhaustion
+        if let Err(e) = crate::validation::validate_code_input(command) {
+            return Err(ErrorData::invalid_params(
+                format!("Command validation failed: {}", e),
+                None,
+            ));
+        }
 
         let session_id = self.resolve_session_id(&args).await?;
         // These are available for future use when execution context supports them
