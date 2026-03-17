@@ -157,6 +157,9 @@ pub struct TrackerConfig {
     pub owner: String,
     /// Repository name (for Gitea).
     pub repo: String,
+    /// Project slug for Linear (optional, Linear-specific).
+    #[serde(default)]
+    pub project_slug: Option<String>,
     /// Whether to use gitea-robot PageRank API.
     #[serde(default)]
     pub use_robot_api: bool,
