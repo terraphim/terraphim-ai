@@ -524,6 +524,24 @@ fn create_tracker(workflow: &WorkflowConfig) -> Result<Box<dyn IssueTracker>, St
 
             Ok(Box::new(tracker))
         }
+        "linear" => {
+            use terraphim_tracker::{LinearConfig, LinearTracker};
+            let project_slug = workflow
+                .tracker
+                .project_slug
+                .clone()
+                .ok_or("project_slug required for linear tracker")?;
+            let tracker = LinearTracker::new(LinearConfig {
+                endpoint: workflow.tracker.endpoint.clone(),
+                api_key: workflow.tracker.api_key.clone(),
+                project_slug,
+                active_states: workflow.tracker.states.active.clone(),
+                terminal_states: workflow.tracker.states.terminal.clone(),
+            })
+            .map_err(|e| format!("failed to create Linear tracker: {}", e))?;
+
+            Ok(Box::new(tracker))
+        }
         _ => Err(format!(
             "unsupported tracker kind: {}",
             workflow.tracker.kind
