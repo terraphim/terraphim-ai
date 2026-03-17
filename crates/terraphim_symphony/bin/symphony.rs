@@ -12,8 +12,8 @@ use terraphim_symphony::SymphonyError;
 use terraphim_symphony::config::ServiceConfig;
 use terraphim_symphony::orchestrator::SymphonyOrchestrator;
 use terraphim_symphony::tracker::gitea::GiteaTracker;
-use terraphim_symphony::tracker::linear::LinearTracker;
 use terraphim_symphony::workspace::WorkspaceManager;
+use terraphim_tracker::LinearTracker;
 
 /// Symphony orchestration service.
 ///

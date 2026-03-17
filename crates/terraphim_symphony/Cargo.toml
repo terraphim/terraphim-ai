@@ -36,6 +36,9 @@ anyhow = "1"
 # Process management (Unix signals)
 nix = { version = "0.27", features = ["process", "signal"] }
 
+# Issue tracker abstraction
+terraphim_tracker = { path = "../terraphim_tracker" }
+
 # File watching (for WORKFLOW.md hot-reload)
 notify = { version = "6.1", optional = true }
 

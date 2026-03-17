@@ -1,53 +1,46 @@
 //! Linear GraphQL issue tracker client.
 //!
 //! Fetches issues from Linear using the GraphQL API, normalising them
-//! to the common [`Issue`](super::Issue) model.
+//! to the common [`Issue`] model.
 
-use super::{BlockerRef, Issue, IssueTracker};
-use crate::config::ServiceConfig;
-use crate::error::{Result, SymphonyError};
+use crate::{BlockerRef, Issue, IssueTracker, Result, TrackerError};
 use async_trait::async_trait;
-use chrono::{DateTime, Utc};
+use jiff::Zoned;
 use reqwest::Client;
 use tracing::debug;
+
+/// Configuration for Linear tracker.
+#[derive(Debug, Clone)]
+pub struct LinearConfig {
+    /// GraphQL endpoint URL (typically https://api.linear.app/graphql).
+    pub endpoint: String,
+    /// API key for authentication (LINEAR_API_KEY).
+    pub api_key: String,
+    /// Project slug identifier (e.g., "ABC" for project ABC).
+    pub project_slug: String,
+    /// Active states that trigger agent dispatch.
+    pub active_states: Vec<String>,
+    /// Terminal states that trigger workspace cleanup.
+    pub terminal_states: Vec<String>,
+}
 
 /// Linear GraphQL client.
 pub struct LinearTracker {
     client: Client,
-    endpoint: String,
-    api_key: String,
-    project_slug: String,
-    active_states: Vec<String>,
+    config: LinearConfig,
 }
 
 impl LinearTracker {
-    /// Create a new Linear tracker from the service configuration.
-    pub fn from_config(config: &ServiceConfig) -> Result<Self> {
-        let api_key = config
-            .tracker_api_key()
-            .or_else(|| {
-                std::env::var("LINEAR_API_KEY")
-                    .ok()
-                    .filter(|v| !v.is_empty())
-            })
-            .ok_or_else(|| SymphonyError::AuthenticationMissing {
-                service: "linear".into(),
+    /// Create a new Linear tracker from configuration.
+    pub fn new(config: LinearConfig) -> Result<Self> {
+        let client = Client::builder()
+            .timeout(std::time::Duration::from_secs(30))
+            .build()
+            .map_err(|e| TrackerError::Api {
+                message: format!("Failed to create HTTP client: {e}"),
             })?;
 
-        let project_slug =
-            config
-                .tracker_project_slug()
-                .ok_or_else(|| SymphonyError::ValidationFailed {
-                    checks: vec!["tracker.project_slug is required for linear".into()],
-                })?;
-
-        Ok(Self {
-            client: Client::new(),
-            endpoint: config.tracker_endpoint(),
-            api_key,
-            project_slug,
-            active_states: config.active_states(),
-        })
+        Ok(Self { client, config })
     }
 
     /// Execute a GraphQL query against the Linear API.
@@ -63,28 +56,25 @@ impl LinearTracker {
 
         let resp = self
             .client
-            .post(&self.endpoint)
-            .header("Authorization", &self.api_key)
+            .post(&self.config.endpoint)
+            .header("Authorization", &self.config.api_key)
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
             .await
-            .map_err(|e| SymphonyError::Tracker {
-                kind: "linear".into(),
+            .map_err(|e| TrackerError::Api {
                 message: format!("request failed: {e}"),
             })?;
 
         let status = resp.status();
         if !status.is_success() {
             let text = resp.text().await.unwrap_or_default();
-            return Err(SymphonyError::Tracker {
-                kind: "linear".into(),
+            return Err(TrackerError::Api {
                 message: format!("HTTP {status}: {text}"),
             });
         }
 
-        let json: serde_json::Value = resp.json().await.map_err(|e| SymphonyError::Tracker {
-            kind: "linear".into(),
+        let json: serde_json::Value = resp.json().await.map_err(|e| TrackerError::Api {
             message: format!("response parse error: {e}"),
         })?;
 
@@ -97,9 +87,8 @@ impl LinearTracker {
                         .filter_map(|e| e.get("message").and_then(|m| m.as_str()))
                         .map(String::from)
                         .collect();
-                    return Err(SymphonyError::Tracker {
-                        kind: "linear".into(),
-                        message: format!("GraphQL errors: {}", messages.join("; ")),
+                    return Err(TrackerError::GraphQLError {
+                        message: messages.join("; "),
                     });
                 }
             }
@@ -107,15 +96,14 @@ impl LinearTracker {
 
         json.get("data")
             .cloned()
-            .ok_or_else(|| SymphonyError::Tracker {
-                kind: "linear".into(),
+            .ok_or_else(|| TrackerError::Api {
                 message: "missing data field in response".into(),
             })
     }
 
     /// Build the state filter expression for a GraphQL query.
     fn state_filter(&self, states: &[String]) -> String {
-        let quoted: Vec<String> = states.iter().map(|s| format!("\"{s}\"")).collect();
+        let quoted: Vec<String> = states.iter().map(|s| format!("\"{}\"", s)).collect();
         format!("[{}]", quoted.join(", "))
     }
 
@@ -186,11 +174,13 @@ impl LinearTracker {
         let created_at = node
             .get("createdAt")
             .and_then(|c| c.as_str())
-            .and_then(|s| s.parse::<DateTime<Utc>>().ok());
+            .and_then(|s| s.parse::<jiff::Timestamp>().ok())
+            .map(|ts| ts.to_zoned(jiff::tz::TimeZone::UTC));
         let updated_at = node
             .get("updatedAt")
             .and_then(|u| u.as_str())
-            .and_then(|s| s.parse::<DateTime<Utc>>().ok());
+            .and_then(|s| s.parse::<jiff::Timestamp>().ok())
+            .map(|ts| ts.to_zoned(jiff::tz::TimeZone::UTC));
 
         Some(Issue {
             id,
@@ -230,16 +220,14 @@ impl LinearTracker {
             let connection = data_path
                 .split('.')
                 .try_fold(&data, |acc, key| acc.get(key))
-                .ok_or_else(|| SymphonyError::Tracker {
-                    kind: "linear".into(),
-                    message: format!("missing path '{data_path}' in response"),
+                .ok_or_else(|| TrackerError::Api {
+                    message: format!("missing path '{}' in response", data_path),
                 })?;
 
             let nodes = connection
                 .get("nodes")
                 .and_then(|n| n.as_array())
-                .ok_or_else(|| SymphonyError::Tracker {
-                    kind: "linear".into(),
+                .ok_or_else(|| TrackerError::Api {
                     message: "missing nodes array in response".into(),
                 })?;
 
@@ -264,8 +252,7 @@ impl LinearTracker {
                 .map(String::from);
 
             if cursor.is_none() {
-                return Err(SymphonyError::Tracker {
-                    kind: "linear".into(),
+                return Err(TrackerError::Api {
                     message: "missing endCursor for pagination".into(),
                 });
             }
@@ -279,7 +266,7 @@ impl LinearTracker {
 #[async_trait]
 impl IssueTracker for LinearTracker {
     async fn fetch_candidate_issues(&self) -> Result<Vec<Issue>> {
-        let state_names = self.state_filter(&self.active_states);
+        let state_names = self.state_filter(&self.config.active_states);
 
         let query = format!(
             r#"
@@ -326,7 +313,7 @@ impl IssueTracker for LinearTracker {
         );
 
         let variables = serde_json::json!({
-            "projectSlug": self.project_slug,
+            "projectSlug": self.config.project_slug,
         });
 
         self.fetch_paginated(&query, variables, "issues").await
@@ -398,7 +385,7 @@ impl IssueTracker for LinearTracker {
         );
 
         let variables = serde_json::json!({
-            "projectSlug": self.project_slug,
+            "projectSlug": self.config.project_slug,
         });
 
         self.fetch_paginated(&query, variables, "issues").await
@@ -408,6 +395,23 @@ impl IssueTracker for LinearTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn test_config() -> LinearConfig {
+        LinearConfig {
+            endpoint: "https://api.linear.app/graphql".into(),
+            api_key: "test-key".into(),
+            project_slug: "TEST".into(),
+            active_states: vec!["Todo".into(), "In Progress".into()],
+            terminal_states: vec!["Done".into(), "Closed".into()],
+        }
+    }
+
+    #[test]
+    fn linear_tracker_new_succeeds_with_valid_config() {
+        let config = test_config();
+        let tracker = LinearTracker::new(config);
+        assert!(tracker.is_ok());
+    }
 
     #[test]
     fn parse_linear_issue_node() {
@@ -446,6 +450,7 @@ mod tests {
         assert_eq!(issue.blocked_by[0].identifier.as_deref(), Some("PRJ-10"));
         assert_eq!(issue.blocked_by[0].state.as_deref(), Some("Done"));
         assert!(issue.created_at.is_some());
+        assert!(issue.updated_at.is_some());
     }
 
     #[test]
@@ -471,5 +476,14 @@ mod tests {
             "id": "x",
         });
         assert!(LinearTracker::parse_issue(&node).is_none());
+    }
+
+    #[test]
+    fn state_filter_builds_correctly() {
+        let config = test_config();
+        let tracker = LinearTracker::new(config).unwrap();
+        let states = vec!["Todo".to_string(), "In Progress".to_string()];
+        let filter = tracker.state_filter(&states);
+        assert_eq!(filter, "[\"Todo\", \"In Progress\"]");
     }
 }
