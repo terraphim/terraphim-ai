@@ -3,8 +3,8 @@
 //! Manages cron-scheduled agents using the unified dispatcher.
 
 use crate::{
-    AgentDefinition, AgentLayer, ConcurrencyController, DispatchTask, Dispatcher,
-    ScheduleEvent, TimeScheduler,
+    AgentDefinition, AgentLayer, ConcurrencyController, DispatchTask, Dispatcher, ScheduleEvent,
+    TimeScheduler,
 };
 use tracing::{error, info, warn};
 
@@ -22,10 +22,7 @@ pub struct TimeMode {
 
 impl TimeMode {
     /// Create a new time mode controller.
-    pub fn new(
-        scheduler: TimeScheduler,
-        concurrency: ConcurrencyController,
-    ) -> Self {
+    pub fn new(scheduler: TimeScheduler, concurrency: ConcurrencyController) -> Self {
         Self {
             scheduler,
             dispatcher: Dispatcher::new(),
@@ -40,9 +37,7 @@ impl TimeMode {
     }
 
     /// Start a Safety agent immediately.
-    pub async fn start_safety_agent(&mut self,
-        agent: AgentDefinition,
-    ) -> Result<(), String> {
+    pub async fn start_safety_agent(&mut self, agent: AgentDefinition) -> Result<(), String> {
         // Safety agents bypass concurrency limits (they're always on)
         let task = DispatchTask::TimeDriven {
             name: agent.name.clone(),
@@ -103,10 +98,7 @@ impl TimeMode {
     }
 
     /// Handle a spawn event.
-    async fn handle_spawn(
-        &mut self,
-        agent: AgentDefinition,
-    ) -> Result<(), String> {
+    async fn handle_spawn(&mut self, agent: AgentDefinition) -> Result<(), String> {
         // Try to acquire a time-driven slot
         match self.concurrency.acquire_time_driven().await {
             Some(permit) => {
@@ -141,9 +133,7 @@ impl TimeMode {
     }
 
     /// Handle a stop event.
-    async fn handle_stop(&mut self,
-        agent_name: String,
-    ) {
+    async fn handle_stop(&mut self, agent_name: String) {
         info!(agent_name = %agent_name, "stopping agent");
         self.running.remove(&agent_name);
     }
@@ -179,10 +169,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_safety_agent_bypasses_concurrency() {
-        let scheduler = TimeScheduler::new(
-            &[test_agent("safety", AgentLayer::Safety)],
-            None,
-        ).unwrap();
+        let scheduler =
+            TimeScheduler::new(&[test_agent("safety", AgentLayer::Safety)], None).unwrap();
 
         let concurrency = ConcurrencyController::new(
             10,
@@ -194,7 +182,7 @@ mod tests {
         );
 
         let mut mode = TimeMode::new(scheduler, concurrency);
-        
+
         // Safety agents should still start even with no slots
         let agent = test_agent("safety", AgentLayer::Safety);
         let result = mode.start_safety_agent(agent).await;

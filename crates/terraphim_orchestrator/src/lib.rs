@@ -10,15 +10,15 @@ pub mod nightwatch;
 pub mod scheduler;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
+pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
     OrchestratorConfig, TrackerConfig, TrackerStates, WorkflowConfig,
 };
-pub use error::OrchestratorError;
-pub use handoff::HandoffContext;
-pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
+pub use error::OrchestratorError;
+pub use handoff::HandoffContext;
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,

@@ -73,13 +73,13 @@ pub trait IssueTracker: Send + Sync {
 pub enum TrackerError {
     #[error("HTTP request failed: {0}")]
     Http(#[from] reqwest::Error),
-    
+
     #[error("API error: {message}")]
     Api { message: String },
-    
+
     #[error("Authentication missing for {service}")]
     AuthenticationMissing { service: String },
-    
+
     #[error("Validation failed: {checks:?}")]
     ValidationFailed { checks: Vec<String> },
 }

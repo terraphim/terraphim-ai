@@ -52,11 +52,7 @@ impl PagerankClient {
     }
 
     /// Fetch ready issues with PageRank scores.
-    pub async fn fetch_ready(
-        &self,
-        owner: &str,
-        repo: &str,
-    ) -> crate::Result<ReadyResponse> {
+    pub async fn fetch_ready(&self, owner: &str, repo: &str) -> crate::Result<ReadyResponse> {
         let url = format!(
             "{}/api/v1/robot/ready?owner={}&repo={}",
             self.base_url, owner, repo
@@ -79,7 +75,7 @@ impl PagerankClient {
         }
 
         let ready: ReadyResponse = response.json().await.map_err(crate::TrackerError::Http)?;
-        
+
         tracing::info!(
             total = ready.total_count,
             ready = ready.ready_issues.len(),
@@ -92,7 +88,7 @@ impl PagerankClient {
     /// Merge PageRank scores into issues.
     pub fn merge_scores(issues: &mut [crate::Issue], scores: &[PagerankScore]) {
         for issue in issues.iter_mut() {
-            if let Some(id) = issue.id.parse::<i64>().ok() {
+            if let Ok(id) = issue.id.parse::<i64>() {
                 if let Some(score) = scores.iter().find(|s| s.id == id) {
                     issue.pagerank_score = Some(score.page_rank);
                 }
