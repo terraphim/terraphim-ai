@@ -3,7 +3,6 @@
 //! Polls Gitea/Linear for issues and dispatches agents to work on them.
 
 use crate::{ConcurrencyController, DispatchTask, Dispatcher, WorkflowConfig};
-use std::collections::HashMap;
 use std::time::Duration;
 use terraphim_tracker::{Issue, IssueTracker, PagerankClient};
 use tracing::{error, info, warn};
@@ -228,6 +227,31 @@ mod tests {
         ) -> terraphim_tracker::Result<Vec<Issue>> {
             Ok(vec![])
         }
+    }
+
+    #[tokio::test]
+    async fn test_mock_tracker_fetch_candidate_issues() {
+        let tracker = MockTracker {
+            issues: vec![Issue {
+                id: "1".into(),
+                identifier: "TEST-1".into(),
+                title: "Test Issue".into(),
+                description: None,
+                priority: Some(1),
+                state: "open".into(),
+                branch_name: None,
+                url: None,
+                labels: vec![],
+                blocked_by: vec![],
+                pagerank_score: None,
+                created_at: None,
+                updated_at: None,
+            }],
+        };
+
+        let issues = tracker.fetch_candidate_issues().await.unwrap();
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues[0].identifier, "TEST-1");
     }
 
     #[test]

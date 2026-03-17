@@ -3,7 +3,6 @@
 //! Provides a priority queue with fairness between different dispatch sources.
 
 use std::collections::VecDeque;
-use tokio::sync::{mpsc, oneshot};
 
 /// A dispatch task from any source.
 #[derive(Debug, Clone)]

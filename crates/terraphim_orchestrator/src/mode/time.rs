@@ -3,8 +3,7 @@
 //! Manages cron-scheduled agents using the unified dispatcher.
 
 use crate::{
-    AgentDefinition, AgentLayer, ConcurrencyController, DispatchTask, Dispatcher, ScheduleEvent,
-    TimeScheduler,
+    AgentDefinition, ConcurrencyController, DispatchTask, Dispatcher, ScheduleEvent, TimeScheduler,
 };
 use tracing::{error, info, warn};
 
@@ -152,7 +151,7 @@ impl TimeMode {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ModeQuotas;
+    use crate::{AgentLayer, ModeQuotas};
 
     fn test_agent(name: &str, layer: AgentLayer) -> AgentDefinition {
         AgentDefinition {

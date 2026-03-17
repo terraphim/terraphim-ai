@@ -4,16 +4,15 @@
 //! with shared concurrency control and unified status.
 
 use crate::{
-    AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewResult, ConcurrencyController,
-    DispatchTask, DispatcherStats, FairnessPolicy, HandoffContext, IssueMode, ModeQuotas,
-    NightwatchMonitor, OrchestratorConfig, ScheduleEvent, TimeMode, TimeScheduler, WorkflowConfig,
+    AgentDefinition, AgentOrchestrator, CompoundReviewResult, ConcurrencyController,
+    DispatcherStats, FairnessPolicy, HandoffContext, ModeQuotas, OrchestratorConfig, ScheduleEvent,
+    TimeScheduler, WorkflowConfig,
 };
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 use terraphim_tracker::{GiteaTracker, IssueTracker};
 use tokio::sync::{mpsc, watch, Mutex};
-use tokio::task::JoinHandle;
 use tracing::{error, info, warn};
 
 /// Shared state between time and issue modes.
@@ -88,8 +87,10 @@ pub struct DualModeOrchestrator {
     time_mode: Option<TimeModeComponents>,
     /// Issue mode controller (if enabled).
     issue_mode: Option<IssueModeComponents>,
-    /// Task receiver.
+    /// Task receiver from both modes.
     task_rx: mpsc::Receiver<SpawnTask>,
+    /// Task sender for dispatching from modes.
+    task_tx: mpsc::Sender<SpawnTask>,
     /// Active agents.
     active_agents: Arc<Mutex<HashMap<String, AgentId>>>,
 }
@@ -141,7 +142,7 @@ impl DualModeOrchestrator {
             shutdown_tx,
         };
 
-        // Create task channel
+        // Create task channel for modes to send spawned tasks to orchestrator
         let (task_tx, task_rx) = mpsc::channel(128);
 
         // Setup time mode
@@ -186,16 +187,26 @@ impl DualModeOrchestrator {
             time_mode,
             issue_mode,
             task_rx,
+            task_tx,
             active_agents: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
+    /// Access the orchestrator configuration.
+    pub fn config(&self) -> &OrchestratorConfig {
+        &self.config
+    }
+
     /// Run the dual-mode orchestrator.
     pub async fn run(&mut self) -> Result<(), crate::OrchestratorError> {
-        info!("starting dual-mode orchestrator");
+        info!(
+            agents = self.config.agents.len(),
+            workflow_enabled = self.config.workflow.as_ref().is_some_and(|w| w.enabled),
+            "starting dual-mode orchestrator"
+        );
 
         // Start time mode task
-        let time_handle = if let Some(time_components) = self.time_mode.take() {
+        let mut time_handle = if let Some(time_components) = self.time_mode.take() {
             let state = self.state.clone();
             Some(tokio::spawn(run_time_mode(time_components, state)))
         } else {
@@ -203,41 +214,68 @@ impl DualModeOrchestrator {
         };
 
         // Start issue mode task
-        let issue_handle = if let Some(issue_components) = self.issue_mode.take() {
+        let mut issue_handle = if let Some(issue_components) = self.issue_mode.take() {
             let state = self.state.clone();
             Some(tokio::spawn(run_issue_mode(issue_components, state)))
         } else {
             None
         };
 
-        // Wait for shutdown signal or task completion
+        // Wait for shutdown signal, task completion, or spawned tasks
         let ctrl_c = tokio::signal::ctrl_c();
         tokio::pin!(ctrl_c);
 
-        tokio::select! {
-            _ = async {
-                if let Some(h) = time_handle {
-                    let _ = h.await;
+        // Pin the optional handles for select
+        let mut time_done = false;
+        let mut issue_done = false;
+
+        loop {
+            tokio::select! {
+                // Receive spawned tasks from modes and track them
+                Some(task) = self.task_rx.recv() => {
+                    self.track_spawned_task(task).await;
                 }
-            } => {
-                info!("time mode completed");
-            }
-            _ = async {
-                if let Some(h) = issue_handle {
-                    let _ = h.await;
+                // Wait for time mode completion
+                result = async {
+                    match &mut time_handle {
+                        Some(h) => h.await,
+                        None => std::future::pending().await,
+                    }
+                }, if !time_done => {
+                    time_done = true;
+                    match result {
+                        Ok(()) => info!("time mode completed"),
+                        Err(e) => error!("time mode panicked: {}", e),
+                    }
+                    if issue_done { break; }
                 }
-            } => {
-                info!("issue mode completed");
-            }
-            result = self.base.run() => {
-                match result {
-                    Ok(()) => info!("base orchestrator completed"),
-                    Err(e) => error!("base orchestrator error: {}", e),
+                // Wait for issue mode completion
+                result = async {
+                    match &mut issue_handle {
+                        Some(h) => h.await,
+                        None => std::future::pending().await,
+                    }
+                }, if !issue_done => {
+                    issue_done = true;
+                    match result {
+                        Ok(()) => info!("issue mode completed"),
+                        Err(e) => error!("issue mode panicked: {}", e),
+                    }
+                    if time_done { break; }
                 }
-            }
-            _ = &mut ctrl_c => {
-                info!("shutdown signal received");
-                let _ = self.state.shutdown_tx.send(true);
+                // Base orchestrator reconciliation loop
+                result = self.base.run() => {
+                    match result {
+                        Ok(()) => info!("base orchestrator completed"),
+                        Err(e) => error!("base orchestrator error: {}", e),
+                    }
+                    break;
+                }
+                _ = &mut ctrl_c => {
+                    info!("shutdown signal received");
+                    let _ = self.state.shutdown_tx.send(true);
+                    break;
+                }
             }
         }
 
@@ -246,6 +284,43 @@ impl DualModeOrchestrator {
         self.shutdown().await;
 
         Ok(())
+    }
+
+    /// Track a spawned task from either mode.
+    async fn track_spawned_task(&self, task: SpawnTask) {
+        let mut stats = self.state.stats.lock().await;
+        stats.total_agents_spawned += 1;
+        match &task {
+            SpawnTask::TimeTask { agent } => {
+                info!(agent_name = %agent.name, "received time-driven spawn task");
+                let mut agents = self.active_agents.lock().await;
+                agents.insert(
+                    agent.name.clone(),
+                    AgentId {
+                        name: agent.name.clone(),
+                        mode: ExecutionMode::TimeDriven,
+                    },
+                );
+                *stats.active_by_mode.entry("time".into()).or_insert(0) += 1;
+            }
+            SpawnTask::IssueTask { issue_id, title } => {
+                info!(issue_id = %issue_id, title = %title, "received issue-driven spawn task");
+                let mut agents = self.active_agents.lock().await;
+                agents.insert(
+                    issue_id.clone(),
+                    AgentId {
+                        name: issue_id.clone(),
+                        mode: ExecutionMode::IssueDriven,
+                    },
+                );
+                *stats.active_by_mode.entry("issue".into()).or_insert(0) += 1;
+            }
+        }
+    }
+
+    /// Get a clone of the task sender for external dispatch.
+    pub fn task_sender(&self) -> mpsc::Sender<SpawnTask> {
+        self.task_tx.clone()
     }
 
     /// Request shutdown.
