@@ -127,12 +127,42 @@ impl ConcurrencyController {
         }
     }
 
+    /// Get the active fairness policy.
+    pub fn fairness_policy(&self) -> FairnessPolicy {
+        self.fairness
+    }
+
     /// Acquire a slot for the given mode.
     async fn acquire(&self, mode: AgentMode) -> Option<AgentPermit> {
         // Check mode quota first
         if !self.mode_has_capacity(mode).await {
             tracing::debug!(?mode, "mode quota exceeded");
             return None;
+        }
+
+        // Apply fairness policy: under Proportional, check whether the mode
+        // is consuming more than its fair share of global capacity.
+        if self.fairness == FairnessPolicy::Proportional {
+            let counts = self.running.lock().await;
+            let total = counts.time_driven + counts.issue_driven;
+            let global_cap = self.global.available_permits() + total;
+            if global_cap > 0 {
+                let mode_count = match mode {
+                    AgentMode::TimeDriven => counts.time_driven,
+                    AgentMode::IssueDriven => counts.issue_driven,
+                };
+                let mode_quota = match mode {
+                    AgentMode::TimeDriven => self.quotas.time_max,
+                    AgentMode::IssueDriven => self.quotas.issue_max,
+                };
+                let total_quota = self.quotas.time_max + self.quotas.issue_max;
+                // Fair share = global_cap * (mode_quota / total_quota)
+                let fair_share = (global_cap * mode_quota) / total_quota.max(1);
+                if mode_count >= fair_share && fair_share > 0 {
+                    tracing::debug!(?mode, mode_count, fair_share, "proportional fairness limit");
+                    return None;
+                }
+            }
         }
 
         // Try to acquire global permit
