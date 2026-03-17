@@ -16,6 +16,7 @@ fn test_config() -> OrchestratorConfig {
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
             create_prs: false,
         },
+        workflow: None,
         agents: vec![
             AgentDefinition {
                 name: "sentinel".to_string(),
