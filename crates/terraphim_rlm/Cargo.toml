@@ -29,8 +29,8 @@ terraphim_types = { path = "../terraphim_types", optional = true }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
 
-# Firecracker-rust core for VM and snapshot management
-fcctl-core = { path = "../../../firecracker-rust/fcctl-core" }
+# Firecracker-rust core for VM and snapshot management (optional for CI compatibility)
+fcctl-core = { path = "../../../firecracker-rust/fcctl-core", optional = true }
 
 # Async utilities
 tokio-util = "0.7"
@@ -61,7 +61,8 @@ test-log = "0.2"
 
 [features]
 default = ["full"]
-full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security", "mcp"]
+full = ["firecracker", "llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security", "mcp"]
+firecracker = ["dep:fcctl-core"]
 llm = ["dep:terraphim_service"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]

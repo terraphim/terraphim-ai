@@ -408,6 +408,7 @@ impl TerraphimRlm {
             max_recursion_depth: self.config.max_recursion_depth,
             strict_parsing: false,
             command_timeout_ms: self.config.time_budget_ms / 10, // Per-command timeout
+            timeout_duration: std::time::Duration::from_millis(self.config.time_budget_ms),
         };
 
         // Create and execute query loop

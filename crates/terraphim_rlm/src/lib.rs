@@ -75,6 +75,9 @@ pub mod validator;
 #[cfg(feature = "mcp")]
 pub mod mcp_tools;
 
+// Validation utilities
+pub mod validation;
+
 // Remaining phases (to be implemented)
 // pub mod preamble;
 // pub mod autoscaler;
@@ -86,9 +89,11 @@ pub mod mcp_tools;
 pub use budget::BudgetTracker;
 pub use config::{BackendType, KgStrictness, RlmConfig, SessionModel};
 pub use error::RlmError;
+#[cfg(feature = "firecracker")]
+pub use executor::FirecrackerExecutor;
 pub use executor::{
-    Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, SshExecutor,
-    ValidationResult,
+    Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, MockExecutor, SnapshotId,
+    SshExecutor, ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read_trajectory_file};

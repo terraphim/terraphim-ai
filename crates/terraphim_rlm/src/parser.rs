@@ -18,6 +18,12 @@
 use crate::error::{RlmError, RlmResult};
 use crate::types::{BashCommand, Command, LlmQuery, PythonCode};
 
+/// Maximum input size for parsing (10MB).
+const MAX_INPUT_SIZE: usize = 10_485_760;
+
+/// Maximum recursion depth for parsing nested structures.
+const MAX_RECURSION_DEPTH: u32 = 100;
+
 /// Command parser for extracting structured commands from LLM output.
 #[derive(Debug, Default)]
 pub struct CommandParser {
@@ -50,6 +56,17 @@ impl CommandParser {
     /// multiple commands in a single response, though typically only one
     /// is expected.
     pub fn parse(&self, input: &str) -> RlmResult<Vec<Command>> {
+        // Validate input size
+        let input_len = input.len();
+        if input_len > MAX_INPUT_SIZE {
+            return Err(RlmError::ConfigError {
+                message: format!(
+                    "Input size {} exceeds maximum allowed size of {} bytes",
+                    input_len, MAX_INPUT_SIZE
+                ),
+            });
+        }
+
         let mut commands = Vec::new();
         let input = input.trim();
 
@@ -406,6 +423,15 @@ fn extract_parens_content(input: &str, cmd_name: &str) -> RlmResult<String> {
         if !in_string {
             if c == '(' {
                 depth += 1;
+                // Check recursion depth limit
+                if depth > MAX_RECURSION_DEPTH {
+                    return Err(RlmError::CommandParseFailed {
+                        message: format!(
+                            "Maximum recursion depth ({}) exceeded in {cmd_name} command",
+                            MAX_RECURSION_DEPTH
+                        ),
+                    });
+                }
             } else if c == ')' {
                 depth -= 1;
             }
