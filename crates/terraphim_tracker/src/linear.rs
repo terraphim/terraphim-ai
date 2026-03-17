@@ -59,7 +59,7 @@ impl LinearTracker {
         let resp = self
             .client
             .post(&self.config.endpoint)
-            .header("Authorization", &self.config.api_key)
+            .header("Authorization", format!("Bearer {}", &self.config.api_key))
             .header("Content-Type", "application/json")
             .json(&body)
             .send()
@@ -224,15 +224,23 @@ impl LinearTracker {
                     message: format!("missing path '{}' in response", data_path),
                 })?;
 
-            let nodes = connection
+            // Try "nodes" first (real Linear API), fallback to "edges" (twin)
+            let items: Vec<&serde_json::Value> = connection
                 .get("nodes")
                 .and_then(|n| n.as_array())
+                .map(|arr| arr.iter().collect())
+                .or_else(|| {
+                    connection
+                        .get("edges")
+                        .and_then(|e| e.as_array())
+                        .map(|arr| arr.iter().filter_map(|edge| edge.get("node")).collect())
+                })
                 .ok_or_else(|| TrackerError::Api {
-                    message: "missing nodes array in response".into(),
+                    message: "missing nodes or edges array in response".into(),
                 })?;
 
-            for node in nodes {
-                if let Some(issue) = Self::parse_issue(node) {
+            for item in items {
+                if let Some(issue) = Self::parse_issue(item) {
                     all_issues.push(issue);
                 }
             }
@@ -278,7 +286,7 @@ impl IssueTracker for LinearTracker {
                     }}
                     first: 50
                     after: $after
-                    orderBy: updatedAt
+                    orderBy: "updatedAt"
                 ) {{
                     nodes {{
                         id
