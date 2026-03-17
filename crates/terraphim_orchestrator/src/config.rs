@@ -11,6 +11,9 @@ pub struct OrchestratorConfig {
     pub nightwatch: NightwatchConfig,
     /// Compound review configuration.
     pub compound_review: CompoundReviewConfig,
+    /// Optional workflow configuration for issue-driven mode.
+    #[serde(default)]
+    pub workflow: Option<WorkflowConfig>,
     /// Agent definitions.
     pub agents: Vec<AgentDefinition>,
     /// Seconds to wait before restarting a Safety agent after it exits.
@@ -124,6 +127,112 @@ fn default_max_duration() -> u64 {
     1800
 }
 
+/// Workflow configuration for issue-driven mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowConfig {
+    /// Whether issue-driven mode is enabled.
+    pub enabled: bool,
+    /// Poll interval in seconds.
+    #[serde(default = "default_poll_interval")]
+    pub poll_interval_secs: u64,
+    /// Path to WORKFLOW.md file.
+    pub workflow_file: PathBuf,
+    /// Tracker configuration.
+    pub tracker: TrackerConfig,
+    /// Concurrency configuration.
+    #[serde(default)]
+    pub concurrency: ConcurrencyConfig,
+}
+
+/// Tracker configuration for issue-driven mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackerConfig {
+    /// Tracker kind: "gitea" or "linear".
+    pub kind: String,
+    /// API endpoint URL.
+    pub endpoint: String,
+    /// API key (supports env var substitution like "${GITEA_TOKEN}").
+    pub api_key: String,
+    /// Repository owner (for Gitea).
+    pub owner: String,
+    /// Repository name (for Gitea).
+    pub repo: String,
+    /// Whether to use gitea-robot PageRank API.
+    #[serde(default)]
+    pub use_robot_api: bool,
+    /// State configuration.
+    #[serde(default)]
+    pub states: TrackerStates,
+}
+
+/// Tracker state configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackerStates {
+    /// Active states that trigger agent dispatch.
+    #[serde(default = "default_active_states")]
+    pub active: Vec<String>,
+    /// Terminal states that trigger workspace cleanup.
+    #[serde(default = "default_terminal_states")]
+    pub terminal: Vec<String>,
+}
+
+impl Default for TrackerStates {
+    fn default() -> Self {
+        Self {
+            active: default_active_states(),
+            terminal: default_terminal_states(),
+        }
+    }
+}
+
+/// Concurrency configuration for issue-driven mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConcurrencyConfig {
+    /// Global maximum concurrent agents (both modes combined).
+    #[serde(default = "default_global_max")]
+    pub global_max: usize,
+    /// Maximum issue-driven agents.
+    #[serde(default = "default_issue_max")]
+    pub issue_max: usize,
+    /// Fairness strategy: "round_robin", "priority", "proportional".
+    #[serde(default = "default_fairness")]
+    pub fairness: String,
+}
+
+impl Default for ConcurrencyConfig {
+    fn default() -> Self {
+        Self {
+            global_max: default_global_max(),
+            issue_max: default_issue_max(),
+            fairness: default_fairness(),
+        }
+    }
+}
+
+fn default_poll_interval() -> u64 {
+    120 // 2 minutes
+}
+
+fn default_active_states() -> Vec<String> {
+    vec!["Todo".into(), "In Progress".into()]
+}
+
+fn default_terminal_states() -> Vec<String> {
+    vec!["Done".into(), "Closed".into(), "Cancelled".into()]
+}
+
+fn default_global_max() -> usize {
+    5
+}
+
+fn default_issue_max() -> usize {
+    3
+}
+
+fn default_fairness() -> String {
+    "round_robin".into()
+}
+
 fn default_restart_cooldown() -> u64 {
     60
 }
@@ -149,6 +258,55 @@ impl OrchestratorConfig {
         let content = std::fs::read_to_string(path.as_ref())?;
         Self::from_toml(&content)
     }
+
+    /// Substitute environment variables in workflow config.
+    /// Replaces ${VAR} or $VAR with the value of the environment variable.
+    pub fn substitute_env_vars(&mut self) {
+        if let Some(ref mut workflow) = self.workflow {
+            workflow.tracker.api_key = substitute_env(&workflow.tracker.api_key);
+        }
+    }
+
+    /// Validate the configuration.
+    pub fn validate(&self) -> Result<(), crate::error::OrchestratorError> {
+        // Validate workflow config if present
+        if let Some(ref workflow) = self.workflow {
+            if workflow.enabled {
+                if workflow.tracker.api_key.is_empty() {
+                    return Err(crate::error::OrchestratorError::Config(
+                        "workflow.tracker.api_key is required when workflow is enabled".into(),
+                    ));
+                }
+                if workflow.tracker.endpoint.is_empty() {
+                    return Err(crate::error::OrchestratorError::Config(
+                        "workflow.tracker.endpoint is required when workflow is enabled".into(),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+}
+
+/// Substitute environment variables in a string.
+/// Supports ${VAR} and $VAR syntax.
+fn substitute_env(s: &str) -> String {
+    let mut result = s.to_string();
+
+    // Handle ${VAR} syntax
+    while let Some(start) = result.find("${") {
+        if let Some(end) = result[start..].find('}') {
+            let var_name = &result[start + 2..start + end];
+            let var_value = std::env::var(var_name).unwrap_or_default();
+            result.replace_range(start..start + end + 1, &var_value);
+        } else {
+            break;
+        }
+    }
+
+    // Handle $VAR syntax (simplistic)
+    // Note: This is a basic implementation. A full implementation would use regex.
+    result
 }
 
 #[cfg(test)]
@@ -350,5 +508,160 @@ task = "t"
         assert_eq!(config.agents[1].layer, AgentLayer::Core);
         assert_eq!(config.agents[2].layer, AgentLayer::Growth);
         assert!(config.agents[1].schedule.is_some());
+    }
+
+    #[test]
+    fn test_config_backward_compatible_without_workflow() {
+        // Old config without workflow section should still parse
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.workflow.is_none());
+    }
+
+    #[test]
+    fn test_config_with_workflow_section() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+enabled = true
+poll_interval_secs = 120
+workflow_file = "./WORKFLOW.md"
+
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.terraphim.cloud"
+api_key = "${GITEA_TOKEN}"
+owner = "terraphim"
+repo = "terraphim-ai"
+use_robot_api = true
+
+[workflow.tracker.states]
+active = ["Todo", "In Progress"]
+terminal = ["Done", "Closed"]
+
+[workflow.concurrency]
+global_max = 5
+issue_max = 3
+fairness = "round_robin"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+
+        let workflow = config.workflow.expect("workflow config should exist");
+        assert!(workflow.enabled);
+        assert_eq!(workflow.poll_interval_secs, 120);
+        assert_eq!(
+            workflow.workflow_file,
+            std::path::PathBuf::from("./WORKFLOW.md")
+        );
+
+        assert_eq!(workflow.tracker.kind, "gitea");
+        assert_eq!(workflow.tracker.endpoint, "https://git.terraphim.cloud");
+        assert_eq!(workflow.tracker.owner, "terraphim");
+        assert!(workflow.tracker.use_robot_api);
+
+        assert_eq!(workflow.tracker.states.active.len(), 2);
+        assert_eq!(workflow.tracker.states.terminal.len(), 2);
+
+        assert_eq!(workflow.concurrency.global_max, 5);
+        assert_eq!(workflow.concurrency.issue_max, 3);
+        assert_eq!(workflow.concurrency.fairness, "round_robin");
+    }
+
+    #[test]
+    fn test_workflow_defaults() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+enabled = true
+workflow_file = "./WORKFLOW.md"
+
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.com"
+api_key = "test"
+owner = "owner"
+repo = "repo"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let workflow = config.workflow.expect("workflow config should exist");
+
+        // Check defaults
+        assert_eq!(workflow.poll_interval_secs, 120);
+        assert!(!workflow.tracker.use_robot_api);
+        assert_eq!(workflow.concurrency.global_max, 5);
+        assert_eq!(workflow.concurrency.issue_max, 3);
+        assert_eq!(workflow.concurrency.fairness, "round_robin");
+    }
+
+    #[test]
+    fn test_validate_workflow_missing_api_key() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+enabled = true
+workflow_file = "./WORKFLOW.md"
+
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.com"
+api_key = ""
+owner = "owner"
+repo = "repo"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_err());
     }
 }

@@ -1,16 +1,25 @@
 pub mod compound;
+pub mod concurrency;
 pub mod config;
+pub mod dispatcher;
+pub mod dual_mode;
 pub mod error;
 pub mod handoff;
+pub mod mode;
 pub mod nightwatch;
 pub mod scheduler;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
-    AgentDefinition, AgentLayer, CompoundReviewConfig, NightwatchConfig, OrchestratorConfig,
+    AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
+    OrchestratorConfig, TrackerConfig, TrackerStates, WorkflowConfig,
 };
 pub use error::OrchestratorError;
 pub use handoff::HandoffContext;
+pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
+pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
+pub use dual_mode::DualModeOrchestrator;
+pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
     RateLimitTracker, RateLimitWindow,
@@ -662,6 +671,7 @@ mod tests {
                 repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
                 create_prs: false,
             },
+            workflow: None,
             agents: vec![
                 AgentDefinition {
                     name: "sentinel".to_string(),
@@ -774,6 +784,7 @@ task = "test"
                 repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
                 create_prs: false,
             },
+            workflow: None,
             agents: vec![AgentDefinition {
                 name: "echo-safety".to_string(),
                 layer: AgentLayer::Safety,
