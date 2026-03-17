@@ -27,7 +27,9 @@ pub struct LinearConfig {
 /// Linear GraphQL client.
 pub struct LinearTracker {
     client: Client,
-    config: LinearConfig,
+    /// Configuration for the tracker (exposed for testing).
+    #[doc(hidden)]
+    pub config: LinearConfig,
 }
 
 impl LinearTracker {
@@ -94,11 +96,9 @@ impl LinearTracker {
             }
         }
 
-        json.get("data")
-            .cloned()
-            .ok_or_else(|| TrackerError::Api {
-                message: "missing data field in response".into(),
-            })
+        json.get("data").cloned().ok_or_else(|| TrackerError::Api {
+            message: "missing data field in response".into(),
+        })
     }
 
     /// Build the state filter expression for a GraphQL query.
