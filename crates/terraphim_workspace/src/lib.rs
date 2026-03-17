@@ -16,13 +16,13 @@ pub use config::{HooksConfig, WorkspaceConfig};
 pub enum WorkspaceError {
     #[error("workspace error for {identifier}: {reason}")]
     Workspace { identifier: String, reason: String },
-    
+
     #[error("path {path} is outside workspace root")]
     PathOutsideRoot { path: String },
-    
+
     #[error("hook '{hook}' failed: {reason}")]
     HookFailed { hook: String, reason: String },
-    
+
     #[error("hook '{hook}' timed out after {timeout_ms}ms")]
     HookTimeout { hook: String, timeout_ms: u64 },
 }
@@ -52,7 +52,7 @@ impl WorkspaceManager {
     /// Create a new workspace manager.
     pub fn new(config: &WorkspaceConfig) -> Result<Self> {
         let root = &config.root;
-        
+
         // Ensure root exists
         std::fs::create_dir_all(root).map_err(|e| WorkspaceError::Workspace {
             identifier: "<root>".into(),
@@ -61,7 +61,10 @@ impl WorkspaceManager {
 
         let root = root.canonicalize().map_err(|e| WorkspaceError::Workspace {
             identifier: "<root>".into(),
-            reason: format!("failed to canonicalise workspace root {}: {e}", root.display()),
+            reason: format!(
+                "failed to canonicalise workspace root {}: {e}",
+                root.display()
+            ),
         })?;
 
         Ok(Self {
@@ -102,10 +105,7 @@ impl WorkspaceManager {
 
             // Run after_create hook
             if let Some(script) = &self.hooks.after_create {
-                if let Err(e) = self
-                    .run_hook("after_create", script, &path, env_vars)
-                    .await
-                {
+                if let Err(e) = self.run_hook("after_create", script, &path, env_vars).await {
                     // after_create failure is fatal: remove the directory
                     tracing::warn!(
                         issue_identifier = identifier,
@@ -224,13 +224,13 @@ impl WorkspaceManager {
             identifier: identifier.into(),
             reason: format!("failed to archive workspace: {e}"),
         })?;
-        
+
         tracing::info!(
             issue_identifier = identifier,
             archive_path = %archive_path.display(),
             "archived workspace"
         );
-        
+
         Ok(archive_path)
     }
 
@@ -244,7 +244,7 @@ impl WorkspaceManager {
                 path: path_str.into_owned(),
             });
         }
-        
+
         // Reject if workspace key would create subdirectories
         let key = sanitise_workspace_key(identifier);
         if key.contains('/') || key.contains('\\') {
@@ -281,8 +281,11 @@ impl WorkspaceManager {
             reason: format!("failed to spawn: {e}"),
         })?;
 
-        let result =
-            tokio::time::timeout(Duration::from_millis(self.hook_timeout_ms), child.wait_with_output()).await;
+        let result = tokio::time::timeout(
+            Duration::from_millis(self.hook_timeout_ms),
+            child.wait_with_output(),
+        )
+        .await;
 
         match result {
             Ok(Ok(output)) => {
@@ -311,7 +314,11 @@ impl WorkspaceManager {
                 reason: format!("IO error: {e}"),
             }),
             Err(_) => {
-                tracing::error!(hook = hook_name, timeout_ms = self.hook_timeout_ms, "hook timed out");
+                tracing::error!(
+                    hook = hook_name,
+                    timeout_ms = self.hook_timeout_ms,
+                    "hook timed out"
+                );
                 Err(WorkspaceError::HookTimeout {
                     hook: hook_name.into(),
                     timeout_ms: self.hook_timeout_ms,

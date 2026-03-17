@@ -115,10 +115,15 @@ impl IssueTracker for GiteaTracker {
         }
 
         let gitea_issues: Vec<GiteaIssue> = response.json().await?;
-        
+
         let issues: Vec<Issue> = gitea_issues
             .into_iter()
-            .filter(|gi| self.config.active_states.iter().any(|s| s.eq_ignore_ascii_case(&gi.state)))
+            .filter(|gi| {
+                self.config
+                    .active_states
+                    .iter()
+                    .any(|s| s.eq_ignore_ascii_case(&gi.state))
+            })
             .map(|gi| self.normalise_issue(gi))
             .collect();
 
@@ -132,11 +137,9 @@ impl IssueTracker for GiteaTracker {
         Ok(issues)
     }
 
-    async fn fetch_issue_states_by_ids(&self,
-        ids: &[String],
-    ) -> Result<Vec<Issue>> {
+    async fn fetch_issue_states_by_ids(&self, ids: &[String]) -> Result<Vec<Issue>> {
         let mut issues = Vec::new();
-        
+
         for id in ids {
             let url = format!(
                 "{}/api/v1/repos/{}/{}/issues/{}",
@@ -157,9 +160,7 @@ impl IssueTracker for GiteaTracker {
         Ok(issues)
     }
 
-    async fn fetch_issues_by_states(&self,
-        states: &[String],
-    ) -> Result<Vec<Issue>> {
+    async fn fetch_issues_by_states(&self, states: &[String]) -> Result<Vec<Issue>> {
         let url = format!(
             "{}/api/v1/repos/{}/{}/issues?state=open&limit=1000",
             self.config.base_url, self.config.owner, self.config.repo
@@ -179,7 +180,7 @@ impl IssueTracker for GiteaTracker {
         }
 
         let gitea_issues: Vec<GiteaIssue> = response.json().await?;
-        
+
         let issues: Vec<Issue> = gitea_issues
             .into_iter()
             .filter(|gi| states.iter().any(|s| s.eq_ignore_ascii_case(&gi.state)))
@@ -217,7 +218,7 @@ mod tests {
     fn normalise_issue_converts_fields() {
         let config = test_config();
         let tracker = GiteaTracker::new(config).unwrap();
-        
+
         let gi = GiteaIssue {
             id: 42,
             number: 123,
@@ -229,12 +230,14 @@ mod tests {
             updated_at: Some("2024-01-15T11:00:00Z".into()),
             labels: Some(vec![
                 GiteaLabel { name: "bug".into() },
-                GiteaLabel { name: "Priority:High".into() },
+                GiteaLabel {
+                    name: "Priority:High".into(),
+                },
             ]),
         };
 
         let issue = tracker.normalise_issue(gi);
-        
+
         assert_eq!(issue.id, "42");
         assert_eq!(issue.identifier, "testowner/testrepo/123");
         assert_eq!(issue.title, "Test Issue");
@@ -248,7 +251,7 @@ mod tests {
     fn normalise_issue_lowercases_labels() {
         let config = test_config();
         let tracker = GiteaTracker::new(config).unwrap();
-        
+
         let gi = GiteaIssue {
             id: 1,
             number: 1,
@@ -260,11 +263,18 @@ mod tests {
             updated_at: None,
             labels: Some(vec![
                 GiteaLabel { name: "BUG".into() },
-                GiteaLabel { name: "FEATURE".into() },
+                GiteaLabel {
+                    name: "FEATURE".into(),
+                },
             ]),
         };
 
         let issue = tracker.normalise_issue(gi);
-        assert!(issue.labels.iter().all(|l| l.chars().all(|c| !c.is_uppercase())));
+        assert!(
+            issue
+                .labels
+                .iter()
+                .all(|l| l.chars().all(|c| !c.is_uppercase()))
+        );
     }
 }
