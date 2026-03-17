@@ -117,17 +117,20 @@ impl DualModeOrchestrator {
             ConcurrencyController::new(
                 workflow.concurrency.global_max,
                 ModeQuotas {
-                    time_max: workflow.concurrency.global_max.saturating_sub(workflow.concurrency.issue_max),
+                    time_max: workflow
+                        .concurrency
+                        .global_max
+                        .saturating_sub(workflow.concurrency.issue_max),
                     issue_max: workflow.concurrency.issue_max,
                 },
-                workflow.concurrency.fairness.parse().unwrap_or(FairnessPolicy::RoundRobin),
+                workflow
+                    .concurrency
+                    .fairness
+                    .parse()
+                    .unwrap_or(FairnessPolicy::RoundRobin),
             )
         } else {
-            ConcurrencyController::new(
-                10,
-                ModeQuotas::default(),
-                FairnessPolicy::RoundRobin,
-            )
+            ConcurrencyController::new(10, ModeQuotas::default(), FairnessPolicy::RoundRobin)
         };
 
         // Create shared state
@@ -143,9 +146,13 @@ impl DualModeOrchestrator {
 
         // Setup time mode
         let time_mode = {
-            let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
+            let scheduler =
+                TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
             let shutdown_rx = state.shutdown_tx.subscribe();
-            Some(TimeModeComponents { scheduler, shutdown_rx })
+            Some(TimeModeComponents {
+                scheduler,
+                shutdown_rx,
+            })
         };
 
         // Setup issue mode if configured
@@ -154,7 +161,11 @@ impl DualModeOrchestrator {
                 match create_tracker(workflow) {
                     Ok(tracker) => {
                         let shutdown_rx = state.shutdown_tx.subscribe();
-                        Some(IssueModeComponents { tracker, workflow: workflow.clone(), shutdown_rx })
+                        Some(IssueModeComponents {
+                            tracker,
+                            workflow: workflow.clone(),
+                            shutdown_rx,
+                        })
                     }
                     Err(e) => {
                         warn!("failed to create issue tracker: {}", e);
@@ -245,14 +256,14 @@ impl DualModeOrchestrator {
     /// Shutdown gracefully.
     async fn shutdown(&mut self) {
         info!("initiating graceful shutdown");
-        
+
         // Stop accepting new tasks
         self.request_shutdown();
 
         // Wait for active agents to complete
         let timeout = Duration::from_secs(30);
         let start = std::time::Instant::now();
-        
+
         loop {
             let active_count = {
                 let agents = self.active_agents.lock().await;
@@ -265,7 +276,10 @@ impl DualModeOrchestrator {
             }
 
             if start.elapsed() > timeout {
-                warn!("shutdown timeout reached with {} agents still active", active_count);
+                warn!(
+                    "shutdown timeout reached with {} agents still active",
+                    active_count
+                );
                 break;
             }
 
@@ -274,7 +288,7 @@ impl DualModeOrchestrator {
 
         // Shutdown base orchestrator
         self.base.shutdown();
-        
+
         info!("shutdown complete");
     }
 
@@ -291,12 +305,19 @@ impl DualModeOrchestrator {
     }
 
     /// Trigger compound review.
-    pub async fn trigger_compound_review(&mut self) -> Result<CompoundReviewResult, crate::OrchestratorError> {
+    pub async fn trigger_compound_review(
+        &mut self,
+    ) -> Result<CompoundReviewResult, crate::OrchestratorError> {
         self.base.trigger_compound_review().await
     }
 
     /// Handoff task between agents.
-    pub async fn handoff(&mut self, from_agent: &str, to_agent: &str, ctx: HandoffContext) -> Result<(), crate::OrchestratorError> {
+    pub async fn handoff(
+        &mut self,
+        from_agent: &str,
+        to_agent: &str,
+        ctx: HandoffContext,
+    ) -> Result<(), crate::OrchestratorError> {
         self.base.handoff(from_agent, to_agent, ctx).await
     }
 }
@@ -305,7 +326,10 @@ impl DualModeOrchestrator {
 async fn run_time_mode(components: TimeModeComponents, state: SharedState) {
     info!("starting time mode task");
 
-    let TimeModeComponents { mut scheduler, mut shutdown_rx } = components;
+    let TimeModeComponents {
+        mut scheduler,
+        mut shutdown_rx,
+    } = components;
 
     // Get immediate agents (Safety layer)
     let immediate = scheduler.immediate_agents();
@@ -353,7 +377,11 @@ async fn run_time_mode(components: TimeModeComponents, state: SharedState) {
 async fn run_issue_mode(components: IssueModeComponents, state: SharedState) {
     info!("starting issue mode task");
 
-    let IssueModeComponents { tracker, workflow, mut shutdown_rx } = components;
+    let IssueModeComponents {
+        tracker,
+        workflow,
+        mut shutdown_rx,
+    } = components;
 
     let poll_interval = Duration::from_secs(workflow.poll_interval_secs);
 
@@ -363,7 +391,7 @@ async fn run_issue_mode(components: IssueModeComponents, state: SharedState) {
                 match tracker.fetch_candidate_issues().await {
                     Ok(issues) => {
                         info!(count = issues.len(), "fetched candidate issues");
-                        
+
                         for issue in issues {
                             // Skip blocked issues
                             if !issue.all_blockers_terminal(&workflow.tracker.states.terminal) {
@@ -416,11 +444,15 @@ fn create_tracker(workflow: &WorkflowConfig) -> Result<Box<dyn IssueTracker>, St
                 active_states: workflow.tracker.states.active.clone(),
                 terminal_states: workflow.tracker.states.terminal.clone(),
                 use_robot_api: workflow.tracker.use_robot_api,
-            }).map_err(|e| format!("failed to create Gitea tracker: {}", e))?;
-            
+            })
+            .map_err(|e| format!("failed to create Gitea tracker: {}", e))?;
+
             Ok(Box::new(tracker))
         }
-        _ => Err(format!("unsupported tracker kind: {}", workflow.tracker.kind)),
+        _ => Err(format!(
+            "unsupported tracker kind: {}",
+            workflow.tracker.kind
+        )),
     }
 }
 

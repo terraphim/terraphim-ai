@@ -2,9 +2,7 @@
 //!
 //! Polls Gitea/Linear for issues and dispatches agents to work on them.
 
-use crate::{
-    ConcurrencyController, DispatchTask, Dispatcher, WorkflowConfig,
-};
+use crate::{ConcurrencyController, DispatchTask, Dispatcher, WorkflowConfig};
 use std::collections::HashMap;
 use std::time::Duration;
 use terraphim_tracker::{Issue, IssueTracker, PagerankClient};
@@ -79,18 +77,18 @@ impl IssueMode {
     }
 
     /// Poll for issues and dispatch agents.
-    async fn poll_and_dispatch(&mut self,
-    ) -> Result<(), Box<dyn std::error::Error>> {
+    async fn poll_and_dispatch(&mut self) -> Result<(), Box<dyn std::error::Error>> {
         // Fetch candidate issues
         let mut issues = self.tracker.fetch_candidate_issues().await?;
 
         // Fetch PageRank scores if enabled
         if let Some(ref pagerank) = self.pagerank {
-            match pagerank.fetch_ready(&self.config.tracker.owner,&self.config.tracker.repo,
-            ).await {
+            match pagerank
+                .fetch_ready(&self.config.tracker.owner, &self.config.tracker.repo)
+                .await
+            {
                 Ok(ready) => {
-                    PagerankClient::merge_scores(&mut issues,&ready.ready_issues,
-                    );
+                    PagerankClient::merge_scores(&mut issues, &ready.ready_issues);
                 }
                 Err(e) => {
                     warn!("failed to fetch PageRank scores: {}", e);
@@ -140,7 +138,10 @@ impl IssueMode {
             }
 
             // Check if issue state is active
-            if !active_states.iter().any(|s| s.eq_ignore_ascii_case(&issue.state)) {
+            if !active_states
+                .iter()
+                .any(|s| s.eq_ignore_ascii_case(&issue.state))
+            {
                 continue;
             }
 
@@ -191,7 +192,10 @@ fn compute_sort_score(issue: &Issue) -> i64 {
     let base = issue.priority.map(|p| p as i64 * 100).unwrap_or(500);
 
     // PageRank bonus (higher = more important = lower score)
-    let pagerank_bonus = issue.pagerank_score.map(|pr| -(pr * 100.0) as i64).unwrap_or(0);
+    let pagerank_bonus = issue
+        .pagerank_score
+        .map(|pr| -(pr * 100.0) as i64)
+        .unwrap_or(0);
 
     base + pagerank_bonus
 }
@@ -207,8 +211,7 @@ mod tests {
 
     #[async_trait]
     impl IssueTracker for MockTracker {
-        async fn fetch_candidate_issues(&self,
-        ) -> terraphim_tracker::Result<Vec<Issue>> {
+        async fn fetch_candidate_issues(&self) -> terraphim_tracker::Result<Vec<Issue>> {
             Ok(self.issues.clone())
         }
 

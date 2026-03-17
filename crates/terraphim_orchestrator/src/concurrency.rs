@@ -98,16 +98,12 @@ impl ConcurrencyController {
     }
 
     /// Try to acquire a slot for a time-driven agent.
-    pub async fn acquire_time_driven(
-        &self,
-    ) -> Option<AgentPermit> {
+    pub async fn acquire_time_driven(&self) -> Option<AgentPermit> {
         self.acquire(AgentMode::TimeDriven).await
     }
 
     /// Try to acquire a slot for an issue-driven agent.
-    pub async fn acquire_issue_driven(
-        &self,
-    ) -> Option<AgentPermit> {
+    pub async fn acquire_issue_driven(&self) -> Option<AgentPermit> {
         self.acquire(AgentMode::IssueDriven).await
     }
 
