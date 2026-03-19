@@ -68,15 +68,13 @@ pub mod rlm;
 pub mod logger;
 
 // Knowledge graph validation (Phase 5)
+pub mod validation;
 #[cfg(feature = "kg-validation")]
 pub mod validator;
 
 // MCP tools (Phase 6)
 #[cfg(feature = "mcp")]
 pub mod mcp_tools;
-
-// Validation utilities
-pub mod validation;
 
 // Remaining phases (to be implemented)
 // pub mod preamble;
@@ -89,11 +87,9 @@ pub mod validation;
 pub use budget::BudgetTracker;
 pub use config::{BackendType, KgStrictness, RlmConfig, SessionModel};
 pub use error::RlmError;
-#[cfg(feature = "firecracker")]
-pub use executor::FirecrackerExecutor;
 pub use executor::{
-    Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, MockExecutor, SnapshotId,
-    SshExecutor, ValidationResult,
+    Capability, ExecutionContext, ExecutionEnvironment, ExecutionResult, SnapshotId, SshExecutor,
+    ValidationResult,
 };
 pub use llm_bridge::{LlmBridge, LlmBridgeConfig, QueryRequest, QueryResponse};
 pub use logger::{TrajectoryEvent, TrajectoryLogger, TrajectoryLoggerConfig, read_trajectory_file};
