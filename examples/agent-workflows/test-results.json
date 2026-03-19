@@ -1,0 +1,119 @@
+{
+  "total": 7,
+  "passed": 6,
+  "failed": 0,
+  "skipped": 1,
+  "tests": [
+    {
+      "name": "Backend Health Check",
+      "status": "passed",
+      "timestamp": "2026-03-09T23:16:35.086Z",
+      "details": {
+        "status": 200
+      }
+    },
+    {
+      "name": "Comprehensive Test Suite Page",
+      "status": "skipped",
+      "timestamp": "2026-03-09T23:16:35.089Z",
+      "details": {
+        "reason": "Skipped - individual workflow tests are authoritative"
+      }
+    },
+    {
+      "name": "Workflow: Prompt Chaining",
+      "status": "passed",
+      "timestamp": "2026-03-09T23:16:47.884Z",
+      "details": {
+        "hasProgress": true,
+        "hasErrors": false,
+        "hasApiErrors": false,
+        "apiCalls": 1,
+        "apiStatuses": [
+          200
+        ],
+        "hasApiClient": true,
+        "url": "http://localhost:3000/1-prompt-chaining/index.html"
+      }
+    },
+    {
+      "name": "Workflow: Routing",
+      "status": "passed",
+      "timestamp": "2026-03-09T23:16:53.501Z",
+      "details": {
+        "hasProgress": true,
+        "hasErrors": false,
+        "hasApiErrors": false,
+        "apiCalls": 1,
+        "apiStatuses": [
+          200
+        ],
+        "hasApiClient": true,
+        "url": "http://localhost:3000/2-routing/index.html"
+      }
+    },
+    {
+      "name": "Workflow: Parallelization",
+      "status": "passed",
+      "timestamp": "2026-03-09T23:17:02.792Z",
+      "details": {
+        "hasProgress": true,
+        "hasErrors": false,
+        "hasApiErrors": false,
+        "apiCalls": 4,
+        "apiStatuses": [
+          200,
+          200,
+          200,
+          200
+        ],
+        "hasApiClient": true,
+        "url": "http://localhost:3000/3-parallelization/index.html"
+      }
+    },
+    {
+      "name": "Workflow: Orchestrator-Workers",
+      "status": "passed",
+      "timestamp": "2026-03-09T23:17:16.072Z",
+      "details": {
+        "hasProgress": true,
+        "hasErrors": false,
+        "hasApiErrors": false,
+        "apiCalls": 2,
+        "apiStatuses": [
+          200,
+          200
+        ],
+        "hasApiClient": true,
+        "url": "http://localhost:3000/4-orchestrator-workers/index.html"
+      }
+    },
+    {
+      "name": "Workflow: Evaluator-Optimizer",
+      "status": "passed",
+      "timestamp": "2026-03-09T23:17:31.600Z",
+      "details": {
+        "hasProgress": true,
+        "hasErrors": false,
+        "hasApiErrors": false,
+        "apiCalls": 1,
+        "apiStatuses": [
+          200
+        ],
+        "hasApiClient": true,
+        "url": "http://localhost:3000/5-evaluator-optimizer/index.html"
+      }
+    }
+  ],
+  "duration": 56942,
+  "timestamp": "2026-03-09T23:17:31.603Z",
+  "options": {
+    "backendUrl": "http://localhost:8000",
+    "frontendUrl": "http://localhost:3000",
+    "headless": true,
+    "timeout": 300000,
+    "screenshotOnFailure": true,
+    "slowMo": 0,
+    "devtools": false
+  }
+}

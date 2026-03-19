@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Terraphim AI - Browser Automation Test Report</title>
+    <style>
+        body { font-family: -apple-system, system-ui, sans-serif; margin: 2rem; }
+        .header { text-align: center; margin-bottom: 2rem; }
+        .summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .summary-card { background: #f5f5f5; padding: 1rem; border-radius: 8px; text-align: center; }
+        .summary-card h3 { margin: 0; color: #666; font-size: 0.9rem; }
+        .summary-card .number { font-size: 2rem; font-weight: bold; margin: 0.5rem 0; }
+        .passed .number { color: #22c55e; }
+        .failed .number { color: #ef4444; }
+        .total .number { color: #3b82f6; }
+        .test-results { margin-top: 2rem; }
+        .test-item { border: 1px solid #e5e5e5; margin-bottom: 1rem; border-radius: 8px; overflow: hidden; }
+        .test-header { padding: 1rem; background: #f9f9f9; display: flex; align-items: center; gap: 0.5rem; }
+        .test-status { width: 20px; height: 20px; border-radius: 50%; }
+        .status-passed { background: #22c55e; }
+        .status-failed { background: #ef4444; }
+        .status-skipped { background: #6b7280; }
+        .test-details { padding: 1rem; font-size: 0.9rem; color: #666; }
+        .test-details pre { background: #f5f5f5; padding: 0.5rem; border-radius: 4px; overflow-x: auto; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>🧪 Terraphim AI Browser Automation Test Report</h1>
+        <p>Generated on 09/03/2026, 23:17:31</p>
+        <p>Duration: 57s</p>
+    </div>
+
+    <div class="summary">
+        <div class="summary-card total">
+            <h3>Total Tests</h3>
+            <div class="number">7</div>
+        </div>
+        <div class="summary-card passed">
+            <h3>Passed</h3>
+            <div class="number">6</div>
+        </div>
+        <div class="summary-card failed">
+            <h3>Failed</h3>
+            <div class="number">0</div>
+        </div>
+        <div class="summary-card">
+            <h3>Success Rate</h3>
+            <div class="number">86%</div>
+        </div>
+    </div>
+
+    <div class="test-results">
+        <h2>Test Results</h2>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-passed"></div>
+                    <strong>Backend Health Check</strong>
+                    <span style="margin-left: auto; color: #666;">23:16:35</span>
+                </div>
+                
+            </div>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-skipped"></div>
+                    <strong>Comprehensive Test Suite Page</strong>
+                    <span style="margin-left: auto; color: #666;">23:16:35</span>
+                </div>
+                
+            </div>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-passed"></div>
+                    <strong>Workflow: Prompt Chaining</strong>
+                    <span style="margin-left: auto; color: #666;">23:16:47</span>
+                </div>
+                
+                    <div class="test-details">
+                        
+                        <div><strong>API Calls:</strong> 1</div>
+                        
+                        
+                    </div>
+                
+            </div>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-passed"></div>
+                    <strong>Workflow: Routing</strong>
+                    <span style="margin-left: auto; color: #666;">23:16:53</span>
+                </div>
+                
+                    <div class="test-details">
+                        
+                        <div><strong>API Calls:</strong> 1</div>
+                        
+                        
+                    </div>
+                
+            </div>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-passed"></div>
+                    <strong>Workflow: Parallelization</strong>
+                    <span style="margin-left: auto; color: #666;">23:17:02</span>
+                </div>
+                
+                    <div class="test-details">
+                        
+                        <div><strong>API Calls:</strong> 4</div>
+                        
+                        
+                    </div>
+                
+            </div>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-passed"></div>
+                    <strong>Workflow: Orchestrator-Workers</strong>
+                    <span style="margin-left: auto; color: #666;">23:17:16</span>
+                </div>
+                
+                    <div class="test-details">
+                        
+                        <div><strong>API Calls:</strong> 2</div>
+                        
+                        
+                    </div>
+                
+            </div>
+        
+            <div class="test-item">
+                <div class="test-header">
+                    <div class="test-status status-passed"></div>
+                    <strong>Workflow: Evaluator-Optimizer</strong>
+                    <span style="margin-left: auto; color: #666;">23:17:31</span>
+                </div>
+                
+                    <div class="test-details">
+                        
+                        <div><strong>API Calls:</strong> 1</div>
+                        
+                        
+                    </div>
+                
+            </div>
+        
+    </div>
+
+    <div style="margin-top: 2rem; padding: 1rem; background: #f5f5f5; border-radius: 8px;">
+        <h3>Test Configuration</h3>
+        <pre>{
+  "backendUrl": "http://localhost:8000",
+  "frontendUrl": "http://localhost:3000",
+  "headless": true,
+  "timeout": 300000,
+  "screenshotOnFailure": true,
+  "slowMo": 0,
+  "devtools": false
+}</pre>
+    </div>
+</body>
+</html>
