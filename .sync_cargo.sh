@@ -1,0 +1,1 @@
+CARGO_CONTENT=$(cat /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rlm/Cargo.toml | base64) && ssh bigbox "echo '$CARGO_CONTENT' | base64 -d > /home/alex/terraphim-ai/crates/terraphim_rlm/Cargo.toml"

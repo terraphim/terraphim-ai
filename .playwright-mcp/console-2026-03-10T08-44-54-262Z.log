@@ -1,0 +1,3 @@
+[      37ms] [WARNING] Connection status container connection-status-container not found @ http://localhost:3000/shared/connection-status.js:25
+[      37ms] [WARNING] Settings integration failed, using default configuration @ http://localhost:3000/3-parallelization/app.js:115
+[      37ms] [WARNING] Connection status container connection-status-container not found @ http://localhost:3000/shared/connection-status.js:25

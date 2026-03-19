@@ -1,0 +1,6 @@
+[   34645ms] [ERROR] API Error [/workflows/prompt-chain] after 1 attempts: TimeoutError: signal timed out @ http://localhost:3000/shared/api-client.js?v=2025092102:262
+[   34645ms] [ERROR] Prompt chain execution failed: TimeoutError: signal timed out @ http://localhost:3000/1-prompt-chaining/app.js?v=2025092102:578
+[   34645ms] [ERROR] Chain execution failed: TimeoutError: signal timed out @ http://localhost:3000/1-prompt-chaining/app.js?v=2025092102:491
+[  400767ms] [ERROR] API Error [/workflows/prompt-chain] after 1 attempts: TimeoutError: signal timed out @ http://localhost:3000/shared/api-client.js?v=2025092102:262
+[  400767ms] [ERROR] Prompt chain execution failed: TimeoutError: signal timed out @ http://localhost:3000/1-prompt-chaining/app.js?v=2025092102:578
+[  400768ms] [ERROR] Chain execution failed: TimeoutError: signal timed out @ http://localhost:3000/1-prompt-chaining/app.js?v=2025092102:491

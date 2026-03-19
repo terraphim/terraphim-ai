@@ -1,0 +1,2 @@
+FCCTL_CONTENT=$(cat /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rlm/src/executor/fcctl_adapter.rs | base64) && ssh bigbox "echo '$FCCTL_CONTENT' | base64 -d > /home/alex/terraphim-ai/crates/terraphim_rlm/src/executor/fcctl_adapter.rs"
+FIRE_CONTENT=$(cat /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rlm/src/executor/firecracker.rs | base64) && ssh bigbox "echo '$FIRE_CONTENT' | base64 -d > /home/alex/terraphim-ai/crates/terraphim_rlm/src/executor/firecracker.rs"

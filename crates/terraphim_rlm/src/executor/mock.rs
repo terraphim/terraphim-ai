@@ -487,13 +487,24 @@ impl super::ExecutionEnvironment for MockExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::super::ExecutionEnvironment;
 
     #[tokio::test]
-    async fn test_mock_executor_creation() {
+    async fn test_mock_executor_health_check() {
         let executor = MockExecutor::new();
-        assert_eq!(executor.capabilities().len(), 4);
-        assert!(executor.has_capability(Capability::PythonExecution));
-        assert!(!executor.has_capability(Capability::VmIsolation));
+        executor.initialize().await.unwrap();
+
+        let health: Result<bool, RlmError> = ExecutionEnvironment::health_check(&executor).await;
+        assert!(health.unwrap());
+    }
+
+    #[tokio::test]
+    async fn test_mock_executor_cleanup() {
+        let executor = MockExecutor::new();
+        executor.initialize().await.unwrap();
+
+        let result: Result<(), RlmError> = ExecutionEnvironment::cleanup(&executor).await;
+        assert!(result.is_ok());
     }
 
     #[tokio::test]
@@ -535,11 +546,11 @@ mod tests {
         let session_id = SessionId::new();
 
         // Initially no snapshots
-        let snapshots = executor.list_snapshots(&session_id).await.unwrap();
+        let snapshots: Vec<SnapshotId> = executor.list_snapshots(&session_id).await.unwrap();
         assert!(snapshots.is_empty());
 
         // Create a snapshot
-        let snapshot = executor
+        let snapshot: SnapshotId = executor
             .create_snapshot(&session_id, "test-snapshot")
             .await
             .unwrap();
@@ -567,7 +578,7 @@ mod tests {
         // Don't initialize
 
         let ctx = ExecutionContext::default();
-        let result = executor.execute_code("print('test')", &ctx).await;
+        let result: Result<ExecutionResult, RlmError> = executor.execute_code("print('test')", &ctx).await;
 
         assert!(result.is_err());
         assert!(matches!(

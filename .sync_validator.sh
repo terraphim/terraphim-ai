@@ -1,0 +1,2 @@
+VAlIDATOR_CONTENT=$(cat /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rlm/src/validator.rs | base64)
+ssh bigbox "echo '$VALIDATOR_CONTENT' | base64 -d > /home/alex/terraphim-ai/crates/terraphim_rlm/src/validator.rs"

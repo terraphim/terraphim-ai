@@ -1,0 +1,2 @@
+MOD_CONTENT=$(cat /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rlm/src/executor/mod.rs | base64) && ssh bigbox "echo '$MOD_CONTENT' | base64 -d > /home/alex/terraphim-ai/crates/terraphim_rlm/src/executor/mod.rs"
+CARGO_CONTENT=$(cat /Users/alex/projects/terraphim/terraphim-ai/crates/terraphim_rlm/Cargo.toml | base64) && ssh bigbox "echo '$CARGO_CONTENT' | base64 -d > /home/alex/terraphim-ai/crates/terraphim_rlm/Cargo.toml"
