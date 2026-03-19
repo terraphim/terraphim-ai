@@ -323,19 +323,20 @@ mod tests {
 
     #[test]
     fn test_validate_session_id_valid() {
-        let valid_uuid = "550e8400-e29b-41d4-a716-446655440000";
-        assert!(validate_session_id(valid_uuid).is_ok());
+        // Valid ULID format (26 characters, Crockford base32)
+        let valid_ulid = "01ARZ3NDEKTSV4RRFFQ69G5FAV";
+        assert!(validate_session_id(valid_ulid).is_ok());
     }
 
     #[test]
     fn test_validate_session_id_invalid() {
-        assert!(validate_session_id("not-a-uuid").is_err());
+        assert!(validate_session_id("not-a-ulid").is_err());
         assert!(validate_session_id("").is_err());
         assert!(validate_session_id("../etc/passwd").is_err());
         assert!(validate_session_id("short").is_err());
-        assert!(validate_session_id("550e8400-e29b-41d4-a716-44665544000").is_err()); // Too short
-        assert!(validate_session_id("550e8400-e29b-41d4-a716-4466554400000").is_err());
-        // Too long
+        assert!(validate_session_id("550e8400-e29b-41d4-a716-446655440000").is_err()); // UUID format
+        assert!(validate_session_id("01ARZ3NDEKTSV4RRFFQ69G5FA").is_err()); // Too short (25)
+        assert!(validate_session_id("01ARZ3NDEKTSV4RRFFQ69G5FAVV").is_err()); // Too long (27)
     }
 
     #[test]
@@ -353,7 +354,7 @@ mod tests {
 
     #[test]
     fn test_validate_execution_request_valid() {
-        let session_id = "550e8400-e29b-41d4-a716-446655440000";
+        let session_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"; // Valid ULID
         let code = "print('hello')";
         let result = validate_execution_request(session_id, code);
         assert!(result.is_ok());
@@ -369,7 +370,7 @@ mod tests {
 
     #[test]
     fn test_validate_execution_request_invalid_code() {
-        let session_id = "550e8400-e29b-41d4-a716-446655440000";
+        let session_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"; // Valid ULID
         let code = "x".repeat(MAX_CODE_SIZE + 1);
         let result = validate_execution_request(session_id, &code);
         assert!(result.is_err());
