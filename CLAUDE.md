@@ -981,6 +981,105 @@ These constraints are enforced in `.github/dependabot.yml` to prevent automatic 
 - `GET /config` - Get current configuration
 - `GET /roles` - List available roles
 
+## Dual Mode Orchestrator Architecture
+
+The terraphim orchestrator supports three execution modes for maximum flexibility:
+
+### Execution Modes
+
+1. **Time-Only Mode** (Legacy): Cron-based scheduling with immediate agent spawning
+2. **Issue-Only Mode**: Event-driven execution from issue tracker (Gitea/Linear)
+3. **Dual Mode**: Combines both time and issue task sources with unified dispatch
+
+### Architecture Components
+
+#### ModeCoordinator
+The `ModeCoordinator` manages both `TimeMode` and `IssueMode` simultaneously in dual mode:
+
+```rust
+pub struct ModeCoordinator {
+    pub time_mode: Option<TimeMode>,      // Cron-based scheduler
+    pub issue_mode: Option<IssueMode>,    // Issue tracker integration
+    pub dispatch_queue: DispatchQueue,    // Shared priority queue
+    pub workflow_mode: WorkflowMode,      // Current mode: TimeOnly/IssueOnly/Dual
+    pub concurrency_controller: ConcurrencyController, // Semaphore-based limits
+}
+```
+
+#### Unified Dispatch Queue
+A priority queue with fairness between task types:
+- **Time Tasks**: Medium priority (50), scheduled via cron
+- **Issue Tasks**: Variable priority (0-255), based on labels/PageRank
+- **Fairness**: Round-robin alternation between task types at equal priority
+- **Backpressure**: Bounded queue with configurable depth
+
+#### Key Features
+
+**Stall Detection**: Automatically detects when queue depth exceeds threshold:
+```rust
+pub fn check_stall(&self) -> bool {
+    self.dispatch_queue.len() > self.stall_threshold
+}
+```
+
+**Graceful Shutdown**: Coordinated shutdown with queue draining:
+```rust
+pub async fn unified_shutdown(&mut self) {
+    // 1. Signal mode shutdown
+    // 2. Drain dispatch queue
+    // 3. Wait for active tasks (with timeout)
+    // 4. Force stop remaining agents
+}
+```
+
+**Concurrency Control**: Semaphore-based parallel execution limiting
+
+### Configuration
+
+Enable dual mode by adding to `orchestrator.toml`:
+
+```toml
+[workflow]
+mode = "dual"  # Options: "time_only", "issue_only", "dual"
+poll_interval_secs = 60
+max_concurrent_tasks = 5
+
+[tracker]
+tracker_type = "gitea"
+url = "https://git.terraphim.cloud"
+token_env_var = "GITEA_TOKEN"
+owner = "terraphim"
+repo = "terraphim-ai"
+
+[concurrency]
+max_parallel_agents = 3
+queue_depth = 100
+starvation_timeout_secs = 300
+```
+
+### Backward Compatibility
+
+- **No breaking changes**: Old configs without `[workflow]` continue to work
+- **Default mode**: Time-only when no workflow section present
+- **Migration helpers**: `SymphonyAdapter` in `src/compat.rs` for smooth transitions
+
+### Testing
+
+See `tests/e2e_tests.rs` for comprehensive integration tests:
+- `test_dual_mode_operation`: Both task types processed
+- `test_fairness_under_load`: No starvation between modes
+- `test_graceful_shutdown`: Clean termination
+- `test_stall_detection`: Warning on queue buildup
+
+### Key Files
+
+- `src/lib.rs`: Main orchestrator with ModeCoordinator integration
+- `src/scheduler.rs`: TimeMode implementation
+- `src/issue_mode.rs`: IssueMode implementation  
+- `src/dispatcher.rs`: DispatchQueue with priority and fairness
+- `src/compat.rs`: Migration helpers and compatibility layer
+- `MIGRATION.md`: Detailed migration guide
+
 ## Quick Start Guide
 
 1. **Clone and Build**

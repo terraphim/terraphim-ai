@@ -1,3 +1,4 @@
+pub mod compat;
 pub mod compound;
 pub mod config;
 pub mod convergence_detector;
@@ -10,6 +11,7 @@ pub mod nightwatch;
 pub mod scheduler;
 pub mod session_rotation;
 
+pub use compat::{migration, SymphonyAdapter, SymphonyOrchestrator, SymphonyOrchestratorExt};
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, ConvergenceConfig,
