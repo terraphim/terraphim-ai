@@ -1,0 +1,24 @@
+{
+  "quick": {
+    "provider": "opencode-go",
+    "model": "minimax-m2.5"
+  },
+  "deep": {
+    "provider": "opencode-go",
+    "model": "glm-5"
+  },
+  "tiebreaker": {
+    "provider": "kimi-for-coding",
+    "model": "k2p5"
+  },
+  "oracle": {
+    "provider": "claude-code",
+    "model": "opus-4-6"
+  },
+  "profiles": {
+    "default": ["quick"],
+    "thorough": ["quick", "deep"],
+    "critical": ["deep", "tiebreaker"],
+    "exhaustive": ["quick", "deep", "tiebreaker", "oracle"]
+  }
+}

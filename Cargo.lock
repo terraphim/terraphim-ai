@@ -9521,6 +9521,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_judge_evaluator"
+version = "0.1.0"
+dependencies = [
+ "aho-corasick",
+ "anyhow",
+ "async-trait",
+ "chrono",
+ "log",
+ "regex",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "terraphim_agent_supervisor",
+ "terraphim_rolegraph",
+ "terraphim_types",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "uuid",
+]
+
+[[package]]
 name = "terraphim_kg_agents"
 version = "1.0.0"
 dependencies = [

@@ -1,0 +1,32 @@
+[package]
+name = "terraphim_judge_evaluator"
+version = "0.1.0"
+edition.workspace = true
+authors = ["Terraphim Contributors"]
+description = "Judge evaluator for multi-agent code quality assessment using Knowledge Graph and tiered LLM routing."
+documentation = "https://terraphim.ai"
+homepage = "https://terraphim.ai"
+repository = "https://github.com/terraphim/terraphim-ai"
+keywords = ["judge", "evaluator", "llm", "quality", "multi-agent"]
+license = "Apache-2.0"
+
+[dependencies]
+terraphim_rolegraph = { path = "../terraphim_rolegraph", version = "1.4.10" }
+terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", version = "1.0.0" }
+terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
+
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.0", features = ["full"] }
+async-trait = "0.1"
+thiserror = "1.0"
+anyhow = "1.0"
+uuid = { version = "1.21", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+log = "0.4"
+regex = "1.10"
+aho-corasick = "1.0"
+
+[dev-dependencies]
+tokio-test = "0.4"
+tempfile = "3.0"
