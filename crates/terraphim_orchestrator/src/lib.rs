@@ -1,5 +1,6 @@
 pub mod compound;
 pub mod config;
+pub mod convergence_detector;
 pub mod drift_detection;
 pub mod error;
 pub mod handoff;
@@ -9,9 +10,10 @@ pub mod session_rotation;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
-    AgentDefinition, AgentLayer, CompoundReviewConfig, DriftDetectionConfig, NightwatchConfig,
-    OrchestratorConfig, ReviewPair, SessionRotationConfig,
+    AgentDefinition, AgentLayer, CompoundReviewConfig, ConvergenceConfig, DriftDetectionConfig,
+    NightwatchConfig, OrchestratorConfig, ReviewPair, SessionRotationConfig,
 };
+pub use convergence_detector::{ConvergenceDetector, ConvergenceSignal};
 pub use drift_detection::{DriftDetector, DriftReport};
 pub use error::OrchestratorError;
 pub use session_rotation::{AgentSession, SessionRotationManager};
@@ -831,6 +833,7 @@ mod tests {
             review_pairs: vec![],
             drift_detection: DriftDetectionConfig::default(),
             session_rotation: SessionRotationConfig::default(),
+            convergence: ConvergenceConfig::default(),
         }
     }
 
@@ -947,6 +950,7 @@ task = "test"
             review_pairs: vec![],
             drift_detection: DriftDetectionConfig::default(),
             session_rotation: SessionRotationConfig::default(),
+            convergence: ConvergenceConfig::default(),
         }
     }
 
@@ -1158,6 +1162,7 @@ task = "test"
             review_pairs: vec![],
             drift_detection: DriftDetectionConfig::default(),
             session_rotation: SessionRotationConfig::default(),
+            convergence: ConvergenceConfig::default(),
         };
         assert_eq!(config.stagger_delay_ms, 5000);
     }

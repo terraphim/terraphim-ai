@@ -52,6 +52,41 @@ pub struct OrchestratorConfig {
     /// Session rotation configuration.
     #[serde(default)]
     pub session_rotation: SessionRotationConfig,
+    /// Convergence detection configuration.
+    #[serde(default)]
+    pub convergence: ConvergenceConfig,
+}
+
+/// Configuration for convergence detection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConvergenceConfig {
+    /// Similarity threshold (0.0 - 1.0) for convergence detection.
+    #[serde(default = "default_convergence_threshold")]
+    pub threshold: f64,
+    /// Number of consecutive similar outputs required.
+    #[serde(default = "default_consecutive_threshold")]
+    pub consecutive_threshold: u32,
+    /// Whether to skip next run on convergence.
+    #[serde(default)]
+    pub skip_on_convergence: bool,
+}
+
+impl Default for ConvergenceConfig {
+    fn default() -> Self {
+        Self {
+            threshold: default_convergence_threshold(),
+            consecutive_threshold: default_consecutive_threshold(),
+            skip_on_convergence: false,
+        }
+    }
+}
+
+fn default_convergence_threshold() -> f64 {
+    0.95
+}
+
+fn default_consecutive_threshold() -> u32 {
+    3
 }
 
 /// Configuration for session rotation (fresh eyes mechanism).
