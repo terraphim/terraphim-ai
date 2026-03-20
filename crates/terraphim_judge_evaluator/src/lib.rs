@@ -7,10 +7,12 @@
 //! - **JudgeModelRouter**: Tier-based LLM model selection (quick/deep/tiebreaker/oracle)
 //! - **JudgeAgent**: Supervised agent implementing the full evaluation pipeline
 
+pub mod batch_evaluator;
 pub mod judge_agent;
 pub mod model_router;
 pub mod simple_agent;
 
+pub use batch_evaluator::{BatchEvaluator, BatchResult, BatchSummary};
 pub use judge_agent::{JudgeAgent, JudgeVerdict};
 pub use model_router::{JudgeModelRouter, ModelMappingConfig, TierConfig};
 pub use simple_agent::{KgMatch, SimpleAgent};
