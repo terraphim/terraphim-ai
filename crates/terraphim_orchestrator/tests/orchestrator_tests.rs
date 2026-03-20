@@ -82,6 +82,7 @@ fn test_config() -> OrchestratorConfig {
         banned_providers: vec!["opencode".to_string()],
         skill_registry: Default::default(),
         stagger_delay_ms: 5000,
+        review_pairs: vec![],
     }
 }
 

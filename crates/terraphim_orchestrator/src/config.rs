@@ -2,6 +2,13 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// A review pair definition: when a producer agent completes, request review from another agent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewPair {
+    pub producer: String,
+    pub reviewer: String,
+}
+
 /// Top-level orchestrator configuration (parsed from TOML).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -36,6 +43,9 @@ pub struct OrchestratorConfig {
     /// Milliseconds to wait between spawning Safety agents (thundering herd prevention).
     #[serde(default = "default_stagger_delay_ms")]
     pub stagger_delay_ms: u64,
+    /// Cross-agent review pairs: when producer completes, request review from reviewer.
+    #[serde(default)]
+    pub review_pairs: Vec<ReviewPair>,
 }
 
 /// Registry of available skill chains from terraphim-skills and zestic-engineering-skills.

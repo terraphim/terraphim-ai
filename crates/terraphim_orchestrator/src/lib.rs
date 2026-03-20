@@ -8,6 +8,7 @@ pub mod scheduler;
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, NightwatchConfig, OrchestratorConfig,
+    ReviewPair,
 };
 pub use error::OrchestratorError;
 pub use handoff::HandoffContext;
@@ -27,6 +28,15 @@ use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
+
+/// A request for cross-agent review.
+#[derive(Debug, Clone)]
+pub struct ReviewRequest {
+    pub from_agent: String,
+    pub to_agent: String,
+    pub artifact_path: String,
+    pub review_type: String,
+}
 
 
 
@@ -71,6 +81,8 @@ pub struct AgentOrchestrator {
     restart_cooldowns: HashMap<String, Instant>,
     /// Timestamp of the last reconciliation tick (for cron comparison).
     last_tick_time: chrono::DateTime<chrono::Utc>,
+    /// Queue of pending cross-agent review requests.
+    review_queue: Vec<ReviewRequest>,
 }
 
 impl AgentOrchestrator {
@@ -95,6 +107,7 @@ impl AgentOrchestrator {
             restart_counts: HashMap::new(),
             restart_cooldowns: HashMap::new(),
             last_tick_time: chrono::Utc::now(),
+            review_queue: Vec::new(),
         })
     }
 
@@ -261,6 +274,79 @@ impl AgentOrchestrator {
     /// Get a mutable reference to the rate limiter.
     pub fn rate_limiter_mut(&mut self) -> &mut RateLimitTracker {
         &mut self.rate_limiter
+    }
+
+    /// Submit a cross-agent review request.
+    pub fn submit_review_request(&mut self, request: ReviewRequest) {
+        info!(
+            from = %request.from_agent,
+            to = %request.to_agent,
+            artifact = %request.artifact_path,
+            review_type = %request.review_type,
+            "review request submitted"
+        );
+        self.review_queue.push(request);
+    }
+
+    /// Get a reference to the review queue.
+    pub fn review_queue(&self) -> &[ReviewRequest] {
+        &self.review_queue
+    }
+
+    /// Process pending review requests.
+    /// Returns the number of requests processed.
+    pub async fn process_review_queue(&mut self) -> usize {
+        let mut processed = 0;
+        let to_process: Vec<ReviewRequest> = self.review_queue.drain(..).collect();
+
+        for request in to_process {
+            info!(
+                from = %request.from_agent,
+                to = %request.to_agent,
+                "processing review request"
+            );
+
+            // Find the reviewer agent definition
+            if let Some(reviewer_def) = self
+                .config
+                .agents
+                .iter()
+                .find(|a| a.name == request.to_agent)
+                .cloned()
+            {
+                // Spawn the reviewer agent (in a real implementation, we'd pass the artifact info)
+                if let Err(e) = self.spawn_agent(&reviewer_def).await {
+                    error!(reviewer = %request.to_agent, error = %e, "failed to spawn reviewer agent");
+                } else {
+                    processed += 1;
+                }
+            } else {
+                warn!(reviewer = %request.to_agent, "reviewer agent not found in config");
+            }
+        }
+
+        processed
+    }
+
+    /// Check if a review should be triggered when an agent completes.
+    fn check_review_trigger(&mut self, agent_name: &str, artifact_path: &str) {
+        let matching_pairs: Vec<(String, String)> = self
+            .config
+            .review_pairs
+            .iter()
+            .filter(|pair| pair.producer == agent_name)
+            .map(|pair| (pair.reviewer.clone(), pair.producer.clone()))
+            .collect();
+
+        for (reviewer, producer) in matching_pairs {
+            let request = ReviewRequest {
+                from_agent: producer,
+                to_agent: reviewer,
+                artifact_path: artifact_path.to_string(),
+                review_type: "post_completion".to_string(),
+            };
+            self.submit_review_request(request);
+        }
     }
 
     /// Spawn an agent from its definition.
@@ -721,6 +807,7 @@ mod tests {
             banned_providers: vec!["opencode".to_string()],
             skill_registry: Default::default(),
             stagger_delay_ms: 5000,
+            review_pairs: vec![],
         }
     }
 
@@ -834,6 +921,7 @@ task = "test"
             banned_providers: vec!["opencode".to_string()],
             skill_registry: Default::default(),
             stagger_delay_ms: 5000,
+            review_pairs: vec![],
         }
     }
 
@@ -1042,7 +1130,58 @@ task = "test"
             banned_providers: vec!["opencode".to_string()],
             skill_registry: Default::default(),
             stagger_delay_ms: crate::config::default_stagger_delay_ms(),
+            review_pairs: vec![],
         };
         assert_eq!(config.stagger_delay_ms, 5000);
+    }
+
+    /// Test: verify review queue functionality
+    #[test]
+    fn test_review_queue_operations() {
+        let config = test_config();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Queue should start empty
+        assert!(orch.review_queue.is_empty());
+
+        // Submit a review request
+        let request = ReviewRequest {
+            from_agent: "implementation-swarm".to_string(),
+            to_agent: "security-sentinel".to_string(),
+            artifact_path: "/tmp/report.md".to_string(),
+            review_type: "security".to_string(),
+        };
+        orch.review_queue.push(request.clone());
+
+        // Queue should now have one item
+        assert_eq!(orch.review_queue.len(), 1);
+        assert_eq!(orch.review_queue[0].from_agent, "implementation-swarm");
+        assert_eq!(orch.review_queue[0].to_agent, "security-sentinel");
+
+        // Process the queue (pop the request)
+        let processed = orch.review_queue.remove(0);
+        assert_eq!(processed.from_agent, request.from_agent);
+        assert!(orch.review_queue.is_empty());
+    }
+
+    /// Test: verify review pairs are loaded from config
+    #[test]
+    fn test_review_pairs_config() {
+        let mut config = test_config();
+        config.review_pairs = vec![
+            crate::config::ReviewPair {
+                producer: "implementation-swarm".to_string(),
+                reviewer: "security-sentinel".to_string(),
+            },
+            crate::config::ReviewPair {
+                producer: "code-writer".to_string(),
+                reviewer: "quality-gate".to_string(),
+            },
+        ];
+
+        let orch = AgentOrchestrator::new(config).unwrap();
+        assert_eq!(orch.config.review_pairs.len(), 2);
+        assert_eq!(orch.config.review_pairs[0].producer, "implementation-swarm");
+        assert_eq!(orch.config.review_pairs[0].reviewer, "security-sentinel");
     }
 }
