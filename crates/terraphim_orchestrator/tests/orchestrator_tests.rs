@@ -2,8 +2,8 @@ use std::path::PathBuf;
 use std::time::Duration;
 
 use terraphim_orchestrator::{
-    AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, HandoffContext,
-    NightwatchConfig, OrchestratorConfig, OrchestratorError,
+    AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, DriftDetectionConfig,
+    HandoffContext, NightwatchConfig, OrchestratorConfig, OrchestratorError,
 };
 
 fn test_config() -> OrchestratorConfig {
@@ -83,6 +83,7 @@ fn test_config() -> OrchestratorConfig {
         skill_registry: Default::default(),
         stagger_delay_ms: 5000,
         review_pairs: vec![],
+        drift_detection: DriftDetectionConfig::default(),
     }
 }
 

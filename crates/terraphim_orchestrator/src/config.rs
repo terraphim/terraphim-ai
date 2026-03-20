@@ -46,6 +46,49 @@ pub struct OrchestratorConfig {
     /// Cross-agent review pairs: when producer completes, request review from reviewer.
     #[serde(default)]
     pub review_pairs: Vec<ReviewPair>,
+    /// Strategic drift detection configuration.
+    #[serde(default)]
+    pub drift_detection: DriftDetectionConfig,
+}
+
+/// Configuration for strategic drift detection.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DriftDetectionConfig {
+    /// How many ticks between drift checks.
+    #[serde(default = "default_drift_check_interval")]
+    pub check_interval_ticks: u32,
+    /// Drift score threshold (0.0 - 1.0) above which to log warnings.
+    #[serde(default = "default_drift_threshold")]
+    pub drift_threshold: f64,
+    /// Path to the plans directory containing strategic goals.
+    #[serde(default = "default_plans_dir")]
+    pub plans_dir: PathBuf,
+    /// Whether to pause agents when drift is detected.
+    #[serde(default)]
+    pub pause_on_drift: bool,
+}
+
+impl Default for DriftDetectionConfig {
+    fn default() -> Self {
+        Self {
+            check_interval_ticks: default_drift_check_interval(),
+            drift_threshold: default_drift_threshold(),
+            plans_dir: default_plans_dir(),
+            pause_on_drift: false,
+        }
+    }
+}
+
+fn default_drift_check_interval() -> u32 {
+    10
+}
+
+fn default_drift_threshold() -> f64 {
+    0.6
+}
+
+fn default_plans_dir() -> PathBuf {
+    PathBuf::from("plans")
 }
 
 /// Registry of available skill chains from terraphim-skills and zestic-engineering-skills.

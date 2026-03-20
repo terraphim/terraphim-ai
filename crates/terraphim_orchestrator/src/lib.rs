@@ -1,5 +1,6 @@
 pub mod compound;
 pub mod config;
+pub mod drift_detection;
 pub mod error;
 pub mod handoff;
 pub mod nightwatch;
@@ -7,9 +8,10 @@ pub mod scheduler;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
-    AgentDefinition, AgentLayer, CompoundReviewConfig, NightwatchConfig, OrchestratorConfig,
-    ReviewPair,
+    AgentDefinition, AgentLayer, CompoundReviewConfig, DriftDetectionConfig, NightwatchConfig,
+    OrchestratorConfig, ReviewPair,
 };
+pub use drift_detection::{DriftDetector, DriftReport};
 pub use error::OrchestratorError;
 pub use handoff::HandoffContext;
 pub use nightwatch::{
@@ -83,6 +85,8 @@ pub struct AgentOrchestrator {
     last_tick_time: chrono::DateTime<chrono::Utc>,
     /// Queue of pending cross-agent review requests.
     review_queue: Vec<ReviewRequest>,
+    /// Strategic drift detector.
+    drift_detector: DriftDetector,
 }
 
 impl AgentOrchestrator {
@@ -93,6 +97,11 @@ impl AgentOrchestrator {
         let nightwatch = NightwatchMonitor::new(config.nightwatch.clone());
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow = CompoundReviewWorkflow::new(config.compound_review.clone());
+        let drift_detector = DriftDetector::new(
+            config.drift_detection.check_interval_ticks,
+            config.drift_detection.drift_threshold,
+            &config.drift_detection.plans_dir,
+        );
 
         Ok(Self {
             config,
@@ -108,6 +117,7 @@ impl AgentOrchestrator {
             restart_cooldowns: HashMap::new(),
             last_tick_time: chrono::Utc::now(),
             review_queue: Vec::new(),
+            drift_detector,
         })
     }
 
@@ -808,6 +818,7 @@ mod tests {
             skill_registry: Default::default(),
             stagger_delay_ms: 5000,
             review_pairs: vec![],
+            drift_detection: DriftDetectionConfig::default(),
         }
     }
 
@@ -922,6 +933,7 @@ task = "test"
             skill_registry: Default::default(),
             stagger_delay_ms: 5000,
             review_pairs: vec![],
+            drift_detection: DriftDetectionConfig::default(),
         }
     }
 
@@ -1131,6 +1143,7 @@ task = "test"
             skill_registry: Default::default(),
             stagger_delay_ms: crate::config::default_stagger_delay_ms(),
             review_pairs: vec![],
+            drift_detection: DriftDetectionConfig::default(),
         };
         assert_eq!(config.stagger_delay_ms, 5000);
     }
