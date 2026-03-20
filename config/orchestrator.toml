@@ -15,7 +15,7 @@ schedule = "0 2 * * *"
 max_duration_secs = 1800
 repo_path = "/home/alex/terraphim-ai"
 create_prs = false
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "opencode-go"
 model = "glm-5"
 
@@ -24,7 +24,7 @@ model = "glm-5"
 [[agents]]
 name = "security-sentinel"
 layer = "Safety"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "opencode-go"
 model = "kimi-k2.5"
 fallback_provider = "opencode-go"
@@ -46,7 +46,7 @@ max_memory_bytes = 2147483648
 [[agents]]
 name = "meta-coordinator"
 layer = "Safety"
-cli_tool = "claude"
+cli_tool = "/home/alex/.local/bin/claude"
 provider = "anthropic"
 model = "opus-4-6"
 persona = "Ferrox"
@@ -63,7 +63,7 @@ capabilities = ["monitoring", "coordination", "health-check"]
 [[agents]]
 name = "compliance-watchdog"
 layer = "Safety"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "opencode-go"
 model = "kimi-k2.5"
 fallback_provider = "zai-coding-plan"
@@ -80,7 +80,7 @@ capabilities = ["compliance", "licence-audit", "supply-chain"]
 [[agents]]
 name = "drift-detector"
 layer = "Safety"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "zai-coding-plan"
 model = "glm-4.7-flash"
 fallback_provider = "opencode-go"
@@ -99,7 +99,7 @@ capabilities = ["drift-detection", "configuration-audit"]
 [[agents]]
 name = "upstream-synchronizer"
 layer = "Core"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "kimi-for-coding"
 model = "k2p5"
 fallback_provider = "opencode-go"
@@ -118,13 +118,13 @@ capabilities = ["sync", "dependency-management", "git"]
 [[agents]]
 name = "product-development"
 layer = "Core"
-cli_tool = "claude"
+cli_tool = "/home/alex/.local/bin/claude"
 provider = "anthropic"
 model = "sonnet-4-6"
 persona = "Lux"
 skill_chain = ["disciplined-research", "architecture", "product-vision", "wardley-mapping"]
 task = """Review recent code changes in /home/alex/terraphim-ai:
-1. Run: git log --since=''6 hours ago\' --stat
+1. Run: git log --since='6 hours ago' --stat
 2. For each significant commit, analyse code quality and architectural impact
 3. Use semi-formal reasoning: PREMISES -> TRACE -> EVIDENCE -> CONCLUSION
 4. Check test coverage: cargo test --workspace 2>&1 | tail -20
@@ -136,7 +136,7 @@ capabilities = ["code-review", "architecture", "reasoning"]
 [[agents]]
 name = "spec-validator"
 layer = "Core"
-cli_tool = "claude"
+cli_tool = "/home/alex/.local/bin/claude"
 provider = "anthropic"
 model = "opus-4-6"
 persona = "Carthos"
@@ -152,7 +152,7 @@ capabilities = ["specification", "validation", "traceability"]
 [[agents]]
 name = "test-guardian"
 layer = "Core"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "kimi-for-coding"
 model = "k2p5"
 fallback_provider = "opencode-go"
@@ -170,7 +170,7 @@ capabilities = ["testing", "coverage", "quality"]
 [[agents]]
 name = "documentation-generator"
 layer = "Core"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "opencode-go"
 model = "minimax-m2.5"
 fallback_provider = "opencode-go"
@@ -190,7 +190,7 @@ capabilities = ["documentation", "changelog"]
 [[agents]]
 name = "market-research"
 layer = "Growth"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "opencode-go"
 model = "minimax-m2.5"
 fallback_provider = "opencode-go"
@@ -208,7 +208,7 @@ capabilities = ["research", "analysis", "market"]
 [[agents]]
 name = "implementation-swarm"
 layer = "Growth"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "kimi-for-coding"
 model = "k2p5"
 fallback_provider = "opencode-go"
@@ -225,7 +225,7 @@ capabilities = ["implementation", "coding", "tdd"]
 [[agents]]
 name = "compound-review"
 layer = "Growth"
-cli_tool = "opencode"
+cli_tool = "/home/alex/.bun/bin/opencode"
 provider = "opencode-go"
 model = "glm-5"
 fallback_provider = "zai-coding-plan"
