@@ -80,6 +80,7 @@ impl AgentConfig {
     /// Each CLI tool has its own subcommand/flag for non-interactive mode:
     /// - codex: `exec <prompt>` runs a single task and exits
     /// - claude: `-p <prompt>` prints output without interactive UI
+    /// - opencode: `run --format json` runs a single task and outputs JSON
     fn infer_args(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             "codex" => vec!["exec".to_string(), "--full-auto".to_string()],
@@ -88,6 +89,7 @@ impl AgentConfig {
                 "--allowedTools".to_string(),
                 "Bash,Read,Write,Edit,Glob,Grep".to_string(),
             ],
+            "opencode" => vec!["run".to_string(), "--format".to_string(), "json".to_string()],
             _ => Vec::new(),
         }
     }
@@ -97,6 +99,7 @@ impl AgentConfig {
         match Self::cli_name(cli_command) {
             "codex" => vec!["-m".to_string(), model.to_string()],
             "claude" | "claude-code" => vec!["--model".to_string(), model.to_string()],
+            "opencode" => vec!["-m".to_string(), model.to_string()],
             _ => vec![],
         }
     }
@@ -225,5 +228,28 @@ mod tests {
 
         let keys = AgentConfig::infer_api_keys("unknown");
         assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_infer_args_opencode() {
+        let args = AgentConfig::infer_args("opencode");
+        assert_eq!(args, vec!["run".to_string(), "--format".to_string(), "json".to_string()]);
+    }
+
+    #[test]
+    fn test_model_args_opencode() {
+        let args = AgentConfig::model_args("opencode", "opencode-go/kimi-k2.5");
+        assert_eq!(args, vec!["-m".to_string(), "opencode-go/kimi-k2.5".to_string()]);
+    }
+
+    #[test]
+    fn test_model_args_with_provider_prefix() {
+        // Test that opencode accepts provider-prefixed model strings
+        let args = AgentConfig::model_args("opencode", "kimi-for-coding/k2p5");
+        assert_eq!(args, vec!["-m".to_string(), "kimi-for-coding/k2p5".to_string()]);
+        
+        // Test with opencode-go prefix
+        let args = AgentConfig::model_args("opencode", "opencode-go/glm-5");
+        assert_eq!(args, vec!["-m".to_string(), "opencode-go/glm-5".to_string()]);
     }
 }

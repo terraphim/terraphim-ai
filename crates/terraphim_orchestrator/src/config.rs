@@ -44,6 +44,18 @@ pub struct AgentDefinition {
     pub capabilities: Vec<String>,
     /// Maximum memory in bytes (optional resource limit).
     pub max_memory_bytes: Option<u64>,
+    /// Provider prefix for model routing (e.g., "opencode-go", "kimi-for-coding", "claude-code").
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// Fallback provider if primary fails/times out.
+    #[serde(default)]
+    pub fallback_provider: Option<String>,
+    /// Fallback model to use with fallback_provider.
+    #[serde(default)]
+    pub fallback_model: Option<String>,
+    /// Provider tier classification.
+    #[serde(default)]
+    pub provider_tier: Option<ProviderTier>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -55,6 +67,32 @@ pub enum AgentLayer {
     Core,
     /// On-demand, spawned when needed.
     Growth,
+}
+
+/// Model routing tier based on task complexity and cost.
+/// See ADR-003: Four-tier model routing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ProviderTier {
+    /// Routine docs, advisory. Primary: opencode-go/minimax-m2.5. Timeout: 30s.
+    Quick,
+    /// Quality gates, compound review, security. Primary: opencode-go/glm-5. Timeout: 60s.
+    Deep,
+    /// Code generation, twins, tests. Primary: kimi-for-coding/k2p5. Timeout: 120s.
+    Implementation,
+    /// Spec validation, deep reasoning. Primary: claude-code opus-4-6. Timeout: 300s. No fallback.
+    Oracle,
+}
+
+impl ProviderTier {
+    /// Timeout in seconds for this tier
+    pub fn timeout_secs(&self) -> u64 {
+        match self {
+            Self::Quick => 30,
+            Self::Deep => 60,
+            Self::Implementation => 120,
+            Self::Oracle => 300,
+        }
+    }
 }
 
 /// Nightwatch drift detection thresholds.
@@ -350,5 +388,108 @@ task = "t"
         assert_eq!(config.agents[1].layer, AgentLayer::Core);
         assert_eq!(config.agents[2].layer, AgentLayer::Growth);
         assert!(config.agents[1].schedule.is_some());
+    }
+
+    #[test]
+    fn test_config_parse_with_provider_fields() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "kimi-k2.5"
+fallback_provider = "opencode-go"
+fallback_model = "glm-5"
+provider_tier = "Deep"
+task = "Run security audit"
+capabilities = ["security", "vulnerability-scanning"]
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].name, "security-sentinel");
+        assert_eq!(config.agents[0].provider, Some("opencode-go".to_string()));
+        assert_eq!(config.agents[0].model, Some("kimi-k2.5".to_string()));
+        assert_eq!(
+            config.agents[0].fallback_provider,
+            Some("opencode-go".to_string())
+        );
+        assert_eq!(config.agents[0].fallback_model, Some("glm-5".to_string()));
+        assert_eq!(config.agents[0].provider_tier, Some(ProviderTier::Deep));
+    }
+
+    #[test]
+    fn test_provider_tier_timeout_secs() {
+        assert_eq!(ProviderTier::Quick.timeout_secs(), 30);
+        assert_eq!(ProviderTier::Deep.timeout_secs(), 60);
+        assert_eq!(ProviderTier::Implementation.timeout_secs(), 120);
+        assert_eq!(ProviderTier::Oracle.timeout_secs(), 300);
+    }
+
+    #[test]
+    fn test_provider_fields_backward_compatible() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "legacy-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Legacy task without new fields"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].name, "legacy-agent");
+        assert!(config.agents[0].provider.is_none());
+        assert!(config.agents[0].fallback_provider.is_none());
+        assert!(config.agents[0].fallback_model.is_none());
+        assert!(config.agents[0].provider_tier.is_none());
+    }
+
+    #[test]
+    fn test_all_provider_tier_variants() {
+        let tiers = vec![
+            ("Quick", ProviderTier::Quick),
+            ("Deep", ProviderTier::Deep),
+            ("Implementation", ProviderTier::Implementation),
+            ("Oracle", ProviderTier::Oracle),
+        ];
+        for (name, tier) in tiers {
+            let toml_str = format!(
+                r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "codex"
+provider_tier = "{}"
+task = "Test"
+"#,
+                name
+            );
+            let config = OrchestratorConfig::from_toml(&toml_str).unwrap();
+            assert_eq!(config.agents[0].provider_tier, Some(tier));
+        }
     }
 }

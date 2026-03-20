@@ -141,6 +141,10 @@ mod tests {
             schedule: schedule.map(String::from),
             capabilities: vec![],
             max_memory_bytes: None,
+            provider: None,
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: None,
         }
     }
 
