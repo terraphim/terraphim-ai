@@ -30,6 +30,93 @@ pub struct OrchestratorConfig {
     /// Default: ["opencode"] (Zen proxy, see ADR-002)
     #[serde(default = "default_banned_providers")]
     pub banned_providers: Vec<String>,
+    /// Skill chain registry for agent validation
+    #[serde(default)]
+    pub skill_registry: SkillChainRegistry,
+}
+
+/// Registry of available skill chains from terraphim-skills and zestic-engineering-skills.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(default)]
+pub struct SkillChainRegistry {
+    /// Available skills from terraphim-engineering-skills
+    pub terraphim_skills: Vec<String>,
+    /// Available skills from zestic-engineering-skills
+    pub zestic_skills: Vec<String>,
+}
+
+impl Default for SkillChainRegistry {
+    fn default() -> Self {
+        Self {
+            terraphim_skills: vec![
+                "security-audit".into(),
+                "code-review".into(),
+                "architecture".into(),
+                "implementation".into(),
+                "rust-development".into(),
+                "testing".into(),
+                "debugging".into(),
+                "documentation".into(),
+                "devops".into(),
+                "session-search".into(),
+                "local-knowledge".into(),
+                "disciplined-research".into(),
+                "disciplined-design".into(),
+                "disciplined-implementation".into(),
+                "disciplined-verification".into(),
+                "disciplined-validation".into(),
+                "quality-gate".into(),
+                "requirements-traceability".into(),
+                "acceptance-testing".into(),
+                "visual-testing".into(),
+                "git-safety-guard".into(),
+                "community-engagement".into(),
+                "open-source-contribution".into(),
+                "rust-performance".into(),
+                "md-book".into(),
+                "terraphim-hooks".into(),
+                "gpui-components".into(),
+                "quickwit-log-search".into(),
+                "ubs-scanner".into(),
+                "disciplined-specification".into(),
+                "disciplined-quality-evaluation".into(),
+            ],
+            zestic_skills: vec![
+                "quality-oversight".into(),
+                "responsible-ai".into(),
+                "insight-synthesis".into(),
+                "perspective-investigation".into(),
+                "product-vision".into(),
+                "wardley-mapping".into(),
+                "business-scenario-design".into(),
+                "prompt-agent-spec".into(),
+                "frontend".into(),
+                "cross-platform".into(),
+                "rust-mastery".into(),
+                "backend-architecture".into(),
+                "rapid-prototyping".into(),
+                "via-negativa-analysis".into(),
+                "strategy-execution".into(),
+                "technical-leadership".into(),
+            ],
+        }
+    }
+}
+
+impl SkillChainRegistry {
+    /// Validate that all skills in the chain exist in the registry
+    pub fn validate_chain(&self, chain: &[String]) -> Result<(), Vec<String>> {
+        let missing: Vec<String> = chain
+            .iter()
+            .filter(|s| !self.terraphim_skills.contains(s) && !self.zestic_skills.contains(s))
+            .cloned()
+            .collect();
+        if missing.is_empty() {
+            Ok(())
+        } else {
+            Err(missing)
+        }
+    }
 }
 
 fn default_banned_providers() -> Vec<String> {
@@ -218,6 +305,20 @@ impl OrchestratorConfig {
     ) -> Result<Self, crate::error::OrchestratorError> {
         let content = std::fs::read_to_string(path.as_ref())?;
         Self::from_toml(&content)
+    }
+
+    /// Validate all agent skill chains against the registry
+    pub fn validate_skill_chains(&self) -> Vec<(String, Vec<String>)> {
+        self.agents
+            .iter()
+            .filter(|a| !a.skill_chain.is_empty())
+            .filter_map(|a| {
+                self.skill_registry
+                    .validate_chain(&a.skill_chain)
+                    .err()
+                    .map(|missing| (a.name.clone(), missing))
+            })
+            .collect()
     }
 }
 
@@ -761,5 +862,201 @@ task = "Execute full development cycle"
                 "review".to_string()
             ]
         );
+    }
+
+    #[test]
+    fn test_skill_chain_registry_default_has_expected_skills() {
+        let registry = SkillChainRegistry::default();
+
+        // Test terraphim skills
+        assert!(registry
+            .terraphim_skills
+            .contains(&"security-audit".to_string()));
+        assert!(registry
+            .terraphim_skills
+            .contains(&"code-review".to_string()));
+        assert!(registry
+            .terraphim_skills
+            .contains(&"rust-development".to_string()));
+        assert!(registry
+            .terraphim_skills
+            .contains(&"disciplined-research".to_string()));
+        assert!(registry
+            .terraphim_skills
+            .contains(&"ubs-scanner".to_string()));
+
+        // Test zestic skills
+        assert!(registry
+            .zestic_skills
+            .contains(&"quality-oversight".to_string()));
+        assert!(registry
+            .zestic_skills
+            .contains(&"insight-synthesis".to_string()));
+        assert!(registry.zestic_skills.contains(&"rust-mastery".to_string()));
+        assert!(registry
+            .zestic_skills
+            .contains(&"strategy-execution".to_string()));
+        assert!(registry
+            .zestic_skills
+            .contains(&"technical-leadership".to_string()));
+
+        // Verify we have the expected counts
+        assert_eq!(registry.terraphim_skills.len(), 31);
+        assert_eq!(registry.zestic_skills.len(), 16);
+    }
+
+    #[test]
+    fn test_validate_chain_with_valid_skills() {
+        let registry = SkillChainRegistry::default();
+
+        // Valid terraphim skill
+        let result = registry.validate_chain(&vec!["security-audit".to_string()]);
+        assert!(result.is_ok());
+
+        // Valid zestic skill
+        let result = registry.validate_chain(&vec!["quality-oversight".to_string()]);
+        assert!(result.is_ok());
+
+        // Mixed valid skills
+        let result = registry.validate_chain(&vec![
+            "code-review".to_string(),
+            "quality-oversight".to_string(),
+            "rust-development".to_string(),
+        ]);
+        assert!(result.is_ok());
+
+        // Empty chain (should be valid - nothing to validate)
+        let result = registry.validate_chain(&vec![]);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_validate_chain_with_unknown_skill() {
+        let registry = SkillChainRegistry::default();
+
+        // Single unknown skill
+        let result = registry.validate_chain(&vec!["unknown-skill".to_string()]);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err(), vec!["unknown-skill".to_string()]);
+
+        // Mix of valid and invalid
+        let result = registry.validate_chain(&vec![
+            "security-audit".to_string(),
+            "unknown-skill".to_string(),
+            "also-unknown".to_string(),
+        ]);
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert_eq!(err.len(), 2);
+        assert!(err.contains(&"unknown-skill".to_string()));
+        assert!(err.contains(&"also-unknown".to_string()));
+    }
+
+    #[test]
+    fn test_validate_skill_chains_across_agents() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "valid-agent"
+layer = "Safety"
+cli_tool = "codex"
+skill_chain = ["security-audit", "code-review"]
+task = "Has valid skills"
+
+[[agents]]
+name = "invalid-agent"
+layer = "Growth"
+cli_tool = "opencode"
+skill_chain = ["security-audit", "unknown-skill", "also-unknown"]
+task = "Has invalid skills"
+
+[[agents]]
+name = "empty-chain-agent"
+layer = "Core"
+cli_tool = "claude"
+task = "Has empty skill chain"
+
+[[agents]]
+name = "zestic-agent"
+layer = "Safety"
+cli_tool = "codex"
+skill_chain = ["quality-oversight", "insight-synthesis"]
+task = "Has zestic skills"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let invalid_chains = config.validate_skill_chains();
+
+        assert_eq!(invalid_chains.len(), 1);
+        assert_eq!(invalid_chains[0].0, "invalid-agent");
+        assert_eq!(invalid_chains[0].1.len(), 2);
+        assert!(invalid_chains[0].1.contains(&"unknown-skill".to_string()));
+        assert!(invalid_chains[0].1.contains(&"also-unknown".to_string()));
+    }
+
+    #[test]
+    fn test_backward_compatible_empty_skill_chain() {
+        let registry = SkillChainRegistry::default();
+
+        // Empty skill chain should pass validation
+        let result = registry.validate_chain(&vec![]);
+        assert!(result.is_ok());
+
+        // Agent with empty skill_chain should be filtered out by validate_skill_chains
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "legacy-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Has no skill chain"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.agents[0].skill_chain.is_empty());
+
+        // validate_skill_chains should return empty since empty chains are filtered out
+        let invalid_chains = config.validate_skill_chains();
+        assert!(invalid_chains.is_empty());
+    }
+
+    #[test]
+    fn test_config_with_skill_registry() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[skill_registry]
+
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        // Should have default skills loaded
+        assert!(!config.skill_registry.terraphim_skills.is_empty());
+        assert!(!config.skill_registry.zestic_skills.is_empty());
     }
 }
