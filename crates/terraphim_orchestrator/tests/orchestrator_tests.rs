@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use terraphim_orchestrator::{
     AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, DriftDetectionConfig,
-    HandoffContext, NightwatchConfig, OrchestratorConfig, OrchestratorError,
+    HandoffContext, NightwatchConfig, OrchestratorConfig, OrchestratorError, SessionRotationConfig,
 };
 
 fn test_config() -> OrchestratorConfig {
@@ -84,6 +84,7 @@ fn test_config() -> OrchestratorConfig {
         stagger_delay_ms: 5000,
         review_pairs: vec![],
         drift_detection: DriftDetectionConfig::default(),
+        session_rotation: SessionRotationConfig::default(),
     }
 }
 

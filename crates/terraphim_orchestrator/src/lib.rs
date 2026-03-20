@@ -5,14 +5,16 @@ pub mod error;
 pub mod handoff;
 pub mod nightwatch;
 pub mod scheduler;
+pub mod session_rotation;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, DriftDetectionConfig, NightwatchConfig,
-    OrchestratorConfig, ReviewPair,
+    OrchestratorConfig, ReviewPair, SessionRotationConfig,
 };
 pub use drift_detection::{DriftDetector, DriftReport};
 pub use error::OrchestratorError;
+pub use session_rotation::{AgentSession, SessionRotationManager};
 pub use handoff::HandoffContext;
 pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
@@ -87,6 +89,8 @@ pub struct AgentOrchestrator {
     review_queue: Vec<ReviewRequest>,
     /// Strategic drift detector.
     drift_detector: DriftDetector,
+    /// Session rotation manager for fresh eyes.
+    session_rotation: SessionRotationManager,
 }
 
 impl AgentOrchestrator {
@@ -102,6 +106,12 @@ impl AgentOrchestrator {
             config.drift_detection.drift_threshold,
             &config.drift_detection.plans_dir,
         );
+        let mut session_rotation = SessionRotationManager::new(
+            config.session_rotation.max_sessions_before_rotation,
+        );
+        if let Some(duration_secs) = config.session_rotation.max_session_duration_secs {
+            session_rotation = session_rotation.with_duration(Duration::from_secs(duration_secs));
+        }
 
         Ok(Self {
             config,
@@ -118,6 +128,7 @@ impl AgentOrchestrator {
             last_tick_time: chrono::Utc::now(),
             review_queue: Vec::new(),
             drift_detector,
+            session_rotation,
         })
     }
 
@@ -819,6 +830,7 @@ mod tests {
             stagger_delay_ms: 5000,
             review_pairs: vec![],
             drift_detection: DriftDetectionConfig::default(),
+            session_rotation: SessionRotationConfig::default(),
         }
     }
 
@@ -934,6 +946,7 @@ task = "test"
             stagger_delay_ms: 5000,
             review_pairs: vec![],
             drift_detection: DriftDetectionConfig::default(),
+            session_rotation: SessionRotationConfig::default(),
         }
     }
 
@@ -1144,6 +1157,7 @@ task = "test"
             stagger_delay_ms: crate::config::default_stagger_delay_ms(),
             review_pairs: vec![],
             drift_detection: DriftDetectionConfig::default(),
+            session_rotation: SessionRotationConfig::default(),
         };
         assert_eq!(config.stagger_delay_ms, 5000);
     }

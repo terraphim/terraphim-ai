@@ -49,6 +49,33 @@ pub struct OrchestratorConfig {
     /// Strategic drift detection configuration.
     #[serde(default)]
     pub drift_detection: DriftDetectionConfig,
+    /// Session rotation configuration.
+    #[serde(default)]
+    pub session_rotation: SessionRotationConfig,
+}
+
+/// Configuration for session rotation (fresh eyes mechanism).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SessionRotationConfig {
+    /// Maximum number of sessions before rotation (0 = disabled).
+    #[serde(default = "default_max_sessions_before_rotation")]
+    pub max_sessions_before_rotation: u32,
+    /// Optional maximum session duration in seconds.
+    #[serde(default)]
+    pub max_session_duration_secs: Option<u64>,
+}
+
+impl Default for SessionRotationConfig {
+    fn default() -> Self {
+        Self {
+            max_sessions_before_rotation: default_max_sessions_before_rotation(),
+            max_session_duration_secs: None,
+        }
+    }
+}
+
+fn default_max_sessions_before_rotation() -> u32 {
+    10
 }
 
 /// Configuration for strategic drift detection.
