@@ -89,7 +89,11 @@ impl AgentConfig {
                 "--allowedTools".to_string(),
                 "Bash,Read,Write,Edit,Glob,Grep".to_string(),
             ],
-            "opencode" => vec!["run".to_string(), "--format".to_string(), "json".to_string()],
+            "opencode" => vec![
+                "run".to_string(),
+                "--format".to_string(),
+                "json".to_string(),
+            ],
             _ => Vec::new(),
         }
     }
@@ -114,6 +118,24 @@ impl AgentConfig {
             _ => Vec::new(),
         }
     }
+
+    /// Validate that the provider is not banned.
+    /// Returns error if provider starts with a banned prefix.
+    pub fn validate_provider(&self, banned_providers: &[String]) -> Result<(), ValidationError> {
+        // Check the model string for banned provider prefixes
+        // Model strings look like "opencode/kimi-k2.5" or "opencode-go/kimi-k2.5"
+        for arg in &self.args {
+            for banned in banned_providers {
+                // Check for exact prefix "banned/" but NOT "banned-/" (e.g., "opencode/" vs "opencode-go/")
+                if arg.starts_with(&format!("{}/", banned))
+                    && !arg.starts_with(&format!("{}-", banned))
+                {
+                    return Err(ValidationError::BannedProvider(banned.clone(), arg.clone()));
+                }
+            }
+        }
+        Ok(())
+    }
 }
 
 /// Errors during agent validation
@@ -130,6 +152,9 @@ pub enum ValidationError {
 
     #[error("Working directory does not exist: {0}")]
     WorkingDirNotFound(PathBuf),
+
+    #[error("Banned provider prefix '{0}' detected in model: {1}. See ADR-002.")]
+    BannedProvider(String, String),
 }
 
 /// Validator for agent configuration
@@ -233,23 +258,140 @@ mod tests {
     #[test]
     fn test_infer_args_opencode() {
         let args = AgentConfig::infer_args("opencode");
-        assert_eq!(args, vec!["run".to_string(), "--format".to_string(), "json".to_string()]);
+        assert_eq!(
+            args,
+            vec![
+                "run".to_string(),
+                "--format".to_string(),
+                "json".to_string()
+            ]
+        );
     }
 
     #[test]
     fn test_model_args_opencode() {
         let args = AgentConfig::model_args("opencode", "opencode-go/kimi-k2.5");
-        assert_eq!(args, vec!["-m".to_string(), "opencode-go/kimi-k2.5".to_string()]);
+        assert_eq!(
+            args,
+            vec!["-m".to_string(), "opencode-go/kimi-k2.5".to_string()]
+        );
     }
 
     #[test]
     fn test_model_args_with_provider_prefix() {
         // Test that opencode accepts provider-prefixed model strings
         let args = AgentConfig::model_args("opencode", "kimi-for-coding/k2p5");
-        assert_eq!(args, vec!["-m".to_string(), "kimi-for-coding/k2p5".to_string()]);
-        
+        assert_eq!(
+            args,
+            vec!["-m".to_string(), "kimi-for-coding/k2p5".to_string()]
+        );
+
         // Test with opencode-go prefix
         let args = AgentConfig::model_args("opencode", "opencode-go/glm-5");
-        assert_eq!(args, vec!["-m".to_string(), "opencode-go/glm-5".to_string()]);
+        assert_eq!(
+            args,
+            vec!["-m".to_string(), "opencode-go/glm-5".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_validate_provider_rejects_opencode_prefix() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "opencode".to_string(),
+            args: vec!["-m".to_string(), "opencode/kimi-k2.5".to_string()],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+        };
+
+        let banned = vec!["opencode".to_string()];
+        let result = config.validate_provider(&banned);
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::BannedProvider(provider, model)) => {
+                assert_eq!(provider, "opencode");
+                assert_eq!(model, "opencode/kimi-k2.5");
+            }
+            _ => panic!("Expected BannedProvider error"),
+        }
+    }
+
+    #[test]
+    fn test_validate_provider_allows_opencode_go_prefix() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "opencode".to_string(),
+            args: vec!["-m".to_string(), "opencode-go/kimi-k2.5".to_string()],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+        };
+
+        let banned = vec!["opencode".to_string()];
+        assert!(config.validate_provider(&banned).is_ok());
+    }
+
+    #[test]
+    fn test_validate_provider_allows_kimi_for_coding() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "opencode".to_string(),
+            args: vec!["-m".to_string(), "kimi-for-coding/k2p5".to_string()],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+        };
+
+        let banned = vec!["opencode".to_string()];
+        assert!(config.validate_provider(&banned).is_ok());
+    }
+
+    #[test]
+    fn test_validate_provider_allows_all_when_empty_banned_list() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "opencode".to_string(),
+            args: vec!["-m".to_string(), "opencode/kimi-k2.5".to_string()],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+        };
+
+        let banned: Vec<String> = vec![];
+        assert!(config.validate_provider(&banned).is_ok());
+    }
+
+    #[test]
+    fn test_validate_provider_multiple_args() {
+        let config = AgentConfig {
+            agent_id: "test".to_string(),
+            cli_command: "opencode".to_string(),
+            args: vec![
+                "-m".to_string(),
+                "kimi-for-coding/k2p5".to_string(),
+                "--fallback".to_string(),
+                "opencode/gpt-4".to_string(),
+            ],
+            working_dir: None,
+            env_vars: HashMap::new(),
+            required_api_keys: vec![],
+            resource_limits: ResourceLimits::default(),
+        };
+
+        let banned = vec!["opencode".to_string()];
+        let result = config.validate_provider(&banned);
+        assert!(result.is_err());
+        match result {
+            Err(ValidationError::BannedProvider(provider, model)) => {
+                assert_eq!(provider, "opencode");
+                assert_eq!(model, "opencode/gpt-4");
+            }
+            _ => panic!("Expected BannedProvider error for second occurrence"),
+        }
     }
 }

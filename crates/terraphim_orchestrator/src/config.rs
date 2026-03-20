@@ -22,6 +22,18 @@ pub struct OrchestratorConfig {
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
+    /// Allowed provider prefixes. Providers not in this list are rejected at spawn time.
+    /// Empty list = allow all (backward compatible).
+    #[serde(default)]
+    pub allowed_providers: Vec<String>,
+    /// Explicitly banned provider prefixes. These are rejected even if not in allowlist.
+    /// Default: ["opencode"] (Zen proxy, see ADR-002)
+    #[serde(default = "default_banned_providers")]
+    pub banned_providers: Vec<String>,
+}
+
+fn default_banned_providers() -> Vec<String> {
+    vec!["opencode".to_string()]
 }
 
 /// Definition of a single agent in the fleet.
@@ -491,5 +503,99 @@ task = "Test"
             let config = OrchestratorConfig::from_toml(&toml_str).unwrap();
             assert_eq!(config.agents[0].provider_tier, Some(tier));
         }
+    }
+
+    #[test]
+    fn test_default_banned_providers() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.banned_providers, vec!["opencode".to_string()]);
+        assert!(config.allowed_providers.is_empty());
+    }
+
+    #[test]
+    fn test_custom_banned_providers() {
+        let toml_str = r#"
+working_dir = "/tmp"
+banned_providers = ["zen", "prohibited"]
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(
+            config.banned_providers,
+            vec!["zen".to_string(), "prohibited".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_allowed_providers() {
+        let toml_str = r#"
+working_dir = "/tmp"
+allowed_providers = ["opencode-go", "kimi-for-coding"]
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(
+            config.allowed_providers,
+            vec!["opencode-go".to_string(), "kimi-for-coding".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_backward_compatible_no_provider_fields() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "legacy-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Legacy task"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.allowed_providers.is_empty());
+        assert_eq!(config.banned_providers, vec!["opencode".to_string()]);
     }
 }
