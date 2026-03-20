@@ -5,7 +5,10 @@ use terraphim_spawner::SpawnerError;
 #[derive(Debug, thiserror::Error)]
 pub enum OrchestratorError {
     #[error("configuration error: {0}")]
-    Config(String),
+    Configuration(String),
+
+    #[error("tracker error: {0}")]
+    TrackerError(String),
 
     #[error("agent spawn failed for '{agent}': {reason}")]
     SpawnFailed { agent: String, reason: String },

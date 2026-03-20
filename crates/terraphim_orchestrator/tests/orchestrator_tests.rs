@@ -87,6 +87,9 @@ fn test_config() -> OrchestratorConfig {
         drift_detection: DriftDetectionConfig::default(),
         session_rotation: SessionRotationConfig::default(),
         convergence: ConvergenceConfig::default(),
+        workflow: None,
+        tracker: None,
+        concurrency: None,
     }
 }
 

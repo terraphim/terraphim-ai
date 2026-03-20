@@ -9,6 +9,117 @@ pub struct ReviewPair {
     pub reviewer: String,
 }
 
+/// Workflow execution mode for the orchestrator.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WorkflowMode {
+    /// Time-based scheduling only (default, backward compatible).
+    TimeOnly,
+    /// Issue-driven execution only.
+    IssueOnly,
+    /// Both time and issue modes active.
+    Dual,
+}
+
+impl Default for WorkflowMode {
+    fn default() -> Self {
+        WorkflowMode::TimeOnly
+    }
+}
+
+/// Workflow configuration for issue-driven mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WorkflowConfig {
+    /// Execution mode: time_only, issue_only, or dual.
+    #[serde(default)]
+    pub mode: WorkflowMode,
+    /// Poll interval in seconds for checking new issues.
+    #[serde(default = "default_poll_interval_secs")]
+    pub poll_interval_secs: u64,
+    /// Maximum number of concurrent tasks to run.
+    #[serde(default = "default_max_concurrent_tasks")]
+    pub max_concurrent_tasks: u32,
+}
+
+impl Default for WorkflowConfig {
+    fn default() -> Self {
+        Self {
+            mode: WorkflowMode::default(),
+            poll_interval_secs: default_poll_interval_secs(),
+            max_concurrent_tasks: default_max_concurrent_tasks(),
+        }
+    }
+}
+
+fn default_poll_interval_secs() -> u64 {
+    60
+}
+
+fn default_max_concurrent_tasks() -> u32 {
+    5
+}
+
+/// Issue tracker type.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TrackerType {
+    /// Gitea issue tracker.
+    Gitea,
+    /// Linear issue tracker.
+    Linear,
+}
+
+/// Tracker configuration for issue-driven mode.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TrackerConfig {
+    /// Tracker type (gitea, linear).
+    pub tracker_type: TrackerType,
+    /// Tracker API URL.
+    pub url: String,
+    /// Environment variable name containing the auth token.
+    pub token_env_var: String,
+    /// Repository owner/organization.
+    pub owner: String,
+    /// Repository name.
+    pub repo: String,
+}
+
+/// Concurrency configuration for task dispatching.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConcurrencyConfig {
+    /// Maximum number of parallel agents to run.
+    #[serde(default = "default_max_parallel_agents")]
+    pub max_parallel_agents: u32,
+    /// Maximum depth of the task queue.
+    #[serde(default = "default_queue_depth")]
+    pub queue_depth: u32,
+    /// Timeout in seconds before considering a task starved.
+    #[serde(default = "default_starvation_timeout_secs")]
+    pub starvation_timeout_secs: u64,
+}
+
+impl Default for ConcurrencyConfig {
+    fn default() -> Self {
+        Self {
+            max_parallel_agents: default_max_parallel_agents(),
+            queue_depth: default_queue_depth(),
+            starvation_timeout_secs: default_starvation_timeout_secs(),
+        }
+    }
+}
+
+fn default_max_parallel_agents() -> u32 {
+    3
+}
+
+fn default_queue_depth() -> u32 {
+    100
+}
+
+fn default_starvation_timeout_secs() -> u64 {
+    300
+}
+
 /// Top-level orchestrator configuration (parsed from TOML).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -55,6 +166,15 @@ pub struct OrchestratorConfig {
     /// Convergence detection configuration.
     #[serde(default)]
     pub convergence: ConvergenceConfig,
+    /// Workflow configuration for issue-driven mode.
+    #[serde(default)]
+    pub workflow: Option<WorkflowConfig>,
+    /// Tracker configuration for issue-driven mode.
+    #[serde(default)]
+    pub tracker: Option<TrackerConfig>,
+    /// Concurrency configuration for task dispatching.
+    #[serde(default)]
+    pub concurrency: Option<ConcurrencyConfig>,
 }
 
 /// Configuration for convergence detection.
@@ -418,7 +538,8 @@ pub fn default_stagger_delay_ms() -> u64 {
 impl OrchestratorConfig {
     /// Parse an OrchestratorConfig from a TOML string.
     pub fn from_toml(toml_str: &str) -> Result<Self, crate::error::OrchestratorError> {
-        toml::from_str(toml_str).map_err(|e| crate::error::OrchestratorError::Config(e.to_string()))
+        toml::from_str(toml_str)
+            .map_err(|e| crate::error::OrchestratorError::Configuration(e.to_string()))
     }
 
     /// Load an OrchestratorConfig from a TOML file.
@@ -1180,5 +1301,193 @@ task = "Test"
         // Should have default skills loaded
         assert!(!config.skill_registry.terraphim_skills.is_empty());
         assert!(!config.skill_registry.zestic_skills.is_empty());
+    }
+
+    #[test]
+    fn test_workflow_config_defaults() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        // Without workflow section, should be None (backward compatible)
+        assert!(config.workflow.is_none());
+        assert!(config.tracker.is_none());
+        assert!(config.concurrency.is_none());
+    }
+
+    #[test]
+    fn test_workflow_config_time_only() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+mode = "time_only"
+poll_interval_secs = 120
+max_concurrent_tasks = 10
+
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.workflow.is_some());
+        let workflow = config.workflow.unwrap();
+        assert_eq!(workflow.mode, WorkflowMode::TimeOnly);
+        assert_eq!(workflow.poll_interval_secs, 120);
+        assert_eq!(workflow.max_concurrent_tasks, 10);
+    }
+
+    #[test]
+    fn test_workflow_config_issue_only() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+mode = "issue_only"
+
+[tracker]
+tracker_type = "gitea"
+url = "https://git.example.com"
+token_env_var = "GITEA_TOKEN"
+owner = "testowner"
+repo = "testrepo"
+
+[concurrency]
+max_parallel_agents = 5
+queue_depth = 50
+starvation_timeout_secs = 600
+
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.workflow.is_some());
+        let workflow = config.workflow.unwrap();
+        assert_eq!(workflow.mode, WorkflowMode::IssueOnly);
+        assert_eq!(workflow.poll_interval_secs, 60); // default
+        assert_eq!(workflow.max_concurrent_tasks, 5); // default
+
+        assert!(config.tracker.is_some());
+        let tracker = config.tracker.unwrap();
+        assert_eq!(tracker.tracker_type, TrackerType::Gitea);
+        assert_eq!(tracker.url, "https://git.example.com");
+        assert_eq!(tracker.token_env_var, "GITEA_TOKEN");
+        assert_eq!(tracker.owner, "testowner");
+        assert_eq!(tracker.repo, "testrepo");
+
+        assert!(config.concurrency.is_some());
+        let concurrency = config.concurrency.unwrap();
+        assert_eq!(concurrency.max_parallel_agents, 5);
+        assert_eq!(concurrency.queue_depth, 50);
+        assert_eq!(concurrency.starvation_timeout_secs, 600);
+    }
+
+    #[test]
+    fn test_workflow_config_dual() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+mode = "dual"
+
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.workflow.is_some());
+        let workflow = config.workflow.unwrap();
+        assert_eq!(workflow.mode, WorkflowMode::Dual);
+    }
+
+    #[test]
+    fn test_tracker_type_linear() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[workflow]
+mode = "issue_only"
+
+[tracker]
+tracker_type = "linear"
+url = "https://api.linear.app"
+token_env_var = "LINEAR_API_KEY"
+owner = "my-team"
+repo = "my-project"
+
+[[agents]]
+name = "agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test"
+"#;
+
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.tracker.is_some());
+        let tracker = config.tracker.unwrap();
+        assert_eq!(tracker.tracker_type, TrackerType::Linear);
+    }
+
+    #[test]
+    fn test_concurrency_config_defaults() {
+        let config = ConcurrencyConfig::default();
+        assert_eq!(config.max_parallel_agents, 3);
+        assert_eq!(config.queue_depth, 100);
+        assert_eq!(config.starvation_timeout_secs, 300);
+    }
+
+    #[test]
+    fn test_workflow_config_defaults_struct() {
+        let config = WorkflowConfig::default();
+        assert_eq!(config.mode, WorkflowMode::TimeOnly);
+        assert_eq!(config.poll_interval_secs, 60);
+        assert_eq!(config.max_concurrent_tasks, 5);
     }
 }
