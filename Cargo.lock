@@ -10046,6 +10046,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_tracker"
+version = "0.1.0"
+dependencies = [
+ "async-trait",
+ "chrono",
+ "reqwest 0.12.28",
+ "serde",
+ "serde_json",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "wiremock",
+]
+
+[[package]]
 name = "terraphim_types"
 version = "1.6.0"
 dependencies = [
