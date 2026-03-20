@@ -26,6 +26,11 @@ chrono = { version = "0.4", features = ["serde"] }
 log = "0.4"
 regex = "1.10"
 aho-corasick = "1.0"
+clap = { version = "4.0", features = ["derive"] }
+
+[[bin]]
+name = "judge-evaluator"
+path = "src/main.rs"
 
 [dev-dependencies]
 tokio-test = "0.4"
