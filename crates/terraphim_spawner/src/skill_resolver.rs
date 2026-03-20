@@ -115,6 +115,7 @@ impl SkillResolver {
         };
 
         resolver.initialize_terraphim_skills();
+        resolver.initialize_zestic_skills();
         resolver
     }
 
@@ -128,6 +129,7 @@ impl SkillResolver {
         };
 
         resolver.initialize_terraphim_skills();
+        resolver.initialize_zestic_skills();
         resolver
     }
 
@@ -234,6 +236,84 @@ impl SkillResolver {
                     description: description.to_string(),
                     applicable_to: applicable_to.iter().map(|s| s.to_string()).collect(),
                     source: SkillSource::Terraphim,
+                },
+            );
+        }
+    }
+
+    /// Initialize the zestic skills registry with known skills.
+    fn initialize_zestic_skills(&mut self) {
+        let zestic_skills = vec![
+            (
+                "quality-oversight",
+                "Comprehensive quality oversight for code and documentation",
+                vec!["quality", "oversight"],
+            ),
+            (
+                "responsible-ai",
+                "Responsible AI validation including bias audits and fairness assessment",
+                vec!["ai", "ethics", "responsible"],
+            ),
+            (
+                "insight-synthesis",
+                "Consolidate and harmonize multiple investigative findings into unified strategy",
+                vec!["synthesis", "insights"],
+            ),
+            (
+                "perspective-investigation",
+                "Deep multi-faceted analysis through various expert lenses",
+                vec!["investigation", "perspectives"],
+            ),
+            (
+                "product-vision",
+                "Create Product Vision and Value Hypothesis (PVVH) documents",
+                vec!["product", "vision", "strategy"],
+            ),
+            (
+                "wardley-mapping",
+                "Create Wardley Maps for strategic landscape analysis",
+                vec!["strategy", "mapping", "wardley"],
+            ),
+            (
+                "business-scenario-design",
+                "Design end-to-end business scenarios from personas and jobs-to-be-done",
+                vec!["business", "scenarios", "design"],
+            ),
+            (
+                "rust-mastery",
+                "Expert Rust code review, performance optimization, and standards enforcement",
+                vec!["rust", "mastery", "optimization"],
+            ),
+            (
+                "cross-platform",
+                "Cross-platform development with Tauri 2.0 and Rust/WebAssembly",
+                vec!["cross-platform", "tauri", "wasm"],
+            ),
+            (
+                "frontend",
+                "Building user interfaces, components, and frontend optimization",
+                vec!["frontend", "ui", "react", "vue"],
+            ),
+            (
+                "via-negativa-analysis",
+                "Critical analysis focusing on what could go wrong and what to avoid",
+                vec!["analysis", "risk", "negativa"],
+            ),
+            (
+                "strategy-execution",
+                "Transform high-level strategic plans into concrete actionable tasks",
+                vec!["strategy", "execution", "planning"],
+            ),
+        ];
+
+        for (name, description, applicable_to) in zestic_skills {
+            self.zestic_skills.insert(
+                name.to_string(),
+                SkillMetadata {
+                    name: name.to_string(),
+                    description: description.to_string(),
+                    applicable_to: applicable_to.iter().map(|s| s.to_string()).collect(),
+                    source: SkillSource::Zestic,
                 },
             );
         }
@@ -527,5 +607,186 @@ mod tests {
 
         let skill = resolver.resolve_skill("security-audit").unwrap();
         assert!(skill.path.to_string_lossy().contains("/custom/terraphim"));
+    }
+
+    // ---------- Issue #36: Zestic Skills Tests ----------
+
+    #[test]
+    fn test_resolver_has_zestic_skills() {
+        let resolver = SkillResolver::new();
+
+        // Check that expected zestic skills are present
+        assert!(resolver.zestic_skills.contains_key("quality-oversight"));
+        assert!(resolver.zestic_skills.contains_key("responsible-ai"));
+        assert!(resolver.zestic_skills.contains_key("insight-synthesis"));
+        assert!(resolver.zestic_skills.contains_key("rust-mastery"));
+        assert!(resolver.zestic_skills.contains_key("cross-platform"));
+        assert!(resolver.zestic_skills.contains_key("frontend"));
+    }
+
+    #[test]
+    fn test_resolve_zestic_skill() {
+        let resolver = SkillResolver::new();
+
+        let skill = resolver.resolve_skill("quality-oversight").unwrap();
+        assert_eq!(skill.name, "quality-oversight");
+        assert!(!skill.description.is_empty());
+        assert_eq!(skill.source, SkillSource::Zestic);
+        assert!(skill.path.to_string_lossy().contains("quality-oversight"));
+        assert!(skill.path.to_string_lossy().contains("zestic"));
+    }
+
+    #[test]
+    fn test_resolve_mixed_skill_chain() {
+        let resolver = SkillResolver::new();
+
+        // Mix terraphim and zestic skills in same chain
+        let chain = vec![
+            "security-audit".to_string(),    // terraphim
+            "quality-oversight".to_string(), // zestic
+            "code-review".to_string(),       // terraphim
+            "insight-synthesis".to_string(), // zestic
+        ];
+
+        let resolved = resolver.resolve_skill_chain(chain).unwrap();
+        assert_eq!(resolved.len(), 4);
+
+        // Verify sources are correctly identified
+        assert_eq!(resolved[0].name, "security-audit");
+        assert_eq!(resolved[0].source, SkillSource::Terraphim);
+
+        assert_eq!(resolved[1].name, "quality-oversight");
+        assert_eq!(resolved[1].source, SkillSource::Zestic);
+
+        assert_eq!(resolved[2].name, "code-review");
+        assert_eq!(resolved[2].source, SkillSource::Terraphim);
+
+        assert_eq!(resolved[3].name, "insight-synthesis");
+        assert_eq!(resolved[3].source, SkillSource::Zestic);
+    }
+
+    #[test]
+    fn test_validate_mixed_skill_chain_valid() {
+        let resolver = SkillResolver::new();
+
+        // Valid chain with both sources
+        let chain = vec![
+            "security-audit".to_string(),    // terraphim
+            "quality-oversight".to_string(), // zestic
+            "rust-development".to_string(),  // terraphim
+            "rust-mastery".to_string(),      // zestic
+        ];
+
+        assert!(resolver.validate_skill_chain(&chain).is_ok());
+    }
+
+    #[test]
+    fn test_validate_only_zestic_skills() {
+        let resolver = SkillResolver::new();
+
+        let chain = vec![
+            "quality-oversight".to_string(),
+            "responsible-ai".to_string(),
+            "cross-platform".to_string(),
+        ];
+
+        assert!(resolver.validate_skill_chain(&chain).is_ok());
+
+        let resolved = resolver.resolve_skill_chain(chain).unwrap();
+        for skill in resolved {
+            assert_eq!(skill.source, SkillSource::Zestic);
+        }
+    }
+
+    #[test]
+    fn test_mixed_chain_with_invalid_skills() {
+        let resolver = SkillResolver::new();
+
+        // Mix of valid (both sources) and invalid skills
+        let chain = vec![
+            "security-audit".to_string(),    // terraphim - valid
+            "quality-oversight".to_string(), // zestic - valid
+            "unknown-skill".to_string(),     // invalid
+            "also-invalid".to_string(),      // invalid
+        ];
+
+        let result = resolver.resolve_skill_chain(chain);
+        assert!(result.is_err());
+
+        match result {
+            Err(SkillResolutionError::InvalidChain(msg)) => {
+                assert!(msg.contains("unknown-skill"));
+                assert!(msg.contains("also-invalid"));
+            }
+            _ => panic!("Expected InvalidChain error with missing skills from both sources"),
+        }
+    }
+
+    #[test]
+    fn test_zestic_skill_source_in_resolved() {
+        let resolver = SkillResolver::new();
+
+        let zestic_skills = vec![
+            "quality-oversight",
+            "responsible-ai",
+            "insight-synthesis",
+            "perspective-investigation",
+            "product-vision",
+            "wardley-mapping",
+            "business-scenario-design",
+            "rust-mastery",
+            "cross-platform",
+            "frontend",
+            "via-negativa-analysis",
+            "strategy-execution",
+        ];
+
+        for skill_name in zestic_skills {
+            let skill = resolver.resolve_skill(skill_name).unwrap();
+            assert_eq!(
+                skill.source,
+                SkillSource::Zestic,
+                "Skill {} should have Zestic source",
+                skill_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_all_skill_names_includes_zestic() {
+        let resolver = SkillResolver::new();
+
+        let all_names = resolver.all_skill_names();
+
+        // Should include both terraphim and zestic skills
+        assert!(all_names.contains(&"security-audit".to_string())); // terraphim
+        assert!(all_names.contains(&"quality-oversight".to_string())); // zestic
+        assert!(all_names.contains(&"rust-development".to_string())); // terraphim
+        assert!(all_names.contains(&"rust-mastery".to_string())); // zestic
+    }
+
+    #[test]
+    fn test_zestic_skill_structure() {
+        let resolver = SkillResolver::new();
+
+        let skill = resolver.resolve_skill("business-scenario-design").unwrap();
+
+        assert_eq!(skill.name, "business-scenario-design");
+        assert!(!skill.description.is_empty());
+        assert!(!skill.applicable_to.is_empty());
+        assert_eq!(skill.source, SkillSource::Zestic);
+        assert!(skill
+            .applicable_to
+            .iter()
+            .any(|tag| tag.contains("business")));
+    }
+
+    #[test]
+    fn test_resolver_custom_paths_for_zestic() {
+        let resolver = SkillResolver::with_paths("/custom/terraphim", "/custom/zestic");
+
+        let skill = resolver.resolve_skill("frontend").unwrap();
+        assert_eq!(skill.source, SkillSource::Zestic);
+        assert!(skill.path.to_string_lossy().contains("/custom/zestic"));
     }
 }
