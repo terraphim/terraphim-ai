@@ -11,6 +11,7 @@ pub mod judge_agent;
 pub mod model_router;
 pub mod simple_agent;
 
+pub use judge_agent::{JudgeAgent, JudgeVerdict};
 pub use model_router::{JudgeModelRouter, ModelMappingConfig, TierConfig};
 pub use simple_agent::{KgMatch, SimpleAgent};
 
