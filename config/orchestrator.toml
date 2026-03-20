@@ -1,0 +1,239 @@
+working_dir = "/home/alex/terraphim-ai"
+restart_cooldown_secs = 900
+max_restart_count = 3
+tick_interval_secs = 30
+
+[nightwatch]
+eval_interval_secs = 300
+minor_threshold = 0.10
+moderate_threshold = 0.20
+severe_threshold = 0.40
+critical_threshold = 0.70
+
+[compound_review]
+schedule = "0 2 * * *"
+max_duration_secs = 1800
+repo_path = "/home/alex/terraphim-ai"
+create_prs = false
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "glm-5"
+
+# Safety layer: always running, auto-restart on failure
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "kimi-k2.5"
+fallback_provider = "opencode-go"
+fallback_model = "glm-5"
+persona = "Vigil"
+skill_chain = ["security-audit", "code-review", "quality-oversight"]
+task = """Run security audit on the terraphim-ai project at /home/alex/terraphim-ai:
+1. cd /home/alex/terraphim-ai && cargo audit (check for known CVEs in dependencies)
+2. Review Cargo.lock for outdated dependencies with known vulnerabilities
+3. Scan for hardcoded secrets or API keys: grep -r "sk-" "api_key" "secret" in src/
+4. Check unsafe blocks: grep -rn "unsafe" crates/ and assess necessity
+5. Review recent commits for security-relevant changes: git log --since=24hours --oneline
+6. Also check server exposure: ss -tlnp for unexpected listening ports
+7. Generate a security report at reports/security-YYYYMMDD.md (relative to working dir)
+Prioritize any CVEs or critical vulnerabilities in project dependencies."""
+capabilities = ["security", "vulnerability-scanning", "compliance"]
+max_memory_bytes = 2147483648
+
+[[agents]]
+name = "meta-coordinator"
+layer = "Safety"
+cli_tool = "claude"
+provider = "anthropic"
+model = "opus-4-6"
+persona = "Ferrox"
+skill_chain = ["session-search", "local-knowledge", "insight-synthesis", "perspective-investigation"]
+task = """Monitor the AI Dark Factory system health:
+1. Read /opt/ai-dark-factory/logs/telemetry.jsonl for recent agent run data
+2. Detect anomalies: agents failing repeatedly, unusual durations, missing runs
+3. Read /opt/ai-dark-factory/logs/alerts.log for critical alerts
+4. Check disk usage and system resources
+5. Generate a daily coordination summary at /opt/ai-dark-factory/reports/coordination-YYYYMMDD.md
+Keep it brief and actionable."""
+capabilities = ["monitoring", "coordination", "health-check"]
+
+[[agents]]
+name = "compliance-watchdog"
+layer = "Safety"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "kimi-k2.5"
+fallback_provider = "zai-coding-plan"
+fallback_model = "glm-4.7"
+persona = "Vigil"
+skill_chain = ["security-audit", "responsible-ai", "via-negativa-analysis"]
+task = """Run compliance checks on the terraphim-ai project:
+1. Check licence compliance: cargo deny check licenses
+2. Review dependency supply chain: cargo deny check advisories
+3. Audit GDPR/data handling patterns in crates
+4. Generate compliance report at reports/compliance-YYYYMMDD.md"""
+capabilities = ["compliance", "licence-audit", "supply-chain"]
+
+[[agents]]
+name = "drift-detector"
+layer = "Safety"
+cli_tool = "opencode"
+provider = "zai-coding-plan"
+model = "glm-4.7-flash"
+fallback_provider = "opencode-go"
+fallback_model = "glm-5"
+persona = "Conduit"
+skill_chain = ["git-safety-guard", "devops"]
+task = """Detect configuration drift across the ADF system:
+1. Compare running orchestrator.toml against git-tracked version
+2. Check systemd service states match expected
+3. Verify SSH keys and permissions
+4. Generate drift report at reports/drift-YYYYMMDD.md"""
+capabilities = ["drift-detection", "configuration-audit"]
+
+# Core layer: cron-scheduled
+
+[[agents]]
+name = "upstream-synchronizer"
+layer = "Core"
+cli_tool = "opencode"
+provider = "kimi-for-coding"
+model = "k2p5"
+fallback_provider = "opencode-go"
+fallback_model = "kimi-k2.5"
+persona = "Conduit"
+skill_chain = ["git-safety-guard", "devops"]
+task = """Check upstream repositories for new commits:
+1. cd /home/alex/terraphim-ai && git fetch origin && git log HEAD..origin/main --oneline
+2. cd /home/alex/terraphim-skills && git fetch origin && git log HEAD..origin/main --oneline (if exists)
+3. Analyse any new commits for breaking changes, security fixes, or major refactors
+4. Generate an upstream sync report at /opt/ai-dark-factory/reports/upstream-sync-YYYYMMDD.md
+Flag high-risk commits that need manual review."""
+schedule = "0 */6 * * *"
+capabilities = ["sync", "dependency-management", "git"]
+
+[[agents]]
+name = "product-development"
+layer = "Core"
+cli_tool = "claude"
+provider = "anthropic"
+model = "sonnet-4-6"
+persona = "Lux"
+skill_chain = ["disciplined-research", "architecture", "product-vision", "wardley-mapping"]
+task = """Review recent code changes in /home/alex/terraphim-ai:
+1. Run: git log --since=''6 hours ago\' --stat
+2. For each significant commit, analyse code quality and architectural impact
+3. Use semi-formal reasoning: PREMISES -> TRACE -> EVIDENCE -> CONCLUSION
+4. Check test coverage: cargo test --workspace 2>&1 | tail -20
+5. Generate a development report at /opt/ai-dark-factory/reports/dev-review-YYYYMMDD.md
+Focus on code quality, test coverage gaps, and architectural concerns."""
+schedule = "0 */6 * * *"
+capabilities = ["code-review", "architecture", "reasoning"]
+
+[[agents]]
+name = "spec-validator"
+layer = "Core"
+cli_tool = "claude"
+provider = "anthropic"
+model = "opus-4-6"
+persona = "Carthos"
+skill_chain = ["disciplined-design", "requirements-traceability", "business-scenario-design"]
+task = """Validate specifications against implementation:
+1. Read plans/ directory for active specs
+2. Cross-reference with actual crate implementations
+3. Identify gaps between spec and code
+4. Generate validation report at reports/spec-validation-YYYYMMDD.md"""
+schedule = "0 3 * * *"
+capabilities = ["specification", "validation", "traceability"]
+
+[[agents]]
+name = "test-guardian"
+layer = "Core"
+cli_tool = "opencode"
+provider = "kimi-for-coding"
+model = "k2p5"
+fallback_provider = "opencode-go"
+fallback_model = "kimi-k2.5"
+persona = "Echo"
+skill_chain = ["testing", "acceptance-testing"]
+task = """Run comprehensive test suite and report coverage:
+1. cargo test --workspace 2>&1
+2. Identify flaky or failing tests
+3. Check for untested code paths
+4. Generate test report at reports/test-guardian-YYYYMMDD.md"""
+schedule = "0 */8 * * *"
+capabilities = ["testing", "coverage", "quality"]
+
+[[agents]]
+name = "documentation-generator"
+layer = "Core"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "minimax-m2.5"
+fallback_provider = "opencode-go"
+fallback_model = "minimax-m2.7"
+persona = "Mneme"
+skill_chain = ["documentation", "md-book"]
+task = """Generate and update documentation:
+1. Scan crates for missing or outdated doc comments
+2. Update CHANGELOG.md with recent commits
+3. Generate API reference snippets
+4. Generate doc report at reports/docs-YYYYMMDD.md"""
+schedule = "0 4 * * *"
+capabilities = ["documentation", "changelog"]
+
+# Growth layer: on-demand
+
+[[agents]]
+name = "market-research"
+layer = "Growth"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "minimax-m2.5"
+fallback_provider = "opencode-go"
+fallback_model = "glm-5"
+persona = "Meridian"
+skill_chain = ["disciplined-research"]
+task = """Analyse the AI agent tooling market landscape:
+1. Review recent releases and changelogs for: OpenAI Codex CLI, Claude Code, Aider, Continue.dev, Cursor
+2. Check GitHub trending repos in AI agent categories
+3. Analyse competitor approaches to agent orchestration and multi-agent systems
+4. Generate a market brief at /opt/ai-dark-factory/reports/market-brief-YYYYMMDD.md
+Focus on trends relevant to terraphim-ai positioning."""
+capabilities = ["research", "analysis", "market"]
+
+[[agents]]
+name = "implementation-swarm"
+layer = "Growth"
+cli_tool = "opencode"
+provider = "kimi-for-coding"
+model = "k2p5"
+fallback_provider = "opencode-go"
+fallback_model = "kimi-k2.5"
+persona = "Echo"
+skill_chain = ["implementation", "rust-development", "rust-mastery", "cross-platform"]
+task = """Implement assigned Gitea issues:
+1. Check gitea-robot ready for highest PageRank issue
+2. Create branch, implement with TDD
+3. Run cargo test and cargo clippy
+4. Commit with Refs #IDX"""
+capabilities = ["implementation", "coding", "tdd"]
+
+[[agents]]
+name = "compound-review"
+layer = "Growth"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "glm-5"
+fallback_provider = "zai-coding-plan"
+fallback_model = "glm-4.7"
+persona = "Carthos"
+skill_chain = ["code-review", "quality-gate", "quality-oversight"]
+task = """Run compound code review:
+1. Analyse recent PRs and commits for quality
+2. Cross-reference with architectural decisions (ADRs)
+3. Generate compound review at reports/compound-review-YYYYMMDD.md"""
+capabilities = ["review", "quality-gate", "architecture"]
