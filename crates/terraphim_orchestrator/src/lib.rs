@@ -27,7 +27,7 @@ pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
     RateLimitTracker, RateLimitWindow,
 };
-pub use scheduler::{ScheduleEvent, TimeScheduler};
+pub use scheduler::{ScheduleEvent, TimeMode, TimeScheduler};
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -38,7 +38,7 @@ use terraphim_spawner::health::HealthStatus;
 use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner};
 use tokio::sync::broadcast;
-use tracing::{error, info, warn};
+use tracing::{debug, error, info, warn};
 
 /// A request for cross-agent review.
 #[derive(Debug, Clone)]
@@ -75,6 +75,104 @@ struct ManagedAgent {
     output_rx: broadcast::Receiver<OutputEvent>,
 }
 
+/// Coordinates between TimeMode and IssueMode in dual mode operation.
+pub struct ModeCoordinator {
+    /// Time-based scheduler mode.
+    pub time_mode: Option<TimeMode>,
+    /// Issue-driven mode.
+    pub issue_mode: Option<IssueMode>,
+    /// Shared dispatch queue.
+    pub dispatch_queue: DispatchQueue,
+    /// Current workflow mode.
+    pub workflow_mode: WorkflowMode,
+    /// Shutdown signal sender for issue mode (only available when issue mode is active).
+    pub issue_shutdown_tx: Option<tokio::sync::mpsc::Sender<()>>,
+    /// Concurrency controller for limiting parallel execution.
+    pub concurrency_controller: ConcurrencyController,
+}
+
+impl ModeCoordinator {
+    /// Create a new mode coordinator based on workflow configuration.
+    pub fn new(
+        workflow_config: WorkflowConfig,
+        agents: Vec<AgentDefinition>,
+        tracker_config: Option<terraphim_tracker::TrackerConfig>,
+        compound_schedule: Option<String>,
+    ) -> Result<(Self, tokio::sync::mpsc::Receiver<()>), OrchestratorError> {
+        let dispatch_queue = DispatchQueue::new(workflow_config.max_concurrent_tasks as usize * 10);
+        let concurrency_controller = ConcurrencyController::new(
+            workflow_config.max_concurrent_tasks as usize,
+            300, // 5 minute starvation timeout
+        );
+
+        let (_coord_shutdown_tx, coord_shutdown_rx) = tokio::sync::mpsc::channel(1);
+
+        let time_mode = if matches!(workflow_config.mode, WorkflowMode::TimeOnly | WorkflowMode::Dual) {
+            let tm = TimeMode::new_with_queue(
+                &agents,
+                compound_schedule.as_deref(),
+                dispatch_queue.clone(),
+            )?;
+            Some(tm)
+        } else {
+            None
+        };
+
+        let (issue_mode, issue_shutdown_tx) = if matches!(workflow_config.mode, WorkflowMode::IssueOnly | WorkflowMode::Dual) {
+            if let Some(tracker_cfg) = tracker_config {
+                let (im, tx) = IssueMode::new(
+                    tracker_cfg,
+                    dispatch_queue.clone(),
+                    agents,
+                    workflow_config.poll_interval_secs,
+                )?;
+                (Some(im), Some(tx))
+            } else {
+                (None, None)
+            }
+        } else {
+            (None, None)
+        };
+
+        Ok((Self {
+            time_mode,
+            issue_mode,
+            dispatch_queue,
+            workflow_mode: workflow_config.mode,
+            issue_shutdown_tx,
+            concurrency_controller,
+        }, coord_shutdown_rx))
+    }
+
+    /// Get the next task from the dispatch queue.
+    /// Note: This requires mutable access due to the BinaryHeap's pop operation.
+    pub fn next_task(&mut self) -> Option<DispatchTask> {
+        self.dispatch_queue.next()
+    }
+
+    /// Check if queue is above stall threshold.
+    pub fn is_stalled(&self, threshold: usize) -> bool {
+        self.dispatch_queue.len() > threshold
+    }
+
+    /// Get current queue depth.
+    pub fn queue_depth(&self) -> usize {
+        self.dispatch_queue.len()
+    }
+
+    /// Try to acquire concurrency permit.
+    pub fn try_acquire_permit(&self) -> Option<tokio::sync::SemaphorePermit<'_>> {
+        self.concurrency_controller.try_acquire()
+    }
+
+    /// Signal shutdown to issue mode if active.
+    pub async fn shutdown(&self) {
+        if let Some(ref tx) = self.issue_shutdown_tx {
+            let _ = tx.send(()).await;
+        }
+    }
+}
+
 /// The main orchestrator that runs the dark factory.
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
@@ -98,6 +196,14 @@ pub struct AgentOrchestrator {
     drift_detector: DriftDetector,
     /// Session rotation manager for fresh eyes.
     session_rotation: SessionRotationManager,
+    /// Mode coordinator for dual mode operation.
+    mode_coordinator: Option<ModeCoordinator>,
+    /// Shared dispatch queue for dual mode operation.
+    dispatch_queue: Option<DispatchQueue>,
+    /// Shutdown signal senders for mode tasks.
+    mode_shutdown_tx: Option<tokio::sync::mpsc::Sender<()>>,
+    /// Stall detection threshold.
+    stall_threshold: usize,
 }
 
 impl AgentOrchestrator {
@@ -120,6 +226,30 @@ impl AgentOrchestrator {
             session_rotation = session_rotation.with_duration(Duration::from_secs(duration_secs));
         }
 
+        // Initialize mode coordinator if workflow config is present
+        let mode_coordinator = if let Some(workflow) = &config.workflow {
+            let tracker_cfg = config.tracker.as_ref().map(|t| terraphim_tracker::TrackerConfig {
+                url: t.url.clone(),
+                token: std::env::var(&t.token_env_var).unwrap_or_default(),
+                owner: t.owner.clone(),
+                repo: t.repo.clone(),
+                robot_url: None,
+            });
+            let (coord, _) = ModeCoordinator::new(
+                workflow.clone(),
+                config.agents.clone(),
+                tracker_cfg,
+                Some(config.compound_review.schedule.clone()),
+            )?;
+            Some(coord)
+        } else {
+            None
+        };
+
+        let stall_threshold = config.concurrency.as_ref()
+            .map(|c| c.queue_depth as usize)
+            .unwrap_or(100);
+
         Ok(Self {
             config,
             spawner,
@@ -136,6 +266,10 @@ impl AgentOrchestrator {
             review_queue: Vec::new(),
             drift_detector,
             session_rotation,
+            mode_coordinator,
+            dispatch_queue: None,
+            mode_shutdown_tx: None,
+            stall_threshold,
         })
     }
 
@@ -206,6 +340,150 @@ impl AgentOrchestrator {
     pub fn shutdown(&mut self) {
         info!("shutdown requested");
         self.shutdown_requested = true;
+    }
+
+    /// Unified shutdown with queue draining and active task waiting.
+    /// Signals all modes, drains the dispatch queue, and waits for active tasks to complete.
+    pub async fn unified_shutdown(&mut self) {
+        info!("starting unified shutdown");
+
+        // Set shutdown flag
+        self.shutdown_requested = true;
+
+        // Signal mode shutdown
+        if let Some(ref coord) = self.mode_coordinator {
+            coord.shutdown().await;
+            info!("mode coordinator shutdown signaled");
+        }
+
+        // Drain dispatch queue
+        if let Some(ref mut coord) = self.mode_coordinator {
+            let mut drained = 0;
+            while coord.next_task().is_some() {
+                drained += 1;
+            }
+            info!("drained {} tasks from dispatch queue", drained);
+        }
+
+        // Wait for active tasks to complete (up to timeout)
+        let shutdown_timeout = Duration::from_secs(30);
+        let deadline = Instant::now() + shutdown_timeout;
+
+        while Instant::now() < deadline {
+            let active_count = self.active_agents.len();
+            if active_count == 0 {
+                info!("all agents completed, shutdown complete");
+                break;
+            }
+            info!(
+                active_count = active_count,
+                "waiting for agents to complete..."
+            );
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        }
+
+        // Force shutdown any remaining agents
+        let remaining = self.active_agents.len();
+        if remaining > 0 {
+            warn!(
+                remaining = remaining,
+                "timeout reached, force stopping remaining agents"
+            );
+            self.shutdown_all_agents().await;
+        }
+
+        info!("unified shutdown complete");
+    }
+
+    /// Check for stall condition and log warning if detected.
+    /// Returns true if stalled.
+    pub fn check_stall(&self) -> bool {
+        if let Some(ref coord) = self.mode_coordinator {
+            if coord.is_stalled(self.stall_threshold) {
+                let depth = coord.queue_depth();
+                warn!(
+                    queue_depth = depth,
+                    threshold = self.stall_threshold,
+                    "STALL DETECTED: Queue depth exceeded threshold"
+                );
+                return true;
+            }
+        }
+        false
+    }
+
+    /// Dispatch tasks from the queue to agents using the spawner.
+    /// Returns the number of tasks dispatched.
+    pub async fn dispatch_from_queue(&mut self) -> usize {
+        let mut dispatched = 0;
+
+        // Try to acquire a concurrency permit first
+        let has_permit = self
+            .mode_coordinator
+            .as_ref()
+            .and_then(|c| c.try_acquire_permit())
+            .is_some();
+
+        if !has_permit {
+            debug!("concurrency limit reached, skipping dispatch");
+            return 0;
+        }
+
+        // Get next task from queue - this needs mutable borrow
+        let task = self
+            .mode_coordinator
+            .as_mut()
+            .and_then(|c| c.next_task());
+
+        if let Some(task) = task {
+            match task {
+                DispatchTask::TimeTask(agent_name, _schedule) => {
+                    if let Some(agent_def) =
+                        self.config.agents.iter().find(|a| a.name == agent_name).cloned()
+                    {
+                        if let Err(e) = self.spawn_agent(&agent_def).await {
+                            error!(agent = %agent_name, error = %e, "failed to dispatch time task");
+                        } else {
+                            info!(agent = %agent_name, "dispatched time task");
+                            dispatched += 1;
+                        }
+                    } else {
+                        warn!(agent = %agent_name, "agent not found for time task");
+                    }
+                }
+                DispatchTask::IssueTask(agent_name, issue_id, _priority) => {
+                    if let Some(agent_def) =
+                        self.config.agents.iter().find(|a| a.name == agent_name).cloned()
+                    {
+                        if let Err(e) = self.spawn_agent(&agent_def).await {
+                            error!(agent = %agent_name, issue_id = issue_id, error = %e, "failed to dispatch issue task");
+                        } else {
+                            info!(agent = %agent_name, issue_id = issue_id, "dispatched issue task");
+                            dispatched += 1;
+                        }
+                    } else {
+                        warn!(agent = %agent_name, "agent not found for issue task");
+                    }
+                }
+            }
+        }
+
+        dispatched
+    }
+
+    /// Get the current mode coordinator (if dual mode is configured).
+    pub fn mode_coordinator(&self) -> Option<&ModeCoordinator> {
+        self.mode_coordinator.as_ref()
+    }
+
+    /// Get a mutable reference to the mode coordinator.
+    pub fn mode_coordinator_mut(&mut self) -> Option<&mut ModeCoordinator> {
+        self.mode_coordinator.as_mut()
+    }
+
+    /// Get the current workflow mode (if configured).
+    pub fn workflow_mode(&self) -> Option<WorkflowMode> {
+        self.mode_coordinator.as_ref().map(|c| c.workflow_mode)
     }
 
     /// Get current status of all agents.
@@ -488,7 +766,13 @@ impl AgentOrchestrator {
         // 5. Evaluate nightwatch drift
         self.nightwatch.evaluate();
 
-        // 6. Update last_tick_time
+        // 6. Check for stall condition (if dual mode is active)
+        self.check_stall();
+
+        // 7. Dispatch tasks from queue to agents (if dual mode is active)
+        self.dispatch_from_queue().await;
+
+        // 8. Update last_tick_time
         self.last_tick_time = chrono::Utc::now();
     }
 
@@ -1229,5 +1513,255 @@ task = "test"
         assert_eq!(orch.config.review_pairs.len(), 2);
         assert_eq!(orch.config.review_pairs[0].producer, "implementation-swarm");
         assert_eq!(orch.config.review_pairs[0].reviewer, "security-sentinel");
+    }
+
+    // =========================================================================
+    // Issue #12: Dual Mode and ModeCoordinator Tests
+    // =========================================================================
+
+    /// Test: ModeCoordinator creation in dual mode
+    #[test]
+    fn test_mode_coordinator_dual_mode() {
+        let workflow = WorkflowConfig {
+            mode: WorkflowMode::Dual,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 5,
+        };
+
+        let agents = vec![AgentDefinition {
+            name: "test-agent".to_string(),
+            layer: AgentLayer::Growth,
+            cli_tool: "echo".to_string(),
+            task: "test".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            provider: None,
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: None,
+            persona_name: None,
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
+            skill_chain: vec![],
+        }];
+
+        let (coord, _shutdown_rx) = ModeCoordinator::new(
+            workflow,
+            agents,
+            None, // No tracker for this test
+            Some("0 2 * * *".to_string()),
+        ).unwrap();
+
+        assert_eq!(coord.workflow_mode, WorkflowMode::Dual);
+        assert!(coord.time_mode.is_some());
+        assert!(coord.issue_mode.is_none()); // No tracker provided
+        assert_eq!(coord.queue_depth(), 0);
+        assert!(!coord.is_stalled(100));
+    }
+
+    /// Test: ModeCoordinator creation in time-only mode
+    #[test]
+    fn test_mode_coordinator_time_only_mode() {
+        let workflow = WorkflowConfig {
+            mode: WorkflowMode::TimeOnly,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 3,
+        };
+
+        let agents = vec![];
+
+        let (coord, _shutdown_rx) = ModeCoordinator::new(
+            workflow,
+            agents,
+            None,
+            None,
+        ).unwrap();
+
+        assert_eq!(coord.workflow_mode, WorkflowMode::TimeOnly);
+        assert!(coord.time_mode.is_some());
+        assert!(coord.issue_mode.is_none());
+        assert_eq!(coord.concurrency_controller.max_parallel(), 3);
+    }
+
+    /// Test: ModeCoordinator creation in issue-only mode
+    #[test]
+    fn test_mode_coordinator_issue_only_mode() {
+        let workflow = WorkflowConfig {
+            mode: WorkflowMode::IssueOnly,
+            poll_interval_secs: 30,
+            max_concurrent_tasks: 5,
+        };
+
+        let agents = vec![];
+
+        // Without tracker, issue mode should not be created
+        let (coord, _shutdown_rx) = ModeCoordinator::new(
+            workflow,
+            agents.clone(),
+            None,
+            None,
+        ).unwrap();
+
+        assert_eq!(coord.workflow_mode, WorkflowMode::IssueOnly);
+        assert!(coord.time_mode.is_none());
+        assert!(coord.issue_mode.is_none());
+    }
+
+    /// Test: Stall detection in ModeCoordinator
+    #[test]
+    fn test_stall_detection() {
+        let workflow = WorkflowConfig {
+            mode: WorkflowMode::Dual,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 5,
+        };
+
+        let agents = vec![];
+
+        let (mut coord, _shutdown_rx) = ModeCoordinator::new(
+            workflow,
+            agents,
+            None,
+            None,
+        ).unwrap();
+
+        // Initially not stalled
+        assert!(!coord.is_stalled(10));
+
+        // Fill the queue above threshold
+        for i in 0..15 {
+            let task = DispatchTask::TimeTask(format!("agent-{}", i), "0 * * * *".to_string());
+            coord.dispatch_queue.submit(task).unwrap();
+        }
+
+        // Now should be stalled with threshold of 10
+        assert!(coord.is_stalled(10));
+        assert!(!coord.is_stalled(20));
+    }
+
+    /// Test: Orchestrator stall detection integration
+    #[test]
+    fn test_orchestrator_stall_detection() {
+        let mut config = test_config();
+        config.workflow = Some(WorkflowConfig {
+            mode: WorkflowMode::Dual,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 5,
+        });
+        config.concurrency = Some(ConcurrencyConfig {
+            max_parallel_agents: 3,
+            queue_depth: 10,
+            starvation_timeout_secs: 300,
+        });
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Initially not stalled
+        assert!(!orch.check_stall());
+
+        // Fill the mode coordinator queue if it exists
+        if let Some(ref mut coord) = orch.mode_coordinator {
+            for i in 0..15 {
+                let task = DispatchTask::TimeTask(format!("agent-{}", i), "0 * * * *".to_string());
+                coord.dispatch_queue.submit(task).unwrap();
+            }
+        }
+
+        // Now should be stalled
+        assert!(orch.check_stall());
+    }
+
+    /// Test: Unified shutdown signals issue mode
+    #[tokio::test]
+    async fn test_unified_shutdown() {
+        let mut config = test_config();
+        config.workflow = Some(WorkflowConfig {
+            mode: WorkflowMode::Dual,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 5,
+        });
+
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+
+        // Start shutdown
+        orch.unified_shutdown().await;
+
+        // Should complete without errors
+        assert!(orch.shutdown_requested);
+    }
+
+    /// Test: Dispatch queue operations
+    #[test]
+    fn test_dispatch_queue_next_task() {
+        let workflow = WorkflowConfig {
+            mode: WorkflowMode::Dual,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 5,
+        };
+
+        let agents = vec![];
+
+        let (mut coord, _shutdown_rx) = ModeCoordinator::new(
+            workflow,
+            agents,
+            None,
+            None,
+        ).unwrap();
+
+        // Submit some tasks
+        let task1 = DispatchTask::TimeTask("agent1".to_string(), "0 * * * *".to_string());
+        let task2 = DispatchTask::IssueTask("agent2".to_string(), 42, 100);
+
+        coord.dispatch_queue.submit(task1.clone()).unwrap();
+        coord.dispatch_queue.submit(task2.clone()).unwrap();
+
+        assert_eq!(coord.queue_depth(), 2);
+
+        // Get next task - should be issue task due to higher priority
+        let next = coord.next_task();
+        assert!(next.is_some());
+        assert_eq!(coord.queue_depth(), 1);
+
+        // Get remaining task
+        let next = coord.next_task();
+        assert!(next.is_some());
+        assert_eq!(coord.queue_depth(), 0);
+
+        // Queue empty
+        let next = coord.next_task();
+        assert!(next.is_none());
+    }
+
+    /// Test: Concurrency permit acquisition
+    #[test]
+    fn test_concurrency_permit_acquisition() {
+        let workflow = WorkflowConfig {
+            mode: WorkflowMode::Dual,
+            poll_interval_secs: 60,
+            max_concurrent_tasks: 2,
+        };
+
+        let agents = vec![];
+
+        let (coord, _shutdown_rx) = ModeCoordinator::new(
+            workflow,
+            agents,
+            None,
+            None,
+        ).unwrap();
+
+        // Should be able to acquire permits up to max
+        let permit1 = coord.try_acquire_permit();
+        assert!(permit1.is_some());
+
+        let permit2 = coord.try_acquire_permit();
+        assert!(permit2.is_some());
+
+        // Third permit should fail
+        let permit3 = coord.try_acquire_permit();
+        assert!(permit3.is_none());
     }
 }

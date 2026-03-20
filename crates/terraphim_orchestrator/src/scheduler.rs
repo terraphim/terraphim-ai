@@ -115,6 +115,7 @@ impl TimeScheduler {
 
 /// TimeMode wraps the TimeScheduler and integrates with the dispatch queue.
 /// Supports both legacy mode (direct spawn) and queue-based dispatch.
+#[derive(Debug)]
 pub struct TimeMode {
     /// The underlying scheduler.
     scheduler: TimeScheduler,

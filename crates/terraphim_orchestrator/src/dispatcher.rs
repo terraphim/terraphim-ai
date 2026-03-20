@@ -20,7 +20,7 @@ pub enum DispatchTask {
 }
 
 /// Priority queue for dispatch tasks with fairness support.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct DispatchQueue {
     /// Binary heap for priority ordering (max-heap by priority).
     /// Uses Reverse for min-heap behavior on priority values.
