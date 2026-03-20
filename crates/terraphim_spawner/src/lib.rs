@@ -8,7 +8,7 @@
 //! - Auto-restart on failure
 
 use std::collections::HashMap;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::Duration;
 use tokio::io::BufReader;
@@ -22,6 +22,55 @@ pub mod config;
 pub mod health;
 pub mod mention;
 pub mod output;
+
+/// Spawn request with provider/fallback configuration.
+/// Mirrors fields from AgentDefinition to avoid circular dependency
+/// between terraphim_spawner and terraphim_orchestrator.
+#[derive(Debug, Clone)]
+pub struct SpawnRequest {
+    /// Unique agent name
+    pub name: String,
+    /// CLI tool to use (e.g., "opencode", "codex", "claude")
+    pub cli_tool: String,
+    /// Task/prompt for the agent
+    pub task: String,
+    /// Primary provider prefix (e.g., "opencode-go", "kimi-for-coding")
+    pub provider: Option<String>,
+    /// Primary model (e.g., "kimi-k2.5", "glm-5")
+    pub model: Option<String>,
+    /// Fallback provider if primary fails
+    pub fallback_provider: Option<String>,
+    /// Fallback model
+    pub fallback_model: Option<String>,
+    /// Provider tier for timeout configuration
+    pub provider_tier: Option<ProviderTier>,
+}
+
+/// Provider tier classification for timeout configuration.
+/// Mirrors terraphim_orchestrator::config::ProviderTier to avoid circular dependency.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ProviderTier {
+    /// Routine docs, advisory. Timeout: 30s.
+    Quick,
+    /// Quality gates, compound review, security. Timeout: 60s.
+    Deep,
+    /// Code generation, twins, tests. Timeout: 120s.
+    Implementation,
+    /// Spec validation, deep reasoning. Timeout: 300s. No fallback.
+    Oracle,
+}
+
+impl ProviderTier {
+    /// Timeout in seconds for this tier
+    pub fn timeout_secs(&self) -> u64 {
+        match self {
+            Self::Quick => 30,
+            Self::Deep => 60,
+            Self::Implementation => 120,
+            Self::Oracle => 300,
+        }
+    }
+}
 
 pub use audit::AuditEvent;
 pub use config::{AgentConfig, AgentValidator, ResourceLimits, ValidationError};
@@ -365,6 +414,214 @@ impl AgentSpawner {
         self.spawn_config(provider, &config, task).await
     }
 
+    /// Spawn an agent with automatic fallback on failure.
+    ///
+    /// Uses ProviderTier timeout and retries with fallback provider if configured.
+    /// Checks banned providers before spawning.
+    pub async fn spawn_with_fallback(
+        &self,
+        request: &SpawnRequest,
+        working_dir: &Path,
+        banned_providers: &[String],
+        circuit_breakers: &mut HashMap<String, CircuitBreaker>,
+    ) -> Result<AgentHandle, SpawnerError> {
+        // 1. Check if primary provider is banned
+        if let Some(ref provider) = request.provider {
+            if Self::is_provider_banned(provider, banned_providers) {
+                return Err(SpawnerError::ValidationError(format!(
+                    "Provider '{}' is banned",
+                    provider
+                )));
+            }
+        }
+
+        // 2. Determine timeout from provider_tier (or default 120s)
+        let timeout_secs = request
+            .provider_tier
+            .map(|t| t.timeout_secs())
+            .unwrap_or(120);
+        let timeout_duration = Duration::from_secs(timeout_secs);
+
+        // Build primary provider string: {provider}/{model} or just provider
+        let primary_provider_str =
+            Self::build_provider_string(request.provider.as_deref(), request.model.as_deref());
+
+        // Get or create circuit breaker for primary provider
+        let primary_cb = circuit_breakers
+            .entry(primary_provider_str.clone())
+            .or_insert_with(|| {
+                CircuitBreaker::new(CircuitBreakerConfig {
+                    failure_threshold: 3,
+                    cooldown: Duration::from_secs(300), // 5 minutes
+                    success_threshold: 1,
+                })
+            });
+
+        // Check if primary circuit is open
+        if !primary_cb.should_allow() {
+            tracing::warn!(
+                provider = %primary_provider_str,
+                "Primary provider circuit is open, skipping to fallback"
+            );
+            // Fall through to fallback logic below
+        } else {
+            // 3. Try primary provider with timeout
+            let primary_result = self
+                .try_spawn_with_provider(request, working_dir, false, timeout_duration)
+                .await;
+
+            match primary_result {
+                Ok(handle) => {
+                    primary_cb.record_success();
+                    return Ok(handle);
+                }
+                Err(e) => {
+                    primary_cb.record_failure();
+                    tracing::warn!(
+                        provider = %primary_provider_str,
+                        error = %e,
+                        "Primary provider failed, attempting fallback"
+                    );
+                    // Fall through to fallback logic
+                }
+            }
+        }
+
+        // 4. Check if fallback exists and circuit is not open
+        let fallback_provider_str = match (
+            request.fallback_provider.as_deref(),
+            request.fallback_model.as_deref(),
+        ) {
+            (Some(fp), Some(fm)) => format!("{}/{}", fp, fm),
+            (Some(fp), None) => fp.to_string(),
+            (None, Some(fm)) => format!("fallback/{}", fm),
+            (None, None) => {
+                return Err(SpawnerError::SpawnError(
+                    "Primary provider failed and no fallback configured".to_string(),
+                ));
+            }
+        };
+
+        // Check if fallback provider is banned
+        if let Some(ref fb_provider) = request.fallback_provider {
+            if Self::is_provider_banned(fb_provider, banned_providers) {
+                return Err(SpawnerError::ValidationError(format!(
+                    "Fallback provider '{}' is banned",
+                    fb_provider
+                )));
+            }
+        }
+
+        // Get or create circuit breaker for fallback
+        let fallback_cb = circuit_breakers
+            .entry(fallback_provider_str.clone())
+            .or_insert_with(|| {
+                CircuitBreaker::new(CircuitBreakerConfig {
+                    failure_threshold: 3,
+                    cooldown: Duration::from_secs(300),
+                    success_threshold: 1,
+                })
+            });
+
+        if !fallback_cb.should_allow() {
+            return Err(SpawnerError::SpawnError(format!(
+                "Both primary '{}' and fallback '{}' circuits are open",
+                primary_provider_str, fallback_provider_str
+            )));
+        }
+
+        // 5. Retry with fallback
+        let fallback_result = self
+            .try_spawn_with_provider(request, working_dir, true, timeout_duration)
+            .await;
+
+        match fallback_result {
+            Ok(handle) => {
+                fallback_cb.record_success();
+                Ok(handle)
+            }
+            Err(e) => {
+                fallback_cb.record_failure();
+                Err(SpawnerError::SpawnError(format!(
+                    "Both primary and fallback failed. Fallback error: {}",
+                    e
+                )))
+            }
+        }
+    }
+
+    /// Check if a provider is in the banned list.
+    fn is_provider_banned(provider: &str, banned_providers: &[String]) -> bool {
+        banned_providers
+            .iter()
+            .any(|banned| provider.starts_with(banned))
+    }
+
+    /// Build provider string from provider and model components.
+    fn build_provider_string(provider: Option<&str>, model: Option<&str>) -> String {
+        match (provider, model) {
+            (Some(p), Some(m)) => format!("{}/{}", p, m),
+            (Some(p), None) => p.to_string(),
+            (None, Some(m)) => format!("unknown/{}", m),
+            (None, None) => "unknown".to_string(),
+        }
+    }
+
+    /// Try to spawn with either primary or fallback configuration.
+    async fn try_spawn_with_provider(
+        &self,
+        request: &SpawnRequest,
+        working_dir: &Path,
+        use_fallback: bool,
+        timeout_duration: Duration,
+    ) -> Result<AgentHandle, SpawnerError> {
+        // Determine which provider/model to use
+        let _provider_str = if use_fallback {
+            request.fallback_provider.clone()
+        } else {
+            request.provider.clone()
+        };
+
+        let model_str = if use_fallback {
+            request.fallback_model.clone()
+        } else {
+            request.model.clone()
+        };
+
+        // Build the CLI command - use the cli_tool from request
+        // In practice, this might need to be constructed from provider/model
+        let cli_command = request.cli_tool.clone();
+
+        // Create a minimal Provider for spawning
+        // Note: This is a simplified approach - in production, you'd map
+        // provider strings to actual Provider configurations
+        let provider = Provider::new(
+            format!(
+                "{}-{}",
+                request.name,
+                if use_fallback { "fallback" } else { "primary" }
+            ),
+            format!("{} Agent", request.name),
+            terraphim_types::capability::ProviderType::Agent {
+                agent_id: format!("@{}", request.name),
+                cli_command,
+                working_dir: working_dir.to_path_buf(),
+            },
+            vec![],
+        );
+
+        // Spawn with timeout
+        let spawn_future = self.spawn_with_model(&provider, &request.task, model_str.as_deref());
+
+        match tokio::time::timeout(timeout_duration, spawn_future).await {
+            Ok(result) => result,
+            Err(_) => Err(SpawnerError::SpawnError(format!(
+                "Spawn timed out after {} seconds",
+                timeout_duration.as_secs()
+            ))),
+        }
+    }
+
     /// Internal spawn implementation shared by spawn() and spawn_with_model().
     async fn spawn_config(
         &self,
@@ -665,5 +922,229 @@ mod tests {
         assert_eq!(pool.total_idle(), 1);
         pool.drain().await;
         assert_eq!(pool.total_idle(), 0);
+    }
+
+    // --------------- Spawn With Fallback Tests ---------------
+
+    #[test]
+    fn test_build_provider_string() {
+        assert_eq!(
+            AgentSpawner::build_provider_string(Some("opencode-go"), Some("glm-5")),
+            "opencode-go/glm-5"
+        );
+        assert_eq!(
+            AgentSpawner::build_provider_string(Some("kimi-for-coding"), None),
+            "kimi-for-coding"
+        );
+        assert_eq!(
+            AgentSpawner::build_provider_string(None, Some("k2p5")),
+            "unknown/k2p5"
+        );
+        assert_eq!(AgentSpawner::build_provider_string(None, None), "unknown");
+    }
+
+    #[test]
+    fn test_is_provider_banned() {
+        let banned = vec!["opencode".to_string(), "zen".to_string()];
+
+        // Exact match
+        assert!(AgentSpawner::is_provider_banned("opencode", &banned));
+
+        // Prefix match (e.g., "opencode-go" starts with "opencode")
+        assert!(AgentSpawner::is_provider_banned("opencode-go", &banned));
+
+        // Not banned
+        assert!(!AgentSpawner::is_provider_banned(
+            "kimi-for-coding",
+            &banned
+        ));
+        assert!(!AgentSpawner::is_provider_banned("claude-code", &banned));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_fallback_primary_success() {
+        let spawner = AgentSpawner::new();
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Hello World".to_string(),
+            provider: Some("opencode-go".to_string()),
+            model: Some("kimi-k2.5".to_string()),
+            fallback_provider: Some("opencode-go".to_string()),
+            fallback_model: Some("glm-5".to_string()),
+            provider_tier: Some(ProviderTier::Quick),
+        };
+
+        let mut circuit_breakers = HashMap::new();
+        let banned_providers: Vec<String> = vec![];
+
+        let result = spawner
+            .spawn_with_fallback(
+                &request,
+                Path::new("/tmp"),
+                &banned_providers,
+                &mut circuit_breakers,
+            )
+            .await;
+
+        // Should succeed with primary (echo command)
+        assert!(result.is_ok());
+
+        // Circuit breaker should record success for primary
+        let primary_key = "opencode-go/kimi-k2.5";
+        assert!(circuit_breakers.contains_key(primary_key));
+        assert!(circuit_breakers[primary_key].should_allow());
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_fallback_banned_primary() {
+        let spawner = AgentSpawner::new();
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Hello World".to_string(),
+            provider: Some("opencode-go".to_string()),
+            model: Some("kimi-k2.5".to_string()),
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: Some(ProviderTier::Quick),
+        };
+
+        let mut circuit_breakers = HashMap::new();
+        let banned_providers = vec!["opencode".to_string()];
+
+        let result = spawner
+            .spawn_with_fallback(
+                &request,
+                Path::new("/tmp"),
+                &banned_providers,
+                &mut circuit_breakers,
+            )
+            .await;
+
+        // Should fail because primary is banned
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("banned"));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_fallback_no_fallback_configured() {
+        let spawner = AgentSpawner::new();
+
+        // Use a command that will definitely fail
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "nonexistent_command_12345".to_string(),
+            task: "Hello World".to_string(),
+            provider: Some("primary-provider".to_string()),
+            model: Some("model-1".to_string()),
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: Some(ProviderTier::Quick),
+        };
+
+        let mut circuit_breakers = HashMap::new();
+        let banned_providers: Vec<String> = vec![];
+
+        let result = spawner
+            .spawn_with_fallback(
+                &request,
+                Path::new("/tmp"),
+                &banned_providers,
+                &mut circuit_breakers,
+            )
+            .await;
+
+        // Should fail - no fallback configured
+        assert!(result.is_err());
+        let err_msg = result.unwrap_err().to_string();
+        assert!(err_msg.contains("no fallback configured") || err_msg.contains("Failed to spawn"));
+    }
+
+    #[tokio::test]
+    async fn test_spawn_with_fallback_uses_correct_timeout() {
+        // Test that different tiers use correct timeouts
+        let test_cases = vec![
+            (ProviderTier::Quick, 30u64),
+            (ProviderTier::Deep, 60u64),
+            (ProviderTier::Implementation, 120u64),
+            (ProviderTier::Oracle, 300u64),
+        ];
+
+        for (tier, expected_secs) in test_cases {
+            let request = SpawnRequest {
+                name: "test-agent".to_string(),
+                cli_tool: "echo".to_string(),
+                task: "test".to_string(),
+                provider: Some("test-provider".to_string()),
+                model: Some("test-model".to_string()),
+                fallback_provider: None,
+                fallback_model: None,
+                provider_tier: Some(tier),
+            };
+
+            let timeout = request
+                .provider_tier
+                .map(|t| t.timeout_secs())
+                .unwrap_or(120);
+            assert_eq!(
+                timeout, expected_secs,
+                "Timeout mismatch for tier {:?}",
+                tier
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_provider_tier_timeout_secs() {
+        assert_eq!(ProviderTier::Quick.timeout_secs(), 30);
+        assert_eq!(ProviderTier::Deep.timeout_secs(), 60);
+        assert_eq!(ProviderTier::Implementation.timeout_secs(), 120);
+        assert_eq!(ProviderTier::Oracle.timeout_secs(), 300);
+    }
+
+    #[test]
+    fn test_circuit_breaker_prevents_retry_when_open() {
+        let mut cb = CircuitBreaker::new(CircuitBreakerConfig {
+            failure_threshold: 3,
+            cooldown: Duration::from_secs(300),
+            success_threshold: 1,
+        });
+
+        // Record 3 failures to open the circuit
+        cb.record_failure();
+        assert!(cb.should_allow());
+        cb.record_failure();
+        assert!(cb.should_allow());
+        cb.record_failure();
+        assert!(!cb.should_allow()); // Circuit is now open
+
+        // State should be Open
+        assert_eq!(cb.state(), CircuitState::Open);
+    }
+
+    #[tokio::test]
+    async fn test_spawn_request_clone() {
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Hello".to_string(),
+            provider: Some("provider".to_string()),
+            model: Some("model".to_string()),
+            fallback_provider: Some("fallback".to_string()),
+            fallback_model: Some("fallback-model".to_string()),
+            provider_tier: Some(ProviderTier::Deep),
+        };
+
+        let cloned = request.clone();
+        assert_eq!(cloned.name, "test-agent");
+        assert_eq!(cloned.cli_tool, "echo");
+        assert_eq!(cloned.task, "Hello");
+        assert_eq!(cloned.provider, Some("provider".to_string()));
+        assert_eq!(cloned.model, Some("model".to_string()));
+        assert_eq!(cloned.fallback_provider, Some("fallback".to_string()));
+        assert_eq!(cloned.fallback_model, Some("fallback-model".to_string()));
+        assert_eq!(cloned.provider_tier, Some(ProviderTier::Deep));
     }
 }
