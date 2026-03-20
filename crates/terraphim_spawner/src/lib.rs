@@ -44,6 +44,14 @@ pub struct SpawnRequest {
     pub fallback_model: Option<String>,
     /// Provider tier for timeout configuration
     pub provider_tier: Option<ProviderTier>,
+    /// Persona name for agent identity
+    pub persona_name: Option<String>,
+    /// Persona symbol/icon
+    pub persona_symbol: Option<String>,
+    /// Persona vibe/personality description
+    pub persona_vibe: Option<String>,
+    /// Meta-cortex connections (related agents)
+    pub meta_cortex_connections: Vec<String>,
 }
 
 /// Provider tier classification for timeout configuration.
@@ -70,6 +78,31 @@ impl ProviderTier {
             Self::Oracle => 300,
         }
     }
+}
+
+/// Generate persona identity prefix for agent prompt injection.
+/// Returns None if no persona is configured.
+fn build_persona_prefix(request: &SpawnRequest) -> Option<String> {
+    let name = request.persona_name.as_ref()?;
+    let mut prefix = format!(
+        "# Identity\n\n\
+         You are **{0}**, a member of Species Terraphim.\n",
+        name
+    );
+    if let Some(symbol) = &request.persona_symbol {
+        prefix.push_str(&format!("Symbol: {}\n", symbol));
+    }
+    if let Some(vibe) = &request.persona_vibe {
+        prefix.push_str(&format!("Personality: {}\n", vibe));
+    }
+    if !request.meta_cortex_connections.is_empty() {
+        prefix.push_str(&format!(
+            "Meta-cortex connections: {}\n",
+            request.meta_cortex_connections.join(", ")
+        ));
+    }
+    prefix.push_str("\n---\n\n");
+    Some(prefix)
 }
 
 pub use audit::AuditEvent;
@@ -610,8 +643,15 @@ impl AgentSpawner {
             vec![],
         );
 
+        // Inject persona prefix into task if configured
+        let task = if let Some(prefix) = build_persona_prefix(request) {
+            format!("{}{}", prefix, request.task)
+        } else {
+            request.task.clone()
+        };
+
         // Spawn with timeout
-        let spawn_future = self.spawn_with_model(&provider, &request.task, model_str.as_deref());
+        let spawn_future = self.spawn_with_model(&provider, &task, model_str.as_deref());
 
         match tokio::time::timeout(timeout_duration, spawn_future).await {
             Ok(result) => result,
@@ -973,6 +1013,10 @@ mod tests {
             fallback_provider: Some("opencode-go".to_string()),
             fallback_model: Some("glm-5".to_string()),
             provider_tier: Some(ProviderTier::Quick),
+            persona_name: None,
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
         };
 
         let mut circuit_breakers = HashMap::new();
@@ -1008,6 +1052,10 @@ mod tests {
             fallback_provider: None,
             fallback_model: None,
             provider_tier: Some(ProviderTier::Quick),
+            persona_name: None,
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
         };
 
         let mut circuit_breakers = HashMap::new();
@@ -1042,6 +1090,10 @@ mod tests {
             fallback_provider: None,
             fallback_model: None,
             provider_tier: Some(ProviderTier::Quick),
+            persona_name: None,
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
         };
 
         let mut circuit_breakers = HashMap::new();
@@ -1082,6 +1134,10 @@ mod tests {
                 fallback_provider: None,
                 fallback_model: None,
                 provider_tier: Some(tier),
+                persona_name: None,
+                persona_symbol: None,
+                persona_vibe: None,
+                meta_cortex_connections: vec![],
             };
 
             let timeout = request
@@ -1135,6 +1191,10 @@ mod tests {
             fallback_provider: Some("fallback".to_string()),
             fallback_model: Some("fallback-model".to_string()),
             provider_tier: Some(ProviderTier::Deep),
+            persona_name: Some("TestPersona".to_string()),
+            persona_symbol: Some("🧪".to_string()),
+            persona_vibe: Some("Curious".to_string()),
+            meta_cortex_connections: vec!["agent1".to_string(), "agent2".to_string()],
         };
 
         let cloned = request.clone();
@@ -1146,5 +1206,105 @@ mod tests {
         assert_eq!(cloned.fallback_provider, Some("fallback".to_string()));
         assert_eq!(cloned.fallback_model, Some("fallback-model".to_string()));
         assert_eq!(cloned.provider_tier, Some(ProviderTier::Deep));
+        assert_eq!(cloned.persona_name, Some("TestPersona".to_string()));
+        assert_eq!(cloned.persona_symbol, Some("🧪".to_string()));
+        assert_eq!(cloned.persona_vibe, Some("Curious".to_string()));
+        assert_eq!(
+            cloned.meta_cortex_connections,
+            vec!["agent1".to_string(), "agent2".to_string()]
+        );
+    }
+
+    #[test]
+    fn test_build_persona_prefix_all_fields() {
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Do something".to_string(),
+            provider: None,
+            model: None,
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: None,
+            persona_name: Some("Neo".to_string()),
+            persona_symbol: Some("🔮".to_string()),
+            persona_vibe: Some("Mystical and wise".to_string()),
+            meta_cortex_connections: vec!["@oracle".to_string(), "@seer".to_string()],
+        };
+
+        let prefix = build_persona_prefix(&request).unwrap();
+        assert!(prefix.contains("# Identity"));
+        assert!(prefix.contains("You are **Neo**"));
+        assert!(prefix.contains("Species Terraphim"));
+        assert!(prefix.contains("Symbol: 🔮"));
+        assert!(prefix.contains("Personality: Mystical and wise"));
+        assert!(prefix.contains("Meta-cortex connections: @oracle, @seer"));
+        assert!(prefix.contains("\n---\n\n"));
+    }
+
+    #[test]
+    fn test_build_persona_prefix_no_persona() {
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Do something".to_string(),
+            provider: None,
+            model: None,
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: None,
+            persona_name: None,
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
+        };
+
+        assert!(build_persona_prefix(&request).is_none());
+    }
+
+    #[test]
+    fn test_build_persona_prefix_partial_fields() {
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Do something".to_string(),
+            provider: None,
+            model: None,
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: None,
+            persona_name: Some("Minimal".to_string()),
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
+        };
+
+        let prefix = build_persona_prefix(&request).unwrap();
+        assert!(prefix.contains("You are **Minimal**"));
+        assert!(!prefix.contains("Symbol:"));
+        assert!(!prefix.contains("Personality:"));
+        assert!(!prefix.contains("Meta-cortex connections:"));
+    }
+
+    #[test]
+    fn test_build_persona_prefix_only_connections() {
+        let request = SpawnRequest {
+            name: "test-agent".to_string(),
+            cli_tool: "echo".to_string(),
+            task: "Do something".to_string(),
+            provider: None,
+            model: None,
+            fallback_provider: None,
+            fallback_model: None,
+            provider_tier: None,
+            persona_name: Some("Connected".to_string()),
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec!["@helper".to_string()],
+        };
+
+        let prefix = build_persona_prefix(&request).unwrap();
+        assert!(prefix.contains("You are **Connected**"));
+        assert!(prefix.contains("Meta-cortex connections: @helper"));
     }
 }
