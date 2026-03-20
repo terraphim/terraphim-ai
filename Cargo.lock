@@ -10141,6 +10141,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "terraphim_workspace"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "futures",
+ "serde",
+ "serde_json",
+ "tempfile",
+ "thiserror 1.0.69",
+ "tokio",
+ "tokio-test",
+ "tracing",
+ "uuid",
+]
+
+[[package]]
 name = "test-env-log"
 version = "0.2.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
