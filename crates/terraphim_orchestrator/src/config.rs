@@ -33,6 +33,9 @@ pub struct OrchestratorConfig {
     /// Skill chain registry for agent validation
     #[serde(default)]
     pub skill_registry: SkillChainRegistry,
+    /// Milliseconds to wait between spawning Safety agents (thundering herd prevention).
+    #[serde(default = "default_stagger_delay_ms")]
+    pub stagger_delay_ms: u64,
 }
 
 /// Registry of available skill chains from terraphim-skills and zestic-engineering-skills.
@@ -291,6 +294,10 @@ fn default_max_restart_count() -> u32 {
 
 fn default_tick_interval() -> u64 {
     30
+}
+
+pub fn default_stagger_delay_ms() -> u64 {
+    5000
 }
 
 impl OrchestratorConfig {

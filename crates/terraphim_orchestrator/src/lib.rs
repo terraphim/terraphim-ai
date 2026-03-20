@@ -28,6 +28,8 @@ use terraphim_spawner::{AgentHandle, AgentSpawner};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
+
+
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
 pub struct AgentStatus {
@@ -112,9 +114,14 @@ impl AgentOrchestrator {
             self.config.agents.len()
         );
 
-        // Spawn Safety-layer agents immediately
+        // Spawn Safety-layer agents with stagger delay (thundering herd prevention)
         let immediate = self.scheduler.immediate_agents();
-        for agent_def in &immediate {
+        let stagger_delay = Duration::from_millis(self.config.stagger_delay_ms);
+        for (idx, agent_def) in immediate.iter().enumerate() {
+            if idx > 0 {
+                // Stagger spawns to prevent thundering herd
+                tokio::time::sleep(stagger_delay).await;
+            }
             if let Err(e) = self.spawn_agent(agent_def).await {
                 error!(agent = %agent_def.name, error = %e, "failed to spawn safety agent");
             }
@@ -505,7 +512,12 @@ impl AgentOrchestrator {
             .collect();
 
         for def in to_spawn {
-            info!(agent = %def.name, "cron schedule fired");
+            // Add random jitter to prevent thundering herd for Core agents
+            let jitter_ms = rand::random::<u64>() % self.config.stagger_delay_ms;
+            if jitter_ms > 0 {
+                tokio::time::sleep(Duration::from_millis(jitter_ms)).await;
+            }
+            info!(agent = %def.name, jitter_ms = jitter_ms, "cron schedule fired");
             if let Err(e) = self.spawn_agent(&def).await {
                 error!(agent = %def.name, error = %e, "cron spawn failed");
             }
@@ -676,6 +688,11 @@ mod tests {
                     fallback_provider: None,
                     fallback_model: None,
                     provider_tier: None,
+                    persona_name: None,
+                    persona_symbol: None,
+                    persona_vibe: None,
+                    meta_cortex_connections: vec![],
+                    skill_chain: vec![],
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -690,11 +707,20 @@ mod tests {
                     fallback_provider: None,
                     fallback_model: None,
                     provider_tier: None,
+                    persona_name: None,
+                    persona_symbol: None,
+                    persona_vibe: None,
+                    meta_cortex_connections: vec![],
+                    skill_chain: vec![],
                 },
             ],
             restart_cooldown_secs: 60,
             max_restart_count: 10,
             tick_interval_secs: 30,
+            allowed_providers: vec![],
+            banned_providers: vec!["opencode".to_string()],
+            skill_registry: Default::default(),
+            stagger_delay_ms: 5000,
         }
     }
 
@@ -795,10 +821,19 @@ task = "test"
                 fallback_provider: None,
                 fallback_model: None,
                 provider_tier: None,
+                persona_name: None,
+                persona_symbol: None,
+                persona_vibe: None,
+                meta_cortex_connections: vec![],
+                skill_chain: vec![],
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
             tick_interval_secs: 1,
+            allowed_providers: vec![],
+            banned_providers: vec!["opencode".to_string()],
+            skill_registry: Default::default(),
+            stagger_delay_ms: 5000,
         }
     }
 
@@ -868,6 +903,11 @@ task = "test"
             fallback_provider: None,
             fallback_model: None,
             provider_tier: None,
+            persona_name: None,
+            persona_symbol: None,
+            persona_vibe: None,
+            meta_cortex_connections: vec![],
+            skill_chain: vec![],
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -969,5 +1009,40 @@ task = "test"
             Some(1),
             "restart count should be 1 after first exit+restart cycle"
         );
+    }
+
+    /// Test: verify stagger_delay_ms is configurable
+    #[test]
+    fn test_stagger_delay_configurable() {
+        let mut config = test_config();
+        config.stagger_delay_ms = 100;
+        assert_eq!(config.stagger_delay_ms, 100);
+
+        config.stagger_delay_ms = 0;
+        assert_eq!(config.stagger_delay_ms, 0);
+    }
+
+    /// Test: verify default stagger delay is 5000ms
+    #[test]
+    fn test_stagger_delay_default() {
+        let config = OrchestratorConfig {
+            working_dir: std::path::PathBuf::from("/tmp"),
+            nightwatch: NightwatchConfig::default(),
+            compound_review: CompoundReviewConfig {
+                schedule: "0 0 * * *".to_string(),
+                max_duration_secs: 1800,
+                repo_path: std::path::PathBuf::from("/tmp"),
+                create_prs: false,
+            },
+            agents: vec![],
+            restart_cooldown_secs: 60,
+            max_restart_count: 10,
+            tick_interval_secs: 30,
+            allowed_providers: vec![],
+            banned_providers: vec!["opencode".to_string()],
+            skill_registry: Default::default(),
+            stagger_delay_ms: crate::config::default_stagger_delay_ms(),
+        };
+        assert_eq!(config.stagger_delay_ms, 5000);
     }
 }

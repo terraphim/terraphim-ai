@@ -14,6 +14,11 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         fallback_provider: None,
         fallback_model: None,
         provider_tier: None,
+        persona_name: None,
+        persona_symbol: None,
+        persona_vibe: None,
+        meta_cortex_connections: vec![],
+        skill_chain: vec![],
     }
 }
 
