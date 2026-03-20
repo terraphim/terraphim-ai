@@ -22,6 +22,7 @@ pub mod config;
 pub mod health;
 pub mod mention;
 pub mod output;
+pub mod skill_resolver;
 
 /// Spawn request with provider/fallback configuration.
 /// Mirrors fields from AgentDefinition to avoid circular dependency
@@ -111,7 +112,8 @@ pub use health::{
     CircuitBreaker, CircuitBreakerConfig, CircuitState, HealthChecker, HealthHistory, HealthStatus,
 };
 pub use mention::{MentionEvent, MentionRouter};
-pub use output::{OutputCapture, OutputEvent};
+pub use output::{OpenCodeEvent, OutputCapture, OutputEvent};
+pub use skill_resolver::{ResolvedSkill, SkillResolutionError, SkillResolver, SkillSource};
 
 /// Errors that can occur during agent spawning
 #[derive(thiserror::Error, Debug)]
