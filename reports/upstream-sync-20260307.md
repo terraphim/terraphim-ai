@@ -1,0 +1,148 @@
+# Upstream Sync Report - 20260307
+
+## Scope
+- Repository 1: `/home/alex/terraphim-ai`
+- Repository 2: `/home/alex/terraphim-skills`
+- Requested report path: `/opt/ai-dark-factory/reports/upstream-sync-20260307.md`
+
+## Execution Notes
+- `git fetch origin` for `terraphim-ai` failed due network/DNS restriction: `Could not resolve host: github.com`.
+- `git fetch origin` for `terraphim-skills` failed due sandbox write restriction outside allowed roots (cannot update `.git/FETCH_HEAD`).
+- Commit analysis below is based on current local `origin/main` tracking refs (may be stale vs true remote state).
+
+## Repository Status
+| Repo | Local HEAD | Tracked origin/main | HEAD..origin/main | Fetch status |
+|---|---|---|---:|---|
+| terraphim-ai | `f770aae0` | `f770aae0` | 0 | Failed (DNS/network) |
+| terraphim-skills | `44594d2` | `6a7ae16` | 86 | Failed (sandbox write restriction) |
+
+## Risk Analysis Summary
+- `terraphim-ai`: No upstream delta in local tracking refs (0 commits).
+- `terraphim-skills`: 86 upstream commits pending in local tracking refs.
+- Dominant themes in pending commits: hooks/pre-push behavior, judge system rewrite, repository naming/layout transitions, and new safety/guard plugin examples.
+
+## High-Risk Commits (Manual Review Required)
+| Risk | Commit | Why it is high risk | Manual review focus |
+|---|---|---|---|
+| High | `ef6399d` feat(judge): v2 rewrite with terraphim-cli KG integration | Large rewrite (hundreds of lines changed) in `automation/judge/run-judge.sh` and prompt/verdict flow | Verify CI hook behavior, verdict compatibility, tool invocation safety, and backward compatibility |
+| High | `98b1237` feat(judge): add pre-push hook + config template | Introduces mandatory pre-push automation path | Check for false positives/blocked pushes and ensure opt-out/override policy is acceptable |
+| High | `d6eeedf` feat(hooks): PreToolUse hooks for all commands | Global command interception changes execution behavior | Audit command rewriting logic for safety, shell injection, and unexpected command mutation |
+| High | `dc96659` docs: archive repository - migrate to terraphim-skills | Repository lifecycle/usage shift with major README rewrite | Confirm canonical repo expectations, install paths, and migration docs match current tooling |
+| High | `f21d66f` chore: rename repository to terraphim-skills | Renaming impacts plugin metadata and discovery paths | Validate all automation references, marketplace metadata, and scripts after rename |
+| High | `6a7ae16` feat: add OpenCode safety guard plugins | Adds executable plugin/install artifacts (JS + shell install script) | Review plugin trust model, execution permissions, and default-allow/default-deny behavior |
+
+## Security-Relevant Commits
+| Commit | Signal | Assessment |
+|---|---|---|
+| `90ede88` feat(git-safety-guard): block hook bypass flags | Hardening of bypass prevention | Positive security control; verify no legitimate workflows are broken |
+| `6a7ae16` OpenCode safety guard plugins | Safety policy enforcement plugins added | Security-impacting behavior; requires code review of guard logic |
+| `0aa7d2a` feat(ubs-scanner): add UBS skill and hooks | Automated bug/security scanning introduced | Positive if integrated correctly; verify scope and false-positive handling |
+| `3e256a0` fix(config): add hooks to project-level settings | Hooks become active via config | Review defaults and principle-of-least-surprise for contributors |
+
+## Breaking-Change Candidates
+| Commit | Potential break |
+|---|---|
+| `ef6399d` | Judge v2 rewrite may break existing verdict/schema or script consumers |
+| `98b1237` | New pre-push hook may alter contributor workflow and CI assumptions |
+| `77fd112` then `e1691c4` | Marketplace file path moved then reverted; consumers may still rely on wrong location |
+| `f21d66f` | Repo rename can break hardcoded URLs/tool references |
+| `dc96659` | Archive/migration messaging can invalidate old onboarding instructions |
+
+## Major Refactor/Structural Change Candidates
+- `ef6399d` (judge v2 rewrite, prompt + KG integration)
+- `d6eeedf` (global hook architecture introduction)
+- `851d0a5` (new `terraphim_settings` crate assets + large documentation addition)
+- `5c5d013` (large README merge from canonical repo)
+
+## Full Pending Commit List (terraphim-skills, local tracking ref)
+- `6a7ae16` 2026-02-23 feat: add OpenCode safety guard plugins
+- `61e4476` 2026-02-22 docs: add handover and lessons learned for hook fixes
+- `0f8edb2` 2026-02-22 fix(judge): correct run-judge.sh path in pre-push hook
+- `b5496a1` 2026-02-22 docs(handover): add reference to command correction issue
+- `0d36430` 2026-02-22 test(judge): add test verdicts for hook and quality validation
+- `dd09d96` 2026-02-22 fix(judge): use free model for deep judge
+- `e2c7941` 2026-02-22 docs: update judge v2 handover with Phase 3 operational testing results
+- `71fbff7` 2026-02-21 docs: add judge system architecture covering Phase A, B, and C
+- `547aee2` 2026-02-20 fix: mktemp template incompatible with macOS (no suffix support)
+- `cf21c47` 2026-02-20 fix: add bun/cargo PATH to judge scripts for opencode/terraphim-cli discovery
+- `da2584a` 2026-02-17 docs: add handover for judge v2 session
+- `ef6399d` 2026-02-17 feat(judge): v2 rewrite with terraphim-cli KG integration and file-based prompts (#23)
+- `98b1237` 2026-02-17 feat(judge): add pre-push hook and terraphim-agent config template (#22)
+- `1038f9f` 2026-02-17 feat(judge): add disagreement handler and human fallback (#21)
+- `4c26610` 2026-02-17 feat(judge): add multi-iteration runner script and extend verdict schema (#20)
+- `0fcbe45` 2026-02-17 feat(judge): add opencode config and fix model references (#19)
+- `14eae06` 2026-02-17 feat(judge): add judge skill with prompt templates and verdict schema (#18)
+- `c4e5390` 2026-02-17 fix: add missing license field and correct FR count
+- `89ef74b` 2026-02-17 docs: add article on AI-enabled configuration management
+- `4df52ae` 2026-02-17 feat: add ai-config-management skill with ZDP integration
+- `205f33e` 2026-02-12 feat: Add ZDP integration sections to 7 skills with fallback (#15)
+- `d89ec41` 2026-01-31 docs(ubs-scanner): add references to original authors and open source projects
+- `755faa0` 2026-01-30 docs: update handover and lessons learned for OpenCode skills session
+- `8be5890` 2026-01-30 fix: correct OpenCode skill path documentation
+- `9c1967e` 2026-01-30 fix: add OpenCode skill path fix script
+- `851d0a5` 2026-01-29 feat: add terraphim_settings crate and cross-platform skills documentation
+- `5c5d013` 2026-01-28 Merge remote: keep skills.sh README from canonical repo
+- `dc96659` 2026-01-27 docs: archive repository - migrate to terraphim-skills
+- `35e0765` 2026-01-27 feat(docs): add skills.sh installation instructions
+- `abd8c3f` 2026-01-27 feat(skills): integrate Karpathy LLM coding guidelines into disciplined framework
+- `a49c3c1` 2026-01-22 feat(skills): add quickwit-log-search skill for log exploration (#6)
+- `926d728` 2026-01-21 fix(session-search): update feature name to tsa-full and version to 1.6
+- `372bed4` 2026-01-21 fix(skills): align skill names with directory names and remove unknown field
+- `7cedb37` 2026-01-21 fix(skills): add YAML frontmatter to 1password-secrets, caddy, and md-book skills
+- `ba4a4ec` 2026-01-21 fix(1password-secrets): use example domain for slack webhook
+- `8404508` 2026-01-21 feat(scripts): add conversion script for codex-skills sync
+- `412a0a2` 2026-01-20 docs: add disciplined development framework blog post
+- `d8f61b0` 2026-01-20 chore: bump version to 1.1.0
+- `e4226e5` 2026-01-20 fix(agents): use correct YAML schema for Claude Code plugin spec
+- `1781e7d` 2026-01-20 Merge pull request #5 from terraphim/claude/explain-codebase-mkmqntgm4li0oux0-myEzQ
+- `f3c12a0` 2026-01-20 feat(ubs): integrate UBS into right-side-of-V verification workflow
+- `0aa7d2a` 2026-01-20 feat(ubs-scanner): add Ultimate Bug Scanner skill and hooks
+- `30c77ab` 2026-01-17 docs: update handover and lessons learned for 2026-01-17 session
+- `90ede88` 2026-01-17 feat(git-safety-guard): block hook bypass flags
+- `c6d2816` 2026-01-14 Merge pull request #3 from terraphim/feat/xero-skill
+- `934f3f4` 2026-01-14 docs: troubleshoot and fix terraphim hook not triggering
+- `7ef9a7a` 2026-01-13 feat(agents): add V-model orchestration agents
+- `000e945` 2026-01-13 feat(skills): integrate Essentialism + Effortless framework
+- `b5843b5` 2026-01-11 feat(skill): add Xero API integration skill
+- `45db3f0` 2026-01-11 feat(skill): add Xero API integration skill
+- `f0a4dff` 2026-01-09 fix: use correct filename with spaces for bun install knowledge graph
+- `3e256a0` 2026-01-09 fix(config): add hooks to project-level settings
+- `5a08ae7` 2026-01-09 fix(hooks): remove trailing newline from hook output
+- `d6eeedf` 2026-01-08 feat(hooks): Add PreToolUse hooks with knowledge graph replacement for all commands
+- `c2b09f9` 2026-01-06 docs: update handover and lessons learned for 2026-01-06 session
+- `f14b2b5` 2026-01-06 docs: add comprehensive user-level activation guide
+- `ff609d6` 2026-01-06 docs: add terraphim-agent installation and user-level hooks config
+- `b009e00` 2026-01-05 fix(hooks): use space in filename for bun install replacement
+- `559f0da` 2026-01-04 docs: add cross-links to all skill repositories
+- `625cb59` 2026-01-03 docs: update handover and lessons learned for 2026-01-03 session
+- `0d825f4` 2026-01-03 docs: update terraphim-hooks skill with released binary installation
+- `f21d66f` 2026-01-03 chore: rename repository to terraphim-skills
+- `e5c3679` 2026-01-02 feat: add git-safety-guard skill
+- `09a2fa3` 2025-12-30 feat: add disciplined development agents for V-model workflow
+- `537efd8` 2025-12-30 fix: update marketplace name and URLs for claude-skills repo rename
+- `e1691c4` 2025-12-30 revert: move marketplace.json back to .claude-plugin/
+- `77fd112` 2025-12-30 fix: move marketplace.json to root for plugin marketplace discovery
+- `60a7a1d` 2025-12-30 feat: add right-side-of-V specialist skills for verification and validation
+- `ee5e2eb` 2025-12-30 feat: add CI/CD maintainer guidelines to devops skill
+- `9616aac` 2025-12-30 feat: integrate disciplined skills with specialist skills
+- `c9a6707` 2025-12-30 feat: add right side of V-model with verification and validation skills
+- `0e4bf6a` 2025-12-30 feat: enhance Rust skills with rigorous engineering practices
+- `2f54c46` 2025-12-30 feat: add disciplined-specification skill for deep spec interviews
+- `43b5b33` 2025-12-29 Add infrastructure skills: 1Password secrets and Caddy server management
+- `078eeb2` 2025-12-29 feat: move md-book documentation to skills directory
+- `174dc00` 2025-12-29 chore: add .gitignore and session-search settings
+- `77af5f0` 2025-12-28 feat: add local-knowledge skill for personal notes search
+- `8d00a1f` 2025-12-28 fix: improve session search script reliability
+- `5d5729e` 2025-12-28 feat: add session-search example for Claude Code sessions
+- `50294b3` 2025-12-28 feat: add session-search skill for AI coding history
+- `1a9d03c` 2025-12-28 feat: add terraphim-hooks skill for knowledge graph-based replacement
+- `d2de794` 2025-12-27 docs: Add md-book documentation generator skill
+- `b19d8da` 2025-12-24 Merge pull request #1 from terraphim/feat/gpui-components
+- `528c502` 2025-12-24 feat: add gpui-components skill for Rust desktop UI with Zed patterns
+- `c45348d` 2025-12-10 docs: Add comprehensive usage guide to README
+- `ff2782d` 2025-12-10 Initial release: Terraphim Claude Skills v1.0.0
+## Command Evidence
+```bash
+cd /home/alex/terraphim-ai && git fetch origin && git log HEAD..origin/main --oneline
+cd /home/alex/terraphim-skills && git fetch origin && git log HEAD..origin/main --oneline
+```
