@@ -68,6 +68,26 @@ pub struct AgentDefinition {
     /// Provider tier classification.
     #[serde(default)]
     pub provider_tier: Option<ProviderTier>,
+
+    /// Terraphim persona name (e.g., "Ferrox", "Vigil", "Carthos")
+    #[serde(default)]
+    pub persona_name: Option<String>,
+
+    /// Persona symbol (e.g., "Fe", "Shield-lock", "Compass rose")
+    #[serde(default)]
+    pub persona_symbol: Option<String>,
+
+    /// Persona vibe/personality (e.g., "Meticulous, zero-waste, compiler-minded")
+    #[serde(default)]
+    pub persona_vibe: Option<String>,
+
+    /// Meta-cortex connections: agent names this persona naturally collaborates with
+    #[serde(default)]
+    pub meta_cortex_connections: Vec<String>,
+
+    /// Skill chain: ordered list of skills this agent uses
+    #[serde(default)]
+    pub skill_chain: Vec<String>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -597,5 +617,149 @@ task = "Legacy task"
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert!(config.allowed_providers.is_empty());
         assert_eq!(config.banned_providers, vec!["opencode".to_string()]);
+    }
+
+    #[test]
+    fn test_config_parse_with_persona_fields() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "security-sentinel"
+layer = "Safety"
+cli_tool = "opencode"
+provider = "opencode-go"
+model = "kimi-k2.5"
+fallback_provider = "opencode-go"
+fallback_model = "glm-5"
+provider_tier = "Deep"
+persona_name = "Vigil"
+persona_symbol = "Shield-lock"
+persona_vibe = "Professionally paranoid, calm under breach"
+meta_cortex_connections = ["Ferrox", "Conduit"]
+skill_chain = ["security-audit", "code-review", "quality-oversight"]
+task = "Run security audit"
+capabilities = ["security", "vulnerability-scanning"]
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].name, "security-sentinel");
+        assert_eq!(config.agents[0].persona_name, Some("Vigil".to_string()));
+        assert_eq!(
+            config.agents[0].persona_symbol,
+            Some("Shield-lock".to_string())
+        );
+        assert_eq!(
+            config.agents[0].persona_vibe,
+            Some("Professionally paranoid, calm under breach".to_string())
+        );
+        assert_eq!(
+            config.agents[0].meta_cortex_connections,
+            vec!["Ferrox".to_string(), "Conduit".to_string()]
+        );
+        assert_eq!(
+            config.agents[0].skill_chain,
+            vec![
+                "security-audit".to_string(),
+                "code-review".to_string(),
+                "quality-oversight".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_persona_fields_backward_compatible() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "legacy-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Legacy task without persona fields"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].name, "legacy-agent");
+        assert!(config.agents[0].persona_name.is_none());
+        assert!(config.agents[0].persona_symbol.is_none());
+        assert!(config.agents[0].persona_vibe.is_none());
+        assert!(config.agents[0].meta_cortex_connections.is_empty());
+        assert!(config.agents[0].skill_chain.is_empty());
+    }
+
+    #[test]
+    fn test_meta_cortex_connections_as_vec() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "connector-agent"
+layer = "Core"
+cli_tool = "opencode"
+persona_name = "Conduit"
+meta_cortex_connections = ["Vigil", "Ferrox", "Architect"]
+task = "Coordinate between agents"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents[0].meta_cortex_connections.len(), 3);
+        assert_eq!(
+            config.agents[0].meta_cortex_connections,
+            vec![
+                "Vigil".to_string(),
+                "Ferrox".to_string(),
+                "Architect".to_string()
+            ]
+        );
+    }
+
+    #[test]
+    fn test_skill_chain_as_vec() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "skilled-agent"
+layer = "Growth"
+cli_tool = "opencode"
+persona_name = "Ferrox"
+skill_chain = ["requirements-analysis", "architecture", "implementation", "review"]
+task = "Execute full development cycle"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents[0].skill_chain.len(), 4);
+        assert_eq!(
+            config.agents[0].skill_chain,
+            vec![
+                "requirements-analysis".to_string(),
+                "architecture".to_string(),
+                "implementation".to_string(),
+                "review".to_string()
+            ]
+        );
     }
 }
