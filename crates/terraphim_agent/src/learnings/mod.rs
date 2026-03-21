@@ -26,6 +26,7 @@
 mod capture;
 mod hook;
 mod install;
+mod procedure;
 mod redaction;
 
 pub use capture::{
@@ -44,6 +45,10 @@ pub use hook::{AgentFormat, process_hook_input};
 
 // Install types for AI agent hook installation
 pub use install::{AgentType, install_hook};
+
+// Procedure capture for successful command sequences
+#[allow(unused_imports)]
+pub use procedure::ProcedureStore;
 
 use std::path::PathBuf;
 
