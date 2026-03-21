@@ -1,5 +1,9 @@
+use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::{BufRead, BufReader, Write};
 use std::path::PathBuf;
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -123,6 +127,176 @@ impl HandoffContext {
         let content = std::fs::read_to_string(path)?;
         serde_json::from_str(&content)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))
+    }
+}
+
+/// Entry in the handoff buffer with expiry timestamp.
+#[derive(Debug, Clone)]
+struct BufferEntry {
+    context: HandoffContext,
+    expiry: DateTime<Utc>,
+}
+
+/// In-memory buffer for handoff contexts with TTL-based expiry.
+#[derive(Debug)]
+pub struct HandoffBuffer {
+    entries: HashMap<Uuid, BufferEntry>,
+    default_ttl_secs: u64,
+}
+
+impl HandoffBuffer {
+    /// Create a new HandoffBuffer with the specified default TTL in seconds.
+    pub fn new(default_ttl_secs: u64) -> Self {
+        Self {
+            entries: HashMap::new(),
+            default_ttl_secs,
+        }
+    }
+
+    /// Insert a handoff context into the buffer.
+    /// Computes expiry from ctx.ttl_secs or falls back to default_ttl.
+    pub fn insert(&mut self, context: HandoffContext) -> Uuid {
+        let ttl_secs = context.ttl_secs.unwrap_or(self.default_ttl_secs);
+        let expiry = Utc::now() + chrono::Duration::seconds(ttl_secs as i64);
+        let id = context.handoff_id;
+
+        self.entries.insert(id, BufferEntry { context, expiry });
+        id
+    }
+
+    /// Get a reference to a handoff context by ID.
+    /// Returns None if not found or if expired.
+    pub fn get(&self, id: &Uuid) -> Option<&HandoffContext> {
+        self.entries.get(id).and_then(|entry| {
+            if Utc::now() < entry.expiry {
+                Some(&entry.context)
+            } else {
+                None
+            }
+        })
+    }
+
+    /// Get the most recent handoff for a specific target agent.
+    /// Returns the handoff with the latest timestamp that hasn't expired.
+    pub fn latest_for_agent(&self, to_agent: &str) -> Option<&HandoffContext> {
+        let now = Utc::now();
+        self.entries
+            .values()
+            .filter(|entry| entry.context.to_agent == to_agent && now < entry.expiry)
+            .max_by_key(|entry| entry.context.timestamp)
+            .map(|entry| &entry.context)
+    }
+
+    /// Remove all expired entries and return the count swept.
+    pub fn sweep_expired(&mut self) -> usize {
+        let now = Utc::now();
+        let initial_count = self.entries.len();
+        self.entries.retain(|_, entry| now < entry.expiry);
+        initial_count - self.entries.len()
+    }
+
+    /// Get the number of entries in the buffer.
+    pub fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    /// Check if the buffer is empty.
+    pub fn is_empty(&self) -> bool {
+        self.entries.is_empty()
+    }
+
+    /// Iterate over all entries (including expired ones).
+    /// The iterator yields (id, context, expiry) tuples.
+    pub fn iter(&self) -> impl Iterator<Item = (&Uuid, &HandoffContext, &DateTime<Utc>)> {
+        self.entries
+            .iter()
+            .map(|(id, entry)| (id, &entry.context, &entry.expiry))
+    }
+
+    /// Get the default TTL in seconds.
+    pub fn default_ttl_secs(&self) -> u64 {
+        self.default_ttl_secs
+    }
+}
+
+/// Append-only JSONL ledger for handoff contexts.
+/// Provides durable, append-only storage for handoff history.
+#[derive(Debug)]
+pub struct HandoffLedger {
+    path: PathBuf,
+}
+
+impl HandoffLedger {
+    /// Create a new HandoffLedger with the specified file path.
+    pub fn new(path: impl Into<PathBuf>) -> Self {
+        Self { path: path.into() }
+    }
+
+    /// Append a handoff context to the ledger.
+    /// Opens the file with O_APPEND + create flags, writes JSON line + newline, and fsyncs.
+    pub fn append(&self, context: &HandoffContext) -> Result<(), std::io::Error> {
+        let json = serde_json::to_string(context)
+            .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+
+        let mut file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&self.path)?;
+
+        writeln!(file, "{}", json)?;
+        file.sync_all()?;
+
+        Ok(())
+    }
+
+    /// Read all entries from the ledger file.
+    /// Returns Vec<HandoffContext> in order of insertion.
+    pub fn read_all(&self) -> Result<Vec<HandoffContext>, std::io::Error> {
+        let file = OpenOptions::new().read(true).open(&self.path)?;
+
+        let reader = BufReader::new(file);
+        let mut entries = Vec::new();
+
+        for line in reader.lines() {
+            let line = line?;
+            if line.trim().is_empty() {
+                continue;
+            }
+            let context: HandoffContext = serde_json::from_str(&line)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
+            entries.push(context);
+        }
+
+        Ok(entries)
+    }
+
+    /// Count entries in the ledger without loading all into memory.
+    /// Efficiently counts lines in the file.
+    pub fn count(&self) -> Result<usize, std::io::Error> {
+        let metadata = std::fs::metadata(&self.path)?;
+        if metadata.len() == 0 {
+            return Ok(0);
+        }
+
+        let file = OpenOptions::new().read(true).open(&self.path)?;
+
+        let reader = BufReader::new(file);
+        let mut count = 0;
+
+        for line in reader.lines() {
+            let line = line?;
+            if !line.trim().is_empty() {
+                count += 1;
+            }
+        }
+
+        Ok(count)
+    }
+
+    /// Return the file size in bytes for monitoring.
+    pub fn size_bytes(&self) -> Result<u64, std::io::Error> {
+        let metadata = std::fs::metadata(&self.path)?;
+        Ok(metadata.len())
     }
 }
 
@@ -349,5 +523,359 @@ mod tests {
 
         let json = ctx_with_ttl.to_json().unwrap();
         assert!(json.contains("ttl_secs"));
+    }
+
+    // =========================================================================
+    // HandoffBuffer Tests
+    // =========================================================================
+
+    #[test]
+    fn test_buffer_new() {
+        let buffer = HandoffBuffer::new(3600);
+        assert_eq!(buffer.len(), 0);
+        assert!(buffer.is_empty());
+        assert_eq!(buffer.default_ttl_secs(), 3600);
+    }
+
+    #[test]
+    fn test_buffer_insert_and_get() {
+        let mut buffer = HandoffBuffer::new(3600);
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        let id = ctx.handoff_id;
+
+        buffer.insert(ctx.clone());
+
+        assert_eq!(buffer.len(), 1);
+        assert!(!buffer.is_empty());
+
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_some());
+        assert_eq!(retrieved.unwrap().handoff_id, id);
+        assert_eq!(retrieved.unwrap().from_agent, "agent-a");
+        assert_eq!(retrieved.unwrap().to_agent, "agent-b");
+    }
+
+    #[test]
+    fn test_buffer_get_returns_none_for_unknown() {
+        let buffer = HandoffBuffer::new(3600);
+        let unknown_id = Uuid::new_v4();
+
+        let retrieved = buffer.get(&unknown_id);
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_buffer_latest_for_agent() {
+        let mut buffer = HandoffBuffer::new(3600);
+
+        // Insert two handoffs for the same target agent
+        let ctx1 = HandoffContext::new("agent-a", "agent-c", "task 1");
+        let ctx2 = HandoffContext::new("agent-b", "agent-c", "task 2");
+
+        buffer.insert(ctx1.clone());
+        buffer.insert(ctx2.clone());
+
+        // Get latest for agent-c
+        let latest = buffer.latest_for_agent("agent-c");
+        assert!(latest.is_some());
+        // Should return the most recent one
+        assert_eq!(latest.unwrap().handoff_id, ctx2.handoff_id);
+    }
+
+    #[test]
+    fn test_buffer_latest_for_agent_returns_none_for_unknown() {
+        let buffer = HandoffBuffer::new(3600);
+
+        let latest = buffer.latest_for_agent("unknown-agent");
+        assert!(latest.is_none());
+    }
+
+    #[test]
+    fn test_buffer_sweep_expired() {
+        let mut buffer = HandoffBuffer::new(0); // TTL = 0 means immediate expiry
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        let id = ctx.handoff_id;
+
+        buffer.insert(ctx);
+        assert_eq!(buffer.len(), 1);
+
+        // Sweep should remove the immediately expired entry
+        let swept = buffer.sweep_expired();
+        assert_eq!(swept, 1);
+        assert_eq!(buffer.len(), 0);
+        assert!(buffer.is_empty());
+
+        // Get should return None for expired
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_buffer_sweep_preserves_live() {
+        let mut buffer = HandoffBuffer::new(3600); // 1 hour TTL
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        let id = ctx.handoff_id;
+
+        buffer.insert(ctx);
+        assert_eq!(buffer.len(), 1);
+
+        // Sweep should not remove entries with 1 hour TTL
+        let swept = buffer.sweep_expired();
+        assert_eq!(swept, 0);
+        assert_eq!(buffer.len(), 1);
+
+        // Get should still work
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_some());
+    }
+
+    #[test]
+    fn test_buffer_get_returns_none_for_expired() {
+        let mut buffer = HandoffBuffer::new(0); // TTL = 0 means immediate expiry
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        let id = ctx.handoff_id;
+
+        buffer.insert(ctx);
+        assert_eq!(buffer.len(), 1);
+
+        // Get should return None because entry is expired (TTL=0)
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_none());
+
+        // But the entry is still in the buffer until sweep
+        assert_eq!(buffer.len(), 1);
+    }
+
+    #[test]
+    fn test_buffer_iter() {
+        let mut buffer = HandoffBuffer::new(3600);
+        let ctx1 = HandoffContext::new("agent-a", "agent-b", "task 1");
+        let ctx2 = HandoffContext::new("agent-c", "agent-d", "task 2");
+
+        buffer.insert(ctx1.clone());
+        buffer.insert(ctx2.clone());
+
+        let mut count = 0;
+        for (id, ctx, expiry) in buffer.iter() {
+            count += 1;
+            assert!(*id == ctx1.handoff_id || *id == ctx2.handoff_id);
+            assert!(!ctx.task.is_empty());
+            assert!(expiry > &Utc::now());
+        }
+        assert_eq!(count, 2);
+    }
+
+    #[test]
+    fn test_buffer_uses_context_ttl() {
+        let mut buffer = HandoffBuffer::new(3600); // default 1 hour
+        let mut ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        ctx.ttl_secs = Some(0); // Override with 0 TTL
+        let id = ctx.handoff_id;
+
+        buffer.insert(ctx);
+
+        // Get should return None because context TTL=0
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_none());
+    }
+
+    #[test]
+    fn test_buffer_default_ttl_when_context_ttl_none() {
+        let mut buffer = HandoffBuffer::new(3600); // default 1 hour
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        // ctx.ttl_secs is None, so it should use default
+        let id = ctx.handoff_id;
+
+        buffer.insert(ctx);
+
+        // Get should work because default TTL=3600
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_some());
+    }
+
+    #[test]
+    fn test_buffer_multiple_agents() {
+        let mut buffer = HandoffBuffer::new(3600);
+
+        // Insert handoffs to different agents
+        buffer.insert(HandoffContext::new("agent-a", "target-1", "task 1"));
+        buffer.insert(HandoffContext::new("agent-a", "target-2", "task 2"));
+        buffer.insert(HandoffContext::new("agent-b", "target-1", "task 3"));
+
+        assert_eq!(buffer.len(), 3);
+
+        // Get latest for target-1 should return task 3
+        let latest = buffer.latest_for_agent("target-1");
+        assert!(latest.is_some());
+        assert_eq!(latest.unwrap().task, "task 3");
+
+        // Get latest for target-2 should return task 2
+        let latest = buffer.latest_for_agent("target-2");
+        assert!(latest.is_some());
+        assert_eq!(latest.unwrap().task, "task 2");
+    }
+
+    // =========================================================================
+    // HandoffLedger Tests
+    // =========================================================================
+
+    #[test]
+    fn test_ledger_append_and_read_all() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_path = dir.path().join("handoff-ledger.jsonl");
+        let ledger = HandoffLedger::new(&ledger_path);
+
+        // Create and append 3 entries
+        let ctx1 = HandoffContext::new("agent-a", "agent-b", "task 1");
+        let ctx2 = HandoffContext::new("agent-b", "agent-c", "task 2");
+        let ctx3 = HandoffContext::new("agent-c", "agent-d", "task 3");
+
+        ledger.append(&ctx1).unwrap();
+        ledger.append(&ctx2).unwrap();
+        ledger.append(&ctx3).unwrap();
+
+        // Read all entries and verify
+        let entries = ledger.read_all().unwrap();
+        assert_eq!(entries.len(), 3);
+
+        // Verify each entry matches what was appended
+        assert_eq!(entries[0].from_agent, "agent-a");
+        assert_eq!(entries[0].to_agent, "agent-b");
+        assert_eq!(entries[0].task, "task 1");
+
+        assert_eq!(entries[1].from_agent, "agent-b");
+        assert_eq!(entries[1].to_agent, "agent-c");
+        assert_eq!(entries[1].task, "task 2");
+
+        assert_eq!(entries[2].from_agent, "agent-c");
+        assert_eq!(entries[2].to_agent, "agent-d");
+        assert_eq!(entries[2].task, "task 3");
+    }
+
+    #[test]
+    fn test_ledger_append_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_path = dir.path().join("new-ledger.jsonl");
+
+        // File should not exist yet
+        assert!(!ledger_path.exists());
+
+        let ledger = HandoffLedger::new(&ledger_path);
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+
+        // Append to nonexistent file
+        ledger.append(&ctx).unwrap();
+
+        // File should now exist
+        assert!(ledger_path.exists());
+
+        // Should be able to read it back
+        let entries = ledger.read_all().unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].task, "test task");
+    }
+
+    #[test]
+    fn test_ledger_count() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_path = dir.path().join("count-ledger.jsonl");
+        let ledger = HandoffLedger::new(&ledger_path);
+
+        // First append creates the file
+        let ctx = HandoffContext::new("agent-a", "agent-b", "first");
+        ledger.append(&ctx).unwrap();
+
+        // Count N entries
+        let n = 5;
+        for i in 1..n {
+            let ctx = HandoffContext::new("agent-a", "agent-b", &format!("task {}", i));
+            ledger.append(&ctx).unwrap();
+        }
+
+        let count = ledger.count().unwrap();
+        assert_eq!(count, n);
+    }
+
+    #[test]
+    fn test_ledger_append_is_one_line_per_entry() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_path = dir.path().join("line-ledger.jsonl");
+        let ledger = HandoffLedger::new(&ledger_path);
+
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        ledger.append(&ctx).unwrap();
+        ledger.append(&ctx).unwrap();
+        ledger.append(&ctx).unwrap();
+
+        // Read the raw file and count lines
+        let content = std::fs::read_to_string(&ledger_path).unwrap();
+        let lines: Vec<&str> = content.lines().collect();
+
+        // Should have exactly 3 lines
+        assert_eq!(lines.len(), 3);
+
+        // Each line should end with newline (content.lines() strips them)
+        // Verify each line is valid JSON
+        for (i, line) in lines.iter().enumerate() {
+            assert!(!line.is_empty(), "Line {} should not be empty", i);
+            let parsed: serde_json::Value = serde_json::from_str(line).unwrap();
+            assert!(parsed.is_object());
+        }
+    }
+
+    #[test]
+    fn test_ledger_handles_special_chars() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_path = dir.path().join("special-ledger.jsonl");
+        let ledger = HandoffLedger::new(&ledger_path);
+
+        // Create context with special characters
+        let mut ctx = HandoffContext::new("agent-a", "agent-b", "line1\nline2\nline3");
+        ctx.progress_summary = "Contains \"quotes\" and \t tabs".to_string();
+        ctx.decisions = vec![
+            "Unicode: 日本語".to_string(),
+            "Emoji: 🎉🚀".to_string(),
+            "Backslash: C:\\path\\to\\file".to_string(),
+        ];
+
+        ledger.append(&ctx).unwrap();
+
+        // Read back and verify
+        let entries = ledger.read_all().unwrap();
+        assert_eq!(entries.len(), 1);
+
+        let restored = &entries[0];
+        assert_eq!(restored.task, "line1\nline2\nline3");
+        assert_eq!(restored.progress_summary, "Contains \"quotes\" and \t tabs");
+        assert_eq!(restored.decisions.len(), 3);
+        assert_eq!(restored.decisions[0], "Unicode: 日本語");
+        assert_eq!(restored.decisions[1], "Emoji: 🎉🚀");
+        assert_eq!(restored.decisions[2], "Backslash: C:\\path\\to\\file");
+    }
+
+    #[test]
+    fn test_ledger_size_bytes() {
+        let dir = tempfile::tempdir().unwrap();
+        let ledger_path = dir.path().join("size-ledger.jsonl");
+        let ledger = HandoffLedger::new(&ledger_path);
+
+        // Size should be 0 before any entries (file doesn't exist)
+        // Note: size_bytes returns error for non-existent file
+        let ctx = HandoffContext::new("agent-a", "agent-b", "test task");
+        ledger.append(&ctx).unwrap();
+
+        let size = ledger.size_bytes().unwrap();
+        assert!(
+            size > 0,
+            "Ledger file should have non-zero size after append"
+        );
+
+        // Size should increase after second append
+        ledger.append(&ctx).unwrap();
+        let new_size = ledger.size_bytes().unwrap();
+        assert!(
+            new_size > size,
+            "Ledger size should increase after second append"
+        );
     }
 }

@@ -18,7 +18,7 @@ pub use config::{
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
-pub use handoff::HandoffContext;
+pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
@@ -78,6 +78,10 @@ pub struct AgentOrchestrator {
     restart_cooldowns: HashMap<String, Instant>,
     /// Timestamp of the last reconciliation tick (for cron comparison).
     last_tick_time: chrono::DateTime<chrono::Utc>,
+    /// In-memory buffer for handoff contexts with TTL.
+    handoff_buffer: HandoffBuffer,
+    /// Append-only JSONL ledger for handoff history.
+    handoff_ledger: HandoffLedger,
 }
 
 impl AgentOrchestrator {
@@ -88,6 +92,8 @@ impl AgentOrchestrator {
         let nightwatch = NightwatchMonitor::new(config.nightwatch.clone());
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
         let compound_workflow = CompoundReviewWorkflow::new(config.compound_review.clone());
+        let handoff_buffer = HandoffBuffer::new(config.handoff_buffer_ttl_secs.unwrap_or(86400));
+        let handoff_ledger = HandoffLedger::new(config.working_dir.join("handoff-ledger.jsonl"));
 
         Ok(Self {
             config,
@@ -102,6 +108,8 @@ impl AgentOrchestrator {
             restart_counts: HashMap::new(),
             restart_cooldowns: HashMap::new(),
             last_tick_time: chrono::Utc::now(),
+            handoff_buffer,
+            handoff_ledger,
         })
     }
 
@@ -235,14 +243,34 @@ impl AgentOrchestrator {
                 reason: e.to_string(),
             })?;
 
+        // Insert into in-memory buffer for fast retrieval
+        let handoff_id = self.handoff_buffer.insert(context.clone());
+
+        // Append to persistent ledger
+        self.handoff_ledger.append(&context).map_err(|e| OrchestratorError::HandoffFailed {
+            from: from_agent.to_string(),
+            to: to_agent.to_string(),
+            reason: format!("ledger append failed: {}", e),
+        })?;
+
         info!(
             from = from_agent,
             to = to_agent,
             handoff_file = %handoff_path.display(),
+            handoff_id = %handoff_id,
             "handoff context written"
         );
 
         Ok(())
+    }
+
+    /// Get the most recent handoff for a specific target agent.
+    /// Returns the handoff context with the latest timestamp that hasn't expired.
+    pub fn latest_handoff_for(
+        &self,
+        to_agent: &str,
+    ) -> Option<&HandoffContext> {
+        self.handoff_buffer.latest_for_agent(to_agent)
     }
 
     /// Get a reference to the routing engine.
@@ -376,7 +404,13 @@ impl AgentOrchestrator {
         // 5. Evaluate nightwatch drift
         self.nightwatch.evaluate();
 
-        // 6. Update last_tick_time
+        // 6. Sweep expired handoff buffer entries
+        let swept = self.handoff_buffer.sweep_expired();
+        if swept > 0 {
+            info!(swept_count = swept, "swept expired handoff buffer entries");
+        }
+
+        // 7. Update last_tick_time
         self.last_tick_time = chrono::Utc::now();
     }
 
@@ -697,6 +731,7 @@ mod tests {
             restart_cooldown_secs: 60,
             max_restart_count: 10,
             tick_interval_secs: 30,
+            handoff_buffer_ttl_secs: None,
         }
     }
 
@@ -798,6 +833,7 @@ task = "test"
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
             tick_interval_secs: 1,
+            handoff_buffer_ttl_secs: None,
         }
     }
 

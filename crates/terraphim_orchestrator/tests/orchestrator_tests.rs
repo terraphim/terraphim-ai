@@ -53,6 +53,7 @@ fn test_config() -> OrchestratorConfig {
         restart_cooldown_secs: 60,
         max_restart_count: 10,
         tick_interval_secs: 30,
+        handoff_buffer_ttl_secs: None,
     }
 }
 

@@ -25,6 +25,9 @@ pub struct OrchestratorConfig {
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
+    /// Default TTL in seconds for handoff buffer entries (None = 86400).
+    #[serde(default)]
+    pub handoff_buffer_ttl_secs: Option<u64>,
 }
 
 /// Definition of a single agent in the fleet.
