@@ -784,6 +784,15 @@ mod tests {
                     capabilities: vec!["security".to_string()],
                     max_memory_bytes: None,
                     budget_monthly_cents: None,
+                    provider: None,
+                    persona: None,
+                    terraphim_role: None,
+                    skill_chain: vec![],
+                    sfia_skills: vec![],
+                    fallback_provider: None,
+                    fallback_model: None,
+                    grace_period_secs: None,
+                    max_cpu_seconds: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -795,12 +804,22 @@ mod tests {
                     capabilities: vec!["sync".to_string()],
                     max_memory_bytes: None,
                     budget_monthly_cents: None,
+                    provider: None,
+                    persona: None,
+                    terraphim_role: None,
+                    skill_chain: vec![],
+                    sfia_skills: vec![],
+                    fallback_provider: None,
+                    fallback_model: None,
+                    grace_period_secs: None,
+                    max_cpu_seconds: None,
                 },
             ],
             restart_cooldown_secs: 60,
             max_restart_count: 10,
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
         }
     }
 
@@ -902,11 +921,21 @@ task = "test"
                 capabilities: vec![],
                 max_memory_bytes: None,
                 budget_monthly_cents: None,
+                provider: None,
+                persona: None,
+                terraphim_role: None,
+                skill_chain: vec![],
+                sfia_skills: vec![],
+                fallback_provider: None,
+                fallback_model: None,
+                grace_period_secs: None,
+                max_cpu_seconds: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
+            persona_data_dir: None,
         }
     }
 
@@ -973,6 +1002,15 @@ task = "test"
             capabilities: vec![],
             max_memory_bytes: None,
             budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
