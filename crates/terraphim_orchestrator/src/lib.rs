@@ -40,7 +40,7 @@ use terraphim_spawner::{AgentHandle, AgentSpawner};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
-use cost_tracker::{BudgetVerdict, CostTracker};
+
 
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
