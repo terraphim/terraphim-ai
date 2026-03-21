@@ -99,6 +99,10 @@ pub use mcp_tool::*;
 pub mod procedure;
 pub use procedure::*;
 
+// Persona definition types for agent personas
+pub mod persona;
+pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSkillDef};
+
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::hash_map::Iter;
