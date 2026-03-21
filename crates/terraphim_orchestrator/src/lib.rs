@@ -1,6 +1,7 @@
 pub mod compound;
 pub mod concurrency;
 pub mod config;
+pub mod cost_tracker;
 pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
@@ -8,6 +9,7 @@ pub mod handoff;
 pub mod mode;
 pub mod nightwatch;
 pub mod scheduler;
+pub mod scope;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
@@ -15,6 +17,7 @@ pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
     OrchestratorConfig, TrackerConfig, TrackerStates, WorkflowConfig,
 };
+pub use cost_tracker::{BudgetVerdict, CostSnapshot, CostTracker};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
@@ -36,6 +39,8 @@ use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
+
+use cost_tracker::{BudgetVerdict, CostTracker};
 
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
@@ -82,6 +87,8 @@ pub struct AgentOrchestrator {
     handoff_buffer: HandoffBuffer,
     /// Append-only JSONL ledger for handoff history.
     handoff_ledger: HandoffLedger,
+    /// Per-agent cost tracking with budget enforcement.
+    cost_tracker: CostTracker,
 }
 
 impl AgentOrchestrator {
@@ -94,6 +101,12 @@ impl AgentOrchestrator {
         let compound_workflow = CompoundReviewWorkflow::new(config.compound_review.clone());
         let handoff_buffer = HandoffBuffer::new(config.handoff_buffer_ttl_secs.unwrap_or(86400));
         let handoff_ledger = HandoffLedger::new(config.working_dir.join("handoff-ledger.jsonl"));
+
+        // Initialize cost tracker and register all agents with their budgets
+        let mut cost_tracker = CostTracker::new();
+        for agent_def in &config.agents {
+            cost_tracker.register(&agent_def.name, agent_def.budget_monthly_cents);
+        }
 
         Ok(Self {
             config,
@@ -110,6 +123,7 @@ impl AgentOrchestrator {
             last_tick_time: chrono::Utc::now(),
             handoff_buffer,
             handoff_ledger,
+            cost_tracker,
         })
     }
 
@@ -293,6 +307,16 @@ impl AgentOrchestrator {
         &mut self.rate_limiter
     }
 
+    /// Get a reference to the cost tracker.
+    pub fn cost_tracker(&self) -> &CostTracker {
+        &self.cost_tracker
+    }
+
+    /// Get a mutable reference to the cost tracker.
+    pub fn cost_tracker_mut(&mut self) -> &mut CostTracker {
+        &mut self.cost_tracker
+    }
+
     /// Spawn an agent from its definition.
     ///
     /// Model selection: if the agent has an explicit `model` field, use it.
@@ -410,8 +434,43 @@ impl AgentOrchestrator {
             info!(swept_count = swept, "swept expired handoff buffer entries");
         }
 
-        // 7. Update last_tick_time
+        // 7. Check monthly budget reset
+        self.cost_tracker.monthly_reset_if_due();
+
+        // 8. Enforce budget limits (pause exhausted agents)
+        self.enforce_budgets().await;
+
+        // 9. Update last_tick_time
         self.last_tick_time = chrono::Utc::now();
+    }
+
+    /// Check all agent budgets and pause any that have exceeded their limits.
+    async fn enforce_budgets(&mut self) {
+        let actionable = self.cost_tracker.check_all();
+
+        for (agent_name, verdict) in actionable {
+            match verdict {
+                BudgetVerdict::NearExhaustion { spent_cents, budget_cents } => {
+                    warn!(
+                        agent = %agent_name,
+                        spent_usd = spent_cents as f64 / 100.0,
+                        budget_usd = budget_cents as f64 / 100.0,
+                        pct = (spent_cents * 100 / budget_cents),
+                        "budget warning: agent approaching monthly limit"
+                    );
+                }
+                BudgetVerdict::Exhausted { spent_cents, budget_cents } => {
+                    error!(
+                        agent = %agent_name,
+                        spent_usd = spent_cents as f64 / 100.0,
+                        budget_usd = budget_cents as f64 / 100.0,
+                        "budget exhausted: pausing agent"
+                    );
+                    self.stop_agent(&agent_name).await;
+                }
+                _ => {}
+            }
+        }
     }
 
     /// Poll all active agents for exit and handle exits per layer.
