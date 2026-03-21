@@ -5,6 +5,7 @@ use terraphim_orchestrator::{
     AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, HandoffContext,
     NightwatchConfig, OrchestratorConfig, OrchestratorError,
 };
+use uuid::Uuid;
 
 fn test_config() -> OrchestratorConfig {
     OrchestratorConfig {
@@ -178,6 +179,9 @@ async fn test_handoff_context_file_roundtrip() {
     let handoff_path = dir.path().join("handoff-test.json");
 
     let original = HandoffContext {
+        handoff_id: Uuid::new_v4(),
+        from_agent: "test-agent-a".to_string(),
+        to_agent: "test-agent-b".to_string(),
         task: "Integration test task".to_string(),
         progress_summary: "Completed initial analysis".to_string(),
         decisions: vec![
@@ -189,6 +193,7 @@ async fn test_handoff_context_file_roundtrip() {
             PathBuf::from("tests/integration.rs"),
         ],
         timestamp: chrono::Utc::now(),
+        ttl_secs: Some(3600),
     };
 
     original.write_to_file(&handoff_path).unwrap();

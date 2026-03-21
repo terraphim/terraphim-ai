@@ -23,6 +23,7 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Scheduling
 cron = "0.13"
