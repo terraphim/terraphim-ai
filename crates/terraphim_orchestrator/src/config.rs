@@ -128,10 +128,31 @@ pub struct CompoundReviewConfig {
     /// Whether to create PRs (false = dry run).
     #[serde(default)]
     pub create_prs: bool,
+    /// Root directory for worktrees.
+    #[serde(default = "default_worktree_root")]
+    pub worktree_root: PathBuf,
+    /// Base branch for comparison.
+    #[serde(default = "default_base_branch")]
+    pub base_branch: String,
+    /// Maximum number of concurrent agents.
+    #[serde(default = "default_max_concurrent_agents")]
+    pub max_concurrent_agents: usize,
 }
 
 fn default_max_duration() -> u64 {
     1800
+}
+
+fn default_worktree_root() -> PathBuf {
+    PathBuf::from(".worktrees")
+}
+
+fn default_base_branch() -> String {
+    "main".to_string()
+}
+
+fn default_max_concurrent_agents() -> usize {
+    3
 }
 
 /// Workflow configuration for issue-driven mode.

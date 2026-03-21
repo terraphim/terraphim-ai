@@ -382,8 +382,10 @@ impl DualModeOrchestrator {
     /// Trigger compound review.
     pub async fn trigger_compound_review(
         &mut self,
+        git_ref: &str,
+        base_ref: &str,
     ) -> Result<CompoundReviewResult, crate::OrchestratorError> {
-        self.base.trigger_compound_review().await
+        self.base.trigger_compound_review(git_ref, base_ref).await
     }
 
     /// Handoff task between agents.
