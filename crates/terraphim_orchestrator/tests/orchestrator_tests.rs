@@ -28,6 +28,7 @@ fn test_config() -> OrchestratorConfig {
                 schedule: None,
                 capabilities: vec!["security".to_string()],
                 max_memory_bytes: None,
+                budget_monthly_cents: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -38,6 +39,7 @@ fn test_config() -> OrchestratorConfig {
                 schedule: Some("0 3 * * *".to_string()),
                 capabilities: vec!["sync".to_string()],
                 max_memory_bytes: None,
+                budget_monthly_cents: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -48,6 +50,7 @@ fn test_config() -> OrchestratorConfig {
                 schedule: None,
                 capabilities: vec!["code-review".to_string()],
                 max_memory_bytes: None,
+                budget_monthly_cents: None,
             },
         ],
         restart_cooldown_secs: 60,

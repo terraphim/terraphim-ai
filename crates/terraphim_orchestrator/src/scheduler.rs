@@ -141,6 +141,7 @@ mod tests {
             schedule: schedule.map(String::from),
             capabilities: vec![],
             max_memory_bytes: None,
+            budget_monthly_cents: None,
         }
     }
 

@@ -716,6 +716,7 @@ mod tests {
                     schedule: None,
                     capabilities: vec!["security".to_string()],
                     max_memory_bytes: None,
+                    budget_monthly_cents: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -726,6 +727,7 @@ mod tests {
                     schedule: Some("0 3 * * *".to_string()),
                     capabilities: vec!["sync".to_string()],
                     max_memory_bytes: None,
+                    budget_monthly_cents: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -829,6 +831,7 @@ task = "test"
                 schedule: None,
                 capabilities: vec![],
                 max_memory_bytes: None,
+                budget_monthly_cents: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -899,6 +902,7 @@ task = "test"
             schedule: Some("0 3 * * *".to_string()),
             capabilities: vec![],
             max_memory_bytes: None,
+            budget_monthly_cents: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 

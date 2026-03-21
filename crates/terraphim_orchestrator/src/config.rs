@@ -50,6 +50,10 @@ pub struct AgentDefinition {
     pub capabilities: Vec<String>,
     /// Maximum memory in bytes (optional resource limit).
     pub max_memory_bytes: Option<u64>,
+    /// Monthly USD budget in cents (e.g., 5000 = $50.00).
+    /// None means unlimited (subscription model).
+    #[serde(default)]
+    pub budget_monthly_cents: Option<u64>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -669,5 +673,50 @@ task = "t"
 "#;
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_config_parse_with_budget() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+budget_monthly_cents = 5000
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].budget_monthly_cents, Some(5000));
+    }
+
+    #[test]
+    fn test_config_parse_without_budget() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert!(config.agents[0].budget_monthly_cents.is_none());
     }
 }

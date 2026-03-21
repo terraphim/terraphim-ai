@@ -15,6 +15,9 @@ pub mod workspace;
 
 pub use error::{Result, SymphonyError};
 pub use orchestrator::{OrchestratorRuntimeState, StateSnapshot, SymphonyOrchestrator};
-pub use runner::{AgentEvent, CodexSession, TokenCounts, TokenTotals, WorkerOutcome};
+pub use runner::{
+    AdfEnvelope, AgentEvent, CodexSession, FindingCategory, FindingSeverity, ReviewAgentOutput,
+    ReviewFinding, TokenCounts, TokenTotals, WorkerOutcome, deduplicate_findings,
+};
 pub use tracker::{Issue, IssueTracker};
 pub use workspace::WorkspaceManager;

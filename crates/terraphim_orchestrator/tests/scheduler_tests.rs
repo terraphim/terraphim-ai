@@ -10,6 +10,7 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         schedule: schedule.map(String::from),
         capabilities: vec![],
         max_memory_bytes: None,
+        budget_monthly_cents: None,
     }
 }
 
