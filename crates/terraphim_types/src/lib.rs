@@ -91,10 +91,18 @@ pub mod hgnc;
 pub mod capability;
 pub use capability::*;
 
+// MCP Tool types for self-learning system
+pub mod mcp_tool;
+pub use mcp_tool::*;
+
+// Procedure capture types for self-learning system
+pub mod procedure;
+pub use procedure::*;
+
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashSet;
 use std::collections::hash_map::Iter;
+use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
