@@ -9788,6 +9788,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "cron",
+ "handlebars",
  "serde",
  "serde_json",
  "tempfile",

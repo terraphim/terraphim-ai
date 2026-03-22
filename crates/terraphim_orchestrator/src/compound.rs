@@ -5,9 +5,7 @@ use tokio::sync::mpsc;
 use tracing::{debug, info, warn};
 use uuid::Uuid;
 
-use terraphim_symphony::runner::protocol::{
-    FindingCategory, ReviewAgentOutput, ReviewFinding,
-};
+use terraphim_symphony::runner::protocol::{FindingCategory, ReviewAgentOutput, ReviewFinding};
 
 use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
@@ -170,10 +168,7 @@ impl CompoundReviewWorkflow {
             .worktree_manager
             .create_worktree(&worktree_name, git_ref)
             .map_err(|e| {
-                OrchestratorError::CompoundReviewFailed(format!(
-                    "failed to create worktree: {}",
-                    e
-                ))
+                OrchestratorError::CompoundReviewFailed(format!("failed to create worktree: {}", e))
             })?;
 
         // Channel for collecting agent outputs
@@ -212,13 +207,10 @@ impl CompoundReviewWorkflow {
         let mut failed_count = 0;
         let collect_deadline = Instant::now() + self.config.timeout + Duration::from_secs(10);
 
-        while let Some(result) = tokio::time::timeout(
-            Duration::from_secs(1),
-            rx.recv(),
-        )
-        .await
-        .ok()
-        .flatten()
+        while let Some(result) = tokio::time::timeout(Duration::from_secs(1), rx.recv())
+            .await
+            .ok()
+            .flatten()
         {
             match result {
                 AgentResult::Success(output) => {
@@ -318,10 +310,7 @@ impl CompoundReviewWorkflow {
             .output()
             .await
             .map_err(|e| {
-                OrchestratorError::CompoundReviewFailed(format!(
-                    "git diff failed: {}",
-                    e
-                ))
+                OrchestratorError::CompoundReviewFailed(format!("git diff failed: {}", e))
             })?;
 
         if !output.status.success() {
@@ -564,7 +553,8 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             llm_tier: "Deep".to_string(),
             cli_tool: "claude".to_string(),
             model: None,
-            prompt_template: "crates/terraphim_orchestrator/prompts/review-architecture.md".to_string(),
+            prompt_template: "crates/terraphim_orchestrator/prompts/review-architecture.md"
+                .to_string(),
             visual_only: false,
         },
         ReviewGroupDef {
@@ -573,7 +563,8 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             llm_tier: "Deep".to_string(),
             cli_tool: "claude".to_string(),
             model: None,
-            prompt_template: "crates/terraphim_orchestrator/prompts/review-performance.md".to_string(),
+            prompt_template: "crates/terraphim_orchestrator/prompts/review-performance.md"
+                .to_string(),
             visual_only: false,
         },
         ReviewGroupDef {
@@ -600,7 +591,8 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             llm_tier: "Deep".to_string(),
             cli_tool: "claude".to_string(),
             model: None,
-            prompt_template: "crates/terraphim_orchestrator/prompts/review-design-quality.md".to_string(),
+            prompt_template: "crates/terraphim_orchestrator/prompts/review-design-quality.md"
+                .to_string(),
             visual_only: true,
         },
     ]
@@ -754,7 +746,10 @@ Done!"#;
     #[test]
     fn test_glob_matches_design_system() {
         assert!(glob_matches("design-system/tokens.css", "design-system/*"));
-        assert!(glob_matches("design-system/components/button.css", "design-system/*"));
+        assert!(glob_matches(
+            "design-system/components/button.css",
+            "design-system/*"
+        ));
     }
 
     // ==================== Compound Review Integration Tests ====================

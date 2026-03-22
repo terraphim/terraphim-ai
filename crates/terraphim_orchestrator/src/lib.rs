@@ -8,6 +8,7 @@ pub mod error;
 pub mod handoff;
 pub mod mode;
 pub mod nightwatch;
+pub mod persona;
 pub mod scheduler;
 pub mod scope;
 
@@ -27,6 +28,7 @@ pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
     RateLimitTracker, RateLimitWindow,
 };
+pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
 
 use std::collections::HashMap;
@@ -39,8 +41,6 @@ use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
-
-
 
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
@@ -89,6 +89,10 @@ pub struct AgentOrchestrator {
     handoff_ledger: HandoffLedger,
     /// Per-agent cost tracking with budget enforcement.
     cost_tracker: CostTracker,
+    /// Registry of persona definitions for metaprompt generation.
+    persona_registry: PersonaRegistry,
+    /// Renderer for persona metaprompts.
+    metaprompt_renderer: MetapromptRenderer,
 }
 
 impl AgentOrchestrator {
@@ -98,7 +102,8 @@ impl AgentOrchestrator {
         let router = RoutingEngine::new();
         let nightwatch = NightwatchMonitor::new(config.nightwatch.clone());
         let scheduler = TimeScheduler::new(&config.agents, Some(&config.compound_review.schedule))?;
-        let compound_workflow = CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
+        let compound_workflow =
+            CompoundReviewWorkflow::from_compound_config(config.compound_review.clone());
         let handoff_buffer = HandoffBuffer::new(config.handoff_buffer_ttl_secs.unwrap_or(86400));
         let handoff_ledger = HandoffLedger::new(config.working_dir.join("handoff-ledger.jsonl"));
 
@@ -107,6 +112,38 @@ impl AgentOrchestrator {
         for agent_def in &config.agents {
             cost_tracker.register(&agent_def.name, agent_def.budget_monthly_cents);
         }
+
+        // Initialize persona registry - load from configured directory or create empty
+        let persona_registry = match &config.persona_data_dir {
+            Some(dir) => {
+                info!(dir = %dir.display(), "loading persona registry from directory");
+                PersonaRegistry::load_from_dir(dir).unwrap_or_else(|e| {
+                    warn!(dir = %dir.display(), error = %e, "failed to load persona directory, using empty registry");
+                    PersonaRegistry::new()
+                })
+            }
+            None => {
+                info!("no persona_data_dir configured, using empty registry");
+                PersonaRegistry::new()
+            }
+        };
+
+        // Initialize metaprompt renderer - check for custom template or use default
+        let metaprompt_renderer = match &config.persona_data_dir {
+            Some(dir) => {
+                let custom_template = dir.join("metaprompt-template.hbs");
+                if custom_template.exists() {
+                    info!(path = %custom_template.display(), "using custom metaprompt template");
+                    MetapromptRenderer::from_template_file(&custom_template).unwrap_or_else(|e| {
+                        warn!(path = %custom_template.display(), error = %e, "failed to load custom template, using default");
+                        MetapromptRenderer::new().expect("default template should always compile")
+                    })
+                } else {
+                    MetapromptRenderer::new().expect("default template should always compile")
+                }
+            }
+            None => MetapromptRenderer::new().expect("default template should always compile"),
+        };
 
         Ok(Self {
             config,
@@ -124,6 +161,8 @@ impl AgentOrchestrator {
             handoff_buffer,
             handoff_ledger,
             cost_tracker,
+            persona_registry,
+            metaprompt_renderer,
         })
     }
 
@@ -263,11 +302,13 @@ impl AgentOrchestrator {
         let handoff_id = self.handoff_buffer.insert(context.clone());
 
         // Append to persistent ledger
-        self.handoff_ledger.append(&context).map_err(|e| OrchestratorError::HandoffFailed {
-            from: from_agent.to_string(),
-            to: to_agent.to_string(),
-            reason: format!("ledger append failed: {}", e),
-        })?;
+        self.handoff_ledger
+            .append(&context)
+            .map_err(|e| OrchestratorError::HandoffFailed {
+                from: from_agent.to_string(),
+                to: to_agent.to_string(),
+                reason: format!("ledger append failed: {}", e),
+            })?;
 
         info!(
             from = from_agent,
@@ -282,10 +323,7 @@ impl AgentOrchestrator {
 
     /// Get the most recent handoff for a specific target agent.
     /// Returns the handoff context with the latest timestamp that hasn't expired.
-    pub fn latest_handoff_for(
-        &self,
-        to_agent: &str,
-    ) -> Option<&HandoffContext> {
+    pub fn latest_handoff_for(&self, to_agent: &str) -> Option<&HandoffContext> {
         self.handoff_buffer.latest_for_agent(to_agent)
     }
 
@@ -452,7 +490,10 @@ impl AgentOrchestrator {
 
         for (agent_name, verdict) in actionable {
             match verdict {
-                BudgetVerdict::NearExhaustion { spent_cents, budget_cents } => {
+                BudgetVerdict::NearExhaustion {
+                    spent_cents,
+                    budget_cents,
+                } => {
                     warn!(
                         agent = %agent_name,
                         spent_usd = spent_cents as f64 / 100.0,
@@ -461,7 +502,10 @@ impl AgentOrchestrator {
                         "budget warning: agent approaching monthly limit"
                     );
                 }
-                BudgetVerdict::Exhausted { spent_cents, budget_cents } => {
+                BudgetVerdict::Exhausted {
+                    spent_cents,
+                    budget_cents,
+                } => {
                     error!(
                         agent = %agent_name,
                         spent_usd = spent_cents as f64 / 100.0,
@@ -853,7 +897,10 @@ mod tests {
     async fn test_orchestrator_compound_review_manual() {
         let config = test_config();
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        let result = orch.trigger_compound_review("HEAD", "HEAD~1").await.unwrap();
+        let result = orch
+            .trigger_compound_review("HEAD", "HEAD~1")
+            .await
+            .unwrap();
         assert!(result.pass || !result.pass); // Either is acceptable in test
     }
 

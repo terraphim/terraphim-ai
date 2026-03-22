@@ -133,7 +133,10 @@ async fn test_orchestrator_compound_review_integration() {
     let config = test_config();
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
-    let result = orch.trigger_compound_review("HEAD", "HEAD~1").await.unwrap();
+    let result = orch
+        .trigger_compound_review("HEAD", "HEAD~1")
+        .await
+        .unwrap();
     assert!(!result.pass || result.pass); // Either is acceptable in test
 }
 
