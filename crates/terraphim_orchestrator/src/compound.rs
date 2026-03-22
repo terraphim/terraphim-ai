@@ -28,6 +28,8 @@ pub struct ReviewGroupDef {
     pub prompt_template: String,
     /// Whether this agent only runs on visual/design changes.
     pub visual_only: bool,
+    /// Persona identity for this review agent (e.g., "Vigil", "Carthos").
+    pub persona: Option<String>,
 }
 
 impl ReviewGroupDef {
@@ -546,6 +548,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-security.md".to_string(),
             visual_only: false,
+            persona: Some("Vigil".to_string()),
         },
         ReviewGroupDef {
             agent_name: "architecture-strategist".to_string(),
@@ -556,6 +559,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             prompt_template: "crates/terraphim_orchestrator/prompts/review-architecture.md"
                 .to_string(),
             visual_only: false,
+            persona: Some("Carthos".to_string()),
         },
         ReviewGroupDef {
             agent_name: "performance-oracle".to_string(),
@@ -566,6 +570,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             prompt_template: "crates/terraphim_orchestrator/prompts/review-performance.md"
                 .to_string(),
             visual_only: false,
+            persona: Some("Ferrox".to_string()),
         },
         ReviewGroupDef {
             agent_name: "rust-reviewer".to_string(),
@@ -575,6 +580,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-quality.md".to_string(),
             visual_only: false,
+            persona: Some("Ferrox".to_string()),
         },
         ReviewGroupDef {
             agent_name: "domain-model-reviewer".to_string(),
@@ -584,6 +590,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-domain.md".to_string(),
             visual_only: false,
+            persona: Some("Carthos".to_string()),
         },
         ReviewGroupDef {
             agent_name: "design-fidelity-reviewer".to_string(),
@@ -594,6 +601,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             prompt_template: "crates/terraphim_orchestrator/prompts/review-design-quality.md"
                 .to_string(),
             visual_only: true,
+            persona: Some("Lux".to_string()),
         },
     ]
 }
@@ -839,5 +847,90 @@ Done!"#;
         assert!(result.pass);
         assert_eq!(result.agents_run, 6);
         assert_eq!(result.agents_failed, 0);
+    }
+
+    // ==================== Persona Identity Tests ====================
+
+    #[test]
+    fn test_review_security_contains_vigil() {
+        let prompt = include_str!("../prompts/review-security.md");
+        assert!(prompt.contains("Vigil"), "review-security.md should contain 'Vigil'");
+        assert!(prompt.contains("Security Engineer"), "review-security.md should mention Security Engineer");
+    }
+
+    #[test]
+    fn test_review_architecture_contains_carthos() {
+        let prompt = include_str!("../prompts/review-architecture.md");
+        assert!(prompt.contains("Carthos"), "review-architecture.md should contain 'Carthos'");
+        assert!(prompt.contains("Domain Architect"), "review-architecture.md should mention Domain Architect");
+    }
+
+    #[test]
+    fn test_review_quality_contains_ferrox() {
+        let prompt = include_str!("../prompts/review-quality.md");
+        assert!(prompt.contains("Ferrox"), "review-quality.md should contain 'Ferrox'");
+        assert!(prompt.contains("Rust Engineer"), "review-quality.md should mention Rust Engineer");
+    }
+
+    #[test]
+    fn test_review_performance_contains_ferrox() {
+        let prompt = include_str!("../prompts/review-performance.md");
+        assert!(prompt.contains("Ferrox"), "review-performance.md should contain 'Ferrox'");
+        assert!(prompt.contains("Rust Engineer"), "review-performance.md should mention Rust Engineer");
+    }
+
+    #[test]
+    fn test_review_domain_contains_carthos() {
+        let prompt = include_str!("../prompts/review-domain.md");
+        assert!(prompt.contains("Carthos"), "review-domain.md should contain 'Carthos'");
+        assert!(prompt.contains("Domain Architect"), "review-domain.md should mention Domain Architect");
+    }
+
+    #[test]
+    fn test_review_design_contains_lux() {
+        let prompt = include_str!("../prompts/review-design-quality.md");
+        assert!(prompt.contains("Lux"), "review-design-quality.md should contain 'Lux'");
+        assert!(prompt.contains("TypeScript Engineer"), "review-design-quality.md should mention TypeScript Engineer");
+    }
+
+    #[test]
+    fn test_default_groups_all_have_persona() {
+        let groups = default_groups();
+        for group in &groups {
+            assert!(
+                group.persona.is_some(),
+                "Group '{}' should have a persona set",
+                group.agent_name
+            );
+        }
+
+        // Verify specific persona mappings
+        let vigil = groups.iter().find(|g| g.agent_name == "security-sentinel").unwrap();
+        assert_eq!(vigil.persona.as_ref().unwrap(), "Vigil");
+
+        let carthos_arch = groups.iter().find(|g| g.agent_name == "architecture-strategist").unwrap();
+        assert_eq!(carthos_arch.persona.as_ref().unwrap(), "Carthos");
+
+        let ferrox_perf = groups.iter().find(|g| g.agent_name == "performance-oracle").unwrap();
+        assert_eq!(ferrox_perf.persona.as_ref().unwrap(), "Ferrox");
+
+        let ferrox_qual = groups.iter().find(|g| g.agent_name == "rust-reviewer").unwrap();
+        assert_eq!(ferrox_qual.persona.as_ref().unwrap(), "Ferrox");
+
+        let carthos_domain = groups.iter().find(|g| g.agent_name == "domain-model-reviewer").unwrap();
+        assert_eq!(carthos_domain.persona.as_ref().unwrap(), "Carthos");
+
+        let lux = groups.iter().find(|g| g.agent_name == "design-fidelity-reviewer").unwrap();
+        assert_eq!(lux.persona.as_ref().unwrap(), "Lux");
+    }
+
+    #[test]
+    fn test_extract_review_output_with_persona_agent_name() {
+        // Verify JSON output still parses when agent name includes persona
+        let json = r#"{"agent":"Vigil-security-sentinel","findings":[{"file":"src/lib.rs","line":42,"severity":"high","category":"security","finding":"Test issue","confidence":0.9}],"summary":"Found 1 security issue","pass":false}"#;
+        let output = extract_review_output(json, "Vigil-security-sentinel", FindingCategory::Security);
+        assert_eq!(output.agent, "Vigil-security-sentinel");
+        assert!(!output.pass);
+        assert_eq!(output.findings.len(), 1);
     }
 }
