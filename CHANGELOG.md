@@ -5,6 +5,49 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.14.0] - 2026-03-22
+
+### Added
+
+#### Terraphim Symphony Orchestrator
+- **New `terraphim_symphony` crate** for automated multi-agent issue dispatch
+- **Claude Code runner** with full streaming protocol support
+- **Dual-mode orchestration** combining issue-based and time-based scheduling
+- **Workspace management** with git operations and context tracking
+- **Gitea and Linear tracker integrations** for issue lifecycle management
+
+#### Session File Tracking
+- **File access extraction** from agent sessions (`extract_file_accesses`)
+- **Files and ByFile subcommands** for session file queries
+- **Sessions service methods** for querying by file path
+
+#### Agent Workflows E2E
+- **Complete workflow implementation** with 5 workflow templates
+- **Real API integration** with Cerebras support
+- **Playwright browser tests** for all workflows
+- **Quality gate integration** with merge-to-main workflow
+
+#### Orchestrator Improvements
+- **Proportional fairness** scheduling algorithm
+- **Dual-mode run loop** combining time-based and issue-based dispatch
+- **Dependency-aware dispatch** with topological sorting
+- **PageRank-aware issue sorting** for prioritization
+
+#### Validation Framework
+- **Phase 4/5 disciplined verification and validation** framework
+- **Requirements traceability matrix** (REQ -> design -> code -> test)
+- **Quality gate reports** for release readiness
+
+### Fixed
+- **axum-test 19.x API changes** - Updated test files
+- **atty deprecation** - Replaced with `std::io::IsTerminal`
+- **Symphony hook timeouts** - Increased for long-running operations
+- **Liquid template issues** - Moved to heredoc approach
+
+### Changed
+- **TLA+ TypeScript bindings** research and design completed
+- **Dependency updates** for axum-test, env_logger, actions/github-script
+
 ## [1.8.0] - 2026-02-16
 
 ### Added
