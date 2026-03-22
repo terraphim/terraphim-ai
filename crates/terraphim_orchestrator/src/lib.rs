@@ -407,6 +407,34 @@ impl AgentOrchestrator {
 
         info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
 
+        // Compose persona-enriched task prompt
+        let composed_task = if let Some(ref persona_name) = def.persona {
+            if let Some(persona) = self.persona_registry.get(persona_name) {
+                let composed = self.metaprompt_renderer.compose_prompt(persona, &def.task);
+                info!(
+                    agent = %def.name,
+                    persona = %persona_name,
+                    original_len = def.task.len(),
+                    composed_len = composed.len(),
+                    "composed persona-enriched prompt"
+                );
+                composed
+            } else {
+                warn!(
+                    agent = %def.name,
+                    persona = %persona_name,
+                    "persona not found in registry, using bare task"
+                );
+                def.task.clone()
+            }
+        } else {
+            def.task.clone()
+        };
+
+        // Use stdin for large persona-enriched prompts to avoid ARG_MAX limits
+        const STDIN_THRESHOLD: usize = 32_768; // 32 KB
+        let use_stdin = def.persona.is_some() || composed_task.len() > STDIN_THRESHOLD;
+
         // Build a Provider from the agent definition for the spawner
         let provider = terraphim_types::capability::Provider {
             id: def.name.clone(),
@@ -422,14 +450,19 @@ impl AgentOrchestrator {
             keywords: def.capabilities.clone(),
         };
 
-        let handle = self
-            .spawner
-            .spawn_with_model(&provider, &def.task, model.as_deref())
-            .await
-            .map_err(|e| OrchestratorError::SpawnFailed {
-                agent: def.name.clone(),
-                reason: e.to_string(),
-            })?;
+        let handle = if use_stdin {
+            self.spawner
+                .spawn_with_model_stdin(&provider, &composed_task, model.as_deref())
+                .await
+        } else {
+            self.spawner
+                .spawn_with_model(&provider, &composed_task, model.as_deref())
+                .await
+        }
+        .map_err(|e| OrchestratorError::SpawnFailed {
+            agent: def.name.clone(),
+            reason: e.to_string(),
+        })?;
 
         // Subscribe to the output broadcast for nightwatch drain
         let output_rx = handle.subscribe_output();
@@ -1159,5 +1192,130 @@ task = "test"
             Some(1),
             "restart count should be 1 after first exit+restart cycle"
         );
+    }
+
+    // =========================================================================
+    // Persona Injection Tests (Gitea #73)
+    // =========================================================================
+
+    /// Test that spawn_agent composes persona-enriched prompt when persona exists
+    #[tokio::test]
+    async fn test_spawn_agent_with_persona_composes_prompt() {
+        let mut config = test_config_fast_lifecycle();
+        
+        // Add an agent with a persona
+        config.agents = vec![AgentDefinition {
+            name: "persona-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "echo".to_string(),
+            task: "test task".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: Some("TestAgent".to_string()), // Persona that exists in default test_persona
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+        }];
+        
+        // Set up persona data dir with a test persona
+        let temp_dir = std::env::temp_dir().join(format!("terraphim-test-persona-{}", std::process::id()));
+        std::fs::create_dir_all(&temp_dir).unwrap();
+        
+        let persona_toml = r#"
+agent_name = "TestAgent"
+role_name = "Test Engineer"
+name_origin = "From testing"
+vibe = "Thorough, methodical"
+symbol = "Checkmark"
+core_characteristics = [{ name = "Thorough", description = "checks everything twice" }]
+speech_style = "Precise and factual."
+terraphim_nature = "Adapted to testing environments."
+sfia_title = "Test Engineer"
+primary_level = 4
+guiding_phrase = "Enable"
+level_essence = "Works autonomously under general direction."
+sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Designs and executes test plans." }]
+"#;
+        std::fs::write(temp_dir.join("testagent.toml"), persona_toml).unwrap();
+        config.persona_data_dir = Some(temp_dir.clone());
+        
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        
+        // Spawn the agent - it should use the persona-enriched prompt
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+        
+        // Cleanup
+        let _ = std::fs::remove_dir_all(&temp_dir);
+        
+        // Spawn should succeed
+        assert!(result.is_ok());
+        
+        // The agent should be active
+        assert!(orch.active_agents.contains_key("persona-agent"));
+    }
+
+    /// Test that spawn_agent uses bare task when persona is None
+    #[tokio::test]
+    async fn test_spawn_agent_without_persona_uses_bare_task() {
+        let config = test_config_fast_lifecycle();
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        
+        // Agent without persona should use bare task
+        let def = orch.config.agents[0].clone();
+        assert!(def.persona.is_none());
+        
+        let result = orch.spawn_agent(&def).await;
+        assert!(result.is_ok());
+        
+        assert!(orch.active_agents.contains_key("echo-safety"));
+    }
+
+    /// Test graceful degradation when persona not found in registry
+    #[tokio::test]
+    async fn test_spawn_agent_persona_not_found_graceful() {
+        let mut config = test_config_fast_lifecycle();
+        
+        // Add an agent with a non-existent persona
+        config.agents = vec![AgentDefinition {
+            name: "unknown-persona-agent".to_string(),
+            layer: AgentLayer::Safety,
+            cli_tool: "echo".to_string(),
+            task: "test task".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: Some("NonExistentPersona".to_string()), // This persona doesn't exist
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
+        }];
+        
+        // No persona_data_dir, so registry will be empty
+        config.persona_data_dir = None;
+        
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        
+        // Spawn should still succeed even though persona doesn't exist
+        let def = orch.config.agents[0].clone();
+        let result = orch.spawn_agent(&def).await;
+        
+        assert!(result.is_ok(), "spawn should succeed with fallback to bare task");
+        assert!(orch.active_agents.contains_key("unknown-persona-agent"));
     }
 }

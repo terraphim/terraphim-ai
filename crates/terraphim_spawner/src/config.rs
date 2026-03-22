@@ -37,6 +37,8 @@ pub struct AgentConfig {
     pub required_api_keys: Vec<String>,
     /// Resource limits for the spawned process
     pub resource_limits: ResourceLimits,
+    /// Whether to deliver the task prompt via stdin instead of CLI arg
+    pub use_stdin: bool,
 }
 
 impl AgentConfig {
@@ -55,6 +57,7 @@ impl AgentConfig {
                 env_vars: HashMap::new(),
                 required_api_keys: Self::infer_api_keys(cli_command),
                 resource_limits: ResourceLimits::default(),
+                use_stdin: false,
             }),
             ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
         }
@@ -64,6 +67,12 @@ impl AgentConfig {
     pub fn with_model(mut self, model: &str) -> Self {
         let model_args = Self::model_args(&self.cli_command, model);
         self.args.extend(model_args);
+        self
+    }
+
+    /// Set whether to deliver the task prompt via stdin.
+    pub fn with_stdin(mut self, use_stdin: bool) -> Self {
+        self.use_stdin = use_stdin;
         self
     }
 
