@@ -1050,7 +1050,7 @@ async fn run_offline_command(
 
         if *json {
             println!("{}", serde_json::to_string(&result)?);
-            } else if result.decision == guard_patterns::GuardDecision::Block {
+        } else if result.decision == guard_patterns::GuardDecision::Block {
             if let Some(reason) = &result.reason {
                 eprintln!("BLOCKED: {}", reason);
                 if !fail_open {
@@ -2489,8 +2489,12 @@ async fn run_server_command(
                 (Some(thesaurus_path), Some(allowlist_path)) => {
                     let destructive_json = std::fs::read_to_string(thesaurus_path)?;
                     let allowlist_json = std::fs::read_to_string(allowlist_path)?;
-                    guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json, None)
-                        .map_err(|e| anyhow::anyhow!("{}", e))?
+                    guard_patterns::CommandGuard::from_json(
+                        &destructive_json,
+                        &allowlist_json,
+                        None,
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
                 }
                 (Some(thesaurus_path), None) => {
                     let destructive_json = std::fs::read_to_string(thesaurus_path)?;
@@ -2516,7 +2520,7 @@ async fn run_server_command(
 
             if json {
                 println!("{}", serde_json::to_string(&result)?);
-        } else if result.decision == guard_patterns::GuardDecision::Block {
+            } else if result.decision == guard_patterns::GuardDecision::Block {
                 if let Some(reason) = &result.reason {
                     eprintln!("BLOCKED: {}", reason);
                     if !fail_open {

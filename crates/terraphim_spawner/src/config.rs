@@ -252,7 +252,10 @@ mod tests {
     fn test_infer_api_keys() {
         // Claude CLI uses OAuth, not API keys -- should return empty
         let keys = AgentConfig::infer_api_keys("claude");
-        assert!(keys.is_empty(), "claude uses OAuth, should not require API key");
+        assert!(
+            keys.is_empty(),
+            "claude uses OAuth, should not require API key"
+        );
 
         let keys = AgentConfig::infer_api_keys("opencode");
         assert!(keys.contains(&"OPENAI_API_KEY".to_string()));
@@ -274,12 +277,24 @@ mod tests {
     #[test]
     fn test_normalise_claude_model() {
         // Already prefixed -- pass through
-        assert_eq!(AgentConfig::normalise_claude_model("claude-opus-4-6"), "claude-opus-4-6");
-        assert_eq!(AgentConfig::normalise_claude_model("claude-sonnet-4-6"), "claude-sonnet-4-6");
+        assert_eq!(
+            AgentConfig::normalise_claude_model("claude-opus-4-6"),
+            "claude-opus-4-6"
+        );
+        assert_eq!(
+            AgentConfig::normalise_claude_model("claude-sonnet-4-6"),
+            "claude-sonnet-4-6"
+        );
 
         // Versioned without prefix -- add prefix
-        assert_eq!(AgentConfig::normalise_claude_model("opus-4-6"), "claude-opus-4-6");
-        assert_eq!(AgentConfig::normalise_claude_model("sonnet-4-6"), "claude-sonnet-4-6");
+        assert_eq!(
+            AgentConfig::normalise_claude_model("opus-4-6"),
+            "claude-opus-4-6"
+        );
+        assert_eq!(
+            AgentConfig::normalise_claude_model("sonnet-4-6"),
+            "claude-sonnet-4-6"
+        );
 
         // Short aliases -- pass through (no hyphens)
         assert_eq!(AgentConfig::normalise_claude_model("opus"), "opus");
@@ -290,10 +305,16 @@ mod tests {
     #[test]
     fn test_model_args_claude_normalises() {
         let args = AgentConfig::model_args("claude", "opus-4-6");
-        assert_eq!(args, vec!["--model".to_string(), "claude-opus-4-6".to_string()]);
+        assert_eq!(
+            args,
+            vec!["--model".to_string(), "claude-opus-4-6".to_string()]
+        );
 
         let args = AgentConfig::model_args("claude", "claude-opus-4-6");
-        assert_eq!(args, vec!["--model".to_string(), "claude-opus-4-6".to_string()]);
+        assert_eq!(
+            args,
+            vec!["--model".to_string(), "claude-opus-4-6".to_string()]
+        );
 
         let args = AgentConfig::model_args("claude", "sonnet");
         assert_eq!(args, vec!["--model".to_string(), "sonnet".to_string()]);
@@ -301,8 +322,14 @@ mod tests {
 
     #[test]
     fn test_cli_name_extraction() {
-        assert_eq!(AgentConfig::cli_name("/home/alex/.local/bin/claude"), "claude");
-        assert_eq!(AgentConfig::cli_name("/home/alex/.bun/bin/opencode"), "opencode");
+        assert_eq!(
+            AgentConfig::cli_name("/home/alex/.local/bin/claude"),
+            "claude"
+        );
+        assert_eq!(
+            AgentConfig::cli_name("/home/alex/.bun/bin/opencode"),
+            "opencode"
+        );
         assert_eq!(AgentConfig::cli_name("claude"), "claude");
         assert_eq!(AgentConfig::cli_name("/usr/bin/codex"), "codex");
     }

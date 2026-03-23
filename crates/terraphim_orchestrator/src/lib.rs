@@ -967,7 +967,7 @@ mod tests {
             .trigger_compound_review("HEAD", "HEAD~1")
             .await
             .unwrap();
-        assert!(result.pass || !result.pass); // Either is acceptable in test
+        // Test completed successfully - result.pass can be either true or false depending on test conditions
     }
 
     #[test]
@@ -1235,7 +1235,7 @@ task = "test"
     #[tokio::test]
     async fn test_spawn_agent_with_persona_composes_prompt() {
         let mut config = test_config_fast_lifecycle();
-        
+
         // Add an agent with a persona
         // Use cat (not echo) because persona_found=true triggers stdin delivery.
         // cat reads stdin before exiting, avoiding broken pipe under parallel load.
@@ -1259,11 +1259,12 @@ task = "test"
             grace_period_secs: None,
             max_cpu_seconds: None,
         }];
-        
+
         // Set up persona data dir with a test persona
-        let temp_dir = std::env::temp_dir().join(format!("terraphim-test-persona-{}", std::process::id()));
+        let temp_dir =
+            std::env::temp_dir().join(format!("terraphim-test-persona-{}", std::process::id()));
         std::fs::create_dir_all(&temp_dir).unwrap();
-        
+
         let persona_toml = r#"
 agent_name = "TestAgent"
 role_name = "Test Engineer"
@@ -1281,19 +1282,19 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
 "#;
         std::fs::write(temp_dir.join("testagent.toml"), persona_toml).unwrap();
         config.persona_data_dir = Some(temp_dir.clone());
-        
+
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        
+
         // Spawn the agent - it should use the persona-enriched prompt
         let def = orch.config.agents[0].clone();
         let result = orch.spawn_agent(&def).await;
-        
+
         // Cleanup
         let _ = std::fs::remove_dir_all(&temp_dir);
-        
+
         // Spawn should succeed
         assert!(result.is_ok());
-        
+
         // The agent should be active
         assert!(orch.active_agents.contains_key("persona-agent"));
     }
@@ -1303,14 +1304,14 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     async fn test_spawn_agent_without_persona_uses_bare_task() {
         let config = test_config_fast_lifecycle();
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        
+
         // Agent without persona should use bare task
         let def = orch.config.agents[0].clone();
         assert!(def.persona.is_none());
-        
+
         let result = orch.spawn_agent(&def).await;
         assert!(result.is_ok());
-        
+
         assert!(orch.active_agents.contains_key("echo-safety"));
     }
 
@@ -1318,7 +1319,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     #[tokio::test]
     async fn test_spawn_agent_persona_not_found_graceful() {
         let mut config = test_config_fast_lifecycle();
-        
+
         // Add an agent with a non-existent persona
         config.agents = vec![AgentDefinition {
             name: "unknown-persona-agent".to_string(),
@@ -1340,17 +1341,20 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             grace_period_secs: None,
             max_cpu_seconds: None,
         }];
-        
+
         // No persona_data_dir, so registry will be empty
         config.persona_data_dir = None;
-        
+
         let mut orch = AgentOrchestrator::new(config).unwrap();
-        
+
         // Spawn should still succeed even though persona doesn't exist
         let def = orch.config.agents[0].clone();
         let result = orch.spawn_agent(&def).await;
-        
-        assert!(result.is_ok(), "spawn should succeed with fallback to bare task");
+
+        assert!(
+            result.is_ok(),
+            "spawn should succeed with fallback to bare task"
+        );
         assert!(orch.active_agents.contains_key("unknown-persona-agent"));
     }
 }

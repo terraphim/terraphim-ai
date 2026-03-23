@@ -562,7 +562,7 @@ mod tests {
         assert_eq!(deduped[0].severity, FindingSeverity::High);
         assert_eq!(deduped[0].file, "src/a.rs");
         assert_eq!(deduped[0].line, 3); // Earlier line within same severity
-                                        // Then medium severity
+        // Then medium severity
         assert_eq!(deduped[2].severity, FindingSeverity::Medium);
     }
 }

@@ -137,7 +137,7 @@ async fn test_orchestrator_compound_review_integration() {
         .trigger_compound_review("HEAD", "HEAD~1")
         .await
         .unwrap();
-    assert!(!result.pass || result.pass); // Either is acceptable in test
+    // Test completed successfully - result.pass can be either true or false depending on test conditions
 }
 
 /// Integration test: orchestrator loads from TOML string.

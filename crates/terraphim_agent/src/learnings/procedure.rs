@@ -39,12 +39,11 @@ use std::io::{self, BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 
 use terraphim_automata::matcher::find_matches;
-use terraphim_types::{
-    NormalizedTerm, NormalizedTermValue, Thesaurus,
-    procedure::CapturedProcedure,
-};
 #[cfg(test)]
 use terraphim_types::procedure::ProcedureConfidence;
+use terraphim_types::{
+    NormalizedTerm, NormalizedTermValue, Thesaurus, procedure::CapturedProcedure,
+};
 
 /// Storage for captured procedures with deduplication support.
 #[allow(dead_code)]
@@ -124,25 +123,25 @@ impl ProcedureStore {
         for (idx, existing) in existing_procedures.iter().enumerate() {
             let normalized_title = existing.title.to_lowercase();
             let term = NormalizedTerm::new(idx as u64, NormalizedTermValue::from(normalized_title));
-            thesaurus.insert(NormalizedTermValue::from(existing.title.to_lowercase()), term);
+            thesaurus.insert(
+                NormalizedTermValue::from(existing.title.to_lowercase()),
+                term,
+            );
         }
 
         // Check for matching titles using Aho-Corasick
-        let matches = find_matches(
-            &procedure.title.to_lowercase(),
-            thesaurus,
-            false,
-        )
-        .map_err(|e| io::Error::other(e))?;
+        let matches = find_matches(&procedure.title.to_lowercase(), thesaurus, false)
+            .map_err(|e| io::Error::other(e))?;
 
         let mut merged = false;
         let mut merged_procedure_id = None;
 
         for matched in matches {
             // Find the matching procedure
-            if let Some(existing) = existing_procedures.iter().find(|p| {
-                p.title.to_lowercase() == matched.term.to_lowercase()
-            }) {
+            if let Some(existing) = existing_procedures
+                .iter()
+                .find(|p| p.title.to_lowercase() == matched.term.to_lowercase())
+            {
                 // Check if it has high confidence
                 if existing.confidence.is_high_confidence() {
                     log::info!(
@@ -202,10 +201,7 @@ impl ProcedureStore {
     }
 
     /// Write all procedures to storage (internal helper).
-    async fn write_all(
-        &self,
-        procedures: &[CapturedProcedure],
-    ) -> io::Result<()> {
+    async fn write_all(&self, procedures: &[CapturedProcedure]) -> io::Result<()> {
         let mut file = OpenOptions::new()
             .write(true)
             .create(true)
@@ -223,18 +219,15 @@ impl ProcedureStore {
     }
 
     /// Find procedures by title (case-insensitive substring search).
-    pub async fn find_by_title(
-        &self,
-        query: &str,
-    ) -> io::Result<Vec<CapturedProcedure>> {
+    pub async fn find_by_title(&self, query: &str) -> io::Result<Vec<CapturedProcedure>> {
         let all = self.load_all().await?;
         let query_lower = query.to_lowercase();
 
         let filtered: Vec<_> = all
             .into_iter()
             .filter(|p| {
-                p.title.to_lowercase().contains(&query_lower) ||
-                p.description.to_lowercase().contains(&query_lower)
+                p.title.to_lowercase().contains(&query_lower)
+                    || p.description.to_lowercase().contains(&query_lower)
             })
             .collect();
 
@@ -242,10 +235,7 @@ impl ProcedureStore {
     }
 
     /// Find a procedure by its exact ID.
-    pub async fn find_by_id(
-        &self,
-        id: &str,
-    ) -> io::Result<Option<CapturedProcedure>> {
+    pub async fn find_by_id(&self, id: &str) -> io::Result<Option<CapturedProcedure>> {
         let all = self.load_all().await?;
         Ok(all.into_iter().find(|p| p.id == id))
     }
@@ -253,11 +243,7 @@ impl ProcedureStore {
     /// Update the confidence metrics for a procedure.
     ///
     /// Records a success or failure and updates the score.
-    pub async fn update_confidence(
-        &self,
-        id: &str,
-        success: bool,
-    ) -> io::Result<()> {
+    pub async fn update_confidence(&self, id: &str, success: bool) -> io::Result<()> {
         let mut procedures = self.load_all().await?;
 
         if let Some(procedure) = procedures.iter_mut().find(|p| p.id == id) {
@@ -278,9 +264,7 @@ impl ProcedureStore {
     }
 
     /// Delete a procedure by ID.
-    pub async fn delete(&self,
-        id: &str,
-    ) -> io::Result<bool> {
+    pub async fn delete(&self, id: &str) -> io::Result<bool> {
         let mut procedures = self.load_all().await?;
         let original_len = procedures.len();
 
@@ -405,7 +389,7 @@ mod tests {
         existing_proc.record_failure();
         // Score should be ~0.909, high confidence
         assert!(existing_proc.confidence.is_high_confidence());
-        
+
         existing_proc.add_step(ProcedureStep {
             ordinal: 2,
             command: "rustc --version".to_string(),
@@ -436,12 +420,20 @@ mod tests {
         // new_proc has: echo test, curl
         // existing has: echo test, rustc
         // After merge: echo test, curl, rustc = 3 steps
-        assert_eq!(saved.step_count(), 3, "Expected 3 steps after merge: echo test, curl, rustc");
+        assert_eq!(
+            saved.step_count(),
+            3,
+            "Expected 3 steps after merge: echo test, curl, rustc"
+        );
 
         // Verify the merged procedure is saved (should replace existing)
         let all = store.load_all().await.unwrap();
         assert_eq!(all.len(), 1, "Should have only 1 procedure after merge");
-        assert_eq!(all[0].step_count(), 3, "Saved procedure should have 3 steps");
+        assert_eq!(
+            all[0].step_count(),
+            3,
+            "Saved procedure should have 3 steps"
+        );
     }
 
     #[tokio::test]

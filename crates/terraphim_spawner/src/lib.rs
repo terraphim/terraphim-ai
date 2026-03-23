@@ -504,10 +504,9 @@ impl AgentSpawner {
         if use_stdin {
             if let Some(mut stdin) = child.stdin.take() {
                 use tokio::io::AsyncWriteExt;
-                stdin
-                    .write_all(task.as_bytes())
-                    .await
-                    .map_err(|e| SpawnerError::SpawnError(format!("failed to write prompt to stdin: {}", e)))?;
+                stdin.write_all(task.as_bytes()).await.map_err(|e| {
+                    SpawnerError::SpawnError(format!("failed to write prompt to stdin: {}", e))
+                })?;
                 // Drop stdin to close the pipe (signals EOF to the child)
             }
         }
@@ -817,7 +816,10 @@ mod tests {
             .spawn_with_model_stdin(&provider, &large_prompt, None)
             .await;
 
-        assert!(handle.is_ok(), "large prompt should be written to stdin without error");
+        assert!(
+            handle.is_ok(),
+            "large prompt should be written to stdin without error"
+        );
 
         // Give time for the process to complete
         tokio::time::sleep(Duration::from_millis(300)).await;
@@ -827,7 +829,7 @@ mod tests {
     #[tokio::test]
     async fn test_spawn_with_model_stdin() {
         let spawner = AgentSpawner::new();
-        
+
         // Use echo with a model - echo doesn't actually use models but this tests the API
         let provider = Provider::new(
             "@model-cat-agent",
