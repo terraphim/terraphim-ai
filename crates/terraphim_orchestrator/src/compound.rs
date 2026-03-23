@@ -11,6 +11,16 @@ use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
 use crate::scope::{ScopeRegistry, WorktreeManager};
 
+// Embed prompt templates at compile time to avoid CWD-dependent file loading.
+// The ADF binary may run from /opt/ai-dark-factory/ but templates live in the
+// source tree. Embedding eliminates the path resolution issue entirely.
+const PROMPT_SECURITY: &str = include_str!("../prompts/review-security.md");
+const PROMPT_ARCHITECTURE: &str = include_str!("../prompts/review-architecture.md");
+const PROMPT_PERFORMANCE: &str = include_str!("../prompts/review-performance.md");
+const PROMPT_QUALITY: &str = include_str!("../prompts/review-quality.md");
+const PROMPT_DOMAIN: &str = include_str!("../prompts/review-domain.md");
+const PROMPT_DESIGN_QUALITY: &str = include_str!("../prompts/review-design-quality.md");
+
 /// Definition of a single review group (1 agent per group).
 #[derive(Debug, Clone)]
 pub struct ReviewGroupDef {
@@ -24,8 +34,10 @@ pub struct ReviewGroupDef {
     pub cli_tool: String,
     /// Optional model override.
     pub model: Option<String>,
-    /// Path to prompt template file.
+    /// Path to prompt template file (retained for logging/debug).
     pub prompt_template: String,
+    /// Embedded prompt content (compile-time via include_str).
+    pub prompt_content: &'static str,
     /// Whether this agent only runs on visual/design changes.
     pub visual_only: bool,
     /// Persona identity for this review agent (e.g., "Vigil", "Carthos").
@@ -34,8 +46,8 @@ pub struct ReviewGroupDef {
 
 impl ReviewGroupDef {
     /// Load the prompt template content from file.
-    pub fn load_prompt(&self) -> Result<String, std::io::Error> {
-        std::fs::read_to_string(&self.prompt_template)
+    pub fn prompt(&self) -> &str {
+        self.prompt_content
     }
 }
 
@@ -185,7 +197,6 @@ impl CompoundReviewWorkflow {
             let changed_files = changed_files.clone();
             let timeout = self.config.timeout;
             let cli_tool = group.cli_tool.clone();
-            let prompt_template = group.prompt_template.clone();
 
             tokio::spawn(async move {
                 let result = run_single_agent(
@@ -195,7 +206,6 @@ impl CompoundReviewWorkflow {
                     correlation_id,
                     timeout,
                     &cli_tool,
-                    &prompt_template,
                 )
                 .await;
                 let _ = tx.send(result).await;
@@ -353,20 +363,11 @@ async fn run_single_agent(
     _correlation_id: Uuid,
     timeout: Duration,
     cli_tool: &str,
-    prompt_template: &str,
 ) -> AgentResult {
     let agent_name = &group.agent_name;
 
-    // Load prompt template
-    let prompt = match std::fs::read_to_string(prompt_template) {
-        Ok(p) => p,
-        Err(e) => {
-            return AgentResult::Failed {
-                agent_name: agent_name.clone(),
-                reason: format!("failed to load prompt template: {}", e),
-            };
-        }
-    };
+    // Use embedded prompt content (no filesystem access needed)
+    let prompt = group.prompt_content;
 
     // Build the command
     // Format: <cli_tool> run -p "<prompt>" <changed_files...>
@@ -547,6 +548,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             cli_tool: "opencode".to_string(),
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-security.md".to_string(),
+            prompt_content: PROMPT_SECURITY,
             visual_only: false,
             persona: Some("Vigil".to_string()),
         },
@@ -558,6 +560,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-architecture.md"
                 .to_string(),
+            prompt_content: PROMPT_ARCHITECTURE,
             visual_only: false,
             persona: Some("Carthos".to_string()),
         },
@@ -569,6 +572,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-performance.md"
                 .to_string(),
+            prompt_content: PROMPT_PERFORMANCE,
             visual_only: false,
             persona: Some("Ferrox".to_string()),
         },
@@ -579,6 +583,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             cli_tool: "claude".to_string(),
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-quality.md".to_string(),
+            prompt_content: PROMPT_QUALITY,
             visual_only: false,
             persona: Some("Ferrox".to_string()),
         },
@@ -589,6 +594,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             cli_tool: "opencode".to_string(),
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-domain.md".to_string(),
+            prompt_content: PROMPT_DOMAIN,
             visual_only: false,
             persona: Some("Carthos".to_string()),
         },
@@ -600,6 +606,7 @@ fn default_groups() -> Vec<ReviewGroupDef> {
             model: None,
             prompt_template: "crates/terraphim_orchestrator/prompts/review-design-quality.md"
                 .to_string(),
+            prompt_content: PROMPT_DESIGN_QUALITY,
             visual_only: true,
             persona: Some("Lux".to_string()),
         },
