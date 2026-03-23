@@ -1,6 +1,6 @@
 //! Command definitions for REPL interface
 
-use anyhow::{Result, anyhow};
+use anyhow::{anyhow, Result};
 use std::str::FromStr;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -155,12 +155,7 @@ pub enum FileSubcommand {
 pub enum SessionsSubcommand {
     /// Detect available session sources
     Sources,
-    /// Import sessions from a source
-    Import {
-        source: Option<String>,
-        limit: Option<usize>,
-    },
-    /// List imported sessions
+    /// List imported sessions (auto-imports if cache is empty)
     List {
         source: Option<String>,
         limit: Option<usize>,
@@ -1106,45 +1101,9 @@ impl FromStr for ReplCommand {
                         subcommand: SessionsSubcommand::Sources,
                     }),
                     "import" => {
-                        let mut source = None;
-                        let mut limit = None;
-                        let mut i = 2;
-
-                        while i < parts.len() {
-                            match parts[i] {
-                                "--source" => {
-                                    if i + 1 < parts.len() {
-                                        source = Some(parts[i + 1].to_string());
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--source requires a value"));
-                                    }
-                                }
-                                "--limit" => {
-                                    if i + 1 < parts.len() {
-                                        limit = Some(
-                                            parts[i + 1]
-                                                .parse::<usize>()
-                                                .map_err(|_| anyhow!("Invalid limit value"))?,
-                                        );
-                                        i += 2;
-                                    } else {
-                                        return Err(anyhow!("--limit requires a value"));
-                                    }
-                                }
-                                _ => {
-                                    // Treat as source if no flag prefix
-                                    if source.is_none() && !parts[i].starts_with("--") {
-                                        source = Some(parts[i].to_string());
-                                    }
-                                    i += 1;
-                                }
-                            }
-                        }
-
-                        Ok(ReplCommand::Sessions {
-                            subcommand: SessionsSubcommand::Import { source, limit },
-                        })
+                        return Err(anyhow!(
+                            "The 'import' command has been removed. Sessions are now automatically imported when needed. Use '/sessions list' or '/sessions search <query>' instead."
+                        ));
                     }
                     "list" | "ls" => {
                         let mut source = None;
@@ -1345,7 +1304,7 @@ impl FromStr for ReplCommand {
                         })
                     }
                     _ => Err(anyhow!(
-                        "Unknown sessions subcommand: {}. Use: sources, import, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file",
+                        "Unknown sessions subcommand: {}. Use: sources, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file",
                         parts[1]
                     )),
                 }
@@ -1502,7 +1461,7 @@ impl ReplCommand {
 
             #[cfg(feature = "repl-sessions")]
             "sessions" => Some(
-                "/sessions <subcommand> - AI coding session history (sources, import, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file)",
+                "/sessions <subcommand> - AI coding session history (sources, list, search, stats, show, concepts, related, timeline, export, enrich, files, by-file)",
             ),
 
             _ => None,
@@ -1628,22 +1587,18 @@ mod tests {
         // Test update without subcommand
         let result = "/update".parse::<ReplCommand>();
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("requires a subcommand")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires a subcommand"));
 
         // Test update rollback without version
         let result = "/update rollback".parse::<ReplCommand>();
         assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("requires a version")
-        );
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("requires a version"));
 
         // Test unknown update subcommand
         let result = "/update unknown".parse::<ReplCommand>();
