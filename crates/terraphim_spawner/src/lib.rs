@@ -471,6 +471,19 @@ impl AgentSpawner {
             cmd.env(key, value);
         }
 
+        // Strip ANTHROPIC_API_KEY for Claude CLI agents.
+        // Claude CLI uses OAuth (browser flow) for authentication.
+        // If ANTHROPIC_API_KEY is set in the environment (even inherited),
+        // Claude CLI switches to API-key auth mode which fails with
+        // invalid values like "oauth-managed".
+        let cli_name = std::path::Path::new(&config.cli_command)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if cli_name == "claude" || cli_name == "claude-code" {
+            cmd.env_remove("ANTHROPIC_API_KEY");
+        }
+
         // Apply resource limits via pre_exec hook (unix only)
         #[cfg(unix)]
         {
