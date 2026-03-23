@@ -10,8 +10,8 @@ use std::sync::Arc;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use terraphim_agent_supervisor::{
-    AgentPid, AgentStatus, InitArgs, SupervisedAgent, SupervisionError,
-    SupervisionResult, SupervisorId, SystemMessage, TerminateReason,
+    AgentPid, AgentStatus, InitArgs, SupervisedAgent, SupervisionError, SupervisionResult,
+    SupervisorId, SystemMessage, TerminateReason,
 };
 use terraphim_rolegraph::RoleGraph;
 
@@ -140,15 +140,11 @@ impl JudgeAgent {
     /// # Ok(())
     /// # }
     /// ```
-    pub async fn evaluate(&self,
-        file_path: &Path,
-        profile: &str,
-    ) -> JudgeResult<JudgeVerdict> {
+    pub async fn evaluate(&self, file_path: &Path, profile: &str) -> JudgeResult<JudgeVerdict> {
         let start_time = std::time::Instant::now();
 
         // 1. Load file content
-        let content = std::fs::read_to_string(file_path)
-            .map_err(JudgeError::IoError)?;
+        let content = std::fs::read_to_string(file_path).map_err(JudgeError::IoError)?;
 
         // 2. Enrich with KG context if available
         let enriched_prompt = if let Some(kg_agent) = &self.kg_agent {
@@ -173,13 +169,15 @@ impl JudgeAgent {
         // - Spawn the judge CLI process
         // - Pass enriched_prompt as input
         // - Capture and parse output
-        let verdict = self.simulate_judge_response(&enriched_prompt, profile).await?;
+        let verdict = self
+            .simulate_judge_response(&enriched_prompt, profile)
+            .await?;
 
         let latency_ms = start_time.elapsed().as_millis() as u64;
 
         Ok(JudgeVerdict::new(
             verdict,
-            BTreeMap::new(), // Scores would be parsed from CLI output
+            BTreeMap::new(),    // Scores would be parsed from CLI output
             tiers[0].1.clone(), // Model name as tier
             judge_cli,
             latency_ms,
@@ -214,7 +212,9 @@ impl JudgeAgent {
                 })
                 .unwrap_or_default();
 
-            return Ok(JudgeVerdict::new(verdict, scores, judge_tier, judge_cli, latency_ms));
+            return Ok(JudgeVerdict::new(
+                verdict, scores, judge_tier, judge_cli, latency_ms,
+            ));
         }
 
         // Fallback: parse simple text format
@@ -226,7 +226,12 @@ impl JudgeAgent {
             let line = line.trim();
 
             if line.starts_with("VERDICT:") {
-                verdict = line.split(':').nth(1).unwrap_or("UNKNOWN").trim().to_string();
+                verdict = line
+                    .split(':')
+                    .nth(1)
+                    .unwrap_or("UNKNOWN")
+                    .trim()
+                    .to_string();
             } else if line.starts_with("Score:") {
                 // Parse score lines like "Score: quality=0.95"
                 if let Some(score_part) = line.strip_prefix("Score:") {
@@ -242,17 +247,15 @@ impl JudgeAgent {
             }
         }
 
-        Ok(JudgeVerdict::new(verdict, scores, judge_tier, judge_cli, latency_ms))
+        Ok(JudgeVerdict::new(
+            verdict, scores, judge_tier, judge_cli, latency_ms,
+        ))
     }
 
     /// Simulate a judge response (for testing)
     ///
     /// In production, this would be replaced by actual CLI execution
-    async fn simulate_judge_response(
-        &self,
-        _prompt: &str,
-        profile: &str,
-    ) -> JudgeResult<String> {
+    async fn simulate_judge_response(&self, _prompt: &str, profile: &str) -> JudgeResult<String> {
         // Simulate different responses based on profile
         match profile {
             "default" => Ok("PASS".to_string()),
@@ -294,7 +297,11 @@ impl SupervisedAgent for JudgeAgent {
         }
 
         // Initialize model router if config provides mapping path
-        if let Some(mapping_path) = self.config.get("model_mapping_path").and_then(|v| v.as_str()) {
+        if let Some(mapping_path) = self
+            .config
+            .get("model_mapping_path")
+            .and_then(|v| v.as_str())
+        {
             match JudgeModelRouter::from_config(Path::new(mapping_path)) {
                 Ok(router) => {
                     self.model_router = router;
@@ -324,10 +331,7 @@ impl SupervisedAgent for JudgeAgent {
         Ok(())
     }
 
-    async fn handle_system_message(
-        &mut self,
-        message: SystemMessage,
-    ) -> SupervisionResult<()> {
+    async fn handle_system_message(&mut self, message: SystemMessage) -> SupervisionResult<()> {
         match message {
             SystemMessage::Shutdown => {
                 self.stop().await?;
@@ -565,10 +569,16 @@ mod tests {
         // Test default profile
         // Note: This uses the simulate method which returns different responses
         // based on profile
-        let verdict = agent.simulate_judge_response("test", "default").await.unwrap();
+        let verdict = agent
+            .simulate_judge_response("test", "default")
+            .await
+            .unwrap();
         assert_eq!(verdict, "PASS");
 
-        let verdict = agent.simulate_judge_response("test", "critical").await.unwrap();
+        let verdict = agent
+            .simulate_judge_response("test", "critical")
+            .await
+            .unwrap();
         assert_eq!(verdict, "NEEDS_REVIEW");
     }
 
@@ -584,10 +594,7 @@ mod tests {
         agent.init(args).await.unwrap();
         agent.start().await.unwrap();
 
-        agent
-            .terminate(TerminateReason::Normal)
-            .await
-            .unwrap();
+        agent.terminate(TerminateReason::Normal).await.unwrap();
         assert_eq!(agent.status(), AgentStatus::Stopped);
     }
 }

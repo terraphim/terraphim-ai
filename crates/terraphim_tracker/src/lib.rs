@@ -174,7 +174,9 @@ impl TrackedIssue {
 
     /// Check if issue is assigned to a specific user
     pub fn is_assigned_to(&self, username: &str) -> bool {
-        self.assignees.iter().any(|a| a.eq_ignore_ascii_case(username))
+        self.assignees
+            .iter()
+            .any(|a| a.eq_ignore_ascii_case(username))
     }
 }
 
@@ -305,9 +307,7 @@ impl ListIssuesParams {
 #[async_trait::async_trait]
 pub trait IssueTracker: Send + Sync {
     /// List issues matching the given parameters
-    async fn list_issues(&self,
-        params: ListIssuesParams,
-    ) -> Result<Vec<TrackedIssue>>;
+    async fn list_issues(&self, params: ListIssuesParams) -> Result<Vec<TrackedIssue>>;
 
     /// Get a single issue by ID
     async fn get_issue(&self, id: u64) -> Result<TrackedIssue>;
@@ -333,24 +333,13 @@ pub trait IssueTracker: Send + Sync {
     async fn close_issue(&self, id: u64) -> Result<TrackedIssue>;
 
     /// Add labels to an issue
-    async fn add_labels(&self,
-        id: u64,
-        labels: Vec<String>,
-    ) -> Result<TrackedIssue>;
+    async fn add_labels(&self, id: u64, labels: Vec<String>) -> Result<TrackedIssue>;
 
     /// Remove labels from an issue
-    async fn remove_labels(
-        &self,
-        id: u64,
-        labels: Vec<String>,
-    ) -> Result<TrackedIssue>;
+    async fn remove_labels(&self, id: u64, labels: Vec<String>) -> Result<TrackedIssue>;
 
     /// Assign issue to users
-    async fn assign_issue(
-        &self,
-        id: u64,
-        assignees: Vec<String>,
-    ) -> Result<TrackedIssue>;
+    async fn assign_issue(&self, id: u64, assignees: Vec<String>) -> Result<TrackedIssue>;
 }
 
 #[cfg(test)]
@@ -383,16 +372,18 @@ mod tests {
         assert_eq!(issue.priority, Some("P1".to_string()));
         assert_eq!(issue.page_rank_score, Some(0.85));
         assert_eq!(issue.body, Some("This is a test issue".to_string()));
-        assert_eq!(issue.url, Some("https://git.example.com/issues/42".to_string()));
+        assert_eq!(
+            issue.url,
+            Some("https://git.example.com/issues/42".to_string())
+        );
         assert!(issue.is_open());
         assert!(!issue.is_closed());
     }
 
     #[test]
     fn test_tracked_issue_closed() {
-        let issue = TrackedIssue::new(1, "Closed Issue")
-            .with_state(IssueState::Closed);
-        
+        let issue = TrackedIssue::new(1, "Closed Issue").with_state(IssueState::Closed);
+
         assert!(issue.is_closed());
         assert!(!issue.is_open());
     }
@@ -400,12 +391,7 @@ mod tests {
     #[test]
     fn test_tracker_config_validation() {
         // Valid config
-        let config = TrackerConfig::new(
-            "https://git.example.com",
-            "token123",
-            "owner",
-            "repo",
-        );
+        let config = TrackerConfig::new("https://git.example.com", "token123", "owner", "repo");
         assert!(config.validate().is_ok());
 
         // Empty URL
@@ -427,14 +413,13 @@ mod tests {
 
     #[test]
     fn test_tracker_config_with_robot_url() {
-        let config = TrackerConfig::new(
-            "https://git.example.com",
-            "token123",
-            "owner",
-            "repo",
-        ).with_robot_url("https://robot.example.com");
+        let config = TrackerConfig::new("https://git.example.com", "token123", "owner", "repo")
+            .with_robot_url("https://robot.example.com");
 
-        assert_eq!(config.robot_url, Some("https://robot.example.com".to_string()));
+        assert_eq!(
+            config.robot_url,
+            Some("https://robot.example.com".to_string())
+        );
     }
 
     #[test]
@@ -447,7 +432,10 @@ mod tests {
             .with_page(2);
 
         assert_eq!(params.state, Some(IssueState::Open));
-        assert_eq!(params.labels, Some(vec!["bug".to_string(), "urgent".to_string()]));
+        assert_eq!(
+            params.labels,
+            Some(vec!["bug".to_string(), "urgent".to_string()])
+        );
         assert_eq!(params.assignee, Some("alice".to_string()));
         assert_eq!(params.limit, Some(50));
         assert_eq!(params.page, Some(2));
@@ -462,7 +450,7 @@ mod tests {
     #[test]
     fn test_tracked_issue_default() {
         let issue = TrackedIssue::new(1, "Default Issue");
-        
+
         assert_eq!(issue.state, IssueState::Open);
         assert!(issue.labels.is_empty());
         assert!(issue.assignees.is_empty());

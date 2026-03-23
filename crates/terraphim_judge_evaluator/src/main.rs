@@ -70,8 +70,6 @@ enum OutputFormat {
     Json,
 }
 
-
-
 /// CLI error type
 #[derive(Debug, thiserror::Error)]
 enum CliError {
@@ -88,7 +86,11 @@ async fn main() -> Result<(), CliError> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Evaluate { file, profile, tier: _ } => {
+        Commands::Evaluate {
+            file,
+            profile,
+            tier: _,
+        } => {
             evaluate_single(file, &profile).await?;
         }
         Commands::Batch {
@@ -211,7 +213,11 @@ fn collect_files(dir: &PathBuf) -> Result<Vec<PathBuf>, CliError> {
 }
 
 /// Print results in text format
-fn print_text_summary(results: &[terraphim_judge_evaluator::BatchResult], summary: &BatchSummary, dir: &Path) {
+fn print_text_summary(
+    results: &[terraphim_judge_evaluator::BatchResult],
+    summary: &BatchSummary,
+    dir: &Path,
+) {
     println!("Batch Evaluation Results");
     println!("========================");
     println!("Directory: {}", dir.display());
@@ -221,15 +227,30 @@ fn print_text_summary(results: &[terraphim_judge_evaluator::BatchResult], summar
     for result in results {
         let status = if result.is_error() {
             "ERROR"
-        } else if result.verdict.as_ref().map(|v| v.is_pass()).unwrap_or(false) {
+        } else if result
+            .verdict
+            .as_ref()
+            .map(|v| v.is_pass())
+            .unwrap_or(false)
+        {
             "PASS"
-        } else if result.verdict.as_ref().map(|v| v.is_fail()).unwrap_or(false) {
+        } else if result
+            .verdict
+            .as_ref()
+            .map(|v| v.is_fail())
+            .unwrap_or(false)
+        {
             "FAIL"
         } else {
             "UNKNOWN"
         };
 
-        println!("{}: {} ({}ms)", status, result.file.display(), result.duration_ms);
+        println!(
+            "{}: {} ({}ms)",
+            status,
+            result.file.display(),
+            result.duration_ms
+        );
 
         if let Some(error) = &result.error {
             println!("  Error: {}", error);
@@ -254,11 +275,22 @@ mod tests {
 
     #[test]
     fn test_cli_parse_evaluate() {
-        let args = vec!["judge-evaluator", "evaluate", "--file", "test.rs", "--profile", "default"];
+        let args = vec![
+            "judge-evaluator",
+            "evaluate",
+            "--file",
+            "test.rs",
+            "--profile",
+            "default",
+        ];
         let cli = Cli::parse_from(args);
 
         match cli.command {
-            Commands::Evaluate { file, profile, tier } => {
+            Commands::Evaluate {
+                file,
+                profile,
+                tier,
+            } => {
                 assert_eq!(file, PathBuf::from("test.rs"));
                 assert_eq!(profile, "default");
                 assert!(tier.is_none());
@@ -282,7 +314,11 @@ mod tests {
         let cli = Cli::parse_from(args);
 
         match cli.command {
-            Commands::Evaluate { file, profile, tier } => {
+            Commands::Evaluate {
+                file,
+                profile,
+                tier,
+            } => {
                 assert_eq!(file, PathBuf::from("test.rs"));
                 assert_eq!(profile, "default");
                 assert_eq!(tier, Some("quick".to_string()));
@@ -325,7 +361,14 @@ mod tests {
 
     #[test]
     fn test_cli_parse_batch_defaults() {
-        let args = vec!["judge-evaluator", "batch", "--dir", "./src", "--profile", "default"];
+        let args = vec![
+            "judge-evaluator",
+            "batch",
+            "--dir",
+            "./src",
+            "--profile",
+            "default",
+        ];
         let cli = Cli::parse_from(args);
 
         match cli.command {

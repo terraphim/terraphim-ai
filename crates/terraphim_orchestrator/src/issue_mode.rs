@@ -9,7 +9,9 @@ use tokio::sync::mpsc;
 use tokio::time::{interval, Duration};
 use tracing::{debug, error, info, warn};
 
-use terraphim_tracker::{GiteaTracker, IssueTracker, ListIssuesParams, TrackedIssue, TrackerConfig};
+use terraphim_tracker::{
+    GiteaTracker, IssueTracker, ListIssuesParams, TrackedIssue, TrackerConfig,
+};
 
 use crate::config::AgentDefinition;
 use crate::dispatcher::{DispatchQueue, DispatchTask};
@@ -30,7 +32,7 @@ pub struct IssueMode {
     /// Set of currently running issue IDs (to avoid duplicates).
     running_issues: HashSet<u64>,
     /// Label-to-agent mapping rules.
-    label_mappings: Vec<( String, String)>,
+    label_mappings: Vec<(String, String)>,
     /// Title pattern-to-agent mapping rules.
     pattern_mappings: Vec<(String, String)>,
 }
@@ -61,7 +63,10 @@ impl IssueMode {
         let pattern_mappings = vec![
             (r"\[ADF\]".to_string(), "implementation-swarm".to_string()),
             (r"(?i)security".to_string(), "security-sentinel".to_string()),
-            (r"(?i)documentation|docs".to_string(), "docs-writer".to_string()),
+            (
+                r"(?i)documentation|docs".to_string(),
+                "docs-writer".to_string(),
+            ),
         ];
 
         Ok((
@@ -116,8 +121,7 @@ impl IssueMode {
     }
 
     /// Poll for issues and dispatch tasks.
-    async fn poll_and_dispatch(&mut self,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    async fn poll_and_dispatch(&mut self) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         debug!("Polling for ready issues");
 
         // Fetch open issues sorted by PageRank (via gitea-robot)
@@ -232,7 +236,11 @@ impl IssueMode {
         }
 
         // Increase priority for security labels
-        if issue.labels.iter().any(|l| l.eq_ignore_ascii_case("security")) {
+        if issue
+            .labels
+            .iter()
+            .any(|l| l.eq_ignore_ascii_case("security"))
+        {
             priority = priority.saturating_add(50);
         }
 
@@ -246,8 +254,7 @@ impl IssueMode {
     }
 
     /// Clean up completed issues from the running set.
-    async fn cleanup_completed_issues(&mut self,
-    ) {
+    async fn cleanup_completed_issues(&mut self) {
         let mut to_remove = Vec::new();
 
         for issue_id in &self.running_issues {
@@ -327,20 +334,10 @@ mod tests {
     fn test_map_issue_to_agent_by_label() {
         let agents = create_test_agents();
         let queue = DispatchQueue::new(10);
-        let tracker_config = TrackerConfig::new(
-            "https://git.example.com",
-            "token",
-            "owner",
-            "repo",
-        );
+        let tracker_config =
+            TrackerConfig::new("https://git.example.com", "token", "owner", "repo");
 
-        let (issue_mode, _) = IssueMode::new(
-            tracker_config,
-            queue,
-            agents,
-            60,
-        )
-        .unwrap();
+        let (issue_mode, _) = IssueMode::new(tracker_config, queue, agents, 60).unwrap();
 
         // Create issue with ADF label
         let mut issue = TrackedIssue::new(1, "[ADF] Test issue");
@@ -361,20 +358,10 @@ mod tests {
     fn test_map_issue_to_agent_by_pattern() {
         let agents = create_test_agents();
         let queue = DispatchQueue::new(10);
-        let tracker_config = TrackerConfig::new(
-            "https://git.example.com",
-            "token",
-            "owner",
-            "repo",
-        );
+        let tracker_config =
+            TrackerConfig::new("https://git.example.com", "token", "owner", "repo");
 
-        let (issue_mode, _) = IssueMode::new(
-            tracker_config,
-            queue,
-            agents,
-            60,
-        )
-        .unwrap();
+        let (issue_mode, _) = IssueMode::new(tracker_config, queue, agents, 60).unwrap();
 
         // Create issue with [ADF] pattern in title
         let issue = TrackedIssue::new(1, "[ADF] Implement new feature");
@@ -393,20 +380,10 @@ mod tests {
     fn test_map_issue_default_to_growth_agent() {
         let agents = create_test_agents();
         let queue = DispatchQueue::new(10);
-        let tracker_config = TrackerConfig::new(
-            "https://git.example.com",
-            "token",
-            "owner",
-            "repo",
-        );
+        let tracker_config =
+            TrackerConfig::new("https://git.example.com", "token", "owner", "repo");
 
-        let (issue_mode, _) = IssueMode::new(
-            tracker_config,
-            queue,
-            agents,
-            60,
-        )
-        .unwrap();
+        let (issue_mode, _) = IssueMode::new(tracker_config, queue, agents, 60).unwrap();
 
         // Create issue with no matching labels or patterns
         let issue = TrackedIssue::new(1, "Some random issue");
@@ -420,20 +397,10 @@ mod tests {
     fn test_calculate_priority_with_pagerank() {
         let agents = vec![];
         let queue = DispatchQueue::new(10);
-        let tracker_config = TrackerConfig::new(
-            "https://git.example.com",
-            "token",
-            "owner",
-            "repo",
-        );
+        let tracker_config =
+            TrackerConfig::new("https://git.example.com", "token", "owner", "repo");
 
-        let (issue_mode, _) = IssueMode::new(
-            tracker_config,
-            queue,
-            agents,
-            60,
-        )
-        .unwrap();
+        let (issue_mode, _) = IssueMode::new(tracker_config, queue, agents, 60).unwrap();
 
         // Issue with high PageRank
         let mut high_rank = TrackedIssue::new(1, "Important issue");
@@ -461,20 +428,10 @@ mod tests {
     fn test_priority_capped_at_255() {
         let agents = vec![];
         let queue = DispatchQueue::new(10);
-        let tracker_config = TrackerConfig::new(
-            "https://git.example.com",
-            "token",
-            "owner",
-            "repo",
-        );
+        let tracker_config =
+            TrackerConfig::new("https://git.example.com", "token", "owner", "repo");
 
-        let (issue_mode, _) = IssueMode::new(
-            tracker_config,
-            queue,
-            agents,
-            60,
-        )
-        .unwrap();
+        let (issue_mode, _) = IssueMode::new(tracker_config, queue, agents, 60).unwrap();
 
         // Issue with maximum PageRank and security label
         let mut max_priority = TrackedIssue::new(1, "Critical security");

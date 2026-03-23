@@ -56,7 +56,10 @@ impl GitWorkspace {
     /// Check if a directory is a git repository
     pub fn is_git_repo(path: &Path) -> bool {
         path.join(".git").exists()
-            || path.parent().map(|p| p.join(".git").exists()).unwrap_or(false)
+            || path
+                .parent()
+                .map(|p| p.join(".git").exists())
+                .unwrap_or(false)
     }
 
     /// Get the current branch name
@@ -237,9 +240,9 @@ impl GitWorkspace {
     /// Check if a branch exists
     pub async fn branch_exists(&self, branch_name: &str) -> Result<bool> {
         let branches = self.list_branches().await?;
-        Ok(branches.iter().any(|b| {
-            b == branch_name || b.ends_with(&format!("/{}", branch_name))
-        }))
+        Ok(branches
+            .iter()
+            .any(|b| b == branch_name || b.ends_with(&format!("/{}", branch_name))))
     }
 
     /// Save the current state (branch and stash)
@@ -295,7 +298,7 @@ mod tests {
     async fn create_test_repo(path: &Path) -> Result<()> {
         // Initialize git repo
         let output = Command::new("git")
-            .args(&["init"])
+            .args(["init"])
             .current_dir(path)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -308,13 +311,13 @@ mod tests {
 
         // Configure git user for commits
         Command::new("git")
-            .args(&["config", "user.email", "test@terraphim.ai"])
+            .args(["config", "user.email", "test@terraphim.ai"])
             .current_dir(path)
             .output()
             .await?;
 
         Command::new("git")
-            .args(&["config", "user.name", "Test User"])
+            .args(["config", "user.name", "Test User"])
             .current_dir(path)
             .output()
             .await?;
@@ -324,13 +327,13 @@ mod tests {
         tokio::fs::write(&readme, "# Test Repo\n").await?;
 
         Command::new("git")
-            .args(&["add", "."])
+            .args(["add", "."])
             .current_dir(path)
             .output()
             .await?;
 
         Command::new("git")
-            .args(&["commit", "-m", "Initial commit"])
+            .args(["commit", "-m", "Initial commit"])
             .current_dir(path)
             .stdout(Stdio::null())
             .stderr(Stdio::null())
@@ -353,7 +356,7 @@ mod tests {
     #[tokio::test]
     async fn test_git_workspace_creation() {
         let temp_dir = tempfile::tempdir().unwrap();
-        
+
         // Should fail for non-git directory
         assert!(GitWorkspace::new(temp_dir.path()).is_err());
 
@@ -372,7 +375,7 @@ mod tests {
 
         let workspace = GitWorkspace::new(temp_dir.path()).unwrap();
         let branch = workspace.current_branch().await.unwrap();
-        
+
         // Should have a branch (usually "master" or "main")
         assert!(branch.is_some());
     }
@@ -383,7 +386,7 @@ mod tests {
         create_test_repo(temp_dir.path()).await.unwrap();
 
         let workspace = GitWorkspace::new(temp_dir.path()).unwrap();
-        
+
         // Should be clean initially
         assert!(workspace.is_clean().await.unwrap());
 
@@ -405,7 +408,7 @@ mod tests {
 
         // Create a new branch
         workspace.create_branch("test-branch").await.unwrap();
-        
+
         // Should be on the new branch
         let current = workspace.current_branch().await.unwrap().unwrap();
         assert_eq!(current, "test-branch");
@@ -416,12 +419,18 @@ mod tests {
         assert_eq!(current, original);
 
         // Test checkout_or_create_branch with existing branch
-        workspace.checkout_or_create_branch("test-branch").await.unwrap();
+        workspace
+            .checkout_or_create_branch("test-branch")
+            .await
+            .unwrap();
         let current = workspace.current_branch().await.unwrap().unwrap();
         assert_eq!(current, "test-branch");
 
         // Test checkout_or_create_branch with new branch
-        workspace.checkout_or_create_branch("another-branch").await.unwrap();
+        workspace
+            .checkout_or_create_branch("another-branch")
+            .await
+            .unwrap();
         let current = workspace.current_branch().await.unwrap().unwrap();
         assert_eq!(current, "another-branch");
     }
@@ -458,7 +467,7 @@ mod tests {
 
         // Add the file to git index so it can be stashed
         Command::new("git")
-            .args(&["add", "test.txt"])
+            .args(["add", "test.txt"])
             .current_dir(temp_dir.path())
             .output()
             .await
@@ -489,19 +498,22 @@ mod tests {
 
         let mut workspace = GitWorkspace::new(temp_dir.path()).unwrap();
         let _original_branch = workspace.current_branch().await.unwrap().unwrap();
-        
+
         // Create a file before switching branches
         let test_file = temp_dir.path().join("test.txt");
         tokio::fs::write(&test_file, "test content").await.unwrap();
 
         // Create and switch to a new branch
         workspace.create_branch("temp-branch").await.unwrap();
-        assert_eq!(workspace.current_branch().await.unwrap().unwrap(), "temp-branch");
+        assert_eq!(
+            workspace.current_branch().await.unwrap().unwrap(),
+            "temp-branch"
+        );
 
         // Create another file on the new branch
         let test_file2 = temp_dir.path().join("test2.txt");
         tokio::fs::write(&test_file2, "more content").await.unwrap();
-        
+
         // Save state - this should record original_branch as the branch we came from
         // and stash current changes
         workspace.save_state().await.unwrap();
@@ -512,9 +524,12 @@ mod tests {
 
         // Restore state
         workspace.restore_state().await.unwrap();
-        
+
         // Should be back on temp-branch (which was the original when save_state was called)
-        assert_eq!(workspace.current_branch().await.unwrap().unwrap(), "temp-branch");
+        assert_eq!(
+            workspace.current_branch().await.unwrap().unwrap(),
+            "temp-branch"
+        );
     }
 
     #[tokio::test]
@@ -523,7 +538,7 @@ mod tests {
         create_test_repo(temp_dir.path()).await.unwrap();
 
         let workspace = GitWorkspace::new(temp_dir.path()).unwrap();
-        
+
         // Create some branches
         workspace.create_branch("branch-a").await.unwrap();
         workspace.checkout_branch("master").await.unwrap();
@@ -531,7 +546,7 @@ mod tests {
         workspace.checkout_branch("master").await.unwrap();
 
         let branches = workspace.list_branches().await.unwrap();
-        
+
         // Should have at least master, branch-a, and branch-b
         assert!(branches.len() >= 3);
         assert!(branches.iter().any(|b| b == "master" || b == "main"));

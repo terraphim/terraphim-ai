@@ -22,14 +22,14 @@ pub use convergence_detector::{ConvergenceDetector, ConvergenceSignal};
 pub use dispatcher::{ConcurrencyController, DispatchQueue, DispatchTask, DispatcherError};
 pub use drift_detection::{DriftDetector, DriftReport};
 pub use error::OrchestratorError;
-pub use issue_mode::IssueMode;
-pub use session_rotation::{AgentSession, SessionRotationManager};
 pub use handoff::HandoffContext;
+pub use issue_mode::IssueMode;
 pub use nightwatch::{
     CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
     RateLimitTracker, RateLimitWindow,
 };
 pub use scheduler::{ScheduleEvent, TimeMode, TimeScheduler};
+pub use session_rotation::{AgentSession, SessionRotationManager};
 
 use std::collections::HashMap;
 use std::path::Path;
@@ -50,8 +50,6 @@ pub struct ReviewRequest {
     pub artifact_path: String,
     pub review_type: String,
 }
-
-
 
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
@@ -109,7 +107,10 @@ impl ModeCoordinator {
 
         let (_coord_shutdown_tx, coord_shutdown_rx) = tokio::sync::mpsc::channel(1);
 
-        let time_mode = if matches!(workflow_config.mode, WorkflowMode::TimeOnly | WorkflowMode::Dual) {
+        let time_mode = if matches!(
+            workflow_config.mode,
+            WorkflowMode::TimeOnly | WorkflowMode::Dual
+        ) {
             let tm = TimeMode::new_with_queue(
                 &agents,
                 compound_schedule.as_deref(),
@@ -120,7 +121,10 @@ impl ModeCoordinator {
             None
         };
 
-        let (issue_mode, issue_shutdown_tx) = if matches!(workflow_config.mode, WorkflowMode::IssueOnly | WorkflowMode::Dual) {
+        let (issue_mode, issue_shutdown_tx) = if matches!(
+            workflow_config.mode,
+            WorkflowMode::IssueOnly | WorkflowMode::Dual
+        ) {
             if let Some(tracker_cfg) = tracker_config {
                 let (im, tx) = IssueMode::new(
                     tracker_cfg,
@@ -136,14 +140,17 @@ impl ModeCoordinator {
             (None, None)
         };
 
-        Ok((Self {
-            time_mode,
-            issue_mode,
-            dispatch_queue,
-            workflow_mode: workflow_config.mode,
-            issue_shutdown_tx,
-            concurrency_controller,
-        }, coord_shutdown_rx))
+        Ok((
+            Self {
+                time_mode,
+                issue_mode,
+                dispatch_queue,
+                workflow_mode: workflow_config.mode,
+                issue_shutdown_tx,
+                concurrency_controller,
+            },
+            coord_shutdown_rx,
+        ))
     }
 
     /// Get the next task from the dispatch queue.
@@ -221,22 +228,24 @@ impl AgentOrchestrator {
             config.drift_detection.drift_threshold,
             &config.drift_detection.plans_dir,
         );
-        let mut session_rotation = SessionRotationManager::new(
-            config.session_rotation.max_sessions_before_rotation,
-        );
+        let mut session_rotation =
+            SessionRotationManager::new(config.session_rotation.max_sessions_before_rotation);
         if let Some(duration_secs) = config.session_rotation.max_session_duration_secs {
             session_rotation = session_rotation.with_duration(Duration::from_secs(duration_secs));
         }
 
         // Initialize mode coordinator if workflow config is present
         let mode_coordinator = if let Some(workflow) = &config.workflow {
-            let tracker_cfg = config.tracker.as_ref().map(|t| terraphim_tracker::TrackerConfig {
-                url: t.url.clone(),
-                token: std::env::var(&t.token_env_var).unwrap_or_default(),
-                owner: t.owner.clone(),
-                repo: t.repo.clone(),
-                robot_url: None,
-            });
+            let tracker_cfg = config
+                .tracker
+                .as_ref()
+                .map(|t| terraphim_tracker::TrackerConfig {
+                    url: t.url.clone(),
+                    token: std::env::var(&t.token_env_var).unwrap_or_default(),
+                    owner: t.owner.clone(),
+                    repo: t.repo.clone(),
+                    robot_url: None,
+                });
             let (coord, _) = ModeCoordinator::new(
                 workflow.clone(),
                 config.agents.clone(),
@@ -248,7 +257,9 @@ impl AgentOrchestrator {
             None
         };
 
-        let stall_threshold = config.concurrency.as_ref()
+        let stall_threshold = config
+            .concurrency
+            .as_ref()
             .map(|c| c.queue_depth as usize)
             .unwrap_or(100);
 
@@ -432,16 +443,17 @@ impl AgentOrchestrator {
         }
 
         // Get next task from queue - this needs mutable borrow
-        let task = self
-            .mode_coordinator
-            .as_mut()
-            .and_then(|c| c.next_task());
+        let task = self.mode_coordinator.as_mut().and_then(|c| c.next_task());
 
         if let Some(task) = task {
             match task {
                 DispatchTask::TimeTask(agent_name, _schedule) => {
-                    if let Some(agent_def) =
-                        self.config.agents.iter().find(|a| a.name == agent_name).cloned()
+                    if let Some(agent_def) = self
+                        .config
+                        .agents
+                        .iter()
+                        .find(|a| a.name == agent_name)
+                        .cloned()
                     {
                         if let Err(e) = self.spawn_agent(&agent_def).await {
                             error!(agent = %agent_name, error = %e, "failed to dispatch time task");
@@ -454,8 +466,12 @@ impl AgentOrchestrator {
                     }
                 }
                 DispatchTask::IssueTask(agent_name, issue_id, _priority) => {
-                    if let Some(agent_def) =
-                        self.config.agents.iter().find(|a| a.name == agent_name).cloned()
+                    if let Some(agent_def) = self
+                        .config
+                        .agents
+                        .iter()
+                        .find(|a| a.name == agent_name)
+                        .cloned()
                     {
                         if let Err(e) = self.spawn_agent(&agent_def).await {
                             error!(agent = %agent_name, issue_id = issue_id, error = %e, "failed to dispatch issue task");
@@ -1555,7 +1571,8 @@ task = "test"
             agents,
             None, // No tracker for this test
             Some("0 2 * * *".to_string()),
-        ).unwrap();
+        )
+        .unwrap();
 
         assert_eq!(coord.workflow_mode, WorkflowMode::Dual);
         assert!(coord.time_mode.is_some());
@@ -1575,12 +1592,7 @@ task = "test"
 
         let agents = vec![];
 
-        let (coord, _shutdown_rx) = ModeCoordinator::new(
-            workflow,
-            agents,
-            None,
-            None,
-        ).unwrap();
+        let (coord, _shutdown_rx) = ModeCoordinator::new(workflow, agents, None, None).unwrap();
 
         assert_eq!(coord.workflow_mode, WorkflowMode::TimeOnly);
         assert!(coord.time_mode.is_some());
@@ -1600,12 +1612,8 @@ task = "test"
         let agents = vec![];
 
         // Without tracker, issue mode should not be created
-        let (coord, _shutdown_rx) = ModeCoordinator::new(
-            workflow,
-            agents.clone(),
-            None,
-            None,
-        ).unwrap();
+        let (coord, _shutdown_rx) =
+            ModeCoordinator::new(workflow, agents.clone(), None, None).unwrap();
 
         assert_eq!(coord.workflow_mode, WorkflowMode::IssueOnly);
         assert!(coord.time_mode.is_none());
@@ -1623,12 +1631,7 @@ task = "test"
 
         let agents = vec![];
 
-        let (mut coord, _shutdown_rx) = ModeCoordinator::new(
-            workflow,
-            agents,
-            None,
-            None,
-        ).unwrap();
+        let (mut coord, _shutdown_rx) = ModeCoordinator::new(workflow, agents, None, None).unwrap();
 
         // Initially not stalled
         assert!(!coord.is_stalled(10));
@@ -1706,12 +1709,7 @@ task = "test"
 
         let agents = vec![];
 
-        let (mut coord, _shutdown_rx) = ModeCoordinator::new(
-            workflow,
-            agents,
-            None,
-            None,
-        ).unwrap();
+        let (mut coord, _shutdown_rx) = ModeCoordinator::new(workflow, agents, None, None).unwrap();
 
         // Submit some tasks
         let task1 = DispatchTask::TimeTask("agent1".to_string(), "0 * * * *".to_string());
@@ -1748,12 +1746,7 @@ task = "test"
 
         let agents = vec![];
 
-        let (coord, _shutdown_rx) = ModeCoordinator::new(
-            workflow,
-            agents,
-            None,
-            None,
-        ).unwrap();
+        let (coord, _shutdown_rx) = ModeCoordinator::new(workflow, agents, None, None).unwrap();
 
         // Should be able to acquire permits up to max
         let permit1 = coord.try_acquire_permit();

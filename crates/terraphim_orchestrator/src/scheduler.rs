@@ -188,19 +188,31 @@ impl TimeMode {
                     let task = DispatchTask::TimeTask(agent.name.clone(), schedule.clone());
                     match queue.submit(task) {
                         Ok(()) => {
-                            info!("Submitted TimeTask for agent '{}' to dispatch queue", agent.name);
+                            info!(
+                                "Submitted TimeTask for agent '{}' to dispatch queue",
+                                agent.name
+                            );
                         }
                         Err(e) => {
-                            warn!("Failed to submit TimeTask for agent '{}': {}", agent.name, e);
+                            warn!(
+                                "Failed to submit TimeTask for agent '{}': {}",
+                                agent.name, e
+                            );
                         }
                     }
                 } else {
                     // Safety agents with no schedule should still be spawned immediately
-                    debug!("Safety agent '{}' has no schedule, skipping queue", agent.name);
+                    debug!(
+                        "Safety agent '{}' has no schedule, skipping queue",
+                        agent.name
+                    );
                 }
             }
             ScheduleEvent::Stop { agent_name } => {
-                debug!("Stop event for agent '{}' - not implemented in queue mode", agent_name);
+                debug!(
+                    "Stop event for agent '{}' - not implemented in queue mode",
+                    agent_name
+                );
             }
             ScheduleEvent::CompoundReview => {
                 debug!("CompoundReview event - handled separately");

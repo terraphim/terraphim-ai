@@ -1,0 +1,45 @@
+////////////////////////////////////////////////
+// MINTY
+////////////////////////////////////////////////
+$grey: #888;
+$grey-light: #aaa;
+$grey-lighter: #dbdbdb;
+
+$orange: #eea170;
+$yellow: #ffce67;
+$green: #56cc90;
+$cyan: #6cc3d5;
+$blue: #6d90d6;
+$red: #e07f7d;
+$turquoise: #6abfb0;
+
+$danger: $orange;
+
+$text: darken($grey, 10);
+$subtitle-color: $grey;
+
+$size-1: 2.5rem;
+$size-2: 2rem;
+$size-3: 1.75rem;
+$size-4: 1.5rem;
+$size-5: 1.25rem;
+$size-6: 15px;
+$size-7: 0.75rem;
+
+$radius-small: 4px;
+$radius: 6px;
+$radius-large: 8px;
+
+$family-heading: "Montserrat", -apple-system, system-ui, BlinkMacSystemFont,
+  "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+$navbar-background-color: $turquoise;
+$navbar-item-color: rgba(#fff, 0.75);
+$navbar-item-hover-color: #fff;
+$navbar-item-active-color: #fff;
+$navbar-item-hover-background-color: rgba(#000, 0.1);
+$navbar-dropdown-arrow: $navbar-item-color;
+
+$bulmaswatch-import-font: true !default;
+
+$box-shadow: 0 0 0 1px $grey-lighter;

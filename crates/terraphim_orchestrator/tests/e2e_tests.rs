@@ -19,7 +19,7 @@ use tracing::info;
 fn create_dual_mode_config() -> OrchestratorConfig {
     // Set the test token env var
     std::env::set_var("TEST_TOKEN", "test-token-12345");
-    
+
     OrchestratorConfig {
         working_dir: std::path::PathBuf::from("/tmp/test-orchestrator"),
         nightwatch: NightwatchConfig::default(),
@@ -116,7 +116,7 @@ fn create_time_only_config() -> OrchestratorConfig {
 fn create_issue_only_config() -> OrchestratorConfig {
     // Set the test token env var
     std::env::set_var("TEST_TOKEN", "test-token-12345");
-    
+
     let mut config = create_dual_mode_config();
     config.workflow = Some(WorkflowConfig {
         mode: WorkflowMode::IssueOnly,
@@ -224,10 +224,7 @@ async fn test_fairness_under_load() {
     if let Some(ref mut coord_mut) = orch.mode_coordinator_mut() {
         // Submit time tasks (lower priority)
         for i in 0..num_time_tasks {
-            let task = DispatchTask::TimeTask(
-                format!("time-agent-{}", i),
-                "0 * * * *".to_string(),
-            );
+            let task = DispatchTask::TimeTask(format!("time-agent-{}", i), "0 * * * *".to_string());
             coord_mut.dispatch_queue.submit(task).unwrap();
         }
 
@@ -255,8 +252,14 @@ async fn test_fairness_under_load() {
         }
 
         // Verify we got tasks from both sources
-        assert_eq!(time_count, num_time_tasks, "time tasks should not be starved");
-        assert_eq!(issue_count, num_issue_tasks, "issue tasks should not be starved");
+        assert_eq!(
+            time_count, num_time_tasks,
+            "time tasks should not be starved"
+        );
+        assert_eq!(
+            issue_count, num_issue_tasks,
+            "issue tasks should not be starved"
+        );
     }
 }
 
@@ -280,11 +283,15 @@ async fn test_graceful_shutdown() {
 
     // Verify queue was drained
     if let Some(ref coord) = orch.mode_coordinator() {
-        assert_eq!(coord.queue_depth(), 0, "queue should be drained after shutdown");
+        assert_eq!(
+            coord.queue_depth(),
+            0,
+            "queue should be drained after shutdown"
+        );
     }
 
     // Verify shutdown completed without errors
-    // (mode_coordinator may be None if all tasks completed)  
+    // (mode_coordinator may be None if all tasks completed)
     info!("Graceful shutdown completed successfully");
 }
 
@@ -313,7 +320,10 @@ fn test_stall_detection() {
     }
 
     // Now should be stalled
-    assert!(orch.check_stall(), "should be stalled when queue exceeds threshold");
+    assert!(
+        orch.check_stall(),
+        "should be stalled when queue exceeds threshold"
+    );
 }
 
 /// Test: ModeCoordinator initialization with tracker
@@ -325,27 +335,25 @@ fn test_mode_coordinator_with_tracker() {
         max_concurrent_tasks: 3,
     };
 
-    let agents = vec![
-        AgentDefinition {
-            name: "implementation-swarm".to_string(),
-            layer: AgentLayer::Growth,
-            cli_tool: "echo".to_string(),
-            task: "Implement features".to_string(),
-            model: None,
-            schedule: None,
-            capabilities: vec!["implementation".to_string()],
-            max_memory_bytes: None,
-            provider: None,
-            fallback_provider: None,
-            fallback_model: None,
-            provider_tier: None,
-            persona_name: None,
-            persona_symbol: None,
-            persona_vibe: None,
-            meta_cortex_connections: vec![],
-            skill_chain: vec![],
-        },
-    ];
+    let agents = vec![AgentDefinition {
+        name: "implementation-swarm".to_string(),
+        layer: AgentLayer::Growth,
+        cli_tool: "echo".to_string(),
+        task: "Implement features".to_string(),
+        model: None,
+        schedule: None,
+        capabilities: vec!["implementation".to_string()],
+        max_memory_bytes: None,
+        provider: None,
+        fallback_provider: None,
+        fallback_model: None,
+        provider_tier: None,
+        persona_name: None,
+        persona_symbol: None,
+        persona_vibe: None,
+        meta_cortex_connections: vec![],
+        skill_chain: vec![],
+    }];
 
     let tracker_config = terraphim_tracker::TrackerConfig::new(
         "https://test.example.com",
@@ -377,13 +385,7 @@ fn test_concurrency_limits() {
         max_concurrent_tasks: 2,
     };
 
-    let (coord, _shutdown_rx) = ModeCoordinator::new(
-        workflow,
-        vec![],
-        None,
-        None,
-    )
-    .unwrap();
+    let (coord, _shutdown_rx) = ModeCoordinator::new(workflow, vec![], None, None).unwrap();
 
     // Acquire permits up to limit
     let permit1 = coord.try_acquire_permit();
@@ -411,13 +413,7 @@ fn test_queue_prioritization() {
         max_concurrent_tasks: 5,
     };
 
-    let (mut coord, _shutdown_rx) = ModeCoordinator::new(
-        workflow,
-        vec![],
-        None,
-        None,
-    )
-    .unwrap();
+    let (mut coord, _shutdown_rx) = ModeCoordinator::new(workflow, vec![], None, None).unwrap();
 
     // Submit tasks with different priorities
     let low_priority = DispatchTask::IssueTask("low".to_string(), 1, 1);
@@ -448,13 +444,7 @@ fn test_queue_full_behavior() {
         max_concurrent_tasks: 5,
     };
 
-    let (mut coord, _shutdown_rx) = ModeCoordinator::new(
-        workflow,
-        vec![],
-        None,
-        None,
-    )
-    .unwrap();
+    let (mut coord, _shutdown_rx) = ModeCoordinator::new(workflow, vec![], None, None).unwrap();
 
     // Fill the queue to capacity (queue depth = max_concurrent_tasks * 10 = 50)
     for i in 0..50 {

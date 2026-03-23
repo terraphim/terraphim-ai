@@ -196,11 +196,7 @@ impl OpenCodeEvent {
 
     /// Extract total token count from step_finish or result events
     pub fn total_tokens(&self) -> Option<u64> {
-        self.part
-            .as_ref()?
-            .get("tokens")?
-            .get("total")?
-            .as_u64()
+        self.part.as_ref()?.get("tokens")?.get("total")?.as_u64()
     }
 
     /// Parse a single NDJSON line into an OpenCodeEvent

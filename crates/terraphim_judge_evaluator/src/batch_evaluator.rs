@@ -312,7 +312,11 @@ mod tests {
         // Create 5 test files
         let mut files = Vec::new();
         for i in 0..5 {
-            files.push(create_test_file(&temp_dir, &format!("file{}.rs", i), "fn main() {}"));
+            files.push(create_test_file(
+                &temp_dir,
+                &format!("file{}.rs", i),
+                "fn main() {}",
+            ));
         }
 
         let judge = JudgeAgent::new();
@@ -355,10 +359,7 @@ mod tests {
         let judge = JudgeAgent::new();
         let evaluator = BatchEvaluator::new(judge, 4);
 
-        let files = vec![
-            good_file.clone(),
-            PathBuf::from("/nonexistent/bad.rs"),
-        ];
+        let files = vec![good_file.clone(), PathBuf::from("/nonexistent/bad.rs")];
 
         let results = evaluator.evaluate_batch(files, "default").await;
 
@@ -424,7 +425,9 @@ mod tests {
         let evaluator = BatchEvaluator::new(judge, 4);
 
         let files = vec![file1, file2];
-        let (results, summary) = evaluator.evaluate_batch_with_summary(files, "default").await;
+        let (results, summary) = evaluator
+            .evaluate_batch_with_summary(files, "default")
+            .await;
 
         assert_eq!(results.len(), 2);
         assert_eq!(summary.total, 2);

@@ -75,7 +75,7 @@ impl WorkspaceState {
             (Running, Ready) => true,
             (Running, Cleaning) => true,
             (Cleaning, TornDown) => true,
-            (Cleaning, Ready) => true, // Can recover from cleaning
+            (Cleaning, Ready) => true,   // Can recover from cleaning
             (TornDown, Created) => true, // Can re-create
             _ => false,
         }
@@ -176,7 +176,13 @@ impl WorkspaceConfig {
     /// Validate the configuration
     pub fn validate(&self) -> Result<()> {
         // Check working directory exists or can be created
-        if !self.working_dir.exists() && !self.working_dir.parent().map(|p| p.exists()).unwrap_or(false) {
+        if !self.working_dir.exists()
+            && !self
+                .working_dir
+                .parent()
+                .map(|p| p.exists())
+                .unwrap_or(false)
+        {
             return Err(WorkspaceError::InvalidConfiguration(format!(
                 "Working directory parent does not exist: {:?}",
                 self.working_dir
@@ -197,7 +203,8 @@ impl WorkspaceConfig {
 }
 
 /// Type alias for lifecycle hooks
-pub type LifecycleHook = Arc<dyn Fn(WorkspaceContext) -> futures::future::BoxFuture<'static, Result<()>> + Send + Sync>;
+pub type LifecycleHook =
+    Arc<dyn Fn(WorkspaceContext) -> futures::future::BoxFuture<'static, Result<()>> + Send + Sync>;
 
 /// Context passed to lifecycle hooks
 #[derive(Debug, Clone)]
@@ -239,7 +246,9 @@ impl WorkspaceManager {
 
         let id = uuid::Uuid::new_v4();
         let git = if config.git_branch.is_some() || GitWorkspace::is_git_repo(&config.working_dir) {
-            Some(Arc::new(RwLock::new(GitWorkspace::new(&config.working_dir)?)))
+            Some(Arc::new(RwLock::new(GitWorkspace::new(
+                &config.working_dir,
+            )?)))
         } else {
             None
         };
@@ -263,9 +272,7 @@ impl WorkspaceManager {
         F: Fn(WorkspaceContext) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        self.on_init = Some(Arc::new(move |ctx| {
-            Box::pin(hook(ctx))
-        }));
+        self.on_init = Some(Arc::new(move |ctx| Box::pin(hook(ctx))));
         self
     }
 
@@ -275,9 +282,7 @@ impl WorkspaceManager {
         F: Fn(WorkspaceContext) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        self.on_ready = Some(Arc::new(move |ctx| {
-            Box::pin(hook(ctx))
-        }));
+        self.on_ready = Some(Arc::new(move |ctx| Box::pin(hook(ctx))));
         self
     }
 
@@ -287,9 +292,7 @@ impl WorkspaceManager {
         F: Fn(WorkspaceContext) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        self.on_error = Some(Arc::new(move |ctx| {
-            Box::pin(hook(ctx))
-        }));
+        self.on_error = Some(Arc::new(move |ctx| Box::pin(hook(ctx))));
         self
     }
 
@@ -299,9 +302,7 @@ impl WorkspaceManager {
         F: Fn(WorkspaceContext) -> Fut + Send + Sync + 'static,
         Fut: std::future::Future<Output = Result<()>> + Send + 'static,
     {
-        self.on_teardown = Some(Arc::new(move |ctx| {
-            Box::pin(hook(ctx))
-        }));
+        self.on_teardown = Some(Arc::new(move |ctx| Box::pin(hook(ctx))));
         self
     }
 
@@ -349,7 +350,7 @@ impl WorkspaceManager {
     /// Initialize the workspace
     pub async fn initialize(&self) -> Result<()> {
         let mut state = self.state.write().await;
-        
+
         if !state.can_transition_to(WorkspaceState::Initializing) {
             return Err(WorkspaceError::StateError(format!(
                 "Cannot initialize workspace from state: {}",
@@ -404,7 +405,7 @@ impl WorkspaceManager {
     /// Mark workspace as running
     pub async fn start_running(&self) -> Result<()> {
         let mut state = self.state.write().await;
-        
+
         if !state.can_transition_to(WorkspaceState::Running) {
             return Err(WorkspaceError::StateError(format!(
                 "Cannot start running from state: {}",
@@ -420,7 +421,7 @@ impl WorkspaceManager {
     /// Mark workspace as ready (done running)
     pub async fn stop_running(&self) -> Result<()> {
         let mut state = self.state.write().await;
-        
+
         if !state.can_transition_to(WorkspaceState::Ready) {
             return Err(WorkspaceError::StateError(format!(
                 "Cannot stop running from state: {}",
@@ -436,7 +437,7 @@ impl WorkspaceManager {
     /// Teardown the workspace
     pub async fn teardown(&self) -> Result<()> {
         let mut state = self.state.write().await;
-        
+
         if !state.can_transition_to(WorkspaceState::Cleaning) {
             return Err(WorkspaceError::StateError(format!(
                 "Cannot teardown from state: {}",
@@ -666,8 +667,14 @@ mod tests {
         manager.set_metadata("key1", "value1").await;
         manager.set_metadata("key2", "value2").await;
 
-        assert_eq!(manager.get_metadata("key1").await, Some("value1".to_string()));
-        assert_eq!(manager.get_metadata("key2").await, Some("value2".to_string()));
+        assert_eq!(
+            manager.get_metadata("key1").await,
+            Some("value1".to_string())
+        );
+        assert_eq!(
+            manager.get_metadata("key2").await,
+            Some("value2".to_string())
+        );
         assert_eq!(manager.get_metadata("nonexistent").await, None);
     }
 
@@ -700,8 +707,7 @@ mod tests {
     #[tokio::test]
     async fn test_workspace_without_cleanup() {
         let temp_dir = tempfile::tempdir().unwrap();
-        let config = WorkspaceConfig::new(temp_dir.path())
-            .with_cleanup_on_exit(false);
+        let config = WorkspaceConfig::new(temp_dir.path()).with_cleanup_on_exit(false);
         let manager = WorkspaceManager::new(config).unwrap();
 
         manager.initialize().await.unwrap();

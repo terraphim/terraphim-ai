@@ -12,9 +12,7 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::Duration;
 
-use terraphim_spawner::{
-    AgentSpawner, CircuitBreaker, CircuitState, ProviderTier, SpawnRequest,
-};
+use terraphim_spawner::{AgentSpawner, CircuitBreaker, CircuitState, ProviderTier, SpawnRequest};
 
 // Mock NDJSON strings for testing - no external API calls
 const SAMPLE_NDJSON: &str = r#"{"type":"step_start","timestamp":1234567890,"sessionID":"sess-123","part":{"step":1}}
@@ -37,7 +35,12 @@ async fn test_provider_tier_routing() {
         (ProviderTier::Quick, 30, "opencode-go", "kimi-k2.5-quick"),
         (ProviderTier::Deep, 60, "kimi-for-coding", "k2p5-deep"),
         (ProviderTier::Implementation, 120, "opencode-go", "glm-5"),
-        (ProviderTier::Oracle, 300, "deepseek-for-coding", "deepseek-r1"),
+        (
+            ProviderTier::Oracle,
+            300,
+            "deepseek-for-coding",
+            "deepseek-r1",
+        ),
     ];
 
     for (tier, expected_secs, provider, model) in tier_expectations {
@@ -422,14 +425,8 @@ fn test_opencode_ndjson_parsing() {
     );
 
     // Test is_result detection
-    assert!(
-        !events[0].is_result(),
-        "step_start should not be a result"
-    );
-    assert!(
-        !events[1].is_result(),
-        "text event should not be a result"
-    );
+    assert!(!events[0].is_result(), "step_start should not be a result");
+    assert!(!events[1].is_result(), "text event should not be a result");
     assert!(events[5].is_result(), "Last event should be a result");
 
     // Test is_step_finish detection
@@ -496,9 +493,7 @@ fn test_opencode_ndjson_error_parsing() {
 /// Test skill chain validation for both terraphim-skills and zestic-engineering-skills
 #[test]
 fn test_skill_chain_validation() {
-    use terraphim_spawner::{
-        SkillResolver, SkillSource,
-    };
+    use terraphim_spawner::{SkillResolver, SkillSource};
 
     let resolver = SkillResolver::new();
 
@@ -509,7 +504,9 @@ fn test_skill_chain_validation() {
         "rust-development".to_string(),
     ];
 
-    let resolved = resolver.resolve_skill_chain(terraphim_chain.clone()).unwrap();
+    let resolved = resolver
+        .resolve_skill_chain(terraphim_chain.clone())
+        .unwrap();
     assert_eq!(resolved.len(), 3, "Should resolve all 3 terraphim skills");
 
     for skill in &resolved {
@@ -524,7 +521,10 @@ fn test_skill_chain_validation() {
     assert_eq!(resolved[0].name, "security-audit");
     assert!(!resolved[0].description.is_empty());
     assert!(!resolved[0].applicable_to.is_empty());
-    assert!(resolved[0].path.to_string_lossy().contains("security-audit"));
+    assert!(resolved[0]
+        .path
+        .to_string_lossy()
+        .contains("security-audit"));
 
     // Test zestic-only chain
     let zestic_chain = vec![
@@ -594,10 +594,7 @@ fn test_persona_injection() {
         request_with_persona.persona_name,
         Some("CodeReviewer".to_string())
     );
-    assert_eq!(
-        request_with_persona.persona_symbol,
-        Some("🔍".to_string())
-    );
+    assert_eq!(request_with_persona.persona_symbol, Some("🔍".to_string()));
     assert_eq!(
         request_with_persona.persona_vibe,
         Some("Analytical and thorough".to_string())
@@ -615,7 +612,7 @@ fn test_persona_injection() {
     // Symbol: 🔍
     // Personality: Analytical and thorough
     // Meta-cortex connections: @security-agent, @quality-agent
-       //
+    //
     // ---
 
     // Test without persona
@@ -663,9 +660,7 @@ fn test_persona_injection() {
 /// Test mixed skill chain resolution from both terraphim and zestic sources
 #[test]
 fn test_mixed_skill_chain_resolution() {
-    use terraphim_spawner::{
-        SkillResolver, SkillSource,
-    };
+    use terraphim_spawner::{SkillResolver, SkillSource};
 
     let resolver = SkillResolver::new();
 
@@ -685,7 +680,11 @@ fn test_mixed_skill_chain_resolution() {
 
     // Resolve the mixed chain
     let resolved = resolver.resolve_skill_chain(mixed_chain.clone()).unwrap();
-    assert_eq!(resolved.len(), 6, "Should resolve all 6 skills in mixed chain");
+    assert_eq!(
+        resolved.len(),
+        6,
+        "Should resolve all 6 skills in mixed chain"
+    );
 
     // Verify sources alternate correctly
     assert_eq!(resolved[0].name, "security-audit");
@@ -709,8 +708,14 @@ fn test_mixed_skill_chain_resolution() {
     // Verify all resolved skills have valid structure
     for skill in &resolved {
         assert!(!skill.name.is_empty(), "Skill name should not be empty");
-        assert!(!skill.description.is_empty(), "Skill description should not be empty");
-        assert!(!skill.applicable_to.is_empty(), "Skill should have applicable_to tags");
+        assert!(
+            !skill.description.is_empty(),
+            "Skill description should not be empty"
+        );
+        assert!(
+            !skill.applicable_to.is_empty(),
+            "Skill should have applicable_to tags"
+        );
         assert!(
             skill.path.to_string_lossy().contains(&skill.name),
             "Path should contain skill name"
@@ -766,17 +771,11 @@ fn test_mixed_skill_chain_resolution() {
 /// Test that the spawner correctly builds provider strings with models
 #[test]
 fn test_provider_string_building() {
-    
-
     // This tests the internal build_provider_string behavior through public APIs
     // Provider string format: {provider}/{model}
 
     let test_cases = vec![
-        (
-            Some("opencode-go"),
-            Some("glm-5"),
-            "opencode-go/glm-5",
-        ),
+        (Some("opencode-go"), Some("glm-5"), "opencode-go/glm-5"),
         (
             Some("kimi-for-coding"),
             Some("k2p5"),
@@ -787,16 +786,8 @@ fn test_provider_string_building() {
             Some("deepseek-r1"),
             "deepseek-for-coding/deepseek-r1",
         ),
-        (
-            Some("opencode-go"),
-            None,
-            "opencode-go",
-        ),
-        (
-            None,
-            Some("k2p5"),
-            "unknown/k2p5",
-        ),
+        (Some("opencode-go"), None, "opencode-go"),
+        (None, Some("k2p5"), "unknown/k2p5"),
         (None, None, "unknown"),
     ];
 
@@ -866,7 +857,10 @@ fn test_circuit_breaker_state_transitions() {
     // Record success while open - should remain open
     cb.record_success();
     assert_eq!(cb.state(), CircuitState::Open);
-    assert!(!cb.should_allow(), "Should remain open after success in open state");
+    assert!(
+        !cb.should_allow(),
+        "Should remain open after success in open state"
+    );
 }
 
 /// Integration test: full dispatch flow with in-memory config
@@ -902,7 +896,9 @@ async fn test_full_dispatch_flow() {
     // Verify provider is not banned
     let provider = request.provider.as_ref().unwrap();
     assert!(
-        !banned_providers.iter().any(|banned| provider.starts_with(banned)),
+        !banned_providers
+            .iter()
+            .any(|banned| provider.starts_with(banned)),
         "Provider should not be banned"
     );
 
@@ -916,10 +912,17 @@ async fn test_full_dispatch_flow() {
         )
         .await;
 
-    assert!(result.is_ok(), "Should successfully spawn agent: {:?}", result);
+    assert!(
+        result.is_ok(),
+        "Should successfully spawn agent: {:?}",
+        result
+    );
 
     let handle = result.unwrap();
-    assert!(handle.is_healthy().await, "Agent should be healthy after spawning");
+    assert!(
+        handle.is_healthy().await,
+        "Agent should be healthy after spawning"
+    );
 
     // Verify circuit breaker recorded success
     let provider_key = "opencode-go/kimi-k2.5";

@@ -85,7 +85,7 @@ impl MockClaudeCodeSession {
     /// Parse NDJSON stream and store events
     pub fn parse_stream(&mut self, ndjson: &str) -> Vec<Result<ClaudeCodeEvent, String>> {
         let mut results = Vec::new();
-        
+
         for line in ndjson.lines() {
             match ClaudeCodeEvent::parse_line(line) {
                 Some(event) => {
@@ -104,7 +104,7 @@ impl MockClaudeCodeSession {
                 }
             }
         }
-        
+
         results
     }
 
@@ -148,7 +148,7 @@ mod tests {
     fn test_parse_init_event() {
         let json = r#"{"type":"system","subtype":"init","session_id":"sess-abc-123","content":"Claude Code v2.1"}"#;
         let event = ClaudeCodeEvent::parse_line(json).expect("Should parse init event");
-        
+
         assert_eq!(event.event_type, "system");
         assert_eq!(event.subtype.as_deref(), Some("init"));
         assert_eq!(event.session_id.as_deref(), Some("sess-abc-123"));
@@ -157,9 +157,10 @@ mod tests {
 
     #[test]
     fn test_parse_assistant_text_event() {
-        let json = r#"{"type":"assistant","subtype":"text","content":"I'll help you with that task."}"#;
+        let json =
+            r#"{"type":"assistant","subtype":"text","content":"I'll help you with that task."}"#;
         let event = ClaudeCodeEvent::parse_line(json).expect("Should parse assistant text");
-        
+
         assert_eq!(event.event_type, "assistant");
         assert_eq!(event.subtype.as_deref(), Some("text"));
         assert_eq!(event.text_content(), Some("I'll help you with that task."));
@@ -169,7 +170,7 @@ mod tests {
     fn test_parse_tool_use_event() {
         let json = r#"{"type":"assistant","subtype":"tool_use","tool_name":"Read","content":"Reading file..."}"#;
         let event = ClaudeCodeEvent::parse_line(json).expect("Should parse tool use");
-        
+
         assert_eq!(event.event_type, "assistant");
         assert_eq!(event.subtype.as_deref(), Some("tool_use"));
         assert_eq!(event.tool_name.as_deref(), Some("Read"));
@@ -180,7 +181,7 @@ mod tests {
     fn test_parse_result_event() {
         let json = r#"{"type":"result","cost_usd":0.05,"duration_secs":42.3,"num_turns":5,"session_id":"sess-abc-123","total_input_tokens":5000,"total_output_tokens":2000}"#;
         let event = ClaudeCodeEvent::parse_line(json).expect("Should parse result");
-        
+
         assert_eq!(event.event_type, "result");
         assert!(event.is_result());
         assert_eq!(event.total_input_tokens, Some(5000));
@@ -193,9 +194,12 @@ mod tests {
     fn test_parse_error_event() {
         let json = r#"{"type":"error","content":"Rate limit exceeded - please try again later"}"#;
         let event = ClaudeCodeEvent::parse_line(json).expect("Should parse error");
-        
+
         assert_eq!(event.event_type, "error");
-        assert_eq!(event.content.as_deref(), Some("Rate limit exceeded - please try again later"));
+        assert_eq!(
+            event.content.as_deref(),
+            Some("Rate limit exceeded - please try again later")
+        );
     }
 
     // =========================================================================
@@ -205,10 +209,22 @@ mod tests {
     #[test]
     fn test_extract_text_content_variations() {
         let test_cases = vec![
-            (r#"{"type":"assistant","subtype":"text","content":"Simple message"}"#, Some("Simple message")),
-            (r#"{"type":"assistant","subtype":"text","content":""}"#, Some("")),
-            (r#"{"type":"assistant","subtype":"tool_use","content":"Not text"}"#, None),
-            (r#"{"type":"system","subtype":"init","content":"Not assistant"}"#, None),
+            (
+                r#"{"type":"assistant","subtype":"text","content":"Simple message"}"#,
+                Some("Simple message"),
+            ),
+            (
+                r#"{"type":"assistant","subtype":"text","content":""}"#,
+                Some(""),
+            ),
+            (
+                r#"{"type":"assistant","subtype":"tool_use","content":"Not text"}"#,
+                None,
+            ),
+            (
+                r#"{"type":"system","subtype":"init","content":"Not assistant"}"#,
+                None,
+            ),
             (r#"{"type":"assistant","subtype":"text"}"#, None),
         ];
 
@@ -246,7 +262,7 @@ mod tests {
             "not json at all",
             "{broken json",
             "}",
-            "[1,2,3]", // Valid JSON but not an object
+            "[1,2,3]",      // Valid JSON but not an object
             r#"{"type":}"#, // Invalid syntax
             "",
         ];
@@ -274,7 +290,7 @@ this is not valid json
 
         // Should have 5 results (3 valid, 2 errors)
         assert_eq!(results.len(), 5);
-        
+
         // Check valid events were parsed
         assert!(results[0].is_ok());
         assert!(results[1].is_err());
@@ -332,7 +348,7 @@ this is not valid json
         session.parse_stream(ndjson);
 
         assert_eq!(session.session_id(), Some("persistent-123"));
-        
+
         // Verify all events were captured
         assert_eq!(session.events().len(), 4);
     }
@@ -341,9 +357,9 @@ this is not valid json
     fn test_get_session_id_method() {
         let json = r#"{"type":"system","subtype":"init","session_id":"abc-def-123"}"#;
         let event = ClaudeCodeEvent::parse_line(json).unwrap();
-        
+
         assert_eq!(event.get_session_id(), Some("abc-def-123"));
-        
+
         let no_id = r#"{"type":"assistant","subtype":"text","content":"No ID"}"#;
         let event_no_id = ClaudeCodeEvent::parse_line(no_id).unwrap();
         assert_eq!(event_no_id.get_session_id(), None);
@@ -364,8 +380,9 @@ this is not valid json
 
         let result = timeout(
             Duration::from_secs(1),
-            session.process_with_timeout(Duration::from_millis(100))
-        ).await;
+            session.process_with_timeout(Duration::from_millis(100)),
+        )
+        .await;
 
         assert!(result.is_ok(), "Should complete within timeout");
         let events = result.unwrap().expect("Should process successfully");
@@ -378,8 +395,9 @@ this is not valid json
 
         let result = timeout(
             Duration::from_millis(100),
-            session.process_with_timeout(Duration::from_millis(50))
-        ).await;
+            session.process_with_timeout(Duration::from_millis(50)),
+        )
+        .await;
 
         assert!(result.is_ok());
         // Empty stream returns error from process_with_timeout
@@ -390,15 +408,16 @@ this is not valid json
     async fn test_simulated_slow_stream() {
         // Simulate a stream that takes time to produce events
         let ndjson = r#"{"type":"system","subtype":"init","session_id":"slow-test"}"#;
-        
+
         let mut session = MockClaudeCodeSession::new();
         session.parse_stream(ndjson);
 
         // Should complete quickly with short timeout
         let result = timeout(
             Duration::from_millis(50),
-            session.process_with_timeout(Duration::from_millis(10))
-        ).await;
+            session.process_with_timeout(Duration::from_millis(10)),
+        )
+        .await;
 
         assert!(result.is_ok(), "Should handle quick timeout");
     }
@@ -431,7 +450,10 @@ this is not valid json
         let events = session.events();
         let init_count = events.iter().filter(|e| e.is_init()).count();
         let text_count = events.iter().filter(|e| e.text_content().is_some()).count();
-        let tool_count = events.iter().filter(|e| e.subtype.as_deref() == Some("tool_use")).count();
+        let tool_count = events
+            .iter()
+            .filter(|e| e.subtype.as_deref() == Some("tool_use"))
+            .count();
         let result_count = events.iter().filter(|e| e.is_result()).count();
 
         assert_eq!(init_count, 1);
@@ -453,7 +475,7 @@ this is not valid json
             r#"{{"type":"assistant","subtype":"text","content":"{}"}}"#,
             unicode_content
         );
-        
+
         let event = ClaudeCodeEvent::parse_line(&json).expect("Should parse unicode");
         assert_eq!(event.text_content(), Some(unicode_content));
     }
@@ -465,7 +487,7 @@ this is not valid json
             r#"{{"type":"assistant","subtype":"text","content":"{}"}}"#,
             large_content
         );
-        
+
         let event = ClaudeCodeEvent::parse_line(&json).expect("Should parse large content");
         assert_eq!(event.text_content(), Some(large_content.as_str()));
     }
@@ -476,12 +498,13 @@ this is not valid json
 newline, 	tab"#;
         let json = format!(
             r#"{{"type":"assistant","subtype":"text","content":"{}"}}"#,
-            special_content.replace('\\', "\\\\")
+            special_content
+                .replace('\\', "\\\\")
                 .replace('"', "\\\"")
                 .replace('\n', "\\n")
                 .replace('\t', "\\t")
         );
-        
+
         let event = ClaudeCodeEvent::parse_line(&json).expect("Should parse special chars");
         assert_eq!(event.text_content(), Some(special_content));
     }
@@ -516,7 +539,15 @@ mod integration_tests {
         }
 
         let mut child = Command::new("claude")
-            .args(&["-p", "Say 'test complete'", "--output-format", "stream-json", "--verbose", "--max-turns", "1"])
+            .args(&[
+                "-p",
+                "Say 'test complete'",
+                "--output-format",
+                "stream-json",
+                "--verbose",
+                "--max-turns",
+                "1",
+            ])
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
@@ -533,7 +564,8 @@ mod integration_tests {
                     events.push(event);
                 }
             }
-        }).await;
+        })
+        .await;
 
         assert!(read_result.is_ok(), "Should read events within timeout");
 
@@ -541,8 +573,11 @@ mod integration_tests {
         let _ = child.kill().await;
 
         // Verify we got some events
-        assert!(!events.is_empty(), "Should have received at least one event");
-        
+        assert!(
+            !events.is_empty(),
+            "Should have received at least one event"
+        );
+
         // Check for expected event types
         let has_system = events.iter().any(|e| e.event_type == "system");
         let has_assistant = events.iter().any(|e| e.event_type == "assistant");
@@ -578,27 +613,33 @@ mod edge_case_tests {
         let numeric_id = r#"{"type":"system","subtype":"init","session_id":12345}"#;
         // This should fail because session_id is typed as Option<String>
         let result = ClaudeCodeEvent::parse_line(numeric_id);
-        assert!(result.is_none(), "Numeric session_id should not parse as string");
+        assert!(
+            result.is_none(),
+            "Numeric session_id should not parse as string"
+        );
     }
 
     #[test]
     fn test_extra_fields_preserved() {
         let with_extra = r#"{"type":"assistant","subtype":"text","content":"Hello","custom_field":"custom_value","nested":{"key":"value"}}"#;
         let event = ClaudeCodeEvent::parse_line(with_extra).expect("Should parse");
-        
+
         // Extra fields go into the 'extra' map via #[serde(flatten)]
-        assert_eq!(event.extra.get("custom_field").and_then(|v| v.as_str()), Some("custom_value"));
+        assert_eq!(
+            event.extra.get("custom_field").and_then(|v| v.as_str()),
+            Some("custom_value")
+        );
         assert!(event.extra.get("nested").is_some());
     }
 
     #[test]
     fn test_whitespace_variations() {
         let variations = vec![
-            r#"  {"type":"text"}  "#,         // Leading/trailing spaces
+            r#"  {"type":"text"}  "#, // Leading/trailing spaces
             r#"{"type":"text"}
-"#,              // Trailing newline
-            r#"	{"type":"text"}	"#,         // Tabs
-            "{\"type\":\"text\"}",            // Escaped (would need double parsing)
+"#,     // Trailing newline
+            r#"	{"type":"text"}	"#,   // Tabs
+            "{\"type\":\"text\"}",    // Escaped (would need double parsing)
         ];
 
         for json in variations {
@@ -633,7 +674,7 @@ mod edge_case_tests {
         let ndjson = "   \n\t\n  \n";
         let mut session = MockClaudeCodeSession::new();
         let results = session.parse_stream(ndjson);
-        
+
         assert!(results.is_empty());
         assert!(session.events().is_empty());
     }
@@ -642,7 +683,7 @@ mod edge_case_tests {
     fn test_result_without_tokens() {
         let json = r#"{"type":"result","cost_usd":0.01}"#;
         let event = ClaudeCodeEvent::parse_line(json).expect("Should parse");
-        
+
         assert!(event.is_result());
         assert!(event.total_input_tokens.is_none());
         assert!(event.total_output_tokens.is_none());

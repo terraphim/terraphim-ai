@@ -2,7 +2,9 @@
 //!
 //! Provides integration with Gitea REST API v1 and gitea-robot for PageRank.
 
-use crate::{IssueState, IssueTracker, ListIssuesParams, TrackedIssue, TrackerConfig, TrackerError, Result};
+use crate::{
+    IssueState, IssueTracker, ListIssuesParams, Result, TrackedIssue, TrackerConfig, TrackerError,
+};
 use async_trait::async_trait;
 use reqwest::{Client, Method, StatusCode};
 use serde::{Deserialize, Serialize};
@@ -115,10 +117,7 @@ impl GiteaTracker {
     }
 
     /// Build request with authentication
-    fn build_request(&self,
-        method: Method,
-        path: &str,
-    ) -> reqwest::RequestBuilder {
+    fn build_request(&self, method: Method, path: &str) -> reqwest::RequestBuilder {
         self.client
             .request(method, self.api_url(path))
             .header("Authorization", format!("token {}", self.config.token))
@@ -138,7 +137,7 @@ impl GiteaTracker {
             state,
             labels: issue.labels.into_iter().map(|l| l.name).collect(),
             assignees: issue.assignees.into_iter().map(|u| u.login).collect(),
-            priority: None, // Gitea doesn't have built-in priority field
+            priority: None,        // Gitea doesn't have built-in priority field
             page_rank_score: None, // Will be populated separately
             body: issue.body,
             created_at: issue.created_at,
@@ -150,8 +149,7 @@ impl GiteaTracker {
     }
 
     /// Fetch PageRank scores from gitea-robot
-    async fn fetch_page_ranks(&self,
-    ) -> Result<HashMap<u64, f64>> {
+    async fn fetch_page_ranks(&self) -> Result<HashMap<u64, f64>> {
         let robot_url = match &self.config.robot_url {
             Some(url) => url,
             None => return Ok(HashMap::new()), // No robot configured, return empty
@@ -166,7 +164,8 @@ impl GiteaTracker {
 
         debug!(url = %url, "Fetching PageRank scores from robot");
 
-        let response = self.client
+        let response = self
+            .client
             .get(&url)
             .timeout(std::time::Duration::from_secs(10))
             .send()
@@ -200,13 +199,13 @@ impl GiteaTracker {
         mut issues: Vec<TrackedIssue>,
     ) -> Result<Vec<TrackedIssue>> {
         let ranks = self.fetch_page_ranks().await?;
-        
+
         for issue in &mut issues {
             if let Some(score) = ranks.get(&issue.id) {
                 issue.page_rank_score = Some(*score);
             }
         }
-        
+
         Ok(issues)
     }
 
@@ -217,21 +216,24 @@ impl GiteaTracker {
 
     /// Get single issue path
     fn issue_path(&self, id: u64) -> String {
-        format!("/repos/{}/{}/issues/{}", self.config.owner, self.config.repo, id)
+        format!(
+            "/repos/{}/{}/issues/{}",
+            self.config.owner, self.config.repo, id
+        )
     }
 
     /// Get issue labels path
     fn issue_labels_path(&self, id: u64) -> String {
-        format!("/repos/{}/{}/issues/{}/labels", self.config.owner, self.config.repo, id)
+        format!(
+            "/repos/{}/{}/issues/{}/labels",
+            self.config.owner, self.config.repo, id
+        )
     }
 }
 
 #[async_trait]
 impl IssueTracker for GiteaTracker {
-    async fn list_issues(
-        &self,
-        params: ListIssuesParams,
-    ) -> Result<Vec<TrackedIssue>> {
+    async fn list_issues(&self, params: ListIssuesParams) -> Result<Vec<TrackedIssue>> {
         let mut query = Vec::new();
 
         if let Some(state) = params.state {
@@ -268,21 +270,17 @@ impl IssueTracker for GiteaTracker {
                     .into_iter()
                     .map(|i| self.convert_issue(i))
                     .collect();
-                
+
                 // Enrich with PageRank scores
                 self.enrich_with_page_ranks(issues).await
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Repository {}/{} not found",
-                    self.config.owner, self.config.repo
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!(
+                "Repository {}/{} not found",
+                self.config.owner, self.config.repo
+            ))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -305,26 +303,19 @@ impl IssueTracker for GiteaTracker {
             StatusCode::OK => {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 let mut issue = self.convert_issue(gitea_issue);
-                
+
                 // Try to enrich with PageRank
                 let ranks = self.fetch_page_ranks().await?;
                 if let Some(score) = ranks.get(&issue.id) {
                     issue.page_rank_score = Some(*score);
                 }
-                
+
                 Ok(issue)
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Issue {} not found",
-                    id
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!("Issue {} not found", id))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -348,8 +339,7 @@ impl IssueTracker for GiteaTracker {
             labels,
         };
 
-        let request = self.build_request(Method::POST, &path)
-            .json(&request_body);
+        let request = self.build_request(Method::POST, &path).json(&request_body);
 
         info!(title = %title, "Creating issue");
 
@@ -360,11 +350,9 @@ impl IssueTracker for GiteaTracker {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 Ok(self.convert_issue(gitea_issue))
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -389,8 +377,7 @@ impl IssueTracker for GiteaTracker {
             labels,
         };
 
-        let request = self.build_request(Method::PATCH, &path)
-            .json(&request_body);
+        let request = self.build_request(Method::PATCH, &path).json(&request_body);
 
         debug!(issue_id = id, "Updating issue");
 
@@ -401,17 +388,10 @@ impl IssueTracker for GiteaTracker {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 Ok(self.convert_issue(gitea_issue))
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Issue {} not found",
-                    id
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!("Issue {} not found", id))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -428,8 +408,7 @@ impl IssueTracker for GiteaTracker {
             state: "closed".to_string(),
         };
 
-        let request = self.build_request(Method::PATCH, &path)
-            .json(&request_body);
+        let request = self.build_request(Method::PATCH, &path).json(&request_body);
 
         info!(issue_id = id, "Closing issue");
 
@@ -440,17 +419,10 @@ impl IssueTracker for GiteaTracker {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 Ok(self.convert_issue(gitea_issue))
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Issue {} not found",
-                    id
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!("Issue {} not found", id))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -461,14 +433,9 @@ impl IssueTracker for GiteaTracker {
         }
     }
 
-    async fn add_labels(
-        &self,
-        id: u64,
-        labels: Vec<String>,
-    ) -> Result<TrackedIssue> {
+    async fn add_labels(&self, id: u64, labels: Vec<String>) -> Result<TrackedIssue> {
         let path = self.issue_labels_path(id);
-        let request = self.build_request(Method::POST, &path)
-            .json(&labels);
+        let request = self.build_request(Method::POST, &path).json(&labels);
 
         debug!(issue_id = id, labels = ?labels, "Adding labels");
 
@@ -479,17 +446,10 @@ impl IssueTracker for GiteaTracker {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 Ok(self.convert_issue(gitea_issue))
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Issue {} not found",
-                    id
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!("Issue {} not found", id))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -500,14 +460,11 @@ impl IssueTracker for GiteaTracker {
         }
     }
 
-    async fn remove_labels(
-        &self,
-        id: u64,
-        labels: Vec<String>,
-    ) -> Result<TrackedIssue> {
+    async fn remove_labels(&self, id: u64, labels: Vec<String>) -> Result<TrackedIssue> {
         let path = self.issue_labels_path(id);
         let label_param = labels.join(",");
-        let request = self.build_request(Method::DELETE, &path)
+        let request = self
+            .build_request(Method::DELETE, &path)
             .query(&[("labels", label_param)]);
 
         debug!(issue_id = id, labels = ?labels, "Removing labels");
@@ -519,17 +476,10 @@ impl IssueTracker for GiteaTracker {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 Ok(self.convert_issue(gitea_issue))
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Issue {} not found",
-                    id
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!("Issue {} not found", id))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -540,18 +490,13 @@ impl IssueTracker for GiteaTracker {
         }
     }
 
-    async fn assign_issue(
-        &self,
-        id: u64,
-        assignees: Vec<String>,
-    ) -> Result<TrackedIssue> {
+    async fn assign_issue(&self, id: u64, assignees: Vec<String>) -> Result<TrackedIssue> {
         let path = self.issue_path(id);
         let request_body = AssignIssueRequest {
             assignees: Some(assignees),
         };
 
-        let request = self.build_request(Method::PATCH, &path)
-            .json(&request_body);
+        let request = self.build_request(Method::PATCH, &path).json(&request_body);
 
         debug!(issue_id = id, "Assigning issue");
 
@@ -562,17 +507,10 @@ impl IssueTracker for GiteaTracker {
                 let gitea_issue: GiteaIssue = response.json().await?;
                 Ok(self.convert_issue(gitea_issue))
             }
-            StatusCode::UNAUTHORIZED => {
-                Err(TrackerError::AuthenticationError(
-                    "Invalid token".to_string(),
-                ))
-            }
-            StatusCode::NOT_FOUND => {
-                Err(TrackerError::NotFound(format!(
-                    "Issue {} not found",
-                    id
-                )))
-            }
+            StatusCode::UNAUTHORIZED => Err(TrackerError::AuthenticationError(
+                "Invalid token".to_string(),
+            )),
+            StatusCode::NOT_FOUND => Err(TrackerError::NotFound(format!("Issue {} not found", id))),
             status => {
                 let text = response.text().await.unwrap_or_default();
                 Err(TrackerError::ApiError(format!(
@@ -587,26 +525,16 @@ impl IssueTracker for GiteaTracker {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use wiremock::{MockServer, Mock, ResponseTemplate};
-    use wiremock::matchers::{method, path, header, query_param, body_json};
+    use wiremock::matchers::{body_json, header, method, path, query_param};
+    use wiremock::{Mock, MockServer, ResponseTemplate};
 
     fn create_test_config(server_url: &str) -> TrackerConfig {
-        TrackerConfig::new(
-            server_url,
-            "test-token",
-            "test-owner",
-            "test-repo",
-        )
+        TrackerConfig::new(server_url, "test-token", "test-owner", "test-repo")
     }
 
     #[test]
     fn test_gitea_tracker_creation() {
-        let config = TrackerConfig::new(
-            "https://git.example.com",
-            "token123",
-            "owner",
-            "repo",
-        );
+        let config = TrackerConfig::new("https://git.example.com", "token123", "owner", "repo");
 
         let tracker = GiteaTracker::new(config);
         assert!(tracker.is_ok());
@@ -717,7 +645,14 @@ mod tests {
         let config = create_test_config(&mock_server.uri());
         let tracker = GiteaTracker::new(config).unwrap();
 
-        let issue = tracker.create_issue("New Issue", Some("New issue body"), Some(vec!["bug".to_string()])).await.unwrap();
+        let issue = tracker
+            .create_issue(
+                "New Issue",
+                Some("New issue body"),
+                Some(vec!["bug".to_string()]),
+            )
+            .await
+            .unwrap();
 
         assert_eq!(issue.id, 100);
         assert_eq!(issue.title, "New Issue");
@@ -789,7 +724,10 @@ mod tests {
 
         let result = tracker.list_issues(ListIssuesParams::new()).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), TrackerError::AuthenticationError(_)));
+        assert!(matches!(
+            result.unwrap_err(),
+            TrackerError::AuthenticationError(_)
+        ));
     }
 
     #[tokio::test]
@@ -881,7 +819,7 @@ mod tests {
 
         let mut config = create_test_config(&mock_server.uri());
         config.robot_url = Some(robot_server.uri());
-        
+
         let tracker = GiteaTracker::new(config).unwrap();
         let issues = tracker.list_issues(ListIssuesParams::new()).await.unwrap();
 

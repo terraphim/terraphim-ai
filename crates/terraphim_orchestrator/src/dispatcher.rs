@@ -126,10 +126,7 @@ impl DispatchQueue {
         // Apply round-robin fairness: if both types are present,
         // alternate between them at equal priority levels
         if let Some(last) = self.last_type {
-            let has_other_type = self
-                .queue
-                .iter()
-                .any(|e| e.task_type != last);
+            let has_other_type = self.queue.iter().any(|e| e.task_type != last);
 
             if has_other_type {
                 // Find task of opposite type with highest priority
@@ -139,14 +136,10 @@ impl DispatchQueue {
                 };
 
                 // Get all entries sorted by priority
-                let mut entries: Vec<_> =
-                    std::mem::take(&mut self.queue).into_sorted_vec();
+                let mut entries: Vec<_> = std::mem::take(&mut self.queue).into_sorted_vec();
 
                 // Find the highest priority entry of opposite type
-                if let Some(idx) = entries
-                    .iter()
-                    .position(|e| e.task_type == opposite_type)
-                {
+                if let Some(idx) = entries.iter().position(|e| e.task_type == opposite_type) {
                     let entry = entries.remove(idx);
                     self.last_type = Some(opposite_type);
 
@@ -321,9 +314,7 @@ mod tests {
         assert!(
             matches!(queue.next(), Some(DispatchTask::IssueTask(name, 3, 5)) if name == "medium")
         );
-        assert!(
-            matches!(queue.next(), Some(DispatchTask::IssueTask(name, 1, 1)) if name == "low")
-        );
+        assert!(matches!(queue.next(), Some(DispatchTask::IssueTask(name, 1, 1)) if name == "low"));
     }
 
     #[test]
@@ -340,15 +331,9 @@ mod tests {
         queue.submit(task3.clone()).unwrap();
 
         // Should dequeue in FIFO order
-        assert!(
-            matches!(queue.next(), Some(DispatchTask::TimeTask(name, _)) if name == "first")
-        );
-        assert!(
-            matches!(queue.next(), Some(DispatchTask::TimeTask(name, _)) if name == "second")
-        );
-        assert!(
-            matches!(queue.next(), Some(DispatchTask::TimeTask(name, _)) if name == "third")
-        );
+        assert!(matches!(queue.next(), Some(DispatchTask::TimeTask(name, _)) if name == "first"));
+        assert!(matches!(queue.next(), Some(DispatchTask::TimeTask(name, _)) if name == "second"));
+        assert!(matches!(queue.next(), Some(DispatchTask::TimeTask(name, _)) if name == "third"));
     }
 
     #[test]
