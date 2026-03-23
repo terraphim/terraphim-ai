@@ -1,3 +1,33 @@
+//! Multi-agent orchestration with scheduling, budgeting, and compound review.
+//!
+//! This crate provides the core orchestration engine for managing fleets of AI agents
+//! with features for resource scheduling, cost tracking, and coordinated review workflows.
+//!
+//! # Core Components
+//!
+//! - **AgentOrchestrator**: Main orchestrator running the "dark factory" pattern
+//! - **DualModeOrchestrator**: Real-time and batch processing modes with fairness scheduling
+//! - **CompoundReviewWorkflow**: Multi-agent review swarm with persona-based specialization
+//! - **Scheduler**: Time-based and event-driven task scheduling
+//! - **HandoffBuffer**: Inter-agent state transfer with TTL management
+//! - **CostTracker**: Budget enforcement and spending monitoring
+//! - **NightwatchMonitor**: Drift detection and rate limiting
+//!
+//! # Example
+//!
+//! ```rust
+//! use terraphim_orchestrator::{AgentOrchestrator, OrchestratorConfig};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let config = OrchestratorConfig::default();
+//! let mut orchestrator = AgentOrchestrator::new(config).await?;
+//!
+//! // Run the orchestration loop
+//! orchestrator.run().await?;
+//! # Ok(())
+//! # }
+//! ```
+
 pub mod compound;
 pub mod concurrency;
 pub mod config;
@@ -408,7 +438,7 @@ impl AgentOrchestrator {
         info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
 
         // Compose persona-enriched task prompt
-        let composed_task = if let Some(ref persona_name) = def.persona {
+        let (composed_task, persona_found) = if let Some(ref persona_name) = def.persona {
             if let Some(persona) = self.persona_registry.get(persona_name) {
                 let composed = self.metaprompt_renderer.compose_prompt(persona, &def.task);
                 info!(
@@ -418,22 +448,25 @@ impl AgentOrchestrator {
                     composed_len = composed.len(),
                     "composed persona-enriched prompt"
                 );
-                composed
+                (composed, true)
             } else {
                 warn!(
                     agent = %def.name,
                     persona = %persona_name,
                     "persona not found in registry, using bare task"
                 );
-                def.task.clone()
+                (def.task.clone(), false)
             }
         } else {
-            def.task.clone()
+            (def.task.clone(), false)
         };
 
-        // Use stdin for large persona-enriched prompts to avoid ARG_MAX limits
+        // Use stdin only when persona was actually resolved (prompt is enriched)
+        // or when the task exceeds ARG_MAX safety threshold.
+        // Do NOT use stdin for unfound personas -- the bare task is small and
+        // stdin delivery to short-lived processes (echo) causes broken pipe races.
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
-        let use_stdin = def.persona.is_some() || composed_task.len() > STDIN_THRESHOLD;
+        let use_stdin = persona_found || composed_task.len() > STDIN_THRESHOLD;
 
         // Build a Provider from the agent definition for the spawner
         let provider = terraphim_types::capability::Provider {
@@ -1204,10 +1237,12 @@ task = "test"
         let mut config = test_config_fast_lifecycle();
         
         // Add an agent with a persona
+        // Use cat (not echo) because persona_found=true triggers stdin delivery.
+        // cat reads stdin before exiting, avoiding broken pipe under parallel load.
         config.agents = vec![AgentDefinition {
             name: "persona-agent".to_string(),
             layer: AgentLayer::Safety,
-            cli_tool: "echo".to_string(),
+            cli_tool: "cat".to_string(),
             task: "test task".to_string(),
             model: None,
             schedule: None,
