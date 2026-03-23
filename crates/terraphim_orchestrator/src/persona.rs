@@ -457,12 +457,6 @@ sfia_skills = []
         let renderer = MetapromptRenderer::new().unwrap();
         let task = "Do the thing";
 
-        // Create an incomplete persona that will cause render to fail
-        #[derive(Serialize)]
-        struct BrokenPersona {
-            agent_name: String,
-        }
-
         let broken = PersonaDefinition {
             agent_name: "Broken".to_string(),
             ..test_persona() // Take valid fields from test_persona

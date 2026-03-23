@@ -374,7 +374,7 @@ async fn run_single_agent(
     let mut cmd = tokio::process::Command::new(cli_tool);
     cmd.arg("run")
         .arg("-p")
-        .arg(&prompt)
+        .arg(prompt)
         .current_dir(worktree_path);
 
     // Add model if specified

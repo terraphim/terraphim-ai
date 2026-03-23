@@ -788,7 +788,7 @@ mod tests {
         // Count N entries
         let n = 5;
         for i in 1..n {
-            let ctx = HandoffContext::new("agent-a", "agent-b", &format!("task {}", i));
+            let ctx = HandoffContext::new("agent-a", "agent-b", format!("task {}", i));
             ledger.append(&ctx).unwrap();
         }
 

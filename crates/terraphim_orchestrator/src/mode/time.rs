@@ -73,7 +73,7 @@ impl TimeMode {
                 event = self.scheduler.next_event() => {
                     match event {
                         ScheduleEvent::Spawn(agent) => {
-                            if let Err(e) = self.handle_spawn(agent).await {
+                            if let Err(e) = self.handle_spawn(*agent).await {
                                 error!("failed to spawn agent: {}", e);
                             }
                         }

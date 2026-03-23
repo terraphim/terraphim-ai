@@ -36,7 +36,7 @@
 
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 
 use terraphim_automata::matcher::find_matches;
 #[cfg(test)]
@@ -52,16 +52,19 @@ pub struct ProcedureStore {
     store_path: PathBuf,
 }
 
+#[allow(dead_code)]
 impl ProcedureStore {
     /// Create a new ProcedureStore with the given path.
     ///
     /// The path should be a JSONL file (e.g., `procedures.jsonl`).
     /// Parent directories will be created automatically when saving.
+    #[cfg(test)]
     pub fn new(store_path: PathBuf) -> Self {
         Self { store_path }
     }
 
     /// Get the default store path in the user's config directory.
+    #[allow(dead_code)]
     pub fn default_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("~/.config"))
@@ -131,7 +134,7 @@ impl ProcedureStore {
 
         // Check for matching titles using Aho-Corasick
         let matches = find_matches(&procedure.title.to_lowercase(), thesaurus, false)
-            .map_err(|e| io::Error::other(e))?;
+            .map_err(io::Error::other)?;
 
         let mut merged = false;
         let mut merged_procedure_id = None;
@@ -276,11 +279,6 @@ impl ProcedureStore {
         } else {
             Ok(false)
         }
-    }
-
-    /// Get the storage path.
-    pub fn path(&self) -> &Path {
-        &self.store_path
     }
 }
 

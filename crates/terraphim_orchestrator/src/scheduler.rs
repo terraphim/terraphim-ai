@@ -10,7 +10,7 @@ use crate::error::OrchestratorError;
 #[derive(Debug, Clone)]
 pub enum ScheduleEvent {
     /// Time to spawn this agent.
-    Spawn(AgentDefinition),
+    Spawn(Box<AgentDefinition>),
     /// Time to stop this agent.
     Stop { agent_name: String },
     /// Time to run compound review.

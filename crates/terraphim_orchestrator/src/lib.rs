@@ -967,7 +967,15 @@ mod tests {
             .trigger_compound_review("HEAD", "HEAD~1")
             .await
             .unwrap();
-        // Test completed successfully - result.pass can be either true or false depending on test conditions
+
+        // Verify the compound review result structure is valid
+        assert!(
+            !result.correlation_id.is_nil(),
+            "correlation_id should be set"
+        );
+        assert_eq!(result.agents_run, 0, "no agents should run in test config");
+        assert_eq!(result.agents_failed, 0, "no agents should fail");
+        // result.pass can be either true or false depending on test conditions
     }
 
     #[test]

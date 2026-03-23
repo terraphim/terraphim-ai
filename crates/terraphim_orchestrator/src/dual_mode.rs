@@ -70,7 +70,7 @@ impl std::fmt::Display for ExecutionMode {
 #[derive(Debug, Clone)]
 pub enum SpawnTask {
     /// Time-driven agent task.
-    TimeTask { agent: AgentDefinition },
+    TimeTask { agent: Box<AgentDefinition> },
     /// Issue-driven agent task.
     IssueTask { issue_id: String, title: String },
 }

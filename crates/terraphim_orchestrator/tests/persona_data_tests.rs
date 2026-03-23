@@ -147,9 +147,9 @@ fn test_all_personas_load_into_registry() {
         let path = entry.path();
 
         // Skip non-TOML files (like the metaprompt template)
-        if path.extension().map_or(false, |ext| ext == "toml") {
-            let persona =
-                PersonaDefinition::from_file(&path).expect(&format!("Failed to parse {:?}", path));
+        if path.extension().is_some_and(|ext| ext == "toml") {
+            let persona = PersonaDefinition::from_file(&path)
+                .unwrap_or_else(|_| panic!("Failed to parse {:?}", path));
             personas.push(persona);
         }
     }
@@ -190,9 +190,9 @@ fn test_all_personas_render_without_error() {
         let path = entry.path();
 
         // Skip non-TOML files
-        if path.extension().map_or(false, |ext| ext == "toml") {
-            let persona =
-                PersonaDefinition::from_file(&path).expect(&format!("Failed to parse {:?}", path));
+        if path.extension().is_some_and(|ext| ext == "toml") {
+            let persona = PersonaDefinition::from_file(&path)
+                .unwrap_or_else(|_| panic!("Failed to parse {:?}", path));
 
             // Convert persona to JSON for Handlebars rendering
             let persona_json = json!({
@@ -225,7 +225,7 @@ fn test_all_personas_render_without_error() {
 
             let rendered = handlebars
                 .render("metaprompt", &persona_json)
-                .expect(&format!("Failed to render template for {:?}", path));
+                .unwrap_or_else(|_| panic!("Failed to render template for {:?}", path));
 
             // Basic assertions on rendered content
             assert!(

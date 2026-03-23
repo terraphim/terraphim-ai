@@ -41,7 +41,9 @@ async fn test_scheduler_fires_at_cron_time() {
 
     // Inject a Spawn event for the core agent
     let spawn_def = make_agent("sync", AgentLayer::Core, Some("0 3 * * *"));
-    tx.send(ScheduleEvent::Spawn(spawn_def)).await.unwrap();
+    tx.send(ScheduleEvent::Spawn(Box::new(spawn_def)))
+        .await
+        .unwrap();
 
     // Inject a CompoundReview event
     tx.send(ScheduleEvent::CompoundReview).await.unwrap();
