@@ -56,7 +56,7 @@ uuid = { version = "1.21.0", features = ["v4"] }
 dotenvy = "0.15.7"
 walkdir = "2.4.0"
 env_logger = "0.11"
-tempfile = "3.23"
+tempfile = "3.27"
 
 [features]
 default = []

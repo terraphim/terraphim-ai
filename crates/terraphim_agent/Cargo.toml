@@ -81,7 +81,7 @@ futures = "0.3"
 portpicker = "0.1"
 reqwest = { workspace = true }
 tokio = { workspace = true }
-tempfile = "3.0"
+tempfile = "3.27"
 terraphim_test_utils = { path = "../terraphim_test_utils" }
 insta = { version = "1.41", features = ["yaml", "redactions"] }
 
