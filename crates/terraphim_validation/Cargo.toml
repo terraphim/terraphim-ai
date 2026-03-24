@@ -29,7 +29,7 @@ terraphim_server = { path = "../../terraphim_server" }
 
 # Configuration and CLI
 clap = { version = "4.0", features = ["derive", "env"] }
-config = "0.14"
+config = "0.15"
 toml = "0.8"
 env_logger = "0.11"
 
