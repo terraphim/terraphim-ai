@@ -1001,14 +1001,27 @@ mod tests {
         // Fall back to diffing against the empty tree so the test works everywhere.
         let base_ref = {
             let check = std::process::Command::new("git")
-                .args(["-C", repo_path.to_str().unwrap(), "rev-parse", "--verify", "HEAD~1"])
+                .args([
+                    "-C",
+                    repo_path.to_str().unwrap(),
+                    "rev-parse",
+                    "--verify",
+                    "HEAD~1",
+                ])
                 .output();
             match check {
                 Ok(o) if o.status.success() => "HEAD~1".to_string(),
                 _ => {
                     // 4b825dc: the well-known empty tree hash in git
                     let empty = std::process::Command::new("git")
-                        .args(["-C", repo_path.to_str().unwrap(), "hash-object", "-t", "tree", "/dev/null"])
+                        .args([
+                            "-C",
+                            repo_path.to_str().unwrap(),
+                            "hash-object",
+                            "-t",
+                            "tree",
+                            "/dev/null",
+                        ])
                         .output()
                         .expect("git hash-object failed");
                     String::from_utf8_lossy(&empty.stdout).trim().to_string()
