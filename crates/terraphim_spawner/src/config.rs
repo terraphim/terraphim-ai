@@ -37,6 +37,8 @@ pub struct AgentConfig {
     pub required_api_keys: Vec<String>,
     /// Resource limits for the spawned process
     pub resource_limits: ResourceLimits,
+    /// Whether to deliver the task prompt via stdin instead of CLI arg
+    pub use_stdin: bool,
 }
 
 impl AgentConfig {
@@ -55,6 +57,7 @@ impl AgentConfig {
                 env_vars: HashMap::new(),
                 required_api_keys: Self::infer_api_keys(cli_command),
                 resource_limits: ResourceLimits::default(),
+                use_stdin: false,
             }),
             ProviderType::Llm { .. } => Err(ValidationError::NotAnAgent(provider.id.clone())),
         }
@@ -64,6 +67,12 @@ impl AgentConfig {
     pub fn with_model(mut self, model: &str) -> Self {
         let model_args = Self::model_args(&self.cli_command, model);
         self.args.extend(model_args);
+        self
+    }
+
+    /// Set whether to deliver the task prompt via stdin.
+    pub fn with_stdin(mut self, use_stdin: bool) -> Self {
+        self.use_stdin = use_stdin;
         self
     }
 
@@ -92,11 +101,32 @@ impl AgentConfig {
         }
     }
 
+    /// Normalise a model name for Claude CLI.
+    ///
+    /// Claude CLI requires the `claude-` prefix for versioned model names
+    /// (e.g. `opus-4-6` -> `claude-opus-4-6`). Short aliases like `opus`
+    /// or `sonnet` are passed through unchanged.
+    fn normalise_claude_model(model: &str) -> String {
+        if model.starts_with("claude-") {
+            return model.to_string();
+        }
+        // Versioned names contain hyphens (e.g. "opus-4-6", "sonnet-4-6")
+        // Short aliases do not (e.g. "opus", "sonnet", "haiku")
+        if model.contains('-') {
+            format!("claude-{}", model)
+        } else {
+            model.to_string()
+        }
+    }
+
     /// Generate model-specific CLI arguments.
     fn model_args(cli_command: &str, model: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
             "codex" => vec!["-m".to_string(), model.to_string()],
-            "claude" | "claude-code" => vec!["--model".to_string(), model.to_string()],
+            "claude" | "claude-code" => {
+                let normalised = Self::normalise_claude_model(model);
+                vec!["--model".to_string(), normalised]
+            }
             _ => vec![],
         }
     }
@@ -106,7 +136,10 @@ impl AgentConfig {
     /// Note: codex uses OAuth (ChatGPT login) and does not require OPENAI_API_KEY.
     fn infer_api_keys(cli_command: &str) -> Vec<String> {
         match Self::cli_name(cli_command) {
-            "claude" | "claude-code" => vec!["ANTHROPIC_API_KEY".to_string()],
+            // Claude CLI uses OAuth (browser flow), not API keys.
+            // Do NOT require ANTHROPIC_API_KEY -- it poisons Claude CLI
+            // by forcing API-key auth mode with an invalid value.
+            "claude" | "claude-code" => Vec::new(),
             "opencode" => vec!["OPENAI_API_KEY".to_string()],
             _ => Vec::new(),
         }
@@ -217,13 +250,87 @@ mod tests {
 
     #[test]
     fn test_infer_api_keys() {
+        // Claude CLI uses OAuth, not API keys -- should return empty
         let keys = AgentConfig::infer_api_keys("claude");
-        assert!(keys.contains(&"ANTHROPIC_API_KEY".to_string()));
+        assert!(
+            keys.is_empty(),
+            "claude uses OAuth, should not require API key"
+        );
 
         let keys = AgentConfig::infer_api_keys("opencode");
         assert!(keys.contains(&"OPENAI_API_KEY".to_string()));
 
         let keys = AgentConfig::infer_api_keys("unknown");
         assert!(keys.is_empty());
+    }
+
+    #[test]
+    fn test_infer_api_keys_full_path() {
+        // Full paths should extract the binary name correctly
+        let keys = AgentConfig::infer_api_keys("/home/alex/.local/bin/claude");
+        assert!(keys.is_empty(), "claude via full path uses OAuth");
+
+        let keys = AgentConfig::infer_api_keys("/home/alex/.bun/bin/opencode");
+        assert!(keys.contains(&"OPENAI_API_KEY".to_string()));
+    }
+
+    #[test]
+    fn test_normalise_claude_model() {
+        // Already prefixed -- pass through
+        assert_eq!(
+            AgentConfig::normalise_claude_model("claude-opus-4-6"),
+            "claude-opus-4-6"
+        );
+        assert_eq!(
+            AgentConfig::normalise_claude_model("claude-sonnet-4-6"),
+            "claude-sonnet-4-6"
+        );
+
+        // Versioned without prefix -- add prefix
+        assert_eq!(
+            AgentConfig::normalise_claude_model("opus-4-6"),
+            "claude-opus-4-6"
+        );
+        assert_eq!(
+            AgentConfig::normalise_claude_model("sonnet-4-6"),
+            "claude-sonnet-4-6"
+        );
+
+        // Short aliases -- pass through (no hyphens)
+        assert_eq!(AgentConfig::normalise_claude_model("opus"), "opus");
+        assert_eq!(AgentConfig::normalise_claude_model("sonnet"), "sonnet");
+        assert_eq!(AgentConfig::normalise_claude_model("haiku"), "haiku");
+    }
+
+    #[test]
+    fn test_model_args_claude_normalises() {
+        let args = AgentConfig::model_args("claude", "opus-4-6");
+        assert_eq!(
+            args,
+            vec!["--model".to_string(), "claude-opus-4-6".to_string()]
+        );
+
+        let args = AgentConfig::model_args("claude", "claude-opus-4-6");
+        assert_eq!(
+            args,
+            vec!["--model".to_string(), "claude-opus-4-6".to_string()]
+        );
+
+        let args = AgentConfig::model_args("claude", "sonnet");
+        assert_eq!(args, vec!["--model".to_string(), "sonnet".to_string()]);
+    }
+
+    #[test]
+    fn test_cli_name_extraction() {
+        assert_eq!(
+            AgentConfig::cli_name("/home/alex/.local/bin/claude"),
+            "claude"
+        );
+        assert_eq!(
+            AgentConfig::cli_name("/home/alex/.bun/bin/opencode"),
+            "opencode"
+        );
+        assert_eq!(AgentConfig::cli_name("claude"), "claude");
+        assert_eq!(AgentConfig::cli_name("/usr/bin/codex"), "codex");
     }
 }

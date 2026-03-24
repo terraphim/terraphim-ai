@@ -10,7 +10,7 @@ use crate::error::OrchestratorError;
 #[derive(Debug, Clone)]
 pub enum ScheduleEvent {
     /// Time to spawn this agent.
-    Spawn(AgentDefinition),
+    Spawn(Box<AgentDefinition>),
     /// Time to stop this agent.
     Stop { agent_name: String },
     /// Time to run compound review.
@@ -111,16 +111,25 @@ impl TimeScheduler {
     }
 }
 
-/// Parse a cron expression, prepending seconds field if needed.
+/// Parse a cron expression, normalising to 7-field format for the `cron` crate.
+///
+/// Accepts:
+/// - 5 fields (standard cron): min hour dom month dow -> prepend sec, append year
+/// - 6 fields: sec min hour dom month dow -> append year
+/// - 7 fields: passed through as-is
 fn parse_cron(expr: &str) -> Result<Schedule, OrchestratorError> {
-    // The `cron` crate expects 7 fields (sec min hour dom month dow year)
-    // Standard cron has 5 fields (min hour dom month dow).
-    // Prepend "0" for seconds if the expression has 5 fields.
     let parts: Vec<&str> = expr.split_whitespace().collect();
-    let full_expr = if parts.len() == 5 {
-        format!("0 {}", expr)
-    } else {
-        expr.to_string()
+    let full_expr = match parts.len() {
+        5 => format!("0 {} *", expr),
+        6 => format!("{} *", expr),
+        7 => expr.to_string(),
+        _ => {
+            return Err(OrchestratorError::SchedulerError(format!(
+                "invalid cron '{}': expected 5, 6, or 7 fields, got {}",
+                expr,
+                parts.len()
+            )));
+        }
     };
 
     Schedule::from_str(&full_expr)
@@ -141,6 +150,16 @@ mod tests {
             schedule: schedule.map(String::from),
             capabilities: vec![],
             max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
         }
     }
 
@@ -189,5 +208,25 @@ mod tests {
         let agents = vec![make_agent("sentinel", AgentLayer::Safety, None)];
         let scheduler = TimeScheduler::new(&agents, None).unwrap();
         assert!(scheduler.compound_review_schedule().is_none());
+    }
+
+    #[test]
+    fn test_parse_cron_weekly_day_of_week() {
+        let agents = vec![
+            make_agent("weekly-sun", AgentLayer::Core, Some("0 2 * * SUN")),
+            make_agent("weekly-mon", AgentLayer::Core, Some("0 4 * * MON")),
+        ];
+        let scheduler = TimeScheduler::new(&agents, None).unwrap();
+        let scheduled = scheduler.scheduled_agents();
+        assert_eq!(scheduled.len(), 2);
+    }
+
+    #[test]
+    fn test_parse_cron_field_counts() {
+        assert!(parse_cron("0 3 * * *").is_ok());
+        assert!(parse_cron("0 2 * * SUN").is_ok());
+        assert!(parse_cron("0 0 3 * * *").is_ok());
+        assert!(parse_cron("0 0 3 * * * *").is_ok());
+        assert!(parse_cron("* * *").is_err());
     }
 }

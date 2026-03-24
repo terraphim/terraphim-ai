@@ -13,6 +13,7 @@ terraphim_spawner = { path = "../terraphim_spawner", version = "1.0.0" }
 terraphim_router = { path = "../terraphim_router", version = "1.0.0" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
+terraphim_symphony = { path = "../terraphim_symphony", version = "1.0.0" }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full", "signal"] }
@@ -23,12 +24,16 @@ tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 chrono = { version = "0.4", features = ["serde"] }
 async-trait = "0.1"
+uuid = { version = "1.0", features = ["v4", "serde"] }
 
 # Scheduling
 cron = "0.13"
 
 # Config parsing
 toml = "0.9"
+
+# Template rendering
+handlebars = "6.3"
 
 [dev-dependencies]
 tokio-test = "0.4"
