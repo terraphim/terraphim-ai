@@ -55,7 +55,7 @@ parking_lot = "0.12"
 clap = { version = "4", features = ["derive"] }
 
 # Channel adapters (feature-gated)
-teloxide = { version = "0.13", optional = true, features = ["macros"] }
+teloxide = { version = "0.17", optional = true, features = ["macros"] }
 serenity = { version = "0.12", optional = true }
 slack-morphism = { version = "2", optional = true, features = ["hyper"] }
 # Note: matrix-sdk disabled due to sqlite dependency conflict with terraphim_persistence
