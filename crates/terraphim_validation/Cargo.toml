@@ -66,7 +66,7 @@ term_size = "0.3"
  dirs = "5.0"
 
 # Docker and container support
-bollard = { version = "0.18", optional = true }
+bollard = { version = "0.20", optional = true }
 ahash = "0.8.12"
 axum-test = "19.1.1"
 
