@@ -486,8 +486,8 @@ impl super::ExecutionEnvironment for MockExecutor {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::ExecutionEnvironment;
+    use super::*;
 
     #[tokio::test]
     async fn test_mock_executor_health_check() {
@@ -578,7 +578,8 @@ mod tests {
         // Don't initialize
 
         let ctx = ExecutionContext::default();
-        let result: Result<ExecutionResult, RlmError> = executor.execute_code("print('test')", &ctx).await;
+        let result: Result<ExecutionResult, RlmError> =
+            executor.execute_code("print('test')", &ctx).await;
 
         assert!(result.is_err());
         assert!(matches!(
