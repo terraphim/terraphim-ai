@@ -995,18 +995,39 @@ mod tests {
     async fn test_orchestrator_compound_review_manual() {
         // Use empty groups to avoid git worktree operations during test.
         // Worktree creation fails when git index is locked (e.g. pre-commit hooks).
+        let repo_path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+
+        // In shallow clones (e.g. CI with fetch-depth: 1) HEAD~1 does not exist.
+        // Fall back to diffing against the empty tree so the test works everywhere.
+        let base_ref = {
+            let check = std::process::Command::new("git")
+                .args(["-C", repo_path.to_str().unwrap(), "rev-parse", "--verify", "HEAD~1"])
+                .output();
+            match check {
+                Ok(o) if o.status.success() => "HEAD~1".to_string(),
+                _ => {
+                    // 4b825dc: the well-known empty tree hash in git
+                    let empty = std::process::Command::new("git")
+                        .args(["-C", repo_path.to_str().unwrap(), "hash-object", "-t", "tree", "/dev/null"])
+                        .output()
+                        .expect("git hash-object failed");
+                    String::from_utf8_lossy(&empty.stdout).trim().to_string()
+                }
+            }
+        };
+
         let swarm_config = SwarmConfig {
             groups: vec![],
             timeout: Duration::from_secs(60),
             worktree_root: std::path::PathBuf::from("/tmp/test-orchestrator/.worktrees"),
-            repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+            repo_path,
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
             create_prs: false,
         };
 
         let workflow = CompoundReviewWorkflow::new(swarm_config);
-        let result = workflow.run("HEAD", "HEAD~1").await.unwrap();
+        let result = workflow.run("HEAD", &base_ref).await.unwrap();
 
         assert!(
             !result.correlation_id.is_nil(),
