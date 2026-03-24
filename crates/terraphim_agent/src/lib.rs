@@ -8,6 +8,9 @@ pub mod robot;
 // Forgiving CLI - always available for typo-tolerant parsing
 pub mod forgiving;
 
+// MCP Tool Index - for discovering and searching MCP tools
+pub mod mcp_tool_index;
+
 #[cfg(feature = "repl")]
 pub mod repl;
 

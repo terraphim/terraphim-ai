@@ -8,5 +8,8 @@ pub mod protocol;
 pub mod session;
 
 pub use claude_code::ClaudeCodeSession;
-pub use protocol::{AgentEvent, TokenCounts, TokenTotals};
+pub use protocol::{
+    AdfEnvelope, AgentEvent, FindingCategory, FindingSeverity, ReviewAgentOutput, ReviewFinding,
+    TokenCounts, TokenTotals, deduplicate_findings,
+};
 pub use session::{CodexSession, WorkerOutcome};

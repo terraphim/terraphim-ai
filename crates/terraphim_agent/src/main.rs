@@ -1007,7 +1007,7 @@ async fn run_offline_command(
             (Some(thesaurus_path), Some(allowlist_path)) => {
                 let destructive_json = std::fs::read_to_string(thesaurus_path)?;
                 let allowlist_json = std::fs::read_to_string(allowlist_path)?;
-                guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json)
+                guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json, None)
                     .map_err(|e| {
                         anyhow::anyhow!("Failed to load custom guard thesauruses: {}", e)
                     })?
@@ -1017,6 +1017,7 @@ async fn run_offline_command(
                 guard_patterns::CommandGuard::from_json(
                     &destructive_json,
                     guard_patterns::CommandGuard::default_allowlist_json(),
+                    None,
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to load custom guard thesaurus: {}", e))?
             }
@@ -1025,6 +1026,7 @@ async fn run_offline_command(
                 guard_patterns::CommandGuard::from_json(
                     guard_patterns::CommandGuard::default_destructive_json(),
                     &allowlist_json,
+                    None,
                 )
                 .map_err(|e| anyhow::anyhow!("Failed to load custom guard allowlist: {}", e))?
             }
@@ -1034,7 +1036,7 @@ async fn run_offline_command(
 
         if *json {
             println!("{}", serde_json::to_string(&result)?);
-        } else if result.decision == "block" {
+        } else if result.decision == guard_patterns::GuardDecision::Block {
             if let Some(reason) = &result.reason {
                 eprintln!("BLOCKED: {}", reason);
                 if !fail_open {
@@ -1616,7 +1618,7 @@ async fn run_offline_command(
                                 let guard = guard_patterns::CommandGuard::new();
                                 let guard_result = guard.check(command);
 
-                                if guard_result.decision == "block" {
+                                if guard_result.decision == guard_patterns::GuardDecision::Block {
                                     // Output deny response for Claude Code
                                     let output = serde_json::json!({
                                         "hookSpecificOutput": {
@@ -2434,14 +2436,19 @@ async fn run_server_command(
                 (Some(thesaurus_path), Some(allowlist_path)) => {
                     let destructive_json = std::fs::read_to_string(thesaurus_path)?;
                     let allowlist_json = std::fs::read_to_string(allowlist_path)?;
-                    guard_patterns::CommandGuard::from_json(&destructive_json, &allowlist_json)
-                        .map_err(|e| anyhow::anyhow!("{}", e))?
+                    guard_patterns::CommandGuard::from_json(
+                        &destructive_json,
+                        &allowlist_json,
+                        None,
+                    )
+                    .map_err(|e| anyhow::anyhow!("{}", e))?
                 }
                 (Some(thesaurus_path), None) => {
                     let destructive_json = std::fs::read_to_string(thesaurus_path)?;
                     guard_patterns::CommandGuard::from_json(
                         &destructive_json,
                         guard_patterns::CommandGuard::default_allowlist_json(),
+                        None,
                     )
                     .map_err(|e| anyhow::anyhow!("{}", e))?
                 }
@@ -2450,6 +2457,7 @@ async fn run_server_command(
                     guard_patterns::CommandGuard::from_json(
                         guard_patterns::CommandGuard::default_destructive_json(),
                         &allowlist_json,
+                        None,
                     )
                     .map_err(|e| anyhow::anyhow!("{}", e))?
                 }
@@ -2459,7 +2467,7 @@ async fn run_server_command(
 
             if json {
                 println!("{}", serde_json::to_string(&result)?);
-            } else if result.decision == "block" {
+            } else if result.decision == guard_patterns::GuardDecision::Block {
                 if let Some(reason) = &result.reason {
                     eprintln!("BLOCKED: {}", reason);
                     if !fail_open {

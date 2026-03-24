@@ -19,6 +19,11 @@ pub enum OrchestratorError {
     #[error("compound review failed: {0}")]
     CompoundReviewFailed(String),
 
+    #[error(
+        "invalid agent name '{0}': must contain only alphanumeric, dash, or underscore characters"
+    )]
+    InvalidAgentName(String),
+
     #[error("handoff failed from '{from}' to '{to}': {reason}")]
     HandoffFailed {
         from: String,

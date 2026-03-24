@@ -1,0 +1,50 @@
+{
+  "name": "guard_suspicious",
+  "data": {
+    "| sh": {
+      "id": 1,
+      "nterm": "pipe_to_shell",
+      "url": "Suspicious: piping output directly to a shell can execute arbitrary code. Review the source before executing."
+    },
+    "| bash": {
+      "id": 1,
+      "nterm": "pipe_to_shell",
+      "url": "Suspicious: piping output directly to bash can execute arbitrary code. Review the source before executing."
+    },
+    "wget -O -": {
+      "id": 2,
+      "nterm": "pipe_to_shell",
+      "url": "Suspicious: piping wget output directly to a shell can execute arbitrary code. Review the source before executing."
+    },
+    "eval $(": {
+      "id": 3,
+      "nterm": "eval_command",
+      "url": "Suspicious: eval can execute arbitrary code from command substitution. Ensure the source is trusted."
+    },
+    "sudo": {
+      "id": 4,
+      "nterm": "elevated_privileges",
+      "url": "Suspicious: command uses sudo for elevated privileges. Verify you understand what will be executed."
+    },
+    "ssh": {
+      "id": 5,
+      "nterm": "remote_connection",
+      "url": "Suspicious: SSH connection to remote host. Verify the destination is correct and trusted."
+    },
+    "scp": {
+      "id": 5,
+      "nterm": "remote_connection",
+      "url": "Suspicious: SCP transfers files to/from remote hosts. Verify the destination and file paths."
+    },
+    "nc": {
+      "id": 6,
+      "nterm": "network_tool",
+      "url": "Suspicious: netcat can create network connections for data transfer. Verify the usage is legitimate."
+    },
+    "ncat": {
+      "id": 6,
+      "nterm": "network_tool",
+      "url": "Suspicious: ncat can create network connections for data transfer. Verify the usage is legitimate."
+    }
+  }
+}

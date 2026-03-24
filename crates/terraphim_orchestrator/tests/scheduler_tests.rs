@@ -10,6 +10,16 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         schedule: schedule.map(String::from),
         capabilities: vec![],
         max_memory_bytes: None,
+        budget_monthly_cents: None,
+        provider: None,
+        persona: None,
+        terraphim_role: None,
+        skill_chain: vec![],
+        sfia_skills: vec![],
+        fallback_provider: None,
+        fallback_model: None,
+        grace_period_secs: None,
+        max_cpu_seconds: None,
     }
 }
 
@@ -31,7 +41,9 @@ async fn test_scheduler_fires_at_cron_time() {
 
     // Inject a Spawn event for the core agent
     let spawn_def = make_agent("sync", AgentLayer::Core, Some("0 3 * * *"));
-    tx.send(ScheduleEvent::Spawn(spawn_def)).await.unwrap();
+    tx.send(ScheduleEvent::Spawn(Box::new(spawn_def)))
+        .await
+        .unwrap();
 
     // Inject a CompoundReview event
     tx.send(ScheduleEvent::CompoundReview).await.unwrap();

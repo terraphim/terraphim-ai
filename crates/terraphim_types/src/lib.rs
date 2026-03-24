@@ -91,6 +91,18 @@ pub mod hgnc;
 pub mod capability;
 pub use capability::*;
 
+// MCP Tool types for self-learning system
+pub mod mcp_tool;
+pub use mcp_tool::*;
+
+// Procedure capture types for self-learning system
+pub mod procedure;
+pub use procedure::*;
+
+// Persona definition types for agent personas
+pub mod persona;
+pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSkillDef};
+
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::collections::HashSet;

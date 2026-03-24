@@ -28,6 +28,7 @@ task = "Continuously scan for CVEs and security vulnerabilities in dependencies.
 # model = "o3"                    # Optional: explicit model override. Omit to use keyword routing.
 capabilities = ["security", "vulnerability-scanning"]
 max_memory_bytes = 2147483648   # 2GB
+# budget_monthly_cents = 5000  # $50/month (omit for subscription CLIs)
 
 # --- Core Layer (scheduled) ---
 

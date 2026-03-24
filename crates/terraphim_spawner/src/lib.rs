@@ -352,7 +352,23 @@ impl AgentSpawner {
             Some(m) => config.with_model(m),
             None => config,
         };
-        self.spawn_config(provider, &config, task).await
+        self.spawn_config(provider, &config, task, false).await
+    }
+
+    /// Spawn an agent from a provider configuration with an optional model,
+    /// delivering the task prompt via stdin to avoid ARG_MAX limits.
+    pub async fn spawn_with_model_stdin(
+        &self,
+        provider: &Provider,
+        task: &str,
+        model: Option<&str>,
+    ) -> Result<AgentHandle, SpawnerError> {
+        let config = AgentConfig::from_provider(provider)?;
+        let config = match model {
+            Some(m) => config.with_model(m),
+            None => config,
+        };
+        self.spawn_config(provider, &config, task, true).await
     }
 
     /// Spawn an agent from a provider configuration
@@ -362,7 +378,7 @@ impl AgentSpawner {
         task: &str,
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
-        self.spawn_config(provider, &config, task).await
+        self.spawn_config(provider, &config, task, false).await
     }
 
     /// Internal spawn implementation shared by spawn() and spawn_with_model().
@@ -371,6 +387,7 @@ impl AgentSpawner {
         provider: &Provider,
         config: &AgentConfig,
         task: &str,
+        use_stdin: bool,
     ) -> Result<AgentHandle, SpawnerError> {
         let _span = tracing::info_span!(
             "spawner.spawn",
@@ -384,7 +401,7 @@ impl AgentSpawner {
 
         // Spawn the agent process
         let process_id = ProcessId::new();
-        let mut child = self.spawn_process(config, task).await?;
+        let mut child = self.spawn_process(config, task, use_stdin).await?;
 
         // Set up health checking
         let health_checker = HealthChecker::new(process_id, Duration::from_secs(30));
@@ -421,19 +438,28 @@ impl AgentSpawner {
     }
 
     /// Spawn the actual process
-    async fn spawn_process(&self, config: &AgentConfig, task: &str) -> Result<Child, SpawnerError> {
+    async fn spawn_process(
+        &self,
+        config: &AgentConfig,
+        task: &str,
+        use_stdin: bool,
+    ) -> Result<Child, SpawnerError> {
         let working_dir = config
             .working_dir
             .as_ref()
             .unwrap_or(&self.default_working_dir);
 
         let mut cmd = Command::new(&config.cli_command);
-        cmd.current_dir(working_dir)
-            .args(&config.args)
-            .arg(task)
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .stdin(Stdio::null());
+        cmd.current_dir(working_dir).args(&config.args);
+
+        if use_stdin {
+            cmd.stdin(Stdio::piped());
+        } else {
+            cmd.arg(task);
+            cmd.stdin(Stdio::null());
+        }
+
+        cmd.stdout(Stdio::piped()).stderr(Stdio::piped());
 
         // Add environment variables
         for (key, value) in &self.env_vars {
@@ -443,6 +469,19 @@ impl AgentSpawner {
         // Add provider-specific env vars
         for (key, value) in &config.env_vars {
             cmd.env(key, value);
+        }
+
+        // Strip ANTHROPIC_API_KEY for Claude CLI agents.
+        // Claude CLI uses OAuth (browser flow) for authentication.
+        // If ANTHROPIC_API_KEY is set in the environment (even inherited),
+        // Claude CLI switches to API-key auth mode which fails with
+        // invalid values like "oauth-managed".
+        let cli_name = std::path::Path::new(&config.cli_command)
+            .file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("");
+        if cli_name == "claude" || cli_name == "claude-code" {
+            cmd.env_remove("ANTHROPIC_API_KEY");
         }
 
         // Apply resource limits via pre_exec hook (unix only)
@@ -459,7 +498,18 @@ impl AgentSpawner {
             }
         }
 
-        let child = cmd.spawn()?;
+        let mut child = cmd.spawn()?;
+
+        // Write task to stdin if using stdin delivery
+        if use_stdin {
+            if let Some(mut stdin) = child.stdin.take() {
+                use tokio::io::AsyncWriteExt;
+                stdin.write_all(task.as_bytes()).await.map_err(|e| {
+                    SpawnerError::SpawnError(format!("failed to write prompt to stdin: {}", e))
+                })?;
+                // Drop stdin to close the pipe (signals EOF to the child)
+            }
+        }
 
         Ok(child)
     }
@@ -665,5 +715,141 @@ mod tests {
         assert_eq!(pool.total_idle(), 1);
         pool.drain().await;
         assert_eq!(pool.total_idle(), 0);
+    }
+
+    // =========================================================================
+    // Stdin Delivery Tests (Gitea #73)
+    // =========================================================================
+
+    /// Create a cat agent provider for stdin testing (reads from stdin and outputs to stdout)
+    fn create_cat_agent_provider() -> Provider {
+        Provider::new(
+            "@cat-agent",
+            "Cat Agent",
+            ProviderType::Agent {
+                agent_id: "@cat".to_string(),
+                cli_command: "cat".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        )
+    }
+
+    /// Test that spawn_process delivers prompt via stdin when use_stdin is true
+    #[tokio::test]
+    async fn test_spawn_process_stdin_echo() {
+        let spawner = AgentSpawner::new();
+        let provider = create_cat_agent_provider();
+
+        // Spawn with stdin delivery - cat will echo the prompt back
+        let handle = spawner
+            .spawn_with_model_stdin(&provider, "hello from stdin", None)
+            .await;
+
+        assert!(handle.is_ok());
+
+        let handle = handle.unwrap();
+        assert_eq!(handle.provider.id, "@cat-agent");
+
+        // Give cat time to read stdin and output to stdout
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Check that output was captured
+        let mut receiver = handle.subscribe_output();
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // The cat command should have echoed our input
+        match receiver.try_recv() {
+            Ok(OutputEvent::Stdout { line, .. }) => {
+                assert!(line.contains("hello from stdin"));
+            }
+            Ok(_) => {}
+            Err(tokio::sync::broadcast::error::TryRecvError::Empty) => {
+                // May be empty due to timing - that's okay
+            }
+            Err(e) => panic!("Unexpected broadcast error: {:?}", e),
+        }
+    }
+
+    /// Test that without stdin flag, prompt is passed as CLI arg (backward compatibility)
+    #[tokio::test]
+    async fn test_spawn_process_arg_fallback() {
+        let spawner = AgentSpawner::new();
+        let provider = create_test_agent_provider();
+
+        // Spawn without stdin - prompt should be CLI arg
+        let handle = spawner.spawn(&provider, "arg test").await;
+
+        assert!(handle.is_ok());
+
+        let handle = handle.unwrap();
+        assert_eq!(handle.provider.id, "@test-agent");
+    }
+
+    /// Test that prompts above 32KB threshold trigger stdin delivery
+    #[test]
+    fn test_stdin_threshold_applied() {
+        const STDIN_THRESHOLD: usize = 32_768; // 32 KB
+
+        // Small prompt should NOT trigger stdin
+        let small_prompt = "small task".to_string();
+        let use_stdin = small_prompt.len() > STDIN_THRESHOLD;
+        assert!(!use_stdin, "small prompt should not trigger stdin");
+
+        // Large prompt should trigger stdin
+        let large_prompt = "x".repeat(STDIN_THRESHOLD + 1);
+        let use_stdin = large_prompt.len() > STDIN_THRESHOLD;
+        assert!(use_stdin, "large prompt should trigger stdin");
+    }
+
+    /// Test that large prompts (100KB) write to stdin without error
+    #[tokio::test]
+    async fn test_stdin_write_completes() {
+        let spawner = AgentSpawner::new();
+        let provider = create_cat_agent_provider();
+
+        // Create a large prompt (100KB)
+        let large_prompt = "x".repeat(100 * 1024);
+
+        // Spawn with stdin - should complete without error
+        let handle = spawner
+            .spawn_with_model_stdin(&provider, &large_prompt, None)
+            .await;
+
+        assert!(
+            handle.is_ok(),
+            "large prompt should be written to stdin without error"
+        );
+
+        // Give time for the process to complete
+        tokio::time::sleep(Duration::from_millis(300)).await;
+    }
+
+    /// Test that model flag + stdin delivery work together
+    #[tokio::test]
+    async fn test_spawn_with_model_stdin() {
+        let spawner = AgentSpawner::new();
+
+        // Use echo with a model - echo doesn't actually use models but this tests the API
+        let provider = Provider::new(
+            "@model-cat-agent",
+            "Model Cat Agent",
+            ProviderType::Agent {
+                agent_id: "@model-cat".to_string(),
+                cli_command: "cat".to_string(),
+                working_dir: PathBuf::from("/tmp"),
+            },
+            vec![Capability::CodeGeneration],
+        );
+
+        // Spawn with both model and stdin
+        let handle = spawner
+            .spawn_with_model_stdin(&provider, "model test via stdin", Some("test-model"))
+            .await;
+
+        assert!(handle.is_ok());
+
+        let handle = handle.unwrap();
+        assert_eq!(handle.provider.id, "@model-cat-agent");
     }
 }

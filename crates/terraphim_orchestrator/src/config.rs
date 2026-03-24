@@ -25,6 +25,19 @@ pub struct OrchestratorConfig {
     /// Reconciliation tick interval in seconds.
     #[serde(default = "default_tick_interval")]
     pub tick_interval_secs: u64,
+    /// Default TTL in seconds for handoff buffer entries (None = 86400).
+    #[serde(default)]
+    pub handoff_buffer_ttl_secs: Option<u64>,
+    /// Directory for persona data and configuration files.
+    #[serde(default)]
+    pub persona_data_dir: Option<PathBuf>,
+}
+
+/// Lightweight reference to an SFIA skill code and level.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub struct SfiaSkillRef {
+    pub code: String,
+    pub level: u8,
 }
 
 /// Definition of a single agent in the fleet.
@@ -47,6 +60,37 @@ pub struct AgentDefinition {
     pub capabilities: Vec<String>,
     /// Maximum memory in bytes (optional resource limit).
     pub max_memory_bytes: Option<u64>,
+    /// Monthly USD budget in cents (e.g., 5000 = $50.00).
+    /// None means unlimited (subscription model).
+    #[serde(default)]
+    pub budget_monthly_cents: Option<u64>,
+    /// LLM provider for this agent (e.g., "openai", "anthropic", "openrouter").
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// Persona name for this agent (e.g., "Security Analyst", "Code Reviewer").
+    #[serde(default)]
+    pub persona: Option<String>,
+    /// Terraphim role identifier (e.g., "Terraphim Engineer", "Terraphim Designer").
+    #[serde(default)]
+    pub terraphim_role: Option<String>,
+    /// Chain of skills to invoke for this agent.
+    #[serde(default)]
+    pub skill_chain: Vec<String>,
+    /// SFIA skills with proficiency levels.
+    #[serde(default)]
+    pub sfia_skills: Vec<SfiaSkillRef>,
+    /// Fallback LLM provider if primary fails.
+    #[serde(default)]
+    pub fallback_provider: Option<String>,
+    /// Fallback model if primary fails.
+    #[serde(default)]
+    pub fallback_model: Option<String>,
+    /// Grace period in seconds before killing an unresponsive agent.
+    #[serde(default)]
+    pub grace_period_secs: Option<u64>,
+    /// Maximum CPU seconds allowed per agent execution.
+    #[serde(default)]
+    pub max_cpu_seconds: Option<u64>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -121,10 +165,31 @@ pub struct CompoundReviewConfig {
     /// Whether to create PRs (false = dry run).
     #[serde(default)]
     pub create_prs: bool,
+    /// Root directory for worktrees.
+    #[serde(default = "default_worktree_root")]
+    pub worktree_root: PathBuf,
+    /// Base branch for comparison.
+    #[serde(default = "default_base_branch")]
+    pub base_branch: String,
+    /// Maximum number of concurrent agents.
+    #[serde(default = "default_max_concurrent_agents")]
+    pub max_concurrent_agents: usize,
 }
 
 fn default_max_duration() -> u64 {
     1800
+}
+
+fn default_worktree_root() -> PathBuf {
+    PathBuf::from(".worktrees")
+}
+
+fn default_base_branch() -> String {
+    "main".to_string()
+}
+
+fn default_max_concurrent_agents() -> usize {
+    3
 }
 
 /// Workflow configuration for issue-driven mode.
@@ -292,7 +357,7 @@ impl OrchestratorConfig {
 }
 
 /// Substitute environment variables in a string.
-/// Supports ${VAR} and $VAR syntax.
+/// Supports ${VAR} syntax. Bare $VAR syntax is not implemented.
 fn substitute_env(s: &str) -> String {
     let mut result = s.to_string();
 
@@ -554,7 +619,7 @@ workflow_file = "./WORKFLOW.md"
 [workflow.tracker]
 kind = "gitea"
 endpoint = "https://git.terraphim.cloud"
-api_key = "${GITEA_TOKEN}"
+api_key = "..."
 owner = "terraphim"
 repo = "terraphim-ai"
 use_robot_api = true
@@ -615,7 +680,7 @@ workflow_file = "./WORKFLOW.md"
 [workflow.tracker]
 kind = "gitea"
 endpoint = "https://git.example.com"
-api_key = "test"
+api_key = "..."
 owner = "owner"
 repo = "repo"
 
@@ -666,5 +731,263 @@ task = "t"
 "#;
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert!(config.validate().is_err());
+    }
+
+    #[test]
+    fn test_config_parse_with_budget() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+budget_monthly_cents = 5000
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].budget_monthly_cents, Some(5000));
+    }
+
+    #[test]
+    fn test_config_parse_without_budget() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert!(config.agents[0].budget_monthly_cents.is_none());
+    }
+
+    #[test]
+    fn test_config_parse_with_persona_fields() {
+        let toml_str = r#"
+working_dir = "/tmp"
+persona_data_dir = "/tmp/personas"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test task"
+provider = "openai"
+persona = "Security Analyst"
+terraphim_role = "Terraphim Engineer"
+skill_chain = ["security", "analysis"]
+sfia_skills = [{code = "SCTY", level = 5}, {code = "PROG", level = 4}]
+fallback_provider = "anthropic"
+fallback_model = "claude-sonnet"
+grace_period_secs = 30
+max_cpu_seconds = 300
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        let agent = &config.agents[0];
+        assert_eq!(agent.provider, Some("openai".to_string()));
+        assert_eq!(agent.persona, Some("Security Analyst".to_string()));
+        assert_eq!(agent.terraphim_role, Some("Terraphim Engineer".to_string()));
+        assert_eq!(agent.skill_chain, vec!["security", "analysis"]);
+        assert_eq!(agent.sfia_skills.len(), 2);
+        assert_eq!(agent.sfia_skills[0].code, "SCTY");
+        assert_eq!(agent.sfia_skills[0].level, 5);
+        assert_eq!(agent.sfia_skills[1].code, "PROG");
+        assert_eq!(agent.sfia_skills[1].level, 4);
+        assert_eq!(agent.fallback_provider, Some("anthropic".to_string()));
+        assert_eq!(agent.fallback_model, Some("claude-sonnet".to_string()));
+        assert_eq!(agent.grace_period_secs, Some(30));
+        assert_eq!(agent.max_cpu_seconds, Some(300));
+        assert_eq!(
+            config.persona_data_dir,
+            Some(PathBuf::from("/tmp/personas"))
+        );
+    }
+
+    #[test]
+    fn test_config_parse_without_persona_fields() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "test-agent"
+layer = "Safety"
+cli_tool = "codex"
+task = "Test task"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        let agent = &config.agents[0];
+        assert!(agent.provider.is_none());
+        assert!(agent.persona.is_none());
+        assert!(agent.terraphim_role.is_none());
+        assert!(agent.skill_chain.is_empty());
+        assert!(agent.sfia_skills.is_empty());
+        assert!(agent.fallback_provider.is_none());
+        assert!(agent.fallback_model.is_none());
+        assert!(agent.grace_period_secs.is_none());
+        assert!(agent.max_cpu_seconds.is_none());
+        assert!(config.persona_data_dir.is_none());
+    }
+
+    #[test]
+    fn test_config_persona_defaults() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let agent = &config.agents[0];
+        assert!(agent.provider.is_none());
+        assert!(agent.persona.is_none());
+        assert!(agent.terraphim_role.is_none());
+        assert!(agent.skill_chain.is_empty());
+        assert!(agent.sfia_skills.is_empty());
+        assert!(agent.fallback_provider.is_none());
+        assert!(agent.fallback_model.is_none());
+        assert!(agent.grace_period_secs.is_none());
+        assert!(agent.max_cpu_seconds.is_none());
+    }
+
+    #[test]
+    fn test_config_sfia_skills_parse() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+sfia_skills = [{code = "SCTY", level = 5}]
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents[0].sfia_skills.len(), 1);
+        assert_eq!(config.agents[0].sfia_skills[0].code, "SCTY");
+        assert_eq!(config.agents[0].sfia_skills[0].level, 5);
+    }
+
+    #[test]
+    fn test_config_skill_chain_parse() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+skill_chain = ["a", "b"]
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents[0].skill_chain, vec!["a", "b"]);
+    }
+
+    #[test]
+    fn test_config_persona_data_dir() {
+        let toml_str = r#"
+working_dir = "/tmp"
+persona_data_dir = "/tmp/personas"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(
+            config.persona_data_dir,
+            Some(PathBuf::from("/tmp/personas"))
+        );
+    }
+
+    #[test]
+    fn test_config_persona_data_dir_default() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.persona_data_dir.is_none());
+    }
+
+    #[test]
+    fn test_example_config_parses_with_persona() {
+        let example_path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
+        if example_path.exists() {
+            let config = OrchestratorConfig::from_file(&example_path).unwrap();
+            assert!(config.agents.len() >= 3);
+        }
     }
 }
