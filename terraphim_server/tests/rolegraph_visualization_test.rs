@@ -9,7 +9,6 @@ mod tests {
     use ahash::AHashMap;
 
     use terraphim_server::{Status, axum_server};
-    use terraphim_settings::DeviceSettings;
 
     use std::{net::SocketAddr, path::PathBuf, time::Duration};
     use terraphim_config::{
@@ -23,7 +22,9 @@ mod tests {
     // Sample config with knowledge graphs for testing visualization
     fn sample_config_with_kg() -> Config {
         // Use local knowledge graph files instead of pre-built automata
-        let haystack = PathBuf::from("fixtures/haystack");
+        // Use CARGO_MANIFEST_DIR to ensure correct path resolution
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let haystack = manifest_dir.join("fixtures/haystack");
 
         ConfigBuilder::new()
             .global_shortcut("Ctrl+X")
@@ -58,7 +59,7 @@ mod tests {
                         automata_path: None, // Will be built from local files
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
-                            path: PathBuf::from("fixtures/haystack/"),
+                            path: haystack.clone(),
                         }),
                         public: true,
                         publish: true,
@@ -86,7 +87,7 @@ mod tests {
                         automata_path: None, // Will be built from local files
                         knowledge_graph_local: Some(KnowledgeGraphLocal {
                             input_type: KnowledgeGraphInputType::Markdown,
-                            path: PathBuf::from("fixtures/haystack/"),
+                            path: haystack.clone(),
                         }),
                         public: true,
                         publish: true,
@@ -108,15 +109,14 @@ mod tests {
     }
 
     async fn start_server() -> SocketAddr {
-        let server_settings =
-            DeviceSettings::load_from_env_and_file(None).expect("Failed to load settings");
-        let server_hostname = server_settings
-            .server_hostname
-            .parse::<SocketAddr>()
-            .unwrap_or_else(|_| {
-                let port = portpicker::pick_unused_port().expect("Failed to find unused port");
-                SocketAddr::from(([127, 0, 0, 1], port))
-            });
+        // Initialize logging for debugging
+        let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
+            .is_test(true)
+            .try_init();
+
+        // Always use a random port to avoid conflicts between tests
+        let port = portpicker::pick_unused_port().expect("Failed to find unused port");
+        let server_hostname = SocketAddr::from(([127, 0, 0, 1], port));
 
         let mut config = sample_config_with_kg();
         let config_state = ConfigState::new(&mut config)
@@ -160,6 +160,9 @@ mod tests {
     async fn ensure_server_started() -> SocketAddr {
         let server_addr = start_server().await;
         wait_for_server_ready(server_addr).await;
+        // Wait for rolegraphs to be fully built
+        // The server builds rolegraphs asynchronously, so we need to wait
+        tokio::time::sleep(Duration::from_secs(2)).await;
         server_addr
     }
 

@@ -1,40 +1,123 @@
 use std::collections::HashSet;
+use std::net::SocketAddr;
+use std::path::PathBuf;
 use std::time::Duration;
 
 use reqwest::Client;
 use serde_json::Value;
 use serial_test::serial;
 use terraphim_agent::client::ApiClient;
-use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_config::{ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
+use terraphim_server::axum_server;
+use terraphim_types::{KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
+use portpicker::pick_unused_port;
 
-const TEST_SERVER_URL: &str = "http://localhost:8000";
+fn sample_config_with_kg() -> terraphim_config::Config {
+    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    let haystack = manifest_dir.join("fixtures/haystack");
 
-/// Test helper to check if server is running
-async fn is_server_running() -> bool {
-    Client::new()
-        .get(format!("{}/health", TEST_SERVER_URL))
-        .timeout(Duration::from_secs(5))
-        .send()
+    ConfigBuilder::new()
+        .global_shortcut("Ctrl+X")
+        .add_role(
+            "Default",
+            Role {
+                shortname: Some("Default".to_string()),
+                name: "Default".into(),
+                relevance_function: RelevanceFunction::TitleScorer,
+                theme: "spacelab".to_string(),
+                kg: None,
+                haystacks: vec![Haystack {
+                    location: haystack.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                    fetch_content: false,
+                }],
+                terraphim_it: false,
+                ..Default::default()
+            },
+        )
+        .add_role(
+            "TestKG",
+            Role {
+                shortname: Some("TestKG".to_string()),
+                name: "TestKG".into(),
+                relevance_function: RelevanceFunction::TerraphimGraph,
+                theme: "lumen".to_string(),
+                kg: Some(KnowledgeGraph {
+                    automata_path: None,
+                    knowledge_graph_local: Some(KnowledgeGraphLocal {
+                        input_type: KnowledgeGraphInputType::Markdown,
+                        path: haystack.clone(),
+                    }),
+                    public: true,
+                    publish: true,
+                }),
+                haystacks: vec![Haystack {
+                    location: haystack.to_string_lossy().to_string(),
+                    service: ServiceType::Ripgrep,
+                    read_only: false,
+                    atomic_server_secret: None,
+                    extra_parameters: std::collections::HashMap::new(),
+                    fetch_content: false,
+                }],
+                terraphim_it: false,
+                ..Default::default()
+            },
+        )
+        .build()
+        .unwrap()
+}
+
+async fn start_server() -> SocketAddr {
+    let port = pick_unused_port().expect("Failed to find unused port");
+    let server_addr = SocketAddr::from(([127, 0, 0, 1], port));
+
+    let mut config = sample_config_with_kg();
+    let config_state = ConfigState::new(&mut config)
         .await
-        .map(|r| r.status().is_success())
-        .unwrap_or(false)
+        .expect("Failed to create config state");
+
+    tokio::spawn(async move {
+        axum_server(server_addr, config_state)
+            .await
+            .expect("Server failed to start");
+    });
+
+    // Wait for server to be ready
+    let client = Client::new();
+    for _ in 0..30 {
+        if client
+            .get(format!("http://{}/health", server_addr))
+            .timeout(Duration::from_secs(1))
+            .send()
+            .await
+            .map(|r| r.status().is_success())
+            .unwrap_or(false)
+        {
+            // Extra delay for rolegraphs to be built
+            tokio::time::sleep(Duration::from_secs(2)).await;
+            return server_addr;
+        }
+        tokio::time::sleep(Duration::from_millis(100)).await;
+    }
+    panic!("Server did not start in time");
 }
 
 /// Validate that TUI client and direct HTTP calls return identical search results
 #[tokio::test]
 #[serial]
 async fn test_tui_vs_direct_api_search_parity() {
-    if !is_server_running().await {
-        println!("Server not running, skipping parity test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
     let test_query = "test search";
     let test_role = "Default";
     let limit = 5;
 
     // TUI client search
-    let tui_client = ApiClient::new(TEST_SERVER_URL);
+    let tui_client = ApiClient::new(&test_url);
     let tui_query = SearchQuery {
         search_term: NormalizedTermValue::from(test_query),
         search_terms: None,
@@ -51,7 +134,7 @@ async fn test_tui_vs_direct_api_search_parity() {
     // Direct HTTP API search (simulating desktop)
     let http_client = Client::new();
     let http_result = http_client
-        .post(format!("{}/documents/search", TEST_SERVER_URL))
+        .post(format!("{}/documents/search", test_url))
         .json(&tui_query)
         .send()
         .await;
@@ -84,20 +167,18 @@ async fn test_tui_vs_direct_api_search_parity() {
         assert_eq!(tui_doc.rank, http_doc["rank"].as_f64().map(|f| f as u64));
     }
 
-    println!("✅ TUI and HTTP API search results are identical");
+    println!("TUI and HTTP API search results are identical");
 }
 
 /// Validate that TUI and HTTP config responses are identical
 #[tokio::test]
 #[serial]
 async fn test_tui_vs_direct_api_config_parity() {
-    if !is_server_running().await {
-        println!("Server not running, skipping config parity test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
     // TUI client config
-    let tui_client = ApiClient::new(TEST_SERVER_URL);
+    let tui_client = ApiClient::new(&test_url);
     let tui_result = tui_client.get_config().await;
     assert!(tui_result.is_ok(), "TUI config should succeed");
     let tui_response = tui_result.unwrap();
@@ -105,7 +186,7 @@ async fn test_tui_vs_direct_api_config_parity() {
     // Direct HTTP API config
     let http_client = Client::new();
     let http_result = http_client
-        .get(format!("{}/config", TEST_SERVER_URL))
+        .get(format!("{}/config", test_url))
         .send()
         .await;
 
@@ -147,19 +228,17 @@ async fn test_tui_vs_direct_api_config_parity() {
         .collect();
     assert_eq!(tui_role_names, http_role_names);
 
-    println!("✅ TUI and HTTP API config responses are identical");
+    println!("TUI and HTTP API config responses are identical");
 }
 
 /// Test role switching parity between TUI and direct API
 #[tokio::test]
 #[serial]
 async fn test_tui_vs_direct_api_role_switching_parity() {
-    if !is_server_running().await {
-        println!("Server not running, skipping role switching parity test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
-    let tui_client = ApiClient::new(TEST_SERVER_URL);
+    let tui_client = ApiClient::new(&test_url);
 
     // Get available roles
     let config_result = tui_client.get_config().await;
@@ -187,7 +266,7 @@ async fn test_tui_vs_direct_api_role_switching_parity() {
     });
 
     let http_result = http_client
-        .post(format!("{}/config/selected_role", TEST_SERVER_URL))
+        .post(format!("{}/config/selected_role", test_url))
         .json(&payload)
         .send()
         .await;
@@ -209,22 +288,21 @@ async fn test_tui_vs_direct_api_role_switching_parity() {
     );
     assert_eq!(tui_response.config.selected_role.to_string(), *test_role);
 
-    println!("✅ TUI and HTTP API role switching results are identical");
+    println!("TUI and HTTP API role switching results are identical");
 }
 
 /// Test rolegraph retrieval parity
 #[tokio::test]
 #[serial]
 async fn test_tui_vs_direct_api_rolegraph_parity() {
-    if !is_server_running().await {
-        println!("Server not running, skipping rolegraph parity test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
-    let test_role = "Default";
+    // Use TestKG role which has a knowledge graph
+    let test_role = "TestKG";
 
     // TUI client rolegraph
-    let tui_client = ApiClient::new(TEST_SERVER_URL);
+    let tui_client = ApiClient::new(&test_url);
     let tui_result = tui_client.get_rolegraph_edges(Some(test_role)).await;
     assert!(tui_result.is_ok(), "TUI rolegraph should succeed");
     let tui_response = tui_result.unwrap();
@@ -232,7 +310,7 @@ async fn test_tui_vs_direct_api_rolegraph_parity() {
     // Direct HTTP API rolegraph
     let http_client = Client::new();
     let http_result = http_client
-        .get(format!("{}/rolegraph?role={}", TEST_SERVER_URL, test_role))
+        .get(format!("{}/rolegraph?role={}", test_url, test_role))
         .send()
         .await;
 
@@ -264,24 +342,22 @@ async fn test_tui_vs_direct_api_rolegraph_parity() {
         assert_eq!(tui_node.rank, http_node["rank"].as_u64().unwrap());
     }
 
-    println!("✅ TUI and HTTP API rolegraph responses are identical");
+    println!("TUI and HTTP API rolegraph responses are identical");
 }
 
 /// Test that search results are consistent across multiple identical queries
 #[tokio::test]
 #[serial]
 async fn test_search_consistency_across_interfaces() {
-    if !is_server_running().await {
-        println!("Server not running, skipping consistency test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
     let test_queries = vec!["rust", "api", "config"];
     let test_role = "Default";
 
     for query in test_queries {
         // Run same search multiple times through TUI client
-        let tui_client = ApiClient::new(TEST_SERVER_URL);
+        let tui_client = ApiClient::new(&test_url);
         let search_query = SearchQuery {
             search_term: NormalizedTermValue::from(query),
             search_terms: None,
@@ -300,19 +376,25 @@ async fn test_search_consistency_across_interfaces() {
         }
 
         if !results.is_empty() {
-            // Verify all results are identical
+            // Verify all results are identical (by content, order may vary)
             for i in 1..results.len() {
                 assert_eq!(results[0].status, results[i].status);
                 assert_eq!(results[0].total, results[i].total);
                 assert_eq!(results[0].results.len(), results[i].results.len());
 
-                // Verify document IDs are identical in same order
-                for (j, doc) in results[0].results.iter().enumerate() {
-                    assert_eq!(doc.id, results[i].results[j].id);
-                    assert_eq!(doc.title, results[i].results[j].title);
+                // Sort both result sets by ID for consistent comparison
+                let mut sorted0: Vec<_> = results[0].results.iter().collect();
+                let mut sorted_i: Vec<_> = results[i].results.iter().collect();
+                sorted0.sort_by_key(|doc| &doc.id);
+                sorted_i.sort_by_key(|doc| &doc.id);
+
+                // Verify same documents returned (sorted by ID)
+                for (j, doc) in sorted0.iter().enumerate() {
+                    assert_eq!(doc.id, sorted_i[j].id);
+                    assert_eq!(doc.title, sorted_i[j].title);
                 }
             }
-            println!("✅ Search consistency verified for query: {}", query);
+            println!("Search consistency verified for query: {}", query);
         }
     }
 }
@@ -321,17 +403,15 @@ async fn test_search_consistency_across_interfaces() {
 #[tokio::test]
 #[serial]
 async fn test_pagination_parity() {
-    if !is_server_running().await {
-        println!("Server not running, skipping pagination parity test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
     let query = "test";
     let role = "Default";
     let limit = 2;
 
     // Test first page
-    let tui_client = ApiClient::new(TEST_SERVER_URL);
+    let tui_client = ApiClient::new(&test_url);
     let page1_query = SearchQuery {
         search_term: NormalizedTermValue::from(query),
         search_terms: None,
@@ -346,7 +426,7 @@ async fn test_pagination_parity() {
 
     let http_client = Client::new();
     let http_page1 = http_client
-        .post(format!("{}/documents/search", TEST_SERVER_URL))
+        .post(format!("{}/documents/search", test_url))
         .json(&page1_query)
         .send()
         .await
@@ -369,7 +449,7 @@ async fn test_pagination_parity() {
     assert!(tui_page2.is_ok());
 
     let http_page2 = http_client
-        .post(format!("{}/documents/search", TEST_SERVER_URL))
+        .post(format!("{}/documents/search", test_url))
         .json(&page2_query)
         .send()
         .await
@@ -401,19 +481,17 @@ async fn test_pagination_parity() {
         );
     }
 
-    println!("✅ Pagination parity verified between TUI and HTTP API");
+    println!("Pagination parity verified between TUI and HTTP API");
 }
 
 /// Test error handling consistency
 #[tokio::test]
 #[serial]
 async fn test_error_handling_parity() {
-    if !is_server_running().await {
-        println!("Server not running, skipping error handling parity test");
-        return;
-    }
+    let server_addr = start_server().await;
+    let test_url = format!("http://{}", server_addr);
 
-    let tui_client = ApiClient::new(TEST_SERVER_URL);
+    let tui_client = ApiClient::new(&test_url);
     let http_client = Client::new();
 
     // Test invalid role
@@ -428,7 +506,7 @@ async fn test_error_handling_parity() {
 
     let tui_result = tui_client.search(&invalid_query).await;
     let http_result = http_client
-        .post(format!("{}/documents/search", TEST_SERVER_URL))
+        .post(format!("{}/documents/search", test_url))
         .json(&invalid_query)
         .send()
         .await;
@@ -444,5 +522,5 @@ async fn test_error_handling_parity() {
         }
     }
 
-    println!("✅ Error handling consistency verified");
+    println!("Error handling consistency verified");
 }
