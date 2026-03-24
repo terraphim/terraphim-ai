@@ -66,16 +66,6 @@ build_search_index = true
 
 # Configuration of the Markdown rendering
 [markdown]
-# When set to "true", all code blocks are highlighted.
-highlight_code = true
-
-# A list of directories used to search for additional `.sublime-syntax` files.
-extra_syntaxes = []
-
-# The theme to use for code highlighting.
-# See below for list of allowed values.
-highlight_theme = "one-dark"
-
 # When set to "true", emoji aliases translated to their corresponding
 # Unicode emoji equivalent in the rendered Markdown files. (e.g.: :smile: => 😄)
 render_emoji = true
