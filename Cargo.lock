@@ -1199,25 +1199,6 @@ dependencies = [
 
 [[package]]
 name = "config"
-version = "0.14.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "68578f196d2a33ff61b27fae256c3164f65e36382648e30666dde05b8cc9dfdf"
-dependencies = [
- "async-trait",
- "convert_case 0.6.0",
- "json5",
- "nom",
- "pathdiff",
- "ron 0.8.1",
- "rust-ini 0.20.0",
- "serde",
- "serde_json",
- "toml 0.8.23",
- "yaml-rust2 0.8.1",
-]
-
-[[package]]
-name = "config"
 version = "0.15.19"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b30fa8254caad766fc03cb0ccae691e14bf3bd72bfff27f72802ce729551b3d6"
@@ -1226,14 +1207,14 @@ dependencies = [
  "convert_case 0.6.0",
  "json5",
  "pathdiff",
- "ron 0.12.0",
- "rust-ini 0.21.3",
+ "ron",
+ "rust-ini",
  "serde-untagged",
  "serde_core",
  "serde_json",
  "toml 0.9.12+spec-1.1.0",
  "winnow",
- "yaml-rust2 0.10.4",
+ "yaml-rust2",
 ]
 
 [[package]]
@@ -3210,7 +3191,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 dependencies = [
  "ahash 0.8.12",
- "allocator-api2",
 ]
 
 [[package]]
@@ -3233,15 +3213,6 @@ dependencies = [
  "allocator-api2",
  "equivalent",
  "foldhash 0.2.0",
-]
-
-[[package]]
-name = "hashlink"
-version = "0.8.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
-dependencies = [
- "hashbrown 0.14.5",
 ]
 
 [[package]]
@@ -6636,7 +6607,7 @@ dependencies = [
  "quick-xml 0.37.5",
  "rand 0.8.5",
  "reqwest 0.12.28",
- "rust-ini 0.21.3",
+ "rust-ini",
  "serde",
  "serde_json",
  "sha1",
@@ -6889,18 +6860,6 @@ dependencies = [
 
 [[package]]
 name = "ron"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b91f7eff05f748767f183df4320a63d6936e9c6107d97c9e6bdd9784f4289c94"
-dependencies = [
- "base64 0.21.7",
- "bitflags 2.11.0",
- "serde",
- "serde_derive",
-]
-
-[[package]]
-name = "ron"
 version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fd490c5b18261893f14449cbd28cb9c0b637aebf161cd77900bfdedaff21ec32"
@@ -6994,16 +6953,6 @@ dependencies = [
  "mime_guess",
  "sha2",
  "walkdir",
-]
-
-[[package]]
-name = "rust-ini"
-version = "0.20.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3e0698206bcb8882bf2a9ecb4c1e7785db57ff052297085a6efd4fe42302068a"
-dependencies = [
- "cfg-if",
- "ordered-multimap",
 ]
 
 [[package]]
@@ -8269,7 +8218,7 @@ version = "0.8.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c1c97747dbf44bb1ca44a561ece23508e99cb592e862f22222dcf42f51d1e451"
 dependencies = [
- "heck 0.5.0",
+ "heck 0.4.1",
  "proc-macro2",
  "quote",
  "syn 2.0.117",
@@ -9125,7 +9074,7 @@ dependencies = [
  "async-trait",
  "chrono",
  "clap",
- "config 0.15.19",
+ "config",
  "dashmap 6.1.0",
  "env_logger",
  "fastrand",
@@ -10109,7 +10058,7 @@ dependencies = [
  "bollard",
  "chrono",
  "clap",
- "config 0.14.1",
+ "config",
  "dirs 5.0.1",
  "env_logger",
  "gethostname",
@@ -12209,17 +12158,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "388c44dc09d76f1536602ead6d325eb532f5c122f17782bd57fb47baeeb767e2"
 dependencies = [
  "lzma-sys",
-]
-
-[[package]]
-name = "yaml-rust2"
-version = "0.8.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8902160c4e6f2fb145dbe9d6760a75e3c9522d8bf796ed7047c85919ac7115f8"
-dependencies = [
- "arraydeque",
- "encoding_rs",
- "hashlink 0.8.4",
 ]
 
 [[package]]
