@@ -26,6 +26,8 @@
 mod capture;
 mod hook;
 mod install;
+#[cfg(test)]
+mod procedure;
 mod redaction;
 
 pub use capture::{

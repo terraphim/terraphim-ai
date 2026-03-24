@@ -73,7 +73,7 @@ impl TimeMode {
                 event = self.scheduler.next_event() => {
                     match event {
                         ScheduleEvent::Spawn(agent) => {
-                            if let Err(e) = self.handle_spawn(agent).await {
+                            if let Err(e) = self.handle_spawn(*agent).await {
                                 error!("failed to spawn agent: {}", e);
                             }
                         }
@@ -163,6 +163,16 @@ mod tests {
             schedule: None,
             capabilities: vec![],
             max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: None,
+            max_cpu_seconds: None,
         }
     }
 

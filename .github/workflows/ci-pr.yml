@@ -176,8 +176,6 @@ jobs:
       - name: Disk cleanup
         run: |
           sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/registry/cache/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/git/checkouts/* 2>/dev/null || true
           sudo docker system prune -f 2>/dev/null || true
           df -h
 
@@ -214,8 +212,6 @@ jobs:
       - name: Disk cleanup
         run: |
           sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/registry/cache/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/git/checkouts/* 2>/dev/null || true
           sudo docker system prune -f 2>/dev/null || true
           df -h
 
@@ -255,8 +251,6 @@ jobs:
       - name: Disk cleanup
         run: |
           sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/registry/cache/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/git/checkouts/* 2>/dev/null || true
           sudo docker system prune -f 2>/dev/null || true
           df -h
 
@@ -354,8 +348,6 @@ jobs:
       - name: Disk cleanup
         run: |
           sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/registry/cache/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/git/checkouts/* 2>/dev/null || true
           sudo docker system prune -f 2>/dev/null || true
           df -h
 
@@ -414,8 +406,6 @@ jobs:
       - name: Disk cleanup
         run: |
           sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/registry/cache/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/git/checkouts/* 2>/dev/null || true
           sudo docker system prune -f 2>/dev/null || true
           df -h
 
@@ -459,8 +449,6 @@ jobs:
       - name: Disk cleanup
         run: |
           sudo rm -rf ~/.rustup/tmp/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/registry/cache/* 2>/dev/null || true
-          sudo rm -rf ~/.cargo/git/checkouts/* 2>/dev/null || true
           sudo docker system prune -f 2>/dev/null || true
           df -h
 

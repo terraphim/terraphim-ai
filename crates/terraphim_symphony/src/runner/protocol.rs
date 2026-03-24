@@ -3,7 +3,9 @@
 //! Defines the message types for line-delimited JSON communication
 //! with the coding-agent app-server over stdio.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
+use uuid::Uuid;
 
 /// A JSON-RPC request (client -> server or server -> client).
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -161,6 +163,132 @@ pub struct TokenTotals {
     pub seconds_running: f64,
 }
 
+/// Severity of a review finding.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum FindingSeverity {
+    Info,
+    Low,
+    Medium,
+    High,
+    Critical,
+}
+
+/// Category of a review finding (maps to the 6 review groups).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FindingCategory {
+    Security,
+    Architecture,
+    Performance,
+    Quality,
+    Domain,
+    DesignQuality,
+}
+
+/// A single structured finding from a review agent.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewFinding {
+    pub file: String,
+    #[serde(default)]
+    pub line: u32,
+    pub severity: FindingSeverity,
+    pub category: FindingCategory,
+    pub finding: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub suggestion: Option<String>,
+    #[serde(default = "default_confidence")]
+    pub confidence: f64,
+}
+
+fn default_confidence() -> f64 {
+    0.5
+}
+
+/// Output schema for a single review agent's results.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ReviewAgentOutput {
+    pub agent: String,
+    pub findings: Vec<ReviewFinding>,
+    pub summary: String,
+    pub pass: bool,
+}
+
+/// ADF envelope message types for swarm orchestration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "envelope_type", rename_all = "snake_case")]
+pub enum AdfEnvelope {
+    ReviewCommand {
+        correlation_id: Uuid,
+        agent_name: String,
+        group: FindingCategory,
+        git_ref: String,
+        worktree_path: String,
+        changed_files: Vec<String>,
+        dispatched_at: DateTime<Utc>,
+    },
+    ReviewResponse {
+        correlation_id: Uuid,
+        output: ReviewAgentOutput,
+        duration_ms: u64,
+        completed_at: DateTime<Utc>,
+    },
+    ReviewError {
+        correlation_id: Uuid,
+        agent_name: String,
+        reason: String,
+        failed_at: DateTime<Utc>,
+    },
+    ReviewCancel {
+        correlation_id: Uuid,
+        reason: String,
+    },
+}
+
+impl AdfEnvelope {
+    pub fn correlation_id(&self) -> Uuid {
+        match self {
+            AdfEnvelope::ReviewCommand { correlation_id, .. }
+            | AdfEnvelope::ReviewResponse { correlation_id, .. }
+            | AdfEnvelope::ReviewError { correlation_id, .. }
+            | AdfEnvelope::ReviewCancel { correlation_id, .. } => *correlation_id,
+        }
+    }
+
+    pub fn to_jsonl(&self) -> Result<String, serde_json::Error> {
+        serde_json::to_string(self)
+    }
+
+    pub fn from_jsonl(line: &str) -> Result<Self, serde_json::Error> {
+        serde_json::from_str(line.trim())
+    }
+}
+
+/// Deduplicate findings by (file, line, category).
+/// When duplicates exist, keep the highest-severity finding.
+pub fn deduplicate_findings(findings: Vec<ReviewFinding>) -> Vec<ReviewFinding> {
+    use std::collections::HashMap;
+    let mut best: HashMap<(String, u32, FindingCategory), ReviewFinding> = HashMap::new();
+    for finding in findings {
+        let key = (finding.file.clone(), finding.line, finding.category);
+        best.entry(key)
+            .and_modify(|existing| {
+                if finding.severity > existing.severity {
+                    *existing = finding.clone();
+                }
+            })
+            .or_insert(finding);
+    }
+    let mut result: Vec<ReviewFinding> = best.into_values().collect();
+    result.sort_by(|a, b| {
+        b.severity
+            .cmp(&a.severity)
+            .then_with(|| a.file.cmp(&b.file))
+            .then_with(|| a.line.cmp(&b.line))
+    });
+    result
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -234,5 +362,207 @@ mod tests {
             AppServerMessage::parse_line("[1,2,3]"),
             AppServerMessage::Malformed(_)
         ));
+    }
+
+    #[test]
+    fn test_adf_envelope_review_command_roundtrip() {
+        let cmd = AdfEnvelope::ReviewCommand {
+            correlation_id: Uuid::new_v4(),
+            agent_name: "security-agent".to_string(),
+            group: FindingCategory::Security,
+            git_ref: "abc123".to_string(),
+            worktree_path: "/tmp/worktree".to_string(),
+            changed_files: vec!["src/main.rs".to_string()],
+            dispatched_at: Utc::now(),
+        };
+        let jsonl = cmd.to_jsonl().unwrap();
+        let parsed = AdfEnvelope::from_jsonl(&jsonl).unwrap();
+        assert_eq!(cmd.correlation_id(), parsed.correlation_id());
+    }
+
+    #[test]
+    fn test_adf_envelope_review_response_roundtrip() {
+        let response = AdfEnvelope::ReviewResponse {
+            correlation_id: Uuid::new_v4(),
+            output: ReviewAgentOutput {
+                agent: "test-agent".to_string(),
+                findings: vec![],
+                summary: "All good".to_string(),
+                pass: true,
+            },
+            duration_ms: 1000,
+            completed_at: Utc::now(),
+        };
+        let jsonl = response.to_jsonl().unwrap();
+        let parsed = AdfEnvelope::from_jsonl(&jsonl).unwrap();
+        assert_eq!(response.correlation_id(), parsed.correlation_id());
+    }
+
+    #[test]
+    fn test_adf_envelope_review_error_roundtrip() {
+        let err = AdfEnvelope::ReviewError {
+            correlation_id: Uuid::new_v4(),
+            agent_name: "failing-agent".to_string(),
+            reason: "Network timeout".to_string(),
+            failed_at: Utc::now(),
+        };
+        let jsonl = err.to_jsonl().unwrap();
+        let parsed = AdfEnvelope::from_jsonl(&jsonl).unwrap();
+        assert_eq!(err.correlation_id(), parsed.correlation_id());
+    }
+
+    #[test]
+    fn test_adf_envelope_review_cancel_roundtrip() {
+        let cancel = AdfEnvelope::ReviewCancel {
+            correlation_id: Uuid::new_v4(),
+            reason: "Timeout exceeded".to_string(),
+        };
+        let jsonl = cancel.to_jsonl().unwrap();
+        let parsed = AdfEnvelope::from_jsonl(&jsonl).unwrap();
+        assert_eq!(cancel.correlation_id(), parsed.correlation_id());
+    }
+
+    #[test]
+    fn test_adf_envelope_correlation_id() {
+        let id = Uuid::new_v4();
+        let cmd = AdfEnvelope::ReviewCommand {
+            correlation_id: id,
+            agent_name: "test".to_string(),
+            group: FindingCategory::Quality,
+            git_ref: "main".to_string(),
+            worktree_path: "/tmp".to_string(),
+            changed_files: vec![],
+            dispatched_at: Utc::now(),
+        };
+        assert_eq!(cmd.correlation_id(), id);
+    }
+
+    #[test]
+    fn test_finding_severity_ordering() {
+        assert!(FindingSeverity::Info < FindingSeverity::Low);
+        assert!(FindingSeverity::Low < FindingSeverity::Medium);
+        assert!(FindingSeverity::Medium < FindingSeverity::High);
+        assert!(FindingSeverity::High < FindingSeverity::Critical);
+    }
+
+    #[test]
+    fn test_review_agent_output_json_schema() {
+        let output = ReviewAgentOutput {
+            agent: "test-agent".to_string(),
+            findings: vec![ReviewFinding {
+                file: "src/lib.rs".to_string(),
+                line: 42,
+                severity: FindingSeverity::High,
+                category: FindingCategory::Security,
+                finding: "Potential SQL injection".to_string(),
+                suggestion: Some("Use prepared statements".to_string()),
+                confidence: 0.95,
+            }],
+            summary: "Found 1 issue".to_string(),
+            pass: false,
+        };
+        let json = serde_json::to_string_pretty(&output).unwrap();
+        assert!(json.contains("test-agent"));
+        assert!(json.contains("Potential SQL injection"));
+    }
+
+    #[test]
+    fn test_deduplicate_same_file_line_category() {
+        let findings = vec![
+            ReviewFinding {
+                file: "src/lib.rs".to_string(),
+                line: 42,
+                severity: FindingSeverity::Low,
+                category: FindingCategory::Security,
+                finding: "Low severity issue".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+            ReviewFinding {
+                file: "src/lib.rs".to_string(),
+                line: 42,
+                severity: FindingSeverity::High,
+                category: FindingCategory::Security,
+                finding: "High severity issue".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+        ];
+        let deduped = deduplicate_findings(findings);
+        assert_eq!(deduped.len(), 1);
+        assert_eq!(deduped[0].severity, FindingSeverity::High);
+    }
+
+    #[test]
+    fn test_deduplicate_different_locations_preserved() {
+        let findings = vec![
+            ReviewFinding {
+                file: "src/a.rs".to_string(),
+                line: 1,
+                severity: FindingSeverity::High,
+                category: FindingCategory::Security,
+                finding: "Issue A".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+            ReviewFinding {
+                file: "src/b.rs".to_string(),
+                line: 1,
+                severity: FindingSeverity::High,
+                category: FindingCategory::Security,
+                finding: "Issue B".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+        ];
+        let deduped = deduplicate_findings(findings);
+        assert_eq!(deduped.len(), 2);
+    }
+
+    #[test]
+    fn test_deduplicate_empty_input() {
+        let deduped = deduplicate_findings(vec![]);
+        assert!(deduped.is_empty());
+    }
+
+    #[test]
+    fn test_deduplicate_sort_order() {
+        let findings = vec![
+            ReviewFinding {
+                file: "src/b.rs".to_string(),
+                line: 10,
+                severity: FindingSeverity::Medium,
+                category: FindingCategory::Quality,
+                finding: "Medium B".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+            ReviewFinding {
+                file: "src/a.rs".to_string(),
+                line: 5,
+                severity: FindingSeverity::High,
+                category: FindingCategory::Security,
+                finding: "High A".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+            ReviewFinding {
+                file: "src/a.rs".to_string(),
+                line: 3,
+                severity: FindingSeverity::High,
+                category: FindingCategory::Security,
+                finding: "High A earlier".to_string(),
+                suggestion: None,
+                confidence: 0.5,
+            },
+        ];
+        let deduped = deduplicate_findings(findings);
+        assert_eq!(deduped.len(), 3);
+        // Highest severity first
+        assert_eq!(deduped[0].severity, FindingSeverity::High);
+        assert_eq!(deduped[0].file, "src/a.rs");
+        assert_eq!(deduped[0].line, 3); // Earlier line within same severity
+        // Then medium severity
+        assert_eq!(deduped[2].severity, FindingSeverity::Medium);
     }
 }
