@@ -3,14 +3,18 @@ use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::time::Duration;
 
+use portpicker::pick_unused_port;
 use reqwest::Client;
 use serde_json::Value;
 use serial_test::serial;
 use terraphim_agent::client::ApiClient;
-use terraphim_config::{ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType};
+use terraphim_config::{
+    ConfigBuilder, ConfigState, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Role, ServiceType,
+};
 use terraphim_server::axum_server;
-use terraphim_types::{KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
-use portpicker::pick_unused_port;
+use terraphim_types::{
+    KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
+};
 
 fn sample_config_with_kg() -> terraphim_config::Config {
     let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -185,10 +189,7 @@ async fn test_tui_vs_direct_api_config_parity() {
 
     // Direct HTTP API config
     let http_client = Client::new();
-    let http_result = http_client
-        .get(format!("{}/config", test_url))
-        .send()
-        .await;
+    let http_result = http_client.get(format!("{}/config", test_url)).send().await;
 
     assert!(http_result.is_ok(), "HTTP config should succeed");
     let http_response = http_result.unwrap();
