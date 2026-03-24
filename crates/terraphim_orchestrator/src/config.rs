@@ -357,7 +357,7 @@ impl OrchestratorConfig {
 }
 
 /// Substitute environment variables in a string.
-/// Supports ${VAR} and $VAR syntax.
+/// Supports ${VAR} syntax. Bare $VAR syntax is not implemented.
 fn substitute_env(s: &str) -> String {
     let mut result = s.to_string();
 
@@ -619,7 +619,7 @@ workflow_file = "./WORKFLOW.md"
 [workflow.tracker]
 kind = "gitea"
 endpoint = "https://git.terraphim.cloud"
-api_key = "${GITEA_TOKEN}"
+api_key = "..."
 owner = "terraphim"
 repo = "terraphim-ai"
 use_robot_api = true
@@ -680,7 +680,7 @@ workflow_file = "./WORKFLOW.md"
 [workflow.tracker]
 kind = "gitea"
 endpoint = "https://git.example.com"
-api_key = "test"
+api_key = "..."
 owner = "owner"
 repo = "repo"
 
