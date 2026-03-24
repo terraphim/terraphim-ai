@@ -16,15 +16,21 @@ pub struct SessionService {
     registry: ConnectorRegistry,
     /// Cached sessions (in-memory)
     cache: Arc<RwLock<HashMap<SessionId, Session>>>,
+    /// Whether auto-import is enabled
+    auto_import: bool,
+    /// Whether auto-import has been attempted
+    auto_import_attempted: Arc<RwLock<bool>>,
 }
 
 impl SessionService {
-    /// Create a new session service
+    /// Create a new session service with auto-import enabled
     #[must_use]
     pub fn new() -> Self {
         Self {
             registry: ConnectorRegistry::new(),
             cache: Arc::new(RwLock::new(HashMap::new())),
+            auto_import: true,
+            auto_import_attempted: Arc::new(RwLock::new(false)),
         }
     }
 
@@ -34,7 +40,65 @@ impl SessionService {
         Self {
             registry,
             cache: Arc::new(RwLock::new(HashMap::new())),
+            auto_import: true,
+            auto_import_attempted: Arc::new(RwLock::new(false)),
         }
+    }
+
+    /// Disable auto-import (for testing or explicit control)
+    pub fn disable_auto_import(&mut self) {
+        self.auto_import = false;
+    }
+
+    /// Enable auto-import (default behavior)
+    pub fn enable_auto_import(&mut self) {
+        self.auto_import = true;
+    }
+
+    /// Check if auto-import is enabled
+    #[must_use]
+    pub fn is_auto_import_enabled(&self) -> bool {
+        self.auto_import
+    }
+
+    /// Internal method to perform auto-import if needed
+    async fn maybe_auto_import(&self) -> Result<()> {
+        if !self.auto_import {
+            return Ok(());
+        }
+
+        // Check if already attempted
+        {
+            let attempted = self.auto_import_attempted.read().await;
+            if *attempted {
+                return Ok(());
+            }
+        }
+
+        // Check if cache is empty
+        let cache_empty = {
+            let cache = self.cache.read().await;
+            cache.is_empty()
+        };
+
+        if cache_empty {
+            tracing::info!("Cache empty, auto-importing sessions...");
+            let options = ImportOptions::new().with_limit(100);
+            match self.import_all(&options).await {
+                Ok(sessions) => {
+                    tracing::info!("Auto-imported {} sessions", sessions.len());
+                }
+                Err(e) => {
+                    tracing::warn!("Auto-import failed: {}", e);
+                }
+            }
+        }
+
+        // Mark as attempted
+        let mut attempted = self.auto_import_attempted.write().await;
+        *attempted = true;
+
+        Ok(())
     }
 
     /// Get the connector registry
@@ -95,7 +159,13 @@ impl SessionService {
     }
 
     /// List all cached sessions
+    /// Auto-imports from available sources if cache is empty and auto-import is enabled
     pub async fn list_sessions(&self) -> Vec<Session> {
+        // Try auto-import if needed
+        if let Err(e) = self.maybe_auto_import().await {
+            tracing::warn!("Auto-import check failed: {}", e);
+        }
+
         let cache = self.cache.read().await;
         cache.values().cloned().collect()
     }
@@ -107,7 +177,13 @@ impl SessionService {
     }
 
     /// Search sessions by query string
+    /// Auto-imports from available sources if cache is empty and auto-import is enabled
     pub async fn search(&self, query: &str) -> Vec<Session> {
+        // Try auto-import if needed
+        if let Err(e) = self.maybe_auto_import().await {
+            tracing::warn!("Auto-import check failed: {}", e);
+        }
+
         let cache = self.cache.read().await;
         let query_lower = query.to_lowercase();
 
@@ -142,7 +218,13 @@ impl SessionService {
     }
 
     /// Get sessions by source
+    /// Auto-imports from available sources if cache is empty and auto-import is enabled
     pub async fn sessions_by_source(&self, source: &str) -> Vec<Session> {
+        // Try auto-import if needed
+        if let Err(e) = self.maybe_auto_import().await {
+            tracing::warn!("Auto-import check failed: {}", e);
+        }
+
         let cache = self.cache.read().await;
         cache
             .values()
@@ -172,7 +254,13 @@ impl SessionService {
     }
 
     /// Get summary statistics
+    /// Auto-imports from available sources if cache is empty and auto-import is enabled
     pub async fn statistics(&self) -> SessionStatistics {
+        // Try auto-import if needed
+        if let Err(e) = self.maybe_auto_import().await {
+            tracing::warn!("Auto-import check failed: {}", e);
+        }
+
         let cache = self.cache.read().await;
 
         let mut total_messages = 0;
@@ -235,6 +323,17 @@ impl Default for SessionService {
     }
 }
 
+impl Clone for SessionService {
+    fn clone(&self) -> Self {
+        Self {
+            registry: ConnectorRegistry::new(),
+            cache: Arc::new(RwLock::new(HashMap::new())),
+            auto_import: self.auto_import,
+            auto_import_attempted: Arc::new(RwLock::new(false)),
+        }
+    }
+}
+
 /// Information about a session source
 #[derive(Debug, Clone)]
 pub struct SourceInfo {
@@ -290,7 +389,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_statistics_empty() {
-        let service = SessionService::new();
+        let mut service = SessionService::new();
+        service.disable_auto_import();
         let stats = service.statistics().await;
 
         assert_eq!(stats.total_sessions, 0);

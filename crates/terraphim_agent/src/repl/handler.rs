@@ -1766,7 +1766,7 @@ impl ReplHandler {
         use comfy_table::presets::UTF8_FULL;
         use comfy_table::{Cell, Table};
         use terraphim_sessions::{
-            ConnectorStatus, FileAccess, ImportOptions, MessageRole, Session, SessionService,
+            ConnectorStatus, FileAccess, MessageRole, Session, SessionService,
         };
 
         // Get or create session service
@@ -1820,24 +1820,6 @@ impl ReplHandler {
                 println!("{}", table);
             }
 
-            SessionsSubcommand::Import { source, limit } => {
-                let options = ImportOptions::new().with_limit(limit.unwrap_or(100));
-
-                println!("\n{} Importing sessions...", "⏳".bold());
-
-                let sessions = if let Some(source_id) = source {
-                    svc.import_from(&source_id, &options).await?
-                } else {
-                    svc.import_all(&options).await?
-                };
-
-                println!(
-                    "{} Imported {} session(s)",
-                    "✅".bold(),
-                    sessions.len().to_string().green()
-                );
-            }
-
             SessionsSubcommand::List { source, limit } => {
                 let sessions = if let Some(source_id) = source {
                     svc.sessions_by_source(&source_id).await
@@ -1852,10 +1834,7 @@ impl ReplHandler {
                 };
 
                 if sessions.is_empty() {
-                    println!(
-                        "{} No sessions found. Run '/sessions import' first.",
-                        "ℹ".blue().bold()
-                    );
+                    println!("{} No sessions found.", "ℹ".blue().bold());
                     return Ok(());
                 }
 

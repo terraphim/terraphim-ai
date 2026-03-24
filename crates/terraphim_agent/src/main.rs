@@ -806,27 +806,13 @@ fn get_session_cache_path() -> std::path::PathBuf {
 enum SessionsSub {
     /// Detect available session sources (Claude Code, Cursor, etc.)
     Sources,
-    /// Import sessions from all available sources
-    Import {
-        /// Limit number of sessions to import
-        #[arg(long, default_value_t = 100)]
-        limit: usize,
-    },
-    /// Import sessions from a specific source
-    ImportFrom {
-        /// Source ID (e.g., "claude-code-native")
-        source: String,
-        /// Limit number of sessions to import
-        #[arg(long, default_value_t = 100)]
-        limit: usize,
-    },
-    /// List all cached sessions
+    /// List all cached sessions (auto-imports if cache is empty)
     List {
         /// Limit number of sessions to show
         #[arg(long, default_value_t = 20)]
         limit: usize,
     },
-    /// Search sessions by query string
+    /// Search sessions by query string (auto-imports if cache is empty)
     Search {
         /// Search query
         query: String,
@@ -834,7 +820,7 @@ enum SessionsSub {
         #[arg(long, default_value_t = 10)]
         limit: usize,
     },
-    /// Show session statistics
+    /// Show session statistics (auto-imports if cache is empty)
     Stats,
 }
 
@@ -1839,7 +1825,7 @@ async fn run_offline_command(
 
         #[cfg(feature = "repl-sessions")]
         Command::Sessions { sub } => {
-            use terraphim_sessions::{SessionService, connector::ImportOptions};
+            use terraphim_sessions::SessionService;
 
             let service = SessionService::new();
 
@@ -1878,46 +1864,10 @@ async fn run_offline_command(
                     }
                     Ok(())
                 }
-                SessionsSub::Import { limit } => {
-                    let options = ImportOptions {
-                        limit: Some(limit),
-                        ..Default::default()
-                    };
-                    match service.import_all(&options).await {
-                        Ok(sessions) => {
-                            // Save to cache file
-                            let cache_path = get_session_cache_path();
-                            if let Ok(data) = serde_json::to_string_pretty(&sessions) {
-                                let _ = std::fs::write(&cache_path, data);
-                            }
-                            println!("Imported {} sessions.", sessions.len());
-                            Ok(())
-                        }
-                        Err(e) => Err(anyhow::anyhow!("Import failed: {}", e)),
-                    }
-                }
-                SessionsSub::ImportFrom { source, limit } => {
-                    let options = ImportOptions {
-                        limit: Some(limit),
-                        ..Default::default()
-                    };
-                    match service.import_from(&source, &options).await {
-                        Ok(sessions) => {
-                            // Save to cache file
-                            let cache_path = get_session_cache_path();
-                            if let Ok(data) = serde_json::to_string_pretty(&sessions) {
-                                let _ = std::fs::write(&cache_path, data);
-                            }
-                            println!("Imported {} sessions from {}.", sessions.len(), source);
-                            Ok(())
-                        }
-                        Err(e) => Err(anyhow::anyhow!("Import from {} failed: {}", source, e)),
-                    }
-                }
                 SessionsSub::List { limit } => {
                     let sessions = service.list_sessions().await;
                     if sessions.is_empty() {
-                        println!("No sessions in cache. Import first with 'sessions import'.");
+                        println!("No sessions found.");
                     } else {
                         println!("Cached sessions ({} total):", sessions.len());
                         for session in sessions.iter().take(limit) {
@@ -1934,10 +1884,7 @@ async fn run_offline_command(
                 SessionsSub::Search { query, limit } => {
                     let results = service.search(&query).await;
                     if results.is_empty() {
-                        println!(
-                            "No sessions matching '{}'. Import first with 'sessions import'.",
-                            query
-                        );
+                        println!("No sessions matching '{}'.", query);
                     } else {
                         println!("Found {} matching sessions:", results.len());
                         for session in results.iter().take(limit) {
@@ -2613,7 +2560,7 @@ async fn run_server_command(
 
         #[cfg(feature = "repl-sessions")]
         Command::Sessions { sub } => {
-            use terraphim_sessions::{SessionService, connector::ImportOptions};
+            use terraphim_sessions::SessionService;
 
             let rt = Runtime::new()?;
             rt.block_on(async {
@@ -2641,46 +2588,11 @@ async fn run_server_command(
                         }
                         Ok(())
                     }
-                    SessionsSub::Import { limit } => {
-                        let options = ImportOptions {
-                            limit: Some(limit),
-                            ..Default::default()
-                        };
-                        match service.import_all(&options).await {
-                            Ok(sessions) => {
-                                // Save to cache file
-                                let cache_path = get_session_cache_path();
-                                if let Ok(data) = serde_json::to_string_pretty(&sessions) {
-                                    let _ = std::fs::write(&cache_path, data);
-                                }
-                                println!("Imported {} sessions.", sessions.len());
-                                Ok(())
-                            }
-                            Err(e) => Err(anyhow::anyhow!("Import failed: {}", e)),
-                        }
-                    }
-                    SessionsSub::ImportFrom { source, limit } => {
-                        let options = ImportOptions {
-                            limit: Some(limit),
-                            ..Default::default()
-                        };
-                        match service.import_from(&source, &options).await {
-                            Ok(sessions) => {
-                                // Save to cache file
-                                let cache_path = get_session_cache_path();
-                                if let Ok(data) = serde_json::to_string_pretty(&sessions) {
-                                    let _ = std::fs::write(&cache_path, data);
-                                }
-                                println!("Imported {} sessions from {}.", sessions.len(), source);
-                                Ok(())
-                            }
-                            Err(e) => Err(anyhow::anyhow!("Import from {} failed: {}", source, e)),
-                        }
-                    }
+
                     SessionsSub::List { limit } => {
                         let sessions = service.list_sessions().await;
                         if sessions.is_empty() {
-                            println!("No sessions in cache. Import first with 'sessions import'.");
+                            println!("No sessions found.");
                         } else {
                             println!("Cached sessions ({} total):", sessions.len());
                             for session in sessions.iter().take(limit) {
@@ -2697,10 +2609,7 @@ async fn run_server_command(
                     SessionsSub::Search { query, limit } => {
                         let results = service.search(&query).await;
                         if results.is_empty() {
-                            println!(
-                                "No sessions matching '{}'. Import first with 'sessions import'.",
-                                query
-                            );
+                            println!("No sessions matching '{}'.", query);
                         } else {
                             println!("Found {} matching sessions:", results.len());
                             for session in results.iter().take(limit) {
