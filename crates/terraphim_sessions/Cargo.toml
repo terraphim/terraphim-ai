@@ -39,7 +39,7 @@ anyhow = { workspace = true }
 tracing = "0.1"
 
 # Time handling (same as CLA)
-jiff = { version = "0.1", features = ["serde"] }
+jiff = { version = "0.2", features = ["serde"] }
 
 # File system
 walkdir = "2.4"
