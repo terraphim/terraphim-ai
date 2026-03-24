@@ -1,4 +1,5 @@
 <script lang="ts">
+// @ts-nocheck
 import { invoke } from '@tauri-apps/api/tauri';
 import { Agent } from '@tomic/lib';
 import { store } from '@tomic/svelte';

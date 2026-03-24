@@ -4,7 +4,7 @@ import { register as registerShortcut } from '@tauri-apps/api/globalShortcut';
 import { appDataDir } from '@tauri-apps/api/path';
 import { invoke } from '@tauri-apps/api/tauri';
 import { appWindow } from '@tauri-apps/api/window';
-import { isInitialSetupComplete } from '$lib/stores';
+import { isInitialSetupComplete, theme } from '$lib/stores';
 
 let dataFolder = $state('');
 let globalShortcut = $state('CmdOrControl+X');
@@ -25,7 +25,7 @@ async function _selectFolder() {
 		} else {
 			_error = 'No folder selected or invalid selection';
 		}
-	} catch (err) {
+	} catch (err: any) {
 		console.error('Failed to open folder selector:', err);
 		_error = `Failed to open folder selector: ${err.message}`;
 	}
@@ -36,7 +36,7 @@ function _startCapturingShortcut() {
 	globalShortcut = 'Press your desired shortcut...';
 }
 
-function handleKeyDown(event) {
+function handleKeyDown(event: KeyboardEvent) {
 	if (!isCapturingShortcut) return;
 
 	event.preventDefault();
@@ -58,13 +58,13 @@ function handleKeyDown(event) {
 async function _saveSettings() {
 	// Register the global shortcut
 	try {
-		await registerShortcut(globalShortcut, () => {
-			if (appWindow.isVisible()) {
+		await registerShortcut(globalShortcut, async () => {
+			if (await appWindow.isVisible()) {
 				appWindow.hide();
 			}
 		});
 		console.log(`Global shortcut ${globalShortcut} registered successfully`);
-	} catch (err) {
+	} catch (err: any) {
 		_error = `Failed to register global shortcut: ${err.message}`;
 		console.error('Failed to register global shortcut:', err);
 		return;

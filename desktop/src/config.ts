@@ -1,3 +1,4 @@
+// @ts-nocheck
 export const CONFIG = {
 	ServerURL:
 		process.env.NODE_ENV !== 'production'

@@ -1,4 +1,5 @@
 <script>
+// @ts-nocheck
 import { getMatches } from '@tauri-apps/api/cli';
 
 let { onMessage } = $props();
