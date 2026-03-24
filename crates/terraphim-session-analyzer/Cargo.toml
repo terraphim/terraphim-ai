@@ -44,7 +44,7 @@ anyhow = "1.0"
 thiserror = "1.0"
 
 # Time handling (same as charm projects)
-jiff = { version = "0.1", features = ["serde"] }
+jiff = { version = "0.2", features = ["serde"] }
 
 # Data processing
 regex = "1.12"
