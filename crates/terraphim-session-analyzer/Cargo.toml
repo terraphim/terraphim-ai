@@ -91,5 +91,5 @@ libc = "0.2"
 [dev-dependencies]
 criterion = "0.8"
 insta = "1.46"
-tempfile = "3.8"
+tempfile = "3.27"
 proptest = "1.4"

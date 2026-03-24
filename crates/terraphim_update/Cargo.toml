@@ -31,7 +31,7 @@ base64 = "0.22"
 flate2 = "1.1"
 tar = "0.4"
 zip = "2.2"
-tempfile = "3.0"
+tempfile = "3.27"
 
 [dev-dependencies]
 serial_test = "3.3"

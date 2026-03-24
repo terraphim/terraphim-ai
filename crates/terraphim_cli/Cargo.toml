@@ -46,7 +46,7 @@ default = []
 [dev-dependencies]
 tokio = { workspace = true, features = ["rt-multi-thread", "macros", "test-util"] }
 serial_test = "3.3"
-tempfile = "3.10"
+tempfile = "3.27"
 assert_cmd = "2.1"
 predicates = "3.1"
 
