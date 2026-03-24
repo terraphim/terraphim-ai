@@ -3864,6 +3864,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "indicatif"
+version = "0.18.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "25470f23803092da7d239834776d653104d551bc4d7eacaf31e6837854b8e9eb"
+dependencies = [
+ "console 0.16.2",
+ "portable-atomic",
+ "unicode-width 0.2.2",
+ "unit-prefix",
+ "web-time",
+]
+
+[[package]]
 name = "indoc"
 version = "2.0.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -7677,7 +7690,7 @@ dependencies = [
  "flate2",
  "http 1.4.0",
  "hyper 1.8.1",
- "indicatif",
+ "indicatif 0.17.11",
  "log",
  "quick-xml 0.37.5",
  "regex",
@@ -9145,7 +9158,7 @@ dependencies = [
  "handlebars",
  "home",
  "indexmap 2.13.0",
- "indicatif",
+ "indicatif 0.18.4",
  "insta",
  "jiff 0.1.29",
  "lazy_static",
@@ -11004,6 +11017,12 @@ name = "unicode-xid"
 version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ebc1c04c71510c7f702b52b7c350734c9ff1295c464a03335b00bb84fc54f853"
+
+[[package]]
+name = "unit-prefix"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "81e544489bf3d8ef66c953931f56617f423cd4b5494be343d9b9d3dda037b9a3"
 
 [[package]]
 name = "universal-hash"
