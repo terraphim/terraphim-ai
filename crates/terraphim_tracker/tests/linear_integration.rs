@@ -228,10 +228,9 @@ async fn test_tracker_without_twin_is_skipped() {
     // This test runs without the twin and verifies the skip logic
     if env::var("LINEAR_API_KEY").is_err() {
         println!("LINEAR_API_KEY not set - integration tests will be skipped");
-        // This is expected behavior
-        assert!(true);
+        // Without API key, this test verifies no-panic behavior
     } else {
         println!("LINEAR_API_KEY is set - twin is available");
-        assert!(true);
     }
+    // Test passes if no panic occurs (implicit success)
 }

@@ -61,6 +61,13 @@ impl ProcedureStore {
     }
 
     /// Get the default store path in the user's config directory.
+    ///
+    /// Returns `~/.config/terraphim/learnings/procedures.jsonl` on Unix-like systems,
+    /// or the equivalent config directory on other platforms.
+    ///
+    /// Note: This function is not used internally but is provided as a convenience
+    /// for external callers who want a sensible default path.
+    #[allow(dead_code)]
     pub fn default_path() -> PathBuf {
         dirs::config_dir()
             .unwrap_or_else(|| PathBuf::from("~/.config"))

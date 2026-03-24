@@ -10042,6 +10042,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "terraphim_tracker",
  "thiserror 1.0.69",
  "tokio",
  "tracing",
