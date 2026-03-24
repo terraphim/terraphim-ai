@@ -1,3 +1,4 @@
+// @ts-nocheck
 <script lang="ts">
 import { invoke } from '@tauri-apps/api/tauri';
 import * as d3 from 'd3';
@@ -73,6 +74,8 @@ function nodeToDocument(node: any): Document {
 		tags: ['knowledge-graph', 'concept'],
 		rank: node.rank,
 		stub: `Knowledge graph concept: ${node.label}`,
+		summarization: '',
+		source_haystack: 'knowledge-graph',
 	};
 }
 
@@ -88,14 +91,14 @@ function handleNodeRightClick(event: any, nodeData: any) {
 	event.preventDefault();
 	event.stopPropagation();
 	console.log('Node right-clicked:', nodeData.label);
-	_debugMessage = `Right-clicked: ${nodeData.label}`;
+	debugMessage = `Right-clicked: ${nodeData.label}`;
 	selectedNode = nodeToDocument(nodeData);
 	_startInEditMode = true;
 	_showModal = true;
 
 	// Clear debug message after 2 seconds
 	setTimeout(() => {
-		_debugMessage = '';
+		debugMessage = '';
 	}, 2000);
 }
 

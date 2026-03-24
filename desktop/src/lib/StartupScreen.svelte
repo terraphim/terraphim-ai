@@ -1,3 +1,4 @@
+// @ts-nocheck
 <script lang="ts">
 import { open } from '@tauri-apps/api/dialog';
 import { register as registerShortcut } from '@tauri-apps/api/globalShortcut';

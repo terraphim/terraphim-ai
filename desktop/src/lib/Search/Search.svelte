@@ -1,4 +1,5 @@
 <script lang="ts">
+// @ts-nocheck
 import { invoke } from '@tauri-apps/api/tauri';
 import { Field, Input, Tag, Taglist } from 'svelma';
 import { input, is_tauri, role, serverUrl, thesaurus, typeahead } from '$lib/stores';

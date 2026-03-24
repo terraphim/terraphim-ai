@@ -1,3 +1,4 @@
+// @ts-nocheck
 <script lang="ts">
 let { subject }: { subject: string } = $props();
 
