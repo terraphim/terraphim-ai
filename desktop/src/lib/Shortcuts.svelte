@@ -1,4 +1,4 @@
-<script>
+<script lang="ts">
 import {
 	register as registerShortcut,
 	unregisterAll as unregisterAllShortcuts,
@@ -14,10 +14,10 @@ const _windowMap = {
 };
 
 let { onMessage } = $props();
-const shortcuts = writable([]);
-const shortcut = 'CmdOrControl+X';
+const shortcuts = writable<string[]>([]);
+let shortcut = $state('CmdOrControl+X');
 
-function _register() {
+function register() {
 	const shortcut_ = shortcut;
 	registerShortcut(shortcut_, () => {
 		if (isvisible) {
@@ -37,8 +37,8 @@ function _register() {
 		.catch(onMessage);
 }
 
-function _unregister(shortcut) {
-	const shortcut_ = shortcut;
+function unregister(shortcutToRemove: string) {
+	const shortcut_ = shortcutToRemove;
 	unregisterShortcut(shortcut_)
 		.then(() => {
 			shortcuts.update((shortcuts_) => shortcuts_.filter((s) => s !== shortcut_));
@@ -47,7 +47,7 @@ function _unregister(shortcut) {
 		.catch(onMessage);
 }
 
-function _unregisterAll() {
+function unregisterAll() {
 	unregisterAllShortcuts()
 		.then(() => {
 			shortcuts.update(() => []);

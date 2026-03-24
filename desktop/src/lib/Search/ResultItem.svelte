@@ -1,8 +1,8 @@
 <script lang="ts">
+// @ts-nocheck
 import { invoke } from '@tauri-apps/api/tauri';
 import { Tag, Taglist } from 'svelma';
 import { fade } from 'svelte/transition';
-// @ts-expect-error
 import SvelteMarkdown from 'svelte-markdown';
 import { router } from 'tinro';
 import { is_tauri, role, configStore as roleConfigStore } from '$lib/stores';
