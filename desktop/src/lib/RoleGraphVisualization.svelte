@@ -56,7 +56,7 @@ async function fetchGraph() {
 			nodes = data.nodes;
 			edges = data.edges;
 		}
-	} catch (e) {
+	} catch (e: any) {
 		error = e.message;
 		console.error('Error fetching rolegraph:', e);
 	} finally {
@@ -148,7 +148,7 @@ function renderGraph() {
 			g.attr('transform', event.transform);
 		});
 
-	svg.call(zoom);
+	svg.call(zoom as any);
 
 	const g = svg.append('g');
 
@@ -226,7 +226,7 @@ function renderGraph() {
 					return Math.max(6, Math.min(20, rank * 2));
 				});
 		})
-		.call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended));
+		.call(d3.drag().on('start', dragstarted).on('drag', dragged).on('end', dragended) as any);
 
 	// Node labels
 	const label = g
@@ -358,8 +358,6 @@ $effect(() => {
       bind:active={_showModal}
       item={selectedNode}
       initialEdit={_startInEditMode}
-      on:close={handleModalClose}
-      on:save={handleModalSave}
     />
   {/key}
 {/if}
