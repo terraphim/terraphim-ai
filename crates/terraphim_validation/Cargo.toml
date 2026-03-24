@@ -35,7 +35,7 @@ env_logger = "0.11"
 
 # HTTP and networking
 axum = "0.7"
-tower = "0.4"
+tower = "0.5"
 tower-http = { version = "0.5", features = ["cors", "trace"] }
 
 # Security and validation
