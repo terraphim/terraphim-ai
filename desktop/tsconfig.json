@@ -14,5 +14,6 @@
 		}
 	},
 	"include": ["src/**/*.d.ts", "src/**/*.ts", "src/**/*.js", "src/**/*.svelte"],
+	"exclude": ["**/*.test.ts", "**/*.spec.ts", "**/__tests__/**", "**/__test-utils__/**", "**/test-utils/**", "**/workers/**", "src/svelte-shim.js"],
 	"references": [{ "path": "./tsconfig.node.json" }]
 }

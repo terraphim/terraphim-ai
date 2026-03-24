@@ -147,7 +147,7 @@ export const SlashCommand = Extension.create<SlashCommandOptions>({
 			},
 		};
 
-		return [Suggestion(suggestion)];
+		return [Suggestion(suggestion as SuggestionOptions)];
 	},
 });
 

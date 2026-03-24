@@ -170,7 +170,7 @@ export const TerraphimSuggestion = Extension.create<TerraphimSuggestionOptions>(
 			},
 		};
 
-		return [Suggestion(suggestion)];
+		return [Suggestion(suggestion as SuggestionOptions)];
 	},
 });
 
