@@ -9,7 +9,7 @@ use terraphim_symphony::runner::protocol::{FindingCategory, ReviewAgentOutput, R
 
 use crate::config::CompoundReviewConfig;
 use crate::error::OrchestratorError;
-use crate::scope::{ScopeRegistry, WorktreeManager};
+use crate::scope::WorktreeManager;
 
 // Embed prompt templates at compile time to avoid CWD-dependent file loading.
 // The ADF binary may run from /opt/ai-dark-factory/ but templates live in the
@@ -83,6 +83,20 @@ impl SwarmConfig {
             create_prs: config.create_prs,
         }
     }
+
+    /// Create a SwarmConfig from CompoundReviewConfig with no review groups.
+    /// Useful for testing orchestrator lifecycle without spawning agents.
+    pub fn from_compound_config_empty(config: &CompoundReviewConfig) -> Self {
+        Self {
+            groups: vec![],
+            timeout: Duration::from_secs(300),
+            worktree_root: config.worktree_root.clone(),
+            repo_path: config.repo_path.clone(),
+            base_branch: config.base_branch.clone(),
+            max_concurrent_agents: config.max_concurrent_agents,
+            create_prs: config.create_prs,
+        }
+    }
 }
 
 /// Result of a compound review cycle.
@@ -111,18 +125,15 @@ pub struct CompoundReviewResult {
 #[derive(Debug)]
 pub struct CompoundReviewWorkflow {
     config: SwarmConfig,
-    #[allow(dead_code)]
-    scope_registry: ScopeRegistry,
     worktree_manager: WorktreeManager,
 }
 
 impl CompoundReviewWorkflow {
     /// Create a new compound review workflow from swarm config.
     pub fn new(config: SwarmConfig) -> Self {
-        let worktree_manager = WorktreeManager::new(&config.repo_path);
+        let worktree_manager = WorktreeManager::with_base(&config.repo_path, &config.worktree_root);
         Self {
             config,
-            scope_registry: ScopeRegistry::new(false), // non-exclusive for compound review
             worktree_manager,
         }
     }
@@ -181,12 +192,13 @@ impl CompoundReviewWorkflow {
         let worktree_path = self
             .worktree_manager
             .create_worktree(&worktree_name, git_ref)
+            .await
             .map_err(|e| {
                 OrchestratorError::CompoundReviewFailed(format!("failed to create worktree: {}", e))
             })?;
 
         // Channel for collecting agent outputs
-        let (tx, mut rx) = mpsc::channel::<AgentResult>(active_groups.len());
+        let (tx, mut rx) = mpsc::channel::<AgentResult>(active_groups.len().max(1));
 
         // Spawn agents in parallel
         let mut spawned_count = 0;
@@ -213,43 +225,41 @@ impl CompoundReviewWorkflow {
             spawned_count += 1;
         }
 
-        // Collect results with timeout buffer
+        // Collect results with deadline-based timeout
         drop(tx);
         let mut agent_outputs = Vec::new();
         let mut failed_count = 0;
-        let collect_deadline = Instant::now() + self.config.timeout + Duration::from_secs(10);
+        let collect_deadline =
+            tokio::time::Instant::now() + self.config.timeout + Duration::from_secs(10);
 
-        while let Some(result) = tokio::time::timeout(Duration::from_secs(1), rx.recv())
-            .await
-            .ok()
-            .flatten()
-        {
-            match result {
-                AgentResult::Success(output) => {
-                    info!(agent = %output.agent, findings = output.findings.len(), "agent completed");
-                    agent_outputs.push(output);
+        loop {
+            match tokio::time::timeout_at(collect_deadline, rx.recv()).await {
+                Ok(Some(result)) => match result {
+                    AgentResult::Success(output) => {
+                        info!(agent = %output.agent, findings = output.findings.len(), "agent completed");
+                        agent_outputs.push(output);
+                    }
+                    AgentResult::Failed { agent_name, reason } => {
+                        warn!(agent = %agent_name, error = %reason, "agent failed");
+                        failed_count += 1;
+                        agent_outputs.push(ReviewAgentOutput {
+                            agent: agent_name,
+                            findings: vec![],
+                            summary: format!("Agent failed: {}", reason),
+                            pass: false,
+                        });
+                    }
+                },
+                Ok(None) => break, // channel closed, all senders dropped
+                Err(_) => {
+                    warn!("collection deadline exceeded, using partial results");
+                    break;
                 }
-                AgentResult::Failed { agent_name, reason } => {
-                    warn!(agent = %agent_name, error = %reason, "agent failed");
-                    failed_count += 1;
-                    // Create a failed output placeholder
-                    agent_outputs.push(ReviewAgentOutput {
-                        agent: agent_name,
-                        findings: vec![],
-                        summary: format!("Agent failed: {}", reason),
-                        pass: false,
-                    });
-                }
-            }
-
-            if Instant::now() > collect_deadline {
-                warn!("collection deadline exceeded, using partial results");
-                break;
             }
         }
 
         // Cleanup worktree
-        if let Err(e) = self.worktree_manager.remove_worktree(&worktree_name) {
+        if let Err(e) = self.worktree_manager.remove_worktree(&worktree_name).await {
             warn!(error = %e, "failed to cleanup worktree");
         }
 
@@ -319,6 +329,7 @@ impl CompoundReviewWorkflow {
                 base_ref,
                 git_ref,
             ])
+            .env_remove("GIT_INDEX_FILE")
             .output()
             .await
             .map_err(|e| {
@@ -458,12 +469,12 @@ fn extract_review_output(
         return output;
     }
 
-    // Graceful fallback: empty output with pass true
+    // No parseable output means agent did not produce a valid review
     ReviewAgentOutput {
         agent: agent_name.to_string(),
         findings: vec![],
         summary: "No structured output found in agent response".to_string(),
-        pass: true,
+        pass: false,
     }
 }
 
@@ -684,7 +695,7 @@ More logs..."#;
         let no_json = "Just some plain text output without JSON";
         let output = extract_review_output(no_json, "test-agent", FindingCategory::Quality);
         assert_eq!(output.agent, "test-agent");
-        assert!(output.pass); // Graceful fallback
+        assert!(!output.pass); // Unparseable output treated as failure
         assert_eq!(output.findings.len(), 0);
     }
 
@@ -771,11 +782,10 @@ Done!"#;
 
     #[tokio::test]
     async fn test_compound_review_dry_run() {
-        // Use the current repo as the test repo
         let swarm_config = SwarmConfig {
             groups: default_groups(),
             timeout: Duration::from_secs(60),
-            worktree_root: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+            worktree_root: std::env::temp_dir().join("test-compound-review-worktrees"),
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
@@ -791,7 +801,7 @@ Done!"#;
         let swarm_config = SwarmConfig {
             groups: default_groups(),
             timeout: Duration::from_secs(60),
-            worktree_root: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
+            worktree_root: std::env::temp_dir().join("test-compound-review-worktrees"),
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,

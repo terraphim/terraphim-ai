@@ -1,9 +1,20 @@
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::Instant;
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+/// Check if `prefix` is a proper path prefix of `path`.
+/// Ensures "src/" matches "src/main.rs" but not "src-backup/".
+fn is_path_prefix(prefix: &str, path: &str) -> bool {
+    if prefix.is_empty() {
+        return false;
+    }
+    path.starts_with(prefix)
+        && (prefix.ends_with('/')
+            || path.len() == prefix.len()
+            || path.as_bytes().get(prefix.len()) == Some(&b'/'))
+}
 
 /// A single scope reservation tracking which agent owns which file patterns.
 #[derive(Debug, Clone)]
@@ -46,9 +57,11 @@ impl ScopeReservation {
                 if self_pattern == other_pattern {
                     return true;
                 }
-                // Prefix overlap: "src/" overlaps with "src/main.rs"
-                if other_pattern.starts_with(self_pattern.trim_end_matches('*'))
-                    || self_pattern.starts_with(other_pattern.trim_end_matches('*'))
+                // Prefix overlap: "src/" overlaps with "src/main.rs" but not "src-backup/"
+                let self_prefix = self_pattern.trim_end_matches('*');
+                let other_prefix = other_pattern.trim_end_matches('*');
+                if is_path_prefix(self_prefix, other_pattern)
+                    || is_path_prefix(other_prefix, self_pattern)
                 {
                     return true;
                 }
@@ -210,6 +223,16 @@ impl WorktreeManager {
         }
     }
 
+    /// Create a worktree manager with a custom base directory.
+    ///
+    /// Worktrees will be created under `<worktree_base>/<name>`.
+    pub fn with_base(repo_path: impl AsRef<Path>, worktree_base: impl AsRef<Path>) -> Self {
+        Self {
+            repo_path: repo_path.as_ref().to_path_buf(),
+            worktree_base: worktree_base.as_ref().to_path_buf(),
+        }
+    }
+
     /// Get the base path where worktrees are created.
     pub fn worktree_base(&self) -> &Path {
         &self.worktree_base
@@ -226,12 +249,16 @@ impl WorktreeManager {
     /// * `git_ref` - Git reference (branch, tag, commit) to check out
     ///
     /// Returns the path to the created worktree.
-    pub fn create_worktree(&self, name: &str, git_ref: &str) -> Result<PathBuf, std::io::Error> {
+    pub async fn create_worktree(
+        &self,
+        name: &str,
+        git_ref: &str,
+    ) -> Result<PathBuf, std::io::Error> {
         let worktree_path = self.worktree_base.join(name);
 
         // Create parent directory if needed
         if let Some(parent) = worktree_path.parent() {
-            std::fs::create_dir_all(parent)?;
+            tokio::fs::create_dir_all(parent).await?;
         }
 
         info!(
@@ -241,14 +268,16 @@ impl WorktreeManager {
             "creating git worktree"
         );
 
-        let output = Command::new("git")
+        let output = tokio::process::Command::new("git")
             .arg("-C")
             .arg(&self.repo_path)
             .arg("worktree")
             .arg("add")
             .arg(&worktree_path)
             .arg(git_ref)
-            .output()?;
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .await?;
 
         if !output.status.success() {
             let stderr = String::from_utf8_lossy(&output.stderr);
@@ -266,7 +295,7 @@ impl WorktreeManager {
     /// Remove a worktree.
     ///
     /// * `name` - Name of the worktree to remove
-    pub fn remove_worktree(&self, name: &str) -> Result<(), std::io::Error> {
+    pub async fn remove_worktree(&self, name: &str) -> Result<(), std::io::Error> {
         let worktree_path = self.worktree_base.join(name);
 
         if !worktree_path.exists() {
@@ -276,24 +305,28 @@ impl WorktreeManager {
 
         info!(name = %name, "removing git worktree");
 
-        let output = Command::new("git")
+        let output = tokio::process::Command::new("git")
             .arg("-C")
             .arg(&self.repo_path)
             .arg("worktree")
             .arg("remove")
             .arg(&worktree_path)
-            .output()?;
+            .env_remove("GIT_INDEX_FILE")
+            .output()
+            .await?;
 
         if !output.status.success() {
             // Try force removal if normal removal fails
-            let output = Command::new("git")
+            let output = tokio::process::Command::new("git")
                 .arg("-C")
                 .arg(&self.repo_path)
                 .arg("worktree")
                 .arg("remove")
                 .arg("--force")
                 .arg(&worktree_path)
-                .output()?;
+                .env_remove("GIT_INDEX_FILE")
+                .output()
+                .await?;
 
             if !output.status.success() {
                 let stderr = String::from_utf8_lossy(&output.stderr);
@@ -307,7 +340,7 @@ impl WorktreeManager {
 
         // Clean up empty parent directories
         if let Some(parent) = worktree_path.parent() {
-            let _ = std::fs::remove_dir(parent);
+            let _ = tokio::fs::remove_dir(parent).await;
         }
 
         info!(name = %name, "worktree removed");
@@ -317,12 +350,12 @@ impl WorktreeManager {
     /// Remove all worktrees managed by this manager.
     ///
     /// Returns the number of worktrees removed.
-    pub fn cleanup_all(&self) -> Result<usize, std::io::Error> {
+    pub async fn cleanup_all(&self) -> Result<usize, std::io::Error> {
         let worktrees = self.list_worktrees()?;
         let mut count = 0;
 
         for name in &worktrees {
-            if let Err(e) = self.remove_worktree(name) {
+            if let Err(e) = self.remove_worktree(name).await {
                 error!(name = %name, error = %e, "failed to remove worktree during cleanup");
             } else {
                 count += 1;
@@ -370,6 +403,7 @@ impl WorktreeManager {
 mod tests {
     use super::*;
     use std::collections::HashSet;
+    use std::process::Command;
     use tempfile::TempDir;
 
     // ==================== ScopeRegistry Tests ====================
@@ -565,6 +599,11 @@ mod tests {
     // ==================== WorktreeManager Tests ====================
 
     fn setup_git_repo() -> (TempDir, PathBuf) {
+        // Clear GIT_INDEX_FILE so git commands use their own index.
+        // During pre-commit hooks, git sets this to a lock file which
+        // causes git operations in test temp repos to fail.
+        std::env::remove_var("GIT_INDEX_FILE");
+
         let temp_dir = TempDir::new().expect("failed to create temp dir");
         let repo_path = temp_dir.path().to_path_buf();
 
@@ -618,12 +657,12 @@ mod tests {
         (temp_dir, repo_path)
     }
 
-    #[test]
-    fn test_create_worktree() {
+    #[tokio::test]
+    async fn test_create_worktree() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        let worktree_path = manager.create_worktree("feature-branch", "HEAD");
+        let worktree_path = manager.create_worktree("feature-branch", "HEAD").await;
         assert!(
             worktree_path.is_ok(),
             "create_worktree failed: {:?}",
@@ -636,55 +675,55 @@ mod tests {
         assert!(path.join("README.md").exists());
     }
 
-    #[test]
-    fn test_remove_worktree() {
+    #[tokio::test]
+    async fn test_remove_worktree() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
         // Create worktree
-        manager.create_worktree("to-remove", "HEAD").unwrap();
+        manager.create_worktree("to-remove", "HEAD").await.unwrap();
         let path = manager.worktree_base().join("to-remove");
         assert!(path.exists());
 
         // Remove worktree
-        let result = manager.remove_worktree("to-remove");
+        let result = manager.remove_worktree("to-remove").await;
         assert!(result.is_ok(), "remove_worktree failed: {:?}", result.err());
         assert!(!path.exists());
     }
 
-    #[test]
-    fn test_remove_nonexistent_worktree() {
+    #[tokio::test]
+    async fn test_remove_nonexistent_worktree() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
         // Should succeed (no-op) for non-existent worktree
-        let result = manager.remove_worktree("nonexistent");
+        let result = manager.remove_worktree("nonexistent").await;
         assert!(result.is_ok());
     }
 
-    #[test]
-    fn test_cleanup_all() {
+    #[tokio::test]
+    async fn test_cleanup_all() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
         // Create multiple worktrees
-        manager.create_worktree("wt1", "HEAD").unwrap();
-        manager.create_worktree("wt2", "HEAD").unwrap();
-        manager.create_worktree("wt3", "HEAD").unwrap();
+        manager.create_worktree("wt1", "HEAD").await.unwrap();
+        manager.create_worktree("wt2", "HEAD").await.unwrap();
+        manager.create_worktree("wt3", "HEAD").await.unwrap();
 
         let worktrees = manager.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 3);
 
         // Cleanup all
-        let cleaned = manager.cleanup_all().unwrap();
+        let cleaned = manager.cleanup_all().await.unwrap();
         assert_eq!(cleaned, 3);
 
         let worktrees = manager.list_worktrees().unwrap();
         assert!(worktrees.is_empty());
     }
 
-    #[test]
-    fn test_list_worktrees() {
+    #[tokio::test]
+    async fn test_list_worktrees() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
@@ -693,8 +732,8 @@ mod tests {
         assert!(worktrees.is_empty());
 
         // Create worktrees
-        manager.create_worktree("wt-a", "HEAD").unwrap();
-        manager.create_worktree("wt-b", "HEAD").unwrap();
+        manager.create_worktree("wt-a", "HEAD").await.unwrap();
+        manager.create_worktree("wt-b", "HEAD").await.unwrap();
 
         let worktrees = manager.list_worktrees().unwrap();
         assert_eq!(worktrees.len(), 2);
@@ -702,17 +741,17 @@ mod tests {
         assert!(worktrees.contains(&"wt-b".to_string()));
     }
 
-    #[test]
-    fn test_worktree_exists() {
+    #[tokio::test]
+    async fn test_worktree_exists() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
         assert!(!manager.worktree_exists("test-wt"));
 
-        manager.create_worktree("test-wt", "HEAD").unwrap();
+        manager.create_worktree("test-wt", "HEAD").await.unwrap();
         assert!(manager.worktree_exists("test-wt"));
 
-        manager.remove_worktree("test-wt").unwrap();
+        manager.remove_worktree("test-wt").await.unwrap();
         assert!(!manager.worktree_exists("test-wt"));
     }
 
@@ -725,15 +764,15 @@ mod tests {
         assert_eq!(manager.worktree_base(), repo_path.join(".worktrees"));
     }
 
-    #[test]
-    fn test_create_duplicate_worktree_fails() {
+    #[tokio::test]
+    async fn test_create_duplicate_worktree_fails() {
         let (_temp_dir, repo_path) = setup_git_repo();
         let manager = WorktreeManager::new(&repo_path);
 
-        manager.create_worktree("duplicate", "HEAD").unwrap();
+        manager.create_worktree("duplicate", "HEAD").await.unwrap();
 
         // Creating duplicate should fail
-        let result = manager.create_worktree("duplicate", "HEAD");
+        let result = manager.create_worktree("duplicate", "HEAD").await;
         assert!(result.is_err());
     }
 }

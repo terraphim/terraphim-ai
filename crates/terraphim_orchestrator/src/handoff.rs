@@ -157,7 +157,12 @@ impl HandoffBuffer {
     /// Computes expiry from ctx.ttl_secs or falls back to default_ttl.
     pub fn insert(&mut self, context: HandoffContext) -> Uuid {
         let ttl_secs = context.ttl_secs.unwrap_or(self.default_ttl_secs);
-        let expiry = Utc::now() + chrono::Duration::seconds(ttl_secs as i64);
+        // Cap at ~100 years to avoid chrono::Duration overflow
+        const MAX_TTL_SECS: i64 = 100 * 365 * 24 * 3600;
+        let ttl_i64 = i64::try_from(ttl_secs)
+            .unwrap_or(MAX_TTL_SECS)
+            .min(MAX_TTL_SECS);
+        let expiry = Utc::now() + chrono::Duration::seconds(ttl_i64);
         let id = context.handoff_id;
 
         self.entries.insert(id, BufferEntry { context, expiry });
@@ -877,5 +882,19 @@ mod tests {
             new_size > size,
             "Ledger size should increase after second append"
         );
+    }
+
+    #[test]
+    fn test_ttl_overflow_saturates() {
+        let mut buffer = HandoffBuffer::new(3600);
+        let mut ctx = HandoffContext::new("agent-a", "agent-b", "overflow test");
+        ctx.ttl_secs = Some(u64::MAX); // would overflow i64 if cast with `as`
+
+        // Should not panic -- saturates to i64::MAX
+        let id = buffer.insert(ctx);
+
+        // Entry should be retrievable (expiry is far in the future)
+        let retrieved = buffer.get(&id);
+        assert!(retrieved.is_some());
     }
 }
