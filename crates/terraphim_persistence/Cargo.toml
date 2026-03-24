@@ -38,7 +38,7 @@ tracing = "0.1"
 
 
 [dev-dependencies]
-tempfile = "3.23.0"
+tempfile = "3.27.0"
 terraphim_config = { path = "../terraphim_config" }
 terraphim_multi_agent = { path = "../terraphim_multi_agent" }
 temp-env = "0.3.6"
