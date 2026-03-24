@@ -40,6 +40,11 @@
 
 - [Connectivity Check](./graph-connectivity.md)
 
+## Search Architecture
+
+- [Search Architecture](./search-architecture.md)
+- [Terraphim vs OpenClaw Comparison](./search-architecture-comparison-openclaw.md)
+
 ## Scoring Algorithms
 
 - [Title Scorer](./scorers/Title-Scorer.md)
