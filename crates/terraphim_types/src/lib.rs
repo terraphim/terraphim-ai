@@ -105,8 +105,8 @@ pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSk
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashSet;
 use std::collections::hash_map::Iter;
+use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
@@ -392,6 +392,10 @@ pub struct MarkdownDirectives {
     pub route: Option<RouteDirective>,
     #[serde(default)]
     pub priority: Option<u8>,
+    #[serde(default)]
+    pub trigger: Option<String>,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 /// The central document type representing indexed and searchable content.
