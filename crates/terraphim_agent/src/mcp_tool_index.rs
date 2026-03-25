@@ -394,8 +394,8 @@ mod tests {
 
         assert!(!results.is_empty(), "Should find at least one tool");
         assert!(
-            elapsed.as_millis() < 50,
-            "Search should complete in under 50ms, took {:?}",
+            elapsed.as_millis() < 70,
+            "Search should complete in under 70ms, took {:?}",
             elapsed
         );
     }

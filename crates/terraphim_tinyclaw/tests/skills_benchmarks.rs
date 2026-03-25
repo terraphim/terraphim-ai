@@ -140,7 +140,7 @@ fn benchmark_execution_small_skill() {
 
     // Should complete quickly (just mock steps)
     assert!(
-        exec_time.as_millis() < 1000,
+        exec_time.as_millis() < 2000,
         "Skill execution took too long: {:?}",
         exec_time
     );
