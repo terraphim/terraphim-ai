@@ -58,28 +58,33 @@ fi
 
 cd "$DESKTOP_DIR"
 
-echo -e "${BLUE}📦 Installing system dependencies for Node.js modules...${NC}"
-# Install system dependencies (same as CI)
-sudo apt-get update -qq
-sudo apt-get install -yqq --no-install-recommends \
-    python3 \
-    make \
-    g++ \
-    libcairo2-dev \
-    libpango1.0-dev \
-    libjpeg-dev \
-    libgif-dev \
-    librsvg2-dev \
-    libnss3-dev \
-    libatk-bridge2.0-dev \
-    libdrm2 \
-    libxkbcommon-dev \
-    libxcomposite-dev \
-    libxdamage-dev \
-    libxrandr-dev \
-    libgbm-dev \
-    libxss-dev \
-    libasound2-dev
+# Install system dependencies (skip if SKIP_SYSTEM_DEPS is set)
+if [[ "${SKIP_SYSTEM_DEPS:-}" != "true" ]]; then
+    echo -e "${BLUE}📦 Installing system dependencies for Node.js modules...${NC}"
+    # Install system dependencies (same as CI)
+    sudo apt-get update -qq
+    sudo apt-get install -yqq --no-install-recommends \
+        python3 \
+        make \
+        g++ \
+        libcairo2-dev \
+        libpango1.0-dev \
+        libjpeg-dev \
+        libgif-dev \
+        librsvg2-dev \
+        libnss3-dev \
+        libatk-bridge2.0-dev \
+        libdrm2 \
+        libxkbcommon-dev \
+        libxcomposite-dev \
+        libxdamage-dev \
+        libxrandr-dev \
+        libgbm-dev \
+        libxss-dev \
+        libasound2-dev
+else
+    echo -e "${BLUE}📦 Skipping system dependencies (SKIP_SYSTEM_DEPS=true)${NC}"
+fi
 
 # Set environment variables (same as CI) - Increased memory for CI
 export NODE_OPTIONS="--max-old-space-size=8192"
