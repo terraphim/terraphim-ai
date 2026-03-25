@@ -1,184 +1,242 @@
-# Research Document: Fix Code Review Findings (Issue #708)
+# Research Document: Issue #708 -- Code Review Findings for Wave 4
 
-**Status**: Draft
-**Author**: AI Research Agent
 **Date**: 2026-03-24
-**Issue**: https://github.com/terraphim/terraphim-ai/issues/708
-**Branch**: task/58-handoff-context-fields
+**Branch**: pr-705-merge (post-merge of PR #706)
+**Issue**: https://git.terraphim.cloud/terraphim/terraphim-ai/issues/708
 
-## Executive Summary
+---
 
-Issue #708 catalogues 24 findings from a code review of the `task/58-handoff-context-fields` branch (21 commits, ~8700 lines, 57 files). After examining each finding against the current codebase, **2 tests are actively failing** (C-1), and 3 other critical issues plus 11 important issues remain unfixed. All findings are still present in the code.
+## 1. Problem Statement
 
-## Essential Questions Check
+PR #706 ("feat(adf): Wave 4 -- handoff persistence, budget gates, compound review swarm, self-learning") landed ~8700 lines across 57 files. Issue #708 tracks 12 Important findings, 4 Critical findings, and 8 Suggestions from code review. This research maps each finding to its current state on the merged code.
 
-| Question | Answer | Evidence |
-|----------|--------|----------|
-| Energizing? | Yes | Failing tests block merge; security issue (C-2) is a real risk |
-| Leverages strengths? | Yes | Standard Rust fix work within the orchestrator crate we maintain |
-| Meets real need? | Yes | Branch cannot merge until critical findings are resolved |
+### Success Criteria
 
-**Proceed**: Yes (3/3)
+- All Critical and Important findings resolved or triaged
+- All tests pass (`cargo test --workspace`)
+- No `#[allow(dead_code)]` without justification in orchestrator crates
+- No blocking I/O in async contexts
+- No path traversal vectors
 
-## Current State Analysis
+---
 
-### Failing Tests (C-1) - CONFIRMED FAILING
+## 2. Pre-existing Build/Test Failures (Blockers)
 
-Two tests assert `agents_run == 0` but `default_groups()` spawns 5 non-visual agents:
+### B-1: terraphim_tinyclaw does not compile (BLOCKER)
 
-- `lib.rs:976` - `test_orchestrator_compound_review_manual` asserts `agents_run == 0` but gets `5`
-- `orchestrator_tests.rs:146` - `test_orchestrator_compound_review_integration` asserts `agents_run == 0` but gets `5`
+- **Location**: `crates/terraphim_tinyclaw/src/channels/telegram.rs:49,57,76`
+- **Cause**: PR #672 bumped `teloxide` from 0.13.0 to 0.17.0, which changed `FileId` from a `String` newtype to an opaque struct. Three call sites pass `&voice.file.id` (type `&FileId`) where `&str` is expected.
+- **Impact**: `cargo test --workspace` cannot complete. Must be fixed or the crate excluded before any #708 work can be validated.
+- **Fix**: Change the function signature to accept `&FileId` and call `.as_str()` or equivalent, or convert at each call site.
 
-**Root cause**: `SwarmConfig::from_compound_config()` always calls `default_groups()` which creates 6 groups (5 non-visual + 1 visual-only). When compound review runs with no visual changes, 5 agents get spawned (they fail immediately since `opencode`/`claude` CLIs aren't available in test, but `spawned_count` still increments).
+### B-2: Hardcoded binary name "cla" in session-analyzer test (CONFIRMED FAILING)
 
-**Fix**: Use `SwarmConfig { groups: vec![], .. }` in test configs, or fix assertions to match actual behavior.
+- **Location**: `crates/terraphim-session-analyzer/tests/filename_target_filtering_tests.rs:562`
+- **Problem**: Line 562 uses `"cla"` as the binary name but the actual binary is `"tsa"`.
+- **Evidence**: Test output shows `error: no bin target named 'cla'` with `help: a target with a similar name exists: 'tsa'`
+- **Fix**: Change `"cla"` to `"tsa"` on line 562.
+- **Current test result**: 19 passed, 1 failed (only this test fails in the crate).
 
-### Path Traversal (C-2) - CONFIRMED PRESENT
+---
 
-`lib.rs:322`: `to_agent` is used directly in file path construction:
-```rust
-let handoff_path = self.config.working_dir.join(format!(".handoff-{}.json", to_agent));
+## 3. Finding-by-Finding Assessment
+
+### ALREADY FIXED on main (no action needed)
+
+| ID | Finding | Evidence |
+|----|---------|----------|
+| C-1 | Tests assert wrong `agents_run` count | `lib.rs:1033` and `orchestrator_tests.rs:138` both use `groups: vec![]` and correctly assert `agents_run == 0`. Tests pass. |
+| C-2 | Path traversal via unsanitized agent name | `validate_agent_name()` at `lib.rs:130-141` rejects `/`, `\`, `..`, spaces, and special chars. Called at `lib.rs:317-318`. Full test suite at lines 1444-1472. |
+| C-3 | Blocking `std::process::Command` in async context (scope.rs) | `scope.rs:271` uses `tokio::process::Command` for `create_worktree`. `scope.rs:298` uses `async fn remove_worktree` with `tokio::fs`. Both are non-blocking. |
+| C-4 | Agent failure silently treated as pass | `compound.rs:473-478` fallback sets `pass: false`. |
+| I-1 | Result collection loop exits on 1s gap | `compound.rs:236` uses `tokio::time::timeout_at(collect_deadline, rx.recv())` with a deadline-based pattern. |
+| I-6 | `u64` TTL cast to `i64` overflow | `handoff.rs:160-164` uses `i64::try_from(ttl_secs).unwrap_or(MAX_TTL_SECS).min(MAX_TTL_SECS)` with a 100-year cap. |
+| I-7 | `from_agent`/`to_agent` parameter mismatch with context fields | `lib.rs:320-330` validates `context.from_agent == from_agent && context.to_agent == to_agent`. |
+| I-8 | `ScopeReservation::overlaps` false positives | `scope.rs:9-17` implements `is_path_prefix()` with path-separator-aware logic. The `overlaps` method at line 61-64 trims glob stars before calling it. |
+| I-10 | `expect` in `Default` impl | `persona.rs:195` -- reviewed and deemed justified (compile-time embedded template). No change needed. |
+
+### STILL PRESENT -- Needs Fixing
+
+#### I-2: CostTracker mixed atomics (Minor)
+
+- **File**: `crates/terraphim_orchestrator/src/cost_tracker.rs:50-99`
+- **State**: `spend_sub_cents` is `AtomicU64` while `reset_month` (`u8`) and `reset_year` (`i32`) are plain fields. `reset_if_due()` at line 90 mutates plain fields AND atomics.
+- **Severity**: Minor. The `CostTracker` struct requires `&mut self` for `reset_if_due()`, so there is no actual data race. But the atomic is misleading if the struct is never shared.
+- **Recommendation**: Simplify `AtomicU64` to `u64` since all methods that read it also hold `&self`/`&mut self` through the parent `BudgetGate`. Or add a comment justifying the design.
+
+#### I-3: `ProcedureStore::new` accessibility (Minor -- DIFFERENT CRATE)
+
+- **File**: `crates/terraphim_agent/src/learnings/procedure.rs:54-61`
+- **State**: `ProcedureStore::new()` is `pub` and NOT gated by `#[cfg(test)]`. The issue description may have referenced an older version.
+- **Current status**: FIXED -- `new()` is public and available in production.
+
+#### I-4: Blocking `std::fs` in ProcedureStore (Minor -- DIFFERENT CRATE)
+
+- **File**: `crates/terraphim_agent/src/learnings/procedure.rs:87-103`
+- **State**: `save()`, `load_all()`, etc. are synchronous (`fn`, not `async fn`). They use `std::fs` which is appropriate for synchronous functions.
+- **Current status**: NOT AN ISSUE -- functions are correctly synchronous. No `async fn` wrapping blocking I/O.
+
+#### I-5: `#[allow(dead_code)]` without justification
+
+- **File**: `crates/terraphim_agent/src/learnings/procedure.rs:70`
+- **State**: `ProcedureStore::default_path()` has `#[allow(dead_code)]` with a doc comment explaining it's for "external callers who want a sensible default path."
+- **Severity**: Minor. The justification is in the doc comment, not an inline annotation. The function is public so it could be used by downstream crates.
+- **Note**: There are 60+ `#[allow(dead_code)]` annotations across `terraphim_agent` -- this is a broader pattern, not specific to Wave 4.
+- **Recommendation**: For the orchestrator crate specifically, there are ZERO `#[allow(dead_code)]` annotations -- this is clean. The `terraphim_agent` crate has a different (larger) technical debt.
+
+#### I-9: `substitute_env` misleading comment (Minor)
+
+- **File**: `crates/terraphim_orchestrator/src/config.rs:360-377`
+- **State**: Doc at line 360 correctly says "Bare $VAR syntax is not implemented." However, lines 375-377 contain a misleading dead comment: `// Handle $VAR syntax (simplistic)` followed by just `result` -- implying it does something when it does not.
+- **Severity**: Minor. The function doc is accurate; only the internal comment is misleading.
+- **Fix**: Remove lines 375-377 or replace with `// $VAR syntax intentionally not implemented`.
+
+#### I-11: `which` command not portable
+
+- **File**: `crates/terraphim_spawner/src/config.rs:206`
+- **State**: Uses `tokio::process::Command::new("which")` to check command existence.
+- **Severity**: Minor. `which` is available on Linux and macOS. Not portable to Windows but the project targets Unix.
+- **Fix**: Use the `which` crate for cross-platform support, or accept the Unix-only constraint.
+
+#### I-12: Sleep-based test timing
+
+- **File**: `crates/terraphim_spawner/src/lib.rs:618`
+- **State**: `tokio::time::sleep(Duration::from_millis(100))` in `test_try_wait_completed`. A short sleep waiting for `echo` to exit.
+- **Severity**: Minor. 100ms is short and unlikely to flake, but a polling loop with `tokio::time::timeout` would be more robust.
+
+#### S-3: `index_path()` returns `&PathBuf` not `&Path`
+
+- **File**: `crates/terraphim_agent/src/mcp_tool_index.rs:244`
+- **State**: `pub fn index_path(&self) -> &PathBuf` -- should return `&Path` per Rust API guidelines.
+- **Severity**: Suggestion.
+
+#### S-4: `CostSnapshot.verdict` uses `Debug` format
+
+- **File**: `crates/terraphim_orchestrator/src/cost_tracker.rs:190`
+- **State**: `verdict: format!("{:?}", verdict)` produces debug output like `WithinBudget` instead of human-readable strings.
+- **Severity**: Suggestion.
+
+#### S-7: `PersonaRegistry::persona_names` allocates Vec
+
+- **File**: `crates/terraphim_orchestrator/src/persona.rs:93-98`
+- **State**: Returns `Vec<&str>` by collecting from iterator. Could return an iterator instead.
+- **Severity**: Suggestion. Low-frequency call, no performance impact.
+
+#### S-8: `McpToolIndex::search` clones thesaurus N times
+
+- **File**: `crates/terraphim_agent/src/mcp_tool_index.rs:149`
+- **State**: `find_matches(&search_text, thesaurus.clone(), false)` clones on each iteration.
+- **Severity**: Suggestion. `thesaurus` is `Arc<Thesaurus>` so clone is cheap (reference count bump).
+
+---
+
+## 4. Summary Table
+
+| ID | Severity | Status | File | Action |
+|----|----------|--------|------|--------|
+| B-1 | BLOCKER | Present | `terraphim_tinyclaw/src/channels/telegram.rs` | Fix FileId type mismatch |
+| B-2 | BLOCKER | Present | `terraphim-session-analyzer/tests/filename_target_filtering_tests.rs:562` | Change "cla" to "tsa" |
+| C-1 | Critical | FIXED | `terraphim_orchestrator/src/lib.rs`, `tests/orchestrator_tests.rs` | None |
+| C-2 | Critical | FIXED | `terraphim_orchestrator/src/lib.rs:130-141` | None |
+| C-3 | Critical | FIXED | `terraphim_orchestrator/src/scope.rs:271-280` | None |
+| C-4 | Critical | FIXED | `terraphim_orchestrator/src/compound.rs:473-478` | None |
+| I-1 | Important | FIXED | `terraphim_orchestrator/src/compound.rs:236` | None |
+| I-2 | Minor | Present | `terraphim_orchestrator/src/cost_tracker.rs:50-99` | Simplify or document |
+| I-3 | Minor | FIXED | `terraphim_agent/src/learnings/procedure.rs:54-61` | None |
+| I-4 | Minor | NOT AN ISSUE | `terraphim_agent/src/learnings/procedure.rs` | None (functions are sync) |
+| I-5 | Minor | Present (broad) | `terraphim_agent/src/learnings/procedure.rs:70` | Track as separate debt |
+| I-6 | Important | FIXED | `terraphim_orchestrator/src/handoff.rs:160-164` | None |
+| I-7 | Important | FIXED | `terraphim_orchestrator/src/lib.rs:320-330` | None |
+| I-8 | Important | FIXED | `terraphim_orchestrator/src/scope.rs:9-17,53-66` | None |
+| I-9 | Minor | Present | `terraphim_orchestrator/src/config.rs:375-377` | Remove misleading comment |
+| I-10 | N/A | Justified | `terraphim_orchestrator/src/persona.rs:195` | None |
+| I-11 | Minor | Present | `terraphim_spawner/src/config.rs:206` | Use `which` crate or accept |
+| I-12 | Minor | Present | `terraphim_spawner/src/lib.rs:618` | Replace sleep with poll |
+| S-3 | Suggestion | Present | `terraphim_agent/src/mcp_tool_index.rs:244` | Return `&Path` |
+| S-4 | Suggestion | Present | `terraphim_orchestrator/src/cost_tracker.rs:190` | Implement Display |
+| S-7 | Suggestion | Present | `terraphim_orchestrator/src/persona.rs:93-98` | Return iterator |
+| S-8 | Suggestion | Present | `terraphim_agent/src/mcp_tool_index.rs:149` | Not needed (Arc clone) |
+
+---
+
+## 5. Dependencies Between Findings
+
 ```
-An agent name like `../../etc/passwd` would escape `working_dir`. No validation exists.
+B-1 (tinyclaw compile) --> blocks all workspace test validation
+B-2 (cla->tsa) --------> independent, trivial fix
 
-### Blocking I/O in Async Context (C-3) - CONFIRMED PRESENT
-
-`scope.rs:244-250` and `scope.rs:279-295`: `WorktreeManager::create_worktree` and `remove_worktree` use `std::process::Command` (blocking). These are called from async contexts in `compound.rs` (line 183 calls `create_worktree`, line 252 calls `remove_worktree`).
-
-Note: `create_worktree` is called without `.await` (it returns `Result`, not a future), but the blocking `Command::output()` call will block the async executor thread.
-
-### Agent Failure Silently Treated as Pass (C-4) - CONFIRMED PRESENT
-
-`compound.rs:461-467`: Fallback `pass: true` when no JSON output parsed:
-```rust
-ReviewAgentOutput {
-    agent: agent_name.to_string(),
-    findings: vec![],
-    summary: "No structured output found in agent response".to_string(),
-    pass: true,  // <-- should be false
-}
+I-9, I-11, I-12 --------> all independent, no cross-dependencies
+I-2 --------------------> independent (cost_tracker only)
+S-3, S-4, S-7 ----------> all independent suggestions
 ```
 
-### Important Findings Status
+No findings have circular dependencies. All remaining items are independent of each other.
 
-| # | Status | Location | Issue |
-|---|--------|----------|-------|
-| I-1 | PRESENT | compound.rs:222-249 | 1s inner timeout exits collection loop prematurely |
-| I-2 | LOW RISK | cost_tracker.rs:35-44 | Mixed atomics with plain fields; mitigated by single-owner pattern |
-| I-3 | PRESENT | procedure.rs:61-62 | `ProcedureStore::new` is `#[cfg(test)]` only |
-| I-4 | PRESENT | procedure.rs:88+ | `async fn` signatures that never await (use `std::fs`) |
-| I-5 | PRESENT | compound.rs:114, procedure.rs:49,55,67 | `#[allow(dead_code)]` violations |
-| I-6 | PRESENT | handoff.rs:160 | `u64` TTL cast to `i64` via `as i64` (overflow for values > i64::MAX) |
-| I-7 | NOT PRESENT | lib.rs:294-351 | The handoff method does NOT validate context.from_agent == from_agent |
-| I-8 | PRESENT | scope.rs:49-54 | `overlaps()` false positives with path-separator-unaware prefix check |
-| I-9 | PRESENT | config.rs:358-375 | `substitute_env` doc claims `$VAR` support but only handles `${VAR}` |
-| I-10 | JUSTIFIED | persona.rs:195 | `expect` in Default impl for compile-time template -- keep as-is |
-| I-11 | PRESENT | spawner/config.rs:206 | Uses `which` command (not portable to all systems) |
-| I-12 | PRESENT | spawner/lib.rs:618+ | Sleep-based test timing |
+---
 
-### Suggestions Status
+## 6. Risk Assessment
 
-All 8 suggestions (S-1 through S-8) are still present and unfixed. Low priority.
+### Low Risk
+- B-2: One-character fix, no behavioral change
+- I-9: Comment-only change
+- S-3, S-4, S-7: API refinements, backward compatible with deprecation
 
-## Code Location Map
+### Medium Risk
+- B-1: Teloxide API change requires understanding the new `FileId` type. May need to check if `.as_str()` or `.unique_id` is the correct accessor.
+- I-2: Removing atomics changes the type signature; need to verify no `&self`-only concurrent access paths exist
 
-| Component | File | Lines |
-|-----------|------|-------|
-| Compound review workflow | `crates/terraphim_orchestrator/src/compound.rs` | All |
-| Orchestrator core + tests | `crates/terraphim_orchestrator/src/lib.rs` | 294-351 (handoff), 960-979 (failing test) |
-| Integration tests | `crates/terraphim_orchestrator/tests/orchestrator_tests.rs` | 130-149 (failing test) |
-| Handoff context/buffer | `crates/terraphim_orchestrator/src/handoff.rs` | 158-160 (TTL cast) |
-| Scope/worktree management | `crates/terraphim_orchestrator/src/scope.rs` | 42-58 (overlaps), 229-264/269-315 (blocking I/O) |
-| Procedure store | `crates/terraphim_agent/src/learnings/procedure.rs` | 49-100 (dead code, async) |
-| Cost tracker | `crates/terraphim_orchestrator/src/cost_tracker.rs` | 35-44 (mixed atomics) |
-| Config env substitution | `crates/terraphim_orchestrator/src/config.rs` | 356-375 |
-| Persona metaprompt | `crates/terraphim_orchestrator/src/persona.rs` | 195 |
-| Spawner CLI check | `crates/terraphim_spawner/src/config.rs` | 206 |
-| MCP tool index | `crates/terraphim_agent/src/mcp_tool_index.rs` | 149 (clone), 244 (PathBuf) |
+### Low Priority (can defer)
+- I-5: Broad `#[allow(dead_code)]` cleanup across terraphim_agent is a separate effort
+- I-11: Unix-only is acceptable for current deployment targets
+- I-12: 100ms sleep is unlikely to cause flakes
+- S-8: Arc clone is O(1), no real cost
 
-## Vital Few (Essential Constraints)
+---
 
-| Constraint | Why It's Vital | Evidence |
-|------------|----------------|----------|
-| Tests must pass | Branch cannot merge with failing tests | C-1: 2 tests currently fail |
-| No security vulnerabilities | Path traversal allows file writes outside working_dir | C-2: unsanitized agent name in path |
-| No blocking I/O in async | Blocks tokio executor, can deadlock under load | C-3: std::process::Command in async context |
+## 7. Constraints (Must NOT Change)
 
-## Eliminated from Scope
+1. **Do not modify the public API of `HandoffContext`** -- downstream consumers depend on the field names
+2. **Do not remove `validate_agent_name()`** -- it is the path traversal defense
+3. **Do not change the `is_path_prefix()` logic** -- it correctly handles the false positive case
+4. **Do not modify `SwarmConfig` construction in tests** -- the empty-groups pattern is intentional for CI safety
+5. **Do not alter the `MetapromptRenderer::default()` expect** -- it is justified per I-10
 
-| Eliminated Item | Why Eliminated |
-|-----------------|----------------|
-| I-2: CostTracker mixed atomics | Low risk, mitigated by single-owner, simplification is nice-to-have |
-| I-10: expect in Default | Justified - compile-time invariant |
-| I-11: which portability | Low priority, only affects validation step |
-| I-12: Sleep-based tests | Refactoring tests is low priority for merge |
-| S-1 through S-8 | Performance/style suggestions, not correctness issues |
+---
 
-## Risks and Unknowns
+## 8. Open Questions
 
-| Risk | Likelihood | Impact | Mitigation |
-|------|------------|--------|------------|
-| C-1 fix changes test semantics | Medium | Low | Use empty groups vec in test config |
-| C-3 conversion changes error types | Low | Low | WorktreeManager methods can change to async |
-| I-5 dead code removal breaks downstream | Low | Medium | Check all usages before removing |
+1. **B-1 teloxide migration**: What is the correct way to extract a string file ID from `teloxide 0.17`'s `FileId` type? Need to check the teloxide 0.17 docs.
+2. **I-2 atomics**: Is there any code path where `BudgetGate` or `CostTracker` is shared across threads without `&mut self`? If so, the atomic is necessary.
+3. **I-5 dead_code scope**: Should we create a separate issue for the 60+ `#[allow(dead_code)]` annotations in `terraphim_agent`, or is that accepted debt?
 
-### Assumptions
+---
 
-| Assumption | Basis | Risk if Wrong | Verified? |
-|------------|-------|---------------|-----------|
-| `ProcedureStore` is only used in tests | `#[cfg(test)]` on `new()`, `#[allow(dead_code)]` on struct | Would break production code | Yes - no non-test usages found |
-| `scope_registry` in CompoundReviewWorkflow is truly unused | `#[allow(dead_code)]` annotation | Removing field could break future functionality | Yes - grep shows no reads |
-| Worktree methods are only called from async context | Checked compound.rs call sites | Would need async conversion | Yes |
+## 9. Recommended Next Steps (Grouped by Priority)
 
-## Fix Groups (Recommended Order)
+### Group 1: Unblock CI (must do first)
+1. Fix B-1: `terraphim_tinyclaw` FileId type mismatch (3 call sites)
+2. Fix B-2: Change "cla" to "tsa" in session-analyzer test
 
-### Group 1: Fix Failing Tests (C-1) + Silent Pass (C-4) + Collection Loop (I-1)
-**Files**: compound.rs, lib.rs tests, orchestrator_tests.rs
-**Approach**:
-- C-1: Create test configs with `groups: vec![]` for test isolation
-- C-4: Change fallback `pass: true` to `pass: false`
-- I-1: Replace `Duration::from_secs(1)` inner timeout with `timeout_at(collect_deadline, rx.recv())`
+### Group 2: Remaining Issue #708 Items (all minor)
+3. Fix I-9: Remove misleading `$VAR` comment in `config.rs:375-377`
+4. Fix S-4: Implement `Display` for `BudgetVerdict` instead of `Debug` format
+5. Fix S-3: Change `index_path()` return type to `&Path`
 
-### Group 2: Path Safety (C-2) + TTL Overflow (I-6) + Context Validation (I-7)
-**Files**: handoff.rs, lib.rs
-**Approach**:
-- C-2: Add `validate_agent_name()` that rejects `/`, `\`, `..`, empty, and non-alphanumeric-dash-underscore
-- I-6: Use `i64::try_from(ttl_secs).unwrap_or(i64::MAX)`
-- I-7: Add assertion that `context.from_agent == from_agent && context.to_agent == to_agent`
+### Group 3: Optional Improvements (defer or separate issue)
+6. I-2: Document or simplify CostTracker atomics
+7. I-11: Consider `which` crate
+8. I-12: Replace sleep with polling in spawner test
+9. S-7: Change `persona_names()` to return iterator
+10. I-5: Separate issue for dead_code cleanup in terraphim_agent
 
-### Group 3: Async WorktreeManager (C-3)
-**Files**: scope.rs
-**Approach**: Convert `create_worktree` and `remove_worktree` to use `tokio::process::Command`, make them `async fn`
+---
 
-### Group 4: Dead Code Cleanup (I-5)
-**Files**: compound.rs, procedure.rs
-**Approach**:
-- Remove `scope_registry` field from `CompoundReviewWorkflow` (confirmed unused)
-- Remove `#[allow(dead_code)]` from procedure.rs, make `ProcedureStore::new` non-test-only or cfg-test the entire type
+## 10. Conclusion
 
-### Group 5: ProcedureStore Cleanup (I-3, I-4)
-**File**: procedure.rs
-**Approach**: Either remove `async` from methods that don't await, or keep them for future `tokio::fs` migration
+Of the 4 Critical and 12 Important findings in Issue #708, **all 4 Critical and 5 Important findings have already been fixed** on the merged branch. The remaining work is:
 
-### Group 6: Low-Priority Fixes (I-8, I-9)
-- I-8: Add path-separator-aware prefix check in `overlaps()`
-- I-9: Remove misleading doc claim about `$VAR` syntax
+- **2 blockers** preventing workspace-wide test validation (teloxide type mismatch, hardcoded binary name)
+- **3 minor code quality items** that are straightforward fixes
+- **5 optional improvements** that can be deferred
 
-## Recommendations
-
-### Proceed: Yes
-
-Fix Groups 1-4 are required for merge. Groups 5-6 are recommended but can be deferred.
-
-### Recommended Scope
-- **Must fix**: C-1, C-2, C-3, C-4 (critical), I-1, I-5, I-6, I-7
-- **Should fix**: I-3, I-4, I-8, I-9
-- **Defer**: I-2, I-10, I-11, I-12, S-1 through S-8
-
-## Next Steps
-
-If approved:
-1. Proceed to Phase 2 (Disciplined Design) with this research as input
-2. Design fixes for Groups 1-4 first (critical path)
-3. Implement in the recommended group order
-4. Verify all tests pass after each group
+The most urgent action is fixing B-1 and B-2 to restore a green CI, then addressing the minor items in a single commit.

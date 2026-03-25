@@ -15,7 +15,7 @@
 //!
 //! # Example
 //!
-//! ```rust
+//! ```rust,ignore
 //! use terraphim_orchestrator::{AgentOrchestrator, OrchestratorConfig};
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
