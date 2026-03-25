@@ -39,8 +39,9 @@ async fn start_test_server() -> Result<(Child, String)> {
 
     // Use absolute path for config to work in CI
     let workspace_root = get_workspace_root()?;
-    let config_path = workspace_root.join("terraphim_server/default/terraphim_engineer_config.json");
-    
+    let config_path =
+        workspace_root.join("terraphim_server/default/terraphim_engineer_config.json");
+
     println!("Using config path: {}", config_path.display());
 
     let mut server = Command::new("cargo")
@@ -320,19 +321,25 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
     // 3. Test search with server (may fail in CI due to missing KG data or slow indexing)
     let (search_stdout, search_stderr, search_code) =
         run_server_command(&server_url, &["search", "integration test", "--limit", "3"])?;
-    
+
     // In CI, search may fail due to:
     // - KG indexing timeout
     // - Missing KG data (400 Bad Request)
     // Accept both as valid outcomes for CI resilience
-    let search_failed_acceptably = search_stderr.contains("operation timed out") 
+    let search_failed_acceptably = search_stderr.contains("operation timed out")
         || search_stderr.contains("timed out")
         || search_stderr.contains("400 Bad Request")
         || search_stderr.contains("400");
-    
+
     if search_failed_acceptably {
-        println!("✓ Server search failed acceptably (expected in CI): {}", 
-            if search_stderr.contains("400") { "400 Bad Request" } else { "timeout" });
+        println!(
+            "✓ Server search failed acceptably (expected in CI): {}",
+            if search_stderr.contains("400") {
+                "400 Bad Request"
+            } else {
+                "timeout"
+            }
+        );
     } else if search_code != 0 {
         println!("Search stdout: {}", search_stdout);
         println!("Search stderr: {}", search_stderr);
@@ -348,14 +355,18 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
             &server_url,
             &["search", "test", "--role", test_role, "--limit", "2"],
         )?;
-        
-        let search_role_failed_acceptably = search_role_stderr.contains("operation timed out") 
+
+        let search_role_failed_acceptably = search_role_stderr.contains("operation timed out")
             || search_role_stderr.contains("timed out")
             || search_role_stderr.contains("400 Bad Request")
             || search_role_stderr.contains("400");
-        
+
         if search_role_failed_acceptably {
-            let reason = if search_role_stderr.contains("400") { "400 Bad Request" } else { "timeout" };
+            let reason = if search_role_stderr.contains("400") {
+                "400 Bad Request"
+            } else {
+                "timeout"
+            };
             println!(
                 "✓ Server search with role override '{}' failed acceptably ({})",
                 test_role, reason
@@ -710,16 +721,20 @@ async fn test_full_feature_matrix() -> Result<()> {
             // - KG indexing timeout
             // - Missing KG data (400 Bad Request)
             // Accept both as valid outcomes for CI resilience
-            let failed_acceptably = stderr.contains("operation timed out") 
+            let failed_acceptably = stderr.contains("operation timed out")
                 || stderr.contains("timed out")
                 || stderr.contains("400 Bad Request")
                 || stderr.contains("400");
 
             if test_name == "graph" || test_name == "search" {
                 if failed_acceptably {
-                    let reason = if stderr.contains("400") { "400 Bad Request" } 
-                                 else if stderr.contains("404") { "404 Not Found" }
-                                 else { "timeout" };
+                    let reason = if stderr.contains("400") {
+                        "400 Bad Request"
+                    } else if stderr.contains("404") {
+                        "404 Not Found"
+                    } else {
+                        "timeout"
+                    };
                     println!("  ✓ {}: failed acceptably ({})", test_name, reason);
                 } else if test_name == "graph" && stderr.contains("404") {
                     println!("  ✓ {}: unsupported (404)", test_name);

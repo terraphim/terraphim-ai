@@ -1954,8 +1954,8 @@ async fn run_offline_command(
 
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
-        LearningCaptureConfig, CorrectionType, capture_correction, capture_failed_command, correct_learning, list_all_entries, list_learnings,
-        query_all_entries, query_learnings,
+        CorrectionType, LearningCaptureConfig, capture_correction, capture_failed_command,
+        correct_learning, list_all_entries, list_learnings, query_all_entries, query_learnings,
     };
     let config = LearningCaptureConfig::default();
 
