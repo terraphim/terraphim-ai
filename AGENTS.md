@@ -88,8 +88,8 @@ yarn e2e              # End-to-end tests
 - Never use mocks in tests
 - Use IDE diagnostics to find and fix errors
 - Always check test coverage after implementation
-- Keep track of all tasks in GitHub issues using the `gh` tool
-- Commit every change and keep GitHub issues updated with the progress using the `gh` tool
+- Keep track of all tasks in Gitea issues using `gitea-robot` and `tea` CLI tools (see Gitea PageRank Workflow below)
+- Commit every change and keep Gitea issues updated with progress using `tea comment IDX`
 - Use `tmux` to spin off background tasks, read their output, and drive interaction
 - Use `tmux` instead of `sleep` to continue working on a project and then read log output
 
@@ -160,6 +160,92 @@ Parse: `file:line:col` → location | 💡 → how to fix | Exit 0/1 → pass/fa
 - ❌ Fix symptom (`if (x) { x.y }`) → ✅ Root cause (`x?.y`)
 ````
 Use 'bd' for task tracking
+
+<!-- GITEA_PAGERANK_WORKFLOW_START -->
+
+## Gitea PageRank Workflow: Task Management and Agent Coordination
+
+### Single Source of Truth
+
+Gitea at `https://git.terraphim.cloud` is the authoritative system for all task management. ALL agents (human and AI) MUST use gitea-robot and tea for issue tracking.
+
+### Environment
+
+```bash
+source ~/.profile  # Loads GITEA_URL and GITEA_TOKEN
+```
+
+Required env vars (set in `~/.profile`):
+- `GITEA_URL=https://git.terraphim.cloud`
+- `GITEA_TOKEN` -- API token for authentication
+
+### Tools
+
+- **gitea-robot** (`/home/alex/go/bin/gitea-robot`): PageRank-based issue prioritisation
+- **tea** (`/home/alex/go/bin/tea`): Gitea CLI for issues, comments, PRs
+
+### Task Discovery and Prioritisation
+
+```bash
+# Get issues ranked by dependency impact (highest PageRank first)
+gitea-robot ready --owner terraphim --repo terraphim-ai
+
+# Full triage with blocked/unblocked status
+gitea-robot triage --owner terraphim --repo terraphim-ai
+
+# View dependency graph
+gitea-robot graph --owner terraphim --repo terraphim-ai
+
+# Add dependency: issue X is blocked by issue Y
+gitea-robot add-dep --owner terraphim --repo terraphim-ai --issue X --blocks Y
+```
+
+PageRank scores reflect how many downstream issues each task unblocks. Higher score = fix first.
+
+### Issue Lifecycle
+
+```bash
+# List open issues
+tea issues list --repo terraphim/terraphim-ai --state open
+
+# Create issue
+tea issues create --title "..." --repo terraphim/terraphim-ai
+
+# Comment on issue (progress updates, implementation notes)
+tea comment IDX "progress update" --repo terraphim/terraphim-ai
+
+# Close issue
+tea issues close IDX --repo terraphim/terraphim-ai
+```
+
+### Agent Workflow (Mandatory for All Agents)
+
+1. **Start**: `source ~/.profile` (load Gitea env vars)
+2. **Pick work**: `gitea-robot ready --owner terraphim --repo terraphim-ai` -- choose highest PageRank unblocked issue
+3. **Branch**: `git checkout -b task/IDX-short-title`
+4. **Implement**: TDD, commit with `Refs #IDX`
+5. **Update Gitea**: `tea comment IDX "Implementation complete. Summary." --repo terraphim/terraphim-ai`
+6. **PR**: Push branch, create PR on GitHub referencing `Refs terraphim/terraphim-ai#IDX (Gitea)`
+7. **Close**: `tea issues close IDX --repo terraphim/terraphim-ai` after merge
+
+### Commit Message Convention
+
+```
+feat(module): short description Refs #IDX
+```
+
+### Model Rules for Bigbox Agents
+
+Use ONLY subscription-based models:
+- `kimi-for-coding/k2p5` -- Moonshot subscription (implementation)
+- `opencode-go/minimax-m2.5` -- MiniMax subscription
+- `/home/alex/.local/bin/claude --model sonnet` -- Anthropic subscription (verification)
+- `codex` -- ChatGPT OAuth
+
+**NEVER** use `opencode/` prefix (Zen pay-per-use).
+**NEVER** use `github-copilot/` prefix on bigbox.
+
+<!-- GITEA_PAGERANK_WORKFLOW_END -->
 
 ## Landing the Plane (Session Completion)
 
