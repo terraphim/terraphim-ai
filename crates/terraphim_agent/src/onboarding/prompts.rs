@@ -332,7 +332,7 @@ fn prompt_service_auth(
         ServiceType::Quickwit => {
             let auth_type = Select::with_theme(&theme)
                 .with_prompt("Authentication type")
-                .items(&["Bearer token", "Basic auth (username/password)"])
+                .items(["Bearer token", "Basic auth (username/password)"])
                 .default(0)
                 .interact()?;
 
