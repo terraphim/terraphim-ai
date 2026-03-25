@@ -7,7 +7,7 @@ use terraphim_service::llm;
 /// Defaults to http://127.0.0.1:11434, can be overridden with OLLAMA_BASE_URL.
 #[tokio::test]
 #[serial]
-async fn live_ollama_summarize_deepseek_coder() {
+async fn live_ollama_summarize_llama() {
     if std::env::var("RUN_OLLAMA_TESTS")
         .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
         .unwrap_or(true)
@@ -32,7 +32,7 @@ async fn live_ollama_summarize_deepseek_coder() {
         return;
     }
 
-    // Build a Role configured for Ollama deepseek-coder:latest
+    // Build a Role configured for Ollama llama3.2:3b
     let mut role = terraphim_config::Role {
         shortname: Some("OllamaCoder".into()),
         name: "Ollama Coder".into(),
@@ -48,10 +48,8 @@ async fn live_ollama_summarize_deepseek_coder() {
     };
     role.extra
         .insert("llm_provider".into(), serde_json::json!("ollama"));
-    role.extra.insert(
-        "llm_model".into(),
-        serde_json::json!("deepseek-coder:latest"),
-    );
+    role.extra
+        .insert("llm_model".into(), serde_json::json!("llama3.2:3b"));
     role.extra
         .insert("llm_base_url".into(), serde_json::json!(base_url.clone()));
     role.extra
