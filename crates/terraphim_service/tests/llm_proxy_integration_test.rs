@@ -53,9 +53,8 @@ async fn test_llm_proxy_auto_configuration() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_llm_proxy_fallback_mechanism() {
-    // This test expects a specific default base URL. In CI or developer machines,
-    // the base URL may be overridden by global env vars, so make it opt-in.
     if std::env::var("RUN_LLM_PROXY_INTEGRATION_TESTS")
         .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
         .unwrap_or(true)
@@ -65,7 +64,11 @@ async fn test_llm_proxy_fallback_mechanism() {
         );
         return;
     }
-    let _test_env = TestEnv::new();
+    let mut test_env = TestEnv::new();
+
+    // Clear any proxy env vars so we test the true fallback path
+    test_env.remove("ANTHROPIC_BASE_URL");
+    test_env.remove("ANTHROPIC_AUTH_TOKEN");
 
     // Test without proxy configuration (fallback to direct)
     let client = LlmProxyClient::new("anthropic".to_string()).unwrap();
@@ -79,6 +82,7 @@ async fn test_llm_proxy_fallback_mechanism() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_multiple_provider_configuration() {
     if std::env::var("RUN_LLM_PROXY_INTEGRATION_TESTS")
         .map(|v| v != "1" && !v.eq_ignore_ascii_case("true"))
@@ -208,6 +212,7 @@ async fn test_proxy_url_detection() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_configuration_logging() {
     let mut test_env = TestEnv::new();
 
@@ -287,6 +292,7 @@ fn test_error_handling() {
 }
 
 #[tokio::test]
+#[serial]
 async fn test_concurrent_connectivity_tests() {
     let mut test_env = TestEnv::new();
 
