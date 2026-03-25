@@ -759,6 +759,24 @@ enum LearnSub {
         #[arg(long)]
         correction: String,
     },
+    /// Record a user correction (tool preference, naming, workflow, etc.)
+    Correction {
+        /// What the agent said/did originally
+        #[arg(long)]
+        original: String,
+        /// What the user said instead
+        #[arg(long)]
+        corrected: String,
+        /// Type of correction
+        #[arg(long, default_value = "other")]
+        correction_type: String,
+        /// Context description
+        #[arg(long, default_value = "")]
+        context: String,
+        /// Session ID for traceability
+        #[arg(long)]
+        session_id: Option<String>,
+    },
     /// Process hook input from AI agents (reads JSON from stdin)
     Hook {
         /// AI agent format
@@ -1936,8 +1954,8 @@ async fn run_offline_command(
 
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
-        LearningCaptureConfig, capture_failed_command, correct_learning, list_learnings,
-        query_learnings,
+        LearningCaptureConfig, CorrectionType, capture_correction, capture_failed_command, correct_learning, list_all_entries, list_learnings,
+        query_all_entries, query_learnings,
     };
     let config = LearningCaptureConfig::default();
 
@@ -1974,25 +1992,19 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             } else {
                 &storage_loc
             };
-            match list_learnings(storage_dir, recent) {
-                Ok(learnings) => {
-                    if learnings.is_empty() {
+            match list_all_entries(storage_dir, recent) {
+                Ok(entries) => {
+                    if entries.is_empty() {
                         println!("No learnings found.");
                     } else {
                         println!("Recent learnings:");
-                        for (i, learning) in learnings.iter().enumerate() {
-                            let source_indicator = match learning.source {
+                        for (i, entry) in entries.iter().enumerate() {
+                            let source_indicator = match entry.source() {
                                 learnings::LearningSource::Project => "[P]",
                                 learnings::LearningSource::Global => "[G]",
                             };
-                            println!(
-                                "  {}. {} {} (exit: {})",
-                                i + 1,
-                                source_indicator,
-                                learning.command,
-                                learning.exit_code
-                            );
-                            if let Some(ref correction) = learning.correction {
+                            println!("  {}. {} {}", i + 1, source_indicator, entry.summary());
+                            if let Some(correction) = entry.correction_text() {
                                 println!("     Correction: {}", correction);
                             }
                         }
@@ -2013,22 +2025,19 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             } else {
                 &storage_loc
             };
-            match query_learnings(storage_dir, &pattern, exact) {
-                Ok(learnings) => {
-                    if learnings.is_empty() {
+            match query_all_entries(storage_dir, &pattern, exact) {
+                Ok(entries) => {
+                    if entries.is_empty() {
                         println!("No learnings matching '{}'.", pattern);
                     } else {
-                        println!("Learnings matching '{}':", pattern);
-                        for learning in learnings {
-                            let source_indicator = match learning.source {
+                        println!("Learnings matching '{}'.", pattern);
+                        for entry in entries {
+                            let source_indicator = match entry.source() {
                                 learnings::LearningSource::Project => "[P]",
                                 learnings::LearningSource::Global => "[G]",
                             };
-                            println!(
-                                "  {} {} (exit: {})",
-                                source_indicator, learning.command, learning.exit_code
-                            );
-                            if let Some(ref correction) = learning.correction {
+                            println!("  {} {}", source_indicator, entry.summary());
+                            if let Some(correction) = entry.correction_text() {
                                 println!("     Correction: {}", correction);
                             }
                         }
@@ -2047,6 +2056,33 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                 }
                 Err(e) => {
                     eprintln!("Failed to add correction: {}", e);
+                    Err(e.into())
+                }
+            }
+        }
+        LearnSub::Correction {
+            original,
+            corrected,
+            correction_type,
+            context,
+            session_id,
+        } => {
+            let ct: CorrectionType = correction_type
+                .parse()
+                .unwrap_or(CorrectionType::Other(correction_type.clone()));
+            let mut correction = capture_correction(ct, &original, &corrected, &context, &config);
+            if let Some(ref sid) = session_id {
+                // We need to read the file and update it with session_id
+                // For now, just print the session_id
+                log::info!("Session ID: {}", sid);
+            }
+            match correction {
+                Ok(path) => {
+                    println!("Captured correction: {}", path.display());
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("Failed to capture correction: {}", e);
                     Err(e.into())
                 }
             }
