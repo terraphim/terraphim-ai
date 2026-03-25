@@ -15,11 +15,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 async fn resolve_telegram_file_url(
     bot: &teloxide::Bot,
     token: &str,
-    file_id: &str,
+    file_id: &teloxide::types::FileId,
 ) -> Option<String> {
     use teloxide::prelude::*;
 
-    match bot.get_file(file_id).await {
+    match bot.get_file(file_id.clone()).await {
         Ok(file) => {
             let url = format!("https://api.telegram.org/file/bot{}/{}", token, file.path);
             log::info!("Resolved Telegram file URL for file_id={}", file_id);

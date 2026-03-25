@@ -731,7 +731,7 @@ mod cli_tests {
     #[test]
     fn test_cli_analyze_with_invalid_path() {
         let output = Command::new("cargo")
-            .args(["run", "--bin", "cla", "--", "analyze", "/nonexistent/path"])
+            .args(["run", "--bin", "tsa", "--", "analyze", "/nonexistent/path"])
             .output()
             .expect("Failed to execute CLI analyze command");
 
@@ -747,7 +747,7 @@ mod cli_tests {
             .args([
                 "run",
                 "--bin",
-                "cla",
+                "tsa",
                 "--",
                 "analyze",
                 temp_dir.path().to_str().unwrap(),

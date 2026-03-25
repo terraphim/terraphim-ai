@@ -54,7 +54,7 @@ fn test_search_query_serialization() {
 #[test]
 fn test_search_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "results": [
             {
                 "id": "doc1",
@@ -75,7 +75,7 @@ fn test_search_response_deserialization() {
     assert!(response.is_ok(), "SearchResponse should be deserializable");
 
     let search_response = response.unwrap();
-    assert_eq!(search_response.status, "Success");
+    assert_eq!(search_response.status, "success");
     assert_eq!(search_response.total, 1);
     assert_eq!(search_response.results.len(), 1);
 
@@ -90,7 +90,7 @@ fn test_search_response_deserialization() {
 #[test]
 fn test_config_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "config": {
             "id": "Embedded",
             "selected_role": "Default",
@@ -119,7 +119,7 @@ fn test_config_response_deserialization() {
     );
 
     let config_response = response.unwrap();
-    assert_eq!(config_response.status, "Success");
+    assert_eq!(config_response.status, "success");
     assert_eq!(config_response.config.selected_role.to_string(), "Default");
     assert_eq!(config_response.config.global_shortcut, "Ctrl+Space");
     assert!(
@@ -156,7 +156,7 @@ fn test_chat_request_serialization() {
 #[test]
 fn test_chat_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "message": "Hello! How can I help you?",
         "model_used": "gpt-3.5-turbo",
         "error": null
@@ -166,7 +166,7 @@ fn test_chat_response_deserialization() {
     assert!(response.is_ok(), "ChatResponse should be deserializable");
 
     let chat_response = response.unwrap();
-    assert_eq!(chat_response.status, "Success");
+    assert_eq!(chat_response.status, "success");
     assert_eq!(chat_response.message.unwrap(), "Hello! How can I help you?");
     assert_eq!(chat_response.model_used.unwrap(), "gpt-3.5-turbo");
     assert!(chat_response.error.is_none());
@@ -213,7 +213,7 @@ fn test_summarize_request_serialization() {
 #[test]
 fn test_thesaurus_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "terms": [
             {
                 "id": "term1",
@@ -236,7 +236,7 @@ fn test_thesaurus_response_deserialization() {
     );
 
     let thesaurus_response = response.unwrap();
-    assert_eq!(thesaurus_response.status, "Success");
+    assert_eq!(thesaurus_response.status, "success");
     assert_eq!(thesaurus_response.total, 2);
     assert_eq!(thesaurus_response.terms.len(), 2);
 
@@ -255,7 +255,7 @@ fn test_thesaurus_response_deserialization() {
 #[test]
 fn test_autocomplete_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "suggestions": [
             {
                 "text": "machine learning",
@@ -275,7 +275,7 @@ fn test_autocomplete_response_deserialization() {
     );
 
     let autocomplete_response = response.unwrap();
-    assert_eq!(autocomplete_response.status, "Success");
+    assert_eq!(autocomplete_response.status, "success");
     assert_eq!(autocomplete_response.suggestions.len(), 2);
 
     let suggestion1 = &autocomplete_response.suggestions[0];
@@ -291,7 +291,7 @@ fn test_autocomplete_response_deserialization() {
 #[test]
 fn test_rolegraph_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "nodes": [
             {
                 "id": 1,
@@ -320,7 +320,7 @@ fn test_rolegraph_response_deserialization() {
     );
 
     let rolegraph_response = response.unwrap();
-    assert_eq!(rolegraph_response.status, "Success");
+    assert_eq!(rolegraph_response.status, "success");
     assert_eq!(rolegraph_response.nodes.len(), 2);
     assert_eq!(rolegraph_response.edges.len(), 1);
 
@@ -341,7 +341,7 @@ fn test_task_status_response_deserialization() {
     let test_cases = vec![
         (
             r#"{
-            "status": "Success",
+            "status": "success",
             "task_id": "task-123",
             "state": "pending",
             "progress": null,
@@ -354,7 +354,7 @@ fn test_task_status_response_deserialization() {
         ),
         (
             r#"{
-            "status": "Success",
+            "status": "success",
             "task_id": "task-456",
             "state": "processing",
             "progress": 0.5,
@@ -367,7 +367,7 @@ fn test_task_status_response_deserialization() {
         ),
         (
             r#"{
-            "status": "Success",
+            "status": "success",
             "task_id": "task-789",
             "state": "completed",
             "progress": 1.0,
@@ -380,7 +380,7 @@ fn test_task_status_response_deserialization() {
         ),
         (
             r#"{
-            "status": "Success",
+            "status": "success",
             "task_id": "task-000",
             "state": "failed",
             "progress": null,
@@ -402,7 +402,7 @@ fn test_task_status_response_deserialization() {
         );
 
         let task_response = response.unwrap();
-        assert_eq!(task_response.status, "Success");
+        assert_eq!(task_response.status, "success");
         assert_eq!(task_response.state, expected_state);
         assert!(task_response.task_id.starts_with("task-"));
     }
@@ -412,7 +412,7 @@ fn test_task_status_response_deserialization() {
 #[test]
 fn test_queue_stats_response_deserialization() {
     let json_response = r#"{
-        "status": "Success",
+        "status": "success",
         "pending_tasks": 5,
         "processing_tasks": 2,
         "completed_tasks": 100,
@@ -427,7 +427,7 @@ fn test_queue_stats_response_deserialization() {
     );
 
     let stats_response = response.unwrap();
-    assert_eq!(stats_response.status, "Success");
+    assert_eq!(stats_response.status, "success");
     assert_eq!(stats_response.pending_tasks, 5);
     assert_eq!(stats_response.processing_tasks, 2);
     assert_eq!(stats_response.completed_tasks, 100);
@@ -617,7 +617,7 @@ fn test_clone_implementations() {
     drop(client);
 
     let response = SearchResponse {
-        status: "Success".to_string(),
+        status: "success".to_string(),
         results: vec![],
         total: 0,
     };
@@ -634,11 +634,11 @@ fn test_debug_implementations() {
     assert!(!debug_str.is_empty(), "Debug should produce output");
 
     let response = SearchResponse {
-        status: "Success".to_string(),
+        status: "success".to_string(),
         results: vec![],
         total: 0,
     };
     let debug_response = format!("{:?}", response);
-    assert!(debug_response.contains("Success"));
+    assert!(debug_response.contains("success"));
     assert!(debug_response.contains("0"));
 }
