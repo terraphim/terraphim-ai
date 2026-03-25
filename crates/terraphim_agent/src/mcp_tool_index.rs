@@ -31,7 +31,7 @@
 //! ```
 
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use terraphim_automata::find_matches;
 use terraphim_types::{McpToolEntry, NormalizedTerm, NormalizedTermValue, Thesaurus};
 
@@ -241,7 +241,7 @@ impl McpToolIndex {
     }
 
     /// Get the index path.
-    pub fn index_path(&self) -> &PathBuf {
+    pub fn index_path(&self) -> &Path {
         &self.index_path
     }
 }
