@@ -268,18 +268,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-yarn-
 
-      - name: Install dependencies
-        working-directory: desktop
-        run: yarn install --frozen-lockfile
-
       - name: Build frontend
-        working-directory: desktop
-        run: |
-          yarn build
-
-          # Show build artifacts
-          ls -la dist/
-          du -sh dist/
+        run: ./scripts/ci-check-frontend.sh
+        env:
+          # Skip apt-get in CI (handled by runner image)
+          SKIP_SYSTEM_DEPS: "true"
 
       - name: Upload frontend artifacts
         uses: actions/upload-artifact@v4

@@ -138,10 +138,9 @@ jobs:
 
       - name: Build frontend
         if: steps.frontend-cache.outputs.cache-hit != 'true'
-        working-directory: desktop
-        run: |
-          yarn install --frozen-lockfile
-          yarn build
+        run: ./scripts/ci-check-frontend.sh
+        env:
+          SKIP_SYSTEM_DEPS: "true"
 
       - name: Upload frontend dist
         uses: actions/upload-artifact@v4
@@ -309,6 +308,14 @@ jobs:
           node-version: '20'
           cache: 'yarn'
           cache-dependency-path: desktop/yarn.lock
+
+      - name: Ensure yarn is installed
+        run: |
+          if ! command -v yarn &> /dev/null; then
+            echo "Installing yarn globally..."
+            npm install -g yarn
+          fi
+          yarn --version
 
       - name: Install dependencies
         working-directory: desktop
