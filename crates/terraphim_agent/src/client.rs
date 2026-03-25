@@ -11,8 +11,13 @@ pub struct ApiClient {
 
 impl ApiClient {
     pub fn new(base_url: impl Into<String>) -> Self {
+        // Use longer timeout for CI/CD environments where search may be slow
+        let timeout_secs: u64 = match std::env::var("TERRAPHIM_CLIENT_TIMEOUT") {
+            Ok(v) => v.parse().unwrap_or(60),
+            Err(_) => 30,
+        };
         let client = Client::builder()
-            .timeout(std::time::Duration::from_secs(30))
+            .timeout(std::time::Duration::from_secs(timeout_secs))
             .user_agent("Terraphim-TUI/1.0")
             .build()
             .unwrap_or_else(|_| Client::new());
