@@ -168,10 +168,32 @@ impl TriggerIndex {
     fn is_stopword(word: &str) -> bool {
         matches!(
             word,
-            "the" | "and" | "for" | "are" | "but" | "not" | "you"
-            | "all" | "can" | "her" | "was" | "one" | "our" | "out"
-            | "has" | "have" | "been" | "this" | "that" | "with"
-            | "when" | "from" | "into" | "which" | "their" | "will"
+            "the"
+                | "and"
+                | "for"
+                | "are"
+                | "but"
+                | "not"
+                | "you"
+                | "all"
+                | "can"
+                | "her"
+                | "was"
+                | "one"
+                | "our"
+                | "out"
+                | "has"
+                | "have"
+                | "been"
+                | "this"
+                | "that"
+                | "with"
+                | "when"
+                | "from"
+                | "into"
+                | "which"
+                | "their"
+                | "will"
         )
     }
 
@@ -654,15 +676,11 @@ impl RoleGraph {
             include_pinned
         );
 
-        let node_ids =
-            self.find_matching_node_ids_with_fallback(query_string, include_pinned);
+        let node_ids = self.find_matching_node_ids_with_fallback(query_string, include_pinned);
 
         // Early return if no matching terms found
         if node_ids.is_empty() {
-            log::debug!(
-                "No matching terms found for query: '{}'",
-                query_string
-            );
+            log::debug!("No matching terms found for query: '{}'", query_string);
             return Ok(vec![]);
         }
 
@@ -2042,7 +2060,10 @@ mod tests {
     async fn tfidf_threshold_filters() {
         let mut index = TriggerIndex::new(0.8); // High threshold
         let mut triggers = AHashMap::new();
-        triggers.insert(1u64, "machine learning deep learning neural networks".to_string());
+        triggers.insert(
+            1u64,
+            "machine learning deep learning neural networks".to_string(),
+        );
         index.build(triggers);
 
         let results = index.query("neural networks");
@@ -2080,7 +2101,8 @@ mod tests {
         rolegraph.load_trigger_index(triggers, vec![], 0.3);
 
         // Query that won't match Aho-Corasick but should match trigger
-        let results = rolegraph.find_matching_node_ids_with_fallback("managing cargo dependencies", false);
+        let results =
+            rolegraph.find_matching_node_ids_with_fallback("managing cargo dependencies", false);
         assert!(!results.is_empty());
         assert!(results.contains(&100u64));
     }
@@ -2098,7 +2120,8 @@ mod tests {
         rolegraph.load_trigger_index(triggers, vec![300u64], 0.3); // 300 is pinned
 
         // Query that matches nothing - but pinned should still be included
-        let results = rolegraph.find_matching_node_ids_with_fallback("completely unrelated query xyz", true);
+        let results =
+            rolegraph.find_matching_node_ids_with_fallback("completely unrelated query xyz", true);
         assert!(results.contains(&300u64));
     }
 
