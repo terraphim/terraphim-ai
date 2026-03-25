@@ -372,8 +372,6 @@ fn substitute_env(s: &str) -> String {
         }
     }
 
-    // Handle $VAR syntax (simplistic)
-    // Note: This is a basic implementation. A full implementation would use regex.
     result
 }
 

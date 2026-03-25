@@ -1,6 +1,7 @@
 use chrono::{Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 const WARNING_THRESHOLD: f64 = 0.80;
@@ -28,6 +29,27 @@ impl BudgetVerdict {
     /// Returns true if a warning should be issued (near exhaustion).
     pub fn should_warn(&self) -> bool {
         matches!(self, BudgetVerdict::NearExhaustion { .. })
+    }
+}
+
+impl fmt::Display for BudgetVerdict {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            BudgetVerdict::Uncapped => write!(f, "uncapped"),
+            BudgetVerdict::WithinBudget => write!(f, "within budget"),
+            BudgetVerdict::NearExhaustion {
+                spent_cents,
+                budget_cents,
+            } => write!(
+                f,
+                "near exhaustion ({} / {} cents)",
+                spent_cents, budget_cents
+            ),
+            BudgetVerdict::Exhausted {
+                spent_cents,
+                budget_cents,
+            } => write!(f, "exhausted ({} / {} cents)", spent_cents, budget_cents),
+        }
     }
 }
 
@@ -187,7 +209,7 @@ impl CostTracker {
                     agent_name: name.clone(),
                     spent_usd: agent_cost.spent_usd(),
                     budget_cents: agent_cost.budget_cents,
-                    verdict: format!("{:?}", verdict),
+                    verdict: format!("{}", verdict),
                 }
             })
             .collect()
@@ -423,7 +445,7 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot_1.spent_usd, 85.0);
         assert_eq!(snapshot_1.budget_cents, Some(10000));
-        assert!(snapshot_1.verdict.contains("NearExhaustion"));
+        assert!(snapshot_1.verdict.contains("near exhaustion"));
 
         let snapshot_2 = snapshots
             .iter()
@@ -431,7 +453,7 @@ mod tests {
             .unwrap();
         assert_eq!(snapshot_2.spent_usd, 100.0);
         assert_eq!(snapshot_2.budget_cents, None);
-        assert!(snapshot_2.verdict.contains("Uncapped"));
+        assert!(snapshot_2.verdict.contains("uncapped"));
     }
 
     #[test]

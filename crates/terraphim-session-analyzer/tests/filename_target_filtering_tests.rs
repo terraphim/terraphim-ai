@@ -559,7 +559,7 @@ mod cli_integration_tests {
             .args([
                 "run",
                 "--bin",
-                "cla",
+                "tsa",
                 "--",
                 "analyze",
                 temp_dir.path().to_str().unwrap(),
@@ -646,7 +646,7 @@ mod cli_integration_tests {
             .args([
                 "run",
                 "--bin",
-                "cla",
+                "tsa",
                 "--",
                 "analyze",
                 temp_dir.path().to_str().unwrap(),
@@ -689,7 +689,7 @@ mod cli_integration_tests {
             .args([
                 "run",
                 "--bin",
-                "cla",
+                "tsa",
                 "--",
                 "analyze",
                 temp_dir.path().to_str().unwrap(),
@@ -723,7 +723,7 @@ mod cli_integration_tests {
             .args([
                 "run",
                 "--bin",
-                "cla",
+                "tsa",
                 "--",
                 "analyze",
                 temp_dir.path().to_str().unwrap(),
