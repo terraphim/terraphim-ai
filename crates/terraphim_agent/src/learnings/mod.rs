@@ -31,9 +31,9 @@ mod procedure;
 mod redaction;
 
 pub use capture::{
-    CorrectionEvent, CorrectionType, LearningEntry, LearningSource,
-    capture_correction, capture_failed_command, correct_learning, list_all_entries, list_learnings,
-    query_all_entries, query_learnings,
+    CorrectionEvent, CorrectionType, LearningEntry, LearningSource, capture_correction,
+    capture_failed_command, correct_learning, list_all_entries, list_learnings, query_all_entries,
+    query_learnings,
 };
 
 // Re-export for testing - not used by CLI yet
