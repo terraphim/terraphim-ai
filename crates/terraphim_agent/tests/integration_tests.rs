@@ -1,5 +1,5 @@
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::{Child, Command, Stdio};
 
 use anyhow::Result;
@@ -8,12 +8,40 @@ use std::str;
 use std::thread;
 use std::time::Duration;
 
+/// Get workspace root directory by walking up to find [workspace] in Cargo.toml
+fn get_workspace_root() -> Result<PathBuf> {
+    let mut current = std::env::current_dir()?;
+
+    loop {
+        let cargo_toml = current.join("Cargo.toml");
+        if cargo_toml.exists() {
+            if let Ok(content) = fs::read_to_string(&cargo_toml) {
+                if content.contains("[workspace]") {
+                    return Ok(current);
+                }
+            }
+        }
+
+        if !current.pop() {
+            break;
+        }
+    }
+
+    Ok(PathBuf::from("."))
+}
+
 /// Test helper to start a real terraphim server
 async fn start_test_server() -> Result<(Child, String)> {
     let port = portpicker::pick_unused_port().expect("Failed to find unused port");
     let server_url = format!("http://localhost:{}", port);
 
     println!("Starting test server on {}", server_url);
+
+    // Use absolute path for config to work in CI
+    let workspace_root = get_workspace_root()?;
+    let config_path = workspace_root.join("terraphim_server/default/terraphim_engineer_config.json");
+    
+    println!("Using config path: {}", config_path.display());
 
     let mut server = Command::new("cargo")
         .args([
@@ -22,12 +50,13 @@ async fn start_test_server() -> Result<(Child, String)> {
             "terraphim_server",
             "--",
             "--config",
-            "terraphim_server/default/terraphim_engineer_config.json",
+            config_path.to_str().unwrap(),
         ])
         // The server reads its bind address from settings (env/file), not TERRAPHIM_SERVER_PORT.
         // Override the server bind host+port explicitly for tests.
         .env("TERRAPHIM_SERVER_HOSTNAME", format!("127.0.0.1:{}", port))
         .env("RUST_LOG", "warn") // Reduce log noise
+        .current_dir(&workspace_root)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
@@ -89,7 +118,8 @@ fn run_server_command(server_url: &str, args: &[&str]) -> Result<(String, String
 
     let mut cmd = Command::new("cargo");
     cmd.args(["run", "-p", "terraphim_agent", "--"])
-        .args(&cmd_args);
+        .args(&cmd_args)
+        .env("TERRAPHIM_CLIENT_TIMEOUT", "120");
 
     let output = cmd.output()?;
 
@@ -283,9 +313,13 @@ async fn test_end_to_end_server_workflow() -> Result<()> {
     );
 
     // 3. Test search with server
-    let (_search_stdout, _, search_code) =
+    let (search_stdout, search_stderr, search_code) =
         run_server_command(&server_url, &["search", "integration test", "--limit", "3"])?;
-    assert_eq!(search_code, 0, "Server search should succeed");
+    if search_code != 0 {
+        println!("Search stdout: {}", search_stdout);
+        println!("Search stderr: {}", search_stderr);
+    }
+    assert_eq!(search_code, 0, "Server search should succeed: {}", search_stderr);
     println!("✓ Server search completed");
 
     // 4. Test role override in server mode
