@@ -2,7 +2,7 @@
 mod logical_operators_integration_tests {
     use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
     use terraphim_service::TerraphimService;
-    use terraphim_types::{LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
+    use terraphim_types::{Layer, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
 
     async fn setup_test_service() -> TerraphimService {
         let mut config = ConfigBuilder::new_with_id(ConfigId::Embedded)
@@ -27,6 +27,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         // Test that the search executes without error
@@ -60,6 +61,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result = service.search(&query).await;
@@ -87,6 +89,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result = service.search(&query).await;
@@ -114,6 +117,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result = service.search(&query).await;
@@ -140,6 +144,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result = service.search(&query).await;
@@ -169,6 +174,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result = service.search(&query).await;
@@ -197,6 +203,7 @@ mod logical_operators_integration_tests {
             skip: Some(0),
             limit: Some(3),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result1 = service.search(&query1).await;
@@ -214,6 +221,7 @@ mod logical_operators_integration_tests {
             skip: Some(3),
             limit: Some(3),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result2 = service.search(&query2).await;
@@ -248,6 +256,7 @@ mod logical_operators_integration_tests {
                 skip: Some(0),
                 limit: Some(5),
                 role: Some(RoleName::from(role_name)),
+                layer: Layer::default(),
             };
 
             let result = service.search(&query).await;

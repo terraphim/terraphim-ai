@@ -22,7 +22,7 @@ use anyhow::Result;
 
 use serial_test::serial;
 use terraphim_agent::client::ApiClient;
-use terraphim_types::{Document, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Document, Layer, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Get workspace root directory
 fn get_workspace_root() -> Result<PathBuf> {
@@ -276,6 +276,7 @@ async fn search_via_server(
         skip: Some(0),
         limit: Some(20),
         role: Some(RoleName::new(role)),
+        layer: Layer::default(),
     };
 
     let response = client.search(&search_query).await?;

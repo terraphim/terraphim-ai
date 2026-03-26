@@ -4,7 +4,7 @@ use ahash::AHashMap;
 use serial_test::serial;
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
 use terraphim_service::{TerraphimService, llm};
-use terraphim_types::{NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
+use terraphim_types::{Layer, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
 
 /// Comprehensive integration test suite for Ollama LLM integration with llama3.2:3b
 /// Tests connectivity, summarization, role configuration, and end-to-end search functionality
@@ -308,6 +308,7 @@ Rust has a vibrant community with excellent documentation, tutorials, and exampl
         limit: Some(5),
         skip: None,
         role: Some(role_name.clone()),
+        layer: Layer::default(),
     };
 
     let results = service
