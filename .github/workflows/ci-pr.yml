@@ -463,7 +463,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: cargo install cargo-audit --no-default-features
+        run: which cargo-audit || cargo install cargo-audit --no-default-features
 
       - name: Run security audit
         run: |
