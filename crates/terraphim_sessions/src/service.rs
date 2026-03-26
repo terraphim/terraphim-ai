@@ -83,7 +83,7 @@ impl SessionService {
 
         if cache_empty {
             tracing::info!("Cache empty, auto-importing sessions...");
-            let options = ImportOptions::new().with_limit(100);
+            let options = ImportOptions::new();
             match self.import_all(&options).await {
                 Ok(sessions) => {
                     tracing::info!("Auto-imported {} sessions", sessions.len());
