@@ -30,7 +30,7 @@ terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
 
 # Firecracker-rust core for VM and snapshot management
-fcctl-core = { path = "../../../firecracker-rust/fcctl-core" }
+fcctl-core = { git = "https://github.com/terraphim/firecracker-rust", branch = "main" }
 
 # Async utilities
 tokio-util = "0.7"
@@ -41,7 +41,7 @@ hyper = { version = "1.0", features = ["server", "http1"], optional = true }
 hyper-util = { version = "0.1", features = ["tokio"], optional = true }
 
 # Alternative execution backends
-bollard = { version = "0.18", optional = true }
+bollard = { version = "0.20", optional = true }
 reqwest = { workspace = true, optional = true }
 
 # DNS security
