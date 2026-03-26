@@ -53,6 +53,64 @@ pub enum SpawnerError {
     ConfigValidation(#[from] ValidationError),
 }
 
+/// Request to spawn an agent with primary and fallback configuration.
+///
+/// If the primary provider fails to spawn, the spawner will automatically
+/// retry with the fallback provider (if configured).
+#[derive(Debug, Clone)]
+pub struct SpawnRequest {
+    /// Primary provider configuration
+    pub primary_provider: Provider,
+    /// Primary model to use (if applicable)
+    pub primary_model: Option<String>,
+    /// Fallback provider configuration (if primary fails)
+    pub fallback_provider: Option<Provider>,
+    /// Fallback model to use (if applicable)
+    pub fallback_model: Option<String>,
+    /// Task/prompt to give the agent
+    pub task: String,
+    /// Whether to deliver task via stdin (for large prompts)
+    pub use_stdin: bool,
+}
+
+impl SpawnRequest {
+    /// Create a new spawn request with primary provider and task.
+    pub fn new(primary_provider: Provider, task: impl Into<String>) -> Self {
+        Self {
+            primary_provider,
+            primary_model: None,
+            fallback_provider: None,
+            fallback_model: None,
+            task: task.into(),
+            use_stdin: false,
+        }
+    }
+
+    /// Set the primary model.
+    pub fn with_primary_model(mut self, model: impl Into<String>) -> Self {
+        self.primary_model = Some(model.into());
+        self
+    }
+
+    /// Set the fallback provider.
+    pub fn with_fallback_provider(mut self, provider: Provider) -> Self {
+        self.fallback_provider = Some(provider);
+        self
+    }
+
+    /// Set the fallback model.
+    pub fn with_fallback_model(mut self, model: impl Into<String>) -> Self {
+        self.fallback_model = Some(model.into());
+        self
+    }
+
+    /// Use stdin for task delivery (for large prompts).
+    pub fn with_stdin(mut self) -> Self {
+        self.use_stdin = true;
+        self
+    }
+}
+
 /// Handle to a spawned agent process
 #[derive(Debug)]
 pub struct AgentHandle {
@@ -379,6 +437,90 @@ impl AgentSpawner {
     ) -> Result<AgentHandle, SpawnerError> {
         let config = AgentConfig::from_provider(provider)?;
         self.spawn_config(provider, &config, task, false).await
+    }
+
+    /// Spawn an agent with primary and fallback configuration.
+    ///
+    /// Attempts to spawn with the primary provider first. If that fails,
+    /// falls back to the fallback provider (if configured).
+    pub async fn spawn_with_fallback(
+        &self,
+        request: &SpawnRequest,
+    ) -> Result<AgentHandle, SpawnerError> {
+        // Try primary first
+        let primary_result = if request.use_stdin {
+            self.spawn_with_model_stdin(
+                &request.primary_provider,
+                &request.task,
+                request.primary_model.as_deref(),
+            )
+            .await
+        } else {
+            self.spawn_with_model(
+                &request.primary_provider,
+                &request.task,
+                request.primary_model.as_deref(),
+            )
+            .await
+        };
+
+        // If primary succeeds, return the handle
+        match primary_result {
+            Ok(handle) => Ok(handle),
+            Err(primary_err) => {
+                tracing::warn!(
+                    primary_provider = %request.primary_provider.id,
+                    error = %primary_err,
+                    "Primary spawn failed, attempting fallback"
+                );
+
+                // Try fallback if configured
+                if let Some(ref fallback) = request.fallback_provider {
+                    tracing::info!(
+                        fallback_provider = %fallback.id,
+                        "Attempting fallback spawn"
+                    );
+
+                    let fallback_result = if request.use_stdin {
+                        self.spawn_with_model_stdin(
+                            fallback,
+                            &request.task,
+                            request.fallback_model.as_deref(),
+                        )
+                        .await
+                    } else {
+                        self.spawn_with_model(
+                            fallback,
+                            &request.task,
+                            request.fallback_model.as_deref(),
+                        )
+                        .await
+                    };
+
+                    match fallback_result {
+                        Ok(handle) => {
+                            tracing::info!(
+                                fallback_provider = %fallback.id,
+                                "Fallback spawn succeeded"
+                            );
+                            Ok(handle)
+                        }
+                        Err(fallback_err) => {
+                            tracing::error!(
+                                fallback_provider = %fallback.id,
+                                error = %fallback_err,
+                                "Fallback spawn also failed"
+                            );
+                            // Return the primary error since that's the original failure
+                            Err(primary_err)
+                        }
+                    }
+                } else {
+                    // No fallback configured, return primary error
+                    Err(primary_err)
+                }
+            }
+        }
     }
 
     /// Internal spawn implementation shared by spawn() and spawn_with_model().
