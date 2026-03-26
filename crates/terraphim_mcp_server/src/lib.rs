@@ -15,7 +15,7 @@ use terraphim_automata::matcher::{extract_paragraphs_from_automata, find_matches
 use terraphim_automata::{AutocompleteConfig, AutocompleteIndex, AutocompleteResult};
 use terraphim_config::{Config, ConfigState};
 use terraphim_service::TerraphimService;
-use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 use thiserror::Error;
 use tracing::{error, info};
 
@@ -125,6 +125,7 @@ impl McpService {
             role: Some(role_name),
             limit: limit.map(|l| l as usize),
             skip: skip.map(|s| s as usize),
+            layer: Layer::default(),
         };
 
         match service.search(&search_query).await {
@@ -435,6 +436,7 @@ impl McpService {
                     role: None,
                     limit: Some(1),
                     skip: Some(0),
+                    layer: Layer::default(),
                 };
                 let snippet = match service.search(&sq).await {
                     Ok(documents) if !documents.is_empty() => {
@@ -1913,6 +1915,7 @@ impl ServerHandler for McpService {
                 limit: Some(50), // Reasonable limit per search
                 skip: None,
                 role: None,
+                layer: terraphim_types::Layer::default(),
             };
 
             match service.search(&search_query).await {
@@ -1937,6 +1940,7 @@ impl ServerHandler for McpService {
                 limit: Some(100),
                 skip: None,
                 role: None,
+                layer: terraphim_types::Layer::default(),
             };
 
             let documents = service

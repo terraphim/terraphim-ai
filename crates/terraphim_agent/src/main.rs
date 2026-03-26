@@ -38,7 +38,10 @@ mod repl;
 
 use client::{ApiClient, SearchResponse};
 use service::TuiService;
-use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{
+    Document, Layer, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery,
+    extract_first_paragraph,
+};
 use terraphim_update::{check_for_updates, check_for_updates_startup, update_binary};
 
 #[derive(clap::ValueEnum, Debug, Clone)]
@@ -475,6 +478,10 @@ struct SearchDocumentOutput {
     title: String,
     url: String,
     rank: Option<u64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    tags: Option<Vec<String>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    summary: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -483,6 +490,38 @@ struct SearchOutput {
     role: String,
     count: usize,
     results: Vec<SearchDocumentOutput>,
+}
+
+/// Extension trait to convert Document to layered output
+impl SearchDocumentOutput {
+    fn from_document(doc: &Document, layer: &Layer) -> Self {
+        match layer {
+            Layer::One => Self {
+                id: doc.id.clone(),
+                title: doc.title.clone(),
+                url: doc.url.clone(),
+                rank: doc.rank,
+                tags: doc.tags.clone(),
+                summary: None,
+            },
+            Layer::Two => Self {
+                id: doc.id.clone(),
+                title: doc.title.clone(),
+                url: doc.url.clone(),
+                rank: doc.rank,
+                tags: doc.tags.clone(),
+                summary: Some(extract_first_paragraph(&doc.body)),
+            },
+            Layer::Three => Self {
+                id: doc.id.clone(),
+                title: doc.title.clone(),
+                url: doc.url.clone(),
+                rank: doc.rank,
+                tags: doc.tags.clone(),
+                summary: None, // For full content, summary not needed
+            },
+        }
+    }
 }
 
 fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result<()> {
@@ -540,6 +579,9 @@ enum Command {
         role: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
+        /// Output layer: 1=minimal (title+tags), 2=summary, 3=full (default)
+        #[arg(long, default_value_t = 3, value_name = "1|2|3")]
+        layer: u8,
     },
     /// Manage roles (list, select)
     Roles {
@@ -1130,12 +1172,17 @@ async fn run_offline_command(
             operator,
             role,
             limit,
+            layer,
         } => {
             let role_name = if let Some(role) = role {
                 RoleName::new(&role)
             } else {
                 service.get_selected_role().await
             };
+
+            // Parse and validate layer
+            let layer =
+                terraphim_types::Layer::from_u8(layer).unwrap_or(terraphim_types::Layer::Three);
 
             let results = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
@@ -1170,6 +1217,7 @@ async fn run_offline_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name.clone()),
+                    layer,
                 };
 
                 service.search_with_query(&search_query).await?
@@ -1182,23 +1230,33 @@ async fn run_offline_command(
 
             if output.is_machine_readable() {
                 let payload = SearchOutput {
-                    query,
+                    query: query.clone(),
                     role: role_name.to_string(),
                     count: results.len(),
                     results: results
                         .iter()
-                        .map(|doc| SearchDocumentOutput {
-                            id: doc.id.clone(),
-                            title: doc.title.clone(),
-                            url: doc.url.clone(),
-                            rank: doc.rank,
-                        })
+                        .map(|doc| SearchDocumentOutput::from_document(doc, &layer))
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
                 for doc in results.iter() {
-                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                    match layer {
+                        Layer::One => {
+                            println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                        }
+                        Layer::Two => {
+                            let summary = extract_first_paragraph(&doc.body);
+                            println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                            println!("  {}", summary);
+                        }
+                        Layer::Three => {
+                            println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
+                            if let Some(ref tags) = doc.tags {
+                                println!("  Tags: {}", tags.join(", "));
+                            }
+                        }
+                    }
                 }
             }
             Ok(())
@@ -2172,6 +2230,7 @@ async fn run_server_command(
             operator,
             role,
             limit,
+            layer,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -2180,6 +2239,10 @@ async fn run_server_command(
                 let config_res = api.get_config().await?;
                 config_res.config.selected_role
             };
+
+            // Parse and validate layer
+            let layer =
+                terraphim_types::Layer::from_u8(layer).unwrap_or(terraphim_types::Layer::Three);
 
             let q = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
@@ -2195,6 +2258,7 @@ async fn run_server_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name),
+                    layer,
                 }
             } else {
                 // Single term query (backward compatibility)
@@ -2205,6 +2269,7 @@ async fn run_server_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name),
+                    layer,
                 }
             };
 
@@ -2239,12 +2304,7 @@ async fn run_server_command(
                     results: res
                         .results
                         .iter()
-                        .map(|doc| SearchDocumentOutput {
-                            id: doc.id.clone(),
-                            title: doc.title.clone(),
-                            url: doc.url.clone(),
-                            rank: doc.rank,
-                        })
+                        .map(|doc| SearchDocumentOutput::from_document(doc, &layer))
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
@@ -2955,6 +3015,7 @@ fn ui_loop(
                                             skip: Some(0),
                                             limit: Some(10),
                                             role: Some(RoleName::new(&role)),
+                                            layer: Layer::default(),
                                         };
                                         let resp = api.search(&q).await?;
                                         let lines: Vec<String> = resp
