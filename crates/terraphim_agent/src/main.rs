@@ -1955,7 +1955,7 @@ async fn run_offline_command(
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
         CorrectionType, LearningCaptureConfig, capture_correction, capture_failed_command,
-        correct_learning, list_all_entries, list_learnings, query_all_entries, query_learnings,
+        correct_learning, list_all_entries, query_all_entries,
     };
     let config = LearningCaptureConfig::default();
 
@@ -2070,7 +2070,7 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             let ct: CorrectionType = correction_type
                 .parse()
                 .unwrap_or(CorrectionType::Other(correction_type.clone()));
-            let mut correction = capture_correction(ct, &original, &corrected, &context, &config);
+            let correction = capture_correction(ct, &original, &corrected, &context, &config);
             if let Some(ref sid) = session_id {
                 // We need to read the file and update it with session_id
                 // For now, just print the session_id
