@@ -377,6 +377,7 @@ impl CorrectionEvent {
     }
 
     /// Set session ID.
+    #[allow(dead_code)]
     pub fn with_session_id(mut self, session_id: String) -> Self {
         self.session_id = Some(session_id);
         self
@@ -720,6 +721,7 @@ fn timestamp_millis() -> u64 {
 }
 
 /// List recent learnings from storage.
+#[allow(dead_code)]
 pub fn list_learnings(
     storage_dir: &PathBuf,
     limit: usize,
@@ -754,6 +756,7 @@ pub fn list_learnings(
     Ok(learnings)
 }
 
+#[allow(dead_code)]
 /// Query learnings by pattern (simple text search).
 pub fn query_learnings(
     storage_dir: &PathBuf,
@@ -820,13 +823,6 @@ pub enum LearningEntry {
 }
 
 impl LearningEntry {
-    pub fn captured_at(&self) -> DateTime<Utc> {
-        match self {
-            LearningEntry::Learning(l) => l.context.captured_at,
-            LearningEntry::Correction(c) => c.context.captured_at,
-        }
-    }
-
     pub fn source(&self) -> &LearningSource {
         match self {
             LearningEntry::Learning(l) => &l.source,
@@ -834,10 +830,18 @@ impl LearningEntry {
         }
     }
 
+    #[allow(dead_code)]
     pub fn id(&self) -> &str {
         match self {
             LearningEntry::Learning(l) => &l.id,
             LearningEntry::Correction(c) => &c.id,
+        }
+    }
+
+    pub fn captured_at(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            LearningEntry::Learning(l) => l.context.captured_at,
+            LearningEntry::Correction(c) => c.context.captured_at,
         }
     }
 
