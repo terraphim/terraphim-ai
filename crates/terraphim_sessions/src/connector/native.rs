@@ -71,7 +71,12 @@ impl SessionConnector for NativeClaudeConnector {
 
         tracing::info!("Found {} JSONL files", jsonl_files.len());
 
-        for file_path in jsonl_files {
+        let total = jsonl_files.len();
+        for (idx, file_path) in jsonl_files.into_iter().enumerate() {
+            // Log progress every 50 sessions or at the end
+            if idx > 0 && (idx % 50 == 0 || idx == total - 1) {
+                tracing::info!("Imported {}/{} sessions...", idx, total);
+            }
             match self.parse_session_file(&file_path).await {
                 Ok(session) => {
                     if let Some(session) = session {
@@ -98,12 +103,17 @@ impl SessionConnector for NativeClaudeConnector {
             // Apply limit
             if let Some(limit) = options.limit {
                 if sessions.len() >= limit {
+                    tracing::info!("Reached limit of {} sessions, stopping import", limit);
                     break;
                 }
             }
         }
 
-        tracing::info!("Imported {} Claude sessions", sessions.len());
+        tracing::info!(
+            "Imported {} Claude sessions (from {} files)",
+            sessions.len(),
+            total
+        );
         Ok(sessions)
     }
 }
