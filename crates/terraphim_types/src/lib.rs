@@ -392,6 +392,10 @@ pub struct MarkdownDirectives {
     pub route: Option<RouteDirective>,
     #[serde(default)]
     pub priority: Option<u8>,
+    #[serde(default)]
+    pub trigger: Option<String>,
+    #[serde(default)]
+    pub pinned: bool,
 }
 
 /// The central document type representing indexed and searchable content.
