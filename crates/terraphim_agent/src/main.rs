@@ -777,6 +777,17 @@ enum LearnSub {
         #[arg(long)]
         session_id: Option<String>,
     },
+    /// Suggest relevant past learnings based on context
+    Suggest {
+        /// Context string (e.g., current working directory or task description)
+        context: String,
+        /// Maximum number of suggestions to show
+        #[arg(long, default_value_t = 5)]
+        limit: usize,
+        /// Show global learnings instead of project
+        #[arg(long, default_value_t = false)]
+        global: bool,
+    },
     /// Process hook input from AI agents (reads JSON from stdin)
     Hook {
         /// AI agent format
@@ -1955,7 +1966,7 @@ async fn run_offline_command(
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
         CorrectionType, LearningCaptureConfig, capture_correction, capture_failed_command,
-        correct_learning, list_all_entries, query_all_entries,
+        correct_learning, list_all_entries, query_all_entries, suggest_learnings,
     };
     let config = LearningCaptureConfig::default();
 
@@ -2085,6 +2096,57 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                     eprintln!("Failed to capture correction: {}", e);
                     Err(e.into())
                 }
+            }
+        }
+        LearnSub::Suggest {
+            context,
+            limit,
+            global,
+        } => {
+            let storage_loc = config.storage_location();
+            let storage_dir = if global {
+                &config.global_dir
+            } else {
+                &storage_loc
+            };
+            match suggest_learnings(storage_dir, &context, limit) {
+                Ok(scored) => {
+                    if scored.is_empty() {
+                        println!("No relevant learnings found for context.");
+                    } else {
+                        println!("Suggested learnings for context:",);
+                        for (i, scored_entry) in scored.iter().enumerate() {
+                            let source_indicator = match scored_entry.entry.source() {
+                                learnings::LearningSource::Project => "[P]",
+                                learnings::LearningSource::Global => "[G]",
+                            };
+                            let suggestion = match &scored_entry.entry {
+                                learnings::LearningEntry::Learning(l) => {
+                                    format!("[cmd] {} (exit: {})", l.command, l.exit_code)
+                                }
+                                learnings::LearningEntry::Correction(c) => {
+                                    format!(
+                                        "[{}] {} -> {}",
+                                        c.correction_type, c.original, c.corrected
+                                    )
+                                }
+                            };
+                            println!(
+                                "  {}. {} {} (score: {})",
+                                i + 1,
+                                source_indicator,
+                                suggestion,
+                                scored_entry.score
+                            );
+                            println!("     ID: {}", scored_entry.entry.id());
+                            if let Some(correction) = scored_entry.entry.correction_text() {
+                                println!("     Correction: {}", correction);
+                            }
+                        }
+                    }
+                    Ok(())
+                }
+                Err(e) => Err(e.into()),
             }
         }
         LearnSub::Hook { format } => learnings::process_hook_input(format)

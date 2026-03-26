@@ -932,6 +932,121 @@ pub fn query_all_entries(
     Ok(filtered)
 }
 
+/// Score entry relevance based on keyword matching.
+/// Returns a score based on the number of matching keywords between
+/// the context and the learning content.
+fn score_entry_relevance(entry: &LearningEntry, context_keywords: &[String]) -> usize {
+    let text = match entry {
+        LearningEntry::Learning(l) => {
+            format!("{} {} {:?}", l.command, l.error_output, l.tags)
+        }
+        LearningEntry::Correction(c) => {
+            format!("{} {} {}", c.original, c.corrected, c.context_description)
+        }
+    }
+    .to_lowercase();
+
+    context_keywords
+        .iter()
+        .filter(|keyword| text.contains(*keyword))
+        .count()
+}
+
+/// A scored learning entry with its relevance score.
+#[derive(Debug, Clone)]
+pub struct ScoredEntry {
+    /// The learning entry
+    pub entry: LearningEntry,
+    /// Relevance score (higher is better)
+    pub score: usize,
+}
+
+impl ScoredEntry {
+    /// Format as a suggestion line for display.
+    #[allow(dead_code)]
+    pub fn format_suggestion(&self) -> String {
+        match &self.entry {
+            LearningEntry::Learning(l) => {
+                format!("[cmd] {} (exit: {}) - {}", l.command, l.exit_code, l.id)
+            }
+            LearningEntry::Correction(c) => {
+                format!(
+                    "[{}] {} -> {} - {}",
+                    c.correction_type, c.original, c.corrected, c.id
+                )
+            }
+        }
+    }
+}
+
+/// Suggest learnings based on context relevance.
+///
+/// Takes a context string (e.g., current working directory or task description),
+/// extracts keywords from it, and scores all learnings by keyword frequency.
+/// Returns the top-N most relevant learnings.
+///
+/// # Arguments
+///
+/// * `storage_dir` - Directory containing learning markdown files
+/// * `context` - Context string to match against (e.g., "rust project with cargo build")
+/// * `limit` - Maximum number of suggestions to return
+///
+/// # Returns
+///
+/// List of scored entries sorted by relevance (highest first).
+pub fn suggest_learnings(
+    storage_dir: &PathBuf,
+    context: &str,
+    limit: usize,
+) -> Result<Vec<ScoredEntry>, LearningError> {
+    let all_entries = list_all_entries(storage_dir, usize::MAX)?;
+
+    if all_entries.is_empty() {
+        return Ok(Vec::new());
+    }
+
+    // Extract keywords from context (simple word tokenization)
+    let context_keywords: Vec<String> = context
+        .split_whitespace()
+        .map(|w| {
+            w.to_lowercase()
+                .trim_matches(|c: char| !c.is_alphanumeric())
+                .to_string()
+        })
+        .filter(|w| !w.is_empty() && w.len() > 2) // Filter out short words
+        .collect();
+
+    if context_keywords.is_empty() {
+        // Fallback: return most recent entries if no keywords extracted
+        let recent: Vec<ScoredEntry> = all_entries
+            .into_iter()
+            .take(limit)
+            .map(|entry| ScoredEntry { entry, score: 0 })
+            .collect();
+        return Ok(recent);
+    }
+
+    // Score all entries
+    let mut scored: Vec<ScoredEntry> = all_entries
+        .into_iter()
+        .map(|entry| {
+            let score = score_entry_relevance(&entry, &context_keywords);
+            ScoredEntry { entry, score }
+        })
+        .filter(|se| se.score > 0) // Only include entries with at least one match
+        .collect();
+
+    // Sort by score descending
+    scored.sort_by(|a, b| b.score.cmp(&a.score));
+
+    // Limit results
+    if scored.len() > limit {
+        scored.truncate(limit);
+    }
+
+    Ok(scored)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
