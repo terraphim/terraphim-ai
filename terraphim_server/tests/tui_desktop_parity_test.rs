@@ -13,7 +13,7 @@ use terraphim_config::{
 };
 use terraphim_server::axum_server;
 use terraphim_types::{
-    KnowledgeGraphInputType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
+    KnowledgeGraphInputType, Layer, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
 };
 
 fn sample_config_with_kg() -> terraphim_config::Config {
@@ -129,6 +129,7 @@ async fn test_tui_vs_direct_api_search_parity() {
         skip: Some(0),
         limit: Some(limit),
         role: Some(RoleName::new(test_role)),
+        layer: Layer::default(),
     };
 
     let tui_result = tui_client.search(&tui_query).await;
@@ -366,6 +367,7 @@ async fn test_search_consistency_across_interfaces() {
             skip: Some(0),
             limit: Some(3),
             role: Some(RoleName::new(test_role)),
+            layer: Layer::default(),
         };
 
         let mut results = Vec::new();
@@ -420,6 +422,7 @@ async fn test_pagination_parity() {
         skip: Some(0),
         limit: Some(limit),
         role: Some(RoleName::new(role)),
+        layer: Layer::default(),
     };
 
     let tui_page1 = tui_client.search(&page1_query).await;
@@ -444,6 +447,7 @@ async fn test_pagination_parity() {
         skip: Some(limit),
         limit: Some(limit),
         role: Some(RoleName::new(role)),
+        layer: Layer::default(),
     };
 
     let tui_page2 = tui_client.search(&page2_query).await;
@@ -503,6 +507,7 @@ async fn test_error_handling_parity() {
         skip: Some(0),
         limit: Some(5),
         role: Some(RoleName::new("NonExistentRole")),
+        layer: Layer::default(),
     };
 
     let tui_result = tui_client.search(&invalid_query).await;
