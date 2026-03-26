@@ -800,6 +800,17 @@ enum LearnSub {
         #[arg(value_enum)]
         agent: learnings::AgentType,
     },
+    /// Auto-extract corrections from session transcript
+    AutoExtract {
+        /// Path to JSONL transcript file
+        transcript_path: String,
+        /// Save extracted corrections to storage
+        #[arg(long, default_value_t = false)]
+        save: bool,
+        /// Show global learnings instead of project
+        #[arg(long, default_value_t = false)]
+        global: bool,
+    },
 }
 
 #[derive(Subcommand, Debug)]
@@ -2154,6 +2165,57 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
             .map_err(|e| e.into()),
         LearnSub::InstallHook { agent } => {
             learnings::install_hook(agent).await.map_err(|e| e.into())
+        }
+        LearnSub::AutoExtract {
+            transcript_path,
+            save,
+            global,
+        } => {
+            use learnings::auto_extract_corrections;
+            use std::path::PathBuf;
+
+            let storage_loc = config.storage_location();
+            let storage_dir = if global {
+                &config.global_dir
+            } else {
+                &storage_loc
+            };
+            let transcript_path = PathBuf::from(transcript_path);
+
+            match auto_extract_corrections(&transcript_path) {
+                Ok(corrections) => {
+                    if corrections.is_empty() {
+                        println!("No corrections found in transcript.");
+                    } else {
+                        println!("Extracted {} correction(s):", corrections.len());
+                        for (i, correction) in corrections.iter().enumerate() {
+                            println!("  {}. Type: {}", i + 1, correction.correction_type);
+                            println!("     Original: {}", correction.original);
+                            println!("     Corrected: {}", correction.corrected);
+                            if !correction.context_description.is_empty() {
+                                println!("     Context: {}", correction.context_description);
+                            }
+                            if save {
+                                // Save the correction to storage
+                                let filename = format!("correction-{}.md", correction.id);
+                                let filepath = storage_dir.join(&filename);
+                                match std::fs::write(&filepath, correction.to_markdown()) {
+                                    Ok(_) => println!("     Saved: {}", filepath.display()),
+                                    Err(e) => eprintln!("     Error saving: {}", e),
+                                }
+                            }
+                        }
+                        if save {
+                            println!("\nAll corrections saved to: {}", storage_dir.display());
+                        }
+                    }
+                    Ok(())
+                }
+                Err(e) => {
+                    eprintln!("Failed to extract corrections: {}", e);
+                    Err(e.into())
+                }
+            }
         }
     }
 }
