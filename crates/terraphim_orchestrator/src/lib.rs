@@ -65,10 +65,12 @@ use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
 
+use std::sync::{Arc, Mutex};
+
 use terraphim_router::RoutingEngine;
-use terraphim_spawner::health::HealthStatus;
+use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
 use terraphim_spawner::output::OutputEvent;
-use terraphim_spawner::{AgentHandle, AgentSpawner};
+use terraphim_spawner::{AgentHandle, AgentSpawner, SpawnRequest};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
@@ -123,6 +125,9 @@ pub struct AgentOrchestrator {
     persona_registry: PersonaRegistry,
     /// Renderer for persona metaprompts.
     metaprompt_renderer: MetapromptRenderer,
+    /// Circuit breakers for each provider to prevent cascading failures.
+    #[allow(dead_code)]
+    circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -209,6 +214,7 @@ impl AgentOrchestrator {
             cost_tracker,
             persona_registry,
             metaprompt_renderer,
+            circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
         })
     }
 
@@ -500,8 +506,8 @@ impl AgentOrchestrator {
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
         let use_stdin = persona_found || composed_task.len() > STDIN_THRESHOLD;
 
-        // Build a Provider from the agent definition for the spawner
-        let provider = terraphim_types::capability::Provider {
+        // Build primary Provider from the agent definition for the spawner
+        let primary_provider = terraphim_types::capability::Provider {
             id: def.name.clone(),
             name: def.name.clone(),
             provider_type: terraphim_types::capability::ProviderType::Agent {
@@ -515,19 +521,46 @@ impl AgentOrchestrator {
             keywords: def.capabilities.clone(),
         };
 
-        let handle = if use_stdin {
-            self.spawner
-                .spawn_with_model_stdin(&provider, &composed_task, model.as_deref())
-                .await
-        } else {
-            self.spawner
-                .spawn_with_model(&provider, &composed_task, model.as_deref())
-                .await
+        // Build fallback Provider if fallback_provider is configured
+        let fallback_provider = def.fallback_provider.as_ref().map(|fallback_cli| {
+            terraphim_types::capability::Provider {
+                id: format!("{}-fallback", def.name),
+                name: format!("{} (fallback)", def.name),
+                provider_type: terraphim_types::capability::ProviderType::Agent {
+                    agent_id: format!("{}-fallback", def.name),
+                    cli_command: fallback_cli.clone(),
+                    working_dir: self.config.working_dir.clone(),
+                },
+                capabilities: vec![],
+                cost_level: terraphim_types::capability::CostLevel::Cheap,
+                latency: terraphim_types::capability::Latency::Medium,
+                keywords: def.capabilities.clone(),
+            }
+        });
+
+        // Build the spawn request with primary and fallback
+        let mut request = SpawnRequest::new(primary_provider, &composed_task)
+            .with_primary_model(model.as_deref().unwrap_or(""));
+
+        if let Some(fallback) = fallback_provider {
+            request = request.with_fallback_provider(fallback);
+            if let Some(fallback_model) = &def.fallback_model {
+                request = request.with_fallback_model(fallback_model);
+            }
         }
-        .map_err(|e| OrchestratorError::SpawnFailed {
-            agent: def.name.clone(),
-            reason: e.to_string(),
-        })?;
+
+        if use_stdin {
+            request = request.with_stdin();
+        }
+
+        let handle = self
+            .spawner
+            .spawn_with_fallback(&request)
+            .await
+            .map_err(|e| OrchestratorError::SpawnFailed {
+                agent: def.name.clone(),
+                reason: e.to_string(),
+            })?;
 
         // Subscribe to the output broadcast for nightwatch drain
         let output_rx = handle.subscribe_output();
