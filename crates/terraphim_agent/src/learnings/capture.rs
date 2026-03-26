@@ -756,6 +756,7 @@ pub fn list_learnings(
     Ok(learnings)
 }
 
+#[allow(dead_code)]
 /// Query learnings by pattern (simple text search).
 #[allow(dead_code)]
 pub fn query_learnings(
@@ -823,13 +824,6 @@ pub enum LearningEntry {
 }
 
 impl LearningEntry {
-    pub fn captured_at(&self) -> DateTime<Utc> {
-        match self {
-            LearningEntry::Learning(l) => l.context.captured_at,
-            LearningEntry::Correction(c) => c.context.captured_at,
-        }
-    }
-
     pub fn source(&self) -> &LearningSource {
         match self {
             LearningEntry::Learning(l) => &l.source,
@@ -842,6 +836,13 @@ impl LearningEntry {
         match self {
             LearningEntry::Learning(l) => &l.id,
             LearningEntry::Correction(c) => &c.id,
+        }
+    }
+
+    pub fn captured_at(&self) -> chrono::DateTime<chrono::Utc> {
+        match self {
+            LearningEntry::Learning(l) => l.context.captured_at,
+            LearningEntry::Correction(c) => c.context.captured_at,
         }
     }
 

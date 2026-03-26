@@ -36,7 +36,6 @@ pub use capture::{
     capture_correction, capture_failed_command, correct_learning, list_all_entries,
     query_all_entries, suggest_learnings,
 };
-
 // Re-export for testing - not used by CLI yet
 #[allow(unused_imports)]
 pub use capture::{CapturedLearning, LearningContext, LearningError};
