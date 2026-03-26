@@ -48,6 +48,158 @@ pub fn validate_certificate(cert: &ReasoningCertificate) -> bool {
         && cert.confidence > 0.0
 }
 
+/// Dual-panel evaluation result for detecting drift through independent assessments.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DualPanelResult {
+    /// Automated metric (e.g., certificate completeness).
+    pub panel_a_score: f64,
+    /// Independent metric (e.g., output length/structure).
+    pub panel_b_score: f64,
+    /// How closely panels agree (0.0-1.0).
+    pub agreement: f64,
+    /// True if panels disagree significantly.
+    pub drift_detected: bool,
+    /// Human-readable summary.
+    pub details: String,
+}
+
+/// Evaluate agent output using dual-panel assessment.
+///
+/// Panel A evaluates certificate quality (if present) by checking:
+/// - Presence of sufficient premises (>= 2)
+/// - Presence of claims
+/// - Non-empty conclusion
+/// - Positive confidence score
+///
+/// Panel B evaluates output structure by checking:
+/// - Presence of section headers (## or similar)
+/// - Presence of evidence markers ("evidence:", "because", etc.)
+/// - Presence of conclusion markers ("conclusion:", "therefore", etc.)
+///
+/// Returns a `DualPanelResult` with agreement score and drift detection flag.
+/// Drift is detected when panel agreement is below 0.5.
+pub fn dual_panel_evaluate(
+    output: &str,
+    certificate: Option<&ReasoningCertificate>,
+) -> DualPanelResult {
+    // Panel A: Certificate quality score (0.0-1.0)
+    let panel_a_score = if let Some(cert) = certificate {
+        calculate_certificate_score(cert)
+    } else {
+        0.0
+    };
+
+    // Panel B: Output structure score (0.0-1.0)
+    let panel_b_score = calculate_structure_score(output);
+
+    // Calculate agreement: 1.0 - absolute difference
+    let agreement = 1.0 - (panel_a_score - panel_b_score).abs();
+
+    // Drift detected if agreement is below threshold
+    let drift_detected = agreement < 0.5;
+
+    // Build human-readable details
+    let details = format!(
+        "Panel A (certificate): {:.2}, Panel B (structure): {:.2}, Agreement: {:.2} - {}",
+        panel_a_score,
+        panel_b_score,
+        agreement,
+        if drift_detected {
+            "DRIFT DETECTED: panels disagree significantly"
+        } else {
+            "No drift: panels agree"
+        }
+    );
+
+    DualPanelResult {
+        panel_a_score,
+        panel_b_score,
+        agreement,
+        drift_detected,
+        details,
+    }
+}
+
+/// Calculate certificate quality score (0.0-1.0).
+///
+/// Base score of 0.5 if certificate passes validation.
+/// Additional points for:
+/// - Multiple premises (> 2)
+/// - Multiple claims
+/// - Edge cases considered
+/// - High confidence (> 0.8)
+fn calculate_certificate_score(cert: &ReasoningCertificate) -> f64 {
+    if !validate_certificate(cert) {
+        return 0.0;
+    }
+
+    let mut score: f64 = 0.5; // Base score for passing validation
+
+    // Bonus for extra premises
+    if cert.premises.len() > 2 {
+        score += 0.1;
+    }
+
+    // Bonus for multiple claims
+    if cert.claims.len() > 1 {
+        score += 0.1;
+    }
+
+    // Bonus for edge cases
+    if !cert.edge_cases.is_empty() {
+        score += 0.1;
+    }
+
+    // Bonus for high confidence
+    if cert.confidence > 0.8 {
+        score += 0.2;
+    }
+
+    score.min(1.0)
+}
+
+/// Calculate output structure score (0.0-1.0).
+///
+/// Checks for:
+/// - Section headers (##, ###)
+/// - Evidence markers
+/// - Conclusion markers
+/// - Minimum length
+fn calculate_structure_score(output: &str) -> f64 {
+    let lower = output.to_lowercase();
+    let mut score: f64 = 0.0;
+
+    // Check for section headers
+    if lower.contains("##") || lower.contains("###") {
+        score += 0.3;
+    }
+
+    // Check for evidence markers
+    if lower.contains("evidence:")
+        || lower.contains("because")
+        || lower.contains("since")
+        || lower.contains("given that")
+    {
+        score += 0.3;
+    }
+
+    // Check for conclusion markers
+    if lower.contains("conclusion:")
+        || lower.contains("therefore")
+        || lower.contains("thus")
+        || lower.contains("in conclusion")
+    {
+        score += 0.3;
+    }
+
+    // Minimum length check (at least 100 chars for meaningful content)
+    if output.len() >= 100 {
+        score += 0.1;
+    }
+
+    score.min(1.0)
+}
+
 /// Behavioral drift metrics for a single agent.
 #[derive(Debug, Clone, Default)]
 pub struct DriftMetrics {
@@ -756,5 +908,236 @@ mod tests {
         assert_eq!(claim.claim, "test claim");
         assert_eq!(claim.evidence, "test evidence");
         assert!(claim.dimension.is_none());
+    }
+
+    // ========================================================================
+    // Dual-Panel Evaluation Tests (Gitea #91)
+    // ========================================================================
+
+    #[test]
+    fn test_dual_panel_both_agree_no_drift() {
+        let output = r#"## Analysis
+This is a well-structured output with evidence.
+
+## Evidence
+The data shows X because of Y.
+
+## Conclusion
+Therefore, we should proceed with Z."#;
+
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![
+                Claim {
+                    claim: "claim1".to_string(),
+                    evidence: "evidence1".to_string(),
+                    dimension: Some("test".to_string()),
+                },
+                Claim {
+                    claim: "claim2".to_string(),
+                    evidence: "evidence2".to_string(),
+                    dimension: Some("test2".to_string()),
+                },
+            ],
+            edge_cases: vec!["edge1".to_string()],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.95,
+        };
+
+        let result = dual_panel_evaluate(output, Some(&cert));
+
+        // Both panels should have high scores
+        assert!(
+            result.panel_a_score > 0.5,
+            "Panel A should score high with valid cert"
+        );
+        assert!(
+            result.panel_b_score > 0.5,
+            "Panel B should score high with structured output"
+        );
+        assert!(result.agreement >= 0.5, "Panels should agree");
+        assert!(
+            !result.drift_detected,
+            "No drift should be detected when panels agree"
+        );
+    }
+
+    #[test]
+    fn test_dual_panel_disagree_drift_detected() {
+        // Good certificate but poor output structure
+        let output = "short"; // No sections, no evidence, no conclusion
+
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![Claim {
+                claim: "claim1".to_string(),
+                evidence: "evidence1".to_string(),
+                dimension: None,
+            }],
+            edge_cases: vec![],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.95,
+        };
+
+        let result = dual_panel_evaluate(output, Some(&cert));
+
+        // Panel A should score high (valid cert), Panel B should score low (poor structure)
+        assert!(result.panel_a_score > 0.0, "Panel A should have some score");
+        assert!(
+            result.panel_b_score < 0.5,
+            "Panel B should score low with unstructured output"
+        );
+        assert!(result.agreement < 0.5, "Panels should disagree");
+        assert!(
+            result.drift_detected,
+            "Drift should be detected when panels disagree"
+        );
+    }
+
+    #[test]
+    fn test_dual_panel_missing_certificate() {
+        let output = r#"## Analysis
+This output has structure but no certificate.
+
+## Evidence
+Because of reasons.
+
+## Conclusion
+Therefore, success."#;
+
+        let result = dual_panel_evaluate(output, None);
+
+        // Panel A should be 0 without certificate
+        assert_eq!(
+            result.panel_a_score, 0.0,
+            "Panel A should be 0 when no certificate"
+        );
+        // Panel B should still evaluate structure
+        assert!(
+            result.panel_b_score > 0.5,
+            "Panel B should score high with structured output"
+        );
+        // Panels should disagree significantly
+        assert!(
+            result.drift_detected,
+            "Drift should be detected when certificate is missing"
+        );
+    }
+
+    #[test]
+    fn test_dual_panel_both_poor_no_drift() {
+        // Poor certificate and poor output (both panels agree on low quality)
+        let output = "x";
+
+        let cert = ReasoningCertificate {
+            premises: vec!["only_one".to_string()], // Invalid: needs >= 2
+            claims: vec![],
+            edge_cases: vec![],
+            formal_conclusion: "".to_string(),
+            confidence: 0.0,
+        };
+
+        let result = dual_panel_evaluate(output, Some(&cert));
+
+        // Both panels should score low
+        assert_eq!(
+            result.panel_a_score, 0.0,
+            "Panel A should be 0 with invalid cert"
+        );
+        assert_eq!(
+            result.panel_b_score, 0.0,
+            "Panel B should be 0 with no structure"
+        );
+        // Perfect agreement (both 0)
+        assert_eq!(
+            result.agreement, 1.0,
+            "Agreement should be perfect when both score 0"
+        );
+        assert!(
+            !result.drift_detected,
+            "No drift when both panels agree (even if low)"
+        );
+    }
+
+    #[test]
+    fn test_dual_panel_result_serialization() {
+        let result = DualPanelResult {
+            panel_a_score: 0.9,
+            panel_b_score: 0.8,
+            agreement: 0.9,
+            drift_detected: false,
+            details: "Test details".to_string(),
+        };
+
+        let json = serde_json::to_string(&result).unwrap();
+        assert!(json.contains("panel_a_score"));
+        assert!(json.contains("0.9"));
+        assert!(json.contains("drift_detected"));
+
+        let deserialized: DualPanelResult = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.panel_a_score, 0.9);
+        assert_eq!(deserialized.panel_b_score, 0.8);
+        assert_eq!(deserialized.agreement, 0.9);
+        assert!(!deserialized.drift_detected);
+    }
+
+    #[test]
+    fn test_calculate_certificate_score_components() {
+        // Minimal valid certificate (base score only)
+        let minimal = ReasoningCertificate {
+            premises: vec!["p1".to_string(), "p2".to_string()],
+            claims: vec![Claim {
+                claim: "c1".to_string(),
+                evidence: "e1".to_string(),
+                dimension: None,
+            }],
+            edge_cases: vec![],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.5,
+        };
+        assert_eq!(calculate_certificate_score(&minimal), 0.5);
+
+        // Certificate with all bonuses
+        let full = ReasoningCertificate {
+            premises: vec!["p1".to_string(), "p2".to_string(), "p3".to_string()],
+            claims: vec![
+                Claim {
+                    claim: "c1".to_string(),
+                    evidence: "e1".to_string(),
+                    dimension: None,
+                },
+                Claim {
+                    claim: "c2".to_string(),
+                    evidence: "e2".to_string(),
+                    dimension: None,
+                },
+            ],
+            edge_cases: vec!["edge".to_string()],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.95,
+        };
+        assert_eq!(calculate_certificate_score(&full), 1.0);
+    }
+
+    #[test]
+    fn test_calculate_structure_score_components() {
+        // Empty output
+        assert_eq!(calculate_structure_score(""), 0.0);
+
+        // Just length
+        assert_eq!(calculate_structure_score("x".repeat(100).as_str()), 0.1);
+
+        // With sections
+        assert!(calculate_structure_score("## Section") >= 0.3);
+
+        // With evidence marker
+        assert!(calculate_structure_score("evidence: because") >= 0.3);
+
+        // With conclusion marker
+        assert!(calculate_structure_score("conclusion: therefore") >= 0.3);
+
+        // Full structure (with enough length to get the bonus)
+        let full = "## Analysis\n\nevidence: X is supported by the data\n\nconclusion: Therefore we should proceed with Y. This is the final conclusion of this analysis.";
+        assert!((calculate_structure_score(full) - 1.0).abs() < f64::EPSILON);
     }
 }
