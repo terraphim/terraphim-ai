@@ -48,6 +48,7 @@ async fn atlassian_ripgrep_haystack_smoke() {
         role: Some("Atlassian".into()),
         operator: Some(terraphim_types::LogicalOperator::And),
         search_terms: None,
+        layer: Default::default(),
     };
     let result = search_haystacks(config_state, query).await;
     assert!(

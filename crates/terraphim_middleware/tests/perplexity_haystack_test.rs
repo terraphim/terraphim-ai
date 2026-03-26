@@ -225,6 +225,7 @@ async fn test_perplexity_missing_api_key() {
         skip: Some(0),
         limit: Some(10),
         role: Some("Perplexity Test".into()),
+        layer: Default::default(),
     };
 
     let result = search_haystacks(config_state, query).await;
@@ -323,6 +324,7 @@ async fn perplexity_live_api_test() {
         skip: Some(0),
         limit: Some(5),
         role: Some("Perplexity Live Test".into()),
+        layer: Default::default(),
     };
 
     println!("Sending query: {}", query.search_term.as_str());

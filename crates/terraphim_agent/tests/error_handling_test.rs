@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use serial_test::serial;
 use terraphim_agent::client::ApiClient;
-use terraphim_types::{Document, DocumentType, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Document, DocumentType, Layer, NormalizedTermValue, RoleName, SearchQuery};
 use tokio::time::timeout;
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";
@@ -92,6 +92,7 @@ async fn test_malformed_server_response() {
         skip: Some(0),
         limit: Some(100000), // Extremely large limit
         role: Some(RoleName::new("Default")),
+        layer: Layer::default(),
     };
 
     let result = client.search(&extreme_query).await;
@@ -137,6 +138,7 @@ async fn test_invalid_role_handling() {
         skip: Some(0),
         limit: Some(5),
         role: Some(RoleName::new("CompleteLyInvalidRoleName12345")),
+        layer: Layer::default(),
     };
 
     let result = client.search(&invalid_query).await;
@@ -200,6 +202,7 @@ async fn test_empty_and_special_character_queries() {
             skip: Some(0),
             limit: Some(5),
             role: Some(RoleName::new("Default")),
+            layer: Layer::default(),
         };
 
         let result = client.search(&search_query).await;
@@ -253,6 +256,7 @@ async fn test_concurrent_request_handling() {
                 skip: Some(0),
                 limit: Some(3),
                 role: Some(RoleName::new("Default")),
+                layer: Layer::default(),
             };
             client_clone.search(&query).await
         });
@@ -517,6 +521,7 @@ async fn test_graceful_degradation() {
                     skip: Some(0),
                     limit: Some(1),
                     role: Some(RoleName::new("Default")),
+                    layer: Layer::default(),
                 };
                 client
                     .search(&query)

@@ -3,7 +3,9 @@ use std::collections::HashMap;
 use terraphim_config::{Config, ConfigState, Haystack, Role, ServiceType};
 use terraphim_persistence::Persistable;
 use terraphim_service::TerraphimService;
-use terraphim_types::{Document, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery};
+use terraphim_types::{
+    Document, Layer, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
+};
 
 /// Test that haystack weights correctly affect document ranking
 #[tokio::test]
@@ -118,6 +120,7 @@ async fn test_weighted_haystack_ranking() {
         skip: None,
         limit: None,
         role: Some(RoleName::from("Test Role")),
+        layer: Layer::default(),
     };
     // Perform search which should apply haystack weights
     let search_result = service.search(&search_query).await.expect("Search failed");
@@ -228,6 +231,7 @@ async fn test_default_weight_handling() {
         skip: None,
         limit: None,
         role: Some(RoleName::from("Test Role")),
+        layer: Layer::default(),
     };
 
     let search_result = service.search(&search_query).await.expect("Search failed");
