@@ -744,8 +744,67 @@ impl IntoIterator for Index {
     }
 }
 
+/// Quality scores for Knowledge/Learning/Synthesis (K/L/S) dimensions.
+///
+/// These scores represent the quality of a document across three dimensions:
+/// - Knowledge: Depth and accuracy of domain knowledge
+/// - Learning: Educational value and clarity
+/// - Synthesis: Integration of concepts and insight
+///
+/// All scores are optional and range from 0.0 to 1.0 when present.
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct QualityScore {
+    /// Knowledge quality score (0.0-1.0)
+    pub knowledge: Option<f64>,
+    /// Learning quality score (0.0-1.0)
+    pub learning: Option<f64>,
+    /// Synthesis quality score (0.0-1.0)
+    pub synthesis: Option<f64>,
+}
+
+impl QualityScore {
+    /// Calculate the composite score by averaging all available scores.
+    ///
+    /// Returns 0.0 if no scores are available.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use terraphim_types::QualityScore;
+    ///
+    /// let score = QualityScore {
+    ///     knowledge: Some(0.8),
+    ///     learning: Some(0.6),
+    ///     synthesis: None,
+    /// };
+    /// assert_eq!(score.composite(), 0.7); // (0.8 + 0.6) / 2
+    ///
+    /// let empty = QualityScore::default();
+    /// assert_eq!(empty.composite(), 0.0);
+    /// ```
+    pub fn composite(&self) -> f64 {
+        let mut sum = 0.0;
+        let mut count = 0;
+
+        if let Some(k) = self.knowledge {
+            sum += k;
+            count += 1;
+        }
+        if let Some(l) = self.learning {
+            sum += l;
+            count += 1;
+        }
+        if let Some(s) = self.synthesis {
+            sum += s;
+            count += 1;
+        }
+
+        if count == 0 { 0.0 } else { sum / count as f64 }
+    }
+}
+
 /// Reference to external storage of documents
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 pub struct IndexedDocument {
     /// UUID of the indexed document, matching external storage id
     pub id: String,
@@ -758,6 +817,9 @@ pub struct IndexedDocument {
     pub tags: Vec<String>,
     /// List of node IDs for validation of matching
     pub nodes: Vec<u64>,
+    /// Quality scores for K/L/S dimensions
+    #[serde(default)]
+    pub quality_score: Option<QualityScore>,
 }
 
 impl IndexedDocument {
@@ -771,6 +833,7 @@ impl IndexedDocument {
             rank: 0,
             tags: document.tags.unwrap_or_default(),
             nodes: Vec::new(),
+            quality_score: None,
         }
     }
 }
@@ -2930,5 +2993,125 @@ mod tests {
         // Deserialize and check layer is preserved
         let deserialized: SearchQuery = serde_json::from_str(&json).unwrap();
         assert_eq!(deserialized.layer, Layer::Two);
+    }
+
+    #[test]
+    fn test_quality_score_composite() {
+        // Test with all three scores
+        let full_score = QualityScore {
+            knowledge: Some(0.8),
+            learning: Some(0.6),
+            synthesis: Some(0.7),
+        };
+        assert!((full_score.composite() - 0.7).abs() < f64::EPSILON); // (0.8 + 0.6 + 0.7) / 3
+
+        // Test with two scores
+        let partial_score = QualityScore {
+            knowledge: Some(0.9),
+            learning: None,
+            synthesis: Some(0.5),
+        };
+        assert!((partial_score.composite() - 0.7).abs() < f64::EPSILON); // (0.9 + 0.5) / 2
+
+        // Test with one score
+        let single_score = QualityScore {
+            knowledge: Some(0.8),
+            learning: None,
+            synthesis: None,
+        };
+        assert!((single_score.composite() - 0.8).abs() < f64::EPSILON);
+
+        // Test with no scores (default)
+        let empty_score = QualityScore::default();
+        assert_eq!(empty_score.composite(), 0.0);
+    }
+
+    #[test]
+    fn test_quality_score_serialization() {
+        let score = QualityScore {
+            knowledge: Some(0.8),
+            learning: Some(0.6),
+            synthesis: Some(0.7),
+        };
+
+        let json = serde_json::to_string(&score).unwrap();
+        assert!(json.contains("0.8"));
+        assert!(json.contains("0.6"));
+        assert!(json.contains("0.7"));
+
+        let deserialized: QualityScore = serde_json::from_str(&json).unwrap();
+        assert_eq!(deserialized.knowledge, Some(0.8));
+        assert_eq!(deserialized.learning, Some(0.6));
+        assert_eq!(deserialized.synthesis, Some(0.7));
+    }
+
+    #[test]
+    fn test_quality_score_default_serialization() {
+        // Test that default QualityScore serializes/deserializes correctly
+        let score = QualityScore::default();
+        let json = serde_json::to_string(&score).unwrap();
+        let deserialized: QualityScore = serde_json::from_str(&json).unwrap();
+        assert!(deserialized.knowledge.is_none());
+        assert!(deserialized.learning.is_none());
+        assert!(deserialized.synthesis.is_none());
+    }
+
+    #[test]
+    fn test_indexed_document_with_quality_score() {
+        let doc = IndexedDocument {
+            id: "test-doc-1".to_string(),
+            matched_edges: vec![],
+            rank: 10,
+            tags: vec!["rust".to_string()],
+            nodes: vec![1, 2],
+            quality_score: Some(QualityScore {
+                knowledge: Some(0.8),
+                learning: Some(0.6),
+                synthesis: Some(0.7),
+            }),
+        };
+
+        assert_eq!(doc.id, "test-doc-1");
+        assert!((doc.quality_score.as_ref().unwrap().composite() - 0.7).abs() < f64::EPSILON);
+    }
+
+    #[test]
+    fn test_indexed_document_from_document_quality_score_none() {
+        let doc = Document {
+            id: "doc-1".to_string(),
+            url: "https://example.com".to_string(),
+            title: "Test".to_string(),
+            body: "Body".to_string(),
+            description: None,
+            summarization: None,
+            stub: None,
+            tags: None,
+            rank: None,
+            source_haystack: None,
+            doc_type: DocumentType::Document,
+            synonyms: None,
+            route: None,
+            priority: None,
+        };
+
+        let indexed = IndexedDocument::from_document(doc);
+        assert!(indexed.quality_score.is_none());
+    }
+
+    #[test]
+    fn test_indexed_document_serialization_backward_compat() {
+        // Test that IndexedDocument without quality_score deserializes correctly
+        // This simulates old data that doesn't have the quality_score field
+        let json = r#"{
+            "id": "doc-1",
+            "matched_edges": [],
+            "rank": 5,
+            "tags": ["test"],
+            "nodes": [1]
+        }"#;
+
+        let doc: IndexedDocument = serde_json::from_str(json).unwrap();
+        assert_eq!(doc.id, "doc-1");
+        assert!(doc.quality_score.is_none());
     }
 }

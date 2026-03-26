@@ -633,6 +633,7 @@ impl RoleGraph {
                                 rank: total_rank,
                                 tags: vec![normalized_term.to_string()],
                                 nodes: vec![node_id],
+                                quality_score: None,
                             });
                         }
                         Entry::Occupied(mut e) => {
@@ -732,6 +733,7 @@ impl RoleGraph {
                                 rank: total_rank,
                                 tags: vec![normalized_term.to_string()],
                                 nodes: vec![node_id],
+                                quality_score: None,
                             });
                         }
                         Entry::Occupied(mut e) => {
@@ -835,6 +837,7 @@ impl RoleGraph {
                                     rank: total_rank,
                                     tags: vec![normalized_term.to_string()],
                                     nodes: vec![node_id],
+                                    quality_score: None,
                                 });
                             }
                             Entry::Occupied(mut e) => {
@@ -938,6 +941,7 @@ impl RoleGraph {
                                         rank: total_rank,
                                         tags: vec![normalized_term.to_string()],
                                         nodes: vec![node_id],
+                                        quality_score: None,
                                     },
                                     vec![term.to_string()],
                                 ));
