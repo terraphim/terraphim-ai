@@ -32,9 +32,9 @@ mod redaction;
 
 #[allow(unused_imports)]
 pub use capture::{
-    CorrectionType, LearningEntry, LearningSource, ScoredEntry, capture_correction,
-    capture_failed_command, correct_learning, list_all_entries, query_all_entries,
-    suggest_learnings,
+    CorrectionType, LearningEntry, LearningSource, ScoredEntry, auto_extract_corrections,
+    capture_correction, capture_failed_command, correct_learning, list_all_entries,
+    query_all_entries, suggest_learnings,
 };
 
 // Re-export for testing - not used by CLI yet
