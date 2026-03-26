@@ -153,12 +153,27 @@ impl ConnectorRegistry {
 
     /// Import sessions from all available connectors
     pub async fn import_all(&self, options: &ImportOptions) -> Result<Vec<Session>> {
+        let connectors = self.available();
+        let total_connectors = connectors.len();
         let mut all_sessions = Vec::new();
 
-        for connector in self.available() {
+        for (idx, connector) in connectors.iter().enumerate() {
+            tracing::info!(
+                "Importing from {}/{}: {}",
+                idx + 1,
+                total_connectors,
+                connector.display_name()
+            );
+
             match connector.import(options).await {
                 Ok(mut sessions) => {
+                    let count = sessions.len();
                     all_sessions.append(&mut sessions);
+                    tracing::info!(
+                        "  Imported {} sessions from {}",
+                        count,
+                        connector.display_name()
+                    );
                 }
                 Err(e) => {
                     tracing::warn!("Failed to import from {}: {}", connector.display_name(), e);
@@ -168,12 +183,14 @@ impl ConnectorRegistry {
             // Apply global limit if specified
             if let Some(limit) = options.limit {
                 if all_sessions.len() >= limit {
+                    tracing::info!("Reached global limit of {} sessions", limit);
                     all_sessions.truncate(limit);
                     break;
                 }
             }
         }
 
+        tracing::info!("Total sessions imported: {}", all_sessions.len());
         Ok(all_sessions)
     }
 }
