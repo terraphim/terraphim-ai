@@ -377,6 +377,7 @@ impl CorrectionEvent {
     }
 
     /// Set session ID.
+    #[allow(dead_code)]
     pub fn with_session_id(mut self, session_id: String) -> Self {
         self.session_id = Some(session_id);
         self
@@ -720,6 +721,7 @@ fn timestamp_millis() -> u64 {
 }
 
 /// List recent learnings from storage.
+#[allow(dead_code)]
 pub fn list_learnings(
     storage_dir: &PathBuf,
     limit: usize,
@@ -755,6 +757,7 @@ pub fn list_learnings(
 }
 
 /// Query learnings by pattern (simple text search).
+#[allow(dead_code)]
 pub fn query_learnings(
     storage_dir: &PathBuf,
     pattern: &str,
@@ -834,6 +837,7 @@ impl LearningEntry {
         }
     }
 
+    #[allow(dead_code)]
     pub fn id(&self) -> &str {
         match self {
             LearningEntry::Learning(l) => &l.id,
