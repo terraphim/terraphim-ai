@@ -1,4 +1,4 @@
-use terraphim_types::{NormalizedTermValue, SearchQuery, LogicalOperator};
+use terraphim_types::{Layer, NormalizedTermValue, SearchQuery, LogicalOperator};
 
 fn main() {
     // Test case 1: Basic AND query with 2 terms
@@ -12,6 +12,7 @@ fn main() {
         skip: None,
         limit: None,
         role: None,
+        layer: Layer::default(),
     };
 
     let terms1 = query1.get_all_terms();
@@ -30,6 +31,7 @@ fn main() {
         skip: None,
         limit: None,
         role: None,
+        layer: Layer::default(),
     };
 
     let terms2 = query2.get_all_terms();
@@ -49,6 +51,7 @@ fn main() {
         skip: None,
         limit: None,
         role: None,
+        layer: Layer::default(),
     };
 
     let terms3 = query3.get_all_terms();

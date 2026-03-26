@@ -17,7 +17,7 @@ use std::time::Duration;
 use anyhow::Result;
 use serial_test::serial;
 use terraphim_agent::client::ApiClient;
-use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Result structure normalized across all modes
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -244,6 +244,7 @@ async fn search_via_server(
         skip: Some(0),
         limit: Some(10),
         role: Some(RoleName::new(role)),
+        layer: Layer::default(),
     };
 
     let response = client.search(&search_query).await?;

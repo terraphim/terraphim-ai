@@ -91,6 +91,7 @@ async fn terraphim_graph_falls_back_to_lexical_when_graph_returns_empty() {
         role: Some(role_name),
         skip: None,
         limit: None,
+        layer: Default::default(),
     };
 
     let results = service.search(&query).await.expect("search succeeds");

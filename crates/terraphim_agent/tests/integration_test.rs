@@ -4,7 +4,7 @@ use std::time::Duration;
 use anyhow::Result;
 use serial_test::serial;
 use terraphim_agent::client::{ApiClient, ChatResponse, ConfigResponse, SearchResponse};
-use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{Layer, NormalizedTermValue, RoleName, SearchQuery};
 
 const TEST_SERVER_URL: &str = "http://localhost:8000";
 #[allow(dead_code)]
@@ -58,6 +58,7 @@ async fn test_api_client_search() {
         skip: Some(0),
         limit: Some(5),
         role: Some(RoleName::new("Terraphim Engineer")),
+        layer: Layer::default(),
     };
 
     let result = client.search(&query).await;
@@ -203,6 +204,7 @@ async fn test_search_with_different_roles() {
             skip: Some(0),
             limit: Some(3),
             role: Some(RoleName::new(role_name)),
+            layer: Layer::default(),
         };
 
         let result = client.search(&query).await;
@@ -244,6 +246,7 @@ async fn test_search_pagination() {
         skip: Some(0),
         limit: Some(2),
         role: Some(RoleName::new("Default")),
+        layer: Layer::default(),
     };
 
     let result1 = client.search(&query1).await;
@@ -257,6 +260,7 @@ async fn test_search_pagination() {
         skip: Some(2),
         limit: Some(2),
         role: Some(RoleName::new("Default")),
+        layer: Layer::default(),
     };
 
     let result2 = client.search(&query2).await;
@@ -449,6 +453,7 @@ async fn test_api_error_handling() {
         skip: Some(0),
         limit: Some(0), // Invalid limit
         role: Some(RoleName::new("NonExistentRole")),
+        layer: Layer::default(),
     };
 
     let result = client.search(&query).await;
