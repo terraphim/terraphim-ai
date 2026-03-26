@@ -38,6 +38,60 @@ pub enum LearningSource {
     Global,
 }
 
+/// Type of user correction captured during an agent session.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+pub enum CorrectionType {
+    /// "use bun instead of npm"
+    ToolPreference,
+    /// "we use Result<T> not unwrap()"
+    CodePattern,
+    /// "we call it X not Y"
+    Naming,
+    /// "always run tests before committing"
+    WorkflowStep,
+    /// "the endpoint is /api/v2 not /api/v1"
+    FactCorrection,
+    /// "use British English"
+    StylePreference,
+    /// Catchall
+    Other(String),
+}
+
+impl std::fmt::Display for CorrectionType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            CorrectionType::ToolPreference => write!(f, "tool-preference"),
+            CorrectionType::CodePattern => write!(f, "code-pattern"),
+            CorrectionType::Naming => write!(f, "naming"),
+            CorrectionType::WorkflowStep => write!(f, "workflow-step"),
+            CorrectionType::FactCorrection => write!(f, "fact-correction"),
+            CorrectionType::StylePreference => write!(f, "style-preference"),
+            CorrectionType::Other(s) => write!(f, "other:{}", s),
+        }
+    }
+}
+
+impl std::str::FromStr for CorrectionType {
+    type Err = String;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "tool-preference" => Ok(CorrectionType::ToolPreference),
+            "code-pattern" => Ok(CorrectionType::CodePattern),
+            "naming" => Ok(CorrectionType::Naming),
+            "workflow-step" => Ok(CorrectionType::WorkflowStep),
+            "fact-correction" => Ok(CorrectionType::FactCorrection),
+            "style-preference" => Ok(CorrectionType::StylePreference),
+            other => {
+                if let Some(suffix) = other.strip_prefix("other:") {
+                    Ok(CorrectionType::Other(suffix.to_string()))
+                } else {
+                    Ok(CorrectionType::Other(other.to_string()))
+                }
+            }
+        }
+    }
+}
+
 /// Context information for a captured learning.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LearningContext {
@@ -273,6 +327,220 @@ impl CapturedLearning {
     }
 }
 
+/// A user correction captured during an agent session.
+/// Unlike CapturedLearning (which captures failed commands),
+/// CorrectionEvent captures any user feedback: preferences,
+/// naming conventions, workflow steps, fact corrections.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CorrectionEvent {
+    /// Unique ID (UUID-timestamp, same format as CapturedLearning)
+    pub id: String,
+    /// Type of correction
+    pub correction_type: CorrectionType,
+    /// What the agent said/did originally
+    pub original: String,
+    /// What the user said instead
+    pub corrected: String,
+    /// Surrounding context (conversation snippet, file path, etc.)
+    pub context_description: String,
+    /// Source: project or global
+    pub source: LearningSource,
+    /// Context metadata
+    pub context: LearningContext,
+    /// Session ID for traceability
+    pub session_id: Option<String>,
+    /// Tags for categorisation
+    pub tags: Vec<String>,
+}
+
+impl CorrectionEvent {
+    /// Create a new correction event.
+    pub fn new(
+        correction_type: CorrectionType,
+        original: String,
+        corrected: String,
+        context_description: String,
+        source: LearningSource,
+    ) -> Self {
+        let id = format!("{}-{}", Uuid::new_v4().simple(), timestamp_millis());
+        Self {
+            id,
+            correction_type,
+            original,
+            corrected,
+            context_description,
+            source,
+            context: LearningContext::default(),
+            session_id: None,
+            tags: Vec::new(),
+        }
+    }
+
+    /// Set session ID.
+    #[allow(dead_code)]
+    pub fn with_session_id(mut self, session_id: String) -> Self {
+        self.session_id = Some(session_id);
+        self
+    }
+
+    /// Add tags.
+    pub fn with_tags(mut self, tags: Vec<String>) -> Self {
+        self.tags = tags;
+        self
+    }
+
+    /// Convert to markdown format for storage.
+    /// Uses same YAML frontmatter pattern as CapturedLearning.
+    pub fn to_markdown(&self) -> String {
+        let mut md = String::new();
+
+        // Frontmatter
+        md.push_str("---\n");
+        md.push_str(&format!("id: {}\n", self.id));
+        md.push_str("type: correction\n");
+        md.push_str(&format!("correction_type: {}\n", self.correction_type));
+        md.push_str(&format!("source: {:?}\n", self.source));
+        md.push_str(&format!(
+            "captured_at: {}\n",
+            self.context.captured_at.to_rfc3339()
+        ));
+        md.push_str(&format!("working_dir: {}\n", self.context.working_dir));
+
+        if let Some(ref hostname) = self.context.hostname {
+            md.push_str(&format!("hostname: {}\n", hostname));
+        }
+
+        if let Some(ref session_id) = self.session_id {
+            md.push_str(&format!("session_id: {}\n", session_id));
+        }
+
+        if !self.tags.is_empty() {
+            md.push_str("tags:\n");
+            for tag in &self.tags {
+                md.push_str(&format!("  - {}\n", tag));
+            }
+        }
+
+        md.push_str("---\n\n");
+
+        // Body
+        md.push_str("## Original\n\n");
+        md.push_str(&format!("`{}`\n\n", self.original));
+
+        md.push_str("## Corrected\n\n");
+        md.push_str(&format!("`{}`\n\n", self.corrected));
+
+        if !self.context_description.is_empty() {
+            md.push_str("## Context\n\n");
+            md.push_str(&self.context_description);
+            md.push_str("\n\n");
+        }
+
+        md
+    }
+
+    /// Parse from markdown file content.
+    pub fn from_markdown(content: &str) -> Option<Self> {
+        let parts: Vec<&str> = content.splitn(3, "---").collect();
+        if parts.len() < 3 {
+            return None;
+        }
+
+        let frontmatter = parts[1].trim();
+        let body = parts[2].trim();
+
+        let mut id = String::new();
+        let mut correction_type = CorrectionType::Other("unknown".to_string());
+        let mut source = LearningSource::Project;
+        let mut captured_at = Utc::now();
+        let mut working_dir = String::new();
+        let mut hostname = None;
+        let mut session_id = None;
+        let mut file_type = String::new();
+        let tags = Vec::new();
+
+        for line in frontmatter.lines() {
+            if let Some((key, value)) = line.split_once(':') {
+                let key = key.trim();
+                let value = value.trim();
+                match key {
+                    "id" => id = value.to_string(),
+                    "type" => file_type = value.to_string(),
+                    "correction_type" => {
+                        correction_type = value
+                            .parse()
+                            .unwrap_or(CorrectionType::Other("unknown".to_string()));
+                    }
+                    "source" => {
+                        source = if value == "Project" {
+                            LearningSource::Project
+                        } else {
+                            LearningSource::Global
+                        }
+                    }
+                    "captured_at" => {
+                        captured_at = DateTime::parse_from_rfc3339(value)
+                            .map(|d| d.with_timezone(&Utc))
+                            .unwrap_or_else(|_| Utc::now())
+                    }
+                    "working_dir" => working_dir = value.to_string(),
+                    "hostname" => hostname = Some(value.to_string()),
+                    "session_id" => session_id = Some(value.to_string()),
+                    _ => {}
+                }
+            }
+        }
+
+        // Must be a correction file
+        if file_type != "correction" {
+            return None;
+        }
+
+        // Extract original and corrected from body
+        let original = extract_code_after_heading(body, "## Original");
+        let corrected = extract_code_after_heading(body, "## Corrected");
+        let context_description = extract_section_text(body, "## Context");
+
+        Some(Self {
+            id,
+            correction_type,
+            original: original.unwrap_or_default(),
+            corrected: corrected.unwrap_or_default(),
+            context_description: context_description.unwrap_or_default(),
+            source,
+            context: LearningContext {
+                working_dir,
+                captured_at,
+                hostname,
+                user: None,
+            },
+            session_id,
+            tags,
+        })
+    }
+}
+
+/// Extract inline code after a markdown heading.
+fn extract_code_after_heading(body: &str, heading: &str) -> Option<String> {
+    let idx = body.find(heading)?;
+    let after = &body[idx + heading.len()..];
+    // Find the first backtick-delimited code
+    let start = after.find('`')? + 1;
+    let rest = &after[start..];
+    let end = rest.find('`')?;
+    Some(rest[..end].to_string())
+}
+
+/// Extract plain text section after a heading (up to next heading or EOF).
+fn extract_section_text(body: &str, heading: &str) -> Option<String> {
+    let idx = body.find(heading)?;
+    let after = &body[idx + heading.len()..].trim_start();
+    // Find next heading or end
+    let end = after.find("\n## ").unwrap_or(after.len());
+    let text = after[..end].trim().to_string();
+    if text.is_empty() { None } else { Some(text) }
+}
+
 /// Capture a failed command as a learning document.
 ///
 /// This function:
@@ -358,6 +626,65 @@ pub fn capture_failed_command(
     Ok(filepath)
 }
 
+/// Capture a user correction as a learning document.
+///
+/// # Arguments
+///
+/// * `correction_type` - Type of correction
+/// * `original` - What the agent said/did
+/// * `corrected` - What the user said instead
+/// * `context_description` - Surrounding context
+/// * `config` - Learning capture configuration
+///
+/// # Returns
+///
+/// Path to the saved correction file.
+pub fn capture_correction(
+    correction_type: CorrectionType,
+    original: &str,
+    corrected: &str,
+    context_description: &str,
+    config: &LearningCaptureConfig,
+) -> Result<PathBuf, LearningError> {
+    if !config.enabled {
+        return Err(LearningError::Ignored("Capture disabled".to_string()));
+    }
+
+    // Redact secrets from all text fields
+    let redacted_original = redact_secrets(original);
+    let redacted_corrected = redact_secrets(corrected);
+    let redacted_context = redact_secrets(context_description);
+
+    let storage_dir = config.storage_location();
+    fs::create_dir_all(&storage_dir)
+        .map_err(|e| LearningError::StorageError(format!("Cannot create storage dir: {}", e)))?;
+
+    let source = if storage_dir == config.project_dir {
+        LearningSource::Project
+    } else {
+        LearningSource::Global
+    };
+
+    let correction = CorrectionEvent::new(
+        correction_type.clone(),
+        redacted_original,
+        redacted_corrected,
+        redacted_context,
+        source,
+    )
+    .with_tags(vec![
+        "correction".to_string(),
+        format!("type:{}", correction_type),
+    ]);
+
+    let filename = format!("correction-{}.md", correction.id);
+    let filepath = storage_dir.join(&filename);
+    fs::write(&filepath, correction.to_markdown())?;
+
+    log::info!("Captured correction: {}", filepath.display());
+    Ok(filepath)
+}
+
 /// Parse a chained command to find the failing subcommand.
 ///
 /// For commands like `cmd1 && cmd2 || cmd3`, attempts to determine
@@ -394,6 +721,7 @@ fn timestamp_millis() -> u64 {
 }
 
 /// List recent learnings from storage.
+#[allow(dead_code)]
 pub fn list_learnings(
     storage_dir: &PathBuf,
     limit: usize,
@@ -429,6 +757,7 @@ pub fn list_learnings(
 }
 
 /// Query learnings by pattern (simple text search).
+#[allow(dead_code)]
 pub fn query_learnings(
     storage_dir: &PathBuf,
     pattern: &str,
@@ -484,6 +813,123 @@ pub fn correct_learning(
     }
 
     Err(LearningError::NotFound(id.to_string()))
+}
+
+/// Unified learning entry for display (learning or correction).
+#[derive(Debug, Clone)]
+pub enum LearningEntry {
+    Learning(CapturedLearning),
+    Correction(CorrectionEvent),
+}
+
+impl LearningEntry {
+    pub fn captured_at(&self) -> DateTime<Utc> {
+        match self {
+            LearningEntry::Learning(l) => l.context.captured_at,
+            LearningEntry::Correction(c) => c.context.captured_at,
+        }
+    }
+
+    pub fn source(&self) -> &LearningSource {
+        match self {
+            LearningEntry::Learning(l) => &l.source,
+            LearningEntry::Correction(c) => &c.source,
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn id(&self) -> &str {
+        match self {
+            LearningEntry::Learning(l) => &l.id,
+            LearningEntry::Correction(c) => &c.id,
+        }
+    }
+
+    /// Summary line for display.
+    pub fn summary(&self) -> String {
+        match self {
+            LearningEntry::Learning(l) => {
+                format!("[cmd] {} (exit: {})", l.command, l.exit_code)
+            }
+            LearningEntry::Correction(c) => {
+                format!("[{}] {} -> {}", c.correction_type, c.original, c.corrected)
+            }
+        }
+    }
+
+    /// Correction text if any.
+    pub fn correction_text(&self) -> Option<&str> {
+        match self {
+            LearningEntry::Learning(l) => l.correction.as_deref(),
+            LearningEntry::Correction(c) => Some(&c.corrected),
+        }
+    }
+}
+
+/// List all entries (learnings + corrections) from storage.
+pub fn list_all_entries(
+    storage_dir: &PathBuf,
+    limit: usize,
+) -> Result<Vec<LearningEntry>, LearningError> {
+    let mut entries = Vec::new();
+
+    if !storage_dir.exists() {
+        return Ok(entries);
+    }
+
+    for entry in fs::read_dir(storage_dir)?.flatten() {
+        let path = entry.path();
+        if path.extension().map(|e| e == "md").unwrap_or(false) {
+            if let Ok(content) = fs::read_to_string(&path) {
+                let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
+                if filename.starts_with("correction-") {
+                    if let Some(correction) = CorrectionEvent::from_markdown(&content) {
+                        entries.push(LearningEntry::Correction(correction));
+                    }
+                } else if let Some(learning) = CapturedLearning::from_markdown(&content) {
+                    entries.push(LearningEntry::Learning(learning));
+                }
+            }
+        }
+    }
+
+    entries.sort_by_key(|b| std::cmp::Reverse(b.captured_at()));
+    if entries.len() > limit {
+        entries.truncate(limit);
+    }
+
+    Ok(entries)
+}
+
+/// Query all entries (learnings + corrections) by pattern.
+pub fn query_all_entries(
+    storage_dir: &PathBuf,
+    pattern: &str,
+    exact: bool,
+) -> Result<Vec<LearningEntry>, LearningError> {
+    let all = list_all_entries(storage_dir, usize::MAX)?;
+    let pattern_lower = pattern.to_lowercase();
+
+    let filtered: Vec<_> = all
+        .into_iter()
+        .filter(|entry| {
+            let text = match entry {
+                LearningEntry::Learning(l) => {
+                    format!("{} {}", l.command, l.error_output)
+                }
+                LearningEntry::Correction(c) => {
+                    format!("{} {} {}", c.original, c.corrected, c.context_description)
+                }
+            };
+            if exact {
+                text.contains(pattern)
+            } else {
+                text.to_lowercase().contains(&pattern_lower)
+            }
+        })
+        .collect();
+
+    Ok(filtered)
 }
 
 #[cfg(test)]
@@ -658,5 +1104,224 @@ mod tests {
         let result = list_learnings(&storage, 10).unwrap();
         assert_eq!(result.len(), 1);
         assert_eq!(result[0].command, "test cmd");
+    }
+
+    #[test]
+    fn test_correction_event_to_markdown() {
+        let correction = CorrectionEvent::new(
+            CorrectionType::ToolPreference,
+            "npm install".to_string(),
+            "bun add".to_string(),
+            "User prefers bun over npm".to_string(),
+            LearningSource::Project,
+        )
+        .with_session_id("session-123".to_string())
+        .with_tags(vec!["tool".to_string(), "preference".to_string()]);
+
+        let md = correction.to_markdown();
+        assert!(md.contains("type: correction"));
+        assert!(md.contains("correction_type: tool-preference"));
+        assert!(md.contains("`npm install`"));
+        assert!(md.contains("`bun add`"));
+        assert!(md.contains("session_id: session-123"));
+        assert!(md.contains("User prefers bun over npm"));
+    }
+
+    #[test]
+    fn test_correction_event_roundtrip() {
+        let original = CorrectionEvent::new(
+            CorrectionType::CodePattern,
+            "use unwrap()".to_string(),
+            "use Result<T>".to_string(),
+            "Better error handling".to_string(),
+            LearningSource::Global,
+        );
+
+        let md = original.to_markdown();
+        let parsed = CorrectionEvent::from_markdown(&md).unwrap();
+
+        assert_eq!(parsed.correction_type, original.correction_type);
+        assert_eq!(parsed.original, original.original);
+        assert_eq!(parsed.corrected, original.corrected);
+        assert_eq!(parsed.context_description, original.context_description);
+    }
+
+    #[test]
+    fn test_capture_correction() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LearningCaptureConfig::new(
+            temp_dir.path().join("learnings"),
+            temp_dir.path().join("global"),
+        );
+
+        let result = capture_correction(
+            CorrectionType::Naming,
+            "variable_name",
+            "variableName",
+            "Use camelCase for variables",
+            &config,
+        );
+
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        assert!(path.exists());
+
+        // Verify content
+        let content = fs::read_to_string(&path).unwrap();
+        assert!(content.contains("type: correction"));
+        assert!(content.contains("correction_type: naming"));
+        assert!(content.contains("`variable_name`"));
+        assert!(content.contains("`variableName`"));
+    }
+
+    #[test]
+    fn test_correction_secret_redaction() {
+        let temp_dir = TempDir::new().unwrap();
+        let config = LearningCaptureConfig::new(
+            temp_dir.path().join("learnings"),
+            temp_dir.path().join("global"),
+        );
+
+        let result = capture_correction(
+            CorrectionType::FactCorrection,
+            "AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE",
+            "Use environment variables instead",
+            "Never hardcode AWS keys",
+            &config,
+        );
+
+        assert!(result.is_ok());
+        let path = result.unwrap();
+        let content = fs::read_to_string(&path).unwrap();
+
+        // Secret should be redacted
+        assert!(!content.contains("AKIAIOSFODNN7EXAMPLE"));
+        assert!(content.contains("[AWS_KEY_REDACTED]") || content.contains("[ENV_REDACTED]"));
+    }
+
+    #[test]
+    fn test_list_all_entries_mixed() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create 2 learnings
+        let learning1 = CapturedLearning::new(
+            "cmd1".to_string(),
+            "error1".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        let learning2 = CapturedLearning::new(
+            "cmd2".to_string(),
+            "error2".to_string(),
+            2,
+            LearningSource::Project,
+        );
+
+        // Create 2 corrections
+        let correction1 = CorrectionEvent::new(
+            CorrectionType::ToolPreference,
+            "old".to_string(),
+            "new".to_string(),
+            "context".to_string(),
+            LearningSource::Project,
+        );
+        let correction2 = CorrectionEvent::new(
+            CorrectionType::Naming,
+            "foo".to_string(),
+            "bar".to_string(),
+            "desc".to_string(),
+            LearningSource::Project,
+        );
+
+        // Write files
+        fs::write(storage.join("learning-1.md"), learning1.to_markdown()).unwrap();
+        fs::write(storage.join("learning-2.md"), learning2.to_markdown()).unwrap();
+        fs::write(storage.join("correction-1.md"), correction1.to_markdown()).unwrap();
+        fs::write(storage.join("correction-2.md"), correction2.to_markdown()).unwrap();
+
+        let entries = list_all_entries(&storage, 10).unwrap();
+        assert_eq!(entries.len(), 4);
+    }
+
+    #[test]
+    fn test_query_all_entries_finds_corrections() {
+        let temp_dir = TempDir::new().unwrap();
+        let storage = temp_dir.path().join("learnings");
+        fs::create_dir(&storage).unwrap();
+
+        // Create a learning
+        let learning = CapturedLearning::new(
+            "git status".to_string(),
+            "error".to_string(),
+            1,
+            LearningSource::Project,
+        );
+
+        // Create a correction with "bun" in the text
+        let correction = CorrectionEvent::new(
+            CorrectionType::ToolPreference,
+            "npm install".to_string(),
+            "bun add".to_string(),
+            "Use bun instead of npm".to_string(),
+            LearningSource::Project,
+        );
+
+        fs::write(storage.join("learning-test.md"), learning.to_markdown()).unwrap();
+        fs::write(storage.join("correction-test.md"), correction.to_markdown()).unwrap();
+
+        let results = query_all_entries(&storage, "bun", false).unwrap();
+        assert_eq!(results.len(), 1);
+        match &results[0] {
+            LearningEntry::Correction(c) => {
+                assert_eq!(c.original, "npm install");
+            }
+            _ => panic!("Expected correction entry"),
+        }
+    }
+
+    #[test]
+    fn test_correction_type_roundtrip() {
+        let variants = vec![
+            CorrectionType::ToolPreference,
+            CorrectionType::CodePattern,
+            CorrectionType::Naming,
+            CorrectionType::WorkflowStep,
+            CorrectionType::FactCorrection,
+            CorrectionType::StylePreference,
+            CorrectionType::Other("custom".to_string()),
+        ];
+
+        for variant in variants {
+            let display = format!("{}", variant);
+            let parsed: CorrectionType = display.parse().unwrap();
+            assert_eq!(variant, parsed);
+        }
+    }
+
+    #[test]
+    fn test_learning_entry_summary() {
+        let learning = CapturedLearning::new(
+            "git push".to_string(),
+            "error".to_string(),
+            1,
+            LearningSource::Project,
+        );
+        let learning_entry = LearningEntry::Learning(learning);
+        assert!(learning_entry.summary().contains("[cmd]"));
+        assert!(learning_entry.summary().contains("git push"));
+
+        let correction = CorrectionEvent::new(
+            CorrectionType::ToolPreference,
+            "npm".to_string(),
+            "bun".to_string(),
+            "context".to_string(),
+            LearningSource::Global,
+        );
+        let correction_entry = LearningEntry::Correction(correction);
+        assert!(correction_entry.summary().contains("tool-preference"));
+        assert!(correction_entry.summary().contains("npm"));
+        assert!(correction_entry.summary().contains("bun"));
     }
 }
