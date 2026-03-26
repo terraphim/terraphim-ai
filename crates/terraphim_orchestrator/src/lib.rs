@@ -62,6 +62,7 @@ pub use nightwatch::{
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
 
+use chrono::Timelike;
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, Instant};
@@ -597,8 +598,18 @@ impl AgentOrchestrator {
         // 4. Drain output events to nightwatch
         self.drain_output_events();
 
-        // 5. Evaluate nightwatch drift
-        self.nightwatch.evaluate();
+        // 5. Evaluate nightwatch drift (only during active hours)
+        let nw_cfg = &self.config.nightwatch;
+        let current_hour = chrono::Local::now().hour() as u8;
+        let in_window = if nw_cfg.active_start_hour <= nw_cfg.active_end_hour {
+            current_hour >= nw_cfg.active_start_hour && current_hour < nw_cfg.active_end_hour
+        } else {
+            // Wraps past midnight, e.g. start=22 end=6
+            current_hour >= nw_cfg.active_start_hour || current_hour < nw_cfg.active_end_hour
+        };
+        if in_window {
+            self.nightwatch.evaluate();
+        }
 
         // 6. Sweep expired handoff buffer entries
         let swept = self.handoff_buffer.sweep_expired();
