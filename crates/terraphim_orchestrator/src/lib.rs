@@ -55,8 +55,8 @@ pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
-    CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics, DriftScore, NightwatchMonitor,
-    RateLimitTracker, RateLimitWindow,
+    validate_certificate, Claim, CorrectionAction, CorrectionLevel, DriftAlert, DriftMetrics,
+    DriftScore, NightwatchMonitor, RateLimitTracker, RateLimitWindow, ReasoningCertificate,
 };
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
