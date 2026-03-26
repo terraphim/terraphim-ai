@@ -122,6 +122,12 @@ pub struct NightwatchConfig {
     /// Drift percentage threshold for Critical correction.
     #[serde(default = "default_critical_threshold")]
     pub critical_threshold: f64,
+    /// Hour (0-23) when nightwatch evaluation starts. Default: 0 (midnight).
+    #[serde(default)]
+    pub active_start_hour: u8,
+    /// Hour (0-23) when nightwatch evaluation ends. Default: 24 (always active).
+    #[serde(default = "default_active_end_hour")]
+    pub active_end_hour: u8,
 }
 
 impl Default for NightwatchConfig {
@@ -132,6 +138,8 @@ impl Default for NightwatchConfig {
             moderate_threshold: default_moderate_threshold(),
             severe_threshold: default_severe_threshold(),
             critical_threshold: default_critical_threshold(),
+            active_start_hour: 0,
+            active_end_hour: default_active_end_hour(),
         }
     }
 }
@@ -150,6 +158,9 @@ fn default_severe_threshold() -> f64 {
 }
 fn default_critical_threshold() -> f64 {
     0.70
+}
+fn default_active_end_hour() -> u8 {
+    24
 }
 
 /// Compound review settings.
