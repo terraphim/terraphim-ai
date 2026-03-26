@@ -1,10 +1,52 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
 use terraphim_spawner::health::HealthStatus;
 use terraphim_spawner::output::OutputEvent;
 use tokio::sync::mpsc;
 
 use crate::config::NightwatchConfig;
+
+/// A claim within a reasoning certificate.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Claim {
+    /// The claim statement.
+    pub claim: String,
+    /// Evidence supporting the claim.
+    pub evidence: String,
+    /// Optional dimension or category for the claim.
+    pub dimension: Option<String>,
+}
+
+/// Semi-formal reasoning certificate (arXiv:2603.01896 Phase 4).
+/// Produced by the CTO Executive System judge for audit trail integration.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct ReasoningCertificate {
+    /// Premises or assumptions for the reasoning.
+    pub premises: Vec<String>,
+    /// Claims derived from the premises.
+    pub claims: Vec<Claim>,
+    /// Edge cases or boundary conditions considered.
+    pub edge_cases: Vec<String>,
+    /// The formal conclusion of the reasoning.
+    pub formal_conclusion: String,
+    /// Confidence score (0.0-1.0).
+    pub confidence: f64,
+}
+
+/// Validates a reasoning certificate according to minimum quality criteria.
+///
+/// Returns true if:
+/// - At least 2 premises are provided
+/// - At least 1 claim is present
+/// - The formal conclusion is non-empty
+/// - Confidence is greater than 0.0
+pub fn validate_certificate(cert: &ReasoningCertificate) -> bool {
+    cert.premises.len() >= 2
+        && !cert.claims.is_empty()
+        && !cert.formal_conclusion.is_empty()
+        && cert.confidence > 0.0
+}
 
 /// Behavioral drift metrics for a single agent.
 #[derive(Debug, Clone, Default)]
@@ -590,5 +632,129 @@ mod tests {
             }
             Err(_) => panic!("expected alert from evaluate"),
         }
+    }
+
+    // ========================================================================
+    // ReasoningCertificate Tests (Gitea #92)
+    // ========================================================================
+
+    #[test]
+    fn test_reasoning_certificate_valid() {
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![Claim {
+                claim: "claim1".to_string(),
+                evidence: "evidence1".to_string(),
+                dimension: Some("test".to_string()),
+            }],
+            edge_cases: vec![],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.95,
+        };
+        assert!(validate_certificate(&cert));
+    }
+
+    #[test]
+    fn test_reasoning_certificate_insufficient_premises() {
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string()],
+            claims: vec![Claim {
+                claim: "claim1".to_string(),
+                evidence: "evidence1".to_string(),
+                dimension: None,
+            }],
+            edge_cases: vec![],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.95,
+        };
+        assert!(!validate_certificate(&cert));
+    }
+
+    #[test]
+    fn test_reasoning_certificate_no_claims() {
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![],
+            edge_cases: vec![],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.95,
+        };
+        assert!(!validate_certificate(&cert));
+    }
+
+    #[test]
+    fn test_reasoning_certificate_empty_conclusion() {
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![Claim {
+                claim: "claim1".to_string(),
+                evidence: "evidence1".to_string(),
+                dimension: None,
+            }],
+            edge_cases: vec![],
+            formal_conclusion: "".to_string(),
+            confidence: 0.95,
+        };
+        assert!(!validate_certificate(&cert));
+    }
+
+    #[test]
+    fn test_reasoning_certificate_zero_confidence() {
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![Claim {
+                claim: "claim1".to_string(),
+                evidence: "evidence1".to_string(),
+                dimension: None,
+            }],
+            edge_cases: vec![],
+            formal_conclusion: "conclusion".to_string(),
+            confidence: 0.0,
+        };
+        assert!(!validate_certificate(&cert));
+    }
+
+    #[test]
+    fn test_reasoning_certificate_default_invalid() {
+        let cert = ReasoningCertificate::default();
+        assert!(!validate_certificate(&cert));
+    }
+
+    #[test]
+    fn test_reasoning_certificate_with_edge_cases() {
+        let cert = ReasoningCertificate {
+            premises: vec!["premise1".to_string(), "premise2".to_string()],
+            claims: vec![
+                Claim {
+                    claim: "claim1".to_string(),
+                    evidence: "evidence1".to_string(),
+                    dimension: Some("dimension1".to_string()),
+                },
+                Claim {
+                    claim: "claim2".to_string(),
+                    evidence: "evidence2".to_string(),
+                    dimension: Some("dimension2".to_string()),
+                },
+            ],
+            edge_cases: vec!["edge1".to_string(), "edge2".to_string()],
+            formal_conclusion: "formal conclusion".to_string(),
+            confidence: 0.85,
+        };
+        assert!(validate_certificate(&cert));
+        assert_eq!(cert.premises.len(), 2);
+        assert_eq!(cert.claims.len(), 2);
+        assert_eq!(cert.edge_cases.len(), 2);
+    }
+
+    #[test]
+    fn test_claim_without_dimension() {
+        let claim = Claim {
+            claim: "test claim".to_string(),
+            evidence: "test evidence".to_string(),
+            dimension: None,
+        };
+        assert_eq!(claim.claim, "test claim");
+        assert_eq!(claim.evidence, "test evidence");
+        assert!(claim.dimension.is_none());
     }
 }
