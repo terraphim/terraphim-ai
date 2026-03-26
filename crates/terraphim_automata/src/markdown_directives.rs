@@ -93,6 +93,8 @@ fn parse_markdown_directives_content(
     let mut synonyms: Vec<String> = Vec::new();
     let mut route: Option<RouteDirective> = None;
     let mut priority: Option<u8> = None;
+    let mut trigger: Option<String> = None;
+    let mut pinned: bool = false;
 
     for (idx, line) in content.lines().enumerate() {
         let trimmed = line.trim();
@@ -178,6 +180,24 @@ fn parse_markdown_directives_content(
                     message: format!("Invalid priority directive '{}'", value),
                 }),
             }
+            continue;
+        }
+
+        if lower.starts_with("trigger::") {
+            if trigger.is_some() {
+                continue; // First trigger wins
+            }
+            let value = trimmed["trigger::".len()..].trim();
+            if !value.is_empty() {
+                trigger = Some(value.to_string());
+            }
+            continue;
+        }
+
+        if lower.starts_with("pinned::") {
+            let value = trimmed["pinned::".len()..].trim().to_ascii_lowercase();
+            pinned = matches!(value.as_str(), "true" | "yes" | "1");
+            continue;
         }
     }
 
@@ -194,6 +214,8 @@ fn parse_markdown_directives_content(
         synonyms,
         route,
         priority,
+        trigger,
+        pinned,
     }
 }
 
@@ -285,5 +307,76 @@ mod tests {
         assert!(directives.route.is_none());
         assert_eq!(directives.doc_type, DocumentType::KgEntry);
         assert_eq!(result.warnings.len(), 1);
+    }
+
+    #[test]
+    fn parses_trigger_directive() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.md");
+        fs::write(&path, "trigger:: when managing dependencies").unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("test").unwrap();
+        assert_eq!(
+            directives.trigger,
+            Some("when managing dependencies".to_string())
+        );
+        assert!(result.warnings.is_empty());
+    }
+
+    #[test]
+    fn parses_pinned_directive() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.md");
+        fs::write(&path, "pinned:: true").unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("test").unwrap();
+        assert!(directives.pinned);
+    }
+
+    #[test]
+    fn pinned_false_variants() {
+        let dir = tempdir().unwrap();
+
+        for (filename, value) in [("false", "false"), ("no", "no"), ("zero", "0")] {
+            let path = dir.path().join(format!("{filename}.md"));
+            fs::write(&path, format!("pinned:: {value}")).unwrap();
+        }
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        assert!(!result.directives.get("false").unwrap().pinned);
+        assert!(!result.directives.get("no").unwrap().pinned);
+        assert!(!result.directives.get("zero").unwrap().pinned);
+    }
+
+    #[test]
+    fn trigger_and_synonyms_coexist() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.md");
+        fs::write(
+            &path,
+            "synonyms:: alpha, beta\ntrigger:: when using alphas\n",
+        )
+        .unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("test").unwrap();
+        assert_eq!(
+            directives.synonyms,
+            vec!["alpha".to_string(), "beta".to_string()]
+        );
+        assert_eq!(directives.trigger, Some("when using alphas".to_string()));
+    }
+
+    #[test]
+    fn empty_trigger_ignored() {
+        let dir = tempdir().unwrap();
+        let path = dir.path().join("test.md");
+        fs::write(&path, "trigger::").unwrap();
+
+        let result = parse_markdown_directives_dir(dir.path()).unwrap();
+        let directives = result.directives.get("test").unwrap();
+        assert_eq!(directives.trigger, None);
     }
 }
