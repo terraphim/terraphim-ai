@@ -5,7 +5,7 @@
 
 use ahash::AHashMap;
 use terraphim_config::{Config, Role};
-use terraphim_types::{ChatMessage, Document, NormalizedTermValue, RoleName, SearchQuery};
+use terraphim_types::{ChatMessage, Document, Layer, NormalizedTermValue, RoleName, SearchQuery};
 
 /// Test fixtures for API testing
 pub struct TestFixtures;
@@ -68,6 +68,7 @@ impl TestFixtures {
             role: Some(RoleName::new("TestRole")),
             skip: Some(0),
             limit: Some(10),
+            layer: Layer::default(),
         }
     }
 

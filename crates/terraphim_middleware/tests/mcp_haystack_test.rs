@@ -59,6 +59,7 @@ async fn mcp_live_haystack_smoke() {
         role: Some("MCP".into()),
         operator: None,
         search_terms: None,
+        layer: Default::default(),
     };
 
     let result = search_haystacks(config_state, query)

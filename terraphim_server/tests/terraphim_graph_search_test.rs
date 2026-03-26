@@ -6,7 +6,7 @@ use terraphim_config::{Config, Haystack, KnowledgeGraph, KnowledgeGraphLocal, Ro
 use terraphim_persistence::{DeviceStorage, Persistable};
 use terraphim_service::TerraphimService;
 use terraphim_types::{
-    Document, DocumentType, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
+    Document, DocumentType, Layer, NormalizedTermValue, RelevanceFunction, RoleName, SearchQuery,
 };
 
 /// Comprehensive test for TerraphimGraph search issue
@@ -224,6 +224,7 @@ async fn test_terraphim_graph_search_comprehensive() -> Result<(), Box<dyn std::
             role: Some(role_name.clone()),
             skip: None,
             limit: Some(10),
+            layer: Layer::default(),
         };
 
         let results = terraphim_service.search(&search_query).await?;
@@ -378,6 +379,7 @@ async fn test_empty_rolegraph_search() -> Result<(), Box<dyn std::error::Error>>
         role: Some(role_name.clone()),
         skip: None,
         limit: Some(10),
+        layer: Layer::default(),
     };
 
     let results = terraphim_service.search(&search_query).await?;

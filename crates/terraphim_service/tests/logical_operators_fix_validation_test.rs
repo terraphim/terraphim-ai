@@ -2,7 +2,9 @@
 mod logical_operators_fix_validation_tests {
     use terraphim_config::{ConfigBuilder, ConfigId, ConfigState};
     use terraphim_service::TerraphimService;
-    use terraphim_types::{Document, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery};
+    use terraphim_types::{
+        Document, Layer, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery,
+    };
 
     async fn setup_test_service() -> TerraphimService {
         let mut config = ConfigBuilder::new_with_id(ConfigId::Embedded)
@@ -98,6 +100,7 @@ mod logical_operators_fix_validation_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         // Test get_all_terms to ensure no duplication
@@ -156,6 +159,7 @@ mod logical_operators_fix_validation_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         // Test get_all_terms to ensure no duplication
@@ -220,6 +224,7 @@ mod logical_operators_fix_validation_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         // Test get_all_terms for single term
@@ -297,6 +302,7 @@ mod logical_operators_fix_validation_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         let result = service
@@ -334,6 +340,7 @@ mod logical_operators_fix_validation_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         // Test get_all_terms
@@ -375,6 +382,7 @@ mod logical_operators_fix_validation_tests {
             skip: Some(0),
             limit: Some(10),
             role: Some(RoleName::from("Default")),
+            layer: Layer::default(),
         };
 
         // Test get_all_terms
