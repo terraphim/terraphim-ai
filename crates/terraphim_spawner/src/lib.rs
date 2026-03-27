@@ -1022,9 +1022,11 @@ mod tests {
             max_memory_bytes: Some(2_147_483_648),
             ..Default::default()
         };
-        let request = SpawnRequest::new(provider, "test")
-            .with_resource_limits(limits.clone());
+        let request = SpawnRequest::new(provider, "test").with_resource_limits(limits.clone());
         assert_eq!(request.resource_limits.max_cpu_seconds, Some(3600));
-        assert_eq!(request.resource_limits.max_memory_bytes, Some(2_147_483_648));
+        assert_eq!(
+            request.resource_limits.max_memory_bytes,
+            Some(2_147_483_648)
+        );
     }
 }
