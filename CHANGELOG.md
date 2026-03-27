@@ -5,6 +5,50 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+#### Terraphim RLM Integration
+- **New `terraphim_rlm` crate** for resource lifecycle management
+- **RLM execution backend** wired into orchestrator Refs #98
+
+#### Nightwatch Enhancements
+- **Active hours window** for drift evaluation scheduling
+- **Dual-panel evaluation** for improved drift detection accuracy
+
+#### Linear Tracker Integration
+- **LinearTracker** for Linear.app API integration
+- **Digital twin support** with Linear issue synchronization
+
+#### Search Enhancements
+- **LayeredSearchOutput** --layer 1/2/3 for token efficiency
+- **QualityScore metadata** (K/L/S dimensions) for IndexedDocument
+- **Trigger-based contextual KG retrieval** with TF-IDF fallback
+
+#### Learning System Improvements
+- **CorrectionEvent** for user correction tracking
+- **learn auto-extract** subcommand for session transcripts
+- **learn suggest** subcommand for pattern recommendations
+
+#### Orchestrator Features
+- **ReasoningCertificate** type for audit events and Nightwatch
+- **spawn_with_fallback** migration for resilient agent spawning
+
+### Fixed
+
+- **Sessions:** Removed 100-session import limit with progress logging
+- **RLM:** Resolved clippy warnings Refs #94
+- **CI:** Skip cargo-audit install if already present
+- **Dependencies:** Updated tar to 0.4.45 for RUSTSEC-2026-0067/0068
+- **Tests:** Fixed LLM integration tests for live environments
+
+### Changed
+
+- **Dependencies:** whisper-rs 0.16.0, teloxide 0.17.0, bollard 0.20.2
+- **Dependencies:** tempfile 3.27.0, jiff 0.2.23, config 0.15.19
+- **Dependencies:** tower 0.5.3, indicatif 0.18.4
+
 ## [1.14.0] - 2026-03-22
 
 ### Added

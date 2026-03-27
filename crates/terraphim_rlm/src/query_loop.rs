@@ -680,4 +680,244 @@ mod tests {
         // Even with empty stdout/stderr, we still show exit_code
         assert!(output.contains("exit_code: 0"));
     }
+
+    #[test]
+    fn test_truncate_short_string() {
+        let s = "hello world";
+        assert_eq!(truncate(s, 100), "hello world");
+    }
+
+    #[test]
+    fn test_truncate_long_string() {
+        let s = "a".repeat(200);
+        let result = truncate(&s, 50);
+        assert_eq!(result.len(), 53); // 50 chars + "..."
+        assert!(result.ends_with("..."));
+    }
+
+    #[test]
+    fn test_elapsed_ms() {
+        let start = Timestamp::now();
+        // Small delay to ensure some time passes
+        std::thread::sleep(std::time::Duration::from_millis(10));
+        let elapsed = elapsed_ms(start);
+        assert!(elapsed >= 10);
+    }
+
+    #[test]
+    fn test_query_loop_config_custom() {
+        let config = QueryLoopConfig {
+            max_iterations: 50,
+            allow_recursion: false,
+            max_recursion_depth: 5,
+            strict_parsing: true,
+            command_timeout_ms: 10_000,
+        };
+        assert_eq!(config.max_iterations, 50);
+        assert!(!config.allow_recursion);
+        assert!(config.strict_parsing);
+    }
+
+    #[test]
+    fn test_termination_reason_variants() {
+        // Test all termination reason variants
+        let final_reached = TerminationReason::FinalReached;
+        assert_eq!(format!("{:?}", final_reached), "FinalReached");
+
+        let final_var = TerminationReason::FinalVarReached {
+            variable: "result".to_string(),
+        };
+        assert!(matches!(
+            final_var,
+            TerminationReason::FinalVarReached { .. }
+        ));
+
+        let token_exhausted = TerminationReason::TokenBudgetExhausted;
+        let time_exhausted = TerminationReason::TimeBudgetExhausted;
+        let max_iters = TerminationReason::MaxIterationsReached;
+        let depth_exhausted = TerminationReason::RecursionDepthExhausted;
+        let cancelled = TerminationReason::Cancelled;
+
+        assert_ne!(token_exhausted, time_exhausted);
+        assert_ne!(max_iters, cancelled);
+        assert_ne!(depth_exhausted, TerminationReason::FinalReached);
+
+        let error = TerminationReason::Error {
+            message: "test error".to_string(),
+        };
+        assert!(matches!(error, TerminationReason::Error { .. }));
+    }
+
+    #[test]
+    fn test_execute_result_variants() {
+        let final_result = ExecuteResult::Final("done".to_string());
+        assert!(matches!(final_result, ExecuteResult::Final(s) if s == "done"));
+
+        let final_var = ExecuteResult::FinalVar {
+            variable: "x".to_string(),
+            value: "42".to_string(),
+        };
+        assert!(matches!(final_var, ExecuteResult::FinalVar { .. }));
+
+        let cont = ExecuteResult::Continue {
+            output: "step done".to_string(),
+        };
+        assert!(matches!(cont, ExecuteResult::Continue { .. }));
+
+        let recursive = ExecuteResult::RecursiveResult {
+            output: "sub-result".to_string(),
+        };
+        assert!(matches!(recursive, ExecuteResult::RecursiveResult { .. }));
+    }
+
+    #[test]
+    fn test_query_loop_result_creation() {
+        let result = QueryLoopResult {
+            result: Some("test result".to_string()),
+            success: true,
+            termination_reason: TerminationReason::FinalReached,
+            iterations: 5,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+
+        assert!(result.success);
+        assert_eq!(result.iterations, 5);
+        assert_eq!(result.result, Some("test result".to_string()));
+    }
+
+    #[test]
+    fn test_query_loop_result_with_error() {
+        let result = QueryLoopResult {
+            result: Some("error occurred".to_string()),
+            success: false,
+            termination_reason: TerminationReason::Error {
+                message: "test error".to_string(),
+            },
+            iterations: 3,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+
+        assert!(!result.success);
+        assert!(matches!(
+            result.termination_reason,
+            TerminationReason::Error { .. }
+        ));
+    }
+
+    #[test]
+    fn test_query_loop_result_budget_exhaustion() {
+        let token_exhausted = QueryLoopResult {
+            result: Some(String::new()),
+            success: false,
+            termination_reason: TerminationReason::TokenBudgetExhausted,
+            iterations: 10,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+        assert!(matches!(
+            token_exhausted.termination_reason,
+            TerminationReason::TokenBudgetExhausted
+        ));
+
+        let time_exhausted = QueryLoopResult {
+            result: Some(String::new()),
+            success: false,
+            termination_reason: TerminationReason::TimeBudgetExhausted,
+            iterations: 10,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+        assert!(matches!(
+            time_exhausted.termination_reason,
+            TerminationReason::TimeBudgetExhausted
+        ));
+
+        let depth_exhausted = QueryLoopResult {
+            result: Some(String::new()),
+            success: false,
+            termination_reason: TerminationReason::RecursionDepthExhausted,
+            iterations: 10,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+        assert!(matches!(
+            depth_exhausted.termination_reason,
+            TerminationReason::RecursionDepthExhausted
+        ));
+    }
+
+    #[test]
+    fn test_query_loop_result_max_iterations() {
+        let result = QueryLoopResult {
+            result: Some("max iterations reached".to_string()),
+            success: true,
+            termination_reason: TerminationReason::MaxIterationsReached,
+            iterations: 100,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+
+        assert!(result.success);
+        assert!(matches!(
+            result.termination_reason,
+            TerminationReason::MaxIterationsReached
+        ));
+        assert_eq!(result.iterations, 100);
+    }
+
+    #[test]
+    fn test_query_loop_result_cancelled() {
+        let result = QueryLoopResult {
+            result: None,
+            success: false,
+            termination_reason: TerminationReason::Cancelled,
+            iterations: 2,
+            history: CommandHistory::new(),
+            metadata: QueryMetadata::new(SessionId::new()),
+        };
+
+        assert!(!result.success);
+        assert!(matches!(
+            result.termination_reason,
+            TerminationReason::Cancelled
+        ));
+    }
+
+    #[test]
+    fn test_format_execution_output_with_truncation() {
+        let result = ExecutionResult {
+            stdout: "long output".to_string(),
+            stderr: String::new(),
+            exit_code: 1,
+            execution_time_ms: 500,
+            output_truncated: true,
+            output_file_path: Some("/tmp/output.txt".to_string()),
+            timed_out: false,
+            metadata: std::collections::HashMap::new(),
+        };
+
+        let output = format_execution_output(&result);
+        assert!(output.contains("long output"));
+        assert!(output.contains("exit_code: 1"));
+    }
+
+    #[test]
+    fn test_format_execution_output_timed_out() {
+        let result = ExecutionResult {
+            stdout: String::new(),
+            stderr: "timeout".to_string(),
+            exit_code: -1,
+            execution_time_ms: 30_000,
+            output_truncated: false,
+            output_file_path: None,
+            timed_out: true,
+            metadata: std::collections::HashMap::new(),
+        };
+
+        let output = format_execution_output(&result);
+        assert!(output.contains("timeout"));
+        assert!(output.contains("exit_code: -1"));
+    }
 }
