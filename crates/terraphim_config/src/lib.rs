@@ -495,6 +495,14 @@ impl ConfigBuilder {
         let mut default_role = Role::new("Default");
         default_role.shortname = Some("Default".to_string());
         default_role.theme = "spacelab".to_string();
+        default_role.extra.insert(
+            "llm_provider".to_string(),
+            Value::String("ollama".to_string()),
+        );
+        default_role.extra.insert(
+            "llm_model".to_string(),
+            Value::String("llama3.2:3b".to_string()),
+        );
         default_role.haystacks = vec![Haystack {
             location: "docs/src".to_string(),
             service: ServiceType::Ripgrep,
@@ -512,6 +520,14 @@ impl ConfigBuilder {
         terraphim_role.relevance_function = RelevanceFunction::TerraphimGraph;
         terraphim_role.terraphim_it = true;
         terraphim_role.theme = "lumen".to_string();
+        terraphim_role.extra.insert(
+            "llm_provider".to_string(),
+            Value::String("ollama".to_string()),
+        );
+        terraphim_role.extra.insert(
+            "llm_model".to_string(),
+            Value::String("llama3.2:3b".to_string()),
+        );
         terraphim_role.kg = Some(KnowledgeGraph {
             automata_path: None,
             knowledge_graph_local: Some(KnowledgeGraphLocal {
@@ -536,6 +552,14 @@ impl ConfigBuilder {
         let mut rust_engineer_role = Role::new("Rust Engineer");
         rust_engineer_role.shortname = Some("rust-engineer".to_string());
         rust_engineer_role.theme = "cosmo".to_string();
+        rust_engineer_role.extra.insert(
+            "llm_provider".to_string(),
+            Value::String("ollama".to_string()),
+        );
+        rust_engineer_role.extra.insert(
+            "llm_model".to_string(),
+            Value::String("qwen2.5-coder:latest".to_string()),
+        );
         rust_engineer_role.haystacks = vec![Haystack {
             location: "https://query.rs".to_string(),
             service: ServiceType::QueryRs,
@@ -944,6 +968,42 @@ impl ConfigState {
                             }
                             Err(e) => {
                                 log::warn!("Failed to load thesaurus from automata path: {:?}", e);
+                                if let Some(kg_local) = &kg.knowledge_graph_local {
+                                    log::info!(
+                                        "Falling back to local KG for role {} at {:?}",
+                                        role_name,
+                                        kg_local.path
+                                    );
+                                    let logseq_builder = Logseq::default();
+                                    match logseq_builder
+                                        .build(
+                                            role_name.as_lowercase().to_string(),
+                                            kg_local.path.clone(),
+                                        )
+                                        .await
+                                    {
+                                        Ok(thesaurus) => {
+                                            log::info!(
+                                                "Successfully built thesaurus from local KG fallback for role {}",
+                                                role_name
+                                            );
+                                            let rolegraph =
+                                                RoleGraph::new(role_name.clone(), thesaurus)
+                                                    .await?;
+                                            roles.insert(
+                                                role_name.clone(),
+                                                RoleGraphSync::from(rolegraph),
+                                            );
+                                        }
+                                        Err(e2) => {
+                                            log::error!(
+                                                "Failed to build thesaurus from local KG fallback for role {}: {:?}",
+                                                role_name,
+                                                e2
+                                            );
+                                        }
+                                    }
+                                }
                             }
                         }
                     } else if let Some(kg_local) = &kg.knowledge_graph_local {

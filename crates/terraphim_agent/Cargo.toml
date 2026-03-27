@@ -13,7 +13,7 @@ readme = "../../README.md"
 
 [features]
 default = ["repl-interactive"]
-repl = ["dep:rustyline", "dep:colored", "dep:comfy-table", "dep:dirs"]
+repl = ["dep:rustyline", "dep:colored", "dep:comfy-table"]
 repl-interactive = ["repl"]
 # NOTE: repl-sessions re-enabled for local development (path dependency)
 repl-full = ["repl", "repl-chat", "repl-mcp", "repl-file", "repl-custom", "repl-web", "repl-interactive", "repl-sessions"]
@@ -62,7 +62,7 @@ dialoguer = "0.12"  # Interactive CLI prompts for onboarding wizard
 rustyline = { version = "17.0", optional = true }
 colored = { version = "3.0", optional = true }
 comfy-table = { version = "7.0", optional = true }
-dirs = { version = "5.0", optional = true }
+dirs = { version = "5.0" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_settings = { path = "../terraphim_settings", version = "1.0.0" }
 terraphim_persistence = { path = "../terraphim_persistence", version = "1.0.0" }

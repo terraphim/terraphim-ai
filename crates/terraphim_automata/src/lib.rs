@@ -168,14 +168,17 @@ pub mod autocomplete_helpers {
 
 #[cfg(feature = "remote-loading")]
 pub use autocomplete::load_autocomplete_index;
-use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
+
+use serde::{Deserialize, Serialize};
+
 #[cfg(feature = "typescript")]
 use tsify::Tsify;
 
-use terraphim_types::Thesaurus;
+use terraphim_types::{NormalizedTerm, NormalizedTermValue, Thesaurus};
 
 /// Errors that can occur when working with automata and thesaurus operations.
 #[derive(thiserror::Error, Debug)]
@@ -339,6 +342,74 @@ pub async fn load_thesaurus_from_json_and_replace_async(
     load_thesaurus_from_json_and_replace(json_str, content, link_type)
 }
 
+/// Parse thesaurus JSON supporting both new and legacy formats.
+///
+/// New format: `{"name": "...", "data": {"term": {"id": N, "nterm": "..."}, ...}}`
+/// Legacy format: `{"term": {"id": N, "nterm": "..."}, ...}` (flat map)
+fn parse_thesaurus_json(contents: &str) -> Result<Thesaurus> {
+    #[derive(Deserialize)]
+    struct ThesaurusFormat {
+        name: String,
+        data: HashMap<String, NormalizedTerm>,
+    }
+
+    #[derive(Deserialize)]
+    struct LegacyTerm {
+        id: u64,
+        nterm: String,
+        #[serde(default)]
+        display_value: Option<String>,
+        #[serde(default)]
+        url: Option<String>,
+    }
+
+    // Try new format first
+    match serde_json::from_str::<ThesaurusFormat>(contents) {
+        Ok(parsed) => {
+            log::debug!("Parsed thesaurus in new format with name: {}", parsed.name);
+            let mut thesaurus = Thesaurus::new(parsed.name);
+            for (key, term) in parsed.data {
+                thesaurus.insert(NormalizedTermValue::from(key.as_str()), term);
+            }
+            return Ok(thesaurus);
+        }
+        Err(e) => {
+            log::debug!(
+                "Failed to parse as new Thesaurus format: {}, trying legacy format",
+                e
+            );
+        }
+    }
+
+    // Try legacy format (flat map of terms)
+    match serde_json::from_str::<HashMap<String, LegacyTerm>>(contents) {
+        Ok(legacy) => {
+            log::info!(
+                "Parsed thesaurus in legacy flat format with {} terms",
+                legacy.len()
+            );
+            let mut thesaurus = Thesaurus::new("imported".to_string());
+            for (key, term) in legacy {
+                let normalized =
+                    NormalizedTerm::new(term.id, NormalizedTermValue::from(key.as_str()))
+                        .with_display_value(
+                            term.display_value.unwrap_or_else(|| term.nterm.clone()),
+                        )
+                        .with_url(term.url.unwrap_or_default());
+                thesaurus.insert(NormalizedTermValue::from(key.as_str()), normalized);
+            }
+            return Ok(thesaurus);
+        }
+        Err(e) => {
+            log::warn!("Failed to parse thesaurus JSON in either format: {}", e);
+        }
+    }
+
+    Err(TerraphimAutomataError::InvalidThesaurus(
+        "Could not parse thesaurus JSON in either new or legacy format".to_string(),
+    ))
+}
+
 /// Load a thesaurus from a file or URL
 ///
 /// Note: Remote loading requires the "remote-loading" feature to be enabled.
@@ -362,7 +433,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
             })?;
 
         let status = response.status();
-        let headers = response.headers().clone(); // Clone headers for error reporting
+        let headers = response.headers().clone();
         let body = response.text().await;
 
         match body {
@@ -378,7 +449,6 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
 
     let contents = match automata_path {
         AutomataPath::Local(path) => {
-            // Check if file exists before attempting to read
             if !std::path::Path::new(path).exists() {
                 return Err(TerraphimAutomataError::InvalidThesaurus(format!(
                     "Thesaurus file not found: {}",
@@ -390,8 +460,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
         AutomataPath::Remote(url) => read_url(url.clone()).await?,
     };
 
-    let thesaurus = serde_json::from_str(&contents)?;
-    Ok(thesaurus)
+    parse_thesaurus_json(&contents)
 }
 
 /// Load a thesaurus from a local file only (WASM-compatible version)
@@ -408,8 +477,7 @@ pub fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
         }
     };
 
-    let thesaurus = serde_json::from_str(&contents)?;
-    Ok(thesaurus)
+    parse_thesaurus_json(&contents)
 }
 
 #[cfg(test)]

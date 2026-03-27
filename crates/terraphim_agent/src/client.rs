@@ -46,6 +46,29 @@ impl ApiClient {
         Ok(body)
     }
 
+    /// Resolve a role string (name or shortname) to a RoleName using server config.
+    /// Falls back to RoleName::new if no match found (server will validate).
+    pub async fn resolve_role(&self, role: &str) -> Result<terraphim_types::RoleName> {
+        use terraphim_types::RoleName;
+        let config_res = self.get_config().await?;
+        let role_lower = role.to_lowercase();
+        let selected = &config_res.config.selected_role;
+        if selected.to_string().to_lowercase() == role_lower {
+            return Ok(selected.clone());
+        }
+        for (name, role_cfg) in &config_res.config.roles {
+            if name.to_string().to_lowercase() == role_lower {
+                return Ok(name.clone());
+            }
+            if let Some(ref sn) = role_cfg.shortname {
+                if sn.to_lowercase() == role_lower {
+                    return Ok(name.clone());
+                }
+            }
+        }
+        Ok(RoleName::new(role))
+    }
+
     pub async fn update_selected_role(&self, role: &str) -> Result<ConfigResponse> {
         let url = format!("{}/config/selected_role", self.base);
         #[derive(Serialize)]
