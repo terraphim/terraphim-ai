@@ -185,6 +185,15 @@ pub struct CompoundReviewConfig {
     /// Maximum number of concurrent agents.
     #[serde(default = "default_max_concurrent_agents")]
     pub max_concurrent_agents: usize,
+    /// CLI tool override for compound review agents.
+    #[serde(default)]
+    pub cli_tool: Option<String>,
+    /// LLM provider for compound review agents.
+    #[serde(default)]
+    pub provider: Option<String>,
+    /// Model override for compound review agents.
+    #[serde(default)]
+    pub model: Option<String>,
 }
 
 fn default_max_duration() -> u64 {
