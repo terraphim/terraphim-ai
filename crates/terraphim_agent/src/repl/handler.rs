@@ -374,9 +374,11 @@ impl ReplHandler {
             );
 
             if let Some(service) = &self.service {
-                // Offline mode - use search_with_role if role specified, otherwise use current role
-                let effective_role = role.unwrap_or_else(|| self.current_role.clone());
-                let role_name = terraphim_types::RoleName::new(&effective_role);
+                let role_name = if let Some(r) = role.as_deref() {
+                    service.resolve_role(Some(r)).await?
+                } else {
+                    terraphim_types::RoleName::new(&self.current_role)
+                };
                 let results = service.search_with_role(&query, &role_name, limit).await?;
 
                 if results.is_empty() {
@@ -411,8 +413,10 @@ impl ReplHandler {
                 // Server mode - use current role if no role specified
                 use terraphim_types::{NormalizedTermValue, RoleName, SearchQuery};
 
-                let effective_role = role.unwrap_or_else(|| self.current_role.clone());
-                let role_name = Some(RoleName::new(&effective_role));
+                let role_name = Some(match role.as_deref() {
+                    Some(r) => api_client.resolve_role(r).await?,
+                    None => RoleName::new(&self.current_role),
+                });
                 let search_query = SearchQuery {
                     search_term: NormalizedTermValue::from(query.as_str()),
                     search_terms: None,

@@ -240,6 +240,19 @@ impl TuiService {
         None
     }
 
+    /// Resolve a role string (name or shortname) to a RoleName.
+    /// If `role` is None, returns the currently selected role.
+    /// If `role` is Some, resolves by exact name first, then shortname (case-insensitive).
+    pub async fn resolve_role(&self, role: Option<&str>) -> Result<RoleName> {
+        match role {
+            Some(r) => self
+                .find_role_by_name_or_shortname(r)
+                .await
+                .ok_or_else(|| anyhow::anyhow!("Role '{}' not found in config", r)),
+            None => Ok(self.get_selected_role().await),
+        }
+    }
+
     /// Search documents with a specific role
     pub async fn search_with_role(
         &self,

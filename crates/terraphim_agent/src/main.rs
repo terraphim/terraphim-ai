@@ -1120,11 +1120,7 @@ async fn run_offline_command(
             role,
             limit,
         } => {
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let results = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
@@ -1278,11 +1274,7 @@ async fn run_offline_command(
             Ok(())
         }
         Command::Graph { role, top_k } => {
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let concepts = service.get_role_graph_top_k(&role_name, top_k).await?;
             for concept in concepts {
@@ -1295,11 +1287,7 @@ async fn run_offline_command(
             prompt,
             model,
         } => {
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let response = service.chat(&role_name, &prompt, model).await?;
             println!("{}", response);
@@ -1310,11 +1298,7 @@ async fn run_offline_command(
             role,
             exclude_term,
         } => {
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let results = service
                 .extract_paragraphs(&role_name, &text, exclude_term)
@@ -1350,11 +1334,7 @@ async fn run_offline_command(
                 }
             };
 
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let link_type = match format.as_deref() {
                 Some("markdown") => terraphim_hooks::LinkType::MarkdownLinks,
@@ -1474,11 +1454,7 @@ async fn run_offline_command(
                 }
             };
 
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             if connectivity {
                 let result = service.check_connectivity(&role_name, &input_text).await?;
@@ -1559,11 +1535,7 @@ async fn run_offline_command(
                 }
             };
 
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             let suggestions = service
                 .fuzzy_suggest(&role_name, &input_query, threshold, Some(limit))
@@ -1606,11 +1578,7 @@ async fn run_offline_command(
                 }
             };
 
-            let role_name = if let Some(role) = role {
-                RoleName::new(&role)
-            } else {
-                service.get_selected_role().await
-            };
+            let role_name = service.resolve_role(role.as_deref()).await?;
 
             // Parse input JSON
             let input_value: serde_json::Value = serde_json::from_str(&input_json)
@@ -2113,7 +2081,7 @@ async fn run_server_command(
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
-                RoleName::new(&role)
+                api.resolve_role(&role).await?
             } else {
                 let config_res = api.get_config().await?;
                 config_res.config.selected_role
