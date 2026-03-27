@@ -697,19 +697,70 @@ impl AgentOrchestrator {
     async fn poll_agent_exits(&mut self) {
         // Collect exited agents first to avoid borrow conflict
         let mut exited: Vec<(String, AgentDefinition, std::process::ExitStatus)> = Vec::new();
+        // Collect agents that exceeded their wall-clock timeout
+        let mut timed_out: Vec<String> = Vec::new();
+
         for (name, managed) in &mut self.active_agents {
             match managed.handle.try_wait() {
                 Ok(Some(status)) => {
                     exited.push((name.clone(), managed.definition.clone(), status));
                 }
-                Ok(None) => {} // still running
+                Ok(None) => {
+                    // Still running -- check wall-clock timeout
+                    if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                        let elapsed = managed.started_at.elapsed();
+                        if elapsed > Duration::from_secs(max_secs) {
+                            warn!(
+                                agent = %name,
+                                elapsed_secs = elapsed.as_secs(),
+                                max_secs = max_secs,
+                                "agent exceeded wall-clock timeout, killing"
+                            );
+                            timed_out.push(name.clone());
+                        }
+                    }
+                }
                 Err(e) => {
                     warn!(agent = %name, error = %e, "try_wait failed");
                 }
             }
         }
 
-        // Process exits
+        // Kill timed-out agents
+        for name in timed_out {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
+                let grace = Duration::from_secs(
+                    managed.definition.grace_period_secs.unwrap_or(5),
+                );
+                match managed.handle.shutdown(grace).await {
+                    Ok(graceful) => {
+                        info!(
+                            agent = %name,
+                            graceful = graceful,
+                            "timed-out agent terminated"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(agent = %name, error = %e, "failed to kill timed-out agent");
+                    }
+                }
+                // Handle exit based on layer (similar to handle_agent_exit but for timeout)
+                if managed.definition.layer == AgentLayer::Safety {
+                    let count = self.restart_counts.entry(name.clone()).or_insert(0);
+                    *count += 1;
+                    self.restart_cooldowns.insert(name.clone(), Instant::now());
+                    info!(
+                        agent = %name,
+                        restart_count = *count,
+                        "safety agent timed out, will restart after cooldown"
+                    );
+                } else {
+                    info!(agent = %name, layer = ?managed.definition.layer, "agent timed out");
+                }
+            }
+        }
+
+        // Process natural exits
         for (name, def, status) in exited {
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
@@ -1552,5 +1603,82 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(validate_agent_name("agent name").is_err()); // spaces
         assert!(validate_agent_name("agent@host").is_err()); // @
         assert!(validate_agent_name("agent.name").is_err()); // dots
+    }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_provider_model_composition_opencode() {
+        // Simulate what spawn_agent does for opencode with provider + model
+        let provider = Some("kimi-for-coding".to_string());
+        let model = Some("k2p5".to_string());
+        let cli_name = "opencode";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model,
+            }
+        } else {
+            model
+        };
+        assert_eq!(composed, Some("kimi-for-coding/k2p5".to_string()));
+    }
+
+    #[test]
+    fn test_provider_model_composition_claude_unchanged() {
+        // Claude should not have provider/model composed
+        let provider = Some("anthropic".to_string());
+        let model = Some("claude-opus-4-6".to_string());
+        let cli_name = "claude";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model.clone(),
+            }
+        } else {
+            model.clone()
+        };
+        assert_eq!(composed, Some("claude-opus-4-6".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_wall_clock_timeout_kills_agent() {
+        let mut config = test_config_fast_lifecycle();
+        // Use sleep agent with 1-second timeout
+        config.agents = vec![AgentDefinition {
+            name: "timeout-test".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(2),
+            max_cpu_seconds: Some(1), // 1 second timeout
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("timeout-test"));
+
+        // Wait for the timeout to elapse
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Poll should detect timeout and kill
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("timeout-test"));
     }
 }

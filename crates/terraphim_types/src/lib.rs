@@ -30,6 +30,7 @@
 //!     skip: None,
 //!     limit: Some(10),
 //!     role: Some(RoleName::new("engineer")),
+//!     layer: Default::default(),
 //! };
 //!
 //! // Multi-term AND query
@@ -953,6 +954,7 @@ pub fn extract_first_paragraph(body: &str) -> String {
 ///     skip: None,
 ///     limit: Some(10),
 ///     role: Some(RoleName::new("data_scientist")),
+///     layer: Default::default(),
 /// };
 /// ```
 ///
