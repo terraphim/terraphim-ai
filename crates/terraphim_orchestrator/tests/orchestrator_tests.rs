@@ -12,6 +12,9 @@ fn test_config() -> OrchestratorConfig {
         working_dir: PathBuf::from("/tmp/test-orchestrator"),
         nightwatch: NightwatchConfig::default(),
         compound_review: CompoundReviewConfig {
+            cli_tool: None,
+            provider: None,
+            model: None,
             schedule: "0 2 * * *".to_string(),
             max_duration_secs: 60,
             repo_path: PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),

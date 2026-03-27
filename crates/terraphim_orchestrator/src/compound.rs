@@ -73,9 +73,38 @@ pub struct SwarmConfig {
 impl SwarmConfig {
     /// Create a SwarmConfig from CompoundReviewConfig and add default groups.
     pub fn from_compound_config(config: &CompoundReviewConfig) -> Self {
+        let mut groups = default_groups();
+
+        // Override cli_tool and model from CompoundReviewConfig when present.
+        if let Some(ref cli_tool) = config.cli_tool {
+            for group in &mut groups {
+                group.cli_tool = cli_tool.clone();
+            }
+        }
+        if let Some(ref model) = config.model {
+            // If provider is also set and CLI is opencode, compose provider/model
+            let composed = if let Some(ref provider) = config.provider {
+                let cli_tool_name = config.cli_tool.as_deref().unwrap_or("");
+                let cli_name = std::path::Path::new(cli_tool_name)
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .unwrap_or(cli_tool_name);
+                if cli_name == "opencode" {
+                    format!("{}/{}", provider, model)
+                } else {
+                    model.clone()
+                }
+            } else {
+                model.clone()
+            };
+            for group in &mut groups {
+                group.model = Some(composed.clone());
+            }
+        }
+
         Self {
-            groups: default_groups(),
-            timeout: Duration::from_secs(300),
+            groups,
+            timeout: Duration::from_secs(config.max_duration_secs),
             worktree_root: config.worktree_root.clone(),
             repo_path: config.repo_path.clone(),
             base_branch: config.base_branch.clone(),
@@ -380,18 +409,41 @@ async fn run_single_agent(
     // Use embedded prompt content (no filesystem access needed)
     let prompt = group.prompt_content;
 
-    // Build the command
-    // Format: <cli_tool> run -p "<prompt>" <changed_files...>
+    // Build the command with CLI-specific argument formatting
     let mut cmd = tokio::process::Command::new(cli_tool);
-    cmd.arg("run")
-        .arg("-p")
-        .arg(prompt)
-        .current_dir(worktree_path);
 
-    // Add model if specified
-    if let Some(ref model) = group.model {
-        cmd.arg("--model").arg(model);
+    // Determine CLI name for argument format selection
+    let cli_name = std::path::Path::new(cli_tool)
+        .file_name()
+        .and_then(|n| n.to_str())
+        .unwrap_or(cli_tool);
+
+    match cli_name {
+        "opencode" => {
+            cmd.arg("run").arg("--format").arg("json");
+            if let Some(ref model) = group.model {
+                cmd.arg("-m").arg(model);
+            }
+            cmd.arg(prompt);
+        }
+        "claude" | "claude-code" => {
+            cmd.arg("-p").arg(prompt);
+            if let Some(ref model) = group.model {
+                cmd.arg("--model").arg(model);
+            }
+        }
+        "codex" => {
+            cmd.arg("exec").arg("--full-auto");
+            if let Some(ref model) = group.model {
+                cmd.arg("-m").arg(model);
+            }
+            cmd.arg(prompt);
+        }
+        _ => {
+            cmd.arg(prompt);
+        }
     }
+    cmd.current_dir(worktree_path);
 
     // Add changed files as arguments
     for file in changed_files {
@@ -837,6 +889,9 @@ Done!"#;
             worktree_root: PathBuf::from("/tmp/worktrees"),
             base_branch: "main".to_string(),
             max_concurrent_agents: 3,
+            cli_tool: None,
+            provider: None,
+            model: None,
         };
 
         let swarm_config = SwarmConfig::from_compound_config(&compound_config);
