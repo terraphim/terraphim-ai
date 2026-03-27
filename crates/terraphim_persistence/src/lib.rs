@@ -1,5 +1,6 @@
 pub mod compression;
 pub mod conversation;
+pub mod cost_report;
 pub mod document;
 pub mod error;
 pub mod memory;

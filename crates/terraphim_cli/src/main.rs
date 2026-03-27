@@ -4,10 +4,12 @@
 //! Outputs JSON for easy parsing and integration with other tools.
 
 use anyhow::{Context, Result};
+use chrono::Datelike;
 use clap::{CommandFactory, Parser, Subcommand};
 use clap_complete::{Shell, generate};
 use serde::Serialize;
 use std::io;
+use terraphim_persistence::cost_report::CostReportPersistence;
 
 mod service;
 use service::CliService;
@@ -191,6 +193,25 @@ enum Commands {
         /// Version to rollback to
         version: String,
     },
+
+    /// Show cost report for agent budget tracking
+    CostReport {
+        /// Show report for specific year (default: current year)
+        #[arg(long)]
+        year: Option<i32>,
+
+        /// Show report for specific month 1-12 (default: current month)
+        #[arg(long)]
+        month: Option<u32>,
+
+        /// Show current real-time cost snapshot
+        #[arg(long)]
+        current: bool,
+
+        /// Output format
+        #[arg(long, default_value = "json")]
+        format: String,
+    },
 }
 
 #[derive(Serialize)]
@@ -373,6 +394,12 @@ async fn main() -> Result<()> {
         Some(Commands::CheckUpdate) => handle_check_update().await,
         Some(Commands::Update) => handle_update().await,
         Some(Commands::Rollback { version }) => handle_rollback(&version).await,
+        Some(Commands::CostReport {
+            year,
+            month,
+            current,
+            format,
+        }) => handle_cost_report(year, month, current, format).await,
         Some(Commands::Completions { .. }) => unreachable!(), // Handled above
         None => {
             eprintln!("No command specified. Use --help for usage information.");
@@ -835,6 +862,84 @@ async fn handle_rollback(version: &str) -> Result<serde_json::Value> {
         "message": format!("Successfully rolled back {} to version {}", bin_name, version),
     });
     Ok(result)
+}
+
+async fn handle_cost_report(
+    year: Option<i32>,
+    month: Option<u32>,
+    current: bool,
+    _format: String,
+) -> Result<serde_json::Value> {
+    // Get current date as default
+    let now = chrono::Utc::now();
+    let report_year = year.unwrap_or(now.year());
+    let report_month = month.unwrap_or(now.month());
+
+    // Initialize persistence
+    let storage = terraphim_persistence::DeviceStorage::instance()
+        .await
+        .context("Failed to initialize persistence storage")?;
+    let fastest_op = storage.fastest_op.clone();
+    let persistence =
+        terraphim_persistence::cost_report::OpenDALCostReportPersistence::new(fastest_op);
+
+    if current {
+        // Get current snapshot for all agents
+        let snapshots = persistence
+            .load_all_current_snapshots()
+            .await
+            .context("Failed to load current snapshots")?;
+
+        if snapshots.is_empty() {
+            return Ok(serde_json::json!({
+                "message": "No cost data available. Start the orchestrator to begin tracking.",
+                "snapshots": [],
+                "total_fleet_spend_usd": 0.0,
+            }));
+        }
+
+        let total_spend: f64 = snapshots.iter().map(|s| s.spent_usd).sum();
+
+        // Build response
+        let result = serde_json::json!({
+            "message": "Current cost snapshot",
+            "timestamp": now.to_rfc3339(),
+            "snapshots": snapshots,
+            "total_fleet_spend_usd": total_spend,
+        });
+
+        Ok(result)
+    } else {
+        // Load monthly report
+        match persistence
+            .load_monthly_report(report_year, report_month)
+            .await
+        {
+            Ok(Some(report)) => {
+                let summary = report.budget_summary();
+
+                let result = serde_json::json!({
+                    "message": format!("Monthly cost report for {}-{:02}", report_year, report_month),
+                    "year": report_year,
+                    "month": report_month,
+                    "total_fleet_spend_usd": report.total_fleet_spend_usd,
+                    "generated_at": report.generated_at,
+                    "agents": report.agents,
+                    "budget_summary": summary,
+                });
+
+                Ok(result)
+            }
+            Ok(None) => Ok(serde_json::json!({
+                "message": format!("No cost report found for {}-{:02}. The orchestrator may not have generated a report yet.", report_year, report_month),
+                "year": report_year,
+                "month": report_month,
+                "total_fleet_spend_usd": 0.0,
+                "agents": [],
+            })),
+            Err(e) => Err(anyhow::anyhow!("Failed to load cost report: {}", e)),
+        }
+    }
 }
 
 /// Format JSON as human-readable text (for --format text)

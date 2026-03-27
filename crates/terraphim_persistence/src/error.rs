@@ -25,6 +25,9 @@ pub enum Error {
 
     #[error("Serialization error: {0}")]
     Serde(String),
+
+    #[error("Storage error: {0}")]
+    Storage(String),
 }
 
 impl From<opendal::Error> for Error {

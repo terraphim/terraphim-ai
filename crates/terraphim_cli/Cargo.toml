@@ -40,6 +40,9 @@ serde_json = { workspace = true }
 anyhow = { workspace = true }
 log = { workspace = true }
 
+# Time handling for cost reports
+chrono = { workspace = true }
+
 [features]
 default = []
 
