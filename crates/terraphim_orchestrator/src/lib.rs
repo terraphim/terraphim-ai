@@ -1047,9 +1047,7 @@ impl AgentOrchestrator {
         // Kill timed-out agents
         for name in timed_out {
             if let Some(mut managed) = self.active_agents.remove(&name) {
-                let grace = Duration::from_secs(
-                    managed.definition.grace_period_secs.unwrap_or(5),
-                );
+                let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
                 match managed.handle.shutdown(grace).await {
                     Ok(graceful) => {
                         info!(
