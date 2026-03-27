@@ -41,6 +41,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                backend: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -61,6 +62,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                backend: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -81,6 +83,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                backend: None,
             },
         ],
         restart_cooldown_secs: 60,

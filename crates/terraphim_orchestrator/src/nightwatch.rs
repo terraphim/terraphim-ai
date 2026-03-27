@@ -211,6 +211,12 @@ pub struct DriftMetrics {
     pub health_score: f64,
     /// Number of samples in the evaluation window.
     pub sample_count: u64,
+    /// RLM tokens consumed (for agents using RLM backend).
+    pub rlm_tokens_used: Option<u64>,
+    /// RLM time consumed in ms (for agents using RLM backend).
+    pub rlm_time_used_ms: Option<u64>,
+    /// RLM query count (for agents using RLM backend).
+    pub rlm_query_count: Option<u64>,
 }
 
 /// Drift score combining all metrics into a single 0.0-1.0 value.
@@ -263,11 +269,17 @@ struct AgentMetricAccumulator {
     error_lines: u64,
     health_checks: u64,
     healthy_checks: u64,
+    /// RLM tokens consumed.
+    rlm_tokens_used: u64,
+    /// RLM time consumed in ms.
+    rlm_time_used_ms: u64,
+    /// RLM query count.
+    rlm_query_count: u64,
 }
 
 impl AgentMetricAccumulator {
     fn drift_metrics(&self) -> DriftMetrics {
-        if self.total_lines == 0 && self.health_checks == 0 {
+        if self.total_lines == 0 && self.health_checks == 0 && self.rlm_query_count == 0 {
             return DriftMetrics::default();
         }
 
@@ -289,11 +301,32 @@ impl AgentMetricAccumulator {
             1.0
         };
 
+        let rlm_tokens_used = if self.rlm_query_count > 0 {
+            Some(self.rlm_tokens_used)
+        } else {
+            None
+        };
+
+        let rlm_time_used_ms = if self.rlm_query_count > 0 {
+            Some(self.rlm_time_used_ms)
+        } else {
+            None
+        };
+
+        let rlm_query_count = if self.rlm_query_count > 0 {
+            Some(self.rlm_query_count)
+        } else {
+            None
+        };
+
         DriftMetrics {
             error_rate,
             command_success_rate,
             health_score,
             sample_count: self.total_lines + self.health_checks,
+            rlm_tokens_used,
+            rlm_time_used_ms,
+            rlm_query_count,
         }
     }
 
@@ -302,6 +335,9 @@ impl AgentMetricAccumulator {
         self.error_lines = 0;
         self.health_checks = 0;
         self.healthy_checks = 0;
+        self.rlm_tokens_used = 0;
+        self.rlm_time_used_ms = 0;
+        self.rlm_query_count = 0;
     }
 }
 
@@ -366,6 +402,26 @@ impl NightwatchMonitor {
         if status == HealthStatus::Healthy {
             acc.healthy_checks += 1;
         }
+    }
+
+    /// Feed RLM budget metrics into the monitor.
+    ///
+    /// This is used for agents running in the RLM backend to track
+    /// token and time consumption.
+    pub fn observe_rlm_metrics(
+        &mut self,
+        agent_name: &str,
+        tokens_used: u64,
+        time_used_ms: u64,
+        query_count: u64,
+    ) {
+        let acc = self
+            .agent_metrics
+            .entry(agent_name.to_string())
+            .or_default();
+        acc.rlm_tokens_used += tokens_used;
+        acc.rlm_time_used_ms += time_used_ms;
+        acc.rlm_query_count += query_count;
     }
 
     /// Get the next drift alert (async, used in select!).
@@ -444,20 +500,50 @@ impl NightwatchMonitor {
 
     /// Calculate drift as weighted average of metric deviations.
     /// Returns 0.0 when no samples have been collected.
+    /// RLM metrics are included when present (for agents using RLM backend).
     fn calculate_drift(metrics: &DriftMetrics) -> f64 {
-        if metrics.sample_count == 0 {
+        if metrics.sample_count == 0
+            && metrics.rlm_tokens_used.is_none()
+            && metrics.rlm_query_count.is_none()
+        {
             return 0.0;
         }
 
-        let error_weight = 0.4;
-        let success_weight = 0.3;
-        let health_weight = 0.3;
+        let base_weight_sum = if metrics.sample_count > 0 {
+            let error_weight = 0.4;
+            let success_weight = 0.3;
+            let health_weight = 0.3;
 
-        let error_drift = metrics.error_rate;
-        let success_drift = 1.0 - metrics.command_success_rate;
-        let health_drift = 1.0 - metrics.health_score;
+            let error_drift = metrics.error_rate;
+            let success_drift = 1.0 - metrics.command_success_rate;
+            let health_drift = 1.0 - metrics.health_score;
 
-        error_weight * error_drift + success_weight * success_drift + health_weight * health_drift
+            error_weight * error_drift
+                + success_weight * success_drift
+                + health_weight * health_drift
+        } else {
+            0.0
+        };
+
+        // RLM-specific drift: high token usage relative to budget can indicate inefficiency
+        // This is a secondary indicator that adds to base drift
+        let rlm_drift = if let (Some(tokens), Some(queries)) =
+            (metrics.rlm_tokens_used, metrics.rlm_query_count)
+        {
+            if queries > 0 {
+                // Average tokens per query - high average suggests verbose/redundant LLM calls
+                let avg_tokens = tokens as f64 / queries as f64;
+                // Normalize: > 10K tokens per query is concerning
+                let tokens_per_query_drift = (avg_tokens / 10_000.0).min(1.0);
+                tokens_per_query_drift * 0.1 // Small weight for RLM drift
+            } else {
+                0.0
+            }
+        } else {
+            0.0
+        };
+
+        (base_weight_sum + rlm_drift).min(1.0)
     }
 
     /// Classify a drift score into a correction level.

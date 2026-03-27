@@ -91,6 +91,9 @@ pub struct AgentDefinition {
     /// Maximum CPU seconds allowed per agent execution.
     #[serde(default)]
     pub max_cpu_seconds: Option<u64>,
+    /// Execution backend: None = CLI (default), Some("rlm") = RLM isolated VM.
+    #[serde(default)]
+    pub backend: Option<String>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -998,5 +1001,50 @@ task = "t"
             let config = OrchestratorConfig::from_file(&example_path).unwrap();
             assert!(config.agents.len() >= 3);
         }
+    }
+
+    #[test]
+    fn test_config_parse_with_backend() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "rlm-agent"
+layer = "Safety"
+cli_tool = "claude"
+task = "Execute code in RLM"
+backend = "rlm"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert_eq!(config.agents[0].backend, Some("rlm".to_string()));
+    }
+
+    #[test]
+    fn test_config_parse_without_backend() {
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents.len(), 1);
+        assert!(config.agents[0].backend.is_none());
     }
 }

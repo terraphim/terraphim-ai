@@ -14,6 +14,7 @@ terraphim_router = { path = "../terraphim_router", version = "1.0.0" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
 terraphim_symphony = { path = "../terraphim_symphony", version = "1.0.0" }
+terraphim_rlm = { path = "../terraphim_rlm", version = "1.0.0", optional = true }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full", "signal"] }
@@ -34,6 +35,10 @@ toml = "0.9"
 
 # Template rendering
 handlebars = "6.3"
+
+[features]
+default = []
+rlm = ["dep:terraphim_rlm"]
 
 [dev-dependencies]
 tokio-test = "0.4"

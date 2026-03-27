@@ -31,6 +31,12 @@ pub enum OrchestratorError {
         reason: String,
     },
 
+    #[error("RLM error: {message}")]
+    RlmError { message: String },
+
+    #[error("RLM backend is not enabled. Enable the 'rlm' feature to use isolated VM execution.")]
+    RlmNotEnabled,
+
     #[error(transparent)]
     Spawner(#[from] SpawnerError),
 

@@ -42,6 +42,9 @@ pub mod persona;
 pub mod scheduler;
 pub mod scope;
 
+#[cfg(feature = "rlm")]
+pub mod rlm_dispatch;
+
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
@@ -61,6 +64,9 @@ pub use nightwatch::{
 };
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
+
+#[cfg(feature = "rlm")]
+pub use rlm_dispatch::{RlmBudgetMetrics, RlmDispatcher, RlmSession};
 
 use chrono::Timelike;
 use std::collections::HashMap;
@@ -980,6 +986,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                    backend: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -1000,6 +1007,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                    backend: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -1168,6 +1176,7 @@ task = "test"
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                backend: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -1249,6 +1258,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            backend: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -1383,6 +1393,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            backend: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -1465,6 +1476,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            backend: None,
         }];
 
         // No persona_data_dir, so registry will be empty
