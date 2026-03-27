@@ -1,4 +1,4 @@
-use chrono::{Datelike, Utc};
+use chrono::{DateTime, Datelike, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fmt;
@@ -49,6 +49,191 @@ impl fmt::Display for BudgetVerdict {
                 spent_cents,
                 budget_cents,
             } => write!(f, "exhausted ({} / {} cents)", spent_cents, budget_cents),
+        }
+    }
+}
+
+/// Per-execution metrics for an agent run.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionMetrics {
+    /// Timestamp when the execution started.
+    pub started_at: DateTime<Utc>,
+    /// Timestamp when the execution completed.
+    pub completed_at: DateTime<Utc>,
+    /// Input token count (prompt tokens).
+    pub input_tokens: u64,
+    /// Output token count (completion tokens).
+    pub output_tokens: u64,
+    /// Total token count (input + output).
+    pub total_tokens: u64,
+    /// Latency in milliseconds.
+    pub latency_ms: u64,
+    /// Estimated cost in USD for this execution.
+    pub estimated_cost_usd: f64,
+    /// Whether the execution succeeded.
+    pub success: bool,
+    /// Optional error message if execution failed.
+    pub error_message: Option<String>,
+    /// Model used for this execution.
+    pub model: Option<String>,
+    /// Provider used for this execution.
+    pub provider: Option<String>,
+}
+
+impl ExecutionMetrics {
+    /// Create a new execution metrics record.
+    pub fn new(started_at: DateTime<Utc>) -> Self {
+        Self {
+            started_at,
+            completed_at: started_at,
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+            latency_ms: 0,
+            estimated_cost_usd: 0.0,
+            success: true,
+            error_message: None,
+            model: None,
+            provider: None,
+        }
+    }
+
+    /// Mark the execution as completed with metrics.
+    pub fn complete(
+        mut self,
+        input_tokens: u64,
+        output_tokens: u64,
+        cost_usd: f64,
+        success: bool,
+    ) -> Self {
+        self.completed_at = Utc::now();
+        self.input_tokens = input_tokens;
+        self.output_tokens = output_tokens;
+        self.total_tokens = input_tokens + output_tokens;
+        self.latency_ms = (self.completed_at - self.started_at).num_milliseconds() as u64;
+        self.estimated_cost_usd = cost_usd;
+        self.success = success;
+        self
+    }
+
+    /// Mark execution as failed with error message.
+    pub fn fail(mut self, error: String) -> Self {
+        self.completed_at = Utc::now();
+        self.success = false;
+        self.error_message = Some(error);
+        self.latency_ms = (self.completed_at - self.started_at).num_milliseconds() as u64;
+        self
+    }
+
+    /// Set model and provider information.
+    pub fn with_model(mut self, model: String, provider: String) -> Self {
+        self.model = Some(model);
+        self.provider = Some(provider);
+        self
+    }
+}
+
+/// Aggregated metrics for an agent over time.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AgentMetrics {
+    /// Agent name.
+    pub agent_name: String,
+    /// Total number of executions.
+    pub total_executions: u64,
+    /// Number of successful executions.
+    pub successful_executions: u64,
+    /// Number of failed executions.
+    pub failed_executions: u64,
+    /// Total input tokens across all executions.
+    pub total_input_tokens: u64,
+    /// Total output tokens across all executions.
+    pub total_output_tokens: u64,
+    /// Total tokens across all executions.
+    pub total_tokens: u64,
+    /// Total latency in milliseconds across all executions.
+    pub total_latency_ms: u64,
+    /// Total estimated cost in USD across all executions.
+    pub total_cost_usd: f64,
+    /// Average tokens per execution.
+    pub avg_tokens_per_execution: f64,
+    /// Average latency per execution in milliseconds.
+    pub avg_latency_ms: f64,
+    /// Average cost per execution in USD.
+    pub avg_cost_usd: f64,
+    /// Success rate (0.0 - 1.0).
+    pub success_rate: f64,
+    /// Timestamp of first execution.
+    pub first_execution_at: Option<DateTime<Utc>>,
+    /// Timestamp of most recent execution.
+    pub last_execution_at: Option<DateTime<Utc>>,
+    /// Recent execution history (last 100 executions).
+    pub recent_executions: Vec<ExecutionMetrics>,
+}
+
+impl AgentMetrics {
+    /// Create new agent metrics for the given agent.
+    pub fn new(agent_name: String) -> Self {
+        Self {
+            agent_name,
+            total_executions: 0,
+            successful_executions: 0,
+            failed_executions: 0,
+            total_input_tokens: 0,
+            total_output_tokens: 0,
+            total_tokens: 0,
+            total_latency_ms: 0,
+            total_cost_usd: 0.0,
+            avg_tokens_per_execution: 0.0,
+            avg_latency_ms: 0.0,
+            avg_cost_usd: 0.0,
+            success_rate: 0.0,
+            first_execution_at: None,
+            last_execution_at: None,
+            recent_executions: Vec::with_capacity(100),
+        }
+    }
+
+    /// Record a new execution and update aggregated metrics.
+    pub fn record_execution(&mut self, execution: ExecutionMetrics) {
+        self.total_executions += 1;
+
+        if execution.success {
+            self.successful_executions += 1;
+            self.total_input_tokens += execution.input_tokens;
+            self.total_output_tokens += execution.output_tokens;
+            self.total_tokens += execution.total_tokens;
+            self.total_cost_usd += execution.estimated_cost_usd;
+        } else {
+            self.failed_executions += 1;
+        }
+
+        self.total_latency_ms += execution.latency_ms;
+
+        // Update timestamps
+        if self.first_execution_at.is_none() {
+            self.first_execution_at = Some(execution.started_at);
+        }
+        self.last_execution_at = Some(execution.completed_at);
+
+        // Update averages
+        self.avg_tokens_per_execution = self.total_tokens as f64 / self.total_executions as f64;
+        self.avg_latency_ms = self.total_latency_ms as f64 / self.total_executions as f64;
+        self.avg_cost_usd = self.total_cost_usd / self.total_executions as f64;
+        self.success_rate = self.successful_executions as f64 / self.total_executions as f64;
+
+        // Add to recent executions, keeping only last 100
+        self.recent_executions.push(execution);
+        if self.recent_executions.len() > 100 {
+            self.recent_executions.remove(0);
+        }
+    }
+
+    /// Get cost efficiency metric (tokens per dollar).
+    pub fn tokens_per_dollar(&self) -> f64 {
+        if self.total_cost_usd > 0.0 {
+            self.total_tokens as f64 / self.total_cost_usd
+        } else {
+            0.0
         }
     }
 }
@@ -137,9 +322,11 @@ pub struct CostSnapshot {
     pub verdict: String,
 }
 
-/// Tracks per-agent spend with budget enforcement.
+/// Tracks per-agent spend with budget enforcement and detailed metrics.
 pub struct CostTracker {
     agents: HashMap<String, AgentCost>,
+    /// Per-agent detailed metrics.
+    metrics: HashMap<String, AgentMetrics>,
 }
 
 impl CostTracker {
@@ -147,6 +334,7 @@ impl CostTracker {
     pub fn new() -> Self {
         Self {
             agents: HashMap::new(),
+            metrics: HashMap::new(),
         }
     }
 
@@ -155,6 +343,10 @@ impl CostTracker {
     pub fn register(&mut self, agent_name: &str, budget_monthly_cents: Option<u64>) {
         self.agents
             .insert(agent_name.to_string(), AgentCost::new(budget_monthly_cents));
+        self.metrics.insert(
+            agent_name.to_string(),
+            AgentMetrics::new(agent_name.to_string()),
+        );
     }
 
     /// Record a cost for an agent and return the budget verdict.
@@ -164,6 +356,32 @@ impl CostTracker {
             Some(agent_cost) => agent_cost.record_cost(cost_usd),
             None => BudgetVerdict::Uncapped,
         }
+    }
+
+    /// Record execution metrics for an agent.
+    pub fn record_execution(&mut self, agent_name: &str, execution: ExecutionMetrics) {
+        // Record the cost
+        let _ = self.record_cost(agent_name, execution.estimated_cost_usd);
+
+        // Record the detailed metrics
+        if let Some(metrics) = self.metrics.get_mut(agent_name) {
+            metrics.record_execution(execution);
+        }
+    }
+
+    /// Get metrics for a specific agent.
+    pub fn get_metrics(&self, agent_name: &str) -> Option<&AgentMetrics> {
+        self.metrics.get(agent_name)
+    }
+
+    /// Get mutable metrics for a specific agent.
+    pub fn get_metrics_mut(&mut self, agent_name: &str) -> Option<&mut AgentMetrics> {
+        self.metrics.get_mut(agent_name)
+    }
+
+    /// Get all agent metrics.
+    pub fn all_metrics(&self) -> &HashMap<String, AgentMetrics> {
+        &self.metrics
     }
 
     /// Check budget status for a specific agent.
@@ -221,6 +439,32 @@ impl CostTracker {
             .values()
             .map(|agent_cost| agent_cost.spent_usd())
             .sum()
+    }
+
+    /// Get total fleet metrics.
+    pub fn fleet_metrics(&self) -> AgentMetrics {
+        let mut fleet = AgentMetrics::new("fleet".to_string());
+
+        for metrics in self.metrics.values() {
+            fleet.total_executions += metrics.total_executions;
+            fleet.successful_executions += metrics.successful_executions;
+            fleet.failed_executions += metrics.failed_executions;
+            fleet.total_input_tokens += metrics.total_input_tokens;
+            fleet.total_output_tokens += metrics.total_output_tokens;
+            fleet.total_tokens += metrics.total_tokens;
+            fleet.total_latency_ms += metrics.total_latency_ms;
+            fleet.total_cost_usd += metrics.total_cost_usd;
+        }
+
+        if fleet.total_executions > 0 {
+            fleet.avg_tokens_per_execution =
+                fleet.total_tokens as f64 / fleet.total_executions as f64;
+            fleet.avg_latency_ms = fleet.total_latency_ms as f64 / fleet.total_executions as f64;
+            fleet.avg_cost_usd = fleet.total_cost_usd / fleet.total_executions as f64;
+            fleet.success_rate = fleet.successful_executions as f64 / fleet.total_executions as f64;
+        }
+
+        fleet
     }
 }
 
@@ -476,5 +720,101 @@ mod tests {
             "Expected ~$1.00, got ${}",
             snapshot.spent_usd
         );
+    }
+
+    #[test]
+    fn test_execution_metrics_recording() {
+        let mut tracker = CostTracker::new();
+        tracker.register("test-agent", Some(10000));
+
+        let execution = ExecutionMetrics::new(Utc::now())
+            .complete(100, 50, 0.005, true)
+            .with_model("gpt-4".to_string(), "openai".to_string());
+
+        tracker.record_execution("test-agent", execution);
+
+        let metrics = tracker.get_metrics("test-agent").unwrap();
+        assert_eq!(metrics.total_executions, 1);
+        assert_eq!(metrics.successful_executions, 1);
+        assert_eq!(metrics.total_input_tokens, 100);
+        assert_eq!(metrics.total_output_tokens, 50);
+        assert_eq!(metrics.total_tokens, 150);
+        assert!((metrics.total_cost_usd - 0.005).abs() < 0.0001);
+        assert_eq!(metrics.success_rate, 1.0);
+        assert_eq!(metrics.recent_executions.len(), 1);
+    }
+
+    #[test]
+    fn test_agent_metrics_aggregation() {
+        let mut tracker = CostTracker::new();
+        tracker.register("test-agent", Some(10000));
+
+        // Record multiple executions
+        for i in 0..5 {
+            let execution = ExecutionMetrics::new(Utc::now()).complete(
+                100 + i as u64 * 10,
+                50 + i as u64 * 5,
+                0.005,
+                true,
+            );
+            tracker.record_execution("test-agent", execution);
+        }
+
+        let metrics = tracker.get_metrics("test-agent").unwrap();
+        assert_eq!(metrics.total_executions, 5);
+        assert_eq!(metrics.successful_executions, 5);
+        assert_eq!(metrics.total_input_tokens, 100 + 110 + 120 + 130 + 140);
+        assert_eq!(metrics.total_output_tokens, 50 + 55 + 60 + 65 + 70);
+        assert!(metrics.avg_tokens_per_execution > 0.0);
+        assert!(metrics.avg_cost_usd > 0.0);
+        assert_eq!(metrics.success_rate, 1.0);
+    }
+
+    #[test]
+    fn test_failed_execution_recording() {
+        let mut tracker = CostTracker::new();
+        tracker.register("test-agent", Some(10000));
+
+        let execution = ExecutionMetrics::new(Utc::now()).fail("API timeout".to_string());
+
+        tracker.record_execution("test-agent", execution);
+
+        let metrics = tracker.get_metrics("test-agent").unwrap();
+        assert_eq!(metrics.total_executions, 1);
+        assert_eq!(metrics.successful_executions, 0);
+        assert_eq!(metrics.failed_executions, 1);
+        assert_eq!(metrics.success_rate, 0.0);
+    }
+
+    #[test]
+    fn test_fleet_metrics() {
+        let mut tracker = CostTracker::new();
+        tracker.register("agent-1", Some(10000));
+        tracker.register("agent-2", Some(10000));
+
+        let execution1 = ExecutionMetrics::new(Utc::now()).complete(100, 50, 0.01, true);
+        let execution2 = ExecutionMetrics::new(Utc::now()).complete(200, 100, 0.02, true);
+
+        tracker.record_execution("agent-1", execution1);
+        tracker.record_execution("agent-2", execution2);
+
+        let fleet = tracker.fleet_metrics();
+        assert_eq!(fleet.total_executions, 2);
+        assert_eq!(fleet.total_input_tokens, 300);
+        assert_eq!(fleet.total_output_tokens, 150);
+        assert!((fleet.total_cost_usd - 0.03).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_tokens_per_dollar() {
+        let mut metrics = AgentMetrics::new("test".to_string());
+        metrics.total_tokens = 1000;
+        metrics.total_cost_usd = 0.01;
+
+        assert_eq!(metrics.tokens_per_dollar(), 100000.0);
+
+        // Test zero cost case
+        metrics.total_cost_usd = 0.0;
+        assert_eq!(metrics.tokens_per_dollar(), 0.0);
     }
 }

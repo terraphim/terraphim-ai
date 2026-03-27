@@ -36,6 +36,7 @@ pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
 pub mod handoff;
+pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
 pub mod persona;
@@ -48,11 +49,15 @@ pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
     OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates, WorkflowConfig,
 };
-pub use cost_tracker::{BudgetVerdict, CostSnapshot, CostTracker};
+pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
+pub use metrics_persistence::{
+    InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
+    MetricsPersistenceError, PersistedAgentMetrics,
+};
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
     dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
