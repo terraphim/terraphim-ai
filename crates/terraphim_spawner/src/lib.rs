@@ -71,6 +71,8 @@ pub struct SpawnRequest {
     pub task: String,
     /// Whether to deliver task via stdin (for large prompts)
     pub use_stdin: bool,
+    /// Resource limits for the spawned process.
+    pub resource_limits: ResourceLimits,
 }
 
 impl SpawnRequest {
@@ -83,6 +85,7 @@ impl SpawnRequest {
             fallback_model: None,
             task: task.into(),
             use_stdin: false,
+            resource_limits: ResourceLimits::default(),
         }
     }
 
@@ -107,6 +110,12 @@ impl SpawnRequest {
     /// Use stdin for task delivery (for large prompts).
     pub fn with_stdin(mut self) -> Self {
         self.use_stdin = true;
+        self
+    }
+
+    /// Set resource limits for the spawned process.
+    pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
+        self.resource_limits = limits;
         self
     }
 }
@@ -429,6 +438,24 @@ impl AgentSpawner {
         self.spawn_config(provider, &config, task, true).await
     }
 
+    /// Internal: spawn with model, stdin option, and resource limits.
+    async fn spawn_with_options(
+        &self,
+        provider: &Provider,
+        task: &str,
+        model: Option<&str>,
+        use_stdin: bool,
+        resource_limits: ResourceLimits,
+    ) -> Result<AgentHandle, SpawnerError> {
+        let config = AgentConfig::from_provider(provider)?;
+        let config = config.with_resource_limits(resource_limits);
+        let config = match model {
+            Some(m) => config.with_model(m),
+            None => config,
+        };
+        self.spawn_config(provider, &config, task, use_stdin).await
+    }
+
     /// Spawn an agent from a provider configuration
     pub async fn spawn(
         &self,
@@ -447,22 +474,16 @@ impl AgentSpawner {
         &self,
         request: &SpawnRequest,
     ) -> Result<AgentHandle, SpawnerError> {
-        // Try primary first
-        let primary_result = if request.use_stdin {
-            self.spawn_with_model_stdin(
+        // Try primary first with resource limits
+        let primary_result = self
+            .spawn_with_options(
                 &request.primary_provider,
                 &request.task,
                 request.primary_model.as_deref(),
+                request.use_stdin,
+                request.resource_limits.clone(),
             )
-            .await
-        } else {
-            self.spawn_with_model(
-                &request.primary_provider,
-                &request.task,
-                request.primary_model.as_deref(),
-            )
-            .await
-        };
+            .await;
 
         // If primary succeeds, return the handle
         match primary_result {
@@ -481,21 +502,15 @@ impl AgentSpawner {
                         "Attempting fallback spawn"
                     );
 
-                    let fallback_result = if request.use_stdin {
-                        self.spawn_with_model_stdin(
+                    let fallback_result = self
+                        .spawn_with_options(
                             fallback,
                             &request.task,
                             request.fallback_model.as_deref(),
+                            request.use_stdin,
+                            request.resource_limits.clone(),
                         )
-                        .await
-                    } else {
-                        self.spawn_with_model(
-                            fallback,
-                            &request.task,
-                            request.fallback_model.as_deref(),
-                        )
-                        .await
-                    };
+                        .await;
 
                     match fallback_result {
                         Ok(handle) => {

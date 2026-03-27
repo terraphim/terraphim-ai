@@ -72,7 +72,7 @@ use std::sync::{Arc, Mutex};
 use terraphim_router::RoutingEngine;
 use terraphim_spawner::health::{CircuitBreaker, HealthStatus};
 use terraphim_spawner::output::OutputEvent;
-use terraphim_spawner::{AgentHandle, AgentSpawner, SpawnRequest};
+use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnRequest};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
 
@@ -441,7 +441,7 @@ impl AgentOrchestrator {
             .file_name()
             .and_then(|n| n.to_str())
             .unwrap_or(&def.cli_tool);
-        let supports_model_flag = matches!(cli_name, "claude" | "claude-code");
+        let supports_model_flag = matches!(cli_name, "claude" | "claude-code" | "opencode");
 
         let model = if let Some(m) = &def.model {
             info!(agent = %def.name, model = %m, "using explicit model");
@@ -473,6 +473,22 @@ impl AgentOrchestrator {
         } else {
             info!(agent = %def.name, cli = %def.cli_tool, "skipping model routing (CLI uses OAuth/default)");
             None
+        };
+
+        // For opencode, compose "provider/model" format when both fields are set.
+        // opencode requires `-m provider/model` whereas the TOML config stores them
+        // separately (provider = "kimi-for-coding", model = "k2p5").
+        let model = if cli_name == "opencode" {
+            match (&def.provider, &model) {
+                (Some(provider), Some(m)) => {
+                    let composed = format!("{}/{}", provider, m);
+                    info!(agent = %def.name, composed_model = %composed, "composed provider/model for opencode");
+                    Some(composed)
+                }
+                _ => model,
+            }
+        } else {
+            model
         };
 
         info!(agent = %def.name, layer = ?def.layer, cli = %def.cli_tool, model = ?model, "spawning agent");
@@ -554,6 +570,16 @@ impl AgentOrchestrator {
         if use_stdin {
             request = request.with_stdin();
         }
+
+        // Thread resource limits from agent definition to spawner
+        let mut limits = ResourceLimits::default();
+        if let Some(max_cpu) = def.max_cpu_seconds {
+            limits.max_cpu_seconds = Some(max_cpu);
+        }
+        if let Some(max_mem) = def.max_memory_bytes {
+            limits.max_memory_bytes = Some(max_mem);
+        }
+        request = request.with_resource_limits(limits);
 
         let handle = self
             .spawner
@@ -951,6 +977,9 @@ mod tests {
             working_dir: std::path::PathBuf::from("/tmp/test-orchestrator"),
             nightwatch: NightwatchConfig::default(),
             compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
                 schedule: "0 2 * * *".to_string(),
                 max_duration_secs: 60,
                 repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
@@ -1140,6 +1169,9 @@ task = "test"
             working_dir: std::path::PathBuf::from("/tmp"),
             nightwatch: NightwatchConfig::default(),
             compound_review: CompoundReviewConfig {
+                cli_tool: None,
+                provider: None,
+                model: None,
                 schedule: "0 2 * * *".to_string(),
                 max_duration_secs: 60,
                 repo_path: std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../.."),
