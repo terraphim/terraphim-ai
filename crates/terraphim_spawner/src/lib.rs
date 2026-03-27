@@ -1009,4 +1009,22 @@ mod tests {
         let handle = handle.unwrap();
         assert_eq!(handle.provider.id, "@model-cat-agent");
     }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_spawn_request_with_resource_limits() {
+        let provider = create_test_agent_provider();
+        let limits = ResourceLimits {
+            max_cpu_seconds: Some(3600),
+            max_memory_bytes: Some(2_147_483_648),
+            ..Default::default()
+        };
+        let request = SpawnRequest::new(provider, "test")
+            .with_resource_limits(limits.clone());
+        assert_eq!(request.resource_limits.max_cpu_seconds, Some(3600));
+        assert_eq!(request.resource_limits.max_memory_bytes, Some(2_147_483_648));
+    }
 }
