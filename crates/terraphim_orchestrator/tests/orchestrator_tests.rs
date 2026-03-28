@@ -44,6 +44,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                max_knowledge_items: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -64,6 +65,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                max_knowledge_items: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -84,6 +86,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                max_knowledge_items: None,
             },
         ],
         restart_cooldown_secs: 60,
@@ -267,10 +270,13 @@ fn test_example_config_creates_orchestrator() {
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
     let config = OrchestratorConfig::from_file(&example_path).unwrap();
 
-    assert_eq!(config.agents.len(), 3);
-    assert_eq!(config.agents[0].layer, AgentLayer::Safety);
+    // 5 active agents after Phase 0 cleanup: 4 Core + 1 Growth
+    assert_eq!(config.agents.len(), 5);
+    assert_eq!(config.agents[0].layer, AgentLayer::Core);
     assert_eq!(config.agents[1].layer, AgentLayer::Core);
-    assert_eq!(config.agents[2].layer, AgentLayer::Growth);
+    assert_eq!(config.agents[2].layer, AgentLayer::Core);
+    assert_eq!(config.agents[3].layer, AgentLayer::Core);
+    assert_eq!(config.agents[4].layer, AgentLayer::Growth);
 
     let orch = AgentOrchestrator::new(config);
     assert!(orch.is_ok());

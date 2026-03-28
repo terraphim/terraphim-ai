@@ -135,6 +135,8 @@ pub struct AgentOrchestrator {
     /// Circuit breakers for each provider to prevent cascading failures.
     #[allow(dead_code)]
     circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
+    /// ConfigState for haystack searches (optional - if not set, haystack enrichment is disabled).
+    config_state: Option<terraphim_config::ConfigState>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -222,6 +224,7 @@ impl AgentOrchestrator {
             persona_registry,
             metaprompt_renderer,
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
+            config_state: None,
         })
     }
 
@@ -229,6 +232,107 @@ impl AgentOrchestrator {
     pub fn from_config_file(path: impl AsRef<Path>) -> Result<Self, OrchestratorError> {
         let config = OrchestratorConfig::from_file(path)?;
         Self::new(config)
+    }
+
+    /// Set the ConfigState for haystack searches.
+    /// This enables agent prompt enrichment with knowledge from configured haystacks.
+    pub fn with_config_state(mut self, config_state: terraphim_config::ConfigState) -> Self {
+        self.config_state = Some(config_state);
+        self
+    }
+
+    /// Load knowledge from haystacks for the given agent definition.
+    /// Searches each haystack configured for the agent's terraphim_role using the task as the needle.
+    /// Returns formatted knowledge context or empty string if no haystacks or role not found.
+    async fn load_haystack_knowledge(&self, def: &AgentDefinition) -> String {
+        // Check if we have config_state and the agent has a role
+        let config_state = match &self.config_state {
+            Some(cs) => cs.clone(),
+            None => {
+                info!(agent = %def.name, "no config_state available, skipping haystack enrichment");
+                return String::new();
+            }
+        };
+
+        let role_name = match &def.terraphim_role {
+            Some(role) => role.clone(),
+            None => {
+                info!(agent = %def.name, "no terraphim_role configured, skipping haystack enrichment");
+                return String::new();
+            }
+        };
+
+        // Build search query using the agent's task as the needle
+        let search_query = terraphim_types::SearchQuery {
+            search_term: terraphim_types::NormalizedTermValue::from(def.task.as_str()),
+            role: Some(terraphim_types::RoleName::new(&role_name)),
+            ..Default::default()
+        };
+
+        // Search haystacks
+        let index = match terraphim_middleware::search_haystacks(config_state, search_query).await {
+            Ok(idx) => idx,
+            Err(e) => {
+                warn!(
+                    agent = %def.name,
+                    role = %role_name,
+                    error = %e,
+                    "failed to search haystacks, skipping enrichment"
+                );
+                return String::new();
+            }
+        };
+
+        if index.is_empty() {
+            info!(agent = %def.name, role = %role_name, "no haystack results found");
+            return String::new();
+        }
+
+        // Collect and sort documents by rank (highest first), then apply max_knowledge_items limit
+        let max_items = def.max_knowledge_items.unwrap_or(usize::MAX);
+        let mut docs: Vec<_> = index.into_iter().collect();
+        docs.sort_by(|a, b| {
+            let rank_a = a.1.rank.unwrap_or(0);
+            let rank_b = b.1.rank.unwrap_or(0);
+            rank_b.cmp(&rank_a) // Descending order
+        });
+        docs.truncate(max_items);
+
+        let mut sections = Vec::new();
+        for (doc_id, doc) in docs {
+            let source = doc.source_haystack.as_deref().unwrap_or("unknown");
+            sections.push(format!(
+                "### Knowledge from {} ({})
+
+**Title:** {}
+
+**URL:** {}
+
+{}",
+                source,
+                doc_id,
+                doc.title,
+                doc.url,
+                doc.body.trim()
+            ));
+        }
+
+        if sections.is_empty() {
+            return String::new();
+        }
+
+        info!(
+            agent = %def.name,
+            role = %role_name,
+            items_found = sections.len(),
+            max_items = max_items,
+            "enriching prompt with haystack knowledge"
+        );
+
+        format!(
+            "\n\n## Knowledge Context\n\nThe following relevant knowledge was found in haystacks for this task:\n\n{}\n",
+            sections.join("\n\n---\n\n")
+        )
     }
 
     /// Run the orchestrator (blocks until shutdown signal).
@@ -446,7 +550,9 @@ impl AgentOrchestrator {
             None => {
                 // Default: ~/.claude/skills (resolve HOME from env)
                 match std::env::var("HOME") {
-                    Ok(home) => std::path::PathBuf::from(home).join(".claude").join("skills"),
+                    Ok(home) => std::path::PathBuf::from(home)
+                        .join(".claude")
+                        .join("skills"),
                     Err(_) => return String::new(),
                 }
             }
@@ -601,12 +707,29 @@ impl AgentOrchestrator {
             format!("{}{}", composed_task, skill_content)
         };
 
+        // Inject haystack knowledge from configured haystacks for the agent's role
+        let haystack_knowledge = self.load_haystack_knowledge(def).await;
+        let composed_task = if haystack_knowledge.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                knowledge_bytes = haystack_knowledge.len(),
+                "injecting haystack knowledge into prompt"
+            );
+            // Prepend haystack knowledge to the prompt (before persona/task)
+            format!("{}\n\n{}", haystack_knowledge.trim_start(), composed_task)
+        };
+
         // Use stdin only when persona was actually resolved (prompt is enriched)
         // or when the task exceeds ARG_MAX safety threshold.
         // Do NOT use stdin for unfound personas -- the bare task is small and
         // stdin delivery to short-lived processes (echo) causes broken pipe races.
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
-        let use_stdin = persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
+        let use_stdin = persona_found
+            || !skill_content.is_empty()
+            || !haystack_knowledge.is_empty()
+            || composed_task.len() > STDIN_THRESHOLD;
 
         // Build primary Provider from the agent definition for the spawner
         let primary_provider = terraphim_types::capability::Provider {
@@ -1142,6 +1265,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                    max_knowledge_items: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -1162,6 +1286,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                    max_knowledge_items: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -1334,6 +1459,7 @@ task = "test"
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                max_knowledge_items: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -1416,6 +1542,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            max_knowledge_items: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -1550,6 +1677,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            max_knowledge_items: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -1632,6 +1760,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+            max_knowledge_items: None,
         }];
 
         // No persona_data_dir, so registry will be empty
@@ -1747,6 +1876,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fallback_model: None,
             grace_period_secs: Some(2),
             max_cpu_seconds: Some(1), // 1 second timeout
+            max_knowledge_items: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
         let def = orch.config.agents[0].clone();

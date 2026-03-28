@@ -14,6 +14,8 @@ terraphim_router = { path = "../terraphim_router", version = "1.0.0" }
 terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 terraphim_tracker = { path = "../terraphim_tracker", version = "1.0.0" }
 terraphim_symphony = { path = "../terraphim_symphony", version = "1.0.0" }
+terraphim_middleware = { path = "../terraphim_middleware", version = "1.0.0" }
+terraphim_config = { path = "../terraphim_config", version = "1.0.0" }
 
 # Core dependencies
 tokio = { version = "1.0", features = ["full", "signal"] }

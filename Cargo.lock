@@ -9800,6 +9800,8 @@ dependencies = [
  "serde",
  "serde_json",
  "tempfile",
+ "terraphim_config",
+ "terraphim_middleware",
  "terraphim_router",
  "terraphim_spawner",
  "terraphim_symphony",

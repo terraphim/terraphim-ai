@@ -95,6 +95,10 @@ pub struct AgentDefinition {
     /// Maximum CPU seconds allowed per agent execution.
     #[serde(default)]
     pub max_cpu_seconds: Option<u64>,
+    /// Maximum number of knowledge items to include from haystacks in agent prompt.
+    /// None means no limit (include all results).
+    #[serde(default)]
+    pub max_knowledge_items: Option<usize>,
 }
 
 /// Agent layer in the dark factory hierarchy.

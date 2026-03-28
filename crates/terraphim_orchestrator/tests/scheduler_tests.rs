@@ -20,6 +20,7 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         fallback_model: None,
         grace_period_secs: None,
         max_cpu_seconds: None,
+        max_knowledge_items: None,
     }
 }
 
