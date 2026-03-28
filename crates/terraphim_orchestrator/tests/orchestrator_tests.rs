@@ -91,6 +91,7 @@ fn test_config() -> OrchestratorConfig {
         tick_interval_secs: 30,
         handoff_buffer_ttl_secs: None,
         persona_data_dir: None,
+        skill_data_dir: None,
     }
 }
 

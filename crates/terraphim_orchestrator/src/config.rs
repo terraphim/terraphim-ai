@@ -31,6 +31,10 @@ pub struct OrchestratorConfig {
     /// Directory for persona data and configuration files.
     #[serde(default)]
     pub persona_data_dir: Option<PathBuf>,
+    /// Directory containing skill definitions (SKILL.md files in subdirectories).
+    /// Used to inject skill_chain content into agent prompts.
+    #[serde(default)]
+    pub skill_data_dir: Option<PathBuf>,
 }
 
 /// Lightweight reference to an SFIA skill code and level.

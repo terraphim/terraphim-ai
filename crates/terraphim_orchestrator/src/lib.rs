@@ -432,6 +432,71 @@ impl AgentOrchestrator {
         &mut self.cost_tracker
     }
 
+    /// Load skill chain content from SKILL.md files for the given agent definition.
+    ///
+    /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
+    /// Returns a formatted string with all skill contents, or empty string if no skills
+    /// or no skill_data_dir is configured.
+    fn load_skill_chain_content(&self, def: &AgentDefinition) -> String {
+        if def.skill_chain.is_empty() {
+            return String::new();
+        }
+        let skills_dir = match &self.config.skill_data_dir {
+            Some(dir) => dir.clone(),
+            None => {
+                // Default: ~/.claude/skills (resolve HOME from env)
+                match std::env::var("HOME") {
+                    Ok(home) => std::path::PathBuf::from(home).join(".claude").join("skills"),
+                    Err(_) => return String::new(),
+                }
+            }
+        };
+
+        let mut sections = Vec::new();
+        for skill_name in &def.skill_chain {
+            let skill_path = skills_dir.join(skill_name).join("SKILL.md");
+            match std::fs::read_to_string(&skill_path) {
+                Ok(content) => {
+                    // Strip YAML frontmatter (between --- markers) to keep just instructions
+                    let body = if let Some(after_prefix) = content.strip_prefix("---") {
+                        if let Some(end) = after_prefix.find("---") {
+                            after_prefix[end + 3..].trim_start().to_string()
+                        } else {
+                            content
+                        }
+                    } else {
+                        content
+                    };
+                    sections.push(format!("### Skill: {}\n\n{}", skill_name, body.trim()));
+                    info!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        bytes = body.len(),
+                        "loaded skill content"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        path = %skill_path.display(),
+                        error = %e,
+                        "failed to load skill, skipping"
+                    );
+                }
+            }
+        }
+
+        if sections.is_empty() {
+            return String::new();
+        }
+
+        format!(
+            "\n\n## Active Skills\n\nApply the following skill instructions to your work:\n\n{}\n",
+            sections.join("\n\n---\n\n")
+        )
+    }
+
     /// Spawn an agent from its definition.
     ///
     /// Model selection: if the agent has an explicit `model` field, use it.
@@ -522,12 +587,26 @@ impl AgentOrchestrator {
             (def.task.clone(), false)
         };
 
+        // Inject skill_chain content between persona preamble and task
+        let skill_content = self.load_skill_chain_content(def);
+        let composed_task = if skill_content.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                skills = def.skill_chain.len(),
+                skill_bytes = skill_content.len(),
+                "injecting skill_chain into prompt"
+            );
+            format!("{}{}", composed_task, skill_content)
+        };
+
         // Use stdin only when persona was actually resolved (prompt is enriched)
         // or when the task exceeds ARG_MAX safety threshold.
         // Do NOT use stdin for unfound personas -- the bare task is small and
         // stdin delivery to short-lived processes (echo) causes broken pipe races.
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
-        let use_stdin = persona_found || composed_task.len() > STDIN_THRESHOLD;
+        let use_stdin = persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
         // Build primary Provider from the agent definition for the spawner
         let primary_provider = terraphim_types::capability::Provider {
@@ -1090,6 +1169,7 @@ mod tests {
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            skill_data_dir: None,
         }
     }
 
@@ -1260,6 +1340,7 @@ task = "test"
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            skill_data_dir: None,
         }
     }
 
