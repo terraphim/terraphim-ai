@@ -1,7 +1,7 @@
 # orchestrator.example.toml -- AI Dark Factory Agent Fleet
 #
 # Copy to orchestrator.toml and adjust paths for your environment.
-# This configures 3 agents (one per layer) for initial deployment.
+# This configures agents across all three layers for production deployment.
 
 working_dir = "/Users/alex/projects/terraphim/terraphim-ai"
 
@@ -19,25 +19,45 @@ repo_path = "/Users/alex/projects/terraphim/terraphim-ai"
 create_prs = false              # Dry run for first 2 weeks
 
 # --- Safety Layer (always running) ---
+# Note: Safety agents run continuously. For scheduled security tasks, use Core layer.
+
+# --- Core Layer (scheduled) ---
 
 [[agents]]
 name = "security-sentinel"
-layer = "Safety"
+layer = "Core"
 cli_tool = "codex"
-task = "Continuously scan for CVEs and security vulnerabilities in dependencies. Run cargo audit and report findings."
+task = "Scan for CVEs and security vulnerabilities in dependencies. Run cargo audit and report findings."
+schedule = "0 2 * * *"          # 2 AM daily
 # model = "o3"                    # Optional: explicit model override. Omit to use keyword routing.
 capabilities = ["security", "vulnerability-scanning"]
 max_memory_bytes = 2147483648   # 2GB
 # budget_monthly_cents = 5000  # $50/month (omit for subscription CLIs)
 
-# --- Core Layer (scheduled) ---
+[[agents]]
+name = "compliance-watchdog"
+layer = "Core"
+cli_tool = "claude"
+task = "Check codebase compliance with project standards, licensing, and regulatory requirements."
+schedule = "0 3 * * *"          # 3 AM daily
+capabilities = ["compliance", "license-check", "standards"]
+max_memory_bytes = 1073741824   # 1GB
+
+[[agents]]
+name = "drift-detector"
+layer = "Core"
+cli_tool = "claude"
+task = "Detect configuration drift, schema changes, and deviations from golden paths."
+schedule = "0 4 * * *"          # 4 AM daily
+capabilities = ["drift-detection", "config-validation"]
+max_memory_bytes = 1073741824   # 1GB
 
 [[agents]]
 name = "upstream-synchronizer"
 layer = "Core"
 cli_tool = "codex"
 task = "Sync with upstream repositories. Check for new releases of key dependencies."
-schedule = "0 3 * * *"          # 3 AM daily
+schedule = "0 5 * * *"          # 5 AM daily
 capabilities = ["sync", "dependency-management"]
 
 # --- Growth Layer (on-demand) ---
@@ -48,3 +68,66 @@ layer = "Growth"
 cli_tool = "claude"
 task = "Review the latest PR for code quality, security issues, and adherence to project conventions."
 capabilities = ["code-review", "architecture"]
+
+# --- Stub Agents (commented out - dependencies not yet available) ---
+# The following agents are defined but cannot run until their dependencies are implemented:
+#
+# [[agents]]
+# name = "performance-profiler"
+# layer = "Core"
+# cli_tool = "codex"
+# task = "Profile application performance and identify bottlenecks."
+# schedule = "0 6 * * 0"         # Weekly on Sunday
+# capabilities = ["profiling", "optimization"]
+#
+# [[agents]]
+# name = "documentation-generator"
+# layer = "Core"
+# cli_tool = "claude"
+# task = "Generate and update documentation from code comments."
+# schedule = "0 7 * * *"
+# capabilities = ["documentation", "docgen"]
+#
+# [[agents]]
+# name = "test-coverage-monitor"
+# layer = "Core"
+# cli_tool = "codex"
+# task = "Monitor test coverage and identify untested code paths."
+# schedule = "0 8 * * *"
+# capabilities = ["testing", "coverage"]
+#
+# [[agents]]
+# name = "dependency-health-checker"
+# layer = "Growth"
+# cli_tool = "claude"
+# task = "Analyze dependency health, maintenance status, and security posture."
+# capabilities = ["dependencies", "health-check"]
+#
+# [[agents]]
+# name = "api-compatibility-guardian"
+# layer = "Safety"
+# cli_tool = "codex"
+# task = "Monitor API changes for backward compatibility violations."
+# capabilities = ["api", "compatibility"]
+#
+# [[agents]]
+# name = "metric-aggregator"
+# layer = "Core"
+# cli_tool = "claude"
+# task = "Aggregate and analyze operational metrics."
+# schedule = "0 */6 * * *"       # Every 6 hours
+# capabilities = ["metrics", "analytics"]
+#
+# [[agents]]
+# name = "release-preparer"
+# layer = "Growth"
+# cli_tool = "codex"
+# task = "Prepare release notes and version bumps."
+# capabilities = ["release", "changelog"]
+#
+# [[agents]]
+# name = "issue-triage-bot"
+# layer = "Growth"
+# cli_tool = "claude"
+# task = "Triage incoming issues and route to appropriate teams."
+# capabilities = ["triage", "routing"]

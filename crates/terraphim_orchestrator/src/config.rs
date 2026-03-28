@@ -593,11 +593,23 @@ task = "t"
         let example_path =
             std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("orchestrator.example.toml");
         let config = OrchestratorConfig::from_file(&example_path).unwrap();
-        assert_eq!(config.agents.len(), 3);
-        assert_eq!(config.agents[0].layer, AgentLayer::Safety);
+        // 5 active agents: 4 Core (security-sentinel, compliance-watchdog, drift-detector, upstream-synchronizer) + 1 Growth (code-reviewer)
+        assert_eq!(config.agents.len(), 5);
+        assert_eq!(config.agents[0].layer, AgentLayer::Core);
+        assert_eq!(config.agents[0].name, "security-sentinel");
         assert_eq!(config.agents[1].layer, AgentLayer::Core);
-        assert_eq!(config.agents[2].layer, AgentLayer::Growth);
+        assert_eq!(config.agents[1].name, "compliance-watchdog");
+        assert_eq!(config.agents[2].layer, AgentLayer::Core);
+        assert_eq!(config.agents[2].name, "drift-detector");
+        assert_eq!(config.agents[3].layer, AgentLayer::Core);
+        assert_eq!(config.agents[3].name, "upstream-synchronizer");
+        assert_eq!(config.agents[4].layer, AgentLayer::Growth);
+        assert_eq!(config.agents[4].name, "code-reviewer");
+        // All Core agents have schedules
+        assert!(config.agents[0].schedule.is_some());
         assert!(config.agents[1].schedule.is_some());
+        assert!(config.agents[2].schedule.is_some());
+        assert!(config.agents[3].schedule.is_some());
     }
 
     #[test]

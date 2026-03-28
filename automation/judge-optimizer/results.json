@@ -1,0 +1,93 @@
+{
+  "baseline": {
+    "config": {
+      "name": "baseline",
+      "accept_min_dimension": 3,
+      "accept_min_average": 3.5,
+      "improve_min_dimension": 2,
+      "reject_max_dimension": 2
+    },
+    "total_verdicts": 11,
+    "agreements": 11,
+    "accept_accuracy": 1.0,
+    "improve_accuracy": 1.0,
+    "reject_accuracy": 1.0,
+    "accept_count": 6,
+    "improve_count": 4,
+    "reject_count": 1,
+    "false_accepts": 0,
+    "false_rejects": 0,
+    "avg_score_diff": 0.0021212121212120694,
+    "agreement_rate": 1.0,
+    "quality_score": 99.98
+  },
+  "top_candidates": [
+    {
+      "config": {
+        "name": "baseline",
+        "accept_min_dimension": 3,
+        "accept_min_average": 3.5,
+        "improve_min_dimension": 2,
+        "reject_max_dimension": 2
+      },
+      "total_verdicts": 11,
+      "agreements": 11,
+      "accept_accuracy": 1.0,
+      "improve_accuracy": 1.0,
+      "reject_accuracy": 1.0,
+      "accept_count": 6,
+      "improve_count": 4,
+      "reject_count": 1,
+      "false_accepts": 0,
+      "false_rejects": 0,
+      "avg_score_diff": 0.0021212121212120694,
+      "agreement_rate": 1.0,
+      "quality_score": 99.98
+    },
+    {
+      "config": {
+        "name": "grid_3_3.0_2_1",
+        "accept_min_dimension": 3,
+        "accept_min_average": 3.0,
+        "improve_min_dimension": 2,
+        "reject_max_dimension": 1
+      },
+      "total_verdicts": 11,
+      "agreements": 10,
+      "accept_accuracy": 1.0,
+      "improve_accuracy": 1.0,
+      "reject_accuracy": 0.0,
+      "accept_count": 6,
+      "improve_count": 5,
+      "reject_count": 0,
+      "false_accepts": 0,
+      "false_rejects": 0,
+      "avg_score_diff": 0.0021212121212120694,
+      "agreement_rate": 0.9090909090909091,
+      "quality_score": 90.89
+    },
+    {
+      "config": {
+        "name": "grid_3_3.25_2_1",
+        "accept_min_dimension": 3,
+        "accept_min_average": 3.25,
+        "improve_min_dimension": 2,
+        "reject_max_dimension": 1
+      },
+      "total_verdicts": 11,
+      "agreements": 10,
+      "accept_accuracy": 1.0,
+      "improve_accuracy": 1.0,
+      "reject_accuracy": 0.0,
+      "accept_count": 6,
+      "improve_count": 5,
+      "reject_count": 0,
+      "false_accepts": 0,
+      "false_rejects": 0,
+      "avg_score_diff": 0.0021212121212120694,
+      "agreement_rate": 0.9090909090909091,
+      "quality_score": 90.89
+    }
+  ],
+  "timestamp": "2026-03-27T01:33:50.603116+00:00"
+}

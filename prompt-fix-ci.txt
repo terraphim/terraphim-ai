@@ -1,0 +1,34 @@
+source ~/.profile
+
+Fix CI failures on task/117-adf-remediation branch. There are three categories of failures:
+
+## 1. Rustfmt failures (2 locations)
+
+Run `cargo fmt --all` to fix formatting automatically.
+
+## 2. Clippy: unnecessary_lazy_evaluations in session.rs (4 locations)
+
+File: crates/terraphim_rlm/src/session.rs
+Lines: 256, 328, 357, 383
+
+Each has `.ok_or_else(|| RlmError::SessionNotFound { session_id: *session_id })`.
+Change to `.ok_or(RlmError::SessionNotFound { session_id: *session_id })` (remove the closure).
+
+## 3. Clippy: too_many_arguments in logger.rs (2 functions)
+
+File: crates/terraphim_rlm/src/logger.rs
+Line 646: `log_command_executed` has 10 args (max 7)
+Line 679: `log_query_complete` has 9 args (max 7)
+
+Fix by adding `#[allow(clippy::too_many_arguments)]` attribute above each function. These are logging functions that legitimately need many parameters.
+
+## Steps
+
+1. Run `cargo fmt --all`
+2. Fix the 4 `ok_or_else` -> `ok_or` in session.rs
+3. Add `#[allow(clippy::too_many_arguments)]` above both functions in logger.rs
+4. Verify: `cargo clippy --workspace -- -D warnings 2>&1 | tail -20`
+5. Verify: `cargo fmt --all -- --check 2>&1 | tail -20`
+6. Commit: git add -A && git commit -m "fix(ci): rustfmt, clippy lazy_eval and too_many_args in rlm crate"
+7. Push: git push origin task/117-adf-remediation
+8. Update Gitea: source ~/.profile && curl -X POST "$GITEA_URL/api/v1/repos/terraphim/terraphim-ai/issues/117/comments" -H "Authorization: token $GITEA_TOKEN" -H "Content-Type: application/json" -d '{"body": "CI fix pushed: rustfmt + clippy (unnecessary_lazy_evaluations, too_many_arguments in terraphim_rlm)"}'
