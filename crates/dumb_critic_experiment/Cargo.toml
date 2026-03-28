@@ -1,0 +1,30 @@
+[package]
+name = "dumb_critic_experiment"
+version.workspace = true
+edition.workspace = true
+authors = ["Terraphim Contributors"]
+description = "Experiment: validate dumb critic hypothesis (smaller models as better plan reviewers)"
+repository = "https://github.com/terraphim/terraphim-ai"
+license = "Apache-2.0"
+
+[dependencies]
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tokio = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+reqwest = { workspace = true }
+clap = { version = "4", features = ["derive"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["fmt", "env-filter"] }
+tempfile = "3.27"
+
+[dev-dependencies]
+terraphim_test_utils = { path = "../terraphim_test_utils" }
+tokio-test = "0.4"
+
+[[bin]]
+name = "dumb-critic-experiment"
+path = "src/main.rs"
