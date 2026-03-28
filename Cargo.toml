@@ -22,6 +22,11 @@ exclude = [
     "crates/terraphim_repl",
     # Symphony orchestrator (build separately: cd crates/terraphim_symphony && cargo build)
     "crates/terraphim_symphony",
+    # Firecracker-based crates (private git dependency fcctl-core)
+    "crates/terraphim_rlm",
+    "crates/terraphim_github_runner",
+    "crates/terraphim_github_runner_server",
+    "terraphim_firecracker",
 ]
 default-members = ["terraphim_server"]
 
