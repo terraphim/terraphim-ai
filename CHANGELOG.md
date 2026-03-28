@@ -5,6 +5,48 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.15.0] - 2026-03-28
+
+### Added
+
+#### Quality & Audit System
+- **QualityScore metadata** - K/L/S (knowledge/latency/stability) scores to IndexedDocument
+- **ReasoningCertificate type** - Audit trail for agent reasoning decisions
+- **Dual-panel nightwatch** - Drift detection with side-by-side evaluation
+- **Active hours window** - Scheduling for drift evaluation
+
+#### Agent Improvements
+- **spawn_with_fallback** - Agent spawning with fallback mechanism (#55)
+- **ADF cost optimization** - Token and latency tracking (#116)
+- **skill_chain injection** - Agent prompt content injection
+- **Compound review** - Enhanced resource limits and model flags
+
+#### Learning System
+- **learn suggest subcommand** - Suggest corrections from learnings
+- **learn auto-extract subcommand** - Session transcript extraction
+- **CorrectionEvent** - User correction events for learning
+
+#### Layered Search
+- **Layered output** - `--layer 1/2/3` for token efficiency
+  - Layer 1: Minimal metadata only
+  - Layer 2: Standard results with highlights
+  - Layer 3: Full document content
+
+### Fixed
+- **Sessions import** - Removed 100-session limit
+- **CI runner isolation** - Improved test isolation
+- **RUSTSEC-2026-0067/0068** - Updated tar to 0.4.45
+- **ADF relative paths** - Worktree root resolved against repo_path
+- **Benchmark stability** - Fixed intermittent failures
+
+### Changed
+- **terraphim_rlm workspace** - Enabled with bollard update
+- **whisper-rs** - Updated to 0.16.0
+
+### Dependencies
+- whisper-rs 0.11.1 -> 0.16.0
+- tar 0.4.42 -> 0.4.45
+
 ## [1.14.0] - 2026-03-22
 
 ### Added
@@ -139,5 +181,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - RoleGraph functionality
 - Knowledge graph ranking
 
+[1.15.0]: https://github.com/terraphim/terraphim-ai/compare/v1.14.0...v1.15.0
+[1.14.0]: https://github.com/terraphim/terraphim-ai/compare/v1.8.0...v1.14.0
 [1.8.0]: https://github.com/terraphim/terraphim-ai/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/terraphim/terraphim-ai/compare/v1.6.0...v1.7.0
