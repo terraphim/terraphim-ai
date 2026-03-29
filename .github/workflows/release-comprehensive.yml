@@ -111,7 +111,7 @@ jobs:
             target: armv7-unknown-linux-musleabihf
             use_cross: true
           # macOS builds - use GitHub-hosted runners for building
-          - os: macos-13
+          - os: macos-12
             target: x86_64-apple-darwin
             use_cross: false
           - os: macos-14
