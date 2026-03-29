@@ -8,18 +8,15 @@ ARG NODE_VERSION=20
 # ================================
 # Frontend Build Stage
 # ================================
+# Frontend is pre-built by CI and passed as build context
+# This stage is kept for backward compatibility but uses pre-built assets
 FROM --platform=$BUILDPLATFORM node:${NODE_VERSION}-alpine AS frontend-builder
 
 WORKDIR /app
-# Copy package files - yarn.lock is optional
-COPY desktop/package*.json ./
-COPY desktop/yarn.lock* ./
-RUN yarn install --frozen-lockfile --network-timeout 300000
+# Copy pre-built frontend from build context (downloaded by CI)
+COPY desktop/dist ./dist
 
-COPY desktop ./
-RUN yarn run build
-
-# Verify frontend build
+# Verify frontend build exists
 RUN ls -la dist/ && test -f dist/index.html
 
 # ================================
