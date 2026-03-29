@@ -110,8 +110,8 @@ jobs:
           - os: ubuntu-22.04
             target: armv7-unknown-linux-musleabihf
             use_cross: true
-          # macOS builds - use GitHub-hosted runners for building
-          - os: macos-12
+          # macOS builds
+          - os: [self-hosted, macOS]
             target: x86_64-apple-darwin
             use_cross: false
           - os: macos-14
