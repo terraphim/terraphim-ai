@@ -104,7 +104,20 @@ WORKDIR /code
 
 # Copy dependency files first for better caching
 COPY Cargo.toml Cargo.lock ./
-COPY crates/*/Cargo.toml crates/
+
+# Copy crate Cargo.toml files, excluding firecracker crates with private git deps
+# These are excluded from workspace builds but cargo fetch still sees them
+RUN mkdir -p crates
+COPY crates/*/Cargo.toml crates_temp/
+RUN sh -c 'for f in crates_temp/*.toml; do \
+    name=$(basename "$f"); \
+    case "$name" in \
+        "terraphim_rlm"*|"terraphim_github_runner"*|"terraphim_firecracker"*) \
+            echo "Skipping $name (private git deps)" ;; \
+        *) \
+            cp "$f" "crates/$name" ;; \
+    esac; \
+    done && rm -rf crates_temp'
 COPY terraphim_server/Cargo.toml terraphim_server/
 
 # Create empty source files to satisfy cargo
@@ -114,14 +127,29 @@ RUN find crates -name Cargo.toml -exec dirname {} \; | while read dir; do \
     mkdir -p terraphim_server/src && echo 'fn main() {}' > "terraphim_server/src/main.rs"
 
 # Pre-build dependencies
-# Note: crates with private git deps are excluded via .dockerignore
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     cargo fetch --target=$RUST_TARGET
 
-# Copy source code
-# Note: crates with private git deps are excluded via .dockerignore
-COPY crates ./crates
+# Copy source code (excluding firecracker crates with private git deps)
+# Copy each crate individually, excluding problematic ones
+RUN mkdir -p crates
+COPY crates/terraphim_agent crates/terraphim_agent/
+COPY crates/terraphim_agent_application crates/terraphim_agent_application/ 2>/dev/null || true
+COPY crates/terraphim_automata crates/terraphim_automata/
+COPY crates/terraphim_automata_py crates/terraphim_automata_py/ 2>/dev/null || true
+COPY crates/terraphim_build_args crates/terraphim_build_args/ 2>/dev/null || true
+COPY crates/terraphim_mcp_server crates/terraphim_mcp_server/
+COPY crates/terraphim_mcp_client crates/terraphim_mcp_client/
+COPY crates/terraphim_mcp_transport crates/terraphim_mcp_transport/
+COPY crates/terraphim_mcp_utils crates/terraphim_mcp_utils/
+COPY crates/terraphim_rolegraph crates/terraphim_rolegraph/
+COPY crates/terraphim_rolegraph_py crates/terraphim_rolegraph_py/ 2>/dev/null || true
+COPY crates/terraphim_server crates/terraphim_server/
+COPY crates/terraphim_sessions crates/terraphim_sessions/
+COPY crates/terraphim_tui crates/terraphim_tui/
+COPY crates/terraphim_types crates/terraphim_types/
+COPY crates/haystack_*/ crates/
 COPY terraphim_server ./terraphim_server
 COPY --from=frontend-builder /app/dist ./terraphim_server/dist
 
