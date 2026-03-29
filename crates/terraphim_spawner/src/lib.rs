@@ -22,6 +22,7 @@ pub mod config;
 pub mod health;
 pub mod mention;
 pub mod output;
+pub mod skill;
 
 pub use audit::AuditEvent;
 pub use config::{AgentConfig, AgentValidator, ResourceLimits, ValidationError};
@@ -30,6 +31,7 @@ pub use health::{
 };
 pub use mention::{MentionEvent, MentionRouter};
 pub use output::{OutputCapture, OutputEvent};
+pub use skill::{SkillError, SkillResolver};
 
 /// Errors that can occur during agent spawning
 #[derive(thiserror::Error, Debug)]
@@ -73,6 +75,14 @@ pub struct SpawnRequest {
     pub use_stdin: bool,
     /// Resource limits for the spawned process.
     pub resource_limits: ResourceLimits,
+    /// Skill chain names to resolve and inject into prompt.
+    /// Each skill is loaded from the skill directory and its content
+    /// appended to the task prompt after the persona section.
+    pub skill_chain: Vec<String>,
+    /// Pre-resolved skill chain content. If provided, this is used directly
+    /// instead of resolving skill_chain names. Allows orchestrator to cache
+    /// skill content across multiple spawns.
+    pub skill_chain_context: Option<String>,
 }
 
 impl SpawnRequest {
@@ -86,6 +96,8 @@ impl SpawnRequest {
             task: task.into(),
             use_stdin: false,
             resource_limits: ResourceLimits::default(),
+            skill_chain: Vec::new(),
+            skill_chain_context: None,
         }
     }
 
@@ -116,6 +128,19 @@ impl SpawnRequest {
     /// Set resource limits for the spawned process.
     pub fn with_resource_limits(mut self, limits: ResourceLimits) -> Self {
         self.resource_limits = limits;
+        self
+    }
+
+    /// Set skill chain names to resolve and inject into the agent prompt.
+    pub fn with_skill_chain(mut self, skills: Vec<String>) -> Self {
+        self.skill_chain = skills;
+        self
+    }
+
+    /// Set pre-resolved skill chain context directly.
+    /// This bypasses skill resolution and uses the provided content.
+    pub fn with_skill_chain_context(mut self, context: impl Into<String>) -> Self {
+        self.skill_chain_context = Some(context.into());
         self
     }
 }
@@ -470,17 +495,62 @@ impl AgentSpawner {
     ///
     /// Attempts to spawn with the primary provider first. If that fails,
     /// falls back to the fallback provider (if configured).
+    ///
+    /// This method resolves skill chains and injects them into the task prompt
+    /// before spawning. Skill resolution order:
+    /// 1. If `skill_chain_context` is provided, use it directly
+    /// 2. Otherwise, if `skill_chain` has entries, resolve them via SkillResolver
+    /// 3. Prepend resolved skills to the task after any persona content
     pub async fn spawn_with_fallback(
         &self,
         request: &SpawnRequest,
     ) -> Result<AgentHandle, SpawnerError> {
+        // Resolve skill chain content for injection into prompt
+        let skill_content = if let Some(ref context) = request.skill_chain_context {
+            // Use pre-resolved context directly
+            tracing::info!("using pre-resolved skill_chain_context");
+            context.clone()
+        } else if !request.skill_chain.is_empty() {
+            // Resolve skills from disk
+            match SkillResolver::with_default_dir() {
+                Some(resolver) => {
+                    let content = resolver.resolve_chain(&request.skill_chain);
+                    if !content.is_empty() {
+                        tracing::info!(
+                            skills = request.skill_chain.len(),
+                            skill_bytes = content.len(),
+                            "resolved skill_chain content"
+                        );
+                    }
+                    content
+                }
+                None => {
+                    tracing::warn!("HOME not set, cannot resolve skill_chain");
+                    String::new()
+                }
+            }
+        } else {
+            String::new()
+        };
+
+        // Compose final task with skill content injected after task content
+        // This places skills after the persona/task but before execution
+        let composed_task = if skill_content.is_empty() {
+            request.task.clone()
+        } else {
+            format!("{}{}", request.task, skill_content)
+        };
+
+        // Use stdin if skills were injected (increases task size)
+        let use_stdin = request.use_stdin || !skill_content.is_empty();
+
         // Try primary first with resource limits
         let primary_result = self
             .spawn_with_options(
                 &request.primary_provider,
-                &request.task,
+                &composed_task,
                 request.primary_model.as_deref(),
-                request.use_stdin,
+                use_stdin,
                 request.resource_limits.clone(),
             )
             .await;
@@ -505,9 +575,9 @@ impl AgentSpawner {
                     let fallback_result = self
                         .spawn_with_options(
                             fallback,
-                            &request.task,
+                            &composed_task,
                             request.fallback_model.as_deref(),
-                            request.use_stdin,
+                            use_stdin,
                             request.resource_limits.clone(),
                         )
                         .await;
