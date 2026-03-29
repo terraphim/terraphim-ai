@@ -113,24 +113,17 @@ RUN find crates -name Cargo.toml -exec dirname {} \; | while read dir; do \
     done && \
     mkdir -p terraphim_server/src && echo 'fn main() {}' > "terraphim_server/src/main.rs"
 
-# Remove excluded crates that have private git dependencies
-# These are excluded in workspace Cargo.toml but cargo fetch still sees them
-RUN rm -rf crates/terraphim_rlm crates/terraphim_github_runner crates/terraphim_github_runner_server 2>/dev/null || true
-RUN rm -rf terraphim_firecracker 2>/dev/null || true
-
 # Pre-build dependencies
+# Note: crates with private git deps are excluded via .dockerignore
 RUN . /root/.profile && \
     RUST_TARGET=$(cat /tmp/rust-target) && \
     cargo fetch --target=$RUST_TARGET
 
-# Copy source code (excluding crates with private dependencies)
+# Copy source code
+# Note: crates with private git deps are excluded via .dockerignore
 COPY crates ./crates
 COPY terraphim_server ./terraphim_server
 COPY --from=frontend-builder /app/dist ./terraphim_server/dist
-
-# Remove excluded crates again after copy
-RUN rm -rf crates/terraphim_rlm crates/terraphim_github_runner crates/terraphim_github_runner_server 2>/dev/null || true
-RUN rm -rf terraphim_firecracker 2>/dev/null || true
 
 # Build the application
 RUN . /root/.profile && \
