@@ -1249,11 +1249,8 @@ impl From<RoleGraph> for RoleGraphSync {
     }
 }
 
-#[macro_use]
-extern crate lazy_static;
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"[?!|]\s+").unwrap();
-}
+static RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"[?!|]\s+").unwrap());
 
 pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
     let sentences = UnicodeSegmentation::split_sentence_bounds(paragraphs);

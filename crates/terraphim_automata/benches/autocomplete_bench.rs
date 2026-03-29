@@ -29,12 +29,12 @@ use terraphim_automata::{AutomataPath, load_thesaurus};
 use tokio::runtime::Runtime;
 
 #[cfg(feature = "tokio-runtime")]
-lazy_static::lazy_static! {
-    static ref TOKIO_RUNTIME: Runtime = tokio::runtime::Builder::new_current_thread()
+static TOKIO_RUNTIME: std::sync::LazyLock<Runtime> = std::sync::LazyLock::new(|| {
+    tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
-        .unwrap();
-}
+        .unwrap()
+});
 
 // We can use this `block_on` function to run async code in the benchmarks when tokio is available
 #[cfg(feature = "tokio-runtime")]
