@@ -18,27 +18,38 @@ jobs:
           echo "Current rustc:"
           which rustc || echo "rustc not in PATH"
           rustc --version 2>&1 || echo "rustc failed"
+          echo ""
+          echo "Installed targets:"
+          rustup target list --installed
           
       - name: Fix Rust toolchain
         run: |
-          echo "Installing correct macOS toolchain..."
-          rustup toolchain install stable-x86_64-apple-darwin
+          echo "Adding x86_64 target for cross-compilation..."
+          rustup target add x86_64-apple-darwin
           
-          echo "Setting as default..."
-          rustup default stable-x86_64-apple-darwin
+          echo ""
+          echo "Installing x86_64 toolchain with force flag..."
+          rustup toolchain install stable-x86_64-apple-darwin --force-non-host
           
-          echo "Removing wrong Linux toolchain..."
+          echo ""
+          echo "Removing wrong Linux toolchain if present..."
           rustup toolchain uninstall stable-x86_64-unknown-linux-gnu 2>/dev/null || echo "Linux toolchain not found (good)"
           
           echo ""
           echo "Verification:"
+          echo "Default toolchain:"
           rustup default
+          echo ""
+          echo "Installed targets:"
+          rustup target list --installed
+          echo ""
+          echo "Rustc version:"
           rustc --version
           cargo --version
           
-      - name: Test build
+      - name: Test cross-compilation
         run: |
-          echo "Testing toolchain with a simple build..."
+          echo "Testing cross-compilation to x86_64..."
           mkdir -p /tmp/test-rust
           cd /tmp/test-rust
           cat > main.rs << 'EOF'
@@ -47,7 +58,14 @@ jobs:
               println!("Target: {}", std::env::consts::ARCH);
           }
           EOF
-          rustc main.rs -o test-macos
-          ./test-macos
+          echo "Building for ARM64 (native)..."
+          rustc main.rs -o test-arm64
+          file test-arm64
+          ./test-arm64
+          echo ""
+          echo "Building for x86_64 (cross-compile)..."
+          rustc --target x86_64-apple-darwin main.rs -o test-x86_64
+          file test-x86_64
           rm -rf /tmp/test-rust
+          echo ""
           echo "Toolchain fix complete!"
