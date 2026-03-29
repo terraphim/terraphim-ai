@@ -4,10 +4,12 @@
 //! implementations normalise to.
 
 pub mod gitea;
+pub mod gitea_write;
 pub mod linear;
 pub mod pagerank;
 
 pub use gitea::{CommentUser, GiteaComment, GiteaConfig, GiteaTracker, IssueComment};
+pub use gitea_write::GiteaCommentWriter;
 pub use linear::{LinearConfig, LinearTracker};
 pub use pagerank::{PagerankClient, PagerankScore};
 
