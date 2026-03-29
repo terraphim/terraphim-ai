@@ -1,0 +1,53 @@
+name: Fix macOS Runner Toolchain
+
+on:
+  workflow_dispatch:
+
+jobs:
+  fix-macos-toolchain:
+    runs-on: [self-hosted, macOS]
+    steps:
+      - name: Check current Rust toolchain
+        run: |
+          echo "Current default toolchain:"
+          rustup default
+          echo ""
+          echo "Installed toolchains:"
+          rustup toolchain list
+          echo ""
+          echo "Current rustc:"
+          which rustc || echo "rustc not in PATH"
+          rustc --version 2>&1 || echo "rustc failed"
+          
+      - name: Fix Rust toolchain
+        run: |
+          echo "Installing correct macOS toolchain..."
+          rustup toolchain install stable-x86_64-apple-darwin
+          
+          echo "Setting as default..."
+          rustup default stable-x86_64-apple-darwin
+          
+          echo "Removing wrong Linux toolchain..."
+          rustup toolchain uninstall stable-x86_64-unknown-linux-gnu 2>/dev/null || echo "Linux toolchain not found (good)"
+          
+          echo ""
+          echo "Verification:"
+          rustup default
+          rustc --version
+          cargo --version
+          
+      - name: Test build
+        run: |
+          echo "Testing toolchain with a simple build..."
+          mkdir -p /tmp/test-rust
+          cd /tmp/test-rust
+          cat > main.rs << 'EOF'
+          fn main() {
+              println!("Hello from macOS runner!");
+              println!("Target: {}", std::env::consts::ARCH);
+          }
+          EOF
+          rustc main.rs -o test-macos
+          ./test-macos
+          rm -rf /tmp/test-rust
+          echo "Toolchain fix complete!"
