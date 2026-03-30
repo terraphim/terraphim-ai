@@ -464,7 +464,9 @@ impl AgentOrchestrator {
             None => {
                 // Default: ~/.claude/skills (resolve HOME from env)
                 match std::env::var("HOME") {
-                    Ok(home) => std::path::PathBuf::from(home).join(".claude").join("skills"),
+                    Ok(home) => std::path::PathBuf::from(home)
+                        .join(".claude")
+                        .join("skills"),
                     Err(_) => return String::new(),
                 }
             }
@@ -650,7 +652,8 @@ impl AgentOrchestrator {
         // Do NOT use stdin for unfound personas -- the bare task is small and
         // stdin delivery to short-lived processes (echo) causes broken pipe races.
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
-        let use_stdin = persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
+        let use_stdin =
+            persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
         // Build primary Provider from the agent definition for the spawner
         let primary_provider = terraphim_types::capability::Provider {
@@ -2097,6 +2100,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
         let watch: Vec<String> = vec![];
         assert!(!has_matching_changes(&changed, &watch));
+    }
+
     // =========================================================================
     // ADF Remediation Tests (Gitea #117)
     // =========================================================================
