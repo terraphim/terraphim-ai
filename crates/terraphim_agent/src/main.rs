@@ -3183,15 +3183,13 @@ fn ui_loop(
                                     let doc = detailed_results[selected_result_index].clone();
                                     let backend = backend.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary_opt) = rt.block_on(async move {
+                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
                                         backend.summarize(&doc, Some(&role)).await
                                     }) {
-                                        if let Some(summary_text) = summary_opt {
-                                            // Replace result with summary for display
-                                            if selected_result_index < results.len() {
-                                                results[selected_result_index] =
-                                                    format!("SUMMARY: {}", summary_text);
-                                            }
+                                        // Replace result with summary for display
+                                        if selected_result_index < results.len() {
+                                            results[selected_result_index] =
+                                                format!("SUMMARY: {}", summary_text);
                                         }
                                     }
                                 }
@@ -3220,25 +3218,23 @@ fn ui_loop(
                                     let doc = detailed_results[selected_result_index].clone();
                                     let backend = backend.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary_opt) = rt.block_on(async move {
+                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
                                         backend.summarize(&doc, Some(&role)).await
                                     }) {
-                                        if let Some(summary_text) = summary_opt {
-                                            // Update the document body with summary
-                                            let original_body = if detailed_results
-                                                [selected_result_index]
-                                                .body
-                                                .is_empty()
-                                            {
-                                                "No content"
-                                            } else {
-                                                &detailed_results[selected_result_index].body
-                                            };
-                                            detailed_results[selected_result_index].body = format!(
-                                                "SUMMARY:\n{}\n\nORIGINAL:\n{}",
-                                                summary_text, original_body
-                                            );
-                                        }
+                                        // Update the document body with summary
+                                        let original_body = if detailed_results
+                                            [selected_result_index]
+                                            .body
+                                            .is_empty()
+                                        {
+                                            "No content"
+                                        } else {
+                                            &detailed_results[selected_result_index].body
+                                        };
+                                        detailed_results[selected_result_index].body = format!(
+                                            "SUMMARY:\n{}\n\nORIGINAL:\n{}",
+                                            summary_text, original_body
+                                        );
                                     }
                                 }
                             }
