@@ -83,7 +83,8 @@ fn dag_strategy(
     })
 }
 
-fn random_dag_strategy() -> impl Strategy<Value = (AHashMap<u64, AHashSet<u64>>, AHashMap<u64, MedicalNodeType>)> {
+fn random_dag_strategy()
+-> impl Strategy<Value = (AHashMap<u64, AHashSet<u64>>, AHashMap<u64, MedicalNodeType>)> {
     (5usize..=100).prop_flat_map(|node_count| dag_strategy(node_count))
 }
 
@@ -308,38 +309,45 @@ mod tests {
         let strategy = random_dag_strategy();
 
         runner
-            .run(&strategy, |(isa_parents, node_types): (AHashMap<u64, AHashSet<u64>>, AHashMap<u64, MedicalNodeType>)| {
-                for (&child, parents) in &isa_parents {
-                    for &parent in parents {
+            .run(
+                &strategy,
+                |(isa_parents, node_types): (
+                    AHashMap<u64, AHashSet<u64>>,
+                    AHashMap<u64, MedicalNodeType>,
+                )| {
+                    for (&child, parents) in &isa_parents {
+                        for &parent in parents {
+                            prop_assert!(
+                                parent < child,
+                                "Parent {} should have id less than child {}",
+                                parent,
+                                child
+                            );
+                        }
+                    }
+
+                    for &node in isa_parents.keys() {
                         prop_assert!(
-                            parent < child,
-                            "Parent {} should have id less than child {}",
-                            parent,
-                            child
+                            node_types.contains_key(&node),
+                            "Node {} should have a type",
+                            node
                         );
                     }
-                }
 
-                for &node in isa_parents.keys() {
-                    prop_assert!(
-                        node_types.contains_key(&node),
-                        "Node {} should have a type",
-                        node
-                    );
-                }
+                    let index =
+                        SymbolicEmbeddingIndex::build_from_hierarchy(&isa_parents, &node_types);
 
-                let index = SymbolicEmbeddingIndex::build_from_hierarchy(&isa_parents, &node_types);
+                    for &node in node_types.keys() {
+                        prop_assert!(
+                            index.get_embedding(node).is_some(),
+                            "Node {} should be in the index",
+                            node
+                        );
+                    }
 
-                for &node in node_types.keys() {
-                    prop_assert!(
-                        index.get_embedding(node).is_some(),
-                        "Node {} should be in the index",
-                        node
-                    );
-                }
-
-                Ok(())
-            })
+                    Ok(())
+                },
+            )
             .unwrap();
     }
 }
