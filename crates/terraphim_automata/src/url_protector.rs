@@ -60,24 +60,13 @@ pub struct ProtectedUrl {
 }
 
 /// URL protector for masking and restoring URLs during text replacement.
-#[derive(Debug, Clone)]
-pub struct UrlProtector {
-    /// Counter for generating unique placeholders
-    _placeholder_counter: u32,
-}
-
-impl Default for UrlProtector {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+#[derive(Debug, Clone, Default)]
+pub struct UrlProtector;
 
 impl UrlProtector {
     /// Create a new URL protector.
     pub fn new() -> Self {
-        Self {
-            _placeholder_counter: 0,
-        }
+        Self
     }
 
     /// Mask all URLs in the text with placeholders.
