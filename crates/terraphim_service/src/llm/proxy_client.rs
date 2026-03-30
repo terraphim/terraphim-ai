@@ -233,8 +233,10 @@ impl LlmClient for ProxyLlmClient {
             Err(e) => {
                 error!("Proxy chat request failed: {}", e);
                 return Err(crate::ServiceError::Config(format!(
-                    "Failed to connect to proxy: {}",
-                    e
+                    "Failed to connect to terraphim-llm-proxy at {}. \
+                     Start the proxy with 'terraphim-llm-proxy' or configure an LLM provider. \
+                     Error: {}",
+                    self.config.base_url, e
                 )));
             }
         };

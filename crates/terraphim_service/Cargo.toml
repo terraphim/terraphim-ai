@@ -50,7 +50,8 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"], optional = tr
 default = ["ollama", "llm_router"]
 openrouter = ["terraphim_config/openrouter"]
 ollama = []
-llm_router = ["dep:terraphim_router"]
+llm_router = ["proxy", "dep:terraphim_router"]
+proxy = []
 tracing = ["dep:tracing", "dep:tracing-subscriber"]
 
 [dev-dependencies]
