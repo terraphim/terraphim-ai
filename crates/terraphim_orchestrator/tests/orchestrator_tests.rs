@@ -44,6 +44,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -64,6 +65,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -84,6 +86,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             },
         ],
         restart_cooldown_secs: 60,
@@ -298,4 +301,66 @@ fn test_error_variants_display() {
     assert!(msg.contains("agent-a"));
     assert!(msg.contains("agent-b"));
     assert!(msg.contains("timeout"));
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_skips_on_empty_output() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "true".to_string(),  // exit 0, empty stdout
+        timeout_secs: 5,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    // Agent should NOT be spawned (NoFindings -> skip)
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(!orch.is_agent_active("sentinel"));
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_returns_findings() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "echo 'found issues'".to_string(),
+        timeout_secs: 5,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_fail_open_on_error() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "exit 1".to_string(),
+        timeout_secs: 5,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));  // fail-open
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_timeout_fail_open() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "sleep 10".to_string(),
+        timeout_secs: 1,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));  // fail-open
+}
+
+#[tokio::test]
+async fn test_no_pre_check_spawns_normally() {
+    let config = test_config();  // pre_check is None
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));
 }

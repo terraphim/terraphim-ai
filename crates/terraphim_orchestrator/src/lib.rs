@@ -46,7 +46,7 @@ pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef,
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
-    OrchestratorConfig, TrackerConfig, TrackerStates, WorkflowConfig,
+    OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates, WorkflowConfig,
 };
 pub use cost_tracker::{BudgetVerdict, CostSnapshot, CostTracker};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
@@ -75,6 +75,17 @@ use terraphim_spawner::output::OutputEvent;
 use terraphim_spawner::{AgentHandle, AgentSpawner, ResourceLimits, SpawnRequest};
 use tokio::sync::broadcast;
 use tracing::{error, info, warn};
+
+/// Result of evaluating a pre-check strategy before spawning an agent.
+#[derive(Debug, Clone)]
+pub enum PreCheckResult {
+    /// Pre-check found actionable findings. Agent should spawn with findings prepended.
+    Findings(String),
+    /// Nothing to do. Skip spawn.
+    NoFindings,
+    /// Pre-check execution itself failed. Fail-open: spawn anyway.
+    Failed(String),
+}
 
 /// Status of a single agent in the fleet.
 #[derive(Debug, Clone)]
@@ -130,6 +141,9 @@ pub struct AgentOrchestrator {
     /// Circuit breakers for each provider to prevent cascading failures.
     #[allow(dead_code)]
     circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
+    /// Per-agent last-run commit hash for GitDiff strategy.
+    /// Key: agent name. Value: commit SHA.
+    last_run_commits: HashMap<String, String>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -217,6 +231,7 @@ impl AgentOrchestrator {
             persona_registry,
             metaprompt_renderer,
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
+            last_run_commits: HashMap::new(),
         })
     }
 
@@ -433,6 +448,22 @@ impl AgentOrchestrator {
     /// Otherwise, route the task prompt through the RoutingEngine to select
     /// a model based on keyword matching.
     async fn spawn_agent(&mut self, def: &AgentDefinition) -> Result<(), OrchestratorError> {
+        // === PRE-CHECK GATE ===
+        let pre_check_result = self.run_pre_check(def).await;
+        let findings = match pre_check_result {
+            PreCheckResult::NoFindings => {
+                info!(agent = %def.name, "skipping spawn: pre-check found nothing actionable");
+                return Ok(());
+            }
+            PreCheckResult::Findings(f) if f.is_empty() => None,
+            PreCheckResult::Findings(f) => Some(f),
+            PreCheckResult::Failed(reason) => {
+                warn!(agent = %def.name, reason = %reason,
+                      "pre-check failed, spawning anyway (fail-open)");
+                None
+            }
+        };
+
         // Select model via keyword routing or explicit config.
         // Skip keyword routing for CLIs that use OAuth and don't support -m
         // (e.g. codex with ChatGPT account). Only apply routed models when the
@@ -515,6 +546,16 @@ impl AgentOrchestrator {
             }
         } else {
             (def.task.clone(), false)
+        };
+
+        // === FINDINGS INJECTION ===
+        let composed_task = if let Some(ref findings) = findings {
+            format!(
+                "## Pre-flight findings (automated checks already ran)\n\n{}\n\n---\n\n{}",
+                findings, composed_task
+            )
+        } else {
+            composed_task
         };
 
         // Use stdin only when persona was actually resolved (prompt is enriched)
@@ -607,7 +648,141 @@ impl AgentOrchestrator {
             },
         );
 
+        // === RECORD COMMIT FOR GIT-DIFF STRATEGY ===
+        if let Ok(head) = self.get_current_head().await {
+            self.last_run_commits.insert(def.name.clone(), head);
+        }
+
         Ok(())
+    }
+
+    /// Evaluate the pre-check strategy for an agent.
+    async fn run_pre_check(&self, def: &AgentDefinition) -> PreCheckResult {
+        match &def.pre_check {
+            None | Some(PreCheckStrategy::Always) => PreCheckResult::Findings(String::new()),
+            Some(PreCheckStrategy::GitDiff { watch_paths }) => {
+                self.git_diff_pre_check(&def.name, watch_paths).await
+            }
+            Some(PreCheckStrategy::GiteaIssue { .. }) => {
+                // Phase 2 - not yet implemented, fail-open
+                PreCheckResult::Failed("gitea-issue strategy not yet implemented".into())
+            }
+            Some(PreCheckStrategy::Shell { script, timeout_secs }) => {
+                self.shell_pre_check(script, *timeout_secs).await
+            }
+        }
+    }
+
+    /// Git diff pre-check: compare last_run_commit to HEAD.
+    async fn git_diff_pre_check(&self, agent_name: &str, watch_paths: &[String]) -> PreCheckResult {
+        let last_commit = match self.last_run_commits.get(agent_name) {
+            Some(c) => c.clone(),
+            None => {
+                info!(agent = %agent_name, "no last_run_commit recorded, spawning (first run)");
+                return PreCheckResult::Findings(String::new());
+            }
+        };
+
+        // Get current HEAD
+        let head = match self.get_current_head().await {
+            Ok(h) => h,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "failed to get HEAD, spawning (fail-open)");
+                return PreCheckResult::Failed(format!("git rev-parse failed: {}", e));
+            }
+        };
+
+        if head == last_commit {
+            info!(agent = %agent_name, commit = %head, "HEAD unchanged since last run, skipping");
+            return PreCheckResult::NoFindings;
+        }
+
+        // Get changed files
+        let diff_range = format!("{}..{}", last_commit, head);
+        let output = match tokio::process::Command::new("git")
+            .args(["diff", "--name-only", &diff_range])
+            .current_dir(&self.config.working_dir)
+            .output()
+            .await
+        {
+            Ok(o) => o,
+            Err(e) => {
+                warn!(agent = %agent_name, error = %e, "git diff failed, spawning (fail-open)");
+                return PreCheckResult::Failed(format!("git diff failed: {}", e));
+            }
+        };
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            warn!(agent = %agent_name, stderr = %stderr, "git diff non-zero exit, spawning (fail-open)");
+            return PreCheckResult::Failed(format!("git diff exit {}: {}", output.status, stderr));
+        }
+
+        let changed_files: Vec<String> = String::from_utf8_lossy(&output.stdout)
+            .lines()
+            .filter(|l| !l.is_empty())
+            .map(|l| l.to_string())
+            .collect();
+
+        if changed_files.is_empty() {
+            info!(agent = %agent_name, "no files changed, skipping");
+            return PreCheckResult::NoFindings;
+        }
+
+        if has_matching_changes(&changed_files, watch_paths) {
+            let summary = format!("{} files changed matching watch_paths", changed_files.len());
+            info!(agent = %agent_name, files = changed_files.len(), "matching changes found");
+            PreCheckResult::Findings(summary)
+        } else {
+            info!(agent = %agent_name, files = changed_files.len(), "changes found but none match watch_paths, skipping");
+            PreCheckResult::NoFindings
+        }
+    }
+
+    /// Shell pre-check: run script via sh -c.
+    async fn shell_pre_check(&self, script: &str, timeout_secs: u64) -> PreCheckResult {
+        let result = tokio::time::timeout(
+            Duration::from_secs(timeout_secs),
+            tokio::process::Command::new("sh")
+                .arg("-c")
+                .arg(script)
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await;
+
+        match result {
+            Ok(Ok(output)) => {
+                if output.status.success() {
+                    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+                    if stdout.is_empty() {
+                        PreCheckResult::NoFindings
+                    } else {
+                        PreCheckResult::Findings(stdout)
+                    }
+                } else {
+                    let stderr = String::from_utf8_lossy(&output.stderr);
+                    PreCheckResult::Failed(format!("script exit {}: {}", output.status, stderr))
+                }
+            }
+            Ok(Err(e)) => PreCheckResult::Failed(format!("script I/O error: {}", e)),
+            Err(_) => PreCheckResult::Failed(format!("script timed out after {}s", timeout_secs)),
+        }
+    }
+
+    /// Get current HEAD commit hash.
+    async fn get_current_head(&self) -> Result<String, OrchestratorError> {
+        let output = tokio::process::Command::new("git")
+            .args(["rev-parse", "HEAD"])
+            .current_dir(&self.config.working_dir)
+            .output()
+            .await?;
+
+        if output.status.success() {
+            Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+        } else {
+            Err(OrchestratorError::Config("git rev-parse HEAD failed".into()))
+        }
     }
 
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
@@ -966,6 +1141,31 @@ impl AgentOrchestrator {
             self.stop_agent(&name).await;
         }
     }
+
+    /// Spawn a specific agent by name (test helper).
+    pub async fn spawn_agent_for_test(&mut self, name: &str) -> Result<(), OrchestratorError> {
+        let def = self.config.agents.iter().find(|a| a.name == name)
+            .ok_or_else(|| OrchestratorError::AgentNotFound(name.to_string()))?
+            .clone();
+        self.spawn_agent(&def).await
+    }
+
+    /// Check if an agent is in the active_agents map (test helper).
+    pub fn is_agent_active(&self, name: &str) -> bool {
+        self.active_agents.contains_key(name)
+    }
+}
+
+/// Check whether any changed file matches any of the watch path prefixes.
+fn has_matching_changes(changed_files: &[String], watch_paths: &[String]) -> bool {
+    for file in changed_files {
+        for prefix in watch_paths {
+            if scope::is_path_prefix(prefix, file) {
+                return true;
+            }
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -1009,6 +1209,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                pre_check: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -1029,6 +1230,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
+                pre_check: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -1200,6 +1402,7 @@ task = "test"
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -1281,6 +1484,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+                pre_check: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -1415,6 +1619,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+                pre_check: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -1497,6 +1702,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
+                pre_check: None,
         }];
 
         // No persona_data_dir, so registry will be empty
