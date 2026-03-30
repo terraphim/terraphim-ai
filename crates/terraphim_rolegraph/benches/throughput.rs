@@ -16,9 +16,8 @@ use terraphim_rolegraph::input::TEST_CORPUS;
 use terraphim_rolegraph::split_paragraphs;
 use terraphim_types::{Document, DocumentType, Thesaurus};
 
-lazy_static::lazy_static! {
-    static ref TOKIO_RUNTIME: Runtime = Runtime::new().unwrap();
-}
+static TOKIO_RUNTIME: std::sync::LazyLock<Runtime> =
+    std::sync::LazyLock::new(|| Runtime::new().unwrap());
 
 // We can use this `block_on` function to run async code in the benchmarks
 // without having to use `async fn`, which is not supported by the `criterion` library.
