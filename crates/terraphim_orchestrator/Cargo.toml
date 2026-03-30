@@ -38,6 +38,7 @@ handlebars = "6.3"
 [dev-dependencies]
 tokio-test = "0.4"
 tempfile = "3.27"
+wiremock = "0.6"
 
 [[bin]]
 name = "adf"

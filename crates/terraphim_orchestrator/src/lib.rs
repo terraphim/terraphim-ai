@@ -38,6 +38,7 @@ pub mod error;
 pub mod handoff;
 pub mod mode;
 pub mod nightwatch;
+pub mod output_poster;
 pub mod persona;
 pub mod scheduler;
 pub mod scope;
