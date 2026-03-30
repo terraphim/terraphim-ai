@@ -25,6 +25,9 @@ mod client;
 mod guard_patterns;
 mod onboarding;
 mod service;
+mod tui_backend;
+
+use tui_backend::TuiBackend;
 
 // Robot mode and forgiving CLI - always available
 mod forgiving;
@@ -71,11 +74,15 @@ fn show_usage_info() {
     println!("  terraphim-agent help         # Show command-specific help");
 }
 
+// These functions are used in tests but not in production code currently.
+// They are kept for potential future use (e.g., auto-detect server mode).
+#[allow(dead_code)]
 fn resolve_tui_server_url(explicit: Option<&str>) -> String {
     let env_server = std::env::var("TERRAPHIM_SERVER").ok();
     resolve_tui_server_url_with_env(explicit, env_server.as_deref())
 }
 
+#[allow(dead_code)]
 fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&str>) -> String {
     explicit
         .map(ToOwned::to_owned)
@@ -83,6 +90,7 @@ fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&s
         .unwrap_or_else(|| "http://localhost:8000".to_string())
 }
 
+#[allow(dead_code)]
 fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!(
         "Fullscreen TUI requires a running Terraphim server at {}. \
@@ -93,6 +101,7 @@ fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Err
     )
 }
 
+#[allow(dead_code)]
 fn ensure_tui_server_reachable(
     runtime: &tokio::runtime::Runtime,
     api: &ApiClient,
@@ -935,8 +944,8 @@ fn main() -> Result<()> {
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
-                // Run TUI mode - it will create its own runtime
-                run_tui_offline_mode(cli.transparent)
+                // Run TUI mode with local backend (offline, no server required)
+                run_tui_local_mode(cli.transparent)
             }
         }
 
@@ -960,14 +969,37 @@ fn main() -> Result<()> {
         }
     }
 }
-fn run_tui_offline_mode(transparent: bool) -> Result<()> {
-    // Fullscreen TUI mode requires a running server.
-    // For offline operation, use `terraphim-agent repl`.
-    run_tui(None, transparent)
+fn run_tui_local_mode(transparent: bool) -> Result<()> {
+    // Show loading indicator before entering raw mode
+    // TuiService::new() may take time for rolegraph building
+    println!("Loading Terraphim...");
+    std::io::Write::flush(&mut std::io::stdout())?;
+
+    // Create local TuiService backend (offline, no server required)
+    let rt = Runtime::new()?;
+    let service = rt.block_on(async { TuiService::new(None).await })?;
+    let backend = TuiBackend::Local(service);
+
+    // Clear the loading message before TUI starts
+    // This will scroll away when the terminal enters alternate screen
+    run_tui(backend, transparent)
 }
 
 fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
-    run_tui(Some(server_url.to_string()), transparent)
+    // Create remote ApiClient backend (requires server)
+    let rt = Runtime::new()?;
+    let api = ApiClient::new(server_url.to_string());
+    rt.block_on(async { api.health().await }).map_err(|err| {
+        anyhow::anyhow!(
+            "Fullscreen TUI requires a running Terraphim server at {}. \
+                 Start terraphim_server or use offline mode without --server flag. \
+                 Connection error: {}",
+            server_url,
+            err
+        )
+    })?;
+    let backend = TuiBackend::Remote(api);
+    run_tui(backend, transparent)
 }
 
 /// Stateless config validation -- runs before TuiService initialization.
@@ -2878,10 +2910,10 @@ async fn run_server_command(
     }
 }
 
-fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
+fn run_tui(tui_backend: TuiBackend, transparent: bool) -> Result<()> {
     // Attempt to set up terminal for TUI
     let stdout = io::stdout();
-    let backend = CrosstermBackend::new(stdout);
+    let crossterm_backend = CrosstermBackend::new(stdout);
 
     // Try to enter raw mode and alternate screen
     // These operations can fail in non-interactive environments
@@ -2899,7 +2931,7 @@ fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
                 ));
             }
 
-            let mut terminal = match Terminal::new(backend) {
+            let mut terminal = match Terminal::new(crossterm_backend) {
                 Ok(t) => t,
                 Err(e) => {
                     // Clean up before returning
@@ -2913,7 +2945,7 @@ fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
                 }
             };
 
-            let res = ui_loop(&mut terminal, server_url, transparent);
+            let res = ui_loop(&mut terminal, tui_backend, transparent);
 
             // Always clean up terminal state
             let _ = disable_raw_mode();
@@ -2941,7 +2973,7 @@ fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
 
 fn ui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    server_url: Option<String>,
+    backend: TuiBackend,
     transparent: bool,
 ) -> Result<()> {
     let mut input = String::new();
@@ -2952,19 +2984,18 @@ fn ui_loop(
     let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
     let mut selected_result_index = 0;
     let mut view_mode = ViewMode::Search;
-    let effective_url = resolve_tui_server_url(server_url.as_deref());
-    let api = ApiClient::new(effective_url.clone());
 
     // Create a tokio runtime for this TUI session
     // We need a local runtime because we're in a synchronous function (terminal event loop)
     let rt = tokio::runtime::Runtime::new()?;
-    ensure_tui_server_reachable(&rt, &api, &effective_url)?;
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
-        current_role = cfg.config.selected_role.to_string();
-        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
-            terms = rg.nodes.into_iter().map(|n| n.label).collect();
+    if let Ok(cfg) = rt.block_on(async { backend.get_config().await }) {
+        current_role = cfg.selected_role.to_string();
+        if let Ok(role_terms) =
+            rt.block_on(async { backend.get_rolegraph_terms(&current_role).await })
+        {
+            terms = role_terms;
         }
     }
 
@@ -3066,7 +3097,7 @@ fn ui_loop(
                             TuiAction::Quit => break,
                             TuiAction::SearchOrOpen => {
                                 let query = input.trim().to_string();
-                                let api = api.clone();
+                                let backend = backend.clone();
                                 let role = current_role.clone();
                                 if !query.is_empty() {
                                     if let Ok((lines, docs)) = rt.block_on(async move {
@@ -3079,9 +3110,8 @@ fn ui_loop(
                                             role: Some(RoleName::new(&role)),
                                             layer: Layer::default(),
                                         };
-                                        let resp = api.search(&q).await?;
-                                        let lines: Vec<String> = resp
-                                            .results
+                                        let docs = backend.search(&q).await?;
+                                        let lines: Vec<String> = docs
                                             .iter()
                                             .map(|d| {
                                                 format!(
@@ -3091,7 +3121,6 @@ fn ui_loop(
                                                 )
                                             })
                                             .collect();
-                                        let docs = resp.results;
                                         Ok::<(Vec<String>, Vec<Document>), anyhow::Error>((
                                             lines, docs,
                                         ))
@@ -3113,29 +3142,25 @@ fn ui_loop(
                                 }
                             }
                             TuiAction::Autocomplete => {
-                                // Real autocomplete from API
+                                // Real autocomplete from backend (local or remote)
                                 let query = input.trim();
                                 if !query.is_empty() {
-                                    let api = api.clone();
+                                    let backend = backend.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
-                                        api.get_autocomplete(&role, query).await
+                                    if let Ok(autocomplete_suggestions) = rt.block_on(async move {
+                                        backend.autocomplete(&role, query).await
                                     }) {
-                                        suggestions = autocomplete_resp
-                                            .suggestions
-                                            .into_iter()
-                                            .take(5)
-                                            .map(|s| s.text)
-                                            .collect();
+                                        suggestions =
+                                            autocomplete_suggestions.into_iter().take(5).collect();
                                     }
                                 }
                             }
                             TuiAction::SwitchRole => {
                                 // Switch role
-                                let api = api.clone();
-                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+                                let backend = backend.clone();
+                                if let Ok(cfg) = rt.block_on(async { backend.get_config().await }) {
                                     let roles: Vec<String> =
-                                        cfg.config.roles.keys().map(|k| k.to_string()).collect();
+                                        cfg.roles.keys().map(|k| k.to_string()).collect();
                                     if !roles.is_empty() {
                                         if let Some(current_idx) =
                                             roles.iter().position(|r| r == &current_role)
@@ -3143,11 +3168,10 @@ fn ui_loop(
                                             let next_idx = (current_idx + 1) % roles.len();
                                             current_role = roles[next_idx].clone();
                                             // Update terms for new role
-                                            if let Ok(rg) = rt.block_on(async {
-                                                api.rolegraph(Some(&current_role)).await
+                                            if let Ok(role_terms) = rt.block_on(async {
+                                                backend.get_rolegraph_terms(&current_role).await
                                             }) {
-                                                terms =
-                                                    rg.nodes.into_iter().map(|n| n.label).collect();
+                                                terms = role_terms;
                                             }
                                         }
                                     }
@@ -3157,17 +3181,15 @@ fn ui_loop(
                                 // Summarize current selection
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
-                                    let api = api.clone();
+                                    let backend = backend.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
-                                        api.summarize_document(&doc, Some(&role)).await
+                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
+                                        backend.summarize(&doc, Some(&role)).await
                                     }) {
-                                        if let Some(summary_text) = summary.summary {
-                                            // Replace result with summary for display
-                                            if selected_result_index < results.len() {
-                                                results[selected_result_index] =
-                                                    format!("SUMMARY: {}", summary_text);
-                                            }
+                                        // Replace result with summary for display
+                                        if selected_result_index < results.len() {
+                                            results[selected_result_index] =
+                                                format!("SUMMARY: {}", summary_text);
                                         }
                                     }
                                 }
@@ -3194,27 +3216,25 @@ fn ui_loop(
                                 // Summarize current document in detail view
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
-                                    let api = api.clone();
+                                    let backend = backend.clone();
                                     let role = current_role.clone();
-                                    if let Ok(summary) = rt.block_on(async move {
-                                        api.summarize_document(&doc, Some(&role)).await
+                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
+                                        backend.summarize(&doc, Some(&role)).await
                                     }) {
-                                        if let Some(summary_text) = summary.summary {
-                                            // Update the document body with summary
-                                            let original_body = if detailed_results
-                                                [selected_result_index]
-                                                .body
-                                                .is_empty()
-                                            {
-                                                "No content"
-                                            } else {
-                                                &detailed_results[selected_result_index].body
-                                            };
-                                            detailed_results[selected_result_index].body = format!(
-                                                "SUMMARY:\n{}\n\nORIGINAL:\n{}",
-                                                summary_text, original_body
-                                            );
-                                        }
+                                        // Update the document body with summary
+                                        let original_body = if detailed_results
+                                            [selected_result_index]
+                                            .body
+                                            .is_empty()
+                                        {
+                                            "No content"
+                                        } else {
+                                            &detailed_results[selected_result_index].body
+                                        };
+                                        detailed_results[selected_result_index].body = format!(
+                                            "SUMMARY:\n{}\n\nORIGINAL:\n{}",
+                                            summary_text, original_body
+                                        );
                                     }
                                 }
                             }
