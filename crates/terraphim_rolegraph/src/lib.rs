@@ -676,9 +676,9 @@ impl RoleGraph {
                         Entry::Occupied(mut e) => {
                             let doc = e.get_mut();
                             doc.rank += total_rank; // Adjust to correctly aggregate the rank
-                            doc.matched_edges.push(edge.clone());
-                            // Remove duplicate edges based on unique IDs
-                            doc.matched_edges.dedup_by_key(|e| e.id);
+                            if !doc.matched_edges.iter().any(|e| e.id == edge.id) {
+                                doc.matched_edges.push(edge.clone());
+                            }
                         }
                     }
                 }
@@ -776,9 +776,9 @@ impl RoleGraph {
                         Entry::Occupied(mut e) => {
                             let doc = e.get_mut();
                             doc.rank += total_rank; // Adjust to correctly aggregate the rank
-                            doc.matched_edges.push(edge.clone());
-                            // Remove duplicate edges based on unique IDs
-                            doc.matched_edges.dedup_by_key(|e| e.id);
+                            if !doc.matched_edges.iter().any(|e| e.id == edge.id) {
+                                doc.matched_edges.push(edge.clone());
+                            }
                         }
                     }
                 }
@@ -1023,10 +1023,11 @@ impl RoleGraph {
                 if let Some((term_doc, term_matched)) = term_set.get(doc_id) {
                     // Combine the rankings and metadata
                     combined_doc.rank += term_doc.rank;
-                    combined_doc
-                        .matched_edges
-                        .extend(term_doc.matched_edges.clone());
-                    combined_doc.matched_edges.dedup_by_key(|e| e.id);
+                    for edge in &term_doc.matched_edges {
+                        if !combined_doc.matched_edges.iter().any(|e| e.id == edge.id) {
+                            combined_doc.matched_edges.push(edge.clone());
+                        }
+                    }
 
                     for tag in &term_doc.tags {
                         if !combined_doc.tags.contains(tag) {
