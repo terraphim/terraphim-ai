@@ -669,9 +669,10 @@ impl AgentOrchestrator {
             Some(PreCheckStrategy::GiteaIssue { issue_number }) => {
                 self.gitea_issue_pre_check(*issue_number).await
             }
-            Some(PreCheckStrategy::Shell { script, timeout_secs }) => {
-                self.shell_pre_check(script, *timeout_secs).await
-            }
+            Some(PreCheckStrategy::Shell {
+                script,
+                timeout_secs,
+            }) => self.shell_pre_check(script, *timeout_secs).await,
         }
     }
 
@@ -780,9 +781,7 @@ impl AgentOrchestrator {
     }
 
     /// Get or lazily construct the GiteaTracker for pre-check.
-    fn get_or_init_pre_check_tracker(
-        &mut self,
-    ) -> Option<&terraphim_tracker::GiteaTracker> {
+    fn get_or_init_pre_check_tracker(&mut self) -> Option<&terraphim_tracker::GiteaTracker> {
         if self.pre_check_tracker.is_some() {
             return self.pre_check_tracker.as_ref();
         }
@@ -810,10 +809,7 @@ impl AgentOrchestrator {
     }
 
     /// Evaluate the gitea-issue pre-check strategy.
-    async fn gitea_issue_pre_check(
-        &mut self,
-        issue_number: u64,
-    ) -> PreCheckResult {
+    async fn gitea_issue_pre_check(&mut self, issue_number: u64) -> PreCheckResult {
         let tracker = match self.get_or_init_pre_check_tracker() {
             Some(t) => t,
             None => {
@@ -877,7 +873,10 @@ impl AgentOrchestrator {
 
             let log_output = String::from_utf8_lossy(&output.stdout);
             if log_output.trim().is_empty() {
-                info!(issue = issue_number, "PASS verdict and no new commits, skipping");
+                info!(
+                    issue = issue_number,
+                    "PASS verdict and no new commits, skipping"
+                );
                 return PreCheckResult::NoFindings;
             } else {
                 let commit_count = log_output.lines().count();
@@ -893,7 +892,10 @@ impl AgentOrchestrator {
             }
         }
 
-        info!(issue = issue_number, "no PASS verdict in latest comment, spawning");
+        info!(
+            issue = issue_number,
+            "no PASS verdict in latest comment, spawning"
+        );
         PreCheckResult::Findings(String::new())
     }
 
@@ -913,7 +915,9 @@ impl AgentOrchestrator {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
         } else {
-            Err(OrchestratorError::Config("git rev-parse HEAD failed".into()))
+            Err(OrchestratorError::Config(
+                "git rev-parse HEAD failed".into(),
+            ))
         }
     }
 
@@ -1276,7 +1280,11 @@ impl AgentOrchestrator {
 
     /// Spawn a specific agent by name (test helper).
     pub async fn spawn_agent_for_test(&mut self, name: &str) -> Result<(), OrchestratorError> {
-        let def = self.config.agents.iter().find(|a| a.name == name)
+        let def = self
+            .config
+            .agents
+            .iter()
+            .find(|a| a.name == name)
             .ok_or_else(|| OrchestratorError::AgentNotFound(name.to_string()))?
             .clone();
         self.spawn_agent(&def).await
@@ -1294,7 +1302,8 @@ impl AgentOrchestrator {
 
     /// Test helper: set last_run_commits for a given agent.
     pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
-        self.last_run_commits.insert(agent_name.to_string(), commit.to_string());
+        self.last_run_commits
+            .insert(agent_name.to_string(), commit.to_string());
     }
 }
 
@@ -1351,7 +1360,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
-                pre_check: None,
+                    pre_check: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -1372,7 +1381,7 @@ mod tests {
                     fallback_model: None,
                     grace_period_secs: None,
                     max_cpu_seconds: None,
-                pre_check: None,
+                    pre_check: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -1626,7 +1635,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
-                pre_check: None,
+            pre_check: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -1761,7 +1770,7 @@ task = "test"
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
-                pre_check: None,
+            pre_check: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -1844,7 +1853,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             fallback_model: None,
             grace_period_secs: None,
             max_cpu_seconds: None,
-                pre_check: None,
+            pre_check: None,
         }];
 
         // No persona_data_dir, so registry will be empty
@@ -1933,10 +1942,7 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
     #[test]
     fn test_has_matching_changes_multiple_watch_paths() {
         let changed = vec!["tests/integration.rs".to_string()];
-        let watch = vec![
-            "crates/orchestrator/".to_string(),
-            "tests/".to_string(),
-        ];
+        let watch = vec!["crates/orchestrator/".to_string(), "tests/".to_string()];
         assert!(has_matching_changes(&changed, &watch));
     }
 
