@@ -1,14 +1,15 @@
-use lazy_static::lazy_static;
 use regex::Regex;
 use std::collections::HashSet;
+use std::sync::LazyLock;
 use tracing::warn;
 
 const MAX_PROMPT_LENGTH: usize = 10_000;
 
-lazy_static! {
-    static ref SUSPICIOUS_PATTERNS: Vec<Regex> = vec![
+static SUSPICIOUS_PATTERNS: LazyLock<Vec<Regex>> = LazyLock::new(|| {
+    vec![
         Regex::new(r"(?i)ignore\s+\s*(previous|above|prior)\s+\s*(instructions|prompts?)").unwrap(),
-        Regex::new(r"(?i)disregard\s+\s*(previous|above|all)\s+\s*(instructions|prompts?)").unwrap(),
+        Regex::new(r"(?i)disregard\s+\s*(previous|above|all)\s+\s*(instructions|prompts?)")
+            .unwrap(),
         Regex::new(r"(?i)system\s*:\s*you\s+\s*are\s+\s*now").unwrap(),
         Regex::new(r"(?i)<\|?im_start\|?>").unwrap(),
         Regex::new(r"(?i)<\|?im_end\|?>").unwrap(),
@@ -16,13 +17,16 @@ lazy_static! {
         Regex::new(r"(?i)forget\s+\s*(everything|all|previous)").unwrap(),
         Regex::new(r"\x00").unwrap(),
         Regex::new(r"[\x01-\x08\x0B-\x0C\x0E-\x1F\x7F]").unwrap(),
-    ];
-    static ref CONTROL_CHAR_PATTERN: Regex =
-        Regex::new(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]").unwrap();
+    ]
+});
 
-    // Unicode special characters that can be used for obfuscation or attacks.
-    // HashSet for O(1) per-character lookup.
-    static ref UNICODE_SPECIAL_CHARS: HashSet<char> = [
+static CONTROL_CHAR_PATTERN: LazyLock<Regex> =
+    LazyLock::new(|| Regex::new(r"[\x00-\x08\x0B-\x0C\x0E-\x1F\x7F]").unwrap());
+
+// Unicode special characters that can be used for obfuscation or attacks.
+// HashSet for O(1) per-character lookup.
+static UNICODE_SPECIAL_CHARS: LazyLock<HashSet<char>> = LazyLock::new(|| {
+    [
         '\u{202E}', // RIGHT-TO-LEFT OVERRIDE
         '\u{202D}', // LEFT-TO-RIGHT OVERRIDE
         '\u{202C}', // POP DIRECTIONAL FORMATTING
@@ -43,8 +47,11 @@ lazy_static! {
         '\u{206D}', // ACTIVATE ARABIC FORM SHAPING
         '\u{206E}', // NATIONAL DIGIT SHAPES
         '\u{206F}', // NOMINAL DIGIT SHAPES
-    ].iter().copied().collect();
-}
+    ]
+    .iter()
+    .copied()
+    .collect()
+});
 
 #[derive(Debug, Clone)]
 pub struct SanitizedPrompt {
