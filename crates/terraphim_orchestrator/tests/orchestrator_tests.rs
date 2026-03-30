@@ -8,6 +8,17 @@ use terraphim_orchestrator::{
 };
 use uuid::Uuid;
 
+/// Return a deterministic baseline commit for git-diff tests.
+/// Uses the repository root commit so tests work in any clone.
+fn baseline_commit() -> String {
+    let output = std::process::Command::new("git")
+        .args(["rev-list", "--max-parents=0", "HEAD"])
+        .output()
+        .expect("git rev-list failed");
+    let commits = String::from_utf8_lossy(&output.stdout);
+    commits.lines().next().unwrap_or("").trim().to_string()
+}
+
 fn test_config() -> OrchestratorConfig {
     OrchestratorConfig {
         working_dir: PathBuf::from("/tmp/test-orchestrator"),
@@ -429,8 +440,8 @@ async fn test_git_diff_matching_changes_spawns() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Seed with initial commit so there ARE changes
-    let baseline_commit = "f802d1ed709bf0d9e40a4e27741b84c31f00a029";
-    orch.set_last_run_commit("sentinel", baseline_commit);
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
@@ -448,8 +459,8 @@ async fn test_git_diff_non_matching_changes_skips() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Seed with initial commit so there ARE changes, but none match the watch path
-    let baseline_commit = "f802d1ed709bf0d9e40a4e27741b84c31f00a029";
-    orch.set_last_run_commit("sentinel", baseline_commit);
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
@@ -503,8 +514,8 @@ async fn test_spawn_agent_skipped_by_git_diff_no_matching() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Seed with initial commit so there are diff results
-    let baseline_commit = "f802d1ed709bf0d9e40a4e27741b84c31f00a029";
-    orch.set_last_run_commit("sentinel", baseline_commit);
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
@@ -523,8 +534,8 @@ async fn test_spawn_agent_proceeds_with_git_diff_findings() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
 
     // Use initial commit as baseline -> every file is a change
-    let baseline_commit = "f802d1ed709bf0d9e40a4e27741b84c31f00a029";
-    orch.set_last_run_commit("sentinel", baseline_commit);
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
 
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());

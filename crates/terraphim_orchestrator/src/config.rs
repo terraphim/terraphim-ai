@@ -13,7 +13,7 @@ pub enum PreCheckStrategy {
     /// Only spawn if changed files match watch_paths prefixes.
     GitDiff { watch_paths: Vec<String> },
     /// Query latest comments on a Gitea issue. Skip if PASS verdict
-    /// and no new commits since. (Phase 2 - not implemented yet)
+    /// and no new commits since.
     GiteaIssue { issue_number: u64 },
     /// Run an arbitrary shell command via sh -c.
     /// Exit 0 + non-empty stdout = Findings; Exit 0 + empty stdout = NoFindings;
