@@ -10,7 +10,7 @@ checklist:: tests, documentation, error handling, security, performance
 ### tests
 All code changes must include appropriate tests.
 
-synonyms:: test, testing, unit test, integration test, test coverage
+synonyms:: unit test, integration test, test coverage
 
 ### documentation
 Code must have proper documentation and comments.
