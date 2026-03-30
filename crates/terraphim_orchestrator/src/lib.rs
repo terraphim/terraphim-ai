@@ -36,6 +36,7 @@ pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
 pub mod handoff;
+pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
 pub mod persona;
@@ -48,11 +49,15 @@ pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
     OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates, WorkflowConfig,
 };
-pub use cost_tracker::{BudgetVerdict, CostSnapshot, CostTracker};
+pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
+pub use metrics_persistence::{
+    InMemoryMetricsPersistence, MetricsPersistence, MetricsPersistenceConfig,
+    MetricsPersistenceError, PersistedAgentMetrics,
+};
 pub use mode::{IssueMode, TimeMode};
 pub use nightwatch::{
     dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
@@ -445,6 +450,73 @@ impl AgentOrchestrator {
         &mut self.cost_tracker
     }
 
+    /// Load skill chain content from SKILL.md files for the given agent definition.
+    ///
+    /// Reads each skill named in `def.skill_chain` from `{skill_data_dir}/{name}/SKILL.md`.
+    /// Returns a formatted string with all skill contents, or empty string if no skills
+    /// or no skill_data_dir is configured.
+    fn load_skill_chain_content(&self, def: &AgentDefinition) -> String {
+        if def.skill_chain.is_empty() {
+            return String::new();
+        }
+        let skills_dir = match &self.config.skill_data_dir {
+            Some(dir) => dir.clone(),
+            None => {
+                // Default: ~/.claude/skills (resolve HOME from env)
+                match std::env::var("HOME") {
+                    Ok(home) => std::path::PathBuf::from(home)
+                        .join(".claude")
+                        .join("skills"),
+                    Err(_) => return String::new(),
+                }
+            }
+        };
+
+        let mut sections = Vec::new();
+        for skill_name in &def.skill_chain {
+            let skill_path = skills_dir.join(skill_name).join("SKILL.md");
+            match std::fs::read_to_string(&skill_path) {
+                Ok(content) => {
+                    // Strip YAML frontmatter (between --- markers) to keep just instructions
+                    let body = if let Some(after_prefix) = content.strip_prefix("---") {
+                        if let Some(end) = after_prefix.find("---") {
+                            after_prefix[end + 3..].trim_start().to_string()
+                        } else {
+                            content
+                        }
+                    } else {
+                        content
+                    };
+                    sections.push(format!("### Skill: {}\n\n{}", skill_name, body.trim()));
+                    info!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        bytes = body.len(),
+                        "loaded skill content"
+                    );
+                }
+                Err(e) => {
+                    warn!(
+                        agent = %def.name,
+                        skill = %skill_name,
+                        path = %skill_path.display(),
+                        error = %e,
+                        "failed to load skill, skipping"
+                    );
+                }
+            }
+        }
+
+        if sections.is_empty() {
+            return String::new();
+        }
+
+        format!(
+            "\n\n## Active Skills\n\nApply the following skill instructions to your work:\n\n{}\n",
+            sections.join("\n\n---\n\n")
+        )
+    }
+
     /// Spawn an agent from its definition.
     ///
     /// Model selection: if the agent has an explicit `model` field, use it.
@@ -561,12 +633,27 @@ impl AgentOrchestrator {
             composed_task
         };
 
+        // Inject skill_chain content between persona preamble and task
+        let skill_content = self.load_skill_chain_content(def);
+        let composed_task = if skill_content.is_empty() {
+            composed_task
+        } else {
+            info!(
+                agent = %def.name,
+                skills = def.skill_chain.len(),
+                skill_bytes = skill_content.len(),
+                "injecting skill_chain into prompt"
+            );
+            format!("{}{}", composed_task, skill_content)
+        };
+
         // Use stdin only when persona was actually resolved (prompt is enriched)
         // or when the task exceeds ARG_MAX safety threshold.
         // Do NOT use stdin for unfound personas -- the bare task is small and
         // stdin delivery to short-lived processes (echo) causes broken pipe races.
         const STDIN_THRESHOLD: usize = 32_768; // 32 KB
-        let use_stdin = persona_found || composed_task.len() > STDIN_THRESHOLD;
+        let use_stdin =
+            persona_found || !skill_content.is_empty() || composed_task.len() > STDIN_THRESHOLD;
 
         // Build primary Provider from the agent definition for the spawner
         let primary_provider = terraphim_types::capability::Provider {
@@ -1010,19 +1097,68 @@ impl AgentOrchestrator {
     async fn poll_agent_exits(&mut self) {
         // Collect exited agents first to avoid borrow conflict
         let mut exited: Vec<(String, AgentDefinition, std::process::ExitStatus)> = Vec::new();
+        // Collect agents that exceeded their wall-clock timeout
+        let mut timed_out: Vec<String> = Vec::new();
+
         for (name, managed) in &mut self.active_agents {
             match managed.handle.try_wait() {
                 Ok(Some(status)) => {
                     exited.push((name.clone(), managed.definition.clone(), status));
                 }
-                Ok(None) => {} // still running
+                Ok(None) => {
+                    // Still running -- check wall-clock timeout
+                    if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                        let elapsed = managed.started_at.elapsed();
+                        if elapsed > Duration::from_secs(max_secs) {
+                            warn!(
+                                agent = %name,
+                                elapsed_secs = elapsed.as_secs(),
+                                max_secs = max_secs,
+                                "agent exceeded wall-clock timeout, killing"
+                            );
+                            timed_out.push(name.clone());
+                        }
+                    }
+                }
                 Err(e) => {
                     warn!(agent = %name, error = %e, "try_wait failed");
                 }
             }
         }
 
-        // Process exits
+        // Kill timed-out agents
+        for name in timed_out {
+            if let Some(mut managed) = self.active_agents.remove(&name) {
+                let grace = Duration::from_secs(managed.definition.grace_period_secs.unwrap_or(5));
+                match managed.handle.shutdown(grace).await {
+                    Ok(graceful) => {
+                        info!(
+                            agent = %name,
+                            graceful = graceful,
+                            "timed-out agent terminated"
+                        );
+                    }
+                    Err(e) => {
+                        warn!(agent = %name, error = %e, "failed to kill timed-out agent");
+                    }
+                }
+                // Handle exit based on layer (similar to handle_agent_exit but for timeout)
+                if managed.definition.layer == AgentLayer::Safety {
+                    let count = self.restart_counts.entry(name.clone()).or_insert(0);
+                    *count += 1;
+                    self.restart_cooldowns.insert(name.clone(), Instant::now());
+                    info!(
+                        agent = %name,
+                        restart_count = *count,
+                        "safety agent timed out, will restart after cooldown"
+                    );
+                } else {
+                    info!(agent = %name, layer = ?managed.definition.layer, "agent timed out");
+                }
+            }
+        }
+
+        // Process natural exits
         for (name, def, status) in exited {
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
@@ -1400,6 +1536,7 @@ mod tests {
             tick_interval_secs: 30,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            skill_data_dir: None,
         }
     }
 
@@ -1571,6 +1708,7 @@ task = "test"
             tick_interval_secs: 1,
             handoff_buffer_ttl_secs: None,
             persona_data_dir: None,
+            skill_data_dir: None,
         }
     }
 
@@ -1962,5 +2100,83 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
         let watch: Vec<String> = vec![];
         assert!(!has_matching_changes(&changed, &watch));
+    }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_provider_model_composition_opencode() {
+        // Simulate what spawn_agent does for opencode with provider + model
+        let provider = Some("kimi-for-coding".to_string());
+        let model = Some("k2p5".to_string());
+        let cli_name = "opencode";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model,
+            }
+        } else {
+            model
+        };
+        assert_eq!(composed, Some("kimi-for-coding/k2p5".to_string()));
+    }
+
+    #[test]
+    fn test_provider_model_composition_claude_unchanged() {
+        // Claude should not have provider/model composed
+        let provider = Some("anthropic".to_string());
+        let model = Some("claude-opus-4-6".to_string());
+        let cli_name = "claude";
+
+        let composed = if cli_name == "opencode" {
+            match (&provider, &model) {
+                (Some(p), Some(m)) => Some(format!("{}/{}", p, m)),
+                _ => model.clone(),
+            }
+        } else {
+            model.clone()
+        };
+        assert_eq!(composed, Some("claude-opus-4-6".to_string()));
+    }
+
+    #[tokio::test]
+    async fn test_wall_clock_timeout_kills_agent() {
+        let mut config = test_config_fast_lifecycle();
+        // Use sleep agent with 1-second timeout
+        config.agents = vec![AgentDefinition {
+            name: "timeout-test".to_string(),
+            layer: AgentLayer::Core,
+            cli_tool: "sleep".to_string(),
+            task: "60".to_string(),
+            model: None,
+            schedule: None,
+            capabilities: vec![],
+            max_memory_bytes: None,
+            budget_monthly_cents: None,
+            provider: None,
+            persona: None,
+            terraphim_role: None,
+            skill_chain: vec![],
+            sfia_skills: vec![],
+            fallback_provider: None,
+            fallback_model: None,
+            grace_period_secs: Some(2),
+            max_cpu_seconds: Some(1), // 1 second timeout
+            pre_check: None,
+        }];
+        let mut orch = AgentOrchestrator::new(config).unwrap();
+        let def = orch.config.agents[0].clone();
+        orch.spawn_agent(&def).await.unwrap();
+        assert!(orch.active_agents.contains_key("timeout-test"));
+
+        // Wait for the timeout to elapse
+        tokio::time::sleep(Duration::from_secs(2)).await;
+
+        // Poll should detect timeout and kill
+        orch.poll_agent_exits().await;
+        assert!(!orch.active_agents.contains_key("timeout-test"));
     }
 }

@@ -346,4 +346,28 @@ mod tests {
         assert_eq!(AgentConfig::cli_name("claude"), "claude");
         assert_eq!(AgentConfig::cli_name("/usr/bin/codex"), "codex");
     }
+
+    #[test]
+    fn test_infer_args_opencode() {
+        let args = AgentConfig::infer_args("opencode");
+        assert_eq!(args, vec!["run", "--format", "json"]);
+    }
+
+    #[test]
+    fn test_infer_args_opencode_full_path() {
+        let args = AgentConfig::infer_args("/home/alex/.bun/bin/opencode");
+        assert_eq!(args, vec!["run", "--format", "json"]);
+    }
+
+    #[test]
+    fn test_model_args_opencode() {
+        let args = AgentConfig::model_args("opencode", "kimi-for-coding/k2p5");
+        assert_eq!(args, vec!["-m", "kimi-for-coding/k2p5"]);
+    }
+
+    #[test]
+    fn test_model_args_opencode_full_path() {
+        let args = AgentConfig::model_args("/home/alex/.bun/bin/opencode", "opencode-go/kimi-k2.5");
+        assert_eq!(args, vec!["-m", "opencode-go/kimi-k2.5"]);
+    }
 }

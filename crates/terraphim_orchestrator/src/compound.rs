@@ -1060,4 +1060,67 @@ Done!"#;
         assert!(!output.pass);
         assert_eq!(output.findings.len(), 1);
     }
+
+    // =========================================================================
+    // ADF Remediation Tests (Gitea #117)
+    // =========================================================================
+
+    #[test]
+    fn test_compound_config_cli_tool_override() {
+        let config = CompoundReviewConfig {
+            schedule: "0 2 * * *".to_string(),
+            max_duration_secs: 1800,
+            repo_path: PathBuf::from("/tmp"),
+            create_prs: false,
+            worktree_root: PathBuf::from("/tmp/worktrees"),
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 3,
+            cli_tool: Some("/home/alex/.bun/bin/opencode".to_string()),
+            provider: Some("opencode-go".to_string()),
+            model: Some("glm-5".to_string()),
+        };
+        let swarm = SwarmConfig::from_compound_config(&config);
+        for group in &swarm.groups {
+            assert_eq!(group.cli_tool, "/home/alex/.bun/bin/opencode");
+            assert_eq!(group.model, Some("opencode-go/glm-5".to_string()));
+        }
+    }
+
+    #[test]
+    fn test_compound_config_no_override() {
+        let config = CompoundReviewConfig {
+            schedule: "0 2 * * *".to_string(),
+            max_duration_secs: 1800,
+            repo_path: PathBuf::from("/tmp"),
+            create_prs: false,
+            worktree_root: PathBuf::from("/tmp/worktrees"),
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 3,
+            cli_tool: None,
+            provider: None,
+            model: None,
+        };
+        let swarm = SwarmConfig::from_compound_config(&config);
+        // Should use default groups unchanged
+        assert_eq!(swarm.groups[0].cli_tool, "opencode");
+        assert!(swarm.groups[0].model.is_none());
+    }
+
+    #[test]
+    fn test_compound_config_timeout_uses_max_duration() {
+        let config = CompoundReviewConfig {
+            schedule: "0 2 * * *".to_string(),
+            max_duration_secs: 900,
+            repo_path: PathBuf::from("/tmp"),
+            create_prs: false,
+            worktree_root: PathBuf::from("/tmp/worktrees"),
+            base_branch: "main".to_string(),
+            max_concurrent_agents: 3,
+            cli_tool: None,
+            provider: None,
+            model: None,
+        };
+        let swarm = SwarmConfig::from_compound_config(&config);
+        assert_eq!(swarm.timeout, Duration::from_secs(900));
+    }
 }
