@@ -463,7 +463,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install cargo-audit
-        run: which cargo-audit || cargo install cargo-audit --no-default-features
+        run: |
+          if ! which cargo-audit 2>/dev/null; then
+            AUDIT_VERSION="0.22.1"
+            curl -sSL "https://github.com/rustsec/rustsec/releases/download/cargo-audit/v${AUDIT_VERSION}/cargo-audit-x86_64-unknown-linux-gnu-v${AUDIT_VERSION}.tgz" \
+              | tar xz --strip-components=1 -C "${CARGO_HOME:-$HOME/.cargo}/bin/" --wildcards '*/cargo-audit'
+          fi
+          cargo-audit --version
 
       - name: Run security audit
         run: |

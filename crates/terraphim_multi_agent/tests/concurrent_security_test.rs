@@ -129,8 +129,8 @@ async fn test_sanitizer_thread_safety() {
 }
 
 #[test]
-fn test_lazy_static_thread_safety() {
-    // Verify lazy_static patterns are initialized safely
+fn test_lazy_lock_thread_safety() {
+    // Verify LazyLock patterns are initialized safely
     // This tests the regex compilation in SUSPICIOUS_PATTERNS
     use std::thread;
 
@@ -150,7 +150,7 @@ fn test_lazy_static_thread_safety() {
 
 #[tokio::test]
 async fn test_unicode_chars_vec_concurrent_access() {
-    // Test concurrent access to UNICODE_SPECIAL_CHARS lazy_static
+    // Test concurrent access to UNICODE_SPECIAL_CHARS LazyLock
     let mut handles = vec![];
 
     for _ in 0..50 {

@@ -86,18 +86,11 @@ fn extra_props(class_url: &str, slug: &str) -> HashMap<String, serde_json::Value
 }
 
 #[tokio::test]
+#[ignore = "requires running Atomic Server with valid credentials (ATOMIC_SERVER_URL, ATOMIC_SERVER_SECRET)"]
 async fn generic_classes_crud_search() {
     dotenv().ok();
 
-    // This is an optional, environment/integration test.
-    // Skip when ATOMIC_* env vars are not present.
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    let config = Config::from_env().expect("ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET must be set");
     assert!(config.agent.is_some(), "Need authenticated agent");
     let store = Store::new(config).expect("Create store");
 

@@ -1,6 +1,5 @@
 use ahash::AHashMap;
 use itertools::Itertools;
-use memoize::memoize;
 use regex::Regex;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
@@ -1032,15 +1031,6 @@ impl RoleGraph {
         Ok(documents)
     }
 
-    // pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
-    //     let matches = self.find_matching_node_ids(text);
-    //     for (a, b) in matches.into_iter().tuple_windows() {
-    //         // cast to Id
-    //         let a = a as Id;
-    //         self.add_or_update_document(document_id, a, b);
-    //     }
-    // }
-
     /// Inserts an document into the rolegraph
     pub fn insert_document(&mut self, document_id: &str, document: Document) {
         self.documents.insert(
@@ -1249,11 +1239,8 @@ impl From<RoleGraph> for RoleGraphSync {
     }
 }
 
-#[macro_use]
-extern crate lazy_static;
-lazy_static! {
-    static ref RE: Regex = Regex::new(r"[?!|]\s+").unwrap();
-}
+static RE: std::sync::LazyLock<Regex> =
+    std::sync::LazyLock::new(|| Regex::new(r"[?!|]\s+").unwrap());
 
 pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
     let sentences = UnicodeSegmentation::split_sentence_bounds(paragraphs);
@@ -1267,8 +1254,7 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 
 /// Combining two numbers into a unique one: pairing functions.
 /// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
-/// also using memoize macro with Ahash hasher
-#[memoize(CustomHasher: ahash::AHashMap)]
+#[inline]
 pub fn magic_pair(x: u64, y: u64) -> u64 {
     if x >= y { x * x + x + y } else { y * y + x }
 }
@@ -1282,7 +1268,7 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 //   }
 ///   return q, l - q
 /// }
-#[memoize(CustomHasher: ahash::AHashMap)]
+#[inline]
 pub fn magic_unpair(z: u64) -> (u64, u64) {
     let q = (z as f64).sqrt().floor() as u64;
     let l = z - q * q;
