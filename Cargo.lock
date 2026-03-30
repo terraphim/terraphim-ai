@@ -8662,6 +8662,8 @@ dependencies = [
  "chrono",
  "cron",
  "handlebars",
+ "once_cell",
+ "regex",
  "serde",
  "serde_json",
  "tempfile",
@@ -8677,6 +8679,7 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "uuid",
+ "wiremock",
 ]
 
 [[package]]

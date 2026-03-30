@@ -36,6 +36,7 @@ pub mod dispatcher;
 pub mod dual_mode;
 pub mod error;
 pub mod handoff;
+pub mod mention;
 pub mod mode;
 pub mod nightwatch;
 pub mod output_poster;
