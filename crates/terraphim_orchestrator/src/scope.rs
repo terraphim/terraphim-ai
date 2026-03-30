@@ -6,7 +6,7 @@ use uuid::Uuid;
 
 /// Check if `prefix` is a proper path prefix of `path`.
 /// Ensures "src/" matches "src/main.rs" but not "src-backup/".
-fn is_path_prefix(prefix: &str, path: &str) -> bool {
+pub(crate) fn is_path_prefix(prefix: &str, path: &str) -> bool {
     if prefix.is_empty() {
         return false;
     }
