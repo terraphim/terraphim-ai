@@ -13,8 +13,8 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::learnings::LearningCaptureConfig;
 use crate::learnings::redaction::redact_secrets;
+use crate::learnings::LearningCaptureConfig;
 
 /// Errors that can occur during learning capture.
 #[derive(Error, Debug)]
@@ -538,7 +538,11 @@ fn extract_section_text(body: &str, heading: &str) -> Option<String> {
     // Find next heading or end
     let end = after.find("\n## ").unwrap_or(after.len());
     let text = after[..end].trim().to_string();
-    if text.is_empty() { None } else { Some(text) }
+    if text.is_empty() {
+        None
+    } else {
+        Some(text)
+    }
 }
 
 /// Capture a failed command as a learning document.
@@ -756,7 +760,6 @@ pub fn list_learnings(
     Ok(learnings)
 }
 
-#[allow(dead_code)]
 /// Query learnings by pattern (simple text search).
 #[allow(dead_code)]
 pub fn query_learnings(
