@@ -35,18 +35,12 @@ mod tests {
     use terraphim_atomic_client::{Config, Resource, Store};
 
     #[tokio::test]
+    #[ignore = "requires running Atomic Server with valid credentials"]
     async fn test_crud_operations() {
-        // Load .env file if present
         dotenv().ok();
 
-        // Optional integration test: skip when ATOMIC_* env vars are not present
-        let config = match Config::from_env() {
-            Ok(c) => c,
-            Err(_) => {
-                eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-                return;
-            }
-        };
+        let config =
+            Config::from_env().expect("ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET must be set");
         assert!(
             config.agent.is_some(),
             "ATOMIC_SERVER_SECRET must decode into a valid Agent"
@@ -153,17 +147,11 @@ mod tests {
 }
 
 #[tokio::test]
+#[ignore = "requires running Atomic Server with valid credentials"]
 async fn test_search() {
-    // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    let config = Config::from_env().expect("ATOMIC_SERVER_URL must be set");
     let store = Store::new(config).expect("Failed to create Store");
 
     let _results = store.search("test").await.expect("Search request failed");
@@ -172,17 +160,11 @@ async fn test_search() {
 }
 
 #[tokio::test]
+#[ignore = "requires running Atomic Server with valid credentials"]
 async fn test_query() {
-    // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    let config = Config::from_env().expect("ATOMIC_SERVER_URL must be set");
     let store = Store::new(config).expect("Failed to create Store");
 
     // Query the collections resource directly using GET with query params
@@ -205,17 +187,11 @@ async fn test_query() {
 }
 
 #[tokio::test]
+#[ignore = "requires running Atomic Server with valid credentials"]
 async fn test_create_and_search() {
-    // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    let config = Config::from_env().expect("ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET must be set");
     assert!(
         config.agent.is_some(),
         "ATOMIC_SERVER_SECRET must decode into Agent"
@@ -282,17 +258,11 @@ async fn test_create_and_search() {
 }
 
 #[tokio::test]
+#[ignore = "requires running Atomic Server with valid credentials"]
 async fn test_create_and_query() {
-    // Load .env file if present
     dotenv().ok();
 
-    let config = match Config::from_env() {
-        Ok(c) => c,
-        Err(_) => {
-            eprintln!("Skipping: ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET not set");
-            return;
-        }
-    };
+    let config = Config::from_env().expect("ATOMIC_SERVER_URL / ATOMIC_SERVER_SECRET must be set");
     assert!(
         config.agent.is_some(),
         "ATOMIC_SERVER_SECRET must decode into Agent"
