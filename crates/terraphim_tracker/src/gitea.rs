@@ -44,6 +44,15 @@ struct GiteaLabel {
     name: String,
 }
 
+/// Gitea API comment response.
+#[derive(Debug, Deserialize)]
+pub struct GiteaComment {
+    pub id: u64,
+    pub body: String,
+    pub created_at: String,
+    pub updated_at: Option<String>,
+}
+
 impl GiteaTracker {
     /// Create a new Gitea tracker from configuration.
     pub fn new(config: GiteaConfig) -> Result<Self> {
@@ -90,6 +99,38 @@ impl GiteaTracker {
             created_at: gi.created_at.and_then(|s| parse_datetime(&s)),
             updated_at: gi.updated_at.and_then(|s| parse_datetime(&s)),
         }
+    }
+
+    /// Fetch comments on an issue, optionally filtered by `since` timestamp.
+    /// Returns comments ordered by creation time (oldest first, as per API default).
+    pub async fn fetch_comments(
+        &self,
+        issue_number: u64,
+        since: Option<&str>,
+    ) -> Result<Vec<GiteaComment>> {
+        let mut url = format!(
+            "{}/api/v1/repos/{}/{}/issues/{}/comments",
+            self.config.base_url, self.config.owner, self.config.repo, issue_number
+        );
+        if let Some(since_ts) = since {
+            url.push_str(&format!("?since={}", since_ts));
+        }
+
+        let response = self
+            .build_request(reqwest::Method::GET, &url)
+            .send()
+            .await?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let text = response.text().await.unwrap_or_default();
+            return Err(TrackerError::Api {
+                message: format!("Gitea comments API error {}: {}", status, text),
+            });
+        }
+
+        let comments: Vec<GiteaComment> = response.json().await?;
+        Ok(comments)
     }
 }
 
@@ -276,5 +317,76 @@ mod tests {
                 .iter()
                 .all(|l| l.chars().all(|c| !c.is_uppercase()))
         );
+    }
+
+    #[tokio::test]
+    async fn test_fetch_comments_returns_comments() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/42/comments"))
+            .respond_with(ResponseTemplate::new(200).set_body_json(serde_json::json!([
+                {
+                    "id": 1,
+                    "body": "VERDICT: PASS - all checks passed",
+                    "created_at": "2026-03-30T10:00:00Z",
+                    "updated_at": "2026-03-30T10:00:00Z"
+                },
+                {
+                    "id": 2,
+                    "body": "Some other comment",
+                    "created_at": "2026-03-30T11:00:00Z",
+                    "updated_at": "2026-03-30T11:00:00Z"
+                }
+            ])))
+            .mount(&mock_server)
+            .await;
+
+        let config = GiteaConfig {
+            base_url: mock_server.uri(),
+            token: "test-token".into(),
+            owner: "testowner".into(),
+            repo: "testrepo".into(),
+            active_states: vec!["open".into()],
+            terminal_states: vec!["closed".into()],
+            use_robot_api: false,
+        };
+        let tracker = GiteaTracker::new(config).unwrap();
+
+        let comments = tracker.fetch_comments(42, None).await.unwrap();
+        assert_eq!(comments.len(), 2);
+        assert_eq!(comments[0].body, "VERDICT: PASS - all checks passed");
+        assert_eq!(comments[1].body, "Some other comment");
+    }
+
+    #[tokio::test]
+    async fn test_fetch_comments_api_error() {
+        use wiremock::matchers::{method, path};
+        use wiremock::{Mock, MockServer, ResponseTemplate};
+
+        let mock_server = MockServer::start().await;
+
+        Mock::given(method("GET"))
+            .and(path("/api/v1/repos/testowner/testrepo/issues/99/comments"))
+            .respond_with(ResponseTemplate::new(404).set_body_string("not found"))
+            .mount(&mock_server)
+            .await;
+
+        let config = GiteaConfig {
+            base_url: mock_server.uri(),
+            token: "test-token".into(),
+            owner: "testowner".into(),
+            repo: "testrepo".into(),
+            active_states: vec!["open".into()],
+            terminal_states: vec!["closed".into()],
+            use_robot_api: false,
+        };
+        let tracker = GiteaTracker::new(config).unwrap();
+
+        let result = tracker.fetch_comments(99, None).await;
+        assert!(result.is_err());
     }
 }
