@@ -3,6 +3,10 @@
 //! This module provides `RouterBridgeLlmClient`, which implements `LlmClient`
 //! and uses `terraphim_router::Router` for capability-based routing. Each registered
 //! provider maps to a concrete `Arc<dyn LlmClient>`.
+//!
+//! NOTE: This module is currently unused because the `proxy` feature takes precedence
+//! when enabled. The code is preserved for future use when routing logic is reordered.
+#![allow(dead_code)]
 
 use std::sync::Arc;
 

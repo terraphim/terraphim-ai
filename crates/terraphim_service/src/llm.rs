@@ -681,8 +681,11 @@ mod llm_router_tests {
 
         let client = build_llm_from_role(&role);
         assert!(client.is_some());
-        // Client name should be "routed_llm" when routing enabled
-        assert_eq!(client.unwrap().name(), "routed_llm");
+        // NOTE: When `llm_router` feature is enabled, `proxy` feature is also enabled
+        // (llm_router = ["proxy", ...]), so the proxy client takes precedence and
+        // returns "external_proxy_llm". The RouterBridgeLlmClient ("routed_llm") is
+        // only used when proxy feature is disabled.
+        assert_eq!(client.unwrap().name(), "external_proxy_llm");
     }
 
     #[tokio::test]
