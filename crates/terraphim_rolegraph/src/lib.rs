@@ -1031,15 +1031,6 @@ impl RoleGraph {
         Ok(documents)
     }
 
-    // pub fn parse_document_to_pair(&mut self, document_id: &str, text: &str) {
-    //     let matches = self.find_matching_node_ids(text);
-    //     for (a, b) in matches.into_iter().tuple_windows() {
-    //         // cast to Id
-    //         let a = a as Id;
-    //         self.add_or_update_document(document_id, a, b);
-    //     }
-    // }
-
     /// Inserts an document into the rolegraph
     pub fn insert_document(&mut self, document_id: &str, document: Document) {
         self.documents.insert(
