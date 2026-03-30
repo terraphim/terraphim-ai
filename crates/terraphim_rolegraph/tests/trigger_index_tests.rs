@@ -1,5 +1,5 @@
 use ahash::AHashMap;
-use terraphim_rolegraph::TriggerIndex;
+use terraphim_rolegraph::{DEFAULT_TRIGGER_THRESHOLD, TriggerIndex};
 
 #[test]
 fn test_empty_index_returns_empty() {
@@ -226,4 +226,47 @@ fn test_rebuild_clears_old_data() {
     // New data should be present
     assert_eq!(index.query("diabetes").len(), 1);
     assert_eq!(index.query("diabetes")[0].0, 3);
+}
+
+#[test]
+fn test_default_threshold_constant() {
+    assert!((DEFAULT_TRIGGER_THRESHOLD - 0.3).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_set_threshold() {
+    let mut index = TriggerIndex::new(0.3);
+    assert!((index.threshold() - 0.3).abs() < f64::EPSILON);
+    index.set_threshold(0.8);
+    assert!((index.threshold() - 0.8).abs() < f64::EPSILON);
+}
+
+#[test]
+fn test_custom_stopwords() {
+    // "cancer" is not a default stopword, but we make it one
+    let mut stopwords = ahash::AHashSet::new();
+    stopwords.insert("cancer".to_string());
+
+    let mut index = TriggerIndex::with_stopwords(0.1, stopwords);
+    let mut triggers = AHashMap::new();
+    triggers.insert(1, "lung cancer treatment".to_string());
+    triggers.insert(2, "treatment options".to_string());
+    index.build(triggers);
+
+    // "cancer" is a stopword now, so querying it should not match trigger 1
+    // only "treatment" tokens remain in trigger 1, same as trigger 2
+    let results = index.query("cancer");
+    assert!(
+        results.is_empty(),
+        "Custom stopword 'cancer' should be filtered from queries"
+    );
+}
+
+#[test]
+fn test_default_stopwords_filter() {
+    // "the" and "with" are default stopwords
+    assert!(TriggerIndex::is_default_stopword("the"));
+    assert!(TriggerIndex::is_default_stopword("with"));
+    assert!(!TriggerIndex::is_default_stopword("cancer"));
+    assert!(!TriggerIndex::is_default_stopword("treatment"));
 }

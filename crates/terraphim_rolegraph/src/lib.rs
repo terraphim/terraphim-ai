@@ -57,16 +57,46 @@ pub struct TriggerIndex {
     doc_count: usize,
     /// Configurable relevance threshold (0.0-1.0)
     threshold: f64,
+    /// Custom stopwords (if None, uses the default built-in set)
+    custom_stopwords: Option<ahash::AHashSet<String>>,
 }
 
+/// Default threshold for TriggerIndex relevance filtering.
+pub const DEFAULT_TRIGGER_THRESHOLD: f64 = 0.3;
+
 impl TriggerIndex {
+    /// Create a new TriggerIndex with the given threshold and default stopwords.
     pub fn new(threshold: f64) -> Self {
         Self {
             triggers: AHashMap::new(),
             idf: AHashMap::new(),
             doc_count: 0,
             threshold,
+            custom_stopwords: None,
         }
+    }
+
+    /// Create a new TriggerIndex with custom stopwords.
+    ///
+    /// The custom stopwords completely replace the default set.
+    pub fn with_stopwords(threshold: f64, stopwords: ahash::AHashSet<String>) -> Self {
+        Self {
+            triggers: AHashMap::new(),
+            idf: AHashMap::new(),
+            doc_count: 0,
+            threshold,
+            custom_stopwords: Some(stopwords),
+        }
+    }
+
+    /// Set the relevance threshold (0.0-1.0).
+    pub fn set_threshold(&mut self, threshold: f64) {
+        self.threshold = threshold;
+    }
+
+    /// Get the current relevance threshold.
+    pub fn threshold(&self) -> f64 {
+        self.threshold
     }
 
     /// Build the index from a map of node_id -> trigger description
@@ -78,7 +108,7 @@ impl TriggerIndex {
         // Tokenise each trigger
         let mut doc_freq: AHashMap<String, usize> = AHashMap::new();
         for (node_id, trigger_text) in &triggers {
-            let tokens: Vec<String> = Self::tokenise(trigger_text);
+            let tokens: Vec<String> = self.tokenise(trigger_text);
             // Count unique tokens per document for DF
             let unique: ahash::AHashSet<&str> = tokens.iter().map(|s| s.as_str()).collect();
             for token in &unique {
@@ -101,7 +131,7 @@ impl TriggerIndex {
             return vec![];
         }
 
-        let query_tokens = Self::tokenise(text);
+        let query_tokens = self.tokenise(text);
         if query_tokens.is_empty() {
             return vec![];
         }
@@ -154,17 +184,25 @@ impl TriggerIndex {
     }
 
     /// Simple whitespace tokeniser with lowercasing and stopword removal
-    fn tokenise(text: &str) -> Vec<String> {
+    fn tokenise(&self, text: &str) -> Vec<String> {
         text.to_ascii_lowercase()
             .split_whitespace()
             .filter(|w| w.len() > 2) // Skip very short words
-            .filter(|w| !Self::is_stopword(w))
+            .filter(|w| !self.is_stopword(w))
             .map(|w| w.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
             .filter(|w| !w.is_empty())
             .collect()
     }
 
-    fn is_stopword(word: &str) -> bool {
+    fn is_stopword(&self, word: &str) -> bool {
+        if let Some(custom) = &self.custom_stopwords {
+            return custom.contains(word);
+        }
+        Self::is_default_stopword(word)
+    }
+
+    /// The built-in default stopword list.
+    pub fn is_default_stopword(word: &str) -> bool {
         matches!(
             word,
             "the"
@@ -304,7 +342,7 @@ impl RoleGraph {
             aho_corasick_values,
             ac,
             ac_reverse_nterm,
-            trigger_index: TriggerIndex::new(0.3), // Default threshold 0.3
+            trigger_index: TriggerIndex::new(DEFAULT_TRIGGER_THRESHOLD),
             pinned_node_ids: Vec::new(),
         })
     }
