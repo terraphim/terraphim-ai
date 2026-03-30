@@ -2,6 +2,33 @@ use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
+/// Strategy for gating agent spawns.
+/// All strategies fail-open: if the check itself fails, the agent spawns anyway.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
+#[serde(tag = "kind", rename_all = "kebab-case")]
+pub enum PreCheckStrategy {
+    /// Always spawn the agent. No gating.
+    Always,
+    /// Check git diff between last recorded commit and HEAD.
+    /// Only spawn if changed files match watch_paths prefixes.
+    GitDiff { watch_paths: Vec<String> },
+    /// Query latest comments on a Gitea issue. Skip if PASS verdict
+    /// and no new commits since.
+    GiteaIssue { issue_number: u64 },
+    /// Run an arbitrary shell command via sh -c.
+    /// Exit 0 + non-empty stdout = Findings; Exit 0 + empty stdout = NoFindings;
+    /// Non-zero exit or timeout = Failed (fail-open).
+    Shell {
+        script: String,
+        #[serde(default = "default_pre_check_timeout")]
+        timeout_secs: u64,
+    },
+}
+
+fn default_pre_check_timeout() -> u64 {
+    60
+}
+
 /// Top-level orchestrator configuration (parsed from TOML).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OrchestratorConfig {
@@ -91,6 +118,10 @@ pub struct AgentDefinition {
     /// Maximum CPU seconds allowed per agent execution.
     #[serde(default)]
     pub max_cpu_seconds: Option<u64>,
+    /// Optional pre-check strategy to gate agent spawns.
+    /// If None, the agent always spawns (equivalent to Always).
+    #[serde(default)]
+    pub pre_check: Option<PreCheckStrategy>,
 }
 
 /// Agent layer in the dark factory hierarchy.
@@ -372,6 +403,19 @@ impl OrchestratorConfig {
                 }
             }
         }
+
+        // Validate pre-check strategies
+        for agent in &self.agents {
+            if let Some(PreCheckStrategy::GiteaIssue { .. }) = &agent.pre_check {
+                if self.workflow.is_none() {
+                    return Err(crate::error::OrchestratorError::PreCheckConfig {
+                        agent: agent.name.clone(),
+                        reason: "gitea-issue strategy requires [workflow] config section".into(),
+                    });
+                }
+            }
+        }
+
         Ok(())
     }
 }
@@ -1007,5 +1051,217 @@ task = "t"
             let config = OrchestratorConfig::from_file(&example_path).unwrap();
             assert!(config.agents.len() >= 3);
         }
+    }
+
+    #[test]
+    fn test_config_parse_pre_check_always() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "always"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert_eq!(config.agents[0].pre_check, Some(PreCheckStrategy::Always));
+    }
+
+    #[test]
+    fn test_config_parse_pre_check_git_diff() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "git-diff"
+watch_paths = ["crates/", "Cargo.toml"]
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        match &config.agents[0].pre_check {
+            Some(PreCheckStrategy::GitDiff { watch_paths }) => {
+                assert_eq!(
+                    watch_paths,
+                    &vec!["crates/".to_string(), "Cargo.toml".to_string()]
+                );
+            }
+            other => panic!("expected GitDiff, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_config_parse_pre_check_gitea_issue() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "gitea-issue"
+issue_number = 637
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        match &config.agents[0].pre_check {
+            Some(PreCheckStrategy::GiteaIssue { issue_number }) => {
+                assert_eq!(*issue_number, 637);
+            }
+            other => panic!("expected GiteaIssue, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_config_parse_pre_check_shell() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "shell"
+script = "echo hello"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        match &config.agents[0].pre_check {
+            Some(PreCheckStrategy::Shell {
+                script,
+                timeout_secs,
+            }) => {
+                assert_eq!(script, "echo hello");
+                assert_eq!(*timeout_secs, 60); // default
+            }
+            other => panic!("expected Shell, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_config_parse_pre_check_shell_custom_timeout() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "shell"
+script = "test -f /tmp/flag"
+timeout_secs = 10
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        match &config.agents[0].pre_check {
+            Some(PreCheckStrategy::Shell {
+                script,
+                timeout_secs,
+            }) => {
+                assert_eq!(script, "test -f /tmp/flag");
+                assert_eq!(*timeout_secs, 10);
+            }
+            other => panic!("expected Shell, got {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_config_parse_no_pre_check() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.agents[0].pre_check.is_none());
+    }
+
+    #[test]
+    fn test_config_validate_gitea_issue_requires_workflow() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "gitea-issue"
+issue_number = 42
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        let result = config.validate();
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("gitea-issue"),
+            "error should mention gitea-issue: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn test_config_validate_gitea_issue_with_workflow_ok() {
+        let toml_str = r#"
+working_dir = "/tmp"
+[nightwatch]
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+[workflow]
+enabled = true
+workflow_file = "./WORKFLOW.md"
+[workflow.tracker]
+kind = "gitea"
+endpoint = "https://git.example.com"
+api_key = "token123"
+owner = "owner"
+repo = "repo"
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+[agents.pre_check]
+kind = "gitea-issue"
+issue_number = 42
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+        assert!(config.validate().is_ok());
     }
 }
