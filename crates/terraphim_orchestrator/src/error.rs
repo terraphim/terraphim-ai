@@ -39,4 +39,7 @@ pub enum OrchestratorError {
 
     #[error(transparent)]
     Io(#[from] std::io::Error),
+
+    #[error("pre-check configuration error for agent '{agent}': {reason}")]
+    PreCheckConfig { agent: String, reason: String },
 }

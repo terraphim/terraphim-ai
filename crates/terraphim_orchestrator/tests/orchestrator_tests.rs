@@ -3,9 +3,21 @@ use std::time::Duration;
 
 use terraphim_orchestrator::{
     AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, HandoffContext,
-    NightwatchConfig, OrchestratorConfig, OrchestratorError,
+    NightwatchConfig, OrchestratorConfig, OrchestratorError, TrackerConfig, TrackerStates,
+    WorkflowConfig,
 };
 use uuid::Uuid;
+
+/// Return a deterministic baseline commit for git-diff tests.
+/// Uses the repository root commit so tests work in any clone.
+fn baseline_commit() -> String {
+    let output = std::process::Command::new("git")
+        .args(["rev-list", "--max-parents=0", "HEAD"])
+        .output()
+        .expect("git rev-list failed");
+    let commits = String::from_utf8_lossy(&output.stdout);
+    commits.lines().next().unwrap_or("").trim().to_string()
+}
 
 fn test_config() -> OrchestratorConfig {
     OrchestratorConfig {
@@ -44,6 +56,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -64,6 +77,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -84,6 +98,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                pre_check: None,
             },
         ],
         restart_cooldown_secs: 60,
@@ -298,4 +313,231 @@ fn test_error_variants_display() {
     assert!(msg.contains("agent-a"));
     assert!(msg.contains("agent-b"));
     assert!(msg.contains("timeout"));
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_skips_on_empty_output() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "true".to_string(), // exit 0, empty stdout
+        timeout_secs: 5,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    // Agent should NOT be spawned (NoFindings -> skip)
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(!orch.is_agent_active("sentinel"));
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_returns_findings() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "echo 'found issues'".to_string(),
+        timeout_secs: 5,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_fail_open_on_error() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "exit 1".to_string(),
+        timeout_secs: 5,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel")); // fail-open
+}
+
+#[tokio::test]
+async fn test_shell_pre_check_timeout_fail_open() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
+        script: "sleep 10".to_string(),
+        timeout_secs: 1,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel")); // fail-open
+}
+
+#[tokio::test]
+async fn test_no_pre_check_spawns_normally() {
+    let config = test_config(); // pre_check is None
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));
+}
+
+/// Integration test: gitea-issue pre-check fails open when no workflow config.
+#[tokio::test]
+async fn test_gitea_issue_no_workflow_config_fail_open() {
+    let mut config = test_config();
+    config.workflow = None; // no workflow config
+    config.agents[0].pre_check =
+        Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue { issue_number: 42 });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel")); // fail-open
+}
+
+/// Git-diff: first run (no last_run_commits) always spawns.
+#[tokio::test]
+async fn test_git_diff_first_run_always_spawns() {
+    let mut config = test_config();
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
+        watch_paths: vec!["crates/".to_string()],
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    // First run: no last_run_commits -> should spawn (Findings)
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));
+}
+
+/// Git-diff: HEAD unchanged since last run -> skip (NoFindings).
+#[tokio::test]
+async fn test_git_diff_no_changes_skips() {
+    let mut config = test_config();
+    // Set working_dir to the actual repo so git commands work
+    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
+        watch_paths: vec!["crates/".to_string()],
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    // First spawn to record HEAD
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));
+
+    // Remove agent from active so we can test second spawn
+    orch.remove_agent_for_test("sentinel");
+
+    // Second spawn with same HEAD -> should skip
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(!orch.is_agent_active("sentinel")); // skipped
+}
+
+/// Git-diff: changes in watched paths -> spawn (Findings).
+#[tokio::test]
+async fn test_git_diff_matching_changes_spawns() {
+    let mut config = test_config();
+    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
+        watch_paths: vec!["crates/".to_string()],
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    // Seed with initial commit so there ARE changes
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
+
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel")); // changes found in crates/
+}
+
+/// Git-diff: changes exist but NOT in watched paths -> skip (NoFindings).
+#[tokio::test]
+async fn test_git_diff_non_matching_changes_skips() {
+    let mut config = test_config();
+    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
+        watch_paths: vec!["nonexistent-directory-that-will-never-match/".to_string()],
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    // Seed with initial commit so there ARE changes, but none match the watch path
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
+
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(!orch.is_agent_active("sentinel")); // no matching changes
+}
+
+/// Gitea-issue: no comments on issue -> spawn (Findings).
+/// This tests the path where fetch_comments returns empty vec.
+/// Without a real Gitea server, we test via the fail-open path.
+/// The no-workflow test already covers fail-open; this test ensures
+/// that a config WITH workflow but unreachable endpoint also fails open.
+#[tokio::test]
+async fn test_gitea_issue_unreachable_endpoint_fail_open() {
+    let mut config = test_config();
+    config.workflow = Some(WorkflowConfig {
+        enabled: true,
+        poll_interval_secs: 30,
+        workflow_file: PathBuf::from("WORKFLOW.md"),
+        tracker: TrackerConfig {
+            kind: "gitea".to_string(),
+            endpoint: "http://127.0.0.1:1".to_string(), // unreachable port
+            api_key: "test-token".to_string(),
+            owner: "testowner".to_string(),
+            repo: "testrepo".to_string(),
+            project_slug: None,
+            use_robot_api: false,
+            states: TrackerStates {
+                active: vec!["open".to_string()],
+                terminal: vec!["closed".to_string()],
+            },
+        },
+        concurrency: terraphim_orchestrator::ConcurrencyConfig::default(),
+    });
+    config.agents[0].pre_check =
+        Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue { issue_number: 42 });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel")); // fail-open on connection refused
+}
+
+/// Integration: spawn_agent is skipped when git-diff finds no matching changes.
+/// Uses real git repo (CARGO_MANIFEST_DIR) with HEAD as last-run commit.
+#[tokio::test]
+async fn test_spawn_agent_skipped_by_git_diff_no_matching() {
+    let mut config = test_config();
+    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
+        watch_paths: vec!["nonexistent-path-that-never-matches/".to_string()],
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    // Seed with initial commit so there are diff results
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
+
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(!orch.is_agent_active("sentinel")); // skipped: changes don't match watch_paths
+}
+
+/// Integration: spawn_agent proceeds when git-diff finds matching changes.
+/// Uses real git repo with empty tree as baseline.
+#[tokio::test]
+async fn test_spawn_agent_proceeds_with_git_diff_findings() {
+    let mut config = test_config();
+    config.working_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GitDiff {
+        watch_paths: vec!["crates/".to_string()],
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+
+    // Use initial commit as baseline -> every file is a change
+    let baseline_commit = baseline_commit();
+    orch.set_last_run_commit("sentinel", &baseline_commit);
+
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel")); // changes match crates/ watch_path
 }
