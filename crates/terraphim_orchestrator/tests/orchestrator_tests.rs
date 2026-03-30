@@ -364,3 +364,17 @@ async fn test_no_pre_check_spawns_normally() {
     assert!(result.is_ok());
     assert!(orch.is_agent_active("sentinel"));
 }
+
+/// Integration test: gitea-issue pre-check fails open when no workflow config.
+#[tokio::test]
+async fn test_gitea_issue_no_workflow_config_fail_open() {
+    let mut config = test_config();
+    config.workflow = None;  // no workflow config
+    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue {
+        issue_number: 42,
+    });
+    let mut orch = AgentOrchestrator::new(config).unwrap();
+    let result = orch.spawn_agent_for_test("sentinel").await;
+    assert!(result.is_ok());
+    assert!(orch.is_agent_active("sentinel"));  // fail-open
+}

@@ -144,6 +144,8 @@ pub struct AgentOrchestrator {
     /// Per-agent last-run commit hash for GitDiff strategy.
     /// Key: agent name. Value: commit SHA.
     last_run_commits: HashMap<String, String>,
+    /// Lazy-initialised Gitea tracker for gitea-issue pre-check.
+    pre_check_tracker: Option<terraphim_tracker::GiteaTracker>,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -232,6 +234,7 @@ impl AgentOrchestrator {
             metaprompt_renderer,
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
             last_run_commits: HashMap::new(),
+            pre_check_tracker: None,
         })
     }
 
@@ -657,15 +660,14 @@ impl AgentOrchestrator {
     }
 
     /// Evaluate the pre-check strategy for an agent.
-    async fn run_pre_check(&self, def: &AgentDefinition) -> PreCheckResult {
+    async fn run_pre_check(&mut self, def: &AgentDefinition) -> PreCheckResult {
         match &def.pre_check {
             None | Some(PreCheckStrategy::Always) => PreCheckResult::Findings(String::new()),
             Some(PreCheckStrategy::GitDiff { watch_paths }) => {
                 self.git_diff_pre_check(&def.name, watch_paths).await
             }
-            Some(PreCheckStrategy::GiteaIssue { .. }) => {
-                // Phase 2 - not yet implemented, fail-open
-                PreCheckResult::Failed("gitea-issue strategy not yet implemented".into())
+            Some(PreCheckStrategy::GiteaIssue { issue_number }) => {
+                self.gitea_issue_pre_check(*issue_number).await
             }
             Some(PreCheckStrategy::Shell { script, timeout_secs }) => {
                 self.shell_pre_check(script, *timeout_secs).await
@@ -768,6 +770,124 @@ impl AgentOrchestrator {
             Ok(Err(e)) => PreCheckResult::Failed(format!("script I/O error: {}", e)),
             Err(_) => PreCheckResult::Failed(format!("script timed out after {}s", timeout_secs)),
         }
+    }
+
+    /// Get or lazily construct the GiteaTracker for pre-check.
+    fn get_or_init_pre_check_tracker(
+        &mut self,
+    ) -> Option<&terraphim_tracker::GiteaTracker> {
+        if self.pre_check_tracker.is_some() {
+            return self.pre_check_tracker.as_ref();
+        }
+        let workflow = self.config.workflow.as_ref()?;
+        let tc = &workflow.tracker;
+        let config = terraphim_tracker::GiteaConfig {
+            base_url: tc.endpoint.clone(),
+            token: tc.api_key.clone(),
+            owner: tc.owner.clone(),
+            repo: tc.repo.clone(),
+            active_states: tc.states.active.clone(),
+            terminal_states: tc.states.terminal.clone(),
+            use_robot_api: tc.use_robot_api,
+        };
+        match terraphim_tracker::GiteaTracker::new(config) {
+            Ok(tracker) => {
+                self.pre_check_tracker = Some(tracker);
+                self.pre_check_tracker.as_ref()
+            }
+            Err(e) => {
+                warn!(error = %e, "failed to construct GiteaTracker for pre-check");
+                None
+            }
+        }
+    }
+
+    /// Evaluate the gitea-issue pre-check strategy.
+    async fn gitea_issue_pre_check(
+        &mut self,
+        issue_number: u64,
+    ) -> PreCheckResult {
+        let tracker = match self.get_or_init_pre_check_tracker() {
+            Some(t) => t,
+            None => {
+                return PreCheckResult::Failed(
+                    "no workflow config for gitea-issue pre-check".into(),
+                );
+            }
+        };
+
+        // Fetch comments with 15s timeout
+        let comments = match tokio::time::timeout(
+            Duration::from_secs(15),
+            tracker.fetch_comments(issue_number, None),
+        )
+        .await
+        {
+            Ok(Ok(comments)) => comments,
+            Ok(Err(e)) => {
+                warn!(
+                    issue = issue_number,
+                    error = %e,
+                    "gitea comment fetch failed, spawning (fail-open)"
+                );
+                return PreCheckResult::Failed(format!("comment fetch failed: {}", e));
+            }
+            Err(_) => {
+                warn!(
+                    issue = issue_number,
+                    "gitea comment fetch timed out, spawning (fail-open)"
+                );
+                return PreCheckResult::Failed("comment fetch timed out after 15s".into());
+            }
+        };
+
+        if comments.is_empty() {
+            info!(issue = issue_number, "no comments on issue, spawning");
+            return PreCheckResult::Findings(String::new());
+        }
+
+        // Check the most recent comment for PASS verdict
+        let latest = comments.last().unwrap();
+        let body_lower = latest.body.to_lowercase();
+
+        if body_lower.contains("verdict: pass") {
+            // Check if there are new commits since this comment
+            let comment_time = &latest.created_at;
+
+            // Use git log to check for commits after the comment time
+            let output = match tokio::process::Command::new("git")
+                .args(["log", "--oneline", &format!("--since={}", comment_time)])
+                .current_dir(&self.config.working_dir)
+                .output()
+                .await
+            {
+                Ok(o) => o,
+                Err(e) => {
+                    warn!(error = %e, "git log failed, spawning (fail-open)");
+                    return PreCheckResult::Failed(format!("git log failed: {}", e));
+                }
+            };
+
+            let log_output = String::from_utf8_lossy(&output.stdout);
+            if log_output.trim().is_empty() {
+                info!(issue = issue_number, "PASS verdict and no new commits, skipping");
+                return PreCheckResult::NoFindings;
+            } else {
+                let commit_count = log_output.lines().count();
+                info!(
+                    issue = issue_number,
+                    new_commits = commit_count,
+                    "PASS verdict but new commits found, spawning"
+                );
+                return PreCheckResult::Findings(format!(
+                    "{} new commits since last PASS verdict",
+                    commit_count
+                ));
+            }
+        }
+
+        info!(issue = issue_number, "no PASS verdict in latest comment, spawning");
+        PreCheckResult::Findings(String::new())
     }
 
     /// Get current HEAD commit hash.
