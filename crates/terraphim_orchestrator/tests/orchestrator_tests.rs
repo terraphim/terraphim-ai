@@ -3,8 +3,8 @@ use std::time::Duration;
 
 use terraphim_orchestrator::{
     AgentDefinition, AgentLayer, AgentOrchestrator, CompoundReviewConfig, HandoffContext,
-    NightwatchConfig, OrchestratorConfig, OrchestratorError,
-    TrackerConfig, TrackerStates, WorkflowConfig,
+    NightwatchConfig, OrchestratorConfig, OrchestratorError, TrackerConfig, TrackerStates,
+    WorkflowConfig,
 };
 use uuid::Uuid;
 
@@ -308,7 +308,7 @@ fn test_error_variants_display() {
 async fn test_shell_pre_check_skips_on_empty_output() {
     let mut config = test_config();
     config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::Shell {
-        script: "true".to_string(),  // exit 0, empty stdout
+        script: "true".to_string(), // exit 0, empty stdout
         timeout_secs: 5,
     });
     let mut orch = AgentOrchestrator::new(config).unwrap();
@@ -341,7 +341,7 @@ async fn test_shell_pre_check_fail_open_on_error() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
-    assert!(orch.is_agent_active("sentinel"));  // fail-open
+    assert!(orch.is_agent_active("sentinel")); // fail-open
 }
 
 #[tokio::test]
@@ -354,12 +354,12 @@ async fn test_shell_pre_check_timeout_fail_open() {
     let mut orch = AgentOrchestrator::new(config).unwrap();
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
-    assert!(orch.is_agent_active("sentinel"));  // fail-open
+    assert!(orch.is_agent_active("sentinel")); // fail-open
 }
 
 #[tokio::test]
 async fn test_no_pre_check_spawns_normally() {
-    let config = test_config();  // pre_check is None
+    let config = test_config(); // pre_check is None
     let mut orch = AgentOrchestrator::new(config).unwrap();
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
@@ -370,14 +370,13 @@ async fn test_no_pre_check_spawns_normally() {
 #[tokio::test]
 async fn test_gitea_issue_no_workflow_config_fail_open() {
     let mut config = test_config();
-    config.workflow = None;  // no workflow config
-    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue {
-        issue_number: 42,
-    });
+    config.workflow = None; // no workflow config
+    config.agents[0].pre_check =
+        Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue { issue_number: 42 });
     let mut orch = AgentOrchestrator::new(config).unwrap();
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
-    assert!(orch.is_agent_active("sentinel"));  // fail-open
+    assert!(orch.is_agent_active("sentinel")); // fail-open
 }
 
 /// Git-diff: first run (no last_run_commits) always spawns.
@@ -484,9 +483,8 @@ async fn test_gitea_issue_unreachable_endpoint_fail_open() {
         },
         concurrency: terraphim_orchestrator::ConcurrencyConfig::default(),
     });
-    config.agents[0].pre_check = Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue {
-        issue_number: 42,
-    });
+    config.agents[0].pre_check =
+        Some(terraphim_orchestrator::PreCheckStrategy::GiteaIssue { issue_number: 42 });
     let mut orch = AgentOrchestrator::new(config).unwrap();
     let result = orch.spawn_agent_for_test("sentinel").await;
     assert!(result.is_ok());
