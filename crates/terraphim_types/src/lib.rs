@@ -20,7 +20,7 @@
 //! ## Creating a Search Query
 //!
 //! ```
-//! use terraphim_types::{SearchQuery, NormalizedTermValue, LogicalOperator, RoleName};
+//! use terraphim_types::{SearchQuery, NormalizedTermValue, Layer, LogicalOperator, RoleName};
 //!
 //! // Simple single-term query
 //! let query = SearchQuery {
@@ -30,6 +30,7 @@
 //!     skip: None,
 //!     limit: Some(10),
 //!     role: Some(RoleName::new("engineer")),
+//!     layer: Layer::default(),
 //! };
 //!
 //! // Multi-term AND query
@@ -944,7 +945,7 @@ pub fn extract_first_paragraph(body: &str) -> String {
 /// ## Single-term query
 ///
 /// ```
-/// use terraphim_types::{SearchQuery, NormalizedTermValue, RoleName};
+/// use terraphim_types::{SearchQuery, NormalizedTermValue, Layer, RoleName};
 ///
 /// let query = SearchQuery {
 ///     search_term: NormalizedTermValue::from("machine learning"),
@@ -953,6 +954,7 @@ pub fn extract_first_paragraph(body: &str) -> String {
 ///     skip: None,
 ///     limit: Some(10),
 ///     role: Some(RoleName::new("data_scientist")),
+///     layer: Layer::default(),
 /// };
 /// ```
 ///
