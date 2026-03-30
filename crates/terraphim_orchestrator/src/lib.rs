@@ -858,16 +858,23 @@ impl AgentOrchestrator {
             let comment_time = &latest.created_at;
 
             // Use git log to check for commits after the comment time
-            let output = match tokio::process::Command::new("git")
-                .args(["log", "--oneline", &format!("--since={}", comment_time)])
-                .current_dir(&self.config.working_dir)
-                .output()
-                .await
+            let output = match tokio::time::timeout(
+                Duration::from_secs(30),
+                tokio::process::Command::new("git")
+                    .args(["log", "--oneline", &format!("--since={}", comment_time)])
+                    .current_dir(&self.config.working_dir)
+                    .output(),
+            )
+            .await
             {
-                Ok(o) => o,
-                Err(e) => {
+                Ok(Ok(o)) => o,
+                Ok(Err(e)) => {
                     warn!(error = %e, "git log failed, spawning (fail-open)");
                     return PreCheckResult::Failed(format!("git log failed: {}", e));
+                }
+                Err(_) => {
+                    warn!("git log --since timed out after 30s, spawning (fail-open)");
+                    return PreCheckResult::Failed("git log timed out after 30s".into());
                 }
             };
 
@@ -1279,6 +1286,7 @@ impl AgentOrchestrator {
     }
 
     /// Spawn a specific agent by name (test helper).
+    #[doc(hidden)]
     pub async fn spawn_agent_for_test(&mut self, name: &str) -> Result<(), OrchestratorError> {
         let def = self
             .config
@@ -1291,16 +1299,19 @@ impl AgentOrchestrator {
     }
 
     /// Check if an agent is in the active_agents map (test helper).
+    #[doc(hidden)]
     pub fn is_agent_active(&self, name: &str) -> bool {
         self.active_agents.contains_key(name)
     }
 
     /// Test helper: remove an agent from active_agents so it can be re-spawned.
+    #[doc(hidden)]
     pub fn remove_agent_for_test(&mut self, name: &str) {
         self.active_agents.remove(name);
     }
 
     /// Test helper: set last_run_commits for a given agent.
+    #[doc(hidden)]
     pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
         self.last_run_commits
             .insert(agent_name.to_string(), commit.to_string());

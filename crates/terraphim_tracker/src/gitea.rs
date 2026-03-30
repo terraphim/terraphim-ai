@@ -113,7 +113,7 @@ impl GiteaTracker {
             self.config.base_url, self.config.owner, self.config.repo, issue_number
         );
         if let Some(since_ts) = since {
-            url.push_str(&format!("?since={}", since_ts));
+            url.push_str(&format!("?since={}", urlencoding::encode(since_ts)));
         }
 
         let response = self
