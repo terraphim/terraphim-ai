@@ -701,16 +701,23 @@ impl AgentOrchestrator {
 
         // Get changed files
         let diff_range = format!("{}..{}", last_commit, head);
-        let output = match tokio::process::Command::new("git")
-            .args(["diff", "--name-only", &diff_range])
-            .current_dir(&self.config.working_dir)
-            .output()
-            .await
+        let output = match tokio::time::timeout(
+            Duration::from_secs(30),
+            tokio::process::Command::new("git")
+                .args(["diff", "--name-only", &diff_range])
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await
         {
-            Ok(o) => o,
-            Err(e) => {
+            Ok(Ok(o)) => o,
+            Ok(Err(e)) => {
                 warn!(agent = %agent_name, error = %e, "git diff failed, spawning (fail-open)");
                 return PreCheckResult::Failed(format!("git diff failed: {}", e));
+            }
+            Err(_) => {
+                warn!(agent = %agent_name, "git diff timed out after 30s, spawning (fail-open)");
+                return PreCheckResult::Failed("git diff timed out after 30s".into());
             }
         };
 
@@ -847,7 +854,7 @@ impl AgentOrchestrator {
         }
 
         // Check the most recent comment for PASS verdict
-        let latest = comments.last().unwrap();
+        let latest = comments.last().expect("checked non-empty above");
         let body_lower = latest.body.to_lowercase();
 
         if body_lower.contains("verdict: pass") {
@@ -892,11 +899,16 @@ impl AgentOrchestrator {
 
     /// Get current HEAD commit hash.
     async fn get_current_head(&self) -> Result<String, OrchestratorError> {
-        let output = tokio::process::Command::new("git")
-            .args(["rev-parse", "HEAD"])
-            .current_dir(&self.config.working_dir)
-            .output()
-            .await?;
+        let output = tokio::time::timeout(
+            Duration::from_secs(5),
+            tokio::process::Command::new("git")
+                .args(["rev-parse", "HEAD"])
+                .current_dir(&self.config.working_dir)
+                .output(),
+        )
+        .await
+        .map_err(|_| OrchestratorError::Config("git rev-parse HEAD timed out after 5s".into()))?
+        .map_err(OrchestratorError::from)?;
 
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
@@ -1273,6 +1285,16 @@ impl AgentOrchestrator {
     /// Check if an agent is in the active_agents map (test helper).
     pub fn is_agent_active(&self, name: &str) -> bool {
         self.active_agents.contains_key(name)
+    }
+
+    /// Test helper: remove an agent from active_agents so it can be re-spawned.
+    pub fn remove_agent_for_test(&mut self, name: &str) {
+        self.active_agents.remove(name);
+    }
+
+    /// Test helper: set last_run_commits for a given agent.
+    pub fn set_last_run_commit(&mut self, agent_name: &str, commit: &str) {
+        self.last_run_commits.insert(agent_name.to_string(), commit.to_string());
     }
 }
 
@@ -1873,5 +1895,55 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(validate_agent_name("agent name").is_err()); // spaces
         assert!(validate_agent_name("agent@host").is_err()); // @
         assert!(validate_agent_name("agent.name").is_err()); // dots
+    }
+
+    // ==================== has_matching_changes Tests ====================
+
+    #[test]
+    fn test_has_matching_changes_prefix_match() {
+        let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_exact_match() {
+        let changed = vec!["Cargo.toml".to_string()];
+        let watch = vec!["Cargo.toml".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_no_match() {
+        let changed = vec!["docs/README.md".to_string()];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(!has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_multiple_files_one_matches() {
+        let changed = vec![
+            "docs/README.md".to_string(),
+            "crates/orchestrator/src/config.rs".to_string(),
+        ];
+        let watch = vec!["crates/orchestrator/".to_string()];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_multiple_watch_paths() {
+        let changed = vec!["tests/integration.rs".to_string()];
+        let watch = vec![
+            "crates/orchestrator/".to_string(),
+            "tests/".to_string(),
+        ];
+        assert!(has_matching_changes(&changed, &watch));
+    }
+
+    #[test]
+    fn test_has_matching_changes_empty_watch_paths() {
+        let changed = vec!["crates/orchestrator/src/lib.rs".to_string()];
+        let watch: Vec<String> = vec![];
+        assert!(!has_matching_changes(&changed, &watch));
     }
 }
