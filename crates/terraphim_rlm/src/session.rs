@@ -252,12 +252,12 @@ impl SessionManager {
         session_id: &SessionId,
         key: &str,
     ) -> RlmResult<Option<String>> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         Ok(session.context_variables.remove(key))
     }
@@ -324,12 +324,12 @@ impl SessionManager {
         snapshot_id: String,
         set_as_current: bool,
     ) -> RlmResult<()> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.snapshot_count += 1;
         if set_as_current {
@@ -353,12 +353,12 @@ impl SessionManager {
         session_id: &SessionId,
         snapshot_id: String,
     ) -> RlmResult<()> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.current_snapshot_id = Some(snapshot_id.clone());
 
@@ -379,12 +379,12 @@ impl SessionManager {
 
     /// Clear snapshot tracking for a session (used when all snapshots are deleted).
     pub fn clear_snapshot_tracking(&self, session_id: &SessionId) -> RlmResult<()> {
-        let mut session =
-            self.sessions
-                .get_mut(session_id)
-                .ok_or_else(|| RlmError::SessionNotFound {
-                    session_id: *session_id,
-                })?;
+        let mut session = self
+            .sessions
+            .get_mut(session_id)
+            .ok_or(RlmError::SessionNotFound {
+                session_id: *session_id,
+            })?;
 
         session.current_snapshot_id = None;
         session.snapshot_count = 0;
