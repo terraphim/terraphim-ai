@@ -8717,6 +8717,7 @@ dependencies = [
  "itertools 0.14.0",
  "log",
  "memoize",
+ "proptest",
  "regex",
  "serde",
  "serde_json",
