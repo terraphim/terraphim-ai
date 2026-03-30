@@ -35,7 +35,6 @@ rand = "0.9"
 # tiktoken-rs = "0.6" # Now handled by rust-genai
 tracing = "0.1"
 regex = "1.12"
-lazy_static = "1.4"
 
 # Terraphim dependencies
 terraphim_types = { path = "../terraphim_types" }

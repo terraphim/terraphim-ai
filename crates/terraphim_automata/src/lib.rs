@@ -246,7 +246,7 @@ impl Display for AutomataPath {
 impl AutomataPath {
     /// Create a new AutomataPath from a URL
     pub fn from_remote(url: &str) -> Result<Self> {
-        if !url.starts_with("http") || !url.starts_with("https") {
+        if !url.starts_with("http://") && !url.starts_with("https://") {
             return Err(TerraphimAutomataError::Dict(format!(
                 "Invalid URL scheme. Only `http` and `https` are supported right now. Got {}",
                 url
@@ -344,7 +344,6 @@ pub async fn load_thesaurus_from_json_and_replace_async(
 /// Note: Remote loading requires the "remote-loading" feature to be enabled.
 #[cfg(feature = "remote-loading")]
 pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
-    #[allow(dead_code)]
     async fn read_url(url: String) -> Result<String> {
         log::debug!("Reading thesaurus from remote: {url}");
         let response = reqwest::Client::builder()
@@ -388,11 +387,7 @@ pub async fn load_thesaurus(automata_path: &AutomataPath) -> Result<Thesaurus> {
             }
             fs::read_to_string(path)?
         }
-        AutomataPath::Remote(_) => {
-            return Err(TerraphimAutomataError::InvalidThesaurus(
-                "Remote loading is not supported. Enable the 'remote-loading' feature.".to_string(),
-            ));
-        }
+        AutomataPath::Remote(url) => read_url(url.clone()).await?,
     };
 
     let thesaurus = serde_json::from_str(&contents)?;
@@ -623,6 +618,48 @@ mod tests {
     fn test_load_thesaurus_from_json_invalid() {
         let invalid_json = "{invalid_json}";
         let result = load_thesaurus_from_json(invalid_json);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_remote_accepts_https() {
+        let result = AutomataPath::from_remote("https://example.com/thesaurus.json");
+        assert!(result.is_ok());
+        match result.unwrap() {
+            AutomataPath::Remote(url) => {
+                assert_eq!(url, "https://example.com/thesaurus.json");
+            }
+            AutomataPath::Local(_) => panic!("Expected Remote variant"),
+        }
+    }
+
+    #[test]
+    fn test_from_remote_accepts_http() {
+        let result = AutomataPath::from_remote("http://example.com/thesaurus.json");
+        assert!(result.is_ok());
+        match result.unwrap() {
+            AutomataPath::Remote(url) => {
+                assert_eq!(url, "http://example.com/thesaurus.json");
+            }
+            AutomataPath::Local(_) => panic!("Expected Remote variant"),
+        }
+    }
+
+    #[test]
+    fn test_from_remote_rejects_ftp() {
+        let result = AutomataPath::from_remote("ftp://example.com/thesaurus.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_remote_rejects_file_path() {
+        let result = AutomataPath::from_remote("/tmp/thesaurus.json");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_from_remote_rejects_empty() {
+        let result = AutomataPath::from_remote("");
         assert!(result.is_err());
     }
 }
