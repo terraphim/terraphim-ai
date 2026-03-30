@@ -8,6 +8,7 @@ use crate::config::AgentDefinition;
 use crate::persona::PersonaRegistry;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use terraphim_tracker::gitea_write::IssueComment;
 
@@ -182,6 +183,50 @@ impl MentionTracker {
     pub fn increment_depth(&mut self, issue_number: u64) {
         *self.depth_counters.entry(issue_number).or_insert(0) += 1;
     }
+}
+
+/// Structured mention request emitted by an agent in its output.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MentionRequest {
+    /// Target agent or persona name to mention.
+    #[serde(rename = "mention")]
+    pub target: String,
+    /// Issue number to post the mention on.
+    pub issue: u64,
+    /// Context/request message for the target agent.
+    pub message: String,
+}
+
+/// Extract mention requests from agent output text.
+///
+/// Scans for JSON objects matching: {"mention": "name", "issue": N, "message": "..."}
+/// Returns all valid mention requests found.
+pub fn extract_mention_requests(output: &str) -> Vec<MentionRequest> {
+    let mut requests = Vec::new();
+    // Scan for JSON objects in the output
+    for line in output.lines() {
+        let trimmed = line.trim();
+        if trimmed.starts_with('{') && trimmed.contains("\"mention\"") {
+            if let Ok(req) = serde_json::from_str::<MentionRequest>(trimmed) {
+                requests.push(req);
+            }
+        }
+    }
+    // Also try to find embedded JSON in larger text blocks
+    if let Some(start) = output.find("{\"mention\"") {
+        if let Some(end) = output[start..].find('}') {
+            let candidate = &output[start..=start + end];
+            if let Ok(req) = serde_json::from_str::<MentionRequest>(candidate) {
+                if !requests
+                    .iter()
+                    .any(|r| r.target == req.target && r.issue == req.issue)
+                {
+                    requests.push(req);
+                }
+            }
+        }
+    }
+    requests
 }
 
 #[cfg(test)]
@@ -402,5 +447,41 @@ mod tests {
         tracker.increment_depth(42);
         tracker.increment_depth(42);
         assert!(tracker.depth_exceeded(42));
+    }
+
+    #[test]
+    fn test_extract_mention_request_from_line() {
+        let output = r#"Analysis complete.
+{"mention": "vigil", "issue": 42, "message": "Please review security implications"}
+Done."#;
+        let requests = extract_mention_requests(output);
+        assert_eq!(requests.len(), 1);
+        assert_eq!(requests[0].target, "vigil");
+        assert_eq!(requests[0].issue, 42);
+        assert_eq!(requests[0].message, "Please review security implications");
+    }
+
+    #[test]
+    fn test_extract_multiple_mention_requests() {
+        let output = r#"Found issues.
+{"mention": "vigil", "issue": 42, "message": "Security review needed"}
+{"mention": "carthos", "issue": 42, "message": "Architecture review needed"}
+"#;
+        let requests = extract_mention_requests(output);
+        assert_eq!(requests.len(), 2);
+    }
+
+    #[test]
+    fn test_extract_no_mention_requests() {
+        let output = "Just plain text output with no JSON";
+        let requests = extract_mention_requests(output);
+        assert!(requests.is_empty());
+    }
+
+    #[test]
+    fn test_extract_malformed_json_ignored() {
+        let output = r#"{"mention": "vigil", "issue": "not_a_number"}"#;
+        let requests = extract_mention_requests(output);
+        assert!(requests.is_empty());
     }
 }
