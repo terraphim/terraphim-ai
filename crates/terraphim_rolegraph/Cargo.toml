@@ -40,6 +40,11 @@ medical = ["terraphim_types/medical", "csv", "anyhow"]
 name = "throughput"
 harness = false
 
+[[bench]]
+name = "symbolic_embedding_bench"
+harness = false
+required-features = ["medical"]
+
 [dev-dependencies]
 criterion = "0.8"
 tempfile = "3.27"
