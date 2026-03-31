@@ -170,5 +170,10 @@
 		"tiptap-markdown": {
 			"optional": true
 		}
+	},
+	"overrides": {
+		"svelma": {
+			"bulma": "$bulma"
+		}
 	}
 }

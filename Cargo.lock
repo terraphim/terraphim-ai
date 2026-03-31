@@ -8666,6 +8666,7 @@ dependencies = [
  "ahash",
  "aho-corasick",
  "anyhow",
+ "cached",
  "criterion",
  "csv",
  "itertools 0.14.0",
@@ -8688,16 +8689,13 @@ dependencies = [
 name = "terraphim_router"
 version = "1.8.0"
 dependencies = [
- "anyhow",
  "async-trait",
  "chrono",
  "criterion",
  "dirs 5.0.1",
  "notify",
  "proptest",
- "regex",
  "serde",
- "serde_json",
  "serde_yaml",
  "serial_test",
  "tempfile",
@@ -8834,21 +8832,15 @@ dependencies = [
 name = "terraphim_spawner"
 version = "1.8.0"
 dependencies = [
- "anyhow",
- "chrono",
  "nix 0.27.1",
  "proptest",
  "regex",
- "serde",
- "serde_json",
  "tempfile",
- "terraphim_router",
  "terraphim_types",
  "thiserror 1.0.69",
  "tokio",
  "tokio-test",
  "tracing",
- "uuid",
 ]
 
 [[package]]

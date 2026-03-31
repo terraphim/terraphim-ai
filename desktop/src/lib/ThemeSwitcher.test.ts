@@ -9,9 +9,9 @@ const TEST_TIMEOUT = 5000; // 5 seconds for API calls
 // Stub TAURI IPC to prevent invoke errors
 (global as any).__TAURI_IPC__ = () => {};
 
-describe('ThemeSwitcher Component - Real Integration', () => {
+describe('ThemeSwitcher', () => {
 	// Skip integration tests in CI environment where server setup is complex
-	const isCI = process.env.CI || process.env.GITHUB_ACTIONS;
+	const isCI = typeof process !== 'undefined' && (process.env.CI || process.env.GITHUB_ACTIONS);
 
 	beforeAll(async () => {
 		// Set up for web-based testing (not Tauri)

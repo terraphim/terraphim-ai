@@ -25,9 +25,6 @@ mod client;
 mod guard_patterns;
 mod onboarding;
 mod service;
-mod tui_backend;
-
-use tui_backend::TuiBackend;
 
 // Robot mode and forgiving CLI - always available
 mod forgiving;
@@ -43,7 +40,6 @@ use client::{ApiClient, SearchResponse};
 use service::TuiService;
 use terraphim_types::{
     Document, Layer, LogicalOperator, NormalizedTermValue, RoleName, SearchQuery,
-    extract_first_paragraph,
 };
 use terraphim_update::{check_for_updates, check_for_updates_startup, update_binary};
 
@@ -74,15 +70,11 @@ fn show_usage_info() {
     println!("  terraphim-agent help         # Show command-specific help");
 }
 
-// These functions are used in tests but not in production code currently.
-// They are kept for potential future use (e.g., auto-detect server mode).
-#[allow(dead_code)]
 fn resolve_tui_server_url(explicit: Option<&str>) -> String {
     let env_server = std::env::var("TERRAPHIM_SERVER").ok();
     resolve_tui_server_url_with_env(explicit, env_server.as_deref())
 }
 
-#[allow(dead_code)]
 fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&str>) -> String {
     explicit
         .map(ToOwned::to_owned)
@@ -90,7 +82,6 @@ fn resolve_tui_server_url_with_env(explicit: Option<&str>, env_server: Option<&s
         .unwrap_or_else(|| "http://localhost:8000".to_string())
 }
 
-#[allow(dead_code)]
 fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Error {
     anyhow::anyhow!(
         "Fullscreen TUI requires a running Terraphim server at {}. \
@@ -101,7 +92,6 @@ fn tui_server_requirement_error(url: &str, cause: &anyhow::Error) -> anyhow::Err
     )
 }
 
-#[allow(dead_code)]
 fn ensure_tui_server_reachable(
     runtime: &tokio::runtime::Runtime,
     api: &ApiClient,
@@ -487,10 +477,6 @@ struct SearchDocumentOutput {
     title: String,
     url: String,
     rank: Option<u64>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    tags: Option<Vec<String>>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    summary: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
@@ -499,38 +485,6 @@ struct SearchOutput {
     role: String,
     count: usize,
     results: Vec<SearchDocumentOutput>,
-}
-
-/// Extension trait to convert Document to layered output
-impl SearchDocumentOutput {
-    fn from_document(doc: &Document, layer: &Layer) -> Self {
-        match layer {
-            Layer::One => Self {
-                id: doc.id.clone(),
-                title: doc.title.clone(),
-                url: doc.url.clone(),
-                rank: doc.rank,
-                tags: doc.tags.clone(),
-                summary: None,
-            },
-            Layer::Two => Self {
-                id: doc.id.clone(),
-                title: doc.title.clone(),
-                url: doc.url.clone(),
-                rank: doc.rank,
-                tags: doc.tags.clone(),
-                summary: Some(extract_first_paragraph(&doc.body)),
-            },
-            Layer::Three => Self {
-                id: doc.id.clone(),
-                title: doc.title.clone(),
-                url: doc.url.clone(),
-                rank: doc.rank,
-                tags: doc.tags.clone(),
-                summary: None, // For full content, summary not needed
-            },
-        }
-    }
 }
 
 fn print_json_output<T: Serialize>(value: &T, mode: CommandOutputMode) -> Result<()> {
@@ -588,9 +542,6 @@ enum Command {
         role: Option<String>,
         #[arg(long, default_value_t = 10)]
         limit: usize,
-        /// Output layer: 1=minimal (title+tags), 2=summary, 3=full (default)
-        #[arg(long, default_value_t = 3, value_name = "1|2|3")]
-        layer: u8,
     },
     /// Manage roles (list, select)
     Roles {
@@ -828,17 +779,6 @@ enum LearnSub {
         #[arg(long)]
         session_id: Option<String>,
     },
-    /// Suggest relevant past learnings based on context
-    Suggest {
-        /// Context string (e.g., current working directory or task description)
-        context: String,
-        /// Maximum number of suggestions to show
-        #[arg(long, default_value_t = 5)]
-        limit: usize,
-        /// Show global learnings instead of project
-        #[arg(long, default_value_t = false)]
-        global: bool,
-    },
     /// Process hook input from AI agents (reads JSON from stdin)
     Hook {
         /// AI agent format
@@ -850,17 +790,6 @@ enum LearnSub {
         /// AI agent to install hook for
         #[arg(value_enum)]
         agent: learnings::AgentType,
-    },
-    /// Auto-extract corrections from session transcript
-    AutoExtract {
-        /// Path to JSONL transcript file
-        transcript_path: String,
-        /// Save extracted corrections to storage
-        #[arg(long, default_value_t = false)]
-        save: bool,
-        /// Show global learnings instead of project
-        #[arg(long, default_value_t = false)]
-        global: bool,
     },
 }
 
@@ -944,8 +873,8 @@ fn main() -> Result<()> {
             if cli.server {
                 run_tui_server_mode(&cli.server_url, cli.transparent)
             } else {
-                // Run TUI mode with local backend (offline, no server required)
-                run_tui_local_mode(cli.transparent)
+                // Run TUI mode - it will create its own runtime
+                run_tui_offline_mode(cli.transparent)
             }
         }
 
@@ -969,37 +898,14 @@ fn main() -> Result<()> {
         }
     }
 }
-fn run_tui_local_mode(transparent: bool) -> Result<()> {
-    // Show loading indicator before entering raw mode
-    // TuiService::new() may take time for rolegraph building
-    println!("Loading Terraphim...");
-    std::io::Write::flush(&mut std::io::stdout())?;
-
-    // Create local TuiService backend (offline, no server required)
-    let rt = Runtime::new()?;
-    let service = rt.block_on(async { TuiService::new(None).await })?;
-    let backend = TuiBackend::Local(service);
-
-    // Clear the loading message before TUI starts
-    // This will scroll away when the terminal enters alternate screen
-    run_tui(backend, transparent)
+fn run_tui_offline_mode(transparent: bool) -> Result<()> {
+    // Fullscreen TUI mode requires a running server.
+    // For offline operation, use `terraphim-agent repl`.
+    run_tui(None, transparent)
 }
 
 fn run_tui_server_mode(server_url: &str, transparent: bool) -> Result<()> {
-    // Create remote ApiClient backend (requires server)
-    let rt = Runtime::new()?;
-    let api = ApiClient::new(server_url.to_string());
-    rt.block_on(async { api.health().await }).map_err(|err| {
-        anyhow::anyhow!(
-            "Fullscreen TUI requires a running Terraphim server at {}. \
-                 Start terraphim_server or use offline mode without --server flag. \
-                 Connection error: {}",
-            server_url,
-            err
-        )
-    })?;
-    let backend = TuiBackend::Remote(api);
-    run_tui(backend, transparent)
+    run_tui(Some(server_url.to_string()), transparent)
 }
 
 /// Stateless config validation -- runs before TuiService initialization.
@@ -1215,13 +1121,8 @@ async fn run_offline_command(
             operator,
             role,
             limit,
-            layer,
         } => {
             let role_name = service.resolve_role(role.as_deref()).await?;
-
-            // Parse and validate layer
-            let layer =
-                terraphim_types::Layer::from_u8(layer).unwrap_or(terraphim_types::Layer::Three);
 
             let results = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
@@ -1256,7 +1157,7 @@ async fn run_offline_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name.clone()),
-                    layer,
+                    layer: Layer::default(),
                 };
 
                 service.search_with_query(&search_query).await?
@@ -1269,33 +1170,23 @@ async fn run_offline_command(
 
             if output.is_machine_readable() {
                 let payload = SearchOutput {
-                    query: query.clone(),
+                    query,
                     role: role_name.to_string(),
                     count: results.len(),
                     results: results
                         .iter()
-                        .map(|doc| SearchDocumentOutput::from_document(doc, &layer))
+                        .map(|doc| SearchDocumentOutput {
+                            id: doc.id.clone(),
+                            title: doc.title.clone(),
+                            url: doc.url.clone(),
+                            rank: doc.rank,
+                        })
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
             } else {
                 for doc in results.iter() {
-                    match layer {
-                        Layer::One => {
-                            println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
-                        }
-                        Layer::Two => {
-                            let summary = extract_first_paragraph(&doc.body);
-                            println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
-                            println!("  {}", summary);
-                        }
-                        Layer::Three => {
-                            println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
-                            if let Some(ref tags) = doc.tags {
-                                println!("  Tags: {}", tags.join(", "));
-                            }
-                        }
-                    }
+                    println!("- {}\t{}", doc.rank.unwrap_or_default(), doc.title);
                 }
             }
             Ok(())
@@ -2035,7 +1926,7 @@ async fn run_offline_command(
 async fn run_learn_command(sub: LearnSub) -> Result<()> {
     use learnings::{
         CorrectionType, LearningCaptureConfig, capture_correction, capture_failed_command,
-        correct_learning, list_all_entries, query_all_entries, suggest_learnings,
+        correct_learning, list_all_entries, query_all_entries,
     };
     let config = LearningCaptureConfig::default();
 
@@ -2167,113 +2058,11 @@ async fn run_learn_command(sub: LearnSub) -> Result<()> {
                 }
             }
         }
-        LearnSub::Suggest {
-            context,
-            limit,
-            global,
-        } => {
-            let storage_loc = config.storage_location();
-            let storage_dir = if global {
-                &config.global_dir
-            } else {
-                &storage_loc
-            };
-            match suggest_learnings(storage_dir, &context, limit) {
-                Ok(scored) => {
-                    if scored.is_empty() {
-                        println!("No relevant learnings found for context.");
-                    } else {
-                        println!("Suggested learnings for context:",);
-                        for (i, scored_entry) in scored.iter().enumerate() {
-                            let source_indicator = match scored_entry.entry.source() {
-                                learnings::LearningSource::Project => "[P]",
-                                learnings::LearningSource::Global => "[G]",
-                            };
-                            let suggestion = match &scored_entry.entry {
-                                learnings::LearningEntry::Learning(l) => {
-                                    format!("[cmd] {} (exit: {})", l.command, l.exit_code)
-                                }
-                                learnings::LearningEntry::Correction(c) => {
-                                    format!(
-                                        "[{}] {} -> {}",
-                                        c.correction_type, c.original, c.corrected
-                                    )
-                                }
-                            };
-                            println!(
-                                "  {}. {} {} (score: {})",
-                                i + 1,
-                                source_indicator,
-                                suggestion,
-                                scored_entry.score
-                            );
-                            println!("     ID: {}", scored_entry.entry.id());
-                            if let Some(correction) = scored_entry.entry.correction_text() {
-                                println!("     Correction: {}", correction);
-                            }
-                        }
-                    }
-                    Ok(())
-                }
-                Err(e) => Err(e.into()),
-            }
-        }
         LearnSub::Hook { format } => learnings::process_hook_input(format)
             .await
             .map_err(|e| e.into()),
         LearnSub::InstallHook { agent } => {
             learnings::install_hook(agent).await.map_err(|e| e.into())
-        }
-        LearnSub::AutoExtract {
-            transcript_path,
-            save,
-            global,
-        } => {
-            use learnings::auto_extract_corrections;
-            use std::path::PathBuf;
-
-            let storage_loc = config.storage_location();
-            let storage_dir = if global {
-                &config.global_dir
-            } else {
-                &storage_loc
-            };
-            let transcript_path = PathBuf::from(transcript_path);
-
-            match auto_extract_corrections(&transcript_path) {
-                Ok(corrections) => {
-                    if corrections.is_empty() {
-                        println!("No corrections found in transcript.");
-                    } else {
-                        println!("Extracted {} correction(s):", corrections.len());
-                        for (i, correction) in corrections.iter().enumerate() {
-                            println!("  {}. Type: {}", i + 1, correction.correction_type);
-                            println!("     Original: {}", correction.original);
-                            println!("     Corrected: {}", correction.corrected);
-                            if !correction.context_description.is_empty() {
-                                println!("     Context: {}", correction.context_description);
-                            }
-                            if save {
-                                // Save the correction to storage
-                                let filename = format!("correction-{}.md", correction.id);
-                                let filepath = storage_dir.join(&filename);
-                                match std::fs::write(&filepath, correction.to_markdown()) {
-                                    Ok(_) => println!("     Saved: {}", filepath.display()),
-                                    Err(e) => eprintln!("     Error saving: {}", e),
-                                }
-                            }
-                        }
-                        if save {
-                            println!("\nAll corrections saved to: {}", storage_dir.display());
-                        }
-                    }
-                    Ok(())
-                }
-                Err(e) => {
-                    eprintln!("Failed to extract corrections: {}", e);
-                    Err(e.into())
-                }
-            }
         }
     }
 }
@@ -2292,7 +2081,6 @@ async fn run_server_command(
             operator,
             role,
             limit,
-            layer,
         } => {
             // Get selected role from server if not specified
             let role_name = if let Some(role) = role {
@@ -2301,10 +2089,6 @@ async fn run_server_command(
                 let config_res = api.get_config().await?;
                 config_res.config.selected_role
             };
-
-            // Parse and validate layer
-            let layer =
-                terraphim_types::Layer::from_u8(layer).unwrap_or(terraphim_types::Layer::Three);
 
             let q = if let Some(additional_terms) = terms {
                 // Multi-term query with logical operators
@@ -2320,7 +2104,7 @@ async fn run_server_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name),
-                    layer,
+                    layer: Layer::default(),
                 }
             } else {
                 // Single term query (backward compatibility)
@@ -2331,7 +2115,7 @@ async fn run_server_command(
                     skip: Some(0),
                     limit: Some(limit),
                     role: Some(role_name),
-                    layer,
+                    layer: Layer::default(),
                 }
             };
 
@@ -2366,7 +2150,12 @@ async fn run_server_command(
                     results: res
                         .results
                         .iter()
-                        .map(|doc| SearchDocumentOutput::from_document(doc, &layer))
+                        .map(|doc| SearchDocumentOutput {
+                            id: doc.id.clone(),
+                            title: doc.title.clone(),
+                            url: doc.url.clone(),
+                            rank: doc.rank,
+                        })
                         .collect(),
                 };
                 print_json_output(&payload, output.mode)?;
@@ -2878,10 +2667,10 @@ async fn run_server_command(
     }
 }
 
-fn run_tui(tui_backend: TuiBackend, transparent: bool) -> Result<()> {
+fn run_tui(server_url: Option<String>, transparent: bool) -> Result<()> {
     // Attempt to set up terminal for TUI
     let stdout = io::stdout();
-    let crossterm_backend = CrosstermBackend::new(stdout);
+    let backend = CrosstermBackend::new(stdout);
 
     // Try to enter raw mode and alternate screen
     // These operations can fail in non-interactive environments
@@ -2899,7 +2688,7 @@ fn run_tui(tui_backend: TuiBackend, transparent: bool) -> Result<()> {
                 ));
             }
 
-            let mut terminal = match Terminal::new(crossterm_backend) {
+            let mut terminal = match Terminal::new(backend) {
                 Ok(t) => t,
                 Err(e) => {
                     // Clean up before returning
@@ -2913,7 +2702,7 @@ fn run_tui(tui_backend: TuiBackend, transparent: bool) -> Result<()> {
                 }
             };
 
-            let res = ui_loop(&mut terminal, tui_backend, transparent);
+            let res = ui_loop(&mut terminal, server_url, transparent);
 
             // Always clean up terminal state
             let _ = disable_raw_mode();
@@ -2941,7 +2730,7 @@ fn run_tui(tui_backend: TuiBackend, transparent: bool) -> Result<()> {
 
 fn ui_loop(
     terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-    backend: TuiBackend,
+    server_url: Option<String>,
     transparent: bool,
 ) -> Result<()> {
     let mut input = String::new();
@@ -2952,18 +2741,19 @@ fn ui_loop(
     let mut current_role = String::from("Terraphim Engineer"); // Default to Terraphim Engineer
     let mut selected_result_index = 0;
     let mut view_mode = ViewMode::Search;
+    let effective_url = resolve_tui_server_url(server_url.as_deref());
+    let api = ApiClient::new(effective_url.clone());
 
     // Create a tokio runtime for this TUI session
     // We need a local runtime because we're in a synchronous function (terminal event loop)
     let rt = tokio::runtime::Runtime::new()?;
+    ensure_tui_server_reachable(&rt, &api, &effective_url)?;
 
     // Initialize terms from rolegraph (selected role)
-    if let Ok(cfg) = rt.block_on(async { backend.get_config().await }) {
-        current_role = cfg.selected_role.to_string();
-        if let Ok(role_terms) =
-            rt.block_on(async { backend.get_rolegraph_terms(&current_role).await })
-        {
-            terms = role_terms;
+    if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
+        current_role = cfg.config.selected_role.to_string();
+        if let Ok(rg) = rt.block_on(async { api.rolegraph(Some(current_role.as_str())).await }) {
+            terms = rg.nodes.into_iter().map(|n| n.label).collect();
         }
     }
 
@@ -3065,7 +2855,7 @@ fn ui_loop(
                             TuiAction::Quit => break,
                             TuiAction::SearchOrOpen => {
                                 let query = input.trim().to_string();
-                                let backend = backend.clone();
+                                let api = api.clone();
                                 let role = current_role.clone();
                                 if !query.is_empty() {
                                     if let Ok((lines, docs)) = rt.block_on(async move {
@@ -3078,8 +2868,9 @@ fn ui_loop(
                                             role: Some(RoleName::new(&role)),
                                             layer: Layer::default(),
                                         };
-                                        let docs = backend.search(&q).await?;
-                                        let lines: Vec<String> = docs
+                                        let resp = api.search(&q).await?;
+                                        let lines: Vec<String> = resp
+                                            .results
                                             .iter()
                                             .map(|d| {
                                                 format!(
@@ -3089,6 +2880,7 @@ fn ui_loop(
                                                 )
                                             })
                                             .collect();
+                                        let docs = resp.results;
                                         Ok::<(Vec<String>, Vec<Document>), anyhow::Error>((
                                             lines, docs,
                                         ))
@@ -3110,25 +2902,29 @@ fn ui_loop(
                                 }
                             }
                             TuiAction::Autocomplete => {
-                                // Real autocomplete from backend (local or remote)
+                                // Real autocomplete from API
                                 let query = input.trim();
                                 if !query.is_empty() {
-                                    let backend = backend.clone();
+                                    let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(autocomplete_suggestions) = rt.block_on(async move {
-                                        backend.autocomplete(&role, query).await
+                                    if let Ok(autocomplete_resp) = rt.block_on(async move {
+                                        api.get_autocomplete(&role, query).await
                                     }) {
-                                        suggestions =
-                                            autocomplete_suggestions.into_iter().take(5).collect();
+                                        suggestions = autocomplete_resp
+                                            .suggestions
+                                            .into_iter()
+                                            .take(5)
+                                            .map(|s| s.text)
+                                            .collect();
                                     }
                                 }
                             }
                             TuiAction::SwitchRole => {
                                 // Switch role
-                                let backend = backend.clone();
-                                if let Ok(cfg) = rt.block_on(async { backend.get_config().await }) {
+                                let api = api.clone();
+                                if let Ok(cfg) = rt.block_on(async { api.get_config().await }) {
                                     let roles: Vec<String> =
-                                        cfg.roles.keys().map(|k| k.to_string()).collect();
+                                        cfg.config.roles.keys().map(|k| k.to_string()).collect();
                                     if !roles.is_empty() {
                                         if let Some(current_idx) =
                                             roles.iter().position(|r| r == &current_role)
@@ -3136,10 +2932,11 @@ fn ui_loop(
                                             let next_idx = (current_idx + 1) % roles.len();
                                             current_role = roles[next_idx].clone();
                                             // Update terms for new role
-                                            if let Ok(role_terms) = rt.block_on(async {
-                                                backend.get_rolegraph_terms(&current_role).await
+                                            if let Ok(rg) = rt.block_on(async {
+                                                api.rolegraph(Some(&current_role)).await
                                             }) {
-                                                terms = role_terms;
+                                                terms =
+                                                    rg.nodes.into_iter().map(|n| n.label).collect();
                                             }
                                         }
                                     }
@@ -3149,15 +2946,17 @@ fn ui_loop(
                                 // Summarize current selection
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
-                                    let backend = backend.clone();
+                                    let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
-                                        backend.summarize(&doc, Some(&role)).await
+                                    if let Ok(summary) = rt.block_on(async move {
+                                        api.summarize_document(&doc, Some(&role)).await
                                     }) {
-                                        // Replace result with summary for display
-                                        if selected_result_index < results.len() {
-                                            results[selected_result_index] =
-                                                format!("SUMMARY: {}", summary_text);
+                                        if let Some(summary_text) = summary.summary {
+                                            // Replace result with summary for display
+                                            if selected_result_index < results.len() {
+                                                results[selected_result_index] =
+                                                    format!("SUMMARY: {}", summary_text);
+                                            }
                                         }
                                     }
                                 }
@@ -3184,25 +2983,27 @@ fn ui_loop(
                                 // Summarize current document in detail view
                                 if selected_result_index < detailed_results.len() {
                                     let doc = detailed_results[selected_result_index].clone();
-                                    let backend = backend.clone();
+                                    let api = api.clone();
                                     let role = current_role.clone();
-                                    if let Ok(Some(summary_text)) = rt.block_on(async move {
-                                        backend.summarize(&doc, Some(&role)).await
+                                    if let Ok(summary) = rt.block_on(async move {
+                                        api.summarize_document(&doc, Some(&role)).await
                                     }) {
-                                        // Update the document body with summary
-                                        let original_body = if detailed_results
-                                            [selected_result_index]
-                                            .body
-                                            .is_empty()
-                                        {
-                                            "No content"
-                                        } else {
-                                            &detailed_results[selected_result_index].body
-                                        };
-                                        detailed_results[selected_result_index].body = format!(
-                                            "SUMMARY:\n{}\n\nORIGINAL:\n{}",
-                                            summary_text, original_body
-                                        );
+                                        if let Some(summary_text) = summary.summary {
+                                            // Update the document body with summary
+                                            let original_body = if detailed_results
+                                                [selected_result_index]
+                                                .body
+                                                .is_empty()
+                                            {
+                                                "No content"
+                                            } else {
+                                                &detailed_results[selected_result_index].body
+                                            };
+                                            detailed_results[selected_result_index].body = format!(
+                                                "SUMMARY:\n{}\n\nORIGINAL:\n{}",
+                                                summary_text, original_body
+                                            );
+                                        }
                                     }
                                 }
                             }

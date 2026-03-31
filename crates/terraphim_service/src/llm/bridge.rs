@@ -7,6 +7,10 @@
 //! NOTE: This module is currently unused because the `proxy` feature takes precedence
 //! when enabled. The code is preserved for future use when routing logic is reordered.
 #![allow(dead_code)]
+// This module is only compiled when the `llm_router` feature is enabled.
+// The parent `llm.rs` includes it under `#[cfg(feature = "llm_router")]`.
+// When proxy feature is also enabled, this is unreachable code in `build_llm_from_role`.
+#![allow(dead_code, clippy::duplicated_attributes)]
 
 use std::sync::Arc;
 

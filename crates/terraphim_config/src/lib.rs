@@ -85,6 +85,23 @@ impl From<terraphim_persistence::Error> for TerraphimConfigError {
 pub fn expand_path(path: &str) -> PathBuf {
     let mut result = path.to_string();
 
+    /// Get home directory using multiple fallback strategies
+    fn get_home_dir() -> Option<PathBuf> {
+        // Try dirs crate first
+        if let Some(home) = dirs::home_dir() {
+            return Some(home);
+        }
+        // Fallback to HOME environment variable
+        if let Ok(home) = std::env::var("HOME") {
+            return Some(PathBuf::from(home));
+        }
+        // Fallback to USERPROFILE on Windows
+        if let Ok(profile) = std::env::var("USERPROFILE") {
+            return Some(PathBuf::from(profile));
+        }
+        None
+    }
+
     // Handle ${VAR:-default} syntax (environment variable with default)
     // This regex handles nested ${...} in the default value by using a greedy match
     // that captures everything until the last }
@@ -135,7 +152,7 @@ pub fn expand_path(path: &str) -> PathBuf {
         .replace_all(&result, |caps: &regex::Captures| {
             let var_name = &caps[1];
             if var_name == "HOME" {
-                dirs::home_dir()
+                get_home_dir()
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|| format!("${{{}}}", var_name))
             } else {
@@ -150,7 +167,7 @@ pub fn expand_path(path: &str) -> PathBuf {
         .replace_all(&result, |caps: &regex::Captures| {
             let var_name = &caps[1];
             if var_name == "HOME" {
-                dirs::home_dir()
+                get_home_dir()
                     .map(|p| p.to_string_lossy().to_string())
                     .unwrap_or_else(|| format!("${}", var_name))
             } else {
@@ -161,7 +178,7 @@ pub fn expand_path(path: &str) -> PathBuf {
 
     // Handle ~ at the beginning of the path
     if result.starts_with('~') {
-        if let Some(home) = dirs::home_dir() {
+        if let Some(home) = get_home_dir() {
             result = result.replacen('~', &home.to_string_lossy(), 1);
         }
     }

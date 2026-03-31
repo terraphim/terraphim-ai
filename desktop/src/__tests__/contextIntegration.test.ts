@@ -6,7 +6,7 @@ const execAsync = promisify(exec);
 
 describe('Context Management Integration', () => {
 	// Skip integration tests in CI environment where server setup is complex
-	const isCI = process.env.CI || process.env.GITHUB_ACTIONS;
+	const isCI = typeof process !== 'undefined' && (process.env.CI || process.env.GITHUB_ACTIONS);
 
 	beforeEach(async () => {
 		if (isCI) {

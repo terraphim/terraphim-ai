@@ -1,4 +1,5 @@
 use ahash::AHashMap;
+use cached::proc_macro::cached;
 use itertools::Itertools;
 use regex::Regex;
 use std::collections::hash_map::Entry;
@@ -1293,7 +1294,7 @@ pub fn split_paragraphs(paragraphs: &str) -> Vec<&str> {
 
 /// Combining two numbers into a unique one: pairing functions.
 /// It uses "elegant pairing" (https://odino.org/combining-two-numbers-into-a-unique-one-pairing-functions/).
-#[inline]
+#[cached]
 pub fn magic_pair(x: u64, y: u64) -> u64 {
     if x >= y { x * x + x + y } else { y * y + x }
 }
@@ -1304,10 +1305,10 @@ pub fn magic_pair(x: u64, y: u64) -> u64 {
 ///     l := z - q * q
 ///   if l < q {
 ///       return l, q
-//   }
+///   }
 ///   return q, l - q
 /// }
-#[inline]
+#[cached]
 pub fn magic_unpair(z: u64) -> (u64, u64) {
     let q = (z as f64).sqrt().floor() as u64;
     let l = z - q * q;

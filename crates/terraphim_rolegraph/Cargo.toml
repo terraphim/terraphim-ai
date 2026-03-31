@@ -18,6 +18,7 @@ terraphim_types = { path = "../terraphim_types", version = "1.0.0" }
 ahash = { version = "0.8.3", features = ["serde"] }
 aho-corasick = "1.0.2"
 anyhow = { version = "1.0", optional = true }
+cached = { version = "0.56", features = ["proc_macro"] }
 itertools = "0.14.0"
 log = "0.4.29"
 regex = "1.12.3"
