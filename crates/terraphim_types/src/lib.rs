@@ -73,7 +73,7 @@
 //! let mut thesaurus = Thesaurus::new("programming".to_string());
 //! thesaurus.insert(
 //!     NormalizedTermValue::from("rust"),
-//!     NormalizedTerm::new(1, NormalizedTermValue::from("rust programming language"))
+//!     NormalizedTerm::new_with_uuid(NormalizedTermValue::from("rust programming language"))
 //!         .with_url("https://rust-lang.org".to_string())
 //! );
 //! ```
@@ -106,8 +106,8 @@ pub use persona::{CharacteristicDef, PersonaDefinition, PersonaLoadError, SfiaSk
 
 use ahash::AHashMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use std::collections::HashSet;
 use std::collections::hash_map::Iter;
+use std::collections::HashSet;
 use std::fmt::{self, Display, Formatter};
 use std::iter::IntoIterator;
 use std::ops::{Deref, DerefMut};
@@ -271,21 +271,14 @@ impl AsRef<[u8]> for NormalizedTermValue {
     }
 }
 
-// FIXME: this can be greatly improved, ID only shall be unique per KG
-use std::sync::atomic::{AtomicU64, Ordering};
-static INT_SEQ: AtomicU64 = AtomicU64::new(1);
-fn get_int_id() -> u64 {
-    INT_SEQ.fetch_add(1, Ordering::SeqCst)
-}
-
 /// A normalized term is a higher-level term that has been normalized
 ///
 /// It holds a unique identifier to an underlying and the normalized value.
 /// The `display_value` field stores the original case for output purposes.
 #[derive(Debug, Deserialize, Serialize, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct NormalizedTerm {
-    /// Unique identifier for the normalized term
-    pub id: u64,
+    /// Unique identifier for the normalized term (UUID)
+    pub id: String,
     /// The normalized value (lowercase, used for case-insensitive matching)
     // This field is currently called `nterm` in the JSON
     #[serde(rename = "nterm")]
@@ -301,9 +294,20 @@ pub struct NormalizedTerm {
 impl NormalizedTerm {
     /// Create a new normalized term with the given id and value.
     /// The display_value will be None (falls back to value for output).
-    pub fn new(id: u64, value: NormalizedTermValue) -> Self {
+    pub fn new(id: impl Into<String>, value: NormalizedTermValue) -> Self {
         Self {
-            id,
+            id: id.into(),
+            value,
+            display_value: None,
+            url: None,
+        }
+    }
+
+    /// Create a new normalized term with a generated UUID.
+    /// The display_value will be None (falls back to value for output).
+    pub fn new_with_uuid(value: NormalizedTermValue) -> Self {
+        Self {
+            id: uuid::Uuid::new_v4().to_string(),
             value,
             display_value: None,
             url: None,
@@ -340,16 +344,25 @@ impl NormalizedTerm {
 /// "Machine Learning"
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Concept {
-    /// A unique identifier for the concept
-    pub id: u64,
+    /// A unique identifier for the concept (UUID)
+    pub id: String,
     /// The normalized concept
     pub value: NormalizedTermValue,
 }
 
 impl Concept {
+    /// Create a new concept with a generated UUID.
     pub fn new(value: NormalizedTermValue) -> Self {
         Self {
-            id: get_int_id(),
+            id: uuid::Uuid::new_v4().to_string(),
+            value,
+        }
+    }
+
+    /// Create a new concept with a specific ID.
+    pub fn with_id(id: impl Into<String>, value: NormalizedTermValue) -> Self {
+        Self {
+            id: id.into(),
             value,
         }
     }
@@ -515,8 +528,8 @@ impl Document {
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Edge {
-    /// ID of the edge
-    pub id: u64,
+    /// ID of the edge (String for flexibility)
+    pub id: String,
     /// Rank of the edge
     pub rank: u64,
     /// A hashmap of `document_id` to `rank`
@@ -528,11 +541,11 @@ pub struct Edge {
 }
 
 impl Edge {
-    pub fn new(id: u64, document_id: String) -> Self {
+    pub fn new(id: impl Into<String>, document_id: String) -> Self {
         let mut doc_hash = AHashMap::new();
         doc_hash.insert(document_id, 1);
         Self {
-            id,
+            id: id.into(),
             rank: 1,
             doc_hash,
             #[cfg(feature = "medical")]
@@ -546,12 +559,12 @@ impl Edge {
 /// Each node can have multiple edges to other nodes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct Node {
-    /// Unique identifier of the node
-    pub id: u64,
+    /// Unique identifier of the node (String for flexibility)
+    pub id: String,
     /// Number of co-occurrences
     pub rank: u64,
     /// List of connected edges
-    pub connected_with: HashSet<u64>,
+    pub connected_with: HashSet<String>,
     /// Medical node type (only available with the `medical` feature)
     #[cfg(feature = "medical")]
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -568,11 +581,11 @@ pub struct Node {
 
 impl Node {
     /// Create a new node with a given id and edge
-    pub fn new(id: u64, edge: Edge) -> Self {
+    pub fn new(id: impl Into<String>, edge: Edge) -> Self {
         let mut connected_with = HashSet::new();
         connected_with.insert(edge.id);
         Self {
-            id,
+            id: id.into(),
             rank: 1,
             connected_with,
             #[cfg(feature = "medical")]
@@ -800,7 +813,11 @@ impl QualityScore {
             count += 1;
         }
 
-        if count == 0 { 0.0 } else { sum / count as f64 }
+        if count == 0 {
+            0.0
+        } else {
+            sum / count as f64
+        }
     }
 }
 
@@ -817,7 +834,7 @@ pub struct IndexedDocument {
     /// Tags, which are nodes turned into concepts for human readability
     pub tags: Vec<String>,
     /// List of node IDs for validation of matching
-    pub nodes: Vec<u64>,
+    pub nodes: Vec<String>,
     /// Quality scores for K/L/S dimensions
     #[serde(default)]
     pub quality_score: Option<QualityScore>,
@@ -3065,7 +3082,7 @@ mod tests {
             matched_edges: vec![],
             rank: 10,
             tags: vec!["rust".to_string()],
-            nodes: vec![1, 2],
+            nodes: vec!["1".to_string(), "2".to_string()],
             quality_score: Some(QualityScore {
                 knowledge: Some(0.8),
                 learning: Some(0.6),
@@ -3104,12 +3121,13 @@ mod tests {
     fn test_indexed_document_serialization_backward_compat() {
         // Test that IndexedDocument without quality_score deserializes correctly
         // This simulates old data that doesn't have the quality_score field
+        // NOTE: After migrating to String IDs, node IDs are now strings
         let json = r#"{
             "id": "doc-1",
             "matched_edges": [],
             "rank": 5,
             "tags": ["test"],
-            "nodes": [1]
+            "nodes": ["1"]
         }"#;
 
         let doc: IndexedDocument = serde_json::from_str(json).unwrap();
