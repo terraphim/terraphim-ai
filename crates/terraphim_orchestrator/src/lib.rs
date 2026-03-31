@@ -1164,6 +1164,9 @@ Comment: {}",
 
     /// Periodic reconciliation: detect exits, check cron, evaluate drift, drain output.
     async fn reconcile_tick(&mut self) {
+        // Check wall-clock timeouts and respawn with fallback
+        self.poll_wall_timeouts().await;
+
         // 1. Poll all active agents for exit and handle exits per layer
         self.poll_agent_exits().await;
 
@@ -1266,6 +1269,64 @@ Comment: {}",
                     self.stop_agent(&agent_name).await;
                 }
                 _ => {}
+            }
+        }
+    }
+
+    /// Kill agents that have exceeded their wall-clock timeout and respawn with fallback.
+    async fn poll_wall_timeouts(&mut self) {
+        let mut timed_out: Vec<String> = Vec::new();
+        for (name, managed) in &self.active_agents {
+            if let Some(max_secs) = managed.definition.max_cpu_seconds {
+                let elapsed = managed.started_at.elapsed();
+                if elapsed > Duration::from_secs(max_secs) {
+                    warn!(
+                        agent = %name,
+                        elapsed_secs = elapsed.as_secs(),
+                        max_wall_secs = max_secs,
+                        "agent exceeded wall-clock timeout, killing for fallback respawn"
+                    );
+                    timed_out.push(name.clone());
+                }
+            }
+        }
+
+        for name in timed_out {
+            if let Some(managed) = self.active_agents.remove(&name) {
+                let def = managed.definition.clone();
+
+                // Kill the process
+                if let Err(e) = managed.handle.kill().await {
+                    error!(agent = %name, error = %e, "failed to kill timed-out agent");
+                }
+
+                // Try respawn with fallback if configured
+                if def.fallback_provider.is_some() {
+                    info!(
+                        agent = %name,
+                        fallback_model = ?def.fallback_model,
+                        "respawning timed-out agent with fallback provider"
+                    );
+                    let mut fallback_def = def.clone();
+                    // Swap provider to fallback (fallback_provider is a CLI tool path)
+                    if let Some(ref fb_provider) = def.fallback_provider {
+                        fallback_def.cli_tool = fb_provider.clone();
+                    }
+                    if let Some(ref fb_model) = def.fallback_model {
+                        fallback_def.model = Some(fb_model.clone());
+                    }
+                    // Clear provider field so model composition uses the new cli_tool
+                    fallback_def.provider = Some("fallback".to_string());
+                    // Clear fallback to prevent infinite loops
+                    fallback_def.fallback_provider = None;
+                    fallback_def.fallback_model = None;
+
+                    if let Err(e) = self.spawn_agent(&fallback_def).await {
+                        error!(agent = %name, error = %e, "failed to respawn with fallback");
+                    }
+                } else {
+                    info!(agent = %name, "no fallback configured, agent timed out permanently");
+                }
             }
         }
     }
