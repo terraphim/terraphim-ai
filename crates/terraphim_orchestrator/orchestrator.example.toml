@@ -48,3 +48,48 @@ layer = "Growth"
 cli_tool = "claude"
 task = "Review the latest PR for code quality, security issues, and adherence to project conventions."
 capabilities = ["code-review", "architecture"]
+
+# --- Flow DAG Examples ---
+
+# Example: Compound Review v2 using Flow DAG
+# This replaces the legacy compound_review with a multi-step DAG workflow
+[[flows]]
+name = "compound-review-v2"
+schedule = "0 2 * * *"          # 2 AM daily
+repo_path = "/Users/alex/projects/terraphim/terraphim-ai"
+base_branch = "main"
+timeout_secs = 7200
+
+[[flows.steps]]
+name = "gather-changes"
+kind = "action"
+command = "git diff main..HEAD --name-only > /tmp/changed_files.txt && cat /tmp/changed_files.txt"
+timeout_secs = 300
+on_fail = "abort"
+
+[[flows.steps]]
+name = "analyze-architecture"
+kind = "agent"
+cli_tool = "claude"
+model = "sonnet"
+task = "Review the architecture changes in the modified files. Focus on design patterns, API contracts, and system boundaries."
+timeout_secs = 900
+on_fail = "skip_failed"
+
+[[flows.steps]]
+name = "check-security"
+kind = "agent"
+cli_tool = "opencode"
+model = "kimi-for-coding/k2p5"
+task = "Perform a security audit on the changed code. Look for injection vulnerabilities, unsafe deserialization, and authentication bypasses."
+timeout_secs = 600
+on_fail = "continue"
+
+[[flows.steps]]
+name = "gate-approval"
+kind = "gate"
+condition = "{{steps.analyze-architecture.exit_code}} == 0"
+
+[[flows.steps]]
+name = "checkpoint-completed"
+kind = "checkpoint"

@@ -84,6 +84,9 @@ impl TimeMode {
                             // Compound review is handled by orchestrator
                             info!("compound review scheduled");
                         }
+                        ScheduleEvent::Flow(flow) => {
+                            info!(flow_name = %flow.name, "flow scheduled");
+                        }
                     }
                 }
                 _ = shutdown.changed() => {

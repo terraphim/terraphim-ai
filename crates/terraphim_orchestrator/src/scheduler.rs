@@ -5,6 +5,7 @@ use tokio::sync::mpsc;
 
 use crate::config::{AgentDefinition, AgentLayer};
 use crate::error::OrchestratorError;
+use crate::flow::config::FlowDefinition;
 
 /// Schedule event indicating an agent should be spawned or stopped.
 #[derive(Debug, Clone)]
@@ -15,6 +16,8 @@ pub enum ScheduleEvent {
     Stop { agent_name: String },
     /// Time to run compound review.
     CompoundReview,
+    /// Time to run a flow.
+    Flow(Box<FlowDefinition>),
 }
 
 /// A parsed schedule entry for one agent.

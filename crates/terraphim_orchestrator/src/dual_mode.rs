@@ -438,6 +438,9 @@ async fn run_time_mode(components: TimeModeComponents, state: SharedState) {
                     ScheduleEvent::CompoundReview => {
                         info!("compound review triggered");
                     }
+                    ScheduleEvent::Flow(flow) => {
+                        info!(flow_name = %flow.name, "flow triggered");
+                    }
                 }
             }
             _ = shutdown_rx.changed() => {

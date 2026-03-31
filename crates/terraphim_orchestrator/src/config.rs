@@ -62,6 +62,12 @@ pub struct OrchestratorConfig {
     /// Used to inject skill_chain content into agent prompts.
     #[serde(default)]
     pub skill_data_dir: Option<PathBuf>,
+    /// Flow DAG definitions for multi-step workflows.
+    #[serde(default)]
+    pub flows: Vec<crate::flow::config::FlowDefinition>,
+    /// Directory for flow run state persistence.
+    #[serde(default)]
+    pub flow_state_dir: Option<PathBuf>,
 }
 
 /// Lightweight reference to an SFIA skill code and level.
@@ -1267,5 +1273,94 @@ issue_number = 42
 "#;
         let config = OrchestratorConfig::from_toml(toml_str).unwrap();
         assert!(config.validate().is_ok());
+    }
+
+    #[test]
+    fn test_config_with_flows() {
+        let toml_str = r#"
+working_dir = "/tmp"
+flow_state_dir = "/tmp/flow-states"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+
+[[flows]]
+name = "test-flow"
+repo_path = "/home/user/project"
+
+[[flows.steps]]
+name = "build"
+kind = "action"
+command = "cargo build"
+
+[[flows.steps]]
+name = "test"
+kind = "action"
+command = "cargo test"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+
+        // Check flows parsed correctly
+        assert_eq!(config.flows.len(), 1);
+        assert_eq!(config.flows[0].name, "test-flow");
+        assert_eq!(config.flows[0].repo_path, "/home/user/project");
+        assert_eq!(config.flows[0].steps.len(), 2);
+
+        // Check step data
+        assert_eq!(config.flows[0].steps[0].name, "build");
+        assert_eq!(
+            config.flows[0].steps[0].kind,
+            crate::flow::config::StepKind::Action
+        );
+        assert_eq!(
+            config.flows[0].steps[0].command,
+            Some("cargo build".to_string())
+        );
+
+        assert_eq!(config.flows[0].steps[1].name, "test");
+        assert_eq!(
+            config.flows[0].steps[1].command,
+            Some("cargo test".to_string())
+        );
+
+        // Check flow_state_dir
+        assert_eq!(
+            config.flow_state_dir,
+            Some(PathBuf::from("/tmp/flow-states"))
+        );
+    }
+
+    #[test]
+    fn test_config_without_flows() {
+        // Existing config without flows section should still parse
+        let toml_str = r#"
+working_dir = "/tmp"
+
+[nightwatch]
+
+[compound_review]
+schedule = "0 0 * * *"
+repo_path = "/tmp"
+
+[[agents]]
+name = "a"
+layer = "Safety"
+cli_tool = "echo"
+task = "t"
+"#;
+        let config = OrchestratorConfig::from_toml(toml_str).unwrap();
+
+        // Flows should be empty by default
+        assert!(config.flows.is_empty());
+        assert!(config.flow_state_dir.is_none());
     }
 }
