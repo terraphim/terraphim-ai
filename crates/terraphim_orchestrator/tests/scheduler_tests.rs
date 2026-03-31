@@ -21,6 +21,8 @@ fn make_agent(name: &str, layer: AgentLayer, schedule: Option<&str>) -> AgentDef
         grace_period_secs: None,
         max_cpu_seconds: None,
         pre_check: None,
+
+        gitea_issue: None,
     }
 }
 
