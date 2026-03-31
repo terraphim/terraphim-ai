@@ -44,6 +44,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                gitea_issue: None,
             },
             AgentDefinition {
                 name: "sync".to_string(),
@@ -64,6 +65,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                gitea_issue: None,
             },
             AgentDefinition {
                 name: "reviewer".to_string(),
@@ -84,6 +86,7 @@ fn test_config() -> OrchestratorConfig {
                 fallback_model: None,
                 grace_period_secs: None,
                 max_cpu_seconds: None,
+                gitea_issue: None,
             },
         ],
         restart_cooldown_secs: 60,
@@ -93,6 +96,7 @@ fn test_config() -> OrchestratorConfig {
         persona_data_dir: None,
         flows: vec![],
         flow_state_dir: None,
+        gitea: None,
     }
 }
 
