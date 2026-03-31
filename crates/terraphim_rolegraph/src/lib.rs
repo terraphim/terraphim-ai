@@ -283,16 +283,7 @@ pub struct RoleGraph {
 
 impl RoleGraph {
     /// Creates a new `RoleGraph` with the given role and thesaurus
-    pub async fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
-        Self::new_sync(role, thesaurus)
-    }
-
-    /// Creates a new `RoleGraph` synchronously.
-    ///
-    /// This is identical to [`new`] but does not require an async runtime.
-    /// The async version exists for API compatibility; the actual construction
-    /// is fully synchronous.
-    pub fn new_sync(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
+    pub fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
         let (ac, aho_corasick_values, ac_reverse_nterm) = Self::build_aho_corasick(&thesaurus)?;
 
         Ok(Self {
@@ -312,7 +303,11 @@ impl RoleGraph {
     /// Build Aho-Corasick automata from thesaurus
     fn build_aho_corasick(
         thesaurus: &Thesaurus,
-    ) -> Result<(AhoCorasick, Vec<String>, AHashMap<String, NormalizedTermValue>)> {
+    ) -> Result<(
+        AhoCorasick,
+        Vec<String>,
+        AHashMap<String, NormalizedTermValue>,
+    )> {
         let mut keys = Vec::new();
         let mut values = Vec::new();
         let mut ac_reverse_nterm = AHashMap::new();
@@ -1048,7 +1043,12 @@ impl RoleGraph {
         self.documents.contains_key(document_id)
     }
 
-    pub fn add_or_update_document(&mut self, document_id: &str, x: impl AsRef<str>, y: impl AsRef<str>) {
+    pub fn add_or_update_document(
+        &mut self,
+        document_id: &str,
+        x: impl AsRef<str>,
+        y: impl AsRef<str>,
+    ) {
         let edge_id = magic_pair(&x, &y);
         let edge = self.init_or_update_edge(edge_id, document_id);
         self.init_or_update_node(x, &edge);
@@ -1294,7 +1294,7 @@ pub fn magic_unpair(z: impl AsRef<str>) -> (String, String) {
 /// use terraphim_rolegraph::{RoleGraph, SerializableRoleGraph};
 ///
 /// // Create a RoleGraph
-/// let rolegraph = RoleGraph::new(role.into(), thesaurus).await?;
+/// let rolegraph = RoleGraph::new(role.into(), thesaurus)?;
 ///
 /// // Convert to serializable representation
 /// let serializable = rolegraph.to_serializable();
@@ -1386,9 +1386,7 @@ mod tests {
     async fn test_find_matching_node_idss() {
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
-            .await
-            .unwrap();
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await).unwrap();
         let matches = rolegraph.find_matching_node_ids(query);
         // Updated: automata now finds more matches including duplicates from repeated terms
         assert_eq!(matches.len(), 7);
@@ -1398,9 +1396,7 @@ mod tests {
     async fn test_find_matching_node_idss_ac_values() {
         let query = "life cycle framework I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
-            .await
-            .unwrap();
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await).unwrap();
         println!("rolegraph: {:?}", rolegraph);
         let matches = rolegraph.find_matching_node_ids(query);
         println!("matches: {:?}", matches);
@@ -1522,9 +1518,7 @@ mod tests {
     #[test]
     async fn test_rolegraph() {
         let role = "system operator".to_string();
-        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
-            .await
-            .unwrap();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await).unwrap();
         let document_id = Ulid::new().to_string();
         let query = "I am a text with the word Life cycle concepts and bar and Trained operators and maintainers, project direction, some bingo words Paradigm Map and project planning, then again: some bingo words Paradigm Map and project planning, then repeats: Trained operators and maintainers, project direction";
         let matches = rolegraph.find_matching_node_ids(query);
@@ -1581,9 +1575,7 @@ mod tests {
     #[ignore]
     async fn test_is_all_terms_connected_by_path_true() {
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
-            .await
-            .unwrap();
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await).unwrap();
         let text = "Life cycle concepts ... Paradigm Map ... project planning";
         assert!(rolegraph.is_all_terms_connected_by_path(text));
     }
@@ -1591,9 +1583,7 @@ mod tests {
     #[test]
     async fn test_is_all_terms_connected_by_path_false() {
         let role = "system operator".to_string();
-        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
-            .await
-            .unwrap();
+        let rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await).unwrap();
         // Intentionally pick terms unlikely to be connected together
         let text = "Trained operators ... bar";
         // Depending on fixture this might be connected; if so, adjust to rare combo
@@ -1609,7 +1599,6 @@ mod tests {
         let role_name = "Test Role".to_string();
         let thesaurus = load_sample_thesaurus().await;
         let mut rolegraph = RoleGraph::new(role_name.into(), thesaurus.clone())
-            .await
             .expect("Failed to create rolegraph");
 
         // Verify thesaurus is loaded properly
@@ -1896,9 +1885,7 @@ mod tests {
     async fn test_graph_stats_serialization() {
         // Create a populated rolegraph
         let role = "stats test role".to_string();
-        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await)
-            .await
-            .unwrap();
+        let mut rolegraph = RoleGraph::new(role.into(), load_sample_thesaurus().await).unwrap();
 
         // Add test data with content that should match thesaurus terms
         let document_id = Ulid::new().to_string();
@@ -1967,7 +1954,7 @@ mod tests {
         // Test with single node
         let role = "single node test".to_string();
         let thesaurus = load_sample_thesaurus().await;
-        let mut single_rolegraph = RoleGraph::new(role.into(), thesaurus).await.unwrap();
+        let mut single_rolegraph = RoleGraph::new(role.into(), thesaurus).unwrap();
 
         let document_id = Ulid::new().to_string();
         let simple_document = Document {
@@ -2109,7 +2096,7 @@ mod tests {
         // Create rolegraph
         let role = "test role".to_string();
         let thesaurus = Thesaurus::new("test".to_string());
-        let mut rolegraph = RoleGraph::new(role.into(), thesaurus).await.unwrap();
+        let mut rolegraph = RoleGraph::new(role.into(), thesaurus).unwrap();
 
         // Load trigger index with a pinned node
         let mut triggers = AHashMap::new();
@@ -2126,7 +2113,7 @@ mod tests {
     async fn serializable_roundtrip_preserves_triggers() {
         let role = "test role".to_string();
         let thesaurus = Thesaurus::new("test".to_string());
-        let mut rolegraph = RoleGraph::new(role.into(), thesaurus).await.unwrap();
+        let mut rolegraph = RoleGraph::new(role.into(), thesaurus).unwrap();
 
         // Load trigger index and pinned nodes
         let mut triggers = AHashMap::new();

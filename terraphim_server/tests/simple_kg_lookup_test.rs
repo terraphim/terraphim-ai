@@ -123,7 +123,7 @@ async fn test_rolegraph_find_documents_for_term_direct() {
 
     // Create RoleGraph
     let role_name = RoleName::new("Test");
-    match RoleGraph::new(role_name, thesaurus).await {
+    match RoleGraph::new(role_name, thesaurus) {
         Ok(rolegraph) => {
             println!("✅ Successfully created RoleGraph");
 

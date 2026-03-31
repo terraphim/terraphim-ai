@@ -179,8 +179,7 @@ impl TerraphimService {
                                 }
                             }
 
-                            let rolegraph =
-                                RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone());
                             match rolegraph {
                                 Ok(rolegraph) => {
                                     let rolegraph_value = RoleGraphSync::from(rolegraph);
@@ -241,8 +240,7 @@ impl TerraphimService {
                                         }
 
                                         let rolegraph =
-                                            RoleGraph::new(role_name.clone(), thesaurus.clone())
-                                                .await;
+                                            RoleGraph::new(role_name.clone(), thesaurus.clone());
                                         match rolegraph {
                                             Ok(rolegraph) => {
                                                 let rolegraph_value =
@@ -344,8 +342,7 @@ impl TerraphimService {
                                 }
                             }
 
-                            let rolegraph =
-                                RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus.clone());
                             match rolegraph {
                                 Ok(rolegraph) => {
                                     let rolegraph_value = RoleGraphSync::from(rolegraph);
@@ -437,7 +434,7 @@ impl TerraphimService {
                                 }
 
                                 let rolegraph =
-                                    RoleGraph::new(role_name.clone(), thesaurus.clone()).await;
+                                    RoleGraph::new(role_name.clone(), thesaurus.clone());
                                 match rolegraph {
                                     Ok(rolegraph) => {
                                         let rolegraph_value = RoleGraphSync::from(rolegraph);

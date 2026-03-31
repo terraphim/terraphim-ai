@@ -895,7 +895,6 @@ impl TerraphimAgent {
         let role_name = RoleName::from(role_config.name.as_str());
         let thesaurus = Thesaurus::new("default".to_string());
         RoleGraph::new(role_name, thesaurus)
-            .await
             .map_err(|e| MultiAgentError::PersistenceError(e.to_string()))
     }
 

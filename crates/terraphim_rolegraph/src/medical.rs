@@ -63,8 +63,8 @@ impl MedicalRoleGraph {
     ///
     /// The medical-specific data structures start empty. Use
     /// [`add_medical_node`] and [`add_medical_edge`] to populate them.
-    pub async fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
-        let role_graph = RoleGraph::new(role, thesaurus).await?;
+    pub fn new(role: RoleName, thesaurus: Thesaurus) -> Result<Self> {
+        let role_graph = RoleGraph::new(role, thesaurus)?;
         Ok(Self {
             role_graph,
             node_types: AHashMap::new(),
@@ -86,7 +86,7 @@ impl MedicalRoleGraph {
     /// thesaurus matching.
     pub fn new_empty() -> Result<Self> {
         let empty_thesaurus = Thesaurus::new("empty".to_string());
-        let role_graph = RoleGraph::new_sync("empty".into(), empty_thesaurus)?;
+        let role_graph = RoleGraph::new("empty".into(), empty_thesaurus)?;
         Ok(Self {
             role_graph,
             node_types: AHashMap::new(),

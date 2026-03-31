@@ -249,7 +249,7 @@ pub async fn axum_server(server_hostname: SocketAddr, mut config_state: ConfigSt
                                 files.len()
                             );
                             // Create rolegraph
-                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await?;
+                            let rolegraph = RoleGraph::new(role_name.clone(), thesaurus)?;
                             log::info!("Successfully created rolegraph for role '{}'", role_name);
 
                             // Index documents from knowledge graph files into the rolegraph

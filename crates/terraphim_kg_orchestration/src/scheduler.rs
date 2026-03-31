@@ -112,7 +112,7 @@ impl TaskScheduler {
             }
         };
 
-        let role_graph = RoleGraph::new(role_name, thesaurus).await.map_err(|e| {
+        let role_graph = RoleGraph::new(role_name, thesaurus).map_err(|e| {
             OrchestrationError::System(format!("Failed to create role graph: {}", e))
         })?;
 

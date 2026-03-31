@@ -301,7 +301,6 @@ impl SupervisionTreeOrchestrator {
                 .map_err(|e| OrchestrationError::SystemError(e.to_string()))?;
         let role_graph = Arc::new(
             terraphim_rolegraph::RoleGraph::new(role_name, thesaurus)
-                .await
                 .map_err(|e| OrchestrationError::SystemError(e.to_string()))?,
         );
 

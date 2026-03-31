@@ -938,8 +938,7 @@ impl ConfigState {
                         match load_thesaurus(automata_path).await {
                             Ok(thesaurus) => {
                                 log::info!("Successfully loaded thesaurus from automata path");
-                                let rolegraph =
-                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus)?;
                                 roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
                             }
                             Err(e) => {
@@ -963,8 +962,7 @@ impl ConfigState {
                                     "Successfully built thesaurus from local KG for role {}",
                                     role_name
                                 );
-                                let rolegraph =
-                                    RoleGraph::new(role_name.clone(), thesaurus).await?;
+                                let rolegraph = RoleGraph::new(role_name.clone(), thesaurus)?;
                                 roles.insert(role_name.clone(), RoleGraphSync::from(rolegraph));
                             }
                             Err(e) => {

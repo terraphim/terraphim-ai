@@ -40,8 +40,8 @@ pub mod handoff;
 pub mod mention;
 pub mod mode;
 pub mod nightwatch;
-pub mod persona;
 pub mod output_poster;
+pub mod persona;
 pub mod scheduler;
 pub mod scope;
 
@@ -52,19 +52,19 @@ pub use config::{
     MentionConfig, NightwatchConfig, OrchestratorConfig, TrackerConfig, TrackerStates,
     WorkflowConfig,
 };
-pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionTracker};
 pub use cost_tracker::{BudgetVerdict, CostSnapshot, CostTracker};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
 pub use handoff::{HandoffBuffer, HandoffContext, HandoffLedger};
+pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionTracker};
 pub use mode::{IssueMode, TimeMode};
-pub use output_poster::OutputPoster;
 pub use nightwatch::{
     dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
     DriftAlert, DriftMetrics, DriftScore, DualPanelResult, NightwatchMonitor, RateLimitTracker,
     RateLimitWindow, ReasoningCertificate,
 };
+pub use output_poster::OutputPoster;
 pub use persona::{MetapromptRenderError, MetapromptRenderer, PersonaRegistry};
 pub use scheduler::{ScheduleEvent, TimeScheduler};
 
@@ -714,7 +714,9 @@ impl AgentOrchestrator {
                             );
 
                             // Spawn the mentioned agent
-                            if let Some(def) = agents.iter().find(|a| a.name == m.agent_name).cloned() {
+                            if let Some(def) =
+                                agents.iter().find(|a| a.name == m.agent_name).cloned()
+                            {
                                 let mut mention_def = def.clone();
                                 // Append mention context
                                 mention_def.task = format!(
@@ -727,7 +729,11 @@ Comment: {}",
                                     m.agent_name,
                                     m.issue_number,
                                     m.comment_id,
-                                    if m.comment_body.len() > 500 { &m.comment_body[..500] } else { &m.comment_body }
+                                    if m.comment_body.len() > 500 {
+                                        &m.comment_body[..500]
+                                    } else {
+                                        &m.comment_body
+                                    }
                                 );
                                 // Post output back to the same issue
                                 mention_def.gitea_issue = Some(m.issue_number);
@@ -798,7 +804,8 @@ Comment: {}",
         self.enforce_budgets().await;
 
         // 9. Poll active flows (non-blocking)
-        let completed_flows: Vec<String> = self.active_flows
+        let completed_flows: Vec<String> = self
+            .active_flows
             .iter()
             .filter(|(_, handle)| handle.is_finished())
             .map(|(name, _)| name.clone())
@@ -904,7 +911,10 @@ Comment: {}",
             // Post output to Gitea if configured
             if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
                 let exit_code = status.code();
-                if let Err(e) = poster.post_agent_output(name, issue, &output_lines, exit_code).await {
+                if let Err(e) = poster
+                    .post_agent_output(name, issue, &output_lines, exit_code)
+                    .await
+                {
                     warn!(agent = %name, issue = issue, error = %e, "failed to post output to Gitea");
                 }
             }
@@ -1076,8 +1086,12 @@ Comment: {}",
         let mut to_trigger: Vec<flow::config::FlowDefinition> = Vec::new();
 
         for flow_def in &self.config.flows {
-            let Some(ref schedule_str) = flow_def.schedule else { continue };
-            let Ok(schedule) = cron::Schedule::from_str(schedule_str) else { continue };
+            let Some(ref schedule_str) = flow_def.schedule else {
+                continue;
+            };
+            let Ok(schedule) = cron::Schedule::from_str(schedule_str) else {
+                continue;
+            };
 
             // Overlap prevention: skip if this flow is already active
             if self.active_flows.contains_key(&flow_def.name) {
@@ -1100,9 +1114,8 @@ Comment: {}",
         }
 
         for flow_def in to_trigger {
-            self.handle_schedule_event(
-                ScheduleEvent::Flow(Box::new(flow_def))
-            ).await;
+            self.handle_schedule_event(ScheduleEvent::Flow(Box::new(flow_def)))
+                .await;
         }
     }
 
@@ -1140,7 +1153,10 @@ Comment: {}",
             }
             ScheduleEvent::Flow(flow_def) => {
                 let flow_name = flow_def.name.clone();
-                let flow_state_dir = self.config.flow_state_dir.clone()
+                let flow_state_dir = self
+                    .config
+                    .flow_state_dir
+                    .clone()
                     .unwrap_or_else(|| PathBuf::from("/tmp/flow-states"));
                 let working_dir = self.config.compound_review.repo_path.clone();
                 let flow_def = *flow_def;
@@ -1839,10 +1855,16 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         config.flow_state_dir = None;
 
         let orch = AgentOrchestrator::new(config);
-        assert!(orch.is_ok(), "orchestrator should initialize with empty flows");
+        assert!(
+            orch.is_ok(),
+            "orchestrator should initialize with empty flows"
+        );
 
         let orch = orch.unwrap();
-        assert!(orch.active_flows.is_empty(), "active_flows should be empty initially");
+        assert!(
+            orch.active_flows.is_empty(),
+            "active_flows should be empty initially"
+        );
     }
 
     /// Test that flow scheduling overlap prevention works
@@ -1881,6 +1903,9 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
         assert!(orch.is_ok(), "orchestrator should initialize with flows");
 
         let orch = orch.unwrap();
-        assert!(orch.active_flows.is_empty(), "active_flows should be empty initially");
+        assert!(
+            orch.active_flows.is_empty(),
+            "active_flows should be empty initially"
+        );
     }
 }

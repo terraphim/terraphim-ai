@@ -86,7 +86,7 @@ async fn update_thesaurus(
     thesaurus: Thesaurus,
 ) -> Result<()> {
     log::debug!("Updating thesaurus for role: {}", role_name);
-    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus).await;
+    let rolegraph = RoleGraph::new(role_name.clone(), thesaurus);
     match rolegraph {
         Ok(rolegraph) => {
             let rolegraph_value = RoleGraphSync::from(rolegraph);

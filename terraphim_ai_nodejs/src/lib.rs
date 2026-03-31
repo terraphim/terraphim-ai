@@ -223,15 +223,11 @@ pub fn build_role_graph_from_json(
     )
   })?;
 
-  let role_graph = rt.block_on(async {
-    RoleGraph::new(role_name.into(), thesaurus)
-      .await
-      .map_err(|e| {
-        napi::Error::new(
-          Status::GenericFailure,
-          format!("Failed to create role graph: {}", e),
-        )
-      })
+  let role_graph = RoleGraph::new(role_name.into(), thesaurus).map_err(|e| {
+    napi::Error::new(
+      Status::GenericFailure,
+      format!("Failed to create role graph: {}", e),
+    )
   })?;
 
   // Convert to serializable form and serialize

@@ -2,8 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use pyo3::exceptions::{PyRuntimeError, PyValueError};
 use pyo3::prelude::*;
-use ::terraphim_automata::load_thesaurus_from_json;
-use ::terraphim_types::LogicalOperator;
+use terraphim_automata::load_thesaurus_from_json;
+use terraphim_types::LogicalOperator;
 
 // ---------------------------------------------------------------------------
 // Wrapper types
@@ -222,7 +222,10 @@ impl PyGraphStats {
     fn __repr__(&self) -> String {
         format!(
             "GraphStats(nodes={}, edges={}, documents={}, thesaurus={}, populated={})",
-            self.node_count, self.edge_count, self.document_count, self.thesaurus_size,
+            self.node_count,
+            self.edge_count,
+            self.document_count,
+            self.thesaurus_size,
             self.is_populated
         )
     }
@@ -271,7 +274,7 @@ impl PyRoleGraph {
     fn new(role_name: &str, thesaurus_json: &str) -> PyResult<Self> {
         let thesaurus = load_thesaurus_from_json(thesaurus_json)
             .map_err(|e| PyValueError::new_err(format!("Failed to load thesaurus: {}", e)))?;
-        let inner = ::terraphim_rolegraph::RoleGraph::new_sync(role_name.into(), thesaurus)
+        let inner = ::terraphim_rolegraph::RoleGraph::new(role_name.into(), thesaurus)
             .map_err(|e| PyRuntimeError::new_err(format!("Failed to create RoleGraph: {}", e)))?;
         Ok(PyRoleGraph { inner })
     }
@@ -280,8 +283,7 @@ impl PyRoleGraph {
 
     /// Insert a document into the knowledge graph.
     fn insert_document(&mut self, document_id: &str, document: PyDocument) {
-        self.inner
-            .insert_document(document_id, document.into());
+        self.inner.insert_document(document_id, document.into());
     }
 
     /// Check if a document is already indexed.
@@ -291,7 +293,9 @@ impl PyRoleGraph {
 
     /// Get an indexed document by ID, or None if not found.
     fn get_document(&self, document_id: &str) -> Option<PyIndexedDocument> {
-        self.inner.get_document(document_id).map(PyIndexedDocument::from)
+        self.inner
+            .get_document(document_id)
+            .map(PyIndexedDocument::from)
     }
 
     /// Get all indexed documents as a list of (id, IndexedDocument) tuples.

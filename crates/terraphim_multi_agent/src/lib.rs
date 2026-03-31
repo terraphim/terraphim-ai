@@ -128,7 +128,6 @@ pub mod test_utils {
         use terraphim_types::Thesaurus;
         let empty_thesaurus = Thesaurus::new("test_thesaurus".to_string());
         let rolegraph = terraphim_rolegraph::RoleGraph::new("TestRole".into(), empty_thesaurus)
-            .await
             .map_err(|e| {
                 MultiAgentError::KnowledgeGraphError(format!(
                     "Failed to create test rolegraph: {}",
