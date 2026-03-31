@@ -713,6 +713,35 @@ impl AgentOrchestrator {
                                 "dispatching mention-driven task"
                             );
 
+                            // Spawn the mentioned agent
+                            if let Some(def) = agents.iter().find(|a| a.name == m.agent_name).cloned() {
+                                let mut mention_def = def.clone();
+                                // Append mention context
+                                mention_def.task = format!(
+                                    "{}
+
+## Mention Context
+Triggered by @adf:{} mention in issue #{} (comment {}).
+Comment: {}",
+                                    def.task,
+                                    m.agent_name,
+                                    m.issue_number,
+                                    m.comment_id,
+                                    if m.comment_body.len() > 500 { &m.comment_body[..500] } else { &m.comment_body }
+                                );
+                                // Post output back to the same issue
+                                mention_def.gitea_issue = Some(m.issue_number);
+
+                                if let Err(e) = self.spawn_agent(&mention_def).await {
+                                    tracing::error!(
+                                        agent = %m.agent_name,
+                                        issue = m.issue_number,
+                                        error = %e,
+                                        "failed to spawn mentioned agent"
+                                    );
+                                }
+                            }
+
                             self.mention_tracker.mark_processed(&m);
                             self.mention_tracker.increment_depth(issue_number);
                         }
