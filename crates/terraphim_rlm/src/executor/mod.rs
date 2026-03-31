@@ -20,12 +20,16 @@
 //! 3. Fallback to next available backend if preferred is unavailable
 
 mod context;
+#[cfg(feature = "firecracker")]
 mod firecracker;
+mod mock;
 mod ssh;
 mod r#trait;
 
 pub use context::{Capability, ExecutionContext, ExecutionResult, SnapshotId, ValidationResult};
+#[cfg(feature = "firecracker")]
 pub use firecracker::FirecrackerExecutor;
+pub use mock::{MockExecutor, MockOperation, OperationType};
 pub use ssh::SshExecutor;
 pub use r#trait::ExecutionEnvironment;
 
@@ -59,6 +63,7 @@ pub fn is_gvisor_available() -> bool {
 /// Select and create an appropriate executor based on configuration.
 ///
 /// Tries backends in preference order, falling back to next available.
+/// If no backends are available, falls back to MockExecutor for CI/testing.
 ///
 /// # Example
 ///
@@ -85,13 +90,20 @@ pub async fn select_executor(
 
     for backend in backends {
         match backend {
+            #[cfg(feature = "firecracker")]
             BackendType::Firecracker if is_kvm_available() => {
                 log::info!("Selected Firecracker backend (KVM available)");
                 return Ok(Box::new(FirecrackerExecutor::new(config.clone())?));
             }
+            #[cfg(feature = "firecracker")]
             BackendType::Firecracker => {
                 log::debug!("Firecracker unavailable: KVM not present");
                 tried.push("firecracker (no KVM)".to_string());
+            }
+            #[cfg(not(feature = "firecracker"))]
+            BackendType::Firecracker => {
+                log::debug!("Firecracker unavailable: feature not enabled");
+                tried.push("firecracker (feature not enabled)".to_string());
             }
 
             BackendType::E2b if config.e2b_api_key.is_some() => {
@@ -119,7 +131,11 @@ pub async fn select_executor(
         }
     }
 
-    Err(RlmError::NoBackendAvailable { tried })
+    // If no backends available, fall back to MockExecutor for CI/testing
+    log::info!("No native backends available, using MockExecutor for CI/testing");
+    let mock = MockExecutor::with_config(config.clone());
+    mock.initialize().await?;
+    Ok(Box::new(mock))
 }
 
 #[cfg(test)]

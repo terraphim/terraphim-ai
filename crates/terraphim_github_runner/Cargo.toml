@@ -12,6 +12,7 @@ default = []
 github-runner = [
     "dep:terraphim_multi_agent",
     "dep:terraphim_agent_evolution",
+    "dep:terraphim-firecracker",
 ]
 
 [dependencies]
@@ -36,8 +37,8 @@ reqwest = { version = "0.12", features = ["json", "rustls-tls"], default-feature
 terraphim_multi_agent = { path = "../terraphim_multi_agent", optional = true }
 terraphim_agent_evolution = { path = "../terraphim_agent_evolution", optional = true }
 
-# Firecracker VM integration
-terraphim-firecracker = { path = "../../terraphim_firecracker" }
+# Firecracker VM integration (feature-gated - requires fcctl-core / KVM)
+terraphim-firecracker = { path = "../../terraphim_firecracker", optional = true }
 
 # LLM integration for workflow understanding
 terraphim_service = { path = "../terraphim_service" }

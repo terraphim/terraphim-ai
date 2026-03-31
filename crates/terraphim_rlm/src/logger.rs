@@ -643,7 +643,6 @@ impl TrajectoryLogger {
     }
 
     /// Log command executed.
-    #[allow(clippy::too_many_arguments)]
     pub fn log_command_executed(
         &self,
         session_id: SessionId,
@@ -677,7 +676,6 @@ impl TrajectoryLogger {
     }
 
     /// Log query complete.
-    #[allow(clippy::too_many_arguments)]
     pub fn log_query_complete(
         &self,
         session_id: SessionId,

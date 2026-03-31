@@ -22,15 +22,14 @@ anyhow.workspace = true
 log.workspace = true
 
 # Terraphim crates
-terraphim_firecracker = { package = "terraphim-firecracker", path = "../../terraphim_firecracker" }
+terraphim_firecracker = { package = "terraphim-firecracker", path = "../../terraphim_firecracker", optional = true }
 terraphim_service = { path = "../terraphim_service", optional = true }
 terraphim_automata = { path = "../terraphim_automata", optional = true }
 terraphim_types = { path = "../terraphim_types", optional = true }
 terraphim_rolegraph = { path = "../terraphim_rolegraph", optional = true }
 terraphim_agent_supervisor = { path = "../terraphim_agent_supervisor", optional = true }
 
-# Firecracker-rust core for VM and snapshot management
-fcctl-core = { git = "https://github.com/terraphim/firecracker-rust", branch = "main" }
+fcctl-core = { git = "https://github.com/terraphim/firecracker-rust", branch = "main", optional = true }
 
 # Async utilities
 tokio-util = "0.7"
@@ -62,6 +61,7 @@ test-log = "0.2"
 [features]
 default = ["full"]
 full = ["llm", "kg-validation", "supervision", "llm-bridge", "docker-backend", "e2b-backend", "dns-security", "mcp"]
+firecracker = ["dep:fcctl-core", "dep:terraphim_firecracker"]
 llm = ["dep:terraphim_service"]
 kg-validation = ["dep:terraphim_automata", "dep:terraphim_types", "dep:terraphim_rolegraph"]
 supervision = ["dep:terraphim_agent_supervisor"]

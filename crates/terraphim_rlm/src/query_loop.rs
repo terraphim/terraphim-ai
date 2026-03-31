@@ -77,6 +77,8 @@ pub struct QueryLoopConfig {
     pub strict_parsing: bool,
     /// Timeout for individual command execution (ms).
     pub command_timeout_ms: u64,
+    /// Timeout for entire query loop execution.
+    pub timeout_duration: std::time::Duration,
 }
 
 impl Default for QueryLoopConfig {
@@ -87,6 +89,7 @@ impl Default for QueryLoopConfig {
             max_recursion_depth: crate::DEFAULT_MAX_RECURSION_DEPTH,
             strict_parsing: false,
             command_timeout_ms: 30_000,
+            timeout_duration: std::time::Duration::from_secs(300), // 5 minutes
         }
     }
 }

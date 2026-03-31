@@ -68,6 +68,7 @@ pub mod rlm;
 pub mod logger;
 
 // Knowledge graph validation (Phase 5)
+pub mod validation;
 #[cfg(feature = "kg-validation")]
 pub mod validator;
 

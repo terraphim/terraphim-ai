@@ -60,9 +60,6 @@ tempfile = "3.27"
 
 [features]
 default = []
-# NOTE: atomic feature disabled for crates.io publishing (dependency not published yet)
-# Placeholder feature - when dependency is published, change to:
-# atomic = ["dep:terraphim_atomic_client"]
 atomic = []
 grepapp = ["dep:grepapp_haystack"]
 # Enable AI coding assistant session haystack (Claude Code, OpenCode, Cursor, Aider, Codex)
