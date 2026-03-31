@@ -202,24 +202,24 @@ impl FlowExecutor {
                 reason: format!("agent step '{}' spawn failed: {}", step.name, e),
             })?;
 
-        // Subscribe to output events BEFORE waiting for shutdown
+        // Subscribe to output events BEFORE waiting for completion
         let mut output_rx = handle.subscribe_output();
 
-        // Wait for process completion with timeout
+        // Wait for process to exit naturally (with timeout)
         let wait_result = timeout(
             Duration::from_secs(step.timeout_secs),
-            handle.shutdown(Duration::from_secs(5))
+            handle.wait()
         ).await;
 
         let finished_at = Utc::now();
 
         // Try to get exit status
         let exit_code = match wait_result {
-            Ok(Ok(_)) => 0, // Graceful shutdown means success
-            Ok(Err(_)) => -1, // Error during shutdown
+            Ok(Ok(status)) => status.code().unwrap_or(-1),
+            Ok(Err(_)) => -1,
             Err(_) => {
                 // Timeout - kill the process
-                let _ = handle.kill().await;
+                let _ = handle.shutdown(Duration::from_secs(5)).await;
                 return Err(OrchestratorError::FlowFailed {
                     flow_name: flow.name.clone(),
                     reason: format!("agent step '{}' timed out after {}s", step.name, step.timeout_secs),
