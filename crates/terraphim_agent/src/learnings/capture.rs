@@ -756,8 +756,8 @@ pub fn list_learnings(
     Ok(learnings)
 }
 
-/// Query learnings by pattern (simple text search).
 #[allow(dead_code)]
+/// Query learnings by pattern (simple text search).
 pub fn query_learnings(
     storage_dir: &PathBuf,
     pattern: &str,
@@ -935,6 +935,7 @@ pub fn query_all_entries(
 /// Score entry relevance based on keyword matching.
 /// Returns a score based on the number of matching keywords between
 /// the context and the learning content.
+#[allow(dead_code)]
 fn score_entry_relevance(entry: &LearningEntry, context_keywords: &[String]) -> usize {
     let text = match entry {
         LearningEntry::Learning(l) => {
@@ -981,6 +982,7 @@ impl ScoredEntry {
 
 /// JSONL transcript entry types for auto-extraction.
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct TranscriptEntry {
     #[serde(default)]
     pub r#type: Option<String>,
@@ -999,6 +1001,7 @@ pub struct TranscriptEntry {
 }
 
 /// Check if content contains explicit correction phrases.
+#[allow(dead_code)]
 fn contains_correction_phrase(content: &str) -> Option<(String, String)> {
     let lower = content.to_lowercase();
 
@@ -1054,6 +1057,7 @@ fn contains_correction_phrase(content: &str) -> Option<(String, String)> {
 }
 
 /// Extract command from Bash tool input.
+#[allow(dead_code)]
 fn extract_command_from_input(input: &serde_json::Value) -> Option<String> {
     input
         .get("command")
@@ -1075,6 +1079,7 @@ fn extract_command_from_input(input: &serde_json::Value) -> Option<String> {
 /// # Returns
 ///
 /// Vector of extracted CorrectionEvent objects.
+#[allow(dead_code)]
 pub fn auto_extract_corrections(
     transcript_path: &std::path::Path,
 ) -> Result<Vec<CorrectionEvent>, LearningError> {
@@ -1211,6 +1216,7 @@ pub fn auto_extract_corrections(
 /// # Returns
 ///
 /// List of scored entries sorted by relevance (highest first).
+#[allow(dead_code)]
 pub fn suggest_learnings(
     storage_dir: &PathBuf,
     context: &str,

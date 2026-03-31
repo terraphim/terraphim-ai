@@ -1,5 +1,4 @@
 use ahash::AHashMap;
-use regex::Regex;
 use terraphim_automata::builder::{Logseq, ThesaurusBuilder};
 use terraphim_automata::load_thesaurus;
 use terraphim_automata::{LinkType, replace_matches};
@@ -1263,15 +1262,55 @@ impl TerraphimService {
         Ok(role)
     }
 
-    /// Check if a term matches in text using word boundaries to avoid partial word matches
-    fn term_matches_with_word_boundaries(term: &str, text: &str) -> bool {
-        // Create regex pattern with word boundaries
-        if let Ok(regex) = Regex::new(&format!(r"\b{}\b", regex::escape(term))) {
-            regex.is_match(text)
+    /// Check if a character is a word boundary (not alphanumeric or underscore).
+    /// This provides Unicode-aware word boundary detection.
+    fn is_word_boundary_char(c: char) -> bool {
+        !c.is_alphanumeric() && c != '_'
+    }
+
+    /// Check if a match position is at word boundaries in the text.
+    /// Returns true if the character before start (or start of string) and
+    /// the character after end (or end of string) are word boundary characters.
+    fn is_at_word_boundary(text: &str, start: usize, end: usize) -> bool {
+        let before_ok = if start == 0 {
+            true
         } else {
-            // Fallback to simple contains if regex compilation fails
-            text.contains(term)
+            text[..start]
+                .chars()
+                .last()
+                .map(Self::is_word_boundary_char)
+                .unwrap_or(true)
+        };
+
+        let after_ok = if end >= text.len() {
+            true
+        } else {
+            text[end..]
+                .chars()
+                .next()
+                .map(Self::is_word_boundary_char)
+                .unwrap_or(true)
+        };
+
+        before_ok && after_ok
+    }
+
+    /// Match a term against text using unicode-aware word boundaries.
+    /// Returns true if the term appears as a complete word (not as part of another word).
+    /// Both inputs should already be lowercase for efficiency.
+    fn term_matches_with_word_boundaries(term: &str, text: &str) -> bool {
+        // Find all occurrences of the term in the text
+        let mut start = 0;
+        while let Some(pos) = text[start..].find(term) {
+            let abs_start = start + pos;
+            let abs_end = abs_start + term.len();
+
+            if Self::is_at_word_boundary(text, abs_start, abs_end) {
+                return true;
+            }
+            start = abs_end;
         }
+        false
     }
 
     /// Apply logical operators (AND/OR) to filter documents based on multiple search terms
@@ -1294,6 +1333,12 @@ impl TerraphimService {
             all_terms.len()
         );
 
+        // Pre-compute lowercase terms once for efficiency
+        let terms_lower: Vec<String> = all_terms
+            .iter()
+            .map(|t| t.as_str().to_lowercase())
+            .collect();
+
         let filtered_docs: Vec<Document> = documents
             .into_iter()
             .filter(|doc| {
@@ -1310,21 +1355,15 @@ impl TerraphimService {
 
                 match operator {
                     LogicalOperator::And => {
-                        // Document must contain ALL terms
-                        all_terms.iter().all(|term| {
-                            Self::term_matches_with_word_boundaries(
-                                &term.as_str().to_lowercase(),
-                                &searchable_text,
-                            )
+                        // Document must contain ALL terms as whole words
+                        terms_lower.iter().all(|term| {
+                            Self::term_matches_with_word_boundaries(term, &searchable_text)
                         })
                     }
                     LogicalOperator::Or => {
-                        // Document must contain ANY term
-                        all_terms.iter().any(|term| {
-                            Self::term_matches_with_word_boundaries(
-                                &term.as_str().to_lowercase(),
-                                &searchable_text,
-                            )
+                        // Document must contain ANY term as a whole word
+                        terms_lower.iter().any(|term| {
+                            Self::term_matches_with_word_boundaries(term, &searchable_text)
                         })
                     }
                 }
@@ -1338,11 +1377,7 @@ impl TerraphimService {
         );
 
         // Sort filtered documents by relevance using a combined query
-        let combined_query_string = all_terms
-            .iter()
-            .map(|t| t.as_str())
-            .collect::<Vec<_>>()
-            .join(" ");
+        let combined_query_string = terms_lower.join(" ");
         let query = Query::new(&combined_query_string);
         let sorted_docs = score::sort_documents(&query, filtered_docs);
 
