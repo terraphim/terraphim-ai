@@ -21,7 +21,7 @@ pub struct AutocompleteIndex {
 /// Metadata associated with each autocomplete term
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AutocompleteMetadata {
-    pub id: u64,
+    pub id: String,
     pub normalized_term: NormalizedTermValue,
     pub url: Option<String>,
     pub original_term: String,
@@ -32,7 +32,7 @@ pub struct AutocompleteMetadata {
 pub struct AutocompleteResult {
     pub term: String,
     pub normalized_term: NormalizedTermValue,
-    pub id: u64,
+    pub id: String,
     pub url: Option<String>,
     pub score: f64, // FST value as relevance score
 }
@@ -104,16 +104,16 @@ pub fn build_autocomplete_index(
             key.as_str().to_lowercase()
         };
 
-        // Use the ID as a score (higher ID = higher relevance)
+        // Use a default score for FST indexing
         // In a real implementation, this could be based on term frequency, importance, etc.
-        let score = normalized_term.id;
+        let score = 1u64;
 
         terms_with_scores.push((term.clone(), score));
 
         metadata.insert(
             term.clone(),
             AutocompleteMetadata {
-                id: normalized_term.id,
+                id: normalized_term.id.clone(),
                 normalized_term: normalized_term.value.clone(),
                 url: normalized_term.url.clone(),
                 original_term: if config.case_sensitive {
@@ -205,7 +205,7 @@ pub fn autocomplete_search(
             results.push(AutocompleteResult {
                 term: metadata.original_term.clone(),
                 normalized_term: metadata.normalized_term.clone(),
-                id: metadata.id,
+                id: metadata.id.clone(),
                 url: metadata.url.clone(),
                 score: score as f64,
             });
@@ -281,14 +281,13 @@ pub fn fuzzy_autocomplete_search_levenshtein(
                 // Convert distance to similarity score (same as terraphim_service scorer)
                 let similarity = 1.0 / (1.0 + min_distance as f64);
 
-                // Weight by original FST score
-                let original_score = metadata.id as f64;
-                let combined_score = similarity * original_score * 0.8; // Penalize fuzzy matches
+                // Use constant base score (UUIDs are not meaningful for scoring)
+                let combined_score = similarity * 0.8; // Penalize fuzzy matches
 
                 fuzzy_candidates.push(AutocompleteResult {
                     term: metadata.original_term.clone(),
                     normalized_term: metadata.normalized_term.clone(),
-                    id: metadata.id,
+                    id: metadata.id.clone(),
                     url: metadata.url.clone(),
                     score: combined_score,
                 });
@@ -372,14 +371,13 @@ pub fn fuzzy_autocomplete_search(
 
             // Only include if above similarity threshold
             if max_similarity >= min_similarity {
-                // Weight by original FST score
-                let original_score = metadata.id as f64;
-                let combined_score = max_similarity * original_score * 0.8; // Penalize fuzzy matches
+                // Use constant base score (UUIDs are not meaningful for scoring)
+                let combined_score = max_similarity * 0.8; // Penalize fuzzy matches
 
                 fuzzy_candidates.push(AutocompleteResult {
                     term: metadata.original_term.clone(),
                     normalized_term: metadata.normalized_term.clone(),
-                    id: metadata.id,
+                    id: metadata.id.clone(),
                     url: metadata.url.clone(),
                     score: combined_score,
                 });
