@@ -71,6 +71,9 @@ pub struct OrchestratorConfig {
     /// Gitea configuration for posting agent output to issues.
     #[serde(default)]
     pub gitea: Option<GiteaOutputConfig>,
+    /// Mention-driven dispatch configuration.
+    #[serde(default)]
+    pub mentions: Option<MentionConfig>,
 }
 
 /// Configuration for posting agent output to Gitea issues.
@@ -80,6 +83,28 @@ pub struct GiteaOutputConfig {
     pub token: String,
     pub owner: String,
     pub repo: String,
+}
+
+/// Configuration for mention-driven dispatch.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MentionConfig {
+    /// Issue numbers to watch for @adf: mentions.
+    #[serde(default)]
+    pub watch_issues: Vec<u64>,
+    /// Maximum dispatch depth per issue to prevent infinite loops.
+    #[serde(default = "default_max_mention_depth")]
+    pub max_mention_depth: u32,
+    /// Poll every N reconciliation ticks (default 2).
+    #[serde(default = "default_poll_modulo")]
+    pub poll_modulo: u64,
+}
+
+fn default_max_mention_depth() -> u32 {
+    3
+}
+
+fn default_poll_modulo() -> u64 {
+    2
 }
 
 /// Lightweight reference to an SFIA skill code and level.

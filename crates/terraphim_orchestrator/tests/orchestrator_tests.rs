@@ -116,6 +116,7 @@ fn test_config() -> OrchestratorConfig {
         flows: vec![],
         flow_state_dir: None,
         gitea: None,
+        mentions: None,
     }
 }
 

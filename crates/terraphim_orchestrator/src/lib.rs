@@ -37,6 +37,7 @@ pub mod dual_mode;
 pub mod error;
 pub mod flow;
 pub mod handoff;
+pub mod mention;
 pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
@@ -49,10 +50,11 @@ pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef,
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
     AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
-    NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates,
-    WorkflowConfig,
+    MentionConfig, NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig,
+    TrackerStates, WorkflowConfig,
 };
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
+pub use mention::{parse_mentions, resolve_mention, DetectedMention, MentionTracker};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
 pub use dual_mode::DualModeOrchestrator;
 pub use error::OrchestratorError;
@@ -161,6 +163,10 @@ pub struct AgentOrchestrator {
     /// Active flow executions keyed by flow name.
     #[allow(dead_code)]
     active_flows: HashMap<String, tokio::task::JoinHandle<flow::state::FlowRunState>>,
+    /// Tracker for processed @adf: mentions (dedup + depth limiting).
+    mention_tracker: MentionTracker,
+    /// Monotonically increasing tick counter for poll_modulo gating.
+    tick_count: u64,
 }
 
 /// Validate agent name for safe use in file paths.
@@ -232,6 +238,14 @@ impl AgentOrchestrator {
         // Initialize output poster if Gitea config is provided
         let output_poster = config.gitea.as_ref().map(OutputPoster::new);
 
+        // Initialize mention tracker with configured depth limit (default 3)
+        let max_mention_depth = config
+            .mentions
+            .as_ref()
+            .map(|m| m.max_mention_depth)
+            .unwrap_or(3);
+        let mention_tracker = MentionTracker::new(max_mention_depth);
+
         Ok(Self {
             config,
             spawner,
@@ -255,6 +269,8 @@ impl AgentOrchestrator {
             last_run_commits: HashMap::new(),
             pre_check_tracker: None,
             active_flows: HashMap::new(),
+            mention_tracker,
+            tick_count: 0,
         })
     }
 
@@ -1027,6 +1043,93 @@ impl AgentOrchestrator {
             Err(OrchestratorError::Config(
                 "git rev-parse HEAD failed".into(),
             ))
+
+/// Poll configured Gitea issues for new @adf: mentions and enqueue MentionDriven tasks.
+    ///
+    /// Skipped when no mention configuration is present or when the Gitea tracker
+    /// is not configured. Uses `tick_count % poll_modulo` to avoid polling on
+    /// every reconciliation tick.
+    async fn poll_mentions(&mut self) {
+        let mention_cfg = match self.config.mentions.clone() {
+            Some(cfg) => cfg,
+            None => return,
+        };
+
+        let gitea_cfg = match self.config.gitea.clone() {
+            Some(cfg) => cfg,
+            None => {
+                tracing::debug!("mention polling skipped: no Gitea output config");
+                return;
+            }
+        };
+
+        // Respect poll_modulo to reduce API traffic
+        if self.tick_count % mention_cfg.poll_modulo != 0 {
+            return;
+        }
+
+        let tracker_cfg = terraphim_tracker::GiteaConfig {
+            base_url: gitea_cfg.base_url.clone(),
+            token: gitea_cfg.token.clone(),
+            owner: gitea_cfg.owner.clone(),
+            repo: gitea_cfg.repo.clone(),
+            active_states: vec!["open".to_string()],
+            terminal_states: vec!["closed".to_string()],
+            use_robot_api: false,
+        };
+        let tracker = match terraphim_tracker::GiteaTracker::new(tracker_cfg) {
+            Ok(t) => t,
+            Err(e) => {
+                tracing::warn!(error = %e, "failed to create GiteaTracker for mention polling");
+                return;
+            }
+        };
+
+        let agents = self.config.agents.clone();
+        let persona_registry = self.persona_registry.clone();
+
+        for &issue_number in &mention_cfg.watch_issues {
+            if self.mention_tracker.depth_exceeded(issue_number) {
+                tracing::debug!(issue = issue_number, "mention depth exceeded, skipping");
+                continue;
+            }
+
+            match tracker.fetch_comments(issue_number, None).await {
+                Ok(comments) => {
+                    for comment in &comments {
+                        let detected = mention::parse_mentions(
+                            comment,
+                            issue_number,
+                            &agents,
+                            &persona_registry,
+                        );
+
+                        for m in detected {
+                            if self.mention_tracker.is_processed(&m) {
+                                continue;
+                            }
+
+                            tracing::info!(
+                                agent = %m.agent_name,
+                                issue = m.issue_number,
+                                comment_id = m.comment_id,
+                                "dispatching mention-driven task"
+                            );
+
+                            self.mention_tracker.mark_processed(&m);
+                            self.mention_tracker.increment_depth(issue_number);
+                        }
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(
+                        issue = issue_number,
+                        error = %e,
+                        "failed to fetch comments for mention polling"
+                    );
+                }
+            }
+
         }
     }
 
@@ -1095,8 +1198,12 @@ impl AgentOrchestrator {
         // 10. Check flow schedules
         self.check_flow_schedules().await;
 
-        // 11. Update last_tick_time
+        // 11. Poll for @adf: mentions in watched issues
+        self.poll_mentions().await;
+
+        // 12. Update last_tick_time and increment tick counter
         self.last_tick_time = chrono::Utc::now();
+        self.tick_count = self.tick_count.wrapping_add(1);
     }
 
     /// Check all agent budgets and pause any that have exceeded their limits.
@@ -1674,6 +1781,7 @@ mod tests {
             flows: vec![],
             flow_state_dir: None,
             gitea: None,
+            mentions: None,
         }
     }
 
@@ -1851,6 +1959,7 @@ task = "test"
             flows: vec![],
             flow_state_dir: None,
             gitea: None,
+            mentions: None,
         }
     }
 
