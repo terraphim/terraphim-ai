@@ -41,14 +41,16 @@ pub mod metrics_persistence;
 pub mod mode;
 pub mod nightwatch;
 pub mod persona;
+pub mod output_poster;
 pub mod scheduler;
 pub mod scope;
 
 pub use compound::{CompoundReviewResult, CompoundReviewWorkflow, ReviewGroupDef, SwarmConfig};
 pub use concurrency::{ConcurrencyController, FairnessPolicy, ModeQuotas};
 pub use config::{
-    AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, NightwatchConfig,
-    OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates, WorkflowConfig,
+    AgentDefinition, AgentLayer, CompoundReviewConfig, ConcurrencyConfig, GiteaOutputConfig,
+    NightwatchConfig, OrchestratorConfig, PreCheckStrategy, TrackerConfig, TrackerStates,
+    WorkflowConfig,
 };
 pub use cost_tracker::{AgentMetrics, BudgetVerdict, CostSnapshot, CostTracker, ExecutionMetrics};
 pub use dispatcher::{DispatchTask, Dispatcher, DispatcherStats};
@@ -60,6 +62,7 @@ pub use metrics_persistence::{
     MetricsPersistenceError, PersistedAgentMetrics,
 };
 pub use mode::{IssueMode, TimeMode};
+pub use output_poster::OutputPoster;
 pub use nightwatch::{
     dual_panel_evaluate, validate_certificate, Claim, CorrectionAction, CorrectionLevel,
     DriftAlert, DriftMetrics, DriftScore, DualPanelResult, NightwatchMonitor, RateLimitTracker,
@@ -145,6 +148,8 @@ pub struct AgentOrchestrator {
     persona_registry: PersonaRegistry,
     /// Renderer for persona metaprompts.
     metaprompt_renderer: MetapromptRenderer,
+    /// Output poster for posting agent output to Gitea issues.
+    output_poster: Option<OutputPoster>,
     /// Circuit breakers for each provider to prevent cascading failures.
     #[allow(dead_code)]
     circuit_breakers: Arc<Mutex<HashMap<String, CircuitBreaker>>>,
@@ -224,6 +229,9 @@ impl AgentOrchestrator {
             None => MetapromptRenderer::new().expect("default template should always compile"),
         };
 
+        // Initialize output poster if Gitea config is provided
+        let output_poster = config.gitea.as_ref().map(OutputPoster::new);
+
         Ok(Self {
             config,
             spawner,
@@ -242,6 +250,7 @@ impl AgentOrchestrator {
             cost_tracker,
             persona_registry,
             metaprompt_renderer,
+            output_poster,
             circuit_breakers: Arc::new(Mutex::new(HashMap::new())),
             last_run_commits: HashMap::new(),
             pre_check_tracker: None,
@@ -1190,7 +1199,37 @@ impl AgentOrchestrator {
             }
         }
 
+        // Drain output from exiting agents BEFORE removing them
+        for (name, def, status) in &exited {
+            // Drain remaining output events
+            let mut output_lines: Vec<String> = Vec::new();
+            if let Some(managed) = self.active_agents.get_mut(name) {
+                while let Ok(event) = managed.output_rx.try_recv() {
+                    self.nightwatch.observe(name, &event);
+                    match &event {
+                        crate::OutputEvent::Stdout { line, .. } => {
+                            output_lines.push(line.clone());
+                        }
+                        crate::OutputEvent::Stderr { line, .. } => {
+                            output_lines.push(format!("[stderr] {}", line));
+                        }
+                        _ => {}
+                    }
+                }
+            }
+
+            // Post output to Gitea if configured
+            if let (Some(poster), Some(issue)) = (&self.output_poster, def.gitea_issue) {
+                let exit_code = status.code();
+                if let Err(e) = poster.post_agent_output(name, issue, &output_lines, exit_code).await {
+                    warn!(agent = %name, issue = issue, error = %e, "failed to post output to Gitea");
+                }
+            }
+        }
+
         // Process natural exits
+
+        // NOW remove from active_agents and handle exits
         for (name, def, status) in exited {
             self.active_agents.remove(&name);
             self.handle_agent_exit(&name, &def, status);
@@ -1599,6 +1638,8 @@ mod tests {
                     grace_period_secs: None,
                     max_cpu_seconds: None,
                     pre_check: None,
+
+                    gitea_issue: None,
                 },
                 AgentDefinition {
                     name: "sync".to_string(),
@@ -1620,6 +1661,8 @@ mod tests {
                     grace_period_secs: None,
                     max_cpu_seconds: None,
                     pre_check: None,
+
+                    gitea_issue: None,
                 },
             ],
             restart_cooldown_secs: 60,
@@ -1630,6 +1673,7 @@ mod tests {
             skill_data_dir: None,
             flows: vec![],
             flow_state_dir: None,
+            gitea: None,
         }
     }
 
@@ -1795,6 +1839,8 @@ task = "test"
                 grace_period_secs: None,
                 max_cpu_seconds: None,
                 pre_check: None,
+
+                gitea_issue: None,
             }],
             restart_cooldown_secs: 0, // instant restart for testing
             max_restart_count: 3,
@@ -1804,6 +1850,7 @@ task = "test"
             skill_data_dir: None,
             flows: vec![],
             flow_state_dir: None,
+            gitea: None,
         }
     }
 
@@ -1880,6 +1927,8 @@ task = "test"
             grace_period_secs: None,
             max_cpu_seconds: None,
             pre_check: None,
+
+            gitea_issue: None,
         }];
         let mut orch = AgentOrchestrator::new(config).unwrap();
 
@@ -2015,6 +2064,8 @@ task = "test"
             grace_period_secs: None,
             max_cpu_seconds: None,
             pre_check: None,
+
+            gitea_issue: None,
         }];
 
         // Set up persona data dir with a test persona
@@ -2098,6 +2149,8 @@ sfia_skills = [{ code = "TEST", name = "Testing", level = 4, description = "Desi
             grace_period_secs: None,
             max_cpu_seconds: None,
             pre_check: None,
+
+            gitea_issue: None,
         }];
 
         // No persona_data_dir, so registry will be empty

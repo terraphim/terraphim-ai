@@ -68,6 +68,18 @@ pub struct OrchestratorConfig {
     /// Directory for flow run state persistence.
     #[serde(default)]
     pub flow_state_dir: Option<PathBuf>,
+    /// Gitea configuration for posting agent output to issues.
+    #[serde(default)]
+    pub gitea: Option<GiteaOutputConfig>,
+}
+
+/// Configuration for posting agent output to Gitea issues.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GiteaOutputConfig {
+    pub base_url: String,
+    pub token: String,
+    pub owner: String,
+    pub repo: String,
 }
 
 /// Lightweight reference to an SFIA skill code and level.
@@ -132,6 +144,10 @@ pub struct AgentDefinition {
     /// If None, the agent always spawns (equivalent to Always).
     #[serde(default)]
     pub pre_check: Option<PreCheckStrategy>,
+
+    /// Gitea issue number to post output to (optional).
+    #[serde(default)]
+    pub gitea_issue: Option<u64>,
 }
 
 /// Agent layer in the dark factory hierarchy.
