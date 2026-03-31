@@ -305,7 +305,6 @@ pub fn download_silent(url: &str, output_path: &std::path::Path) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::fs;
     use std::net::ToSocketAddrs;
 
     fn can_connect(host: &str, port: u16) -> bool {

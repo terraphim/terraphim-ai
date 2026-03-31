@@ -1,7 +1,7 @@
 // @ts-nocheck
 export const CONFIG = {
 	ServerURL:
-		process.env.NODE_ENV !== 'production'
+		import.meta.env.MODE !== 'production'
 			? 'http://localhost:8000'
 			: `${location.protocol}//${window.location.host}` || '/',
 	// ServerURL: location.protocol + '//'+window.location.host || '/',
