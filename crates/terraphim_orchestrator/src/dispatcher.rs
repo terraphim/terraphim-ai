@@ -27,6 +27,17 @@ pub enum DispatchTask {
         /// PageRank score (higher = more important).
         pagerank_score: Option<f64>,
     },
+    /// Mention-driven agent dispatch (from @adf: comment mentions).
+    MentionDriven {
+        /// Name of the agent to dispatch.
+        agent_name: String,
+        /// Issue number where the mention was detected.
+        issue_number: u64,
+        /// Comment ID that contained the mention.
+        comment_id: u64,
+        /// Full comment body for context.
+        context: String,
+    },
 }
 
 /// Priority wrapper for dispatch tasks.
@@ -167,6 +178,12 @@ impl Dispatcher {
                 // Time-driven gets slight priority over issue-driven at same urgency
                 base + pagerank_bonus + 3000
             }
+            DispatchTask::MentionDriven { .. } => {
+                // Mention-driven tasks sit between Safety (0) and Core (1000).
+                // Priority 200 ensures mentions are handled promptly but Safety
+                // agent restarts remain the highest priority.
+                200
+            }
         }
     }
 
@@ -175,6 +192,7 @@ impl Dispatcher {
         match task {
             DispatchTask::TimeDriven { .. } => "time_driven".into(),
             DispatchTask::IssueDriven { .. } => "issue_driven".into(),
+            DispatchTask::MentionDriven { .. } => "mention_driven".into(),
         }
     }
 }
