@@ -259,6 +259,14 @@ impl AgentHandle {
             Err(e) => Err(SpawnerError::Io(e)),
         }
     }
+
+    /// Wait for the child process to exit naturally.
+    /// Returns the exit status.
+    pub async fn wait(&mut self) -> Result<std::process::ExitStatus, SpawnerError> {
+        let status = self.child.wait().await.map_err(SpawnerError::Io)?;
+        self.health_checker.mark_terminated();
+        Ok(status)
+    }
 }
 
 // --------------- Agent Pool ---------------
